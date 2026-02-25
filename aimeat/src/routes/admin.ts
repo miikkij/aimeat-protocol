@@ -68,12 +68,14 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
             burn_rate: config.burnRate,
             jwt_ttl_seconds: config.jwtTtlSeconds,
             keyed_browse_enabled: config.keyedBrowseEnabled,
+            extended_features_enabled: config.extendedFeaturesEnabled,
+            rate_limits: config.rateLimits,
         }));
     });
 
     // PUT /v1/admin/config — update runtime configuration (operator only)
     router.put('/v1/admin/config', requireAuth(), requireRole('operator'), validateBody(ConfigUpdateSchema, config.nodeId), async (req, res) => {
-        const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled', 'rateLimits'] as const;
+        const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled', 'extendedFeaturesEnabled', 'rateLimits'] as const;
         const updates: Record<string, unknown> = {};
 
         for (const key of allowedKeys) {

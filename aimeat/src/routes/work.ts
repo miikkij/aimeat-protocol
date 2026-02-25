@@ -8,6 +8,8 @@ import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel
 import { logger } from '../utils/logger.js';
 import { executeHooks } from '../services/hooks.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
+import { resolveGaii } from '../services/federation.js';
+import type { PeerInfo } from '../services/federation.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -35,6 +37,7 @@ async function createWorkItem(
   storage: Storage,
   requesterGaii: string,
   body: any,
+  peers: Map<string, PeerInfo>,
 ) {
   const { action_id, provider_gaii, input, ttl_hours, callback_url } = body;
 
@@ -48,6 +51,28 @@ async function createWorkItem(
   });
   if (!hookResult.allowed) {
     return { error: hookResult.reason ?? 'Work request denied by extension hook', status: 403, code: 'HOOK_REJECTED' };
+  }
+
+  // Resolve provider location — local or remote?
+  const resolved = await resolveGaii(provider_gaii, config, storage, peers);
+  if (resolved && !resolved.local) {
+    // Forward work request to the remote node
+    try {
+      const resp = await fetch(`${resolved.nodeUrl}/v1/work/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-MEAT-Origin-Node': config.nodeId,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const remoteResult = await resp.json() as Record<string, unknown>;
+      return { forwarded: true, remoteStatus: resp.status, remoteResult };
+    } catch (err) {
+      logger.warn('Failed to forward work request to remote node', { nodeUrl: resolved.nodeUrl, error: String(err) });
+      return { error: `Remote node ${resolved.nodeId} unreachable`, status: 502, code: 'REMOTE_UNREACHABLE' };
+    }
   }
 
   const ttl = ttl_hours ?? 24;
@@ -90,12 +115,16 @@ async function createWorkItem(
   return { work };
 }
 
-export function workRouter(config: MeatConfig, storage: Storage): Router {
+export function workRouter(config: MeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
 
   // POST /v1/work/request — submit a work request (spec path)
   router.post('/v1/work/request', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
-    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {});
+    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers);
+    if ('forwarded' in result) {
+      res.status(result.remoteStatus as number).json(result.remoteResult);
+      return;
+    }
     if ('error' in result) {
       res.status(result.status!).json(error(config.nodeId, result.code!, result.error!, result.status, result.details));
       return;
@@ -118,7 +147,11 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
 
   // POST /v1/work — legacy submit path (alias)
   router.post('/v1/work', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
-    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {});
+    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers);
+    if ('forwarded' in result) {
+      res.status(result.remoteStatus as number).json(result.remoteResult);
+      return;
+    }
     if ('error' in result) {
       res.status(result.status!).json(error(config.nodeId, result.code!, result.error!, result.status, result.details));
       return;
@@ -144,8 +177,10 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
 
     const results = [];
     for (const r of requests) {
-      const result = await createWorkItem(config, storage, req.auth!.sub, r);
-      if ('error' in result) {
+      const result = await createWorkItem(config, storage, req.auth!.sub, r, peers);
+      if ('forwarded' in result) {
+        results.push({ forwarded: true, remote_result: result.remoteResult });
+      } else if ('error' in result) {
         results.push({ error: result.error, code: result.code });
       } else {
         results.push({

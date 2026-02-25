@@ -19,12 +19,20 @@ export interface RateLimitTier {
   max: number;
 }
 
+export interface RoleMultipliers {
+  operator: number;
+  owner: number;
+  agent: number;
+  anonymous: number;
+}
+
 export interface RateLimitsConfig {
   global: RateLimitTier;
   auth: RateLimitTier;
   work: RateLimitTier;
   memory: RateLimitTier;
   boards: RateLimitTier;
+  roleMultipliers: RoleMultipliers;
 }
 
 export interface MeatConfig {
@@ -38,6 +46,7 @@ export interface MeatConfig {
   dailyAllowanceCap: number;
   burnRate: number;
   keyedBrowseEnabled: boolean;
+  extendedFeaturesEnabled: boolean;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
 }
@@ -54,6 +63,7 @@ export function loadConfig(): MeatConfig {
     dailyAllowanceCap: parseInt(process.env.MEAT_DAILY_ALLOWANCE_CAP ?? '500', 10),
     burnRate: parseFloat(process.env.MEAT_BURN_RATE ?? '0.10'),
     keyedBrowseEnabled: process.env.MEAT_KEYED_BROWSE !== 'false',
+    extendedFeaturesEnabled: process.env.MEAT_EXTENDED_FEATURES !== 'false',
     extensionHooks: {
       pre_owner_registration: [],
       post_owner_registration: [],
@@ -73,6 +83,7 @@ export function loadConfig(): MeatConfig {
       work: { windowMs: 60_000, max: 60 },
       memory: { windowMs: 60_000, max: 120 },
       boards: { windowMs: 60_000, max: 60 },
+      roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },
   };
 }

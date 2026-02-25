@@ -598,6 +598,157 @@ await test('Federation — heartbeat + peers list', async () => {
     assert(Array.isArray(plBody.data?.peers), 'has peers array');
 });
 
+// ─── Phase 7: Advanced Scenarios ───
+console.log('Phase 7 — Advanced Scenarios');
+
+await test('Memory TTL expiry', async () => {
+    // Write with very short TTL (0.001 hours ≈ 3.6 seconds)
+    const { body: wBody } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'ttl_test', value: 'expires_soon', visibility: 'private', ttl_hours: 0.001 }),
+    });
+    assert(wBody.ok === true, `write ttl entry: ${JSON.stringify(wBody.error)}`);
+
+    // Wait for TTL to expire
+    await new Promise(r => setTimeout(r, 4000));
+
+    // Read — should be gone
+    const { body: rBody } = await json(`/v1/memory/ttl_test`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(rBody.ok === false || rBody.data === null, 'TTL entry should be expired');
+});
+
+await test('Chunked upload lifecycle', async () => {
+    // Init upload
+    const { body: initBody } = await json('/v1/storage/upload/init', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'e2e_chunked_test.txt', content_type: 'text/plain', total_chunks: 1 }),
+    });
+    assert(initBody.ok === true, `init: ${JSON.stringify(initBody.error)}`);
+    const uploadId = initBody.data?.upload_id;
+    assert(uploadId, 'has upload_id');
+
+    // Upload single chunk
+    const { status: chunkStatus } = await json(`/v1/storage/upload/${uploadId}/0`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}`, 'Content-Type': 'application/octet-stream' },
+        body: 'Hello, chunked world!',
+    });
+    assert(chunkStatus < 400, `chunk upload status ${chunkStatus}`);
+
+    // Complete upload
+    const { body: completeBody } = await json(`/v1/storage/upload/${uploadId}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(completeBody.ok === true, `complete: ${JSON.stringify(completeBody.error)}`);
+});
+
+await test('Action update (PUT)', async () => {
+    // Publish an action first
+    const actionId = `e2e-action-${Date.now()}`;
+    const { body: pubBody } = await json('/v1/actions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            id: actionId, display_name: 'Test Action', description: 'Original description',
+            input_schema: {}, output_schema: {}, pricing: { base_morsels: 1 },
+        }),
+    });
+    assert(pubBody.ok === true, `publish: ${JSON.stringify(pubBody.error)}`);
+
+    // Update it
+    const { body: updBody } = await json(`/v1/actions/${actionId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ description: 'Updated description', pricing: { base_morsels: 5 } }),
+    });
+    assert(updBody.ok === true, `update: ${JSON.stringify(updBody.error)}`);
+    assert(updBody.data?.description === 'Updated description' || updBody.data?.action?.description === 'Updated description', 'description updated');
+});
+
+await test('HEAD storage metadata', async () => {
+    // Upload a file
+    const { body: upBody } = await json('/v1/storage', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'e2e_head_test.txt', content: 'head test content', content_type: 'text/plain' }),
+    });
+    assert(upBody.ok === true, `upload: ${JSON.stringify(upBody.error)}`);
+
+    // HEAD request — no json helper, use fetch directly
+    const headRes = await fetch(`${BASE}/v1/storage/e2e_head_test.txt`, {
+        method: 'HEAD',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(headRes.status === 200, `HEAD status: ${headRes.status}`);
+    assert(headRes.headers.has('content-length') || headRes.headers.has('content-type'), 'has metadata headers');
+});
+
+await test('Error paths (400, 401, 404)', async () => {
+    // 400 — invalid body
+    const { status: s400 } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({}),
+    });
+    assert(s400 === 400, `expected 400, got ${s400}`);
+
+    // 401 — no auth
+    const { status: s401 } = await json('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'x', value: 'y' }) });
+    assert(s401 === 401, `expected 401, got ${s401}`);
+
+    // 404 — nonexistent resource
+    const { status: s404 } = await json('/v1/agents/nonexistent%23fake%40nowhere');
+    assert(s404 === 404, `expected 404, got ${s404}`);
+});
+
+await test('Optimistic locking conflict (409)', async () => {
+    // Write a memory entry
+    const { body: wBody } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'lock_test', value: 'v1', visibility: 'private' }),
+    });
+    assert(wBody.ok === true, `write: ${JSON.stringify(wBody.error)}`);
+
+    // First update with version 1 — should succeed
+    const { body: u1Body, status: u1Status } = await json('/v1/memory/lock_test', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ value: 'v2', version: 1 }),
+    });
+    assert(u1Status === 200, `first update: ${u1Status} ${JSON.stringify(u1Body.error)}`);
+
+    // Second update with version 1 (stale) — should fail with 409
+    const { status: u2Status } = await json('/v1/memory/lock_test', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ value: 'v3', version: 1 }),
+    });
+    assert(u2Status === 409, `expected 409 conflict, got ${u2Status}`);
+});
+
+await test('Rate limiting 429', async () => {
+    // Hit a tight-limit endpoint rapidly — auth has 20/60s limit
+    // Fire 25 rapid requests to auth token endpoint (will all fail auth, but rate limit counts)
+    let got429 = false;
+    for (let i = 0; i < 25; i++) {
+        const { status } = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ gaii: 'fake', timestamp: new Date().toISOString(), signature: 'bad' }),
+        });
+        if (status === 429) {
+            got429 = true;
+            break;
+        }
+    }
+    assert(got429, 'expected to hit 429 rate limit');
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 

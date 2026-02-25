@@ -10,6 +10,7 @@ export function bootstrapRouter(config: MeatConfig): Router {
       description: 'AI Memory Exchange and Action Transfer protocol node',
       welcome: 'Welcome to MEAT — AI Infrastructure: Memory, Economy, Actions, Trust. Protocol: AIMEAT v1.2 | License: MIT | The network starts here.',
       capabilities: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
+      extended_features_enabled: config.extendedFeaturesEnabled,
       endpoints: {
         register_owner: { method: 'POST', url: '/v1/owners', description: 'Register a new owner identity', tier: 'core' },
         register_agent: { method: 'POST', url: '/v1/agents', description: 'Register a new agent under an owner', tier: 'core' },

@@ -51,14 +51,14 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
     next();
   });
 
-  // Rate limiting — global
-  app.use(rateLimit(config.rateLimits.global));
+  // Rate limiting — global (with role multipliers)
+  app.use(rateLimit(config.rateLimits.global, config.rateLimits.roleMultipliers));
 
   // Per-tier rate limits
-  app.use('/v1/auth', rateLimit(config.rateLimits.auth));
-  app.use('/v1/work', rateLimit(config.rateLimits.work));
-  app.use('/v1/memory', rateLimit(config.rateLimits.memory));
-  app.use('/v1/boards', rateLimit(config.rateLimits.boards));
+  app.use('/v1/auth', rateLimit(config.rateLimits.auth, config.rateLimits.roleMultipliers));
+  app.use('/v1/work', rateLimit(config.rateLimits.work, config.rateLimits.roleMultipliers));
+  app.use('/v1/memory', rateLimit(config.rateLimits.memory, config.rateLimits.roleMultipliers));
+  app.use('/v1/boards', rateLimit(config.rateLimits.boards, config.rateLimits.roleMultipliers));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency());
@@ -110,8 +110,27 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(memoryRouter(config, storage));
   app.use(actionsRouter(config, storage));
   app.use(catalogueRouter(config, storage));
-  app.use(workRouter(config, storage));
+  app.use(workRouter(config, storage, peers));
   app.use(walletRouter(config, storage));
+
+  // Extended features guard — returns 503 when extended features are disabled
+  const requireExtended: express.RequestHandler = (_req, res, next) => {
+    if (!config.extendedFeaturesEnabled) {
+      res.status(503).json({
+        ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+        timestamp: new Date().toISOString(),
+        error: { code: 'FEATURE_DISABLED', message: 'Extended features are disabled on this node' },
+      });
+      return;
+    }
+    next();
+  };
+
+  app.use('/v1/boards', requireExtended);
+  app.use('/v1/federation', requireExtended);
+  app.use('/v1/storage', requireExtended);
+  app.use('/v1/validate', requireExtended);
+
   app.use(boardsRouter(config, storage));
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage));

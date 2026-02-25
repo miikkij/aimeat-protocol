@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { RateLimitTier } from '../config.js';
+import type { RateLimitTier, RoleMultipliers } from '../config.js';
 
 interface RateBucket {
     count: number;
@@ -16,14 +16,25 @@ setInterval(() => {
     }
 }, 60_000);
 
-export function rateLimit(opts: Partial<RateLimitTier> = {}) {
+export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: RoleMultipliers) {
     const windowMs = opts.windowMs ?? 60_000;
-    const max = opts.max ?? 100;
+    const baseMax = opts.max ?? 100;
 
     return (req: Request, res: Response, next: NextFunction) => {
         // Key by GAII if authenticated, otherwise by IP
         const key = req.auth?.sub ?? req.ip ?? 'unknown';
         const now = Date.now();
+
+        // Determine role-based multiplier
+        let multiplier = 1;
+        if (roleMultipliers) {
+            const roles = req.auth?.roles as string[] | undefined;
+            if (roles?.includes('operator')) multiplier = roleMultipliers.operator;
+            else if (roles?.includes('owner')) multiplier = roleMultipliers.owner;
+            else if (req.auth) multiplier = roleMultipliers.agent;
+            else multiplier = roleMultipliers.anonymous;
+        }
+        const max = Math.ceil(baseMax * multiplier);
 
         let bucket = buckets.get(key);
         if (!bucket || now > bucket.resetAt) {

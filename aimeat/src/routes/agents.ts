@@ -125,6 +125,21 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
     const gaii = decodeURIComponent(req.params.gaii as string);
     const agent = await storage.getAgent(gaii);
     if (!agent) {
+      // Check for redirect pointer (ported agent)
+      const redirect = await storage.getMemory(gaii, '__redirect__');
+      if (redirect && typeof redirect.value === 'object' && redirect.value !== null && 'target_node_url' in (redirect.value as Record<string, unknown>)) {
+        const val = redirect.value as { target_node_url: string; target_node_id?: string; ported_at?: string };
+        const location = `${val.target_node_url}/v1/agents/${encodeURIComponent(gaii)}`;
+        res.setHeader('Location', location);
+        res.status(301).json(success(config.nodeId, {
+          ported: true,
+          target_node_url: val.target_node_url,
+          target_node_id: val.target_node_id,
+          ported_at: val.ported_at,
+          message: 'Agent has been ported. Follow the Location header.',
+        }));
+        return;
+      }
       res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
       return;
     }
@@ -438,7 +453,7 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
       value: { target_node_url, target_node_id: target_node_id ?? 'unknown', ported_at: new Date().toISOString() },
       visibility: 'public',
       tags: ['system', 'redirect'],
-      ttlHours: null,
+      ttlHours: 30 * 24,
       version: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
