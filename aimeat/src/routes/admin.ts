@@ -5,192 +5,192 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 
 export function adminRouter(config: MeatConfig, storage: Storage): Router {
-  const router = Router();
+    const router = Router();
 
-  // GET /v1/admin/dashboard — node overview (operator only)
-  router.get('/v1/admin/dashboard', requireAuth(), requireRole('operator'), async (_req, res) => {
-    const owners = await storage.listOwners();
-    const agents = await storage.listAgents();
-    const actions = await storage.listActions();
-    const boards = await storage.listBoards();
+    // GET /v1/admin/dashboard — node overview (operator only)
+    router.get('/v1/admin/dashboard', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const owners = await storage.listOwners();
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+        const boards = await storage.listBoards();
 
-    let totalMorsels = 0;
-    let activeAgents = 0;
-    const now = Date.now();
-    for (const a of agents) {
-      totalMorsels += a.morselBalance;
-      if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) {
-        activeAgents++;
-      }
-    }
-
-    res.json(success(config.nodeId, {
-      node_id: config.nodeId,
-      uptime_seconds: Math.floor(process.uptime()),
-      storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
-      counts: {
-        owners: owners.length,
-        agents: agents.length,
-        active_agents_24h: activeAgents,
-        actions: actions.length,
-        boards: boards.length,
-      },
-      economy: {
-        total_morsels_in_circulation: totalMorsels,
-        welcome_bonus: config.welcomeBonus,
-        daily_allowance: config.dailyAllowance,
-        daily_allowance_cap: config.dailyAllowanceCap,
-        burn_rate: config.burnRate,
-      },
-      config: {
-        port: config.port,
-        jwt_ttl_seconds: config.jwtTtlSeconds,
-        keyed_browse_enabled: config.keyedBrowseEnabled,
-      },
-    }, [
-      { description: 'View all agents', method: 'GET', url: '/v1/agents' },
-      { description: 'Update config', method: 'PUT', url: '/v1/admin/config' },
-    ]));
-  });
-
-  // PUT /v1/admin/config — update runtime configuration (operator only)
-  router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
-    const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled'] as const;
-    const updates: Record<string, unknown> = {};
-
-    for (const key of allowedKeys) {
-      if (req.body[key] !== undefined) {
-        (config as any)[key] = req.body[key];
-        updates[key] = req.body[key];
-      }
-    }
-
-    if (Object.keys(updates).length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `No valid config keys. Allowed: ${allowedKeys.join(', ')}`));
-      return;
-    }
-
-    res.json(success(config.nodeId, {
-      updated: updates,
-      note: 'Runtime config updated. Changes lost on restart unless persisted to environment or config file.',
-    }));
-  });
-
-  // GET /v1/admin/agents — list all agents with full details (operator only)
-  router.get('/v1/admin/agents', requireAuth(), requireRole('operator'), async (_req, res) => {
-    const agents = await storage.listAgents();
-
-    res.json(success(config.nodeId, {
-      agents: agents.map(a => ({
-        gaii: a.gaii,
-        owner: a.owner,
-        display_name: a.displayName,
-        trust_score: a.trustScore,
-        morsel_balance: a.morselBalance,
-        created_at: a.createdAt,
-        last_seen: a.lastSeen,
-      })),
-      total: agents.length,
-    }));
-  });
-
-  // GET /v1/admin/stats — aggregate statistics (operator only)
-  router.get('/v1/admin/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
-    const agents = await storage.listAgents();
-    const actions = await storage.listActions();
-
-    const trustBuckets = { low: 0, medium: 0, high: 0 };
-    for (const a of agents) {
-      if (a.trustScore < 30) trustBuckets.low++;
-      else if (a.trustScore < 70) trustBuckets.medium++;
-      else trustBuckets.high++;
-    }
-
-    res.json(success(config.nodeId, {
-      agents: {
-        total: agents.length,
-        trust_distribution: trustBuckets,
-      },
-      actions: {
-        total: actions.length,
-        categories: [...new Set(actions.map(a => a.category).filter(Boolean))],
-      },
-    }));
-  });
-
-  // GET /v1/admin/backup — export all data as JSON (operator only)
-  router.get('/v1/admin/backup', requireAuth(), requireRole('operator'), async (_req, res) => {
-    const owners = await storage.listOwners();
-    const agents = await storage.listAgents();
-    const actions = await storage.listActions();
-    const boards = await storage.listBoards();
-
-    // Collect all memories and transactions per agent
-    const agentData: Record<string, { memories: unknown[]; transactions: unknown[] }> = {};
-    for (const a of agents) {
-      const memories = await storage.listMemory(a.gaii);
-      const transactions = await storage.getTransactions(a.gaii, 100_000);
-      agentData[a.gaii] = { memories, transactions };
-    }
-
-    res.json(success(config.nodeId, {
-      version: '1.2',
-      exported_at: new Date().toISOString(),
-      node_id: config.nodeId,
-      owners,
-      agents,
-      actions,
-      boards,
-      agent_data: agentData,
-    }));
-  });
-
-  // POST /v1/admin/restore — import data from backup (operator only)
-  router.post('/v1/admin/restore', requireAuth(), requireRole('operator'), async (req, res) => {
-    const { owners, agents, actions, boards, agent_data } = req.body ?? {};
-    let imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
-
-    if (owners) {
-      for (const o of owners) {
-        try { await storage.createOwner(o); imported.owners++; } catch { /* skip duplicates */ }
-      }
-    }
-    if (agents) {
-      for (const a of agents) {
-        try { await storage.createAgent(a); imported.agents++; } catch { /* skip duplicates */ }
-      }
-    }
-    if (actions) {
-      for (const a of actions) {
-        try { await storage.createAction(a); imported.actions++; } catch { /* skip duplicates */ }
-      }
-    }
-    if (boards) {
-      for (const b of boards) {
-        try { await storage.createBoard(b); imported.boards++; } catch { /* skip duplicates */ }
-      }
-    }
-    if (agent_data) {
-      for (const [gaii, data] of Object.entries(agent_data as Record<string, any>)) {
-        if (data.memories) {
-          for (const m of data.memories) {
-            await storage.setMemory(m);
-            imported.memories++;
-          }
+        let totalMorsels = 0;
+        let activeAgents = 0;
+        const now = Date.now();
+        for (const a of agents) {
+            totalMorsels += a.morselBalance;
+            if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) {
+                activeAgents++;
+            }
         }
-        if (data.transactions) {
-          for (const tx of data.transactions) {
-            await storage.addTransaction(tx);
-          }
+
+        res.json(success(config.nodeId, {
+            node_id: config.nodeId,
+            uptime_seconds: Math.floor(process.uptime()),
+            storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
+            counts: {
+                owners: owners.length,
+                agents: agents.length,
+                active_agents_24h: activeAgents,
+                actions: actions.length,
+                boards: boards.length,
+            },
+            economy: {
+                total_morsels_in_circulation: totalMorsels,
+                welcome_bonus: config.welcomeBonus,
+                daily_allowance: config.dailyAllowance,
+                daily_allowance_cap: config.dailyAllowanceCap,
+                burn_rate: config.burnRate,
+            },
+            config: {
+                port: config.port,
+                jwt_ttl_seconds: config.jwtTtlSeconds,
+                keyed_browse_enabled: config.keyedBrowseEnabled,
+            },
+        }, [
+            { description: 'View all agents', method: 'GET', url: '/v1/agents' },
+            { description: 'Update config', method: 'PUT', url: '/v1/admin/config' },
+        ]));
+    });
+
+    // PUT /v1/admin/config — update runtime configuration (operator only)
+    router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
+        const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled'] as const;
+        const updates: Record<string, unknown> = {};
+
+        for (const key of allowedKeys) {
+            if (req.body[key] !== undefined) {
+                (config as any)[key] = req.body[key];
+                updates[key] = req.body[key];
+            }
         }
-      }
-    }
 
-    res.json(success(config.nodeId, {
-      restored: true,
-      imported,
-    }));
-  });
+        if (Object.keys(updates).length === 0) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `No valid config keys. Allowed: ${allowedKeys.join(', ')}`));
+            return;
+        }
 
-  return router;
+        res.json(success(config.nodeId, {
+            updated: updates,
+            note: 'Runtime config updated. Changes lost on restart unless persisted to environment or config file.',
+        }));
+    });
+
+    // GET /v1/admin/agents — list all agents with full details (operator only)
+    router.get('/v1/admin/agents', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const agents = await storage.listAgents();
+
+        res.json(success(config.nodeId, {
+            agents: agents.map(a => ({
+                gaii: a.gaii,
+                owner: a.owner,
+                display_name: a.displayName,
+                trust_score: a.trustScore,
+                morsel_balance: a.morselBalance,
+                created_at: a.createdAt,
+                last_seen: a.lastSeen,
+            })),
+            total: agents.length,
+        }));
+    });
+
+    // GET /v1/admin/stats — aggregate statistics (operator only)
+    router.get('/v1/admin/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+
+        const trustBuckets = { low: 0, medium: 0, high: 0 };
+        for (const a of agents) {
+            if (a.trustScore < 30) trustBuckets.low++;
+            else if (a.trustScore < 70) trustBuckets.medium++;
+            else trustBuckets.high++;
+        }
+
+        res.json(success(config.nodeId, {
+            agents: {
+                total: agents.length,
+                trust_distribution: trustBuckets,
+            },
+            actions: {
+                total: actions.length,
+                categories: [...new Set(actions.map(a => a.category).filter(Boolean))],
+            },
+        }));
+    });
+
+    // GET /v1/admin/backup — export all data as JSON (operator only)
+    router.get('/v1/admin/backup', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const owners = await storage.listOwners();
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+        const boards = await storage.listBoards();
+
+        // Collect all memories and transactions per agent
+        const agentData: Record<string, { memories: unknown[]; transactions: unknown[] }> = {};
+        for (const a of agents) {
+            const memories = await storage.listMemory(a.gaii);
+            const transactions = await storage.getTransactions(a.gaii, 100_000);
+            agentData[a.gaii] = { memories, transactions };
+        }
+
+        res.json(success(config.nodeId, {
+            version: '1.2',
+            exported_at: new Date().toISOString(),
+            node_id: config.nodeId,
+            owners,
+            agents,
+            actions,
+            boards,
+            agent_data: agentData,
+        }));
+    });
+
+    // POST /v1/admin/restore — import data from backup (operator only)
+    router.post('/v1/admin/restore', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { owners, agents, actions, boards, agent_data } = req.body ?? {};
+        let imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
+
+        if (owners) {
+            for (const o of owners) {
+                try { await storage.createOwner(o); imported.owners++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (agents) {
+            for (const a of agents) {
+                try { await storage.createAgent(a); imported.agents++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (actions) {
+            for (const a of actions) {
+                try { await storage.createAction(a); imported.actions++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (boards) {
+            for (const b of boards) {
+                try { await storage.createBoard(b); imported.boards++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (agent_data) {
+            for (const [gaii, data] of Object.entries(agent_data as Record<string, any>)) {
+                if (data.memories) {
+                    for (const m of data.memories) {
+                        await storage.setMemory(m);
+                        imported.memories++;
+                    }
+                }
+                if (data.transactions) {
+                    for (const tx of data.transactions) {
+                        await storage.addTransaction(tx);
+                    }
+                }
+            }
+        }
+
+        res.json(success(config.nodeId, {
+            restored: true,
+            imported,
+        }));
+    });
+
+    return router;
 }
