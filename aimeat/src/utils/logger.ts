@@ -8,12 +8,12 @@ export const logger = winston.createLogger({
     process.env.NODE_ENV === 'production'
       ? winston.format.json()
       : winston.format.combine(
-          winston.format.colorize(),
-          winston.format.printf(({ timestamp, level, message, ...meta }) => {
-            const extra = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-            return `${timestamp} ${level}: ${message}${extra}`;
-          }),
-        ),
+        winston.format.colorize(),
+        winston.format.printf(({ timestamp, level, message, ...meta }) => {
+          const extra = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+          return `${timestamp} ${level}: ${message}${extra}`;
+        }),
+      ),
   ),
   transports: [new winston.transports.Console()],
 });
