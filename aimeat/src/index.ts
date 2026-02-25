@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createInterface } from 'node:readline';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
 import { logger } from './utils/logger.js';
@@ -24,6 +25,7 @@ aimeat — AI Memory Exchange and Action Transfer protocol node
 
 USAGE
   aimeat [options]            Start the node
+  aimeat init                 Interactive config wizard
   aimeat backup  --out FILE   Export all data to JSON
   aimeat restore --from FILE  Import data from JSON backup
 
@@ -84,9 +86,46 @@ const config = loadConfig();
 const subcommand = positionals[0];
 
 // Handle subcommands
-if (subcommand === 'backup') {
+if (subcommand === 'init') {
+  const outFile = positionals[1] ?? 'aimeat.config.json';
+  if (existsSync(outFile)) {
+    console.log(`Config file already exists: ${outFile}`);
+    process.exit(1);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const ask = (q: string, def: string): Promise<string> =>
+    new Promise(resolve => rl.question(`${q} [${def}]: `, ans => resolve(ans.trim() || def)));
+
+  (async () => {
+    console.log('\n🥩 AIMEAT Node Configuration Wizard\n');
+    const nodeId = await ask('Node ID', 'meat-local-001');
+    const port = await ask('Port', '3117');
+    const welcomeBonus = await ask('Welcome bonus (morsels)', '100');
+    const dailyAllowance = await ask('Daily allowance (morsels)', '50');
+    const dailyAllowanceCap = await ask('Daily allowance cap', '500');
+    const burnRate = await ask('Burn rate (0-1)', '0.10');
+    const jwtTtlSeconds = await ask('JWT TTL (seconds)', '3600');
+    const db = await ask('MongoDB URL (blank for in-memory)', '');
+    rl.close();
+
+    const cfg: Record<string, unknown> = {
+      nodeId,
+      port: parseInt(port, 10),
+      welcomeBonus: parseInt(welcomeBonus, 10),
+      dailyAllowance: parseInt(dailyAllowance, 10),
+      dailyAllowanceCap: parseInt(dailyAllowanceCap, 10),
+      burnRate: parseFloat(burnRate),
+      jwtTtlSeconds: parseInt(jwtTtlSeconds, 10),
+    };
+    if (db) cfg.db = db;
+
+    writeFileSync(outFile, JSON.stringify(cfg, null, 2) + '\n');
+    console.log(`\nConfig written to ${outFile}`);
+    console.log(`Start the node: aimeat --config ${outFile}`);
+  })();
+} else if (subcommand === 'backup') {
   const outArg = positionals[1] ?? 'aimeat-backup.json';
-  const app = createServer(config);
+  const app = await createServer(config);
   // Start server temporarily to access storage
   const server = app.listen(0, async () => {
     try {
@@ -112,7 +151,7 @@ if (subcommand === 'backup') {
     console.error('Usage: aimeat restore <file.json>');
     process.exit(1);
   }
-  const app = createServer(config);
+  const app = await createServer(config);
   const server = app.listen(0, async () => {
     try {
       const addr = server.address();
@@ -140,7 +179,7 @@ if (subcommand === 'backup') {
   });
 } else {
   // Default: start the server
-  const app = createServer(config);
+  const app = await createServer(config);
   app.listen(config.port, () => {
     logger.info(`🥩 AIMEAT node started`, {
       nodeId: config.nodeId,

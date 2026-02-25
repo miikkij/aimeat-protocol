@@ -304,6 +304,12 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
     // Settle: pay provider, network fee, burn
     await settlePayment(storage, config, work);
 
+    // Extension hook: post_settlement (fire-and-forget)
+    executeHooks(config, storage, 'post_settlement', {
+      tracking_code: tc, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
+      cost: work.cost,
+    }).catch(() => { });
+
     const updated = await storage.updateWork(tc, {
       status: 'delivered',
       output,

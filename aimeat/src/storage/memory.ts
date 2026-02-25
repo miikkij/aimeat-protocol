@@ -98,8 +98,19 @@ export class InMemoryStorage implements Storage {
     return record;
   }
 
+  private isMemoryExpired(record: MemoryRecord): boolean {
+    if (!record.ttlHours) return false;
+    const createdMs = new Date(record.createdAt).getTime();
+    return Date.now() > createdMs + record.ttlHours * 3_600_000;
+  }
+
   async getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null> {
-    return this.memory.get(this.memKey(ownerGaii, key)) ?? null;
+    const record = this.memory.get(this.memKey(ownerGaii, key)) ?? null;
+    if (record && this.isMemoryExpired(record)) {
+      this.memory.delete(this.memKey(ownerGaii, key));
+      return null;
+    }
+    return record;
   }
 
   async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[] }): Promise<MemoryRecord[]> {
@@ -107,6 +118,7 @@ export class InMemoryStorage implements Storage {
     const results: MemoryRecord[] = [];
     for (const [k, v] of this.memory) {
       if (!k.startsWith(prefix)) continue;
+      if (this.isMemoryExpired(v)) { this.memory.delete(k); continue; }
       if (opts?.prefix && !v.key.startsWith(opts.prefix)) continue;
       if (opts?.visibility && v.visibility !== opts.visibility) continue;
       if (opts?.tags?.length) {
@@ -266,9 +278,11 @@ export class InMemoryStorage implements Storage {
 
   async listPosts(boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {
     const limit = opts?.limit ?? 20;
+    const now = Date.now();
     let results: BoardPostRecord[] = [];
     for (const [k, v] of this.posts) {
       if (!k.startsWith(`${boardId}::`)) continue;
+      if (v.ttlExpiresAt && new Date(v.ttlExpiresAt).getTime() < now) { this.posts.delete(k); continue; }
       if (opts?.category && v.category !== opts.category) continue;
       if (!v.replyTo) results.push(v); // Only top-level posts
     }
@@ -456,6 +470,7 @@ export class InMemoryStorage implements Storage {
     const prefix = `${ownerGaii}::`;
     for (const [k, v] of this.memory) {
       if (!k.startsWith(prefix)) continue;
+      if (this.isMemoryExpired(v)) { this.memory.delete(k); continue; }
       if (opts?.visibility && v.visibility !== opts.visibility) continue;
       const valStr = typeof v.value === 'string' ? v.value : JSON.stringify(v.value);
       if (v.key.toLowerCase().includes(q) || valStr.toLowerCase().includes(q) || v.tags.some(t => t.toLowerCase().includes(q))) {

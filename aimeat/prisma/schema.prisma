@@ -1,0 +1,228 @@
+// This is your Prisma schema file for MongoDB.
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Owner {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  displayName String?
+  publicKey   String
+  roles       String[]
+  createdAt   DateTime @default(now())
+}
+
+model Agent {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  owner         String
+  gaii          String   @unique
+  displayName   String?
+  description   String?
+  capabilities  String[]
+  publicKey     String
+  trustScore    Int      @default(50)
+  morselBalance Int      @default(0)
+  createdAt     DateTime @default(now())
+  lastSeen      DateTime @default(now())
+
+  @@index([owner])
+}
+
+model Memory {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  key        String
+  ownerGaii  String
+  value      Json
+  visibility String   @default("private")
+  tags       String[]
+  ttlHours   Int?
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([ownerGaii, key])
+  @@index([ownerGaii])
+}
+
+model Action {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  actionId             String
+  providerGaii         String
+  displayName          String
+  description          String
+  category             String?
+  inputSchema          Json
+  outputSchema         Json
+  pricingBaseMorsels   Int
+  pricingPerUnit       Json?
+  estimatedTimeSeconds Int?
+  maxInputSizeBytes    Int?
+  tags                 String[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([actionId, providerGaii])
+  @@index([providerGaii])
+  @@index([category])
+}
+
+model Work {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  trackingCode   String   @unique
+  status         String
+  actionId       String
+  providerGaii   String
+  requesterGaii  String
+  input          Json
+  output         Json?
+  costBasePrice  Int
+  costNetworkFee Int
+  costTotal      Int
+  costInEscrow   Int
+  ttlExpiresAt   DateTime
+  callbackUrl    String?
+  ratingScore    Int?
+  ratingComment  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([providerGaii, status])
+  @@index([requesterGaii])
+}
+
+model Transaction {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  txId             String
+  gaii             String
+  type             String
+  amount           Int
+  counterpartyGaii String?
+  trackingCode     String?
+  timestamp        DateTime @default(now())
+
+  @@index([gaii])
+}
+
+model Board {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  boardId      String   @unique
+  name         String
+  description  String?
+  visibility   String
+  ownerGaii    String
+  allowedGaiis String[]
+  createdAt    DateTime @default(now())
+
+  @@index([ownerGaii])
+}
+
+model BoardPost {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId       String   @unique
+  boardId      String
+  authorGaii   String
+  title        String
+  body         String
+  category     String?
+  tags         String[]
+  ttlExpiresAt DateTime?
+  reactions    Json     @default("{}")
+  replyTo      String?
+  createdAt    DateTime @default(now())
+
+  @@index([boardId])
+}
+
+model Otk {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  ownerGaii String
+  action    String
+  params    Json
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Dispute {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  disputeId    String   @unique
+  trackingCode String
+  status       String
+  openedBy     String
+  reason       String
+  ruling       Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([trackingCode])
+}
+
+model DisputeAudit {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  disputeId    String
+  sequence     Int
+  event        String
+  actor        String
+  timestamp    DateTime
+  data         Json
+  hash         String
+  previousHash String
+
+  @@index([disputeId])
+}
+
+model MicroMemory {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  gaii       String
+  setName    String
+  entries    Json
+  visibility String
+  accessCode String?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([gaii, setName])
+}
+
+model StorageFile {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  key        String
+  ownerGaii  String
+  visibility String
+  mimeType   String
+  size       Int
+  data       Bytes
+  createdAt  DateTime @default(now())
+
+  @@unique([ownerGaii, key])
+}
+
+model PeeringRequest {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  requestId   String   @unique
+  fromNodeUrl String
+  fromNodeId  String?
+  toNodeId    String?
+  targetUrl   String?
+  publicKey   String?
+  message     String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NodeKey {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  publicKey  String
+  privateKey String
+}

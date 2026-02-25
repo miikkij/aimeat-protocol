@@ -60,6 +60,8 @@ tags:
     description: Node peering and cross-node routing
   - name: Admin
     description: Operator dashboard and configuration
+  - name: MCP
+    description: Model Context Protocol integration (optional extension)
 
 components:
   securitySchemes:
@@ -2902,6 +2904,292 @@ paths:
                 role:
                   type: string
                   enum: [operator]
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  # ── Additional Implemented Endpoints ───────────────────────
+
+  /v1/health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Liveness/readiness endpoint. No auth required.
+      tags: [Bootstrap]
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/auth/otk:
+    post:
+      operationId: generateOtk
+      summary: Generate one-time key
+      description: Create a one-time key for Tier 0.5 operations (GET-based writes).
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, params]
+              properties:
+                action:
+                  type: string
+                  description: Operation type (write_memory, post_board, etc.)
+                params:
+                  type: object
+                  description: Parameters for the OTK operation
+                ttl_minutes:
+                  type: integer
+                  default: 60
+      responses:
+        '201':
+          $ref: '#/components/responses/MeatSuccess'
+
+  # ── Chunked Upload ─────────────────────────────────────────
+
+  /v1/storage/upload/init:
+    post:
+      operationId: initChunkedUpload
+      summary: Initiate chunked upload
+      description: Start a multi-part file upload for large files.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, mime_type, chunk_size]
+              properties:
+                key:
+                  type: string
+                mime_type:
+                  type: string
+                chunk_size:
+                  type: integer
+                visibility:
+                  $ref: '#/components/schemas/Visibility'
+                total_chunks:
+                  type: integer
+      responses:
+        '201':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/storage/upload/{id}/{chunk}:
+    put:
+      operationId: uploadChunk
+      summary: Upload a single chunk
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chunk
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/storage/upload/{id}/complete:
+    post:
+      operationId: completeChunkedUpload
+      summary: Finalize chunked upload
+      description: Assemble all uploaded chunks into the final file.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/storage/upload/{id}:
+    delete:
+      operationId: abortChunkedUpload
+      summary: Abort chunked upload
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  # ── Admin Extensions ───────────────────────────────────────
+
+  /v1/admin/agents:
+    get:
+      operationId: listAllAgents
+      summary: List all agents (operator)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/admin/stats:
+    get:
+      operationId: getAdminStats
+      summary: System statistics (operator)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/admin/backup:
+    get:
+      operationId: getBackup
+      summary: Export all data
+      description: Full data backup as JSON. Operator only.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/admin/restore:
+    post:
+      operationId: restoreBackup
+      summary: Import data from backup
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/admin/hooks:
+    get:
+      operationId: listHooks
+      summary: List extension hooks
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/admin/hooks/{hookName}:
+    put:
+      operationId: setHook
+      summary: Set hook action URLs
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: hookName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actions]
+              properties:
+                actions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+    delete:
+      operationId: clearHook
+      summary: Clear hook
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: hookName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  # ── MCP (Model Context Protocol) ───────────────────────────
+
+  /v1/mcp:
+    post:
+      operationId: mcpExecute
+      summary: Execute MCP tool call
+      description: Streamable HTTP transport for MCP protocol. Optional extension.
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: MCP response (may be SSE stream)
+
+    get:
+      operationId: mcpResources
+      summary: List MCP resources
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: MCP resource list
+
+    delete:
+      operationId: mcpDeleteSession
+      summary: Delete MCP session
+      tags: [MCP]
+      security:
+        - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/MeatSuccess'

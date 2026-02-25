@@ -14,6 +14,19 @@ export interface ExtensionHooks {
 
 export type HookName = keyof ExtensionHooks;
 
+export interface RateLimitTier {
+  windowMs: number;
+  max: number;
+}
+
+export interface RateLimitsConfig {
+  global: RateLimitTier;
+  auth: RateLimitTier;
+  work: RateLimitTier;
+  memory: RateLimitTier;
+  boards: RateLimitTier;
+}
+
 export interface MeatConfig {
   port: number;
   nodeId: string;
@@ -26,6 +39,7 @@ export interface MeatConfig {
   burnRate: number;
   keyedBrowseEnabled: boolean;
   extensionHooks: ExtensionHooks;
+  rateLimits: RateLimitsConfig;
 }
 
 export function loadConfig(): MeatConfig {
@@ -52,6 +66,13 @@ export function loadConfig(): MeatConfig {
       post_settlement: [],
       pre_board_post: [],
       pre_federation_peer: [],
+    },
+    rateLimits: {
+      global: { windowMs: 60_000, max: 200 },
+      auth: { windowMs: 60_000, max: 20 },
+      work: { windowMs: 60_000, max: 60 },
+      memory: { windowMs: 60_000, max: 120 },
+      boards: { windowMs: 60_000, max: 60 },
     },
   };
 }

@@ -83,6 +83,9 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
       });
     }
 
+    // Extension hook: post_agent_registration (fire-and-forget)
+    executeHooks(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner }).catch(() => { });
+
     res.status(201).json(success(config.nodeId, {
       agent: {
         gaii: agent.gaii,
@@ -197,6 +200,172 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
       checked_in: now,
       trust_score: agent.trustScore,
       morsel_balance: agent.morselBalance,
+    }));
+  });
+
+  // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)
+  router.post('/v1/agents/:gaii/export', requireAuth(), requireRole('owner'), async (req, res) => {
+    const gaii = decodeURIComponent(req.params.gaii as string);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only export your own agents'));
+      return;
+    }
+
+    const memories = await storage.listMemory(gaii);
+    const transactions = await storage.getTransactions(gaii, 100_000);
+    const actions = await storage.listActionsByProvider(gaii);
+    const trust = await calculateTrustScore(gaii, storage);
+
+    res.json(success(config.nodeId, {
+      portability_version: '1.0',
+      exported_at: new Date().toISOString(),
+      source_node: config.nodeId,
+      agent: {
+        name: agent.name,
+        owner: agent.owner,
+        gaii: agent.gaii,
+        display_name: agent.displayName,
+        description: agent.description,
+        capabilities: agent.capabilities,
+        public_key: agent.publicKey,
+        trust_score: trust.score,
+        morsel_balance: agent.morselBalance,
+        created_at: agent.createdAt,
+      },
+      memory: memories.map(m => ({
+        key: m.key,
+        value: m.value,
+        visibility: m.visibility,
+        tags: m.tags,
+        ttl_hours: m.ttlHours,
+        version: m.version,
+      })),
+      actions: actions.map(a => ({
+        id: a.id,
+        display_name: a.displayName,
+        description: a.description,
+        category: a.category,
+        input_schema: a.inputSchema,
+        output_schema: a.outputSchema,
+        pricing: a.pricing,
+        tags: a.tags,
+      })),
+      trust_history: {
+        total_deliveries: trust.totalDeliveries,
+        successful_deliveries: trust.successfulDeliveries,
+        positive_ratings: trust.positiveRatings,
+        negative_ratings: trust.negativeRatings,
+      },
+      transaction_count: transactions.length,
+    }, [
+      { description: 'Import to another node', method: 'POST', url: '/v1/agents/import' },
+    ]));
+  });
+
+  // POST /v1/agents/import — Import agent from another node (owner auth)
+  router.post('/v1/agents/import', requireAuth(), requireRole('owner'), async (req, res) => {
+    const { agent: agentData, memory: memoryData, actions: actionData } = req.body ?? {};
+
+    if (!agentData?.name || !agentData?.owner) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'agent.name and agent.owner are required'));
+      return;
+    }
+
+    if (agentData.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only import agents under your own owner identity'));
+      return;
+    }
+
+    const newGaii = buildGAII(agentData.name, agentData.owner, config.nodeId);
+    const existing = await storage.getAgent(newGaii);
+    if (existing) {
+      res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${agentData.name}" already exists on this node`));
+      return;
+    }
+
+    const keyPair = await generateKeyPair();
+    const now = new Date().toISOString();
+
+    // Import with capped trust score (new node starts lower)
+    const importedTrust = Math.min(agentData.trust_score ?? 50, 65);
+
+    const agent = await storage.createAgent({
+      name: agentData.name,
+      owner: agentData.owner,
+      gaii: newGaii,
+      displayName: agentData.display_name,
+      description: agentData.description,
+      capabilities: agentData.capabilities ?? [],
+      publicKey: keyPair.publicKey,
+      trustScore: importedTrust,
+      morselBalance: config.welcomeBonus, // fresh balance on new node
+      createdAt: now,
+      lastSeen: now,
+    });
+
+    // Import memories
+    let memoriesImported = 0;
+    if (Array.isArray(memoryData)) {
+      for (const m of memoryData) {
+        if (!m.key) continue;
+        await storage.setMemory({
+          key: m.key,
+          ownerGaii: newGaii,
+          value: m.value,
+          visibility: m.visibility ?? 'private',
+          tags: m.tags ?? [],
+          ttlHours: m.ttl_hours ?? null,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+        memoriesImported++;
+      }
+    }
+
+    // Import actions
+    let actionsImported = 0;
+    if (Array.isArray(actionData)) {
+      for (const a of actionData) {
+        if (!a.id || !a.display_name) continue;
+        try {
+          await storage.createAction({
+            id: a.id,
+            providerGaii: newGaii,
+            displayName: a.display_name,
+            description: a.description ?? '',
+            category: a.category,
+            inputSchema: a.input_schema ?? {},
+            outputSchema: a.output_schema ?? {},
+            pricing: a.pricing ?? { baseMorsels: 0 },
+            tags: a.tags ?? [],
+            createdAt: now,
+            updatedAt: now,
+          });
+          actionsImported++;
+        } catch { /* skip duplicates */ }
+      }
+    }
+
+    res.status(201).json(success(config.nodeId, {
+      agent: {
+        gaii: agent.gaii,
+        display_name: agent.displayName,
+        trust_score: agent.trustScore,
+        morsel_balance: agent.morselBalance,
+      },
+      imported: {
+        memories: memoriesImported,
+        actions: actionsImported,
+      },
+      private_key: keyPair.privateKey,
+      public_key: keyPair.publicKey,
+      note: 'Agent imported with new keys. Store the private key securely.',
     }));
   });
 

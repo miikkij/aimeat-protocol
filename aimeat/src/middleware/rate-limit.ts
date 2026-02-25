@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { RateLimitTier } from '../config.js';
 
 interface RateBucket {
     count: number;
@@ -15,7 +16,7 @@ setInterval(() => {
     }
 }, 60_000);
 
-export function rateLimit(opts: { windowMs?: number; max?: number } = {}) {
+export function rateLimit(opts: Partial<RateLimitTier> = {}) {
     const windowMs = opts.windowMs ?? 60_000;
     const max = opts.max ?? 100;
 

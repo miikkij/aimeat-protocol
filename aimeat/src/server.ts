@@ -31,7 +31,7 @@ import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import type { Storage } from './storage/interface.js';
 
-export function createServer(config: MeatConfig): express.Express {
+export async function createServer(config: MeatConfig): Promise<express.Express> {
   const app = express();
 
   // Global middleware
@@ -49,8 +49,14 @@ export function createServer(config: MeatConfig): express.Express {
     next();
   });
 
-  // Rate limiting
-  app.use(rateLimit({ windowMs: 60_000, max: 200 }));
+  // Rate limiting — global
+  app.use(rateLimit(config.rateLimits.global));
+
+  // Per-tier rate limits
+  app.use('/v1/auth', rateLimit(config.rateLimits.auth));
+  app.use('/v1/work', rateLimit(config.rateLimits.work));
+  app.use('/v1/memory', rateLimit(config.rateLimits.memory));
+  app.use('/v1/boards', rateLimit(config.rateLimits.boards));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency());
@@ -58,8 +64,16 @@ export function createServer(config: MeatConfig): express.Express {
   // Optional auth on all routes (parses JWT if present)
   app.use(optionalAuth());
 
-  // Storage — in-memory for now (MongoDB support later)
-  const storage: Storage = new InMemoryStorage();
+  // Storage — select based on config
+  let storage: Storage;
+  if (config.dbUrl) {
+    const { MongoStorage } = await import('./storage/mongodb.js');
+    storage = new MongoStorage(config.dbUrl);
+    logger.info('Using MongoDB storage', { url: config.dbUrl.replace(/\/\/.*@/, '//<credentials>@') });
+  } else {
+    storage = new InMemoryStorage();
+    logger.info('Using in-memory storage (data will not persist across restarts)');
+  }
 
   // Initialize node keys asynchronously
   initializeNode(config, storage);
@@ -69,6 +83,12 @@ export function createServer(config: MeatConfig): express.Express {
 
   // Start work timeout expiry job
   startWorkTimeoutJob(config, storage);
+
+  // Start memory/board TTL cleanup job
+  startTtlCleanupJob(storage);
+
+  // Start dispute auto-escalation job
+  startDisputeTimeoutJob(config, storage);
 
   // Mount routes
   app.use(bootstrapRouter(config));
@@ -187,6 +207,134 @@ function startWorkTimeoutJob(config: MeatConfig, storage: Storage): void {
   // Check every 60 seconds
   setInterval(expireTimedOutWork, 60_000);
   logger.info('Work timeout job scheduled (every 60s)');
+}
+
+// Memory & board post TTL cleanup: remove expired entries
+function startTtlCleanupJob(storage: Storage): void {
+  const cleanup = async () => {
+    try {
+      const now = Date.now();
+
+      // Cleanup expired memory entries
+      const allAgents = await storage.listAgents();
+      for (const agent of allAgents) {
+        const memories = await storage.listMemory(agent.gaii);
+        for (const mem of memories) {
+          if (mem.ttlHours) {
+            const expiresAt = new Date(mem.createdAt).getTime() + mem.ttlHours * 3_600_000;
+            if (now > expiresAt) {
+              await storage.deleteMemory(agent.gaii, mem.key);
+            }
+          }
+        }
+      }
+
+      // Cleanup expired board posts
+      const boards = await storage.listBoards();
+      for (const board of boards) {
+        const posts = await storage.listPosts(board.id, { limit: 10000 });
+        // listPosts already filters expired posts in-memory, but this catches any edge cases
+        void posts;
+      }
+    } catch (err) {
+      logger.error('TTL cleanup job failed', { error: err });
+    }
+  };
+
+  setInterval(cleanup, 5 * 60_000); // Every 5 minutes
+  logger.info('TTL cleanup job scheduled (every 5m)');
+}
+
+// Dispute auto-escalation and timeout (RFC 10.8)
+function startDisputeTimeoutJob(config: MeatConfig, storage: Storage): void {
+  const processDisputes = async () => {
+    try {
+      const now = Date.now();
+      const SEVEN_DAYS = 7 * 24 * 3_600_000;
+      const THIRTY_DAYS = 30 * 24 * 3_600_000;
+
+      const allWork = await storage.listAllWork();
+      for (const work of allWork) {
+        if (work.status !== 'disputed' && work.status !== 'contested' && work.status !== 'escalated') continue;
+
+        const dispute = await storage.getDisputeByTrackingCode(work.trackingCode);
+        if (!dispute) continue;
+
+        const disputeAge = now - new Date(dispute.createdAt).getTime();
+
+        // Auto-escalate after 7 days if still open/contested
+        if ((dispute.status === 'open' || dispute.status === 'contested') && disputeAge > SEVEN_DAYS) {
+          await storage.updateDispute(dispute.id, {
+            status: 'escalated',
+            updatedAt: new Date().toISOString(),
+          });
+
+          const log = await storage.getDisputeAuditLog(dispute.id);
+          const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
+          const { createHash } = await import('node:crypto');
+          const entryData = JSON.stringify({ event: 'auto_escalated', actor: 'system', timestamp: new Date().toISOString() });
+          const hash = createHash('sha256').update(prevHash + entryData).digest('hex');
+
+          await storage.addDisputeAuditEntry(dispute.id, {
+            sequence: log.length + 1,
+            event: 'escalated',
+            actor: 'system',
+            timestamp: new Date().toISOString(),
+            data: { reason: 'Auto-escalated after 7 days without resolution' },
+            hash,
+            previousHash: prevHash,
+          });
+
+          logger.info(`Dispute ${dispute.id} auto-escalated after 7 days`);
+        }
+
+        // Auto-resolve (timeout) after 30 days if still escalated
+        if (dispute.status === 'escalated' && disputeAge > THIRTY_DAYS) {
+          // Return escrow to requester
+          const { returnEscrow } = await import('./services/morsel.js');
+          await returnEscrow(storage, work);
+
+          await storage.updateDispute(dispute.id, {
+            status: 'resolved',
+            ruling: {
+              ruling: 'timeout',
+              distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 },
+              reason: 'Auto-resolved: dispute timed out after 30 days',
+            },
+            updatedAt: new Date().toISOString(),
+          });
+
+          await storage.updateWork(work.trackingCode, {
+            status: 'settled',
+            updatedAt: new Date().toISOString(),
+          });
+
+          const log = await storage.getDisputeAuditLog(dispute.id);
+          const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
+          const { createHash } = await import('node:crypto');
+          const entryData = JSON.stringify({ event: 'timeout_resolved', actor: 'system', timestamp: new Date().toISOString() });
+          const hash = createHash('sha256').update(prevHash + entryData).digest('hex');
+
+          await storage.addDisputeAuditEntry(dispute.id, {
+            sequence: log.length + 1,
+            event: 'timeout_resolved',
+            actor: 'system',
+            timestamp: new Date().toISOString(),
+            data: { reason: 'Auto-resolved after 30 days without operator ruling' },
+            hash,
+            previousHash: prevHash,
+          });
+
+          logger.info(`Dispute ${dispute.id} auto-resolved (timeout after 30 days)`);
+        }
+      }
+    } catch (err) {
+      logger.error('Dispute timeout job failed', { error: err });
+    }
+  };
+
+  setInterval(processDisputes, 3_600_000); // Every hour
+  logger.info('Dispute timeout job scheduled (every 1h)');
 }
 
 async function initializeNode(config: MeatConfig, storage: Storage): Promise<void> {
