@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { listHooks } from '../services/hooks.js';
 import type { HookName } from '../config.js';
+import { ConfigUpdateSchema, RoleGrantSchema, validateBody } from '../models/schemas.js';
 
 export function adminRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
@@ -71,8 +72,8 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // PUT /v1/admin/config — update runtime configuration (operator only)
-    router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
-        const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled'] as const;
+    router.put('/v1/admin/config', requireAuth(), requireRole('operator'), validateBody(ConfigUpdateSchema, config.nodeId), async (req, res) => {
+        const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled', 'rateLimits'] as const;
         const updates: Record<string, unknown> = {};
 
         for (const key of allowedKeys) {
@@ -165,7 +166,7 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
     // POST /v1/admin/restore — import data from backup (operator only)
     router.post('/v1/admin/restore', requireAuth(), requireRole('operator'), async (req, res) => {
         const { owners, agents, actions, boards, agent_data } = req.body ?? {};
-        let imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
+        const imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
 
         if (owners) {
             for (const o of owners) {
@@ -210,12 +211,8 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/admin/roles/grant — grant operator role (operator only)
-    router.post('/v1/admin/roles/grant', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/roles/grant', requireAuth(), requireRole('operator'), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
         const { owner, role } = req.body ?? {};
-        if (!owner || role !== 'operator') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner and role (must be "operator") are required'));
-            return;
-        }
 
         const ownerRecord = await storage.getOwner(owner);
         if (!ownerRecord) {

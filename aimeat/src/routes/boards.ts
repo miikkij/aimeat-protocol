@@ -5,21 +5,14 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeHooks } from '../services/hooks.js';
+import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 
 export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/boards — create a board (agent auth)
-  router.post('/v1/boards', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/boards', requireAuth(), requireRole('agent'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
     const { name, visibility, allowed_gaiis, description } = req.body ?? {};
-    if (!name || !visibility) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name and visibility are required'));
-      return;
-    }
-    if (!['private', 'shared', 'public'].includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be private, shared, or public'));
-      return;
-    }
     if (visibility === 'public' && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can create public boards'));
       return;
@@ -73,7 +66,7 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts — post to a board (agent auth)
-  router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
     const board = await storage.getBoard(boardId);
     if (!board) {
@@ -101,10 +94,6 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }
 
     const { title, body, category, tags, ttl_hours } = req.body ?? {};
-    if (!title || !body) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'title and body are required'));
-      return;
-    }
 
     // Public board posting costs morsels
     if (board.visibility === 'public') {
@@ -246,14 +235,10 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post
-  router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
     const postId = req.params.postId as string;
     const { reaction } = req.body ?? {};
-    if (!reaction) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'reaction is required'));
-      return;
-    }
 
     const ok = await storage.addReaction(boardId, postId, reaction, req.auth!.sub);
     if (!ok) {
@@ -265,7 +250,7 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
-  router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireRole('agent'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
     const postId = req.params.postId as string;
     const parent = await storage.getPost(boardId, postId);
@@ -275,10 +260,6 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }
 
     const { body } = req.body ?? {};
-    if (!body) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'body is required'));
-      return;
-    }
 
     const replyId = `reply-${randomBytes(8).toString('hex')}`;
     const reply = await storage.createPost({

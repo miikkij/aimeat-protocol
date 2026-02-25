@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
+import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 
 export function walletRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
@@ -99,7 +100,7 @@ export function walletRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/wallet/request — request morsels from operator (agent auth)
-  router.post('/v1/wallet/request', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/wallet/request', requireAuth(), requireRole('agent'), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
     const gaii = req.auth!.sub;
     const { amount, reason } = req.body ?? {};
 

@@ -11,6 +11,9 @@ import { logger } from '../utils/logger.js';
 const gaiiCache = new Map<string, { nodeId: string; nodeUrl: string; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60_000;
 
+/** Consecutive failure counter per peer (for health tracking). */
+const peerFailures = new Map<string, number>();
+
 export interface PeerInfo {
     nodeId: string;
     url: string;
@@ -99,18 +102,25 @@ export function startHeartbeatJob(
                 if (resp.ok) {
                     peer.lastSeen = new Date().toISOString();
                     peer.status = 'active';
+                    peerFailures.set(key, 0);
                 } else {
-                    peer.status = 'degraded';
-                    logger.warn(`Peer ${peer.nodeId} returned HTTP ${resp.status}`);
+                    const failures = (peerFailures.get(key) ?? 0) + 1;
+                    peerFailures.set(key, failures);
+                    if (failures >= 10) {
+                        peer.status = 'offline';
+                        logger.warn(`Peer ${peer.nodeId} offline after ${failures} consecutive failures`);
+                    } else if (failures >= 3) {
+                        peer.status = 'degraded';
+                        logger.warn(`Peer ${peer.nodeId} degraded after ${failures} consecutive failures`);
+                    }
                 }
             } catch (err) {
-                const lastSeenMs = new Date(peer.lastSeen).getTime();
-                const offlineMinutes = (Date.now() - lastSeenMs) / 60_000;
-
-                if (offlineMinutes > 60) {
+                const failures = (peerFailures.get(key) ?? 0) + 1;
+                peerFailures.set(key, failures);
+                if (failures >= 10) {
                     peer.status = 'offline';
-                    logger.warn(`Peer ${peer.nodeId} offline for ${Math.round(offlineMinutes)} minutes`);
-                } else {
+                    logger.warn(`Peer ${peer.nodeId} offline after ${failures} consecutive failures`);
+                } else if (failures >= 3) {
                     peer.status = 'degraded';
                 }
             }

@@ -26,7 +26,13 @@ export const TokenRequestSchema = z.object({
 
 export const OwnerTokenRequestSchema = z.object({
     owner: z.string().min(1),
-    node: z.string().min(1),
+    timestamp: z.string().min(1),
+    signature: z.string().min(1),
+});
+
+export const AuthTokenRequestSchema = z.object({
+    gaii: z.string().min(1).optional(),
+    owner: z.string().min(1).optional(),
     timestamp: z.string().min(1),
     signature: z.string().min(1),
 });
@@ -95,7 +101,7 @@ export const ActionUpdateSchema = z.object({
 export const WorkRequestSchema = z.object({
     action_id: z.string().min(1),
     provider_gaii: z.string().min(1),
-    input: z.record(z.string(), z.unknown()),
+    input: z.unknown(),
     callback_url: z.string().url().optional(),
     ttl_hours: z.number().positive().max(720).optional(), // max 30 days
     priority: z.enum(['low', 'normal', 'high']).optional(),
@@ -106,12 +112,13 @@ export const WorkBatchSchema = z.object({
 });
 
 export const WorkDeliverySchema = z.object({
-    output: z.record(z.string(), z.unknown()),
+    output: z.unknown(),
+    metadata: z.unknown().optional(),
 });
 
 export const WorkRatingSchema = z.object({
-    score: z.number().int().min(1).max(5),
-    feedback: z.string().max(1024).optional(),
+    rating: z.enum(['positive', 'negative']),
+    comment: z.string().max(1024).optional(),
 });
 
 export const WorkRejectSchema = z.object({
@@ -130,15 +137,15 @@ export const CounterDisputeSchema = z.object({
 
 export const PartialOfferSchema = z.object({
     refund_morsels: z.number().int().positive(),
-    reason: z.string().max(1024).optional(),
+    message: z.string().max(1024).optional(),
 });
 
 export const OperatorRulingSchema = z.object({
-    ruling: z.enum(['requester_wins', 'provider_wins', 'split']),
+    ruling: z.string().min(1),
     distribution: z.object({
-        toRequester: z.number().int().nonnegative(),
-        toProvider: z.number().int().nonnegative(),
-        burned: z.number().int().nonnegative(),
+        to_requester: z.number().int().nonnegative().optional(),
+        to_provider: z.number().int().nonnegative().optional(),
+        burned: z.number().int().nonnegative().optional(),
     }),
     reason: z.string().max(4096).optional(),
 });
@@ -147,37 +154,38 @@ export const OperatorRulingSchema = z.object({
 
 export const BoardCreateSchema = z.object({
     name: z.string().min(1).max(128),
-    type: z.enum(['private', 'shared', 'public']),
+    visibility: z.enum(['private', 'shared', 'public']),
     description: z.string().max(1024).optional(),
     allowed_gaiis: z.array(z.string()).optional(),
 });
 
 export const BoardPostSchema = z.object({
-    content: z.string().min(1).max(10000),
-    title: z.string().max(256).optional(),
+    title: z.string().min(1).max(256),
+    body: z.string().min(1).max(10000),
     category: z.string().max(64).optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().optional(),
 });
 
 export const BoardReactionSchema = z.object({
-    emoji: z.string().min(1).max(8),
+    reaction: z.string().min(1).max(32),
 });
 
 export const BoardReplySchema = z.object({
-    content: z.string().min(1).max(10000),
-    title: z.string().max(256).optional(),
+    body: z.string().min(1).max(10000),
 });
 
 // ── Federation ──────────────────────────────────────────────
 
 export const PeeringRequestSchema = z.object({
-    target_node_url: z.string().url(),
+    target_url: z.string().url(),
+    target_node_id: z.string().optional(),
+    public_key: z.string().optional(),
     message: z.string().max(1024).optional(),
 });
 
 export const PeeringDecisionSchema = z.object({
-    decision: z.enum(['accept', 'reject']),
+    decision: z.enum(['approve', 'reject']),
     reason: z.string().max(1024).optional(),
 });
 
@@ -196,6 +204,7 @@ export const ConfigUpdateSchema = z.object({
     burnRate: z.number().min(0).max(1).optional(),
     jwtTtlSeconds: z.number().int().positive().optional(),
     keyedBrowseEnabled: z.boolean().optional(),
+    rateLimits: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const RoleGrantSchema = z.object({

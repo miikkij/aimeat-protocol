@@ -2338,6 +2338,24 @@ paths:
         '200':
           $ref: '#/components/responses/MeatSuccess'
 
+  /v1/wallet/history:
+    get:
+      operationId: getTransactionHistory
+      summary: Transaction history (legacy alias)
+      description: Alias for /v1/wallet/transactions. Returns the same data with a simpler interface.
+      tags: [Economy]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
   /v1/wallet/request:
     post:
       operationId: requestMorsels
@@ -3193,3 +3211,108 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/MeatSuccess'
+
+  /v1/mcp/register:
+    post:
+      operationId: mcpRegisterClient
+      summary: Register MCP OAuth client
+      description: Dynamic client registration for MCP OAuth 2.1 flow.
+      tags: [MCP]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client_name:
+                  type: string
+                redirect_uris:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/mcp/authorize:
+    get:
+      operationId: mcpAuthorize
+      summary: MCP OAuth authorization endpoint
+      description: Initiates OAuth 2.1 authorization code flow for MCP clients.
+      tags: [MCP]
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to callback with authorization code
+
+  /v1/mcp/token:
+    post:
+      operationId: mcpToken
+      summary: MCP OAuth token exchange
+      description: Exchange authorization code for access token (MCP OAuth 2.1).
+      tags: [MCP]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                code:
+                  type: string
+                client_id:
+                  type: string
+                code_verifier:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /v1/mcp/token/revoke:
+    post:
+      operationId: mcpRevokeToken
+      summary: Revoke MCP OAuth token
+      tags: [MCP]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+
+  /.well-known/oauth-authorization-server:
+    get:
+      operationId: oauthServerMetadata
+      summary: OAuth 2.0 Authorization Server Metadata
+      description: RFC 8414 discovery document for MCP OAuth integration.
+      tags: [MCP]
+      responses:
+        '200':
+          description: OAuth server metadata
+          content:
+            application/json:
+              schema:
+                type: object

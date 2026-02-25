@@ -5,19 +5,11 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeHooks } from '../services/hooks.js';
+import { PeeringRequestSchema, PeeringDecisionSchema, validateBody } from '../models/schemas.js';
+import type { PeerInfo } from '../services/federation.js';
 
-export function federationRouter(config: MeatConfig, storage: Storage): Router {
+export function federationRouter(config: MeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
-
-    // In-memory peer registry (active peers)
-    const peers = new Map<string, {
-        nodeId: string;
-        url: string;
-        publicKey: string;
-        status: string;
-        addedAt: string;
-        lastSeen: string;
-    }>();
 
     // GET /v1/federation/directory — public peer directory (Tier 0)
     router.get('/v1/federation/directory', (_req, res) => {
@@ -41,12 +33,8 @@ export function federationRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/federation/peer/request — request peering (operator auth)
-    router.post('/v1/federation/peer/request', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/peer/request', requireAuth(), requireRole('operator'), validateBody(PeeringRequestSchema, config.nodeId), async (req, res) => {
         const { target_url, target_node_id, public_key, message } = req.body ?? {};
-        if (!target_url) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_url is required'));
-            return;
-        }
 
         // Extension hook: pre_federation_peer
         const hookResult = await executeHooks(config, storage, 'pre_federation_peer', { target_url, target_node_id });
@@ -164,14 +152,9 @@ export function federationRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // PUT /v1/admin/peering/requests/:id — approve/reject peering request (operator)
-    router.put('/v1/admin/peering/requests/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/admin/peering/requests/:id', requireAuth(), requireRole('operator'), validateBody(PeeringDecisionSchema, config.nodeId), async (req, res) => {
         const id = req.params.id as string;
         const { decision, reason } = req.body ?? {};
-
-        if (!decision || !['approve', 'reject'].includes(decision)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'decision must be "approve" or "reject"'));
-            return;
-        }
 
         const request = await storage.getPeeringRequest(id);
         if (!request) {

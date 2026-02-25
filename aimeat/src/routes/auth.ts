@@ -2,12 +2,13 @@ import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
-import { issueJWT, revokeToken, verifyJWT } from '../auth/jwt.js';
+import { issueJWT, revokeToken } from '../auth/jwt.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseGAII } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
+import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
@@ -118,13 +119,8 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/auth/token — exchange signature for JWT
-  router.post('/v1/auth/token', async (req, res) => {
+  router.post('/v1/auth/token', validateBody(AuthTokenRequestSchema, config.nodeId), async (req, res) => {
     const { gaii, owner: ownerName, timestamp, signature } = req.body ?? {};
-
-    if (!timestamp || !signature) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'timestamp and signature are required'));
-      return;
-    }
 
     // Agent auth (gaii provided)
     if (gaii) {

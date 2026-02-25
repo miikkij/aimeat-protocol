@@ -3,30 +3,16 @@ import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
 
 export function memoryRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/memory — write a memory entry (agent auth required)
-  router.post('/v1/memory', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/memory', requireAuth(), requireRole('agent'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
     const { key, value, visibility, tags, ttl_hours } = req.body ?? {};
 
-    if (!key || value === undefined) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and value are required'));
-      return;
-    }
-
-    if (typeof key !== 'string' || key.length > 256) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key must be a string of 256 characters or fewer'));
-      return;
-    }
-
-    const validVisibility = ['private', 'owner', 'public'];
     const vis = visibility ?? 'private';
-    if (!validVisibility.includes(vis)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${validVisibility.join(', ')}`));
-      return;
-    }
 
     const now = new Date().toISOString();
     const gaii = req.auth!.sub;
@@ -195,15 +181,10 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // PUT /v1/memory/:key — update memory with optimistic locking
-  router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
     const { value, visibility, tags, ttl_hours, version } = req.body ?? {};
-
-    if (value === undefined || version === undefined) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'value and version are required'));
-      return;
-    }
 
     const existing = await storage.getMemory(gaii, key);
     if (!existing) {

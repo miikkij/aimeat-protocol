@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateTrustScore } from '../services/trust.js';
+import { ActionPublishSchema, ActionUpdateSchema, validateBody } from '../models/schemas.js';
 
 const ALLOWED_CATEGORIES = [
   'language', 'translation', 'analysis', 'generation', 'coding',
@@ -17,18 +18,8 @@ export function actionsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/actions — publish an action (agent auth)
-  router.post('/v1/actions', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/actions', requireAuth(), requireRole('agent'), validateBody(ActionPublishSchema, config.nodeId), async (req, res) => {
     const { id, display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags } = req.body ?? {};
-
-    if (!id || !display_name || !description || !input_schema || !output_schema || !pricing) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'id, display_name, description, input_schema, output_schema, and pricing are required'));
-      return;
-    }
-
-    if (!pricing.base_morsels && pricing.base_morsels !== 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'pricing.base_morsels is required'));
-      return;
-    }
 
     // Category validation
     if (category && !ALLOWED_CATEGORIES.includes(category)) {
@@ -149,7 +140,7 @@ export function actionsRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // PUT /v1/actions/:id — update an action (agent auth)
-  router.put('/v1/actions/:id', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.put('/v1/actions/:id', requireAuth(), requireRole('agent'), validateBody(ActionUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = req.auth!.sub;
     const id = req.params.id as string;
     const { display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags } = req.body ?? {};

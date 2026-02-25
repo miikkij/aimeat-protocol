@@ -7,6 +7,7 @@ import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
 import { executeHooks } from '../services/hooks.js';
+import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -93,7 +94,7 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/work/request — submit a work request (spec path)
-  router.post('/v1/work/request', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/request', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
     const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {});
     if ('error' in result) {
       res.status(result.status!).json(error(config.nodeId, result.code!, result.error!, result.status, result.details));
@@ -116,7 +117,7 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/work — legacy submit path (alias)
-  router.post('/v1/work', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
     const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {});
     if ('error' in result) {
       res.status(result.status!).json(error(config.nodeId, result.code!, result.error!, result.status, result.details));
@@ -138,12 +139,8 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/work/batch — batch work requests
-  router.post('/v1/work/batch', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/batch', requireAuth(), requireRole('agent'), validateBody(WorkBatchSchema, config.nodeId), async (req, res) => {
     const { requests } = req.body ?? {};
-    if (!Array.isArray(requests) || requests.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'requests array is required'));
-      return;
-    }
 
     const results = [];
     for (const r of requests) {
@@ -279,7 +276,7 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/work/:tc/deliver — deliver work output (provider, agent auth)
-  router.post('/v1/work/:tc/deliver', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/:tc/deliver', requireAuth(), requireRole('agent'), validateBody(WorkDeliverySchema, config.nodeId), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -296,10 +293,6 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
     }
 
     const { output, metadata } = req.body ?? {};
-    if (output === undefined) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'output is required'));
-      return;
-    }
 
     // Settle: pay provider, network fee, burn
     await settlePayment(storage, config, work);
@@ -342,7 +335,7 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/work/:tc/rate — rate delivered work (requester, agent auth)
-  router.post('/v1/work/:tc/rate', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/:tc/rate', requireAuth(), requireRole('agent'), validateBody(WorkRatingSchema, config.nodeId), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -359,10 +352,6 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
     }
 
     const { rating, comment } = req.body ?? {};
-    if (rating !== 'positive' && rating !== 'negative') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'rating must be "positive" or "negative"'));
-      return;
-    }
 
     const updated = await storage.updateWork(tc, {
       status: 'rated',

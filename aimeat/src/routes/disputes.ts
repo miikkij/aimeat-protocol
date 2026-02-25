@@ -5,6 +5,7 @@ import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
+import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -46,7 +47,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
 
     // POST /v1/work/:tc/dispute — Open dispute
-    router.post('/v1/work/:tc/dispute', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/dispute', requireAuth(), requireRole('agent'), validateBody(DisputeOpenSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) {
@@ -69,10 +70,6 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
         }
 
         const { reason } = req.body ?? {};
-        if (!reason) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'reason is required'));
-            return;
-        }
 
         const now = new Date().toISOString();
         const disputeId = `dispute-${randomBytes(8).toString('hex')}`;
@@ -149,7 +146,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/counter-dispute — Provider counter-disputes
-    router.post('/v1/work/:tc/counter-dispute', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/counter-dispute', requireAuth(), requireRole('agent'), validateBody(CounterDisputeSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -159,7 +156,6 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
         const { reason } = req.body ?? {};
-        if (!reason) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'reason is required')); return; }
 
         await storage.updateDispute(dispute.id, { status: 'contested', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'contested', updatedAt: new Date().toISOString() });
@@ -213,7 +209,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/work/:tc/offer-partial — Provider offers partial refund
-    router.post('/v1/work/:tc/offer-partial', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/work/:tc/offer-partial', requireAuth(), requireRole('agent'), validateBody(PartialOfferSchema, config.nodeId), async (req, res) => {
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`)); return; }
@@ -223,7 +219,6 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
         const { refund_morsels, message } = req.body ?? {};
-        if (!refund_morsels || refund_morsels < 1) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'refund_morsels must be >= 1')); return; }
 
         await appendAuditEntry(storage, dispute.id, 'partial_offer', req.auth!.sub, { refund_morsels, message });
 
@@ -358,17 +353,13 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/admin/disputes/:id/rule — Operator rules on dispute
-    router.post('/v1/admin/disputes/:id/rule', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/disputes/:id/rule', requireAuth(), requireRole('operator'), validateBody(OperatorRulingSchema, config.nodeId), async (req, res) => {
         const disputeId = param(req.params.id);
         const dispute = await storage.getDispute(disputeId);
         if (!dispute) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Dispute not found')); return; }
         if (dispute.status === 'resolved') { res.status(409).json(error(config.nodeId, 'DISPUTE_CLOSED', 'Dispute already resolved')); return; }
 
         const { ruling, distribution, reason } = req.body ?? {};
-        if (!ruling || !distribution) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ruling and distribution are required'));
-            return;
-        }
 
         const work = await storage.getWork(dispute.trackingCode);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Associated work item not found')); return; }

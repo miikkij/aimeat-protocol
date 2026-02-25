@@ -30,6 +30,8 @@ import { mcpRouter } from './routes/mcp.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import type { Storage } from './storage/interface.js';
+import { startHeartbeatJob } from './services/federation.js';
+import type { PeerInfo } from './services/federation.js';
 
 export async function createServer(config: MeatConfig): Promise<express.Express> {
   const app = express();
@@ -84,11 +86,20 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   // Start work timeout expiry job
   startWorkTimeoutJob(config, storage);
 
-  // Start memory/board TTL cleanup job
-  startTtlCleanupJob(storage);
+  // Start memory TTL cleanup job (every 5m)
+  startMemoryTtlCleanupJob(storage);
+
+  // Start board post TTL cleanup job (every 10m)
+  startBoardPostTtlCleanupJob(storage);
 
   // Start dispute auto-escalation job
   startDisputeTimeoutJob(config, storage);
+
+  // Federation peer registry (shared between routes and heartbeat)
+  const peers = new Map<string, PeerInfo>();
+
+  // Start federation heartbeat job (pings peers every 5 minutes)
+  startHeartbeatJob(config, peers);
 
   // Mount routes
   app.use(bootstrapRouter(config));
@@ -104,7 +115,7 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(boardsRouter(config, storage));
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage));
-  app.use(federationRouter(config, storage));
+  app.use(federationRouter(config, storage, peers));
   app.use(disputesRouter(config, storage));
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
@@ -209,13 +220,11 @@ function startWorkTimeoutJob(config: MeatConfig, storage: Storage): void {
   logger.info('Work timeout job scheduled (every 60s)');
 }
 
-// Memory & board post TTL cleanup: remove expired entries
-function startTtlCleanupJob(storage: Storage): void {
+// Memory TTL cleanup: remove expired memory entries
+function startMemoryTtlCleanupJob(storage: Storage): void {
   const cleanup = async () => {
     try {
       const now = Date.now();
-
-      // Cleanup expired memory entries
       const allAgents = await storage.listAgents();
       for (const agent of allAgents) {
         const memories = await storage.listMemory(agent.gaii);
@@ -228,21 +237,31 @@ function startTtlCleanupJob(storage: Storage): void {
           }
         }
       }
-
-      // Cleanup expired board posts
-      const boards = await storage.listBoards();
-      for (const board of boards) {
-        const posts = await storage.listPosts(board.id, { limit: 10000 });
-        // listPosts already filters expired posts in-memory, but this catches any edge cases
-        void posts;
-      }
     } catch (err) {
-      logger.error('TTL cleanup job failed', { error: err });
+      logger.error('Memory TTL cleanup job failed', { error: err });
     }
   };
 
   setInterval(cleanup, 5 * 60_000); // Every 5 minutes
-  logger.info('TTL cleanup job scheduled (every 5m)');
+  logger.info('Memory TTL cleanup job scheduled (every 5m)');
+}
+
+// Board post TTL cleanup: remove expired board posts
+function startBoardPostTtlCleanupJob(storage: Storage): void {
+  const cleanup = async () => {
+    try {
+      const boards = await storage.listBoards();
+      for (const board of boards) {
+        // listPosts filters expired posts in-memory and deletes them
+        await storage.listPosts(board.id, { limit: 10000 });
+      }
+    } catch (err) {
+      logger.error('Board post TTL cleanup job failed', { error: err });
+    }
+  };
+
+  setInterval(cleanup, 10 * 60_000); // Every 10 minutes
+  logger.info('Board post TTL cleanup job scheduled (every 10m)');
 }
 
 // Dispute auto-escalation and timeout (RFC 10.8)

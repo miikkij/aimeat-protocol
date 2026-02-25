@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
+import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 
 export function storageFilesRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
@@ -153,13 +154,9 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
     // -----------------------------------------------
 
     // POST /v1/storage/upload/init — initiate chunked upload
-    router.post('/v1/storage/upload/init', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/storage/upload/init', requireAuth(), requireRole('agent'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
         const gaii = req.auth!.sub;
         const { key, mime_type, visibility, chunk_size, total_chunks } = req.body ?? {};
-        if (!key) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
-            return;
-        }
         const uploadId = `upload-${randomBytes(12).toString('hex')}`;
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 6 * 3600_000).toISOString(); // 6 hours

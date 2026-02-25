@@ -4,21 +4,17 @@ import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { validateAgentName, buildGAII, parseGAII } from '../utils/gaii.js';
+import { validateAgentName, buildGAII } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
+import { AgentRegistrationSchema, validateBody } from '../models/schemas.js';
 
 export function agentsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/agents — register a new agent (requires owner JWT)
-  router.post('/v1/agents', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/agents', requireAuth(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
     const { name, owner, display_name, description, capabilities } = req.body ?? {};
-
-    if (!name || !owner) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name and owner are required'));
-      return;
-    }
 
     // Extension hook: pre_agent_registration
     const hookResult = await executeHooks(config, storage, 'pre_agent_registration', { name, owner, display_name });
@@ -367,6 +363,96 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
       public_key: keyPair.publicKey,
       note: 'Agent imported with new keys. Store the private key securely.',
     }));
+  });
+
+  // POST /v1/agents/:gaii/rekey — Rotate agent keys (owner auth)
+  router.post('/v1/agents/:gaii/rekey', requireAuth(), requireRole('owner'), async (req, res) => {
+    const gaii = decodeURIComponent(req.params.gaii as string);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only rekey your own agents'));
+      return;
+    }
+
+    const keyPair = await generateKeyPair();
+    await storage.updateAgent(gaii, { publicKey: keyPair.publicKey });
+
+    // Extension hook: agent_rekey (fire-and-forget)
+    executeHooks(config, storage, 'agent_rekey', { gaii, owner: agent.owner }).catch(() => { });
+
+    res.json(success(config.nodeId, {
+      rekeyed: true,
+      gaii,
+      private_key: keyPair.privateKey,
+      public_key: keyPair.publicKey,
+      note: 'New keys generated. Store the private key securely. Old JWT tokens are invalidated.',
+    }));
+  });
+
+  // POST /v1/agents/:gaii/port — Port agent to another node (owner auth)
+  // Sets a redirect pointer on this node + deducts porting fee
+  router.post('/v1/agents/:gaii/port', requireAuth(), requireRole('owner'), async (req, res) => {
+    const gaii = decodeURIComponent(req.params.gaii as string);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only port your own agents'));
+      return;
+    }
+
+    const { target_node_url, target_node_id } = req.body ?? {};
+    if (!target_node_url) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node_url is required'));
+      return;
+    }
+
+    // Porting fee: 50 morsels
+    const PORTING_FEE = 50;
+    if (agent.morselBalance < PORTING_FEE) {
+      res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
+        `Porting requires ${PORTING_FEE} morsels, you have ${agent.morselBalance}`));
+      return;
+    }
+
+    // Deduct fee
+    await storage.updateAgent(gaii, { morselBalance: agent.morselBalance - PORTING_FEE });
+    await storage.addTransaction({
+      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      gaii,
+      type: 'spent',
+      amount: -PORTING_FEE,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Store redirect pointer (use memory to persist the redirect)
+    await storage.setMemory({
+      key: `__redirect__`,
+      ownerGaii: gaii,
+      value: { target_node_url, target_node_id: target_node_id ?? 'unknown', ported_at: new Date().toISOString() },
+      visibility: 'public',
+      tags: ['system', 'redirect'],
+      ttlHours: null,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json(success(config.nodeId, {
+      ported: true,
+      gaii,
+      target_node_url,
+      porting_fee: PORTING_FEE,
+      note: 'Redirect pointer set. Export and import agent data to complete the port.',
+    }, [
+      { description: 'Export agent data', method: 'POST', url: `/v1/agents/${encodeURIComponent(gaii)}/export` },
+    ]));
   });
 
   return router;

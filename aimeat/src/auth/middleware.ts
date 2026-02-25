@@ -3,6 +3,7 @@ import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 
 // Extend Express Request with auth info
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       auth?: VerifiedToken;
