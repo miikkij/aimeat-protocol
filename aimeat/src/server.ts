@@ -19,7 +19,10 @@ import { workRouter } from './routes/work.js';
 import { walletRouter } from './routes/wallet.js';
 import { boardsRouter } from './routes/boards.js';
 import { promptsRouter } from './routes/prompts.js';
+import { adminRouter } from './routes/admin.js';
+import { federationRouter } from './routes/federation.js';
 import { specRouter } from './routes/spec.js';
+import { rateLimit } from './middleware/rate-limit.js';
 import type { Storage } from './storage/interface.js';
 
 export function createServer(config: MeatConfig): express.Express {
@@ -39,6 +42,9 @@ export function createServer(config: MeatConfig): express.Express {
     }
     next();
   });
+
+  // Rate limiting
+  app.use(rateLimit({ windowMs: 60_000, max: 200 }));
 
   // Optional auth on all routes (parses JWT if present)
   app.use(optionalAuth());
@@ -62,6 +68,8 @@ export function createServer(config: MeatConfig): express.Express {
   app.use(walletRouter(config, storage));
   app.use(boardsRouter(config, storage));
   app.use(promptsRouter(config, storage));
+  app.use(adminRouter(config, storage));
+  app.use(federationRouter(config, storage));
   app.use(specRouter());
 
   // Global error handler
