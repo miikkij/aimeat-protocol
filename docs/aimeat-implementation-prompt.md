@@ -2,7 +2,7 @@
 
 ## What You're Building
 
-Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in the attached file `AIMEAT-RFC-v1.1.md` — that is your source of truth. Read it fully before writing any code.
+Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in the attached file `AIMEAT-RFC-v1.2-full.md` — that is your source of truth. Read it fully before writing any code.
 
 ## The Goal
 
@@ -37,6 +37,7 @@ A single command starts a fully functional MEAT node that any AI agent can conne
 aimeat/
 ├── package.json
 ├── tsconfig.json
+├── openapi.yaml              # OpenAPI 3.1 spec (source of truth for schemas)
 ├── prisma/
 │   └── schema.prisma          # MongoDB schema
 ├── src/
@@ -67,7 +68,10 @@ aimeat/
 │   │   ├── federation.ts      # /v1/federation/* — peering, directory
 │   │   ├── admin.ts           # /v1/admin/* — dashboard, config, disputes
 │   │   ├── prompts.ts         # /v1/prompts/* — AI system prompts per tier
-│   │   └── spec.ts            # /v1/spec, /v1/docs
+│   │   ├── validate.ts        # /v1/validate — request schema validation
+│   │   └── spec.ts            # /v1/spec (serves openapi.yaml), /v1/docs (Swagger UI)
+│   ├── generated/
+│   │   └── api-types.ts       # Auto-generated from openapi.yaml (pnpm generate:types)
 │   ├── models/
 │   │   └── schemas.ts         # All Zod schemas (request + response)
 │   ├── services/
@@ -194,13 +198,26 @@ Implement the internal token system from RFC Section 8:
 
 ### 8. Trust Scores
 
-Implement from RFC Section 9:
-- Start at 50/100
-- +1 for successful work completion (capped at daily limit)
-- -5 for failed delivery
-- -10 for dispute loss
-- Decay: -1/month for inactive agents
-- Trust affects: work request acceptance, action visibility, escrow requirements
+Implement the exact formula from RFC Section 16.5:
+
+```
+trust_score = clamp(0, 100, floor(
+  (success_rate × 0.30) +
+  (positive_rating_ratio × 0.25) +
+  (age_factor × 0.15) +
+  (volume_factor × 0.15) +
+  (dispute_penalty × 0.15)
+))
+```
+
+Components:
+- `success_rate`: (delivered / (delivered + failed + expired)) × 100
+- `positive_rating_ratio`: (ratings_4_or_5 / total_ratings) × 100
+- `age_factor`: min(100, log2(account_age_days + 1) × 15)
+- `volume_factor`: min(100, log2(total_deliveries + 1) × 11)
+- `dispute_penalty`: max(0, 100 - (disputes_lost × 33))
+
+Modifiers: -1 per 30 days inactivity decay, trust freeze during active disputes, new agents capped at 65 for first 7 days. Recalculate on every transaction event and daily for decay.
 
 ### 9. Node Identity
 
@@ -274,6 +291,7 @@ Phase 5 — Polish:
     "dev": "tsx watch src/index.ts",
     "build": "tsc && tsc-alias",
     "start": "node dist/index.js",
+    "generate:types": "openapi-typescript openapi.yaml -o src/generated/api-types.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "test": "vitest",
@@ -301,17 +319,27 @@ curl http://localhost:3117/v1/catalogue               # empty catalogue
 
 ## Read the RFC
 
-The attached `AIMEAT-RFC-v1.1.md` is ~4400 lines and 145KB. It contains:
-- Complete endpoint definitions (84 endpoints across all tiers)
+The attached `AIMEAT-RFC-v1.2-full.md` is ~4800 lines and 155KB. It contains:
+- Complete endpoint definitions (75 paths, 88 operations across all tiers)
 - Data models for all entities
 - Sequence diagrams for auth, work queue, federation
 - Response envelope format
-- Morsel economy rules
-- Trust score algorithm
+- Morsel economy rules with legal positioning
+- Trust score algorithm (exact formula)
 - Access tier definitions and capability matrix
 - MCP server specification (extended, implement stub only)
+- Dispute resolution with tamper-evident audit log
+
+Also attach `openapi.yaml` — the formal OpenAPI 3.1 spec with 41 schemas.
 
 **Read the full RFC before starting.** The spec is the law. If something in this prompt conflicts with the RFC, the RFC wins.
+
+**Also reference `openapi.yaml`** — the OpenAPI 3.1 spec (75 paths, 88 operations, 41 schemas). Use it for:
+- Type generation: `pnpm openapi-typescript openapi.yaml -o src/generated/api-types.ts`
+- Validation: Zod schemas should match the OpenAPI schemas
+- The `/v1/validate` endpoint should validate requests against this spec
+- The `/v1/spec` endpoint should serve this file
+- The `/v1/docs` endpoint should render Swagger UI from this file
 
 ## One More Thing
 
@@ -319,7 +347,7 @@ The first node in the world will be `meat-finland-001-genesis`. Make the default
 
 ```
 "Welcome to MEAT — AI Infrastructure: Memory, Economy, Actions, Trust.
- Protocol: AIMEAT v1.1 | License: MIT | The network starts here."
+ Protocol: AIMEAT v1.2 | License: MIT | The network starts here."
 ```
 
 Now build it. 🥩
