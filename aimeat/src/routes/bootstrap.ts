@@ -61,5 +61,14 @@ export function bootstrapRouter(config: MeatConfig): Router {
     ]));
   });
 
+  // GET /v1/health — simple liveness/readiness check (Tier 0, no auth)
+  router.get('/v1/health', (_req, res) => {
+    res.json(success(config.nodeId, {
+      status: 'healthy',
+      uptime_seconds: Math.floor(process.uptime()),
+      memory_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    }));
+  });
+
   return router;
 }

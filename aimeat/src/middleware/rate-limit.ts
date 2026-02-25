@@ -37,6 +37,8 @@ export function rateLimit(opts: { windowMs?: number; max?: number } = {}) {
         res.setHeader('X-RateLimit-Reset', Math.ceil(bucket.resetAt / 1000));
 
         if (bucket.count > max) {
+            const retryAfterSec = Math.ceil((bucket.resetAt - now) / 1000);
+            res.setHeader('Retry-After', retryAfterSec);
             res.status(429).json({
                 ok: false,
                 protocol: 'aimeat',

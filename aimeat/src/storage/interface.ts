@@ -132,7 +132,8 @@ export interface MicroMemoryRecord {
   gaii: string;
   set: string;
   entries: Record<string, string>;
-  visibility: 'private' | 'public';
+  visibility: 'private' | 'public_read' | 'shared_read' | 'shared_write' | 'public_write';
+  accessCode?: string;    // required for shared_read / shared_write
   updatedAt: string;
 }
 
@@ -157,6 +158,19 @@ export interface PeeringRequestRecord {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChunkedUploadRecord {
+  uploadId: string;
+  ownerGaii: string;
+  key: string;
+  mimeType: string;
+  visibility: 'private' | 'owner' | 'public';
+  chunkSize: number;
+  totalChunks?: number;
+  receivedChunks: Map<number, Buffer>;
+  createdAt: string;
+  expiresAt: string;   // 6 hours after creation
 }
 
 export interface Storage {
@@ -248,6 +262,12 @@ export interface Storage {
 
   // Action update
   updateAction(id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null>;
+
+  // Chunked uploads
+  createChunkedUpload(record: ChunkedUploadRecord): Promise<ChunkedUploadRecord>;
+  getChunkedUpload(uploadId: string): Promise<ChunkedUploadRecord | null>;
+  addChunk(uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean>;
+  deleteChunkedUpload(uploadId: string): Promise<boolean>;
 
   // Node key
   setNodeKey(publicKey: string, privateKey: string): Promise<void>;

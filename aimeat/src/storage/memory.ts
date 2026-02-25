@@ -3,7 +3,7 @@ import type {
   ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord,
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
-  StorageFileRecord, PeeringRequestRecord,
+  StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -21,6 +21,7 @@ export class InMemoryStorage implements Storage {
   private microMemory = new Map<string, MicroMemoryRecord>();  // key: `${gaii}::${set}`
   private storageFiles = new Map<string, StorageFileRecord>();  // key: `${gaii}::${key}`
   private peeringRequests = new Map<string, PeeringRequestRecord>();
+  private chunkedUploads = new Map<string, ChunkedUploadRecord>();
   private nodeKey: { publicKey: string; privateKey: string } | null = null;
 
   // ── Owners ──
@@ -458,5 +459,36 @@ export class InMemoryStorage implements Storage {
     const updated = { ...existing, ...updates };
     this.actions.set(k, updated);
     return updated;
+  }
+
+  // ── Chunked Uploads ──
+
+  async createChunkedUpload(record: ChunkedUploadRecord): Promise<ChunkedUploadRecord> {
+    this.chunkedUploads.set(record.uploadId, record);
+    return record;
+  }
+
+  async getChunkedUpload(uploadId: string): Promise<ChunkedUploadRecord | null> {
+    const record = this.chunkedUploads.get(uploadId) ?? null;
+    if (record && new Date(record.expiresAt).getTime() < Date.now()) {
+      this.chunkedUploads.delete(uploadId);
+      return null;
+    }
+    return record;
+  }
+
+  async addChunk(uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean> {
+    const record = this.chunkedUploads.get(uploadId);
+    if (!record) return false;
+    if (new Date(record.expiresAt).getTime() < Date.now()) {
+      this.chunkedUploads.delete(uploadId);
+      return false;
+    }
+    record.receivedChunks.set(chunkIndex, data);
+    return true;
+  }
+
+  async deleteChunkedUpload(uploadId: string): Promise<boolean> {
+    return this.chunkedUploads.delete(uploadId);
   }
 }

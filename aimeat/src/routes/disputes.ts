@@ -435,5 +435,50 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
         }));
     });
 
+    // -----------------------------------------------
+    // Tier 0.5 — GET-based dispute operations via OTK
+    // -----------------------------------------------
+
+    // GET /v1/work/:tc/accept-redelivery?otk= — accept redelivery via OTK
+    router.get('/v1/work/:tc/accept-redelivery', async (req, res) => {
+        const otkKey = req.query.otk as string;
+        if (!otkKey) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required')); return; }
+        const otk = await storage.consumeOtk(otkKey);
+        if (!otk) { res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'OTK not found, expired, or used')); return; }
+        const tc = param(req.params.tc);
+        const work = await storage.getWork(tc);
+        if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Work not found')); return; }
+        if (work.requesterGaii !== otk.ownerGaii) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not requester')); return; }
+        const dispute = await storage.getDisputeByTrackingCode(tc);
+        if (!dispute) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No dispute for this work')); return; }
+        const { settlePayment: settlePaymentFn } = await import('../services/morsel.js');
+        await settlePaymentFn(storage, config, work);
+        await storage.updateWork(tc, { status: 'delivered', updatedAt: new Date().toISOString() });
+        await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
+        res.json(success(config.nodeId, { tracking_code: tc, dispute_resolved: true, tier: '0.5' }));
+    });
+
+    // GET /v1/work/:tc/escalate?otk= — escalate dispute via OTK
+    router.get('/v1/work/:tc/escalate', async (req, res) => {
+        const otkKey = req.query.otk as string;
+        if (!otkKey) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required')); return; }
+        const otk = await storage.consumeOtk(otkKey);
+        if (!otk) { res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'OTK not found, expired, or used')); return; }
+        const tc = param(req.params.tc);
+        const work = await storage.getWork(tc);
+        if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Work not found')); return; }
+        const dispute = await storage.getDisputeByTrackingCode(tc);
+        if (!dispute) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No dispute for this work')); return; }
+        await storage.updateDispute(dispute.id, { status: 'escalated', updatedAt: new Date().toISOString() });
+        const auditEntry = { sequence: 0, event: 'escalated_tier_0_5', actor: otk.ownerGaii, timestamp: new Date().toISOString(), data: { via: 'otk' }, hash: '', previousHash: '' };
+        const existingLog = await storage.getDisputeAuditLog(dispute.id);
+        auditEntry.sequence = existingLog.length + 1;
+        auditEntry.previousHash = existingLog.length > 0 ? existingLog[existingLog.length - 1].hash : '0';
+        const { createHash } = await import('node:crypto');
+        auditEntry.hash = createHash('sha256').update(JSON.stringify({ ...auditEntry, hash: undefined })).digest('hex');
+        await storage.addDisputeAuditEntry(dispute.id, auditEntry);
+        res.json(success(config.nodeId, { tracking_code: tc, dispute_status: 'escalated', tier: '0.5' }));
+    });
+
     return router;
 }

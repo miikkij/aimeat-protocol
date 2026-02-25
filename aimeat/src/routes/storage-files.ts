@@ -3,6 +3,7 @@ import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { randomBytes } from 'node:crypto';
 
 export function storageFilesRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
@@ -145,6 +146,164 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         }
 
         res.json(success(config.nodeId, { deleted: true, key }));
+    });
+
+    // -----------------------------------------------
+    // Chunked Upload — Large file support
+    // -----------------------------------------------
+
+    // POST /v1/storage/upload/init — initiate chunked upload
+    router.post('/v1/storage/upload/init', requireAuth(), requireRole('agent'), async (req, res) => {
+        const gaii = req.auth!.sub;
+        const { key, mime_type, visibility, chunk_size, total_chunks } = req.body ?? {};
+        if (!key) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
+            return;
+        }
+        const uploadId = `upload-${randomBytes(12).toString('hex')}`;
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 6 * 3600_000).toISOString(); // 6 hours
+
+        await storage.createChunkedUpload({
+            uploadId,
+            ownerGaii: gaii,
+            key,
+            mimeType: mime_type ?? 'application/octet-stream',
+            visibility: visibility ?? 'private',
+            chunkSize: chunk_size ?? 10 * 1024 * 1024, // 10MB default
+            totalChunks: total_chunks,
+            receivedChunks: new Map(),
+            createdAt: now.toISOString(),
+            expiresAt,
+        });
+
+        res.status(201).json(success(config.nodeId, {
+            upload_id: uploadId,
+            key,
+            chunk_size: chunk_size ?? 10 * 1024 * 1024,
+            expires_at: expiresAt,
+        }, [
+            { description: 'Upload chunk', method: 'PUT', url: `/v1/storage/upload/${uploadId}/0` },
+            { description: 'Complete upload', method: 'POST', url: `/v1/storage/upload/${uploadId}/complete` },
+        ]));
+    });
+
+    // PUT /v1/storage/upload/:id/:chunk — upload a single chunk
+    router.put('/v1/storage/upload/:id/:chunk', requireAuth(), requireRole('agent'), async (req, res) => {
+        const uploadId = req.params.id as string;
+        const chunkIndex = parseInt(req.params.chunk as string, 10);
+        if (isNaN(chunkIndex) || chunkIndex < 0) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'chunk index must be a non-negative integer'));
+            return;
+        }
+
+        const upload = await storage.getChunkedUpload(uploadId);
+        if (!upload) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
+            return;
+        }
+        if (upload.ownerGaii !== req.auth!.sub) {
+            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not your upload'));
+            return;
+        }
+
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+        }
+        const data = Buffer.concat(chunks);
+
+        const added = await storage.addChunk(uploadId, chunkIndex, data);
+        if (!added) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
+            return;
+        }
+
+        res.json(success(config.nodeId, {
+            upload_id: uploadId,
+            chunk_index: chunkIndex,
+            chunk_size: data.length,
+            received: true,
+        }));
+    });
+
+    // POST /v1/storage/upload/:id/complete — assemble chunks into final file
+    router.post('/v1/storage/upload/:id/complete', requireAuth(), requireRole('agent'), async (req, res) => {
+        const uploadId = req.params.id as string;
+        const upload = await storage.getChunkedUpload(uploadId);
+        if (!upload) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
+            return;
+        }
+        if (upload.ownerGaii !== req.auth!.sub) {
+            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not your upload'));
+            return;
+        }
+        if (upload.receivedChunks.size === 0) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No chunks uploaded'));
+            return;
+        }
+
+        // Assemble in order
+        const sortedIndices = [...upload.receivedChunks.keys()].sort((a, b) => a - b);
+        const buffers = sortedIndices.map(i => upload.receivedChunks.get(i)!);
+        const assembledData = Buffer.concat(buffers);
+
+        // Optional checksum verification
+        const { checksum_sha256 } = req.body ?? {};
+        if (checksum_sha256) {
+            const { createHash } = await import('node:crypto');
+            const actual = createHash('sha256').update(assembledData).digest('hex');
+            if (actual !== checksum_sha256) {
+                res.status(400).json(error(config.nodeId, 'CHECKSUM_MISMATCH', 'SHA-256 checksum does not match', undefined, {
+                    expected: checksum_sha256, actual,
+                }));
+                return;
+            }
+        }
+
+        // Create the final storage file
+        const file = await storage.createStorageFile({
+            key: upload.key,
+            ownerGaii: upload.ownerGaii,
+            visibility: upload.visibility,
+            mimeType: upload.mimeType,
+            size: assembledData.length,
+            data: assembledData,
+            createdAt: new Date().toISOString(),
+        });
+
+        // Clean up chunked upload
+        await storage.deleteChunkedUpload(uploadId);
+
+        res.status(201).json(success(config.nodeId, {
+            key: file.key,
+            size: file.size,
+            mime_type: file.mimeType,
+            visibility: file.visibility,
+            chunks_assembled: sortedIndices.length,
+            created_at: file.createdAt,
+        }, [
+            { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(file.key)}` },
+        ]));
+    });
+
+    // DELETE /v1/storage/upload/:id — abort chunked upload
+    router.delete('/v1/storage/upload/:id', requireAuth(), requireRole('agent'), async (req, res) => {
+        const uploadId = req.params.id as string;
+        const upload = await storage.getChunkedUpload(uploadId);
+        if (!upload) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
+            return;
+        }
+        if (upload.ownerGaii !== req.auth!.sub) {
+            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not your upload'));
+            return;
+        }
+
+        await storage.deleteChunkedUpload(uploadId);
+
+        res.json(success(config.nodeId, { upload_id: uploadId, aborted: true }));
     });
 
     return router;

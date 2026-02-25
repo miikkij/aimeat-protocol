@@ -44,6 +44,79 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // GET /v1/auth/session — Submit signed challenge, get OTK (Tier 0.5)
+  router.get('/v1/auth/session', async (req, res) => {
+    const owner = req.query.owner as string | undefined;
+    const challengeStr = req.query.challenge as string | undefined;
+    const sig = req.query.sig as string | undefined;
+
+    if (!owner || !challengeStr || !sig) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Query parameters "owner", "challenge", and "sig" are required'));
+      return;
+    }
+
+    // Look up challenge
+    const stored = challenges.get(challengeStr);
+    if (!stored) {
+      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Challenge not found or expired'));
+      return;
+    }
+    if (Date.now() > stored.expiresAt) {
+      challenges.delete(challengeStr);
+      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Challenge expired'));
+      return;
+    }
+    if (stored.owner !== owner) {
+      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Challenge does not match owner'));
+      return;
+    }
+
+    // Verify signature: owner signed the challenge string with their private key
+    const ownerRecord = await storage.getOwner(owner);
+    if (!ownerRecord) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
+      return;
+    }
+
+    const valid = await verify(ownerRecord.publicKey, challengeStr, sig);
+    if (!valid) {
+      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid signature'));
+      return;
+    }
+
+    // Consume challenge
+    challenges.delete(challengeStr);
+
+    // Find first agent for this owner (or create session OTK for owner)
+    const agents = await storage.getAgentsByOwner(owner);
+    const sessionGaii = agents.length > 0 ? agents[0].gaii : owner;
+
+    // Generate OTK for Tier 0.5 operations
+    const otk = generateOtk();
+    const expiresAt = new Date(Date.now() + 300_000).toISOString(); // 5 minutes
+    const nextOtkActivates = new Date(Date.now() + 60_000).toISOString(); // 60s post-use window
+
+    await storage.createOtk({
+      key: otk,
+      ownerGaii: sessionGaii,
+      action: 'session',
+      params: { owner, sessionType: 'tier_0_5' },
+      expiresAt,
+      used: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json(success(config.nodeId, {
+      otk,
+      otk_expires: expiresAt,
+      next_otk_activates: nextOtkActivates,
+      session_agent: sessionGaii,
+    }, [
+      { description: 'Use OTK for micro-memory operations', method: 'GET', url: `/v1/mm?otk=${otk}&op=list` },
+      { description: 'Accept work via GET', method: 'GET', url: `/v1/work/{tc}/accept?otk=${otk}` },
+    ]));
+  });
+
   // POST /v1/auth/token — exchange signature for JWT
   router.post('/v1/auth/token', async (req, res) => {
     const { gaii, owner: ownerName, timestamp, signature } = req.body ?? {};

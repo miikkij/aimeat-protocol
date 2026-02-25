@@ -327,5 +327,79 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
     }));
   });
 
+  // -----------------------------------------------
+  // Tier 0.5 — GET-based OTK operations
+  // -----------------------------------------------
+
+  // GET /v1/work/:tc/accept?otk= — accept work via OTK (Tier 0.5)
+  router.get('/v1/work/:tc/accept', async (req, res) => {
+    const otkKey = req.query.otk as string;
+    if (!otkKey) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
+      return;
+    }
+    const otk = await storage.consumeOtk(otkKey);
+    if (!otk) {
+      res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
+      return;
+    }
+    const tc = param(req.params.tc);
+    const work = await storage.getWork(tc);
+    if (!work) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
+      return;
+    }
+    if (work.providerGaii !== otk.ownerGaii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'OTK agent is not the provider of this work'));
+      return;
+    }
+    if (work.status !== 'pending') {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", cannot accept`));
+      return;
+    }
+    const updated = await storage.updateWork(tc, { status: 'accepted', updatedAt: new Date().toISOString() });
+    res.json(success(config.nodeId, {
+      tracking_code: updated!.trackingCode,
+      status: updated!.status,
+      tier: '0.5',
+    }));
+  });
+
+  // GET /v1/work/:tc/reject?otk= — reject work via OTK (Tier 0.5)
+  router.get('/v1/work/:tc/reject', async (req, res) => {
+    const otkKey = req.query.otk as string;
+    if (!otkKey) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
+      return;
+    }
+    const otk = await storage.consumeOtk(otkKey);
+    if (!otk) {
+      res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
+      return;
+    }
+    const tc = param(req.params.tc);
+    const work = await storage.getWork(tc);
+    if (!work) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
+      return;
+    }
+    if (work.providerGaii !== otk.ownerGaii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'OTK agent is not the provider of this work'));
+      return;
+    }
+    if (work.status !== 'pending') {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", cannot reject`));
+      return;
+    }
+    const { returnEscrow: returnEscrowFn } = await import('../services/morsel.js');
+    await returnEscrowFn(storage, work);
+    const updated = await storage.updateWork(tc, { status: 'cancelled', updatedAt: new Date().toISOString() });
+    res.json(success(config.nodeId, {
+      tracking_code: updated!.trackingCode,
+      status: updated!.status,
+      tier: '0.5',
+    }));
+  });
+
   return router;
 }

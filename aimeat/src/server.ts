@@ -26,7 +26,9 @@ import { disputesRouter } from './routes/disputes.js';
 import { microMemoryRouter } from './routes/micro-memory.js';
 import { storageFilesRouter } from './routes/storage-files.js';
 import { validateRouter } from './routes/validate.js';
+import { mcpRouter } from './routes/mcp.js';
 import { rateLimit } from './middleware/rate-limit.js';
+import { idempotency } from './middleware/idempotency.js';
 import type { Storage } from './storage/interface.js';
 
 export function createServer(config: MeatConfig): express.Express {
@@ -50,6 +52,9 @@ export function createServer(config: MeatConfig): express.Express {
   // Rate limiting
   app.use(rateLimit({ windowMs: 60_000, max: 200 }));
 
+  // Idempotency-Key support for POST/PUT
+  app.use(idempotency());
+
   // Optional auth on all routes (parses JWT if present)
   app.use(optionalAuth());
 
@@ -58,6 +63,9 @@ export function createServer(config: MeatConfig): express.Express {
 
   // Initialize node keys asynchronously
   initializeNode(config, storage);
+
+  // Start daily allowance background job
+  startDailyAllowanceJob(config, storage);
 
   // Mount routes
   app.use(bootstrapRouter(config));
@@ -78,6 +86,7 @@ export function createServer(config: MeatConfig): express.Express {
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
+  app.use(mcpRouter(config, storage));
   app.use(specRouter());
 
   // Global error handler
@@ -102,6 +111,32 @@ export function createServer(config: MeatConfig): express.Express {
   });
 
   return app;
+}
+
+// Daily allowance: credit all agents every 24 hours (or on first activity)
+function startDailyAllowanceJob(config: MeatConfig, storage: Storage): void {
+  const creditAllAgents = async () => {
+    try {
+      const agents = await storage.listAgents();
+      for (const agent of agents) {
+        if (agent.morselBalance < config.dailyAllowanceCap) {
+          const credit = Math.min(config.dailyAllowance, config.dailyAllowanceCap - agent.morselBalance);
+          if (credit > 0) {
+            await storage.updateAgent(agent.gaii, {
+              morselBalance: agent.morselBalance + credit,
+            });
+          }
+        }
+      }
+      logger.info(`Daily allowance credited to ${agents.length} agents`);
+    } catch (err) {
+      logger.error('Daily allowance job failed', { error: err });
+    }
+  };
+
+  // Run daily (every 24 hours)
+  setInterval(creditAllAgents, 24 * 3600_000);
+  logger.info('Daily allowance job scheduled (every 24h)');
 }
 
 async function initializeNode(config: MeatConfig, storage: Storage): Promise<void> {

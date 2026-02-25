@@ -33,6 +33,24 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
 
     const existing = await storage.getMemory(gaii, key);
 
+    // Quota enforcement: max 1000 keys per agent, max 64KB per value
+    const MAX_KEYS_PER_AGENT = 1000;
+    const MAX_VALUE_SIZE = 65536; // 64KB
+
+    const valueSize = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    if (valueSize > MAX_VALUE_SIZE) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value size ${valueSize} bytes exceeds limit of ${MAX_VALUE_SIZE} bytes`));
+      return;
+    }
+
+    if (!existing) {
+      const allKeys = await storage.listMemory(gaii);
+      if (allKeys.length >= MAX_KEYS_PER_AGENT) {
+        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Memory key limit reached (${MAX_KEYS_PER_AGENT}). Delete unused keys first.`));
+        return;
+      }
+    }
+
     const record = await storage.setMemory({
       key,
       ownerGaii: gaii,
@@ -79,6 +97,7 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
         updated_at: r.updatedAt,
       })),
       total: records.length,
+      quota: { max_keys: 1000, used_keys: records.length },
     }, [
       {
         description: 'Write a new memory entry',

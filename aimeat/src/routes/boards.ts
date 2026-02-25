@@ -293,5 +293,53 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }));
   });
 
+  // -----------------------------------------------
+  // Tier 0.5 — GET-based board post via OTK (limited to 500 chars)
+  // -----------------------------------------------
+  // GET /v1/boards/:boardId/posts/new?otk=&title=&body=&category=
+  router.get('/v1/boards/:boardId/posts/new', async (req, res) => {
+    const otkKey = req.query.otk as string;
+    if (!otkKey) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
+      return;
+    }
+    const otk = await storage.consumeOtk(otkKey);
+    if (!otk) {
+      res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
+      return;
+    }
+    const boardId = req.params.boardId as string;
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Board not found'));
+      return;
+    }
+    const title = (req.query.title as string) ?? 'Untitled';
+    const body = (req.query.body as string) ?? '';
+    if (body.length > 500) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Tier 0.5 board posts are limited to 500 characters'));
+      return;
+    }
+    const postId = `post-${randomBytes(8).toString('hex')}`;
+    const post = await storage.createPost({
+      id: postId,
+      boardId,
+      authorGaii: otk.ownerGaii,
+      title,
+      body,
+      category: (req.query.category as string) ?? undefined,
+      tags: [],
+      reactions: {},
+      createdAt: new Date().toISOString(),
+    });
+    res.status(201).json(success(config.nodeId, {
+      id: post.id,
+      board_id: boardId,
+      title: post.title,
+      body: post.body,
+      tier: '0.5',
+    }));
+  });
+
   return router;
 }
