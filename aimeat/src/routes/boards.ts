@@ -191,6 +191,52 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }));
   });
 
+  // GET /v1/boards/:boardId/posts/:postId — read single post (Tier 0 for public)
+  router.get('/v1/boards/:boardId/posts/:postId', async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const postId = req.params.postId as string;
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+
+    const gaii = req.auth?.sub;
+    if (board.visibility !== 'public') {
+      if (!gaii) {
+        res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
+        return;
+      }
+      if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
+        return;
+      }
+    }
+
+    const post = await storage.getPost(boardId, postId);
+    if (!post) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Post not found: ${postId}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      id: post.id,
+      board_id: post.boardId,
+      author_gaii: post.authorGaii,
+      title: post.title,
+      body: post.body,
+      category: post.category,
+      tags: post.tags,
+      reactions: post.reactions,
+      reply_to: post.replyTo,
+      ttl_expires_at: post.ttlExpiresAt,
+      created_at: post.createdAt,
+    }, [
+      { description: 'React to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/react` },
+      { description: 'Reply to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/replies` },
+    ]));
+  });
+
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post
   router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), async (req, res) => {
     const boardId = req.params.boardId as string;

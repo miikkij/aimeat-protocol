@@ -22,6 +22,10 @@ import { promptsRouter } from './routes/prompts.js';
 import { adminRouter } from './routes/admin.js';
 import { federationRouter } from './routes/federation.js';
 import { specRouter } from './routes/spec.js';
+import { disputesRouter } from './routes/disputes.js';
+import { microMemoryRouter } from './routes/micro-memory.js';
+import { storageFilesRouter } from './routes/storage-files.js';
+import { validateRouter } from './routes/validate.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import type { Storage } from './storage/interface.js';
 
@@ -70,6 +74,10 @@ export function createServer(config: MeatConfig): express.Express {
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage));
   app.use(federationRouter(config, storage));
+  app.use(disputesRouter(config, storage));
+  app.use(microMemoryRouter(config, storage));
+  app.use(storageFilesRouter(config, storage));
+  app.use(validateRouter(config));
   app.use(specRouter());
 
   // Global error handler

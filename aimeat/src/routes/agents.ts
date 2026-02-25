@@ -174,5 +174,23 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // POST /v1/checkin — agent heartbeat (agent auth)
+  router.post('/v1/checkin', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const now = new Date().toISOString();
+    const agent = await storage.updateAgent(gaii, { lastSeen: now });
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii,
+      checked_in: now,
+      trust_score: agent.trustScore,
+      morsel_balance: agent.morselBalance,
+    }));
+  });
+
   return router;
 }

@@ -104,6 +104,46 @@ export function ownersRouter(config: MeatConfig, storage: Storage): Router {
     }));
   });
 
+  // GET /v1/owners/:ownerName@:node/trust — owner trust profile (Tier 0)
+  router.get('/v1/owners/:ownerName@:node/trust', async (req, res) => {
+    const ownerName = (req.params as Record<string, string>).ownerName;
+    const owner = await storage.getOwner(ownerName);
+    if (!owner) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${ownerName}`));
+      return;
+    }
+
+    const agents = await storage.getAgentsByOwner(ownerName);
+    let totalDeliveries = 0, successfulDeliveries = 0, totalTrust = 0;
+    for (const agent of agents) {
+      const trust = await calculateTrustScore(agent.gaii, storage);
+      totalDeliveries += trust.totalDeliveries;
+      successfulDeliveries += trust.successfulDeliveries;
+      totalTrust += trust.score;
+    }
+
+    const avgTrust = agents.length > 0 ? Math.round(totalTrust / agents.length) : 50;
+    const successRate = totalDeliveries > 0 ? successfulDeliveries / totalDeliveries : 1;
+    const ageDays = Math.floor((Date.now() - new Date(owner.createdAt).getTime()) / 86_400_000);
+
+    res.json(success(config.nodeId, {
+      owner: ownerName,
+      node: (req.params as Record<string, string>).node,
+      trust_score: avgTrust,
+      agents: agents.length,
+      success_rate: Math.round(successRate * 100) / 100,
+      total_deliveries: totalDeliveries,
+      successful_deliveries: successfulDeliveries,
+      age_days: ageDays,
+      components: {
+        delivery_reliability: Math.round(successRate * 40),
+        agent_reputation: Math.min(30, agents.length * 10),
+        account_age: Math.min(20, ageDays),
+        dispute_history: 10,
+      },
+    }));
+  });
+
   // GET /v1/owners/:name/export — GDPR data export (owner auth)
   router.get('/v1/owners/:name/export', requireAuth(), async (req, res) => {
     const name = req.params.name as string;

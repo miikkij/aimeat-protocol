@@ -89,6 +89,33 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
+  router.get('/v1/memory/search', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const q = req.query.q as string;
+    if (!q) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'q query parameter is required'));
+      return;
+    }
+
+    const visibility = req.query.visibility as string | undefined;
+    const results = await storage.searchMemory(gaii, q, { visibility });
+
+    res.json(success(config.nodeId, {
+      results: results.map(r => ({
+        key: r.key,
+        value: r.value,
+        visibility: r.visibility,
+        tags: r.tags,
+        version: r.version,
+        created_at: r.createdAt,
+        updated_at: r.updatedAt,
+      })),
+      total: results.length,
+      query: q,
+    }));
+  });
+
   // GET /v1/memory/:key — read a memory entry
   router.get('/v1/memory/:key', requireAuth(), requireRole('agent'), async (req, res) => {
     const gaii = req.auth!.sub;
@@ -132,6 +159,55 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
     }, [
       { description: 'List remaining memory keys', method: 'GET', url: '/v1/memory' },
       { description: 'Write a new memory entry', method: 'POST', url: '/v1/memory' },
+    ]));
+  });
+
+  // PUT /v1/memory/:key — update memory with optimistic locking
+  router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const key = decodeURIComponent(req.params.key as string);
+    const { value, visibility, tags, ttl_hours, version } = req.body ?? {};
+
+    if (value === undefined || version === undefined) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'value and version are required'));
+      return;
+    }
+
+    const existing = await storage.getMemory(gaii, key);
+    if (!existing) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
+      return;
+    }
+
+    if (existing.version !== version) {
+      res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
+        `Expected version ${version} but current is ${existing.version}`,
+        409, { current_version: existing.version, your_version: version }));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const record = await storage.setMemory({
+      key,
+      ownerGaii: gaii,
+      value,
+      visibility: visibility ?? existing.visibility,
+      tags: tags ?? existing.tags,
+      ttlHours: ttl_hours ?? existing.ttlHours,
+      version: existing.version + 1,
+      createdAt: existing.createdAt,
+      updatedAt: now,
+    });
+
+    res.json(success(config.nodeId, {
+      key: record.key,
+      visibility: record.visibility,
+      tags: record.tags,
+      version: record.version,
+      created_at: record.createdAt,
+      updated_at: record.updatedAt,
+    }, [
+      { description: 'Read this memory entry', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
   });
 

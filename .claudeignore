@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+aimeat/node_modules/
+
+# Build output
+dist/
+aimeat/dist/
+build/
+
+# Lock files (large, not useful for context)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.production
+.env.development
+.env.developer.override
+
+# Generated artifacts
+**/generated/
+
+# Logs
+logs/
+*.log
+
+# Archived spec versions (superseded by current docs)
+docs/archived/
+
+# Docker artifacts
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Temp
+.tmp/
+tmp/

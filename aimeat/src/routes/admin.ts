@@ -53,6 +53,21 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
         ]));
     });
 
+    // GET /v1/admin/config — view current config (operator only)
+    router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
+        res.json(success(config.nodeId, {
+            node_id: config.nodeId,
+            port: config.port,
+            storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
+            welcome_bonus: config.welcomeBonus,
+            daily_allowance: config.dailyAllowance,
+            daily_allowance_cap: config.dailyAllowanceCap,
+            burn_rate: config.burnRate,
+            jwt_ttl_seconds: config.jwtTtlSeconds,
+            keyed_browse_enabled: config.keyedBrowseEnabled,
+        }));
+    });
+
     // PUT /v1/admin/config — update runtime configuration (operator only)
     router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
         const allowedKeys = ['welcomeBonus', 'dailyAllowance', 'dailyAllowanceCap', 'burnRate', 'jwtTtlSeconds', 'keyedBrowseEnabled'] as const;
@@ -189,6 +204,34 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, {
             restored: true,
             imported,
+        }));
+    });
+
+    // POST /v1/admin/roles/grant — grant operator role (operator only)
+    router.post('/v1/admin/roles/grant', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { owner, role } = req.body ?? {};
+        if (!owner || role !== 'operator') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner and role (must be "operator") are required'));
+            return;
+        }
+
+        const ownerRecord = await storage.getOwner(owner);
+        if (!ownerRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
+            return;
+        }
+
+        if (ownerRecord.roles.includes('operator')) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" already has operator role`));
+            return;
+        }
+
+        await storage.updateOwner(owner, { roles: [...ownerRecord.roles, 'operator'] });
+
+        res.json(success(config.nodeId, {
+            owner,
+            role: 'operator',
+            granted: true,
         }));
     });
 

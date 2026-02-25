@@ -107,11 +107,64 @@ export interface OtkRecord {
   createdAt: string;
 }
 
+export interface DisputeRecord {
+  id: string;
+  trackingCode: string;
+  status: 'open' | 'contested' | 'escalated' | 'resolved';
+  openedBy: string;        // GAII
+  reason: string;
+  ruling?: { ruling: string; distribution: { toRequester: number; toProvider: number; burned: number }; reason?: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DisputeAuditEntry {
+  sequence: number;
+  event: string;
+  actor: string;
+  timestamp: string;
+  data: Record<string, unknown>;
+  hash: string;
+  previousHash: string;
+}
+
+export interface MicroMemoryRecord {
+  gaii: string;
+  set: string;
+  entries: Record<string, string>;
+  visibility: 'private' | 'public';
+  updatedAt: string;
+}
+
+export interface StorageFileRecord {
+  key: string;
+  ownerGaii: string;
+  visibility: 'private' | 'owner' | 'public';
+  mimeType: string;
+  size: number;
+  data: Buffer;
+  createdAt: string;
+}
+
+export interface PeeringRequestRecord {
+  id: string;
+  fromNodeUrl: string;
+  fromNodeId?: string;
+  toNodeId?: string;
+  targetUrl?: string;
+  publicKey?: string;
+  message?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
   getOwner(name: string): Promise<OwnerRecord | null>;
   listOwners(): Promise<OwnerRecord[]>;
+  updateOwner(name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null>;
   deleteOwner(name: string): Promise<boolean>;
 
   // Agents
@@ -162,6 +215,39 @@ export interface Storage {
   createOtk(otk: OtkRecord): Promise<OtkRecord>;
   getOtk(key: string): Promise<OtkRecord | null>;
   consumeOtk(key: string): Promise<OtkRecord | null>;
+
+  // Disputes
+  createDispute(dispute: DisputeRecord): Promise<DisputeRecord>;
+  getDispute(id: string): Promise<DisputeRecord | null>;
+  getDisputeByTrackingCode(tc: string): Promise<DisputeRecord | null>;
+  updateDispute(id: string, updates: Partial<DisputeRecord>): Promise<DisputeRecord | null>;
+  addDisputeAuditEntry(disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry>;
+  getDisputeAuditLog(disputeId: string): Promise<DisputeAuditEntry[]>;
+
+  // Micro-Memory
+  setMicroMemory(record: MicroMemoryRecord): Promise<MicroMemoryRecord>;
+  getMicroMemory(gaii: string, set: string): Promise<MicroMemoryRecord | null>;
+  listMicroMemorySets(gaii: string): Promise<MicroMemoryRecord[]>;
+  deleteMicroMemory(gaii: string, set: string): Promise<boolean>;
+  deleteMicroMemoryEntry(gaii: string, set: string, key: string): Promise<boolean>;
+
+  // Storage (binary files)
+  createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord>;
+  getStorageFile(ownerGaii: string, key: string): Promise<StorageFileRecord | null>;
+  listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]>;
+  deleteStorageFile(ownerGaii: string, key: string): Promise<boolean>;
+
+  // Peering requests
+  createPeeringRequest(req: PeeringRequestRecord): Promise<PeeringRequestRecord>;
+  getPeeringRequest(id: string): Promise<PeeringRequestRecord | null>;
+  listPeeringRequests(status?: string): Promise<PeeringRequestRecord[]>;
+  updatePeeringRequest(id: string, updates: Partial<PeeringRequestRecord>): Promise<PeeringRequestRecord | null>;
+
+  // Memory search
+  searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string }): Promise<MemoryRecord[]>;
+
+  // Action update
+  updateAction(id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null>;
 
   // Node key
   setNodeKey(publicKey: string, privateKey: string): Promise<void>;

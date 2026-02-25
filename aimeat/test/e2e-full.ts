@@ -271,11 +271,17 @@ await test('Boards — create + post + list', async () => {
     assert(lBody.data.posts.length > 0, 'has posts');
 });
 
-await test('Prompts — tier0, tier1, tier2', async () => {
+await test('Prompts — tier0, tier1, tier2 + unified', async () => {
     for (const tier of ['tier0', 'tier1', 'tier2']) {
         const { body } = await json(`/v1/prompts/${tier}`);
         assert(body.ok === true, `${tier} ok`);
         assert(typeof body.data?.system_prompt === 'string', `${tier} has prompt`);
+    }
+    // Unified prompts
+    for (const tier of ['0', '0.5', '1', '2']) {
+        const { body } = await json(`/v1/prompts/${tier}`);
+        assert(body.ok === true, `prompts/${tier} ok`);
+        assert(typeof body.data?.system_prompt === 'string', `prompts/${tier} has prompt`);
     }
 });
 
@@ -297,11 +303,12 @@ await test('OTK — generate + execute', async () => {
     assert(exBody.ok === true, `otk exec: ${JSON.stringify(exBody.error)}`);
 });
 
-await test('Admin — non-operator denied', async () => {
+await test('Admin — operator access dashboard', async () => {
     const { body } = await json('/v1/admin/dashboard', {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(body.ok === false, 'non-operator denied');
+    assert(body.ok === true, `dashboard: ${JSON.stringify(body.error)}`);
+    assert(typeof body.data?.node_id === 'string', 'has node_id');
 });
 
 await test('Federation directory', async () => {
@@ -335,11 +342,260 @@ await test('GET /v1/docs — HTML docs page', async () => {
     assert(res.ok, 'docs returns 200');
 });
 
-await test('Admin backup — non-operator denied', async () => {
+await test('Admin backup — operator access', async () => {
     const { body } = await json('/v1/admin/backup', {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(body.ok === false, 'non-operator denied');
+    assert(body.ok === true, `backup: ${JSON.stringify(body.error)}`);
+    assert(typeof body.data?.exported_at === 'string', 'has exported_at');
+});
+
+// ─── Phase 6: Extended API Coverage ───
+console.log('Phase 6 — Extended API');
+
+await test('Agent check-in', async () => {
+    const { body } = await json('/v1/checkin', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(body.ok === true, `checkin: ${JSON.stringify(body.error)}`);
+    assert(body.data?.gaii === agentGaii, 'gaii matches');
+    assert(typeof body.data?.checked_in === 'string', 'has checked_in timestamp');
+});
+
+await test('Catalogue sub-endpoints', async () => {
+    // Actions sub-catalogue
+    const { body: actBody } = await json('/v1/catalogue/actions');
+    assert(actBody.ok === true, 'catalogue/actions ok');
+    assert(Array.isArray(actBody.data?.actions), 'has actions');
+
+    // Agents directory
+    const { body: agBody } = await json('/v1/catalogue/agents');
+    assert(agBody.ok === true, 'catalogue/agents ok');
+    assert(Array.isArray(agBody.data?.agents), 'has agents');
+
+    // Boards
+    const { body: bBody } = await json('/v1/catalogue/boards');
+    assert(bBody.ok === true, 'catalogue/boards ok');
+    assert(Array.isArray(bBody.data?.boards), 'has boards');
+
+    // Hash
+    const { body: hBody } = await json('/v1/catalogue/hash');
+    assert(hBody.ok === true, 'catalogue/hash ok');
+    assert(typeof hBody.data?.hash === 'string', 'has hash');
+    assert(hBody.data.hash.length === 64, 'SHA-256 hex is 64 chars');
+});
+
+await test('Public stats', async () => {
+    const { body } = await json('/v1/stats');
+    assert(body.ok === true, `stats: ${JSON.stringify(body.error)}`);
+    assert(typeof body.data?.counts?.agents === 'number', 'has agent count');
+    assert(typeof body.data?.counts?.actions === 'number', 'has action count');
+    assert(body.data?.node_id === NODE_ID, 'node_id correct');
+});
+
+await test('Action discovery + detail', async () => {
+    const { body: discBody } = await json('/v1/actions', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(discBody.ok === true, 'discover ok');
+    assert(Array.isArray(discBody.data?.actions), 'has actions');
+
+    // Detail by GAII
+    const { body: detBody } = await json(`/v1/actions/${encodeURIComponent(agentGaii)}/summarize-text`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(detBody.ok === true, `action detail: ${JSON.stringify(detBody.error)}`);
+});
+
+await test('Memory PUT (optimistic locking) + search', async () => {
+    // Write a memory entry first
+    await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'locktest', value: 'v1', tags: ['test'] }),
+    });
+
+    // PUT with version
+    const { body: putBody } = await json('/v1/memory/locktest', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ value: 'v2', version: 1 }),
+    });
+    assert(putBody.ok === true, `put: ${JSON.stringify(putBody.error)}`);
+    assert(putBody.data?.version === 2, 'version incremented');
+
+    // Search
+    const { body: sBody } = await json('/v1/memory/search?q=locktest', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(sBody.ok === true, `search: ${JSON.stringify(sBody.error)}`);
+    assert(Array.isArray(sBody.data?.results), 'has results');
+});
+
+await test('Wallet — transactions + request', async () => {
+    // Transactions path
+    const { body: txBody } = await json('/v1/wallet/transactions', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(txBody.ok === true, `transactions: ${JSON.stringify(txBody.error)}`);
+    assert(Array.isArray(txBody.data?.transactions), 'has transactions');
+
+    // Request morsels
+    const { body: reqBody } = await json('/v1/wallet/request', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ amount: 10, reason: 'testing' }),
+    });
+    assert(reqBody.ok === true, `request: ${JSON.stringify(reqBody.error)}`);
+    assert(typeof reqBody.data?.granted === 'number', 'has granted');
+});
+
+await test('Validate endpoint', async () => {
+    const { body } = await json('/v1/validate', {
+        method: 'POST',
+        body: JSON.stringify({
+            path: '/v1/memory',
+            method: 'POST',
+            body: { key: 'test', value: 'hello' },
+        }),
+    });
+    assert(body.ok === true, `validate: ${JSON.stringify(body.error)}`);
+    assert(body.data?.valid === true, 'valid');
+});
+
+await test('Work batch + reject', async () => {
+    // Register another agent for batch test
+    const batchAgent = `batchagent${Date.now()}`;
+    const { body: regBody } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: batchAgent, owner: ownerName }),
+    });
+    const bGaii = regBody.data.agent.gaii;
+    const bPriv = regBody.data.private_key;
+    const bTs = new Date().toISOString();
+    const bSig = await signMsg(bPriv, bGaii + bTs);
+    const { body: bTk } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: bGaii, timestamp: bTs, signature: bSig }),
+    });
+    const bToken = bTk.data?.token;
+
+    // Batch submit
+    const { body: batchBody } = await json('/v1/work/batch', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${bToken}` },
+        body: JSON.stringify({
+            requests: [
+                { action_id: 'summarize-text', provider_gaii: agentGaii, input: { text: 'batch1' } },
+            ],
+        }),
+    });
+    assert(batchBody.ok === true, `batch: ${JSON.stringify(batchBody.error)}`);
+    assert(Array.isArray(batchBody.data?.results), 'has results');
+    assert(batchBody.data.results.length === 1, 'one result');
+
+    // Reject the work item
+    const batchTc = batchBody.data.results[0].tracking_code;
+    if (batchTc) {
+        const { body: rejBody } = await json(`/v1/work/${batchTc}/reject`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ reason: 'testing reject' }),
+        });
+        assert(rejBody.ok === true, `reject: ${JSON.stringify(rejBody.error)}`);
+    }
+});
+
+await test('Board single post', async () => {
+    // Create a board and post
+    const { body: cBody } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ name: 'test-single-post', visibility: 'private' }),
+    });
+    const boardId = cBody.data?.id;
+
+    const { body: pBody } = await json(`/v1/boards/${boardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ title: 'Single Post Test', body: 'Testing single post endpoint' }),
+    });
+    const postId = pBody.data?.id;
+
+    // Get single post
+    const { body: sBody } = await json(`/v1/boards/${boardId}/posts/${postId}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(sBody.ok === true, `single post: ${JSON.stringify(sBody.error)}`);
+    assert(sBody.data?.title === 'Single Post Test', 'title matches');
+});
+
+await test('Federation — peer request + status', async () => {
+    // Need operator token — first owner is operator
+    const { body: reqBody } = await json('/v1/federation/peer/request', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ target_url: 'http://example.com:3117' }),
+    });
+    assert(reqBody.ok === true, `peer request: ${JSON.stringify(reqBody.error)}`);
+    const reqId = reqBody.data?.request_id;
+    assert(typeof reqId === 'string', 'got request_id');
+
+    // Check status
+    const { body: stBody } = await json(`/v1/federation/peer/request/${reqId}/status`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(stBody.ok === true, `peer status: ${JSON.stringify(stBody.error)}`);
+    assert(stBody.data?.status === 'pending', 'status is pending');
+});
+
+await test('Admin — config GET + roles grant', async () => {
+    // GET config
+    const { body: cfgBody } = await json('/v1/admin/config', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(cfgBody.ok === true, `config: ${JSON.stringify(cfgBody.error)}`);
+    assert(cfgBody.data?.node_id === NODE_ID, 'node_id');
+
+    // Create another owner and grant operator
+    const grantOwner = `grantowner${Date.now()}`;
+    const { body: goBody } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: grantOwner }),
+    });
+    assert(goBody.ok === true, 'created grant owner');
+
+    const { body: grBody } = await json('/v1/admin/roles/grant', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ owner: grantOwner, role: 'operator' }),
+    });
+    assert(grBody.ok === true, `grant: ${JSON.stringify(grBody.error)}`);
+    assert(grBody.data?.granted === true, 'granted');
+
+    // Clean up
+    await json(`/v1/owners/${grantOwner}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+});
+
+await test('Federation — heartbeat + peers list', async () => {
+    const { body: hbBody } = await json('/v1/federation/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify({ from_node_id: 'test-node', timestamp: new Date().toISOString(), status: 'healthy' }),
+    });
+    assert(hbBody.ok === true, `heartbeat: ${JSON.stringify(hbBody.error)}`);
+    assert(hbBody.data?.status === 'healthy', 'status');
+
+    // List peers (operator)
+    const { body: plBody } = await json('/v1/federation/peers', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(plBody.ok === true, `peers list: ${JSON.stringify(plBody.error)}`);
+    assert(Array.isArray(plBody.data?.peers), 'has peers array');
 });
 
 // ─── GDPR ───

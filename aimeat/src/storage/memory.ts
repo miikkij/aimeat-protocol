@@ -2,6 +2,8 @@ import type {
   Storage, OwnerRecord, AgentRecord, MemoryRecord,
   ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord,
+  DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
+  StorageFileRecord, PeeringRequestRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -14,6 +16,11 @@ export class InMemoryStorage implements Storage {
   private boards = new Map<string, BoardRecord>();
   private posts = new Map<string, BoardPostRecord>();        // key: `${boardId}::${postId}`
   private otks = new Map<string, OtkRecord>();
+  private disputes = new Map<string, DisputeRecord>();
+  private disputeAuditLogs = new Map<string, DisputeAuditEntry[]>();
+  private microMemory = new Map<string, MicroMemoryRecord>();  // key: `${gaii}::${set}`
+  private storageFiles = new Map<string, StorageFileRecord>();  // key: `${gaii}::${key}`
+  private peeringRequests = new Map<string, PeeringRequestRecord>();
   private nodeKey: { publicKey: string; privateKey: string } | null = null;
 
   // ── Owners ──
@@ -34,6 +41,14 @@ export class InMemoryStorage implements Storage {
 
   async deleteOwner(name: string): Promise<boolean> {
     return this.owners.delete(name);
+  }
+
+  async updateOwner(name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null> {
+    const owner = this.owners.get(name);
+    if (!owner) return null;
+    const updated = { ...owner, ...updates };
+    this.owners.set(name, updated);
+    return updated;
   }
 
   // ── Agents ──
@@ -294,5 +309,154 @@ export class InMemoryStorage implements Storage {
 
   async getNodeKey(): Promise<{ publicKey: string; privateKey: string } | null> {
     return this.nodeKey;
+  }
+
+  // ── Disputes ──
+
+  async createDispute(dispute: DisputeRecord): Promise<DisputeRecord> {
+    this.disputes.set(dispute.id, dispute);
+    return dispute;
+  }
+
+  async getDispute(id: string): Promise<DisputeRecord | null> {
+    return this.disputes.get(id) ?? null;
+  }
+
+  async getDisputeByTrackingCode(tc: string): Promise<DisputeRecord | null> {
+    for (const d of this.disputes.values()) {
+      if (d.trackingCode === tc) return d;
+    }
+    return null;
+  }
+
+  async updateDispute(id: string, updates: Partial<DisputeRecord>): Promise<DisputeRecord | null> {
+    const existing = this.disputes.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.disputes.set(id, updated);
+    return updated;
+  }
+
+  async addDisputeAuditEntry(disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry> {
+    const log = this.disputeAuditLogs.get(disputeId) ?? [];
+    log.push(entry);
+    this.disputeAuditLogs.set(disputeId, log);
+    return entry;
+  }
+
+  async getDisputeAuditLog(disputeId: string): Promise<DisputeAuditEntry[]> {
+    return this.disputeAuditLogs.get(disputeId) ?? [];
+  }
+
+  // ── Micro-Memory ──
+
+  private mmKey(gaii: string, set: string) { return `${gaii}::${set}`; }
+
+  async setMicroMemory(record: MicroMemoryRecord): Promise<MicroMemoryRecord> {
+    this.microMemory.set(this.mmKey(record.gaii, record.set), record);
+    return record;
+  }
+
+  async getMicroMemory(gaii: string, set: string): Promise<MicroMemoryRecord | null> {
+    return this.microMemory.get(this.mmKey(gaii, set)) ?? null;
+  }
+
+  async listMicroMemorySets(gaii: string): Promise<MicroMemoryRecord[]> {
+    const prefix = `${gaii}::`;
+    const results: MicroMemoryRecord[] = [];
+    for (const [k, v] of this.microMemory) {
+      if (k.startsWith(prefix)) results.push(v);
+    }
+    return results;
+  }
+
+  async deleteMicroMemory(gaii: string, set: string): Promise<boolean> {
+    return this.microMemory.delete(this.mmKey(gaii, set));
+  }
+
+  async deleteMicroMemoryEntry(gaii: string, set: string, key: string): Promise<boolean> {
+    const record = this.microMemory.get(this.mmKey(gaii, set));
+    if (!record || !(key in record.entries)) return false;
+    delete record.entries[key];
+    return true;
+  }
+
+  // ── Storage (Binary Files) ──
+
+  private fileKey(gaii: string, key: string) { return `${gaii}::${key}`; }
+
+  async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {
+    this.storageFiles.set(this.fileKey(file.ownerGaii, file.key), file);
+    return file;
+  }
+
+  async getStorageFile(ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
+    return this.storageFiles.get(this.fileKey(ownerGaii, key)) ?? null;
+  }
+
+  async listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]> {
+    const prefix = `${ownerGaii}::`;
+    const results: StorageFileRecord[] = [];
+    for (const [k, v] of this.storageFiles) {
+      if (k.startsWith(prefix)) results.push(v);
+    }
+    return results;
+  }
+
+  async deleteStorageFile(ownerGaii: string, key: string): Promise<boolean> {
+    return this.storageFiles.delete(this.fileKey(ownerGaii, key));
+  }
+
+  // ── Peering Requests ──
+
+  async createPeeringRequest(req: PeeringRequestRecord): Promise<PeeringRequestRecord> {
+    this.peeringRequests.set(req.id, req);
+    return req;
+  }
+
+  async getPeeringRequest(id: string): Promise<PeeringRequestRecord | null> {
+    return this.peeringRequests.get(id) ?? null;
+  }
+
+  async listPeeringRequests(status?: string): Promise<PeeringRequestRecord[]> {
+    const results = [...this.peeringRequests.values()];
+    if (status) return results.filter(r => r.status === status);
+    return results;
+  }
+
+  async updatePeeringRequest(id: string, updates: Partial<PeeringRequestRecord>): Promise<PeeringRequestRecord | null> {
+    const existing = this.peeringRequests.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.peeringRequests.set(id, updated);
+    return updated;
+  }
+
+  // ── Memory Search ──
+
+  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string }): Promise<MemoryRecord[]> {
+    const q = query.toLowerCase();
+    const results: MemoryRecord[] = [];
+    const prefix = `${ownerGaii}::`;
+    for (const [k, v] of this.memory) {
+      if (!k.startsWith(prefix)) continue;
+      if (opts?.visibility && v.visibility !== opts.visibility) continue;
+      const valStr = typeof v.value === 'string' ? v.value : JSON.stringify(v.value);
+      if (v.key.toLowerCase().includes(q) || valStr.toLowerCase().includes(q) || v.tags.some(t => t.toLowerCase().includes(q))) {
+        results.push(v);
+      }
+    }
+    return results;
+  }
+
+  // ── Action Update ──
+
+  async updateAction(id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null> {
+    const k = this.actionKey(providerGaii, id);
+    const existing = this.actions.get(k);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.actions.set(k, updated);
+    return updated;
   }
 }
