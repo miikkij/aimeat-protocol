@@ -2,7 +2,7 @@
 
 ## What You're Building
 
-Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in the attached file `AIMEAT-RFC-v1.0.md` — that is your source of truth. Read it fully before writing any code.
+Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in the attached file `AIMEAT-RFC-v1.1.md` — that is your source of truth. Read it fully before writing any code.
 
 ## The Goal
 
@@ -122,7 +122,7 @@ interface MeatResponse<T> {
 ```bash
 aimeat                                    # start with defaults (in-memory, port 3117)
 aimeat --port 8080                        # custom port
-aimeat --db mongodb://localhost/aimeat     # persistent mode
+aimeat --db mongodb://localhost/aimeat     # persistent mode (override DATABASE_URL)
 aimeat --admin-password secret123         # set admin password
 aimeat --node-id meat-finland-001-genesis # set node identity
 aimeat init                               # interactive setup wizard
@@ -130,7 +130,42 @@ aimeat backup --out backup.json           # export all data
 aimeat restore --from backup.json         # import data
 ```
 
+For development, create `.env`:
+```properties
+DATABASE_URL="mongodb://dbuser:dbpassword@localhost:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin"
+MEAT_NODE_ID="meat-finland-001-genesis"
+MEAT_PORT=3117
+MEAT_ADMIN_PASSWORD=TestAdminPw123!
+```
+
 Default port: **3117** (MEAT on a phone keypad: M=6, E=3, A=2, T=8 → but let's use 3117 as the AIMEAT port).
+
+### 5.5 Environment & Package Manager
+
+**Use pnpm exclusively.** No npm, no yarn. All commands, scripts, lockfiles — pnpm only.
+
+```bash
+pnpm init
+pnpm add express@5 zod@4 ...
+pnpm i -g aimeat   # global install for CLI
+```
+
+**MongoDB is already available.** Use this connection URL in development:
+
+```properties
+DATABASE_URL="mongodb://dbuser:dbpassword@localhost:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin"
+```
+
+Set this in `.env` and reference in `prisma/schema.prisma`. Since MongoDB is available, you can develop against the real database from day one. Still implement the in-memory fallback for distribution (when users don't have MongoDB), but test primarily against Mongo.
+
+The Prisma schema should use `mongodb` provider:
+
+```prisma
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+```
 
 ### 5. Bootstrap Response (GET /)
 
@@ -229,7 +264,25 @@ Phase 5 — Polish:
 
 7. **The node generates its own keypair on first run.** This keypair signs all JWTs and is used for federation authentication.
 
-8. **In-memory mode is the default.** No MongoDB required to start. This is critical for adoption — `pnpm i -g aimeat && aimeat` must work with zero external dependencies.
+8. **In-memory mode is the default for distribution.** But for development, we have MongoDB ready — set `DATABASE_URL` in `.env` and Prisma connects automatically. Both modes must pass the same test suite.
+
+## Package Scripts
+
+```json
+{
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc && tsc-alias",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "test": "vitest",
+    "lint": "eslint src/"
+  }
+}
+```
+
+Use `pnpm dev` during development for hot reload.
 
 ## Testing Strategy
 
@@ -248,7 +301,7 @@ curl http://localhost:3117/v1/catalogue               # empty catalogue
 
 ## Read the RFC
 
-The attached `AIMEAT-RFC-v1.0.md` is ~4400 lines and 145KB. It contains:
+The attached `AIMEAT-RFC-v1.1.md` is ~4400 lines and 145KB. It contains:
 - Complete endpoint definitions (84 endpoints across all tiers)
 - Data models for all entities
 - Sequence diagrams for auth, work queue, federation
@@ -266,7 +319,7 @@ The first node in the world will be `meat-finland-001-genesis`. Make the default
 
 ```
 "Welcome to MEAT — AI Infrastructure: Memory, Economy, Actions, Trust.
- Protocol: AIMEAT v1.0 | License: MIT | The network starts here."
+ Protocol: AIMEAT v1.1 | License: MIT | The network starts here."
 ```
 
 Now build it. 🥩
