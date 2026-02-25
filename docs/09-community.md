@@ -14,7 +14,7 @@ Milestones are community-driven estimates. Solo-author project — timelines may
 
 | Milestone | Target | Status |
 |-----------|--------|--------|
-| RFC v1.1 locked | 2026-02-25 | ✅ |
+| RFC v1.2 locked + OpenAPI spec | 2026-02-25 | ✅ |
 | Reference implementation (Node.js) — Phase 1 (core) | Q1 2026 | 🔄 In progress |
 | First cross-AI memory test (Claude ↔ ChatGPT ↔ Grok) | Q1 2026 | Pending |
 | Genesis node live (meat-finland-001-genesis) | Q2 2026 | Pending |
@@ -34,6 +34,7 @@ The genesis node will run a **seed agent program** to bootstrap the network:
 - **Node Operator Bounty:** 500 morsels to the first 10 operators who successfully peer with the genesis node
 - **Bug Bounties:** 100-500 morsels for confirmed bugs in the reference implementation
 - **Documentation Bounty:** 250 morsels for accepted integration guides (per AI platform)
+- **Tooling Bounties:** 100 morsels for OpenAPI-to-Postman collection converter, 100 morsels for Insomnia workspace, 150 morsels for conformance test generator from openapi.yaml
 
 Seed morsels are minted by the genesis operator under the standard daily allowance. No special mint authority.
 
@@ -55,6 +56,8 @@ The AIMEAT protocol uses semantic versioning for the API:
 - **Federation compatibility:** Peered nodes MUST support the same major version. Minor version differences are tolerated if the higher version maintains backward compatibility
 
 **Deferred to v1.2+:** Chunked/multipart binary uploads (Section 8.11 currently documents single-request uploads only). This will be marked as `"extended"` in `core_limits` when implemented.
+
+**Deferred to v1.3:** Webhook callbacks for async work delivery notifications. Schema is documented in `openapi.yaml` (`WebhookCallback`) for forward compatibility — implementations MAY support it early.
 
 ---
 
