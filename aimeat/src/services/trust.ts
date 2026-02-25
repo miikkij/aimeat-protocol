@@ -25,7 +25,12 @@ export async function calculateTrustScore(gaii: string, storage: Storage): Promi
   let delivered = 0, failed = 0, expired = 0;
   let positiveRatings = 0, negativeRatings = 0;
   let totalDeliveryTime = 0;
-  const disputesLost = 0; // TODO: implement disputes tracking
+
+  // Track disputes lost from actual dispute data
+  const disputes = await storage.listDisputesByProvider(gaii);
+  const disputesLost = disputes.filter(d =>
+    d.status === 'resolved' && d.ruling?.ruling === 'requester_wins'
+  ).length;
 
   for (const w of providerWork) {
     if (w.status === 'delivered' || w.status === 'rated') {

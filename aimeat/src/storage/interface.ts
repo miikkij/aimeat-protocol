@@ -58,6 +58,7 @@ export interface WorkRecord {
   output?: Record<string, unknown>;
   cost: { basePrice: number; networkFee: number; total: number; inEscrow: number };
   ttlExpiresAt: string;
+  callbackUrl?: string;
   rating?: { score: number; comment?: string };
   createdAt: string;
   updatedAt: string;
@@ -202,6 +203,7 @@ export interface Storage {
   listActions(opts?: { search?: string; category?: string }): Promise<ActionRecord[]>;
   deleteAction(id: string, providerGaii: string): Promise<boolean>;
   deleteActionsByProvider(gaii: string): Promise<number>;
+  listActionsByProvider(gaii: string): Promise<ActionRecord[]>;
 
   // Work
   createWork(work: WorkRecord): Promise<WorkRecord>;
@@ -209,6 +211,7 @@ export interface Storage {
   updateWork(trackingCode: string, updates: Partial<WorkRecord>): Promise<WorkRecord | null>;
   listWorkByProvider(gaii: string): Promise<WorkRecord[]>;
   listWorkByRequester(gaii: string): Promise<WorkRecord[]>;
+  listAllWork(): Promise<WorkRecord[]>;
 
   // Transactions
   addTransaction(tx: WalletTransaction): Promise<WalletTransaction>;
@@ -237,6 +240,7 @@ export interface Storage {
   updateDispute(id: string, updates: Partial<DisputeRecord>): Promise<DisputeRecord | null>;
   addDisputeAuditEntry(disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry>;
   getDisputeAuditLog(disputeId: string): Promise<DisputeAuditEntry[]>;
+  listDisputesByProvider(gaii: string): Promise<DisputeRecord[]>;
 
   // Micro-Memory
   setMicroMemory(record: MicroMemoryRecord): Promise<MicroMemoryRecord>;

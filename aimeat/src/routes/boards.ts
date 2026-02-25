@@ -4,6 +4,7 @@ import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { executeHooks } from '../services/hooks.js';
 
 export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
@@ -81,6 +82,13 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }
 
     const gaii = req.auth!.sub;
+
+    // Extension hook: pre_board_post
+    const hookResult = await executeHooks(config, storage, 'pre_board_post', { board_id: boardId, author_gaii: gaii });
+    if (!hookResult.allowed) {
+      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Post denied by extension hook'));
+      return;
+    }
 
     // Check access
     if (board.visibility === 'private' && board.ownerGaii !== gaii) {

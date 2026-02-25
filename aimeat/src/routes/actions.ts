@@ -3,6 +3,15 @@ import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { calculateTrustScore } from '../services/trust.js';
+
+const ALLOWED_CATEGORIES = [
+  'language', 'translation', 'analysis', 'generation', 'coding',
+  'data', 'image', 'audio', 'video', 'search', 'utility', 'other',
+] as const;
+
+const MAX_ACTIONS_PER_AGENT = 20;
+const MIN_TRUST_FOR_PAID_ACTIONS = 10;
 
 export function actionsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
@@ -21,7 +30,33 @@ export function actionsRouter(config: MeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Category validation
+    if (category && !ALLOWED_CATEGORIES.includes(category)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `category must be one of: ${ALLOWED_CATEGORIES.join(', ')}`));
+      return;
+    }
+
     const gaii = req.auth!.sub;
+
+    // Min trust enforcement for paid actions
+    if (pricing.base_morsels > 0) {
+      const trust = await calculateTrustScore(gaii, storage);
+      if (trust.score < MIN_TRUST_FOR_PAID_ACTIONS) {
+        res.status(403).json(error(config.nodeId, 'TRUST_TOO_LOW',
+          `Trust score ${trust.score} is below minimum ${MIN_TRUST_FOR_PAID_ACTIONS} for paid actions`));
+        return;
+      }
+    }
+
+    // Action limit per agent
+    const existingActions = await storage.listActionsByProvider(gaii);
+    if (existingActions.length >= MAX_ACTIONS_PER_AGENT) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+        `Maximum ${MAX_ACTIONS_PER_AGENT} actions per agent. Delete unused actions first.`));
+      return;
+    }
+
     const now = new Date().toISOString();
 
     try {

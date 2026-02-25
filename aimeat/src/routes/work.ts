@@ -5,9 +5,28 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+import { logger } from '../utils/logger.js';
+import { executeHooks } from '../services/hooks.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
+}
+
+/** Fire-and-forget webhook POST to callback_url. Retries once on failure. */
+function fireWebhook(url: string, payload: Record<string, unknown>): void {
+  const body = JSON.stringify(payload);
+  const doFetch = (attempt: number) => {
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    }).catch(err => {
+      logger.warn(`Webhook delivery failed (attempt ${attempt})`, { url, error: String(err) });
+      if (attempt < 2) setTimeout(() => doFetch(attempt + 1), 5000);
+    });
+  };
+  doFetch(1);
 }
 
 async function createWorkItem(
@@ -20,6 +39,14 @@ async function createWorkItem(
 
   if (!action_id || !provider_gaii || input === undefined) {
     return { error: 'action_id, provider_gaii, and input are required', status: 400, code: 'INVALID_INPUT' };
+  }
+
+  // Extension hook: pre_work_request
+  const hookResult = await executeHooks(config, storage, 'pre_work_request', {
+    requester_gaii: requesterGaii, action_id, provider_gaii,
+  });
+  if (!hookResult.allowed) {
+    return { error: hookResult.reason ?? 'Work request denied by extension hook', status: 403, code: 'HOOK_REJECTED' };
   }
 
   const ttl = ttl_hours ?? 24;
@@ -53,6 +80,7 @@ async function createWorkItem(
     requesterGaii,
     input,
     cost,
+    callbackUrl: callback_url,
     ttlExpiresAt: new Date(now.getTime() + ttl * 3600_000).toISOString(),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -281,6 +309,22 @@ export function workRouter(config: MeatConfig, storage: Storage): Router {
       output,
       updatedAt: new Date().toISOString(),
     });
+
+    // Fire callback webhook if provided (fire-and-forget)
+    if (work.callbackUrl) {
+      fireWebhook(work.callbackUrl, {
+        event: 'work.delivered',
+        tracking_code: tc,
+        status: 'delivered',
+        output,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Extension hook: post_work_delivery (fire-and-forget)
+    executeHooks(config, storage, 'post_work_delivery', {
+      tracking_code: tc, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
+    }).catch(() => { });
 
     res.json(success(config.nodeId, {
       tracking_code: updated!.trackingCode,

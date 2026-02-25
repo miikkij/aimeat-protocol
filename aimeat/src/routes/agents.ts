@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAgentName, buildGAII, parseGAII } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
+import { executeHooks } from '../services/hooks.js';
 
 export function agentsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
@@ -16,6 +17,13 @@ export function agentsRouter(config: MeatConfig, storage: Storage): Router {
 
     if (!name || !owner) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name and owner are required'));
+      return;
+    }
+
+    // Extension hook: pre_agent_registration
+    const hookResult = await executeHooks(config, storage, 'pre_agent_registration', { name, owner, display_name });
+    if (!hookResult.allowed) {
+      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Agent registration denied by extension hook'));
       return;
     }
 

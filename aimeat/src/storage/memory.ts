@@ -174,6 +174,10 @@ export class InMemoryStorage implements Storage {
     return count;
   }
 
+  async listActionsByProvider(gaii: string): Promise<ActionRecord[]> {
+    return [...this.actions.values()].filter(a => a.providerGaii === gaii);
+  }
+
   // ── Work ──
 
   async createWork(work: WorkRecord): Promise<WorkRecord> {
@@ -199,6 +203,10 @@ export class InMemoryStorage implements Storage {
 
   async listWorkByRequester(gaii: string): Promise<WorkRecord[]> {
     return [...this.work.values()].filter(w => w.requesterGaii === gaii);
+  }
+
+  async listAllWork(): Promise<WorkRecord[]> {
+    return [...this.work.values()];
   }
 
   // ── Transactions ──
@@ -347,6 +355,13 @@ export class InMemoryStorage implements Storage {
 
   async getDisputeAuditLog(disputeId: string): Promise<DisputeAuditEntry[]> {
     return this.disputeAuditLogs.get(disputeId) ?? [];
+  }
+
+  async listDisputesByProvider(gaii: string): Promise<DisputeRecord[]> {
+    return [...this.disputes.values()].filter(d => {
+      const work = this.work.get(d.trackingCode);
+      return work?.providerGaii === gaii;
+    });
   }
 
   // ── Micro-Memory ──

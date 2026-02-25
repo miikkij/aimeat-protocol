@@ -67,6 +67,9 @@ export function createServer(config: MeatConfig): express.Express {
   // Start daily allowance background job
   startDailyAllowanceJob(config, storage);
 
+  // Start work timeout expiry job
+  startWorkTimeoutJob(config, storage);
+
   // Mount routes
   app.use(bootstrapRouter(config));
   app.use(wellknownRouter(config, storage));
@@ -137,6 +140,53 @@ function startDailyAllowanceJob(config: MeatConfig, storage: Storage): void {
   // Run daily (every 24 hours)
   setInterval(creditAllAgents, 24 * 3600_000);
   logger.info('Daily allowance job scheduled (every 24h)');
+}
+
+// Work timeout: expire work items whose TTL has passed, return escrow
+function startWorkTimeoutJob(config: MeatConfig, storage: Storage): void {
+  const expireTimedOutWork = async () => {
+    try {
+      const allWork = await storage.listAllWork();
+      const now = Date.now();
+      for (const work of allWork) {
+        if (['pending', 'accepted', 'in_progress'].includes(work.status)) {
+          if (new Date(work.ttlExpiresAt).getTime() < now) {
+            // Return escrow to requester
+            const { returnEscrow } = await import('./services/morsel.js');
+            await returnEscrow(storage, work);
+            await storage.updateWork(work.trackingCode, {
+              status: 'expired',
+              updatedAt: new Date().toISOString(),
+            });
+
+            // Fire callback webhook if provided
+            if (work.callbackUrl) {
+              const body = JSON.stringify({
+                event: 'work.expired',
+                tracking_code: work.trackingCode,
+                status: 'expired',
+                timestamp: new Date().toISOString(),
+              });
+              fetch(work.callbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+                signal: AbortSignal.timeout(10_000),
+              }).catch(() => { /* fire and forget */ });
+            }
+
+            logger.info(`Work ${work.trackingCode} expired (TTL exceeded)`);
+          }
+        }
+      }
+    } catch (err) {
+      logger.error('Work timeout job failed', { error: err });
+    }
+  };
+
+  // Check every 60 seconds
+  setInterval(expireTimedOutWork, 60_000);
+  logger.info('Work timeout job scheduled (every 60s)');
 }
 
 async function initializeNode(config: MeatConfig, storage: Storage): Promise<void> {

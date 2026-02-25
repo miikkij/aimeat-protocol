@@ -31,6 +31,19 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
     const now = new Date().toISOString();
     const gaii = req.auth!.sub;
 
+    // Validate storage_ref type: if value._type === 'storage_ref', verify storage_key exists
+    if (value && typeof value === 'object' && value._type === 'storage_ref') {
+      if (!value.storage_key || typeof value.storage_key !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'storage_ref requires a valid storage_key string'));
+        return;
+      }
+      const fileExists = await storage.getStorageFile(gaii, value.storage_key);
+      if (!fileExists) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Referenced storage file not found: ${value.storage_key}`));
+        return;
+      }
+    }
+
     const existing = await storage.getMemory(gaii, key);
 
     // Quota enforcement: max 1000 keys per agent, max 64KB per value

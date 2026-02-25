@@ -3,6 +3,8 @@ import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { listHooks } from '../services/hooks.js';
+import type { HookName } from '../config.js';
 
 export function adminRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
@@ -232,6 +234,61 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
             owner,
             role: 'operator',
             granted: true,
+        }));
+    });
+
+    // GET /v1/admin/hooks — list all extension hooks
+    router.get('/v1/admin/hooks', requireAuth(), requireRole('operator'), (_req, res) => {
+        res.json(success(config.nodeId, {
+            extension_hooks: listHooks(config),
+        }));
+    });
+
+    // PUT /v1/admin/hooks/:hookName — set actions for a hook
+    router.put('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), (req, res) => {
+        const hookName = req.params.hookName as string;
+        const validHooks: HookName[] = [
+            'pre_owner_registration', 'post_owner_registration',
+            'pre_agent_registration', 'post_agent_registration',
+            'owner_recovery', 'agent_rekey',
+            'pre_work_request', 'post_work_delivery', 'post_settlement',
+            'pre_board_post', 'pre_federation_peer',
+        ];
+
+        if (!validHooks.includes(hookName as HookName)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid hook name. Valid hooks: ${validHooks.join(', ')}`));
+            return;
+        }
+
+        const { actions } = req.body ?? {};
+        if (!Array.isArray(actions) || !actions.every((a: unknown) => typeof a === 'string')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'actions must be an array of action reference strings'));
+            return;
+        }
+
+        config.extensionHooks[hookName as HookName] = actions;
+
+        res.json(success(config.nodeId, {
+            hook: hookName,
+            actions: config.extensionHooks[hookName as HookName],
+            updated: true,
+        }));
+    });
+
+    // DELETE /v1/admin/hooks/:hookName — clear all actions from a hook
+    router.delete('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), (req, res) => {
+        const hookName = req.params.hookName as string;
+        if (!(hookName in config.extensionHooks)) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Hook "${hookName}" not found`));
+            return;
+        }
+
+        config.extensionHooks[hookName as HookName] = [];
+
+        res.json(success(config.nodeId, {
+            hook: hookName,
+            actions: [],
+            cleared: true,
         }));
     });
 

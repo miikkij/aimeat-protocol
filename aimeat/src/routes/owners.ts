@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
+import { executeHooks } from '../services/hooks.js';
 
 export function ownersRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
@@ -16,6 +17,13 @@ export function ownersRouter(config: MeatConfig, storage: Storage): Router {
 
     if (!name) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name is required'));
+      return;
+    }
+
+    // Extension hook: pre_owner_registration
+    const hookResult = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
+    if (!hookResult.allowed) {
+      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Registration denied by extension hook'));
       return;
     }
 
@@ -47,6 +55,9 @@ export function ownersRouter(config: MeatConfig, storage: Storage): Router {
       roles,
       createdAt: new Date().toISOString(),
     });
+
+    // Extension hook: post_owner_registration (fire-and-forget)
+    executeHooks(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles }).catch(() => { });
 
     res.status(201).json(success(config.nodeId, {
       owner: {
