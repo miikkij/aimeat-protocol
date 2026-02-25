@@ -1,0 +1,40 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.developer.override
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+.DS_Store
+coverage/
+.tmp/
+tmp/
+.env.production
+.env.development
+logs/**
+*.log
+
+# Git worktrees
+.worktrees/
+
+# Generated artifacts
+**/generated/
+
+# Prevent compiled .js/.jsx files in source directories
+**/src/**/*.js
+**/src/**/*.jsx
+!**/src/**/*.test.js
+!**/src/**/*.spec.js
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# OpenMemory - IDE/Assistant specific rules
+.github\instructions\openmemory.instructions.md
+AGENTS.md
