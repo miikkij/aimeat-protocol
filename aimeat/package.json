@@ -8,9 +8,10 @@
     "aimeat": "dist/bin/aimeat.js"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file=.env --import tsx src/index.ts",
+    "dev:watch": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/src/index.js",
+    "start": "node --env-file=.env dist/src/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "tsx test/e2e-full.ts",
