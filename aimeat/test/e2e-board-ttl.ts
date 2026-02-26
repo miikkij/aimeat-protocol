@@ -18,7 +18,9 @@ const results: string[] = [];
 
 async function test(name: string, fn: () => Promise<void>) {
     try {
-        await fn();
+        const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('TIMEOUT after 30s')), 30_000));
+        await Promise.race([fn(), timeout]);
         passed++;
         results.push(`PASS: ${name}`);
         console.log(`  ✅ ${name}`);
@@ -536,6 +538,9 @@ console.log('\nPhase 6 — Tier 0.5 OTK Board Posting');
 await test('24. Get session OTK', async () => {
     const otk = await getSessionOtk();
     assert(otk.length > 0, 'have OTK');
+    // Mark OTK as "first used" now so test 25 reuses the cached one
+    // (avoids an extra challenge+session round-trip that would hit the anon auth rate limit)
+    if (otkFirstUsed === 0) otkFirstUsed = Date.now();
 });
 
 await test('25. Post via OTK (Tier 0.5)', async () => {
@@ -591,31 +596,31 @@ await test('30. Public board posts readable without auth', async () => {
     assert(Array.isArray(body.data.posts), 'posts array');
 });
 
-writeFileSync('t6-ckpt-31.txt', 'before test 31');
+// Create a non-operator owner+agent for tests 31 and 35 (shared to save auth requests)
+let nonOpOwnerName = '';
+let nonOpOwnerToken = '';
+let nonOpAgentToken = '';
 
-await test('31. Non-operator, non-owner cannot list subscribers → 403', async () => {
-    // agent-B inherits operator from first owner, so create a non-operator agent
-    const noOwner = `bd-noop-${Date.now()}`;
+await test('31-pre. Create non-operator owner+agent', async () => {
+    nonOpOwnerName = `bd-noop-${Date.now()}`;
     const { body: oBody } = await json('/v1/owners', {
         method: 'POST',
-        body: JSON.stringify({ name: noOwner, public_key: 'placeholder' }),
+        body: JSON.stringify({ name: nonOpOwnerName, public_key: 'placeholder' }),
     });
-    const noToken = await getToken(noOwner, oBody.data.private_key, false);
+    nonOpOwnerToken = await getToken(nonOpOwnerName, oBody.data.private_key, false);
     const { body: aBody } = await json('/v1/agents', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${noToken}` },
-        body: JSON.stringify({ name: 'noop-agent', owner: noOwner, capabilities: ['boards'], model: 'gpt-4o' }),
+        headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
+        body: JSON.stringify({ name: 'noop-agent', owner: nonOpOwnerName, capabilities: ['boards'], model: 'gpt-4o' }),
     });
-    const noAgentToken = await getToken(aBody.data.agent.gaii, aBody.data.private_key, true);
+    nonOpAgentToken = await getToken(aBody.data.agent.gaii, aBody.data.private_key, true);
+});
+
+await test('31. Non-operator, non-owner cannot list subscribers → 403', async () => {
     const { status } = await json(`/v1/boards/${privateBoardId}/subscribers`, {
-        headers: { Authorization: `Bearer ${noAgentToken}` },
+        headers: { Authorization: `Bearer ${nonOpAgentToken}` },
     });
     assert(status === 403, `expected 403, got ${status}`);
-    // Clean up
-    await json(`/v1/owners/${encodeURIComponent(noOwner)}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${noToken}` },
-    });
 });
 
 // ─── Phase 8: Error Paths ───
@@ -648,45 +653,14 @@ await test('34. Reply to non-existent post → 404', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
-writeFileSync('t6-ckpt-35.txt', 'before test 35');
-
 await test('35. Non-operator create public board → 403', async () => {
-    // Register a separate owner (not first, so not operator)
-    const owner2Name = `bdowner2-${Date.now()}`;
-    writeFileSync('t6-35a.txt', 'registering owner2');
-    const { body: oBody } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-    });
-    writeFileSync('t6-35b.txt', `owner registered: ${oBody.ok}`);
-    const o2Token = await getToken(owner2Name, oBody.data.private_key, false);
-    writeFileSync('t6-35c.txt', 'got owner token');
-    const { body: aBody } = await json('/v1/agents', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${o2Token}` },
-        body: JSON.stringify({ name: 'nonop-agent', owner: owner2Name, capabilities: ['boards'], model: 'gpt-4o' }),
-    });
-    writeFileSync('t6-35d.txt', `agent registered: ${aBody.ok}`);
-    const nonOpToken = await getToken(aBody.data.agent.gaii, aBody.data.private_key, true);
-    writeFileSync('t6-35e.txt', 'got agent token');
-
     const { status } = await json('/v1/boards', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${nonOpToken}` },
+        headers: { Authorization: `Bearer ${nonOpAgentToken}` },
         body: JSON.stringify({ name: 'Should Fail', visibility: 'public' }),
     });
-    writeFileSync('t6-35f.txt', `board create status: ${status}`);
     assert(status === 403, `expected 403, got ${status}`);
-
-    // Clean up the second owner
-    await json(`/v1/owners/${encodeURIComponent(owner2Name)}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${o2Token}` },
-    });
-    writeFileSync('t6-35g.txt', 'cleanup done');
 });
-
-writeFileSync('t6-ckpt-36.txt', 'before test 36');
 
 await test('36. Unsubscribe when not subscribed → 404', async () => {
     const { status } = await json(`/v1/boards/${privateBoardId}/subscribe`, {
@@ -696,17 +670,22 @@ await test('36. Unsubscribe when not subscribed → 404', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
-writeFileSync('t6-ckpt-37.txt', 'before test 37');
-
 await test('37. OTK post without otk param → 400', async () => {
     const { status } = await json(`/v1/boards/${privateBoardId}/posts/new?title=Bad&body=Missing+OTK`);
     assert(status === 400, `expected 400, got ${status}`);
 });
 
-writeFileSync('t6-ckpt-cleanup.txt', 'before cleanup');
-
 // ─── Cleanup ───
 console.log('\nCleanup');
+
+await test('Cascade-delete non-operator owner', async () => {
+    if (!nonOpOwnerName) return; // skip if 31-pre failed
+    const { status, body } = await json(`/v1/owners/${encodeURIComponent(nonOpOwnerName)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+});
 
 await test('Cascade-delete owner', async () => {
     const { status, body } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {

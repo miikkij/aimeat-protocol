@@ -54,6 +54,8 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   });
 
   // Rate limiting — global (with role multipliers)
+  // optionalAuth() must run first so req.auth is available for per-identity rate limiting
+  app.use(optionalAuth());
   app.use(rateLimit(config.rateLimits.global, config.rateLimits.roleMultipliers));
 
   // Per-tier rate limits
@@ -64,9 +66,6 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency());
-
-  // Optional auth on all routes (parses JWT if present)
-  app.use(optionalAuth());
 
   // Storage — select based on config
   let storage: Storage;

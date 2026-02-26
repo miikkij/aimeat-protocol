@@ -6,19 +6,21 @@ interface RateBucket {
     resetAt: number;
 }
 
-const buckets = new Map<string, RateBucket>();
-
-// Cleanup expired buckets every 60 seconds
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, bucket] of buckets) {
-        if (now > bucket.resetAt) buckets.delete(key);
-    }
-}, 60_000);
-
 export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: RoleMultipliers) {
     const windowMs = opts.windowMs ?? 60_000;
     const baseMax = opts.max ?? 100;
+
+    // Each rate limiter instance has its own bucket store
+    const buckets = new Map<string, RateBucket>();
+
+    // Cleanup expired buckets every 60 seconds
+    const cleanup = setInterval(() => {
+        const now = Date.now();
+        for (const [key, bucket] of buckets) {
+            if (now > bucket.resetAt) buckets.delete(key);
+        }
+    }, 60_000);
+    cleanup.unref();
 
     return (req: Request, res: Response, next: NextFunction) => {
         // Key by GAII if authenticated, otherwise by IP
