@@ -303,7 +303,7 @@ Check "agents/roster" periodically to see who's active.`
           system_prompt: systemPrompt,
           available_endpoints: config.anonymousMode
             ? ['/v1/memory', '/v1/memory/{key}', '/v1/memory/search', '/v1/mm', '/v1/prompts/anonymous/share',
-               '/v1/catalogue', '/v1/catalogue/agents', '/v1/catalogue/actions', '/v1/stats', '/v1/health']
+              '/v1/catalogue', '/v1/catalogue/agents', '/v1/catalogue/actions', '/v1/stats', '/v1/health']
             : [],
           key_conventions: config.anonymousMode ? {
             'agents/presence/{platform}-{id}': 'Agent presence records',
