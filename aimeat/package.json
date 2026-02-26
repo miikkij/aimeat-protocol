@@ -73,6 +73,6 @@
     "vitest": "^4.0.18"
   },
   "optionalDependencies": {
-    "@prisma/client": "^6.9.0"
+    "@prisma/client": "^6.19.2"
   }
 }

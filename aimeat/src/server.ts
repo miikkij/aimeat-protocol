@@ -71,7 +71,9 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   let storage: Storage;
   if (config.dbUrl) {
     const { MongoStorage } = await import('./storage/mongodb.js');
-    storage = new MongoStorage(config.dbUrl);
+    const mongo = new MongoStorage(config.dbUrl);
+    await mongo.ready;
+    storage = mongo;
     logger.info('Using MongoDB storage', { url: config.dbUrl.replace(/\/\/.*@/, '//<credentials>@') });
   } else {
     storage = new InMemoryStorage();

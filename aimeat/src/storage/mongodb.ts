@@ -33,15 +33,15 @@ import type {
 export class MongoStorage implements Storage {
     private prisma: any; // PrismaClient — typed as any until @prisma/client is installed
     private chunkedUploads = new Map<string, ChunkedUploadRecord>(); // kept in-memory (transient)
+    readonly ready: Promise<void>;
 
     constructor(databaseUrl: string) {
         // Dynamic import to avoid requiring @prisma/client at compile time
         this.prisma = null;
-        this.init(databaseUrl);
+        this.ready = this.init(databaseUrl);
     }
 
     private async init(databaseUrl: string) {
-        // @ts-expect-error — @prisma/client is an optional peer dependency
         const { PrismaClient } = await import('@prisma/client');
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
