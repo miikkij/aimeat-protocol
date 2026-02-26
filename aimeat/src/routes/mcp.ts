@@ -82,17 +82,19 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
         // Resource template: memory entries
         mcp.registerResource(
             'agent-memory',
-            new ResourceTemplate('meat://memory/{key}', { list: async () => {
-                const entries = await storage.listMemory(agentGaii, {});
-                return {
-                    resources: entries.map(e => ({
-                        uri: `meat://memory/${encodeURIComponent(e.key)}`,
-                        name: e.key,
-                        mimeType: 'application/json',
-                        description: `Memory entry: ${e.key}`,
-                    })),
-                };
-            }}),
+            new ResourceTemplate('meat://memory/{key}', {
+                list: async () => {
+                    const entries = await storage.listMemory(agentGaii, {});
+                    return {
+                        resources: entries.map(e => ({
+                            uri: `meat://memory/${encodeURIComponent(e.key)}`,
+                            name: e.key,
+                            mimeType: 'application/json',
+                            description: `Memory entry: ${e.key}`,
+                        })),
+                    };
+                }
+            }),
             { mimeType: 'application/json', description: 'Agent memory entries' },
             async (uri, variables) => {
                 const key = decodeURIComponent(variables.key as string);
@@ -105,17 +107,19 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
         // Resource template: storage files
         mcp.registerResource(
             'agent-storage',
-            new ResourceTemplate('meat://storage/{key}', { list: async () => {
-                const files = await storage.listStorageFiles(agentGaii);
-                return {
-                    resources: files.map(f => ({
-                        uri: `meat://storage/${encodeURIComponent(f.key)}`,
-                        name: f.key,
-                        mimeType: f.mimeType,
-                        description: `Storage file: ${f.key} (${f.size} bytes)`,
-                    })),
-                };
-            }}),
+            new ResourceTemplate('meat://storage/{key}', {
+                list: async () => {
+                    const files = await storage.listStorageFiles(agentGaii);
+                    return {
+                        resources: files.map(f => ({
+                            uri: `meat://storage/${encodeURIComponent(f.key)}`,
+                            name: f.key,
+                            mimeType: f.mimeType,
+                            description: `Storage file: ${f.key} (${f.size} bytes)`,
+                        })),
+                    };
+                }
+            }),
             { mimeType: 'application/octet-stream', description: 'Agent binary storage files' },
             async (uri, variables) => {
                 const key = decodeURIComponent(variables.key as string);
@@ -141,12 +145,12 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
         // Forward resource:updated events to this session's SSE stream
         const onResourceUpdated = (evt: ResourceChangeEvent) => {
             if (evt.agentGaii === agentGaii) {
-                mcp.server.sendResourceUpdated({ uri: evt.uri }).catch(() => {});
+                mcp.server.sendResourceUpdated({ uri: evt.uri }).catch(() => { });
             }
         };
         const onResourceListChanged = (evt: { agentGaii: string }) => {
             if (evt.agentGaii === agentGaii) {
-                mcp.server.sendResourceListChanged().catch(() => {});
+                mcp.server.sendResourceListChanged().catch(() => { });
             }
         };
         resourceEvents.on('resource:updated', onResourceUpdated);
