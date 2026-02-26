@@ -578,12 +578,12 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
 
         await mcpServer.connect(transport);
 
-        // Store transport for session reuse
+        await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
+
+        // Store transport for session reuse (sessionId is generated during handleRequest)
         if (transport.sessionId) {
             transports.set(transport.sessionId, transport);
         }
-
-        await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
     });
 
     // GET /v1/mcp — SSE endpoint for server-to-client notifications
@@ -698,7 +698,7 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
         }
 
         const message = gaii + config.nodeId + timestamp;
-        const isValid = await verify(message, signature, agent.publicKey);
+        const isValid = await verify(agent.publicKey, message, signature);
         if (!isValid) {
             res.status(401).json({ error: 'access_denied', error_description: 'Invalid signature' });
             return;

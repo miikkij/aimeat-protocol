@@ -1,8 +1,8 @@
 // Full E2E test for AIMEAT Phases 1-5
 // Run: cd aimeat && pnpm exec tsx test/e2e-full.ts
 
-const BASE = 'http://localhost:3117';
-const NODE_ID = 'meat-local-001-dev';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:3117';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
