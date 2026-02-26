@@ -437,6 +437,130 @@ await test('30. Invalid OTK → 401', async () => {
     assert(status === 401, `status ${status}: ${JSON.stringify(body)}`);
 });
 
+// ─── Phase 7: value64 Base64 Support ───
+console.log('\nPhase 7 — value64 Base64 Encoding');
+
+await test('31. Add key via value64 (base64-encoded value)', async () => {
+    const plainValue = 'Hello, base64 world! 🌍';
+    const b64 = Buffer.from(plainValue).toString('base64');
+    const { status, body } = await mmOp(`op=add&set=prefs&key=b64key&value64=${encodeURIComponent(b64)}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.op === 'add', `op: ${body.data.op}`);
+    assert(body.data.value === plainValue, `value mismatch: ${body.data.value}`);
+});
+
+await test('32. Read back value64-stored key', async () => {
+    const { status, body } = await mmOp('op=list&set=prefs');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.entries.b64key === 'Hello, base64 world! 🌍', `value: ${body.data.entries.b64key}`);
+});
+
+await test('33. Mod key via value64', async () => {
+    const newValue = 'Updated via base64!';
+    const b64 = Buffer.from(newValue).toString('base64');
+    const { status, body } = await mmOp(`op=mod&set=prefs&key=b64key&value64=${encodeURIComponent(b64)}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.value === newValue, `value: ${body.data.value}`);
+});
+
+await test('34. value64 overrides plain value when both present', async () => {
+    const b64Val = Buffer.from('base64-wins').toString('base64');
+    const { status, body } = await mmOp(`op=add&set=prefs&key=both&value=plain&value64=${encodeURIComponent(b64Val)}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.value === 'base64-wins', `value: ${body.data.value}`);
+});
+
+// ─── Phase 8: Batch Operations ───
+console.log('\nPhase 8 — Batch Multi-Key Operations');
+
+await test('35. Batch add multiple keys', async () => {
+    const { status, body } = await mmOp(
+        'op=batch&set=batchset&key0=color&value0=red&key1=size&value1=large&key2=shape&value2=round'
+    );
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.op === 'batch', `op: ${body.data.op}`);
+    assert(body.data.count === 3, `count: ${body.data.count}`);
+    assert(body.data.keys.includes('color'), `keys: ${JSON.stringify(body.data.keys)}`);
+});
+
+await test('36. Verify batch keys stored correctly', async () => {
+    const { status, body } = await mmOp('op=list&set=batchset');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.entries.color === 'red', `color: ${body.data.entries.color}`);
+    assert(body.data.entries.size === 'large', `size: ${body.data.entries.size}`);
+    assert(body.data.entries.shape === 'round', `shape: ${body.data.entries.shape}`);
+});
+
+await test('37. Batch with value64_N base64 values', async () => {
+    const v0 = Buffer.from('base64-batch-0').toString('base64');
+    const v1 = Buffer.from('base64-batch-1').toString('base64');
+    const { status, body } = await mmOp(
+        `op=batch&set=batchset&key0=b64a&value64_0=${encodeURIComponent(v0)}&key1=b64b&value64_1=${encodeURIComponent(v1)}`
+    );
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.count === 2, `count: ${body.data.count}`);
+});
+
+await test('38. Batch empty pairs → 400', async () => {
+    const { status, body } = await mmOp('op=batch&set=batchset');
+    assert(status === 400, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.error.code === 'INVALID_INPUT', `code: ${body.error.code}`);
+});
+
+await test('39. Batch without set → 400', async () => {
+    const { status, body } = await mmOp('op=batch&key0=a&value0=b');
+    assert(status === 400, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.error.code === 'INVALID_INPUT', `code: ${body.error.code}`);
+});
+
+// ─── Phase 9: URL Length Test Endpoint ───
+console.log('\nPhase 9 — URL Length Test Endpoint');
+
+await test('40. test-url-length endpoint returns URL metrics', async () => {
+    const param = '0123456789'.repeat(10);
+    const { status, body } = await json(`/v1/mm/test-url-length?paramlength=${param}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.received_url_length > 0, `received_url_length: ${body.data.received_url_length}`);
+    assert(body.data.param_length === 100, `param_length: ${body.data.param_length}`);
+    assert(body.data.last_20_chars === '01234567890123456789', `last_20: ${body.data.last_20_chars}`);
+    assert(typeof body.data.max_url_length === 'number', `max_url_length type: ${typeof body.data.max_url_length}`);
+});
+
+await test('41. test-url-length with empty param', async () => {
+    const { status, body } = await json('/v1/mm/test-url-length');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.param_length === 0, `param_length: ${body.data.param_length}`);
+    assert(body.data.last_20_chars === '', `last_20: ${body.data.last_20_chars}`);
+});
+
+await test('42. X-Max-URL-Length header present on mm responses', async () => {
+    const otk = await getSessionOtk();
+    const result = await json(`/v1/mm?otk=${otk}&op=list`);
+    if (otkFirstUsed === 0) otkFirstUsed = Date.now();
+    const header = result.headers.get('x-max-url-length');
+    assert(header !== null, 'X-Max-URL-Length header missing');
+    assert(parseInt(header!, 10) > 0, `header value: ${header}`);
+});
+
+// ─── Phase 10: OTK Response Includes Timeout Info ───
+console.log('\nPhase 10 — OTK Response Timeout Info');
+
+await test('43. OTK response includes timeout fields', async () => {
+    const { body: chBody } = await json(`/v1/auth/challenge?owner=${encodeURIComponent(ownerName)}`);
+    assert(chBody.ok === true, `challenge: ${JSON.stringify(chBody.error)}`);
+    const challenge = chBody.data.challenge;
+    const sig = await signMsg(ownerPrivKey, challenge);
+    const { status, body } = await json(
+        `/v1/auth/session?owner=${encodeURIComponent(ownerName)}&challenge=${encodeURIComponent(challenge)}&sig=${encodeURIComponent(sig)}`
+    );
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(typeof body.data.otk_ttl_ms === 'number', `otk_ttl_ms: ${body.data.otk_ttl_ms}`);
+    assert(typeof body.data.otk_grace_ms === 'number', `otk_grace_ms: ${body.data.otk_grace_ms}`);
+    assert(typeof body.data.max_url_length === 'number', `max_url_length: ${body.data.max_url_length}`);
+    assert(body.data.otk_ttl_ms > 0, `otk_ttl_ms should be > 0: ${body.data.otk_ttl_ms}`);
+    assert(body.data.otk_grace_ms > 0, `otk_grace_ms should be > 0: ${body.data.otk_grace_ms}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

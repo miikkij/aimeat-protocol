@@ -1,0 +1,33 @@
+{
+  "name": "jm001-aimeat-protocol",
+  "version": "1.2.0",
+  "private": true,
+  "description": "AIMEAT Protocol — AI Memory Exchange and Action Transfer",
+  "type": "module",
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "cd aimeat && pnpm build",
+    "dev": "cd aimeat && pnpm dev",
+    "start": "cd aimeat && pnpm start",
+    "typecheck": "cd aimeat && pnpm typecheck",
+    "lint": "cd aimeat && pnpm lint",
+    "test": "cd aimeat && pnpm test",
+    "test:unit": "cd aimeat && pnpm test",
+    "test:e2e": "cd aimeat && node --import tsx test/run-e2e-ci.ts",
+    "test:e2e:all": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
+    "test:e2e:full": "cd aimeat && pnpm test:e2e",
+    "test:e2e:federation": "cd aimeat && pnpm test:e2e:federation",
+    "test:e2e:mcp": "cd aimeat && pnpm test:e2e:mcp",
+    "test:e2e:disputes": "cd aimeat && pnpm test:e2e:disputes",
+    "test:e2e:micro-memory": "cd aimeat && pnpm test:e2e:micro-memory",
+    "test:e2e:storage-visibility": "cd aimeat && pnpm test:e2e:storage-visibility",
+    "test:e2e:board-ttl": "cd aimeat && pnpm test:e2e:board-ttl",
+    "test:e2e:concurrency": "cd aimeat && npx tsx test/e2e-concurrency.ts",
+    "test:e2e:hooks": "cd aimeat && npx tsx test/e2e-hooks.ts",
+    "test:ci": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
+    "generate:types": "cd aimeat && pnpm generate:types"
+  }
+}

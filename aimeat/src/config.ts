@@ -63,6 +63,9 @@ export interface MeatConfig {
   boardPostCostPerKb: number;
   webhookMaxRetries: number;
   workQueueMaxPending: number;
+  otkTtlMs: number;
+  otkGraceMs: number;
+  maxUrlLength: number;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
 }
@@ -99,6 +102,9 @@ export function loadConfig(): MeatConfig {
     boardPostCostPerKb: parseInt(process.env.MEAT_BOARD_POST_COST_PER_KB ?? '2', 10),
     webhookMaxRetries: parseInt(process.env.MEAT_WEBHOOK_MAX_RETRIES ?? '5', 10),
     workQueueMaxPending: parseInt(process.env.MEAT_WORK_QUEUE_MAX_PENDING ?? '10', 10),
+    otkTtlMs: parseInt(process.env.MEAT_OTK_TTL_MS ?? '300000', 10),
+    otkGraceMs: parseInt(process.env.MEAT_OTK_GRACE_MS ?? '60000', 10),
+    maxUrlLength: parseInt(process.env.MEAT_MAX_URL_LENGTH ?? '8192', 10),
     extensionHooks: {
       pre_owner_registration: [],
       post_owner_registration: [],

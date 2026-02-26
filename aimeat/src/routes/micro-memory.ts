@@ -9,20 +9,61 @@ const VALID_VISIBILITY = ['private', 'public_read', 'shared_read', 'shared_write
 const MAX_SETS_PER_AGENT = 50;
 const MAX_KEYS_PER_SET = 100;
 const MAX_VALUE_SIZE = 1024; // 1KB
+const MAX_BATCH_PAIRS = 100; // Max key-value pairs in a batch GET
+
+/** Resolve value from query — supports plain `value` and base64-encoded `value64` */
+function resolveValue(req: { query: Record<string, unknown> }): string | undefined {
+    const v64 = req.query.value64 as string | undefined;
+    if (v64 !== undefined) {
+        return Buffer.from(v64, 'base64').toString('utf8');
+    }
+    return req.query.value as string | undefined;
+}
+
+/** Parse batch key-value pairs from query params (key0/value0, key1/value1, ...) */
+function parseBatchPairs(query: Record<string, unknown>): { key: string; value: string }[] {
+    const pairs: { key: string; value: string }[] = [];
+    for (let i = 0; i < MAX_BATCH_PAIRS; i++) {
+        const k = query[`key${i}`] as string | undefined;
+        if (k === undefined) break;
+        const v = query[`value${i}`] as string | undefined;
+        const v64 = query[`value64_${i}`] as string | undefined;
+        const val = v64 !== undefined ? Buffer.from(v64, 'base64').toString('utf8') : v;
+        if (val === undefined) break;
+        pairs.push({ key: k, value: val });
+    }
+    return pairs;
+}
 
 export function microMemoryRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
 
+    // GET /v1/mm/test-url-length — Probe endpoint for measuring max accepted URL length
+    router.get('/v1/mm/test-url-length', (req, res) => {
+        const paramlength = req.query.paramlength as string ?? '';
+        const receivedLength = req.originalUrl.length;
+        const last20 = paramlength.slice(-20);
+        res.json(success(config.nodeId, {
+            received_url_length: receivedLength,
+            param_length: paramlength.length,
+            last_20_chars: last20,
+            max_url_length: config.maxUrlLength,
+        }));
+    });
+
     // GET /v1/mm — Micro-memory operations via OTK (Tier 0.5)
-    // Supports op=add, del, mod, list, config
+    // Supports op=add, del, mod, list, config, batch
     router.get('/v1/mm', async (req, res) => {
+        // Include max URL length header on all micro-memory responses
+        res.setHeader('X-Max-URL-Length', config.maxUrlLength);
+
         const otkKey = req.query.otk as string;
         if (!otkKey) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required'));
             return;
         }
 
-        const otk = await storage.consumeOtk(otkKey);
+        const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
         if (!otk) {
             res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
             return;
@@ -35,21 +76,21 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
         const op = req.query.op as string;
         const set = req.query.set as string;
         const key = req.query.key as string;
-        const value = req.query.value as string;
+        const value = resolveValue(req as any);
         const gaii = otk.ownerGaii;
 
         if (!op) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'op query parameter is required (add, del, mod, list, config)'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'op query parameter is required (add, del, mod, list, config, batch)'));
             return;
         }
 
         switch (op) {
             case 'add': {
                 if (!set || !key || value === undefined) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set, key, and value are required for add'));
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set, key, and value (or value64) are required for add'));
                     return;
                 }
-                if (value.length > MAX_VALUE_SIZE) {
+                if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_SIZE) {
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
                     return;
                 }
@@ -94,10 +135,10 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
             }
             case 'mod': {
                 if (!set || !key || value === undefined) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set, key, and value are required for mod'));
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set, key, and value (or value64) are required for mod'));
                     return;
                 }
-                if (value.length > MAX_VALUE_SIZE) {
+                if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_SIZE) {
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
                     return;
                 }
@@ -167,8 +208,72 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                 res.json(success(config.nodeId, { op: 'config', set, visibility: access }));
                 break;
             }
+            case 'batch': {
+                // Batch add/mod multiple key-value pairs in one request
+                // Uses key0/value0, key1/value1, ... or key0/value64_0, key1/value64_1, ... params
+                if (!set) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set is required for batch'));
+                    return;
+                }
+                const pairs = parseBatchPairs(req.query as Record<string, unknown>);
+                if (pairs.length === 0) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No key-value pairs found. Use key0=...&value0=... (or value64_0=...)'));
+                    return;
+                }
+                // Validate individual value sizes
+                for (const pair of pairs) {
+                    if (Buffer.byteLength(pair.value, 'utf8') > MAX_VALUE_SIZE) {
+                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value for key "${pair.key}" exceeds ${MAX_VALUE_SIZE} byte limit`));
+                        return;
+                    }
+                }
+                let batchRecord = await storage.getMicroMemory(gaii, set);
+                if (!batchRecord) {
+                    const sets = await storage.listMicroMemorySets(gaii);
+                    if (sets.length >= MAX_SETS_PER_AGENT) {
+                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_SETS_PER_AGENT} sets per agent`));
+                        return;
+                    }
+                    batchRecord = { gaii, set, entries: {}, visibility: 'private', updatedAt: new Date().toISOString() };
+                }
+                // Check key count limit
+                const newKeyCount = pairs.filter(p => !(p.key in batchRecord!.entries)).length;
+                if (Object.keys(batchRecord.entries).length + newKeyCount > MAX_KEYS_PER_SET) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Would exceed ${MAX_KEYS_PER_SET} keys per set`));
+                    return;
+                }
+                // Calculate total quota delta
+                let totalDelta = 0;
+                for (const pair of pairs) {
+                    const newBytes = Buffer.byteLength(pair.key, 'utf8') + Buffer.byteLength(pair.value, 'utf8');
+                    const oldBytes = batchRecord.entries[pair.key]
+                        ? Buffer.byteLength(pair.key, 'utf8') + Buffer.byteLength(batchRecord.entries[pair.key], 'utf8')
+                        : 0;
+                    totalDelta += newBytes - oldBytes;
+                }
+                if (totalDelta > 0) {
+                    const batchQuota = await checkMicroMemoryQuota(config, storage, gaii, totalDelta);
+                    if (!batchQuota.allowed) {
+                        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', batchQuota.reason!));
+                        return;
+                    }
+                }
+                // Apply all pairs
+                for (const pair of pairs) {
+                    batchRecord.entries[pair.key] = pair.value;
+                }
+                batchRecord.updatedAt = new Date().toISOString();
+                await storage.setMicroMemory(batchRecord);
+                res.json(success(config.nodeId, {
+                    op: 'batch',
+                    set,
+                    count: pairs.length,
+                    keys: pairs.map(p => p.key),
+                }));
+                break;
+            }
             default:
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Unknown op: ${op}. Must be add, del, mod, list, or config`));
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Unknown op: ${op}. Must be add, del, mod, list, config, or batch`));
         }
     });
 
@@ -205,13 +310,13 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                 return;
             }
             const key = req.query.key as string;
-            const value = req.query.value as string;
+            const value = resolveValue(req as any);
             if (writeOp === 'add' || writeOp === 'mod') {
                 if (!key || value === undefined) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and value required'));
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and value (or value64) required'));
                     return;
                 }
-                if (value.length > MAX_VALUE_SIZE) {
+                if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_SIZE) {
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
                     return;
                 }

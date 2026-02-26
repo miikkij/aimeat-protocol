@@ -630,7 +630,7 @@ export class MongoStorage implements Storage {
         return this.toOtkRecord(row);
     }
 
-    async consumeOtk(key: string): Promise<OtkRecord | null> {
+    async consumeOtk(key: string, graceMs: number = 60_000): Promise<OtkRecord | null> {
         this.ensureReady();
         try {
             const row = await this.prisma.otk.findUnique({ where: { key } });
@@ -639,10 +639,10 @@ export class MongoStorage implements Storage {
                 await this.prisma.otk.delete({ where: { key } });
                 return null;
             }
-            // 60-second post-use window
+            // Configurable post-use window
             if (row.used && row.usedAt) {
                 const usedAt = new Date(row.usedAt).getTime();
-                if (Date.now() - usedAt > 60_000) {
+                if (Date.now() - usedAt > graceMs) {
                     await this.prisma.otk.delete({ where: { key } });
                     return null;
                 }

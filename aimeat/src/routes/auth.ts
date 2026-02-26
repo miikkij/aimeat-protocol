@@ -120,7 +120,7 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
 
     // Generate OTK for Tier 0.5 operations
     const otk = generateOtk();
-    const expiresAt = new Date(Date.now() + 300_000).toISOString(); // 5 minutes
+    const expiresAt = new Date(Date.now() + config.otkTtlMs).toISOString();
 
     await storage.createOtk({
       key: otk,
@@ -136,7 +136,7 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
 
     // Pre-rotate: generate next_otk so the AI always has a buffered key
     const nextOtk = generateOtk();
-    const nextExpiresAt = new Date(Date.now() + 300_000).toISOString();
+    const nextExpiresAt = new Date(Date.now() + config.otkTtlMs).toISOString();
     await storage.createOtk({
       key: nextOtk,
       ownerGaii: sessionGaii,
@@ -157,7 +157,10 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
       session_id: sessionId,
       session_agent: sessionGaii,
       session_inactivity_timeout_seconds: SESSION_INACTIVITY_MS / 1000,
-      note: 'OTKs remain valid for 60 seconds after first use to handle retries. Session expires after 5 minutes of inactivity.',
+      otk_ttl_ms: config.otkTtlMs,
+      otk_grace_ms: config.otkGraceMs,
+      max_url_length: config.maxUrlLength,
+      note: `OTKs remain valid for ${config.otkGraceMs / 1000} seconds after first use to handle retries. Session expires after 5 minutes of inactivity.`,
     }, [
       { description: 'Use OTK for micro-memory operations', method: 'GET', url: `/v1/mm?otk=${otk}&op=list` },
       { description: 'Accept work via GET', method: 'GET', url: `/v1/work/{tc}/accept?otk=${otk}` },
@@ -358,7 +361,7 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
   // GET /v1/otk/:key — execute a one-time key action (no auth required — Tier 0.5)
   router.get('/v1/otk/:key', async (req, res) => {
     const key = req.params.key as string;
-    const otk = await storage.consumeOtk(key);
+    const otk = await storage.consumeOtk(key, config.otkGraceMs);
     if (!otk) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'One-time key not found, expired, or already used'));
       return;

@@ -28,6 +28,8 @@
     "test:e2e:docker:micro-memory": "bash test/docker/e2e-runner.sh test/e2e-micro-memory.ts",
     "test:e2e:docker:storage-visibility": "bash test/docker/e2e-runner.sh test/e2e-storage-visibility.ts",
     "test:e2e:docker:board-ttl": "bash test/docker/e2e-runner.sh test/e2e-board-ttl.ts",
+    "test:e2e:ci": "node --import tsx test/run-e2e-ci.ts --all",
+    "test:e2e:ci:filter": "node --import tsx test/run-e2e-ci.ts",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",

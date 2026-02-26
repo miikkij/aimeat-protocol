@@ -435,7 +435,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
     router.get('/v1/work/:tc/accept-redelivery', async (req, res) => {
         const otkKey = req.query.otk as string;
         if (!otkKey) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required')); return; }
-        const otk = await storage.consumeOtk(otkKey);
+        const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
         if (!otk) { res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'OTK not found, expired, or used')); return; }
         if (!await checkOtkSession(otk, storage)) { res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity')); return; }
         const tc = param(req.params.tc);
@@ -455,7 +455,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
     router.get('/v1/work/:tc/escalate', async (req, res) => {
         const otkKey = req.query.otk as string;
         if (!otkKey) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required')); return; }
-        const otk = await storage.consumeOtk(otkKey);
+        const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
         if (!otk) { res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'OTK not found, expired, or used')); return; }
         if (!await checkOtkSession(otk, storage)) { res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity')); return; }
         const tc = param(req.params.tc);

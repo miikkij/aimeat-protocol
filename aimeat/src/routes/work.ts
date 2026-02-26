@@ -533,7 +533,7 @@ export function workRouter(config: MeatConfig, storage: Storage, peers: Map<stri
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
       return;
     }
-    const otk = await storage.consumeOtk(otkKey);
+    const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
     if (!otk) {
       res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
       return;
@@ -571,7 +571,7 @@ export function workRouter(config: MeatConfig, storage: Storage, peers: Map<stri
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
       return;
     }
-    const otk = await storage.consumeOtk(otkKey);
+    const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
     if (!otk) {
       res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
       return;

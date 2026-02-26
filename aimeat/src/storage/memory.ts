@@ -346,21 +346,21 @@ export class InMemoryStorage implements Storage {
     return this.otks.get(key) ?? null;
   }
 
-  async consumeOtk(key: string): Promise<OtkRecord | null> {
+  async consumeOtk(key: string, graceMs: number = 60_000): Promise<OtkRecord | null> {
     const otk = this.otks.get(key);
     if (!otk) return null;
     if (new Date(otk.expiresAt) < new Date()) {
       this.otks.delete(key);
       return null;
     }
-    // 60-second post-use window: allow re-use within 60s of first use
+    // Configurable post-use window: allow re-use within graceMs of first use
     if (otk.used && otk.usedAt) {
       const usedAt = new Date(otk.usedAt).getTime();
-      if (Date.now() - usedAt > 60_000) {
+      if (Date.now() - usedAt > graceMs) {
         this.otks.delete(key);
         return null;
       }
-      return otk; // still within 60s window
+      return otk; // still within grace window
     }
     otk.used = true;
     otk.usedAt = new Date().toISOString();
