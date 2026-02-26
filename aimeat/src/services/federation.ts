@@ -42,7 +42,7 @@ export async function resolveGaii(
     // 2. Local check
     const localAgent = await storage.getAgent(gaii);
     if (localAgent) {
-        return { nodeId: config.nodeId, nodeUrl: `http://localhost:${config.port}`, local: true };
+        return { nodeId: config.nodeId, nodeUrl: config.baseUrl, local: true };
     }
 
     // 3. Parse node hint from GAII (agent#owner@node)

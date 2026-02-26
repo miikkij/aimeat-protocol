@@ -39,6 +39,7 @@ export type NodeType = 'full' | 'relay' | 'mirror';
 
 export interface MeatConfig {
   port: number;
+  baseUrl: string;
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;
@@ -78,8 +79,11 @@ export function loadConfig(): MeatConfig {
     throw new Error(`Invalid MEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', or 'mirror'.`);
   }
 
+  const port = parseInt(process.env.MEAT_PORT ?? '40050', 10);
+
   return {
-    port: parseInt(process.env.MEAT_PORT ?? '40050', 10),
+    port,
+    baseUrl: process.env.MEAT_BASE_URL ?? `http://localhost:${port}`,
     nodeId: process.env.MEAT_NODE_ID ?? 'meat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,

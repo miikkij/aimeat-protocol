@@ -164,7 +164,7 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
             owner: ownerGaii,
             grace_ms: config.otkGraceMs,
             dev_mode: config.devMode,
-            node_url: `http://localhost:${config.port}`,
+            node_url: config.baseUrl,
             note: `Initial OTK — no expiry until first use. After first use, valid for ${config.otkGraceMs / 1000}s.`,
         });
     });

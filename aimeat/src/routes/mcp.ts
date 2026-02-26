@@ -883,7 +883,7 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
 
     // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414)
     router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
-        const baseUrl = `http://localhost:${config.port}`;
+        const baseUrl = config.baseUrl;
         res.json({
             issuer: baseUrl,
             authorization_endpoint: `${baseUrl}/v1/mcp/authorize`,
