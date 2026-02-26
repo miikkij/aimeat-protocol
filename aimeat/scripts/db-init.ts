@@ -2,19 +2,17 @@
 /**
  * AIMEAT Database Initialization Script
  *
- * Sets up MongoDB for use with AIMEAT:
- * 1. Connects to MongoDB
- * 2. Initializes replica set (required by Prisma)
- * 3. Creates the AIMEAT database and collections
- * 4. Pushes the Prisma schema (indexes, etc.)
+ * Initializes the MongoDB database for AIMEAT:
+ * 1. (Optional) Drops all collections (--reset)
+ * 2. Pushes the Prisma schema (indexes & collections)
+ * 3. Verifies the connection
  *
  * Usage:
- *   pnpm db:init                    # uses DATABASE_URL from .env
- *   pnpm db:init --url mongodb://...  # explicit connection string
- *   pnpm db:init --docker           # start MongoDB via docker compose first
+ *   pnpm db:init             # push schema, verify connection
+ *   pnpm db:init --reset     # drop all data first, then push schema
  */
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,14 +23,11 @@ const ROOT = resolve(__dirname, '..');
 // ─── Parse args ─────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const flagDocker = args.includes('--docker');
 const flagReset = args.includes('--reset');
-const urlIdx = args.indexOf('--url');
-const explicitUrl = urlIdx !== -1 ? args[urlIdx + 1] : undefined;
 
 // ─── Resolve DATABASE_URL ───────────────────────────────────
 
-let dbUrl = explicitUrl ?? process.env.DATABASE_URL;
+let dbUrl = process.env.DATABASE_URL;
 
 if (!dbUrl) {
   // Try loading from .env manually
@@ -45,140 +40,62 @@ if (!dbUrl) {
 }
 
 if (!dbUrl) {
-  console.error('❌ No DATABASE_URL found. Set it in .env or pass --url <connection-string>');
+  console.error('❌ No DATABASE_URL found. Set it in .env');
   process.exit(1);
 }
 
-// Extract connection parts
-const url = new URL(dbUrl);
-const host = url.hostname;
-const port = url.port || '27017';
-const username = decodeURIComponent(url.username);
-const password = decodeURIComponent(url.password);
-const dbName = url.pathname.replace('/', '') || 'AIMEAT';
-const replicaSet = url.searchParams.get('replicaSet') || 'myReplicaSet';
-
+const dbDisplay = dbUrl.replace(/\/\/[^@]+@/, '//*****@'); // hide credentials
 console.log('');
 console.log('🥩 AIMEAT Database Initialization');
 console.log('──────────────────────────────────────');
-console.log(`   Host:        ${host}:${port}`);
-console.log(`   Database:    ${dbName}`);
-console.log(`   Replica Set: ${replicaSet}`);
-console.log(`   User:        ${username}`);
+console.log(`   Database: ${dbDisplay}`);
 console.log('');
 
-// ─── Step 0: Docker (optional) ──────────────────────────────
+// ─── Step 1: Reset database (optional) ──────────────────────
 
-if (flagDocker) {
-  console.log('📦 Step 0: Starting MongoDB via docker compose...');
+if (flagReset) {
+  console.log('🗑️  Step 1: Dropping all collections...');
   try {
-    execSync('docker compose up -d mongo', { cwd: ROOT, stdio: 'inherit' });
-    // Wait for health check
-    console.log('   Waiting for MongoDB to be healthy...');
-    for (let i = 0; i < 30; i++) {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient({ datasourceUrl: dbUrl });
+    await prisma.$connect();
+
+    const collections = ['Owner', 'Agent', 'Memory', 'Action', 'Work'];
+    for (const name of collections) {
       try {
-        execSync('docker compose exec mongo mongosh --eval "db.adminCommand(\'ping\')" --quiet', {
-          cwd: ROOT, stdio: 'pipe'
-        });
-        break;
+        await prisma.$runCommandRaw({ drop: name });
+        console.log(`   Dropped: ${name}`);
       } catch {
-        await new Promise(r => setTimeout(r, 1000));
+        // Collection might not exist yet
       }
     }
-    console.log('   ✅ MongoDB is running\n');
-  } catch (err) {
-    console.error('   ❌ Failed to start MongoDB via docker compose');
+
+    await prisma.$disconnect();
+    console.log('   ✅ Reset complete\n');
+  } catch (err: any) {
+    console.error(`   ❌ Reset failed: ${err.message}`);
     process.exit(1);
   }
 }
 
-// ─── Step 1: Initialize Replica Set ─────────────────────────
+// ─── Step 2: Prisma generate + push ─────────────────────────
 
-console.log('🔧 Step 1: Initializing replica set...');
-
-const authStr = username && password
-  ? `-u "${username}" -p "${password}" --authenticationDatabase admin`
-  : '';
-
-// Build mongosh command to init replica set
-const rsInitScript = `
-try {
-  const status = rs.status();
-  print('Replica set already initialized: ' + status.set);
-} catch (e) {
-  print('Initializing replica set: ${replicaSet}');
-  rs.initiate({ _id: '${replicaSet}', members: [{ _id: 0, host: '${host}:${port}' }] });
-  // Wait for primary
-  let attempts = 0;
-  while (attempts < 30) {
-    const s = rs.status();
-    if (s.members && s.members[0] && s.members[0].stateStr === 'PRIMARY') {
-      print('Replica set initialized successfully');
-      break;
-    }
-    sleep(1000);
-    attempts++;
-  }
-}
-`.trim();
-
-try {
-  // Try docker exec first (if mongo is in docker)
-  try {
-    execSync(
-      `docker compose exec -T mongo mongosh ${authStr} --eval "${rsInitScript.replace(/"/g, '\\"')}" --quiet`,
-      { cwd: ROOT, stdio: 'pipe' }
-    );
-    console.log('   ✅ Replica set ready (via docker)\n');
-  } catch {
-    // Fall back to local mongosh
-    execSync(
-      `mongosh "mongodb://${username}:${password}@${host}:${port}/?authSource=admin" --eval "${rsInitScript.replace(/"/g, '\\"')}" --quiet`,
-      { stdio: 'pipe' }
-    );
-    console.log('   ✅ Replica set ready (via local mongosh)\n');
-  }
-} catch (err: any) {
-  console.log('   ⚠️  Could not initialize replica set automatically.');
-  console.log('   If MongoDB is already configured with a replica set, this is fine.');
-  console.log(`   Error: ${err.message?.split('\n')[0] ?? err}\n`);
-}
-
-// ─── Step 2: Reset database (optional) ─────────────────────
-
-if (flagReset) {
-  console.log('🗑️  Step 2: Dropping existing database...');
-  const dropScript = `use ${dbName}; db.dropDatabase(); print('Database dropped');`;
-  try {
-    try {
-      execSync(
-        `docker compose exec -T mongo mongosh ${authStr} --eval "${dropScript}" --quiet`,
-        { cwd: ROOT, stdio: 'pipe' }
-      );
-    } catch {
-      execSync(
-        `mongosh "mongodb://${username}:${password}@${host}:${port}/${dbName}?authSource=admin&replicaSet=${replicaSet}" --eval "${dropScript}" --quiet`,
-        { stdio: 'pipe' }
-      );
-    }
-    console.log('   ✅ Database dropped\n');
-  } catch (err: any) {
-    console.log(`   ⚠️  Could not drop database: ${err.message?.split('\n')[0] ?? err}\n`);
-  }
-}
-
-// ─── Step 3: Prisma generate + push ─────────────────────────
-
-console.log('📐 Step 3: Generating Prisma client...');
+console.log('📐 Step 2: Generating Prisma client...');
 try {
   execSync('npx prisma generate', { cwd: ROOT, stdio: 'pipe', env: { ...process.env, DATABASE_URL: dbUrl } });
   console.log('   ✅ Prisma client generated\n');
 } catch (err: any) {
-  console.error('   ❌ prisma generate failed:', err.stderr?.toString() ?? err.message);
-  process.exit(1);
+  // EPERM = DLL locked by running server — client already generated, that's OK
+  const stderr = err.stderr?.toString() ?? '';
+  if (stderr.includes('EPERM') || stderr.includes('operation not permitted')) {
+    console.log('   ⚠️  Prisma engine locked (server running?) — skipping generate (already up to date)\n');
+  } else {
+    console.error('   ❌ prisma generate failed:', stderr || err.message);
+    process.exit(1);
+  }
 }
 
-console.log('📊 Step 4: Pushing schema to MongoDB (indexes & collections)...');
+console.log('📊 Step 3: Pushing schema to MongoDB (indexes & collections)...');
 try {
   execSync('npx prisma db push', { cwd: ROOT, stdio: 'pipe', env: { ...process.env, DATABASE_URL: dbUrl } });
   console.log('   ✅ Schema pushed successfully\n');
@@ -187,9 +104,9 @@ try {
   process.exit(1);
 }
 
-// ─── Step 5: Verify connection ──────────────────────────────
+// ─── Step 4: Verify connection ──────────────────────────────
 
-console.log('🔍 Step 5: Verifying connection...');
+console.log('🔍 Step 4: Verifying connection...');
 try {
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient({ datasourceUrl: dbUrl });
