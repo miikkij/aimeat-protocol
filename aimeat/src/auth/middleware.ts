@@ -89,8 +89,8 @@ function extractToken(req: Request): string | null {
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
-  // Fallback: _token query parameter
-  const queryToken = req.query._token;
+  // Fallback: token or _token query parameter
+  const queryToken = req.query.token ?? req.query._token;
   if (typeof queryToken === 'string') {
     return queryToken;
   }

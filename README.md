@@ -75,7 +75,12 @@ JM001/
 │   │       ├── gaii.ts                    # GAII builder/parser/validation
 │   │       └── logger.ts                  # Winston logger config
 │   └── test/
-│       └── e2e-full.ts                    # 35 E2E tests (Phases 1-6 + GDPR)
+│       ├── e2e-full.ts                    # Main E2E suite (42 tests)
+│       ├── e2e-micro-memory.ts            # Micro-memory E2E (52 tests)
+│       ├── e2e-*.ts                       # 9 E2E suites total (376+ tests)
+│       ├── run-e2e-ci.ts                  # Cross-platform CI test runner
+│       ├── run-all-e2e.ps1                # PowerShell test runner
+│       └── unit/                          # Vitest unit tests (126 tests)
 └── docs/
     ├── AIMEAT-RFC-v1.2-full.md            # Complete spec in one file (4,777 lines)
     ├── aimeat-implementation-prompt.md     # Build prompt for Claude Code
@@ -132,15 +137,71 @@ docker compose up
 ### Running Tests
 
 ```bash
-# Start the server first
-pnpm dev &
+cd aimeat
 
-# Run E2E tests (35 tests across 6 phases + GDPR)
+# Type-check only (no emit)
+npx tsc --noEmit
+
+# Unit tests (Vitest — 126 tests)
+pnpm test
+
+# E2E tests — start the server first on port 40251
+MEAT_PORT=40251 pnpm dev &
+
+# Run the main E2E suite (42 tests)
 npx tsx test/e2e-full.ts
 
-# Type-check only
-npx tsc --noEmit
+# Run ALL E2E suites (376+ tests across 9 suites)
+# Cross-platform CI runner — auto-starts/stops server:
+node --import tsx test/run-e2e-ci.ts --all
+
+# Run a single suite:
+node --import tsx test/run-e2e-ci.ts --test=micro-memory
+
+# Available suites: full, micro-memory, federation, disputes,
+# actions, wallet, catalogue, storage-files, boards
+
+# PowerShell runner (Windows):
+.\test\run-all-e2e.ps1
 ```
+
+**Port scheme:** 40050 (production) · 40151 (dev/pnpm dev) · 40251 (E2E tests)
+
+### Admin Dashboard
+
+The server includes a built-in graphical dashboard for operators at `GET /v1/admin/ui`.
+It shows health status, agent counts, morsel economy, today's activity, policy/node config, warnings, and an agent list with trust scores.
+
+**How to access it:**
+
+```bash
+cd aimeat
+pnpm dev   # starts on http://localhost:40151
+```
+
+1. **Register the first owner** (automatically gets the `operator` role):
+
+```bash
+curl -s -X POST http://localhost:40151/v1/owners \
+  -H "Content-Type: application/json" \
+  -d '{"name": "admin", "publicKey": "<your-ed25519-public-key-hex>"}'
+```
+
+2. **Get a JWT token** — sign `ownerName + nodeId + timestamp` with your Ed25519 private key:
+
+```bash
+curl -s -X POST http://localhost:40151/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"ownerName": "admin", "nodeId": "meat-local-001-dev", "timestamp": "<ISO-8601>", "signature": "<hex-signature>"}'
+```
+
+3. **Open the dashboard** in your browser:
+
+```
+http://localhost:40151/v1/admin/ui?token=<your-jwt>
+```
+
+The dashboard auto-refreshes every 30 seconds. The token is saved to localStorage so you only need to provide it once.
 
 ### What's Implemented
 
@@ -177,6 +238,12 @@ npx tsc --noEmit
 | `MEAT_DAILY_ALLOWANCE_CAP` | `500` | Max morsel accumulation |
 | `MEAT_BURN_RATE` | `0.10` | Percentage burned per transaction |
 | `MEAT_JWT_TTL` | `3600` | JWT token lifetime (seconds) |
+| `MEAT_OTK_TTL_MS` | `300000` | OTK token lifetime (ms, default 5 min) |
+| `MEAT_OTK_GRACE_MS` | `5000` | OTK grace period after expiry (ms) |
+| `MEAT_RL_GLOBAL` | `200` | Global rate limit (req/min) |
+| `MEAT_RL_AUTH` | `20` | Auth endpoint rate limit (req/min) |
+| `MEAT_RL_WRITE` | `60` | Write endpoint rate limit (req/min) |
+| `MEAT_RL_READ` | `120` | Read endpoint rate limit (req/min) |
 | `DATABASE_URL` | — | MongoDB connection string (when supported) |
 
 ---

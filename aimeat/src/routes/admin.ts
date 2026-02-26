@@ -7,9 +7,119 @@ import { listHooks } from '../services/hooks.js';
 import type { HookName } from '../config.js';
 import { RoleGrantSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
+import { generateKeyPair, sign } from '../auth/keypair.js';
+import { validateOwnerName } from '../utils/gaii.js';
+import { issueJWT } from '../auth/jwt.js';
 
 export function adminRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
+
+    // ── Admin Setup Pages (password-protected, no JWT needed) ──
+
+    function checkSetupPassword(req: import('express').Request, res: import('express').Response): boolean {
+        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
+        if (!config.adminPassword || pw !== config.adminPassword) {
+            res.status(401).type('text/html').send(ADMIN_LOGIN_HTML);
+            return false;
+        }
+        return true;
+    }
+
+    // GET /v1/admin/setup — setup wizard (register owner + get token)
+    router.get('/v1/admin/setup', (req, res) => {
+        if (!checkSetupPassword(req, res)) return;
+        res.type('text/html').send(ADMIN_SETUP_HTML.replace(/\{\{PW\}\}/g, config.adminPassword!).replace(/\{\{NODE_ID\}\}/g, config.nodeId));
+    });
+
+    // POST /v1/admin/setup/register — register owner (password-protected, no auth)
+    router.post('/v1/admin/setup/register', async (req, res) => {
+        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
+        if (!config.adminPassword || pw !== config.adminPassword) {
+            res.status(401).json({ ok: false, error: 'Invalid admin password' });
+            return;
+        }
+
+        const { name, display_name } = req.body ?? {};
+        if (!name || typeof name !== 'string') {
+            res.status(400).json({ ok: false, error: 'name is required' });
+            return;
+        }
+
+        const nameError = validateOwnerName(name);
+        if (nameError) {
+            res.status(400).json({ ok: false, error: nameError });
+            return;
+        }
+
+        const existing = await storage.getOwner(name);
+        if (existing) {
+            res.status(409).json({ ok: false, error: `Owner "${name}" already exists` });
+            return;
+        }
+
+        const keyPair = await generateKeyPair();
+        const allOwners = await storage.listOwners();
+        const roles = ['owner'];
+        if (allOwners.length === 0) roles.push('operator');
+
+        const owner = await storage.createOwner({
+            name,
+            displayName: display_name,
+            publicKey: keyPair.publicKey,
+            roles,
+            createdAt: new Date().toISOString(),
+        });
+
+        res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey });
+    });
+
+    // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
+    router.post('/v1/admin/setup/token', async (req, res) => {
+        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
+        if (!config.adminPassword || pw !== config.adminPassword) {
+            res.status(401).json({ ok: false, error: 'Invalid admin password' });
+            return;
+        }
+
+        const { owner: ownerName, private_key } = req.body ?? {};
+        if (!ownerName || !private_key) {
+            res.status(400).json({ ok: false, error: 'owner and private_key are required' });
+            return;
+        }
+
+        const ownerRecord = await storage.getOwner(ownerName);
+        if (!ownerRecord) {
+            res.status(404).json({ ok: false, error: `Owner not found: ${ownerName}` });
+            return;
+        }
+
+        const timestamp = new Date().toISOString();
+        const message = ownerName + config.nodeId + timestamp;
+        const signature = await sign(private_key, message);
+
+        // Verify signature matches stored public key (sanity check)
+        const { verify: ed25519Verify } = await import('../auth/keypair.js');
+        const valid = await ed25519Verify(ownerRecord.publicKey, message, signature);
+        if (!valid) {
+            res.status(401).json({ ok: false, error: 'Private key does not match the owner\'s public key' });
+            return;
+        }
+
+        const token = await issueJWT({
+            sub: ownerName,
+            owner: ownerName,
+            node: config.nodeId,
+            roles: [...ownerRecord.roles],
+        }, config.jwtTtlSeconds);
+
+        res.json({
+            ok: true,
+            token,
+            expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+            roles: ownerRecord.roles,
+            dashboard_url: `/v1/admin/ui?token=${token}`,
+        });
+    });
 
     // GET /v1/admin/dashboard — node overview (operator only)
     router.get('/v1/admin/dashboard', requireAuth(), requireRole('operator'), async (_req, res) => {
@@ -735,3 +845,155 @@ load();
 </script>
 </body>
 </html>`;
+
+// ── Admin Login Page HTML ──
+const ADMIN_LOGIN_HTML = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AIMEAT Admin Login</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:32px;width:380px;text-align:center}
+h1{font-size:1.4rem;margin-bottom:8px}
+.sub{color:#94a3b8;font-size:.85rem;margin-bottom:24px}
+input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:.95rem;margin-bottom:16px}
+input:focus{outline:none;border-color:#3b82f6}
+button{width:100%;padding:10px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:.95rem;font-weight:600;cursor:pointer}
+button:hover{background:#2563eb}
+.hint{color:#64748b;font-size:.75rem;margin-top:16px}
+</style></head><body>
+<div class="box">
+<h1>&#x1F969; AIMEAT Admin</h1>
+<p class="sub">Enter the admin password from the server console log</p>
+<form onsubmit="go(event)">
+<input type="password" id="pw" placeholder="Admin password" autofocus/>
+<button type="submit">Enter Setup</button>
+</form>
+<p class="hint">Password is printed when the server starts, or set via MEAT_ADMIN_PASSWORD</p>
+</div>
+<script>
+function go(e){e.preventDefault();var pw=document.getElementById('pw').value;if(pw)location.href='/v1/admin/setup?pw='+encodeURIComponent(pw);}
+</script>
+</body></html>`;
+
+// ── Admin Setup Wizard HTML ──
+const ADMIN_SETUP_HTML = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AIMEAT Admin Setup</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
+--green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;--cyan:#06b6d4}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;padding:20px;min-height:100vh}
+.container{max-width:640px;margin:0 auto}
+h1{font-size:1.5rem;margin-bottom:4px}
+.sub{color:var(--muted);font-size:.85rem;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
+.card h2{font-size:.95rem;margin-bottom:12px;color:var(--cyan)}
+label{display:block;color:var(--muted);font-size:.8rem;margin-bottom:4px;margin-top:12px}
+label:first-child{margin-top:0}
+input[type=text]{width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem}
+input:focus{outline:none;border-color:var(--blue)}
+button{padding:10px 20px;border-radius:6px;border:none;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:14px}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-green{background:var(--green);color:#000}
+.btn-green:hover{opacity:.85}
+.result{margin-top:14px;padding:12px;border-radius:8px;font-size:.85rem;word-break:break-all}
+.result-ok{background:#16a34a18;border:1px solid #16a34a55;color:var(--green)}
+.result-err{background:#dc262618;border:1px solid #dc262655;color:var(--red)}
+.result-info{background:#3b82f618;border:1px solid #3b82f655;color:var(--cyan)}
+.key-box{font-family:'SF Mono',Consolas,monospace;font-size:.8rem;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border);margin-top:6px;word-break:break-all;user-select:all}
+.step-num{display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;background:var(--blue);color:#fff;font-size:.75rem;font-weight:700;margin-right:8px}
+.step-done{background:var(--green)}
+.hidden{display:none}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+.warn{color:var(--yellow);font-size:.8rem;margin-top:8px}
+</style></head><body>
+<div class="container">
+<h1>&#x1F969; AIMEAT Node Setup</h1>
+<p class="sub">Node: <strong>{{NODE_ID}}</strong></p>
+
+<div class="card" id="step1card">
+<h2><span class="step-num" id="s1n">1</span>Register Owner</h2>
+<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">The first owner automatically gets the <strong>operator</strong> role.</p>
+<label>Owner Name</label>
+<input type="text" id="ownerName" placeholder="e.g. admin" autocomplete="off"/>
+<label>Display Name (optional)</label>
+<input type="text" id="displayName" placeholder="e.g. System Administrator"/>
+<br/>
+<button class="btn-primary" id="btnRegister" onclick="doRegister()">Register Owner</button>
+<div id="regResult" class="hidden"></div>
+</div>
+
+<div class="card hidden" id="step2card">
+<h2><span class="step-num" id="s2n">2</span>Get JWT Token</h2>
+<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Signing happens server-side. The private key is only used for this one call.</p>
+<button class="btn-primary" id="btnToken" onclick="doToken()">Get Token</button>
+<div id="tokenResult" class="hidden"></div>
+</div>
+
+<div class="card hidden" id="step3card">
+<h2><span class="step-num step-done" id="s3n">3</span>Open Dashboard</h2>
+<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Your operator JWT is ready. Click below to open the dashboard.</p>
+<a id="dashLink" href="#" class="btn-green" style="display:inline-block;text-decoration:none;text-align:center;padding:10px 24px;border-radius:6px">Open Dashboard &#x2192;</a>
+<div style="margin-top:12px">
+<label>JWT Token (for API use)</label>
+<div class="key-box" id="jwtBox"></div>
+</div>
+</div>
+
+</div>
+<script>
+const PW='{{PW}}';
+let savedOwner='',savedKey='';
+
+async function api(method,path,body){
+  const h={'Content-Type':'application/json','X-Admin-Password':PW};
+  const r=await fetch(path+'?pw='+encodeURIComponent(PW),{method,headers:h,body:body?JSON.stringify(body):undefined});
+  return r.json();
+}
+
+function show(id,html,cls){const el=document.getElementById(id);el.className='result '+(cls||'');el.innerHTML=html;el.classList.remove('hidden');}
+
+async function doRegister(){
+  const name=document.getElementById('ownerName').value.trim();
+  const dname=document.getElementById('displayName').value.trim();
+  if(!name){show('regResult','Owner name is required','result-err');return;}
+  document.getElementById('btnRegister').disabled=true;
+  try{
+    const r=await api('POST','/v1/admin/setup/register',{name,display_name:dname||undefined});
+    if(!r.ok){show('regResult',esc(r.error),'result-err');document.getElementById('btnRegister').disabled=false;return;}
+    savedOwner=r.owner.name;savedKey=r.private_key;
+    const isOp=r.owner.roles.includes('operator');
+    show('regResult',
+      '<strong>Owner registered!</strong> Roles: '+r.owner.roles.join(', ')
+      +(isOp?'<br/><span style="color:var(--green)">&#x2713; You are the operator</span>':'')
+      +'<div class="warn">&#x26A0; Save your private key securely \u2014 it cannot be recovered.</div>'
+      +'<label>Private Key</label><div class="key-box">'+esc(r.private_key)+'</div>'
+      +'<label>Public Key</label><div class="key-box">'+esc(r.public_key)+'</div>'
+    ,'result-ok');
+    document.getElementById('s1n').classList.add('step-done');
+    document.getElementById('step2card').classList.remove('hidden');
+  }catch(e){show('regResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnRegister').disabled=false;}
+}
+
+async function doToken(){
+  if(!savedOwner||!savedKey){show('tokenResult','Register an owner first','result-err');return;}
+  document.getElementById('btnToken').disabled=true;
+  try{
+    const r=await api('POST','/v1/admin/setup/token',{owner:savedOwner,private_key:savedKey});
+    if(!r.ok){show('tokenResult',esc(r.error),'result-err');document.getElementById('btnToken').disabled=false;return;}
+    document.getElementById('s2n').classList.add('step-done');
+    document.getElementById('step3card').classList.remove('hidden');
+    document.getElementById('dashLink').href=r.dashboard_url;
+    document.getElementById('jwtBox').textContent=r.token;
+    show('tokenResult','<strong>JWT issued!</strong> Roles: '+r.roles.join(', ')+' \u2014 expires: '+new Date(r.expires_at).toLocaleString(),'result-ok');
+  }catch(e){show('tokenResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnToken').disabled=false;}
+}
+
+function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML;}
+</script>
+</body></html>`;

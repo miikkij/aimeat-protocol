@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
@@ -179,6 +180,10 @@ if (subcommand === 'init') {
   });
 } else {
   // Default: start the server
+  // Auto-generate admin password if not set
+  if (!config.adminPassword) {
+    config.adminPassword = randomBytes(16).toString('base64url');
+  }
   const app = await createServer(config);
   app.listen(config.port, () => {
     logger.info(`🥩 AIMEAT node started`, {
@@ -188,5 +193,10 @@ if (subcommand === 'init') {
     });
     logger.info(`   GET http://localhost:${config.port}/`);
     logger.info(`   Protocol: AIMEAT v1.2 | License: MIT`);
+    logger.info(``);
+    logger.info(`   Admin Setup: http://localhost:${config.port}/v1/admin/setup?pw=${config.adminPassword}`);
+    if (!process.env.MEAT_ADMIN_PASSWORD) {
+      logger.info(`   Admin Password: ${config.adminPassword}`);
+    }
   });
 }
