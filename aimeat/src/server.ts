@@ -449,7 +449,7 @@ async function setupAnonymousIdentity(config: MeatConfig, storage: Storage): Pro
         name: ANON_OWNER,
         displayName: 'Anonymous Node',
         publicKey: kp.publicKey,
-        roles: ['owner', 'operator'],
+        roles: ['owner'],
         createdAt: new Date().toISOString(),
       });
       logger.info('Anonymous owner created');

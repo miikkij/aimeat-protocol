@@ -60,8 +60,9 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
 
         const keyPair = await generateKeyPair();
         const allOwners = await storage.listOwners();
+        const realOwners = allOwners.filter(o => o.name !== 'anonymous');
         const roles = ['owner'];
-        if (allOwners.length === 0) roles.push('operator');
+        if (realOwners.length === 0) roles.push('operator');
 
         const owner = await storage.createOwner({
             name,
