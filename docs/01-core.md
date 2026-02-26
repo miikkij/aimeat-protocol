@@ -2,7 +2,7 @@
 
 ## AI Memory Exchange and Action Transfer
 
-**Status:** v1.3 (Initial OTK, Dev Mode)  
+**Status:** v1.3 (Initial OTK, Dev Mode, Anonymous Node Mode)  
 **Date:** 2026-02-25  
 **Author:** Jouni Miikki (Overscale Solutions Oy)  
 **License:** MIT  
@@ -790,6 +790,43 @@ MEAT_DEV_MODE=true   # Enable dev mode (default: false)
 ```
 
 **IMPORTANT:** Dev Mode is intended for local development and testing only. Never enable it on production or public-facing nodes. It effectively removes write authentication from micro-memory.
+
+#### 5.7.4.2.1 Anonymous Node Mode — Zero-Config Shared Memory
+
+For the fastest possible deployment, operators can enable **Anonymous Node Mode** (`MEAT_ANONYMOUS=true`). This removes all authentication requirements — any AI agent can read and write memory directly without registration, OTKs, or JWTs. All agents share one memory space under a single anonymous identity.
+
+Anonymous mode runs **alongside** normal authenticated mode on the same server. Authenticated endpoints continue to work as before; anonymous mode simply provides an unauthenticated fallback for requests without credentials.
+
+**Behavior when Anonymous Mode is enabled:**
+
+- An "anonymous" owner and "shared" agent are auto-created on startup
+- All unauthenticated requests are assigned the shared anonymous identity (`shared#anonymous@{nodeId}`)
+- Full memory CRUD (read, write, search, delete) works without JWT
+- Micro-memory works without OTK
+- Authenticated requests with valid JWTs still resolve to their own identity
+- A startup message prints the anonymous prompt and share URLs
+- AI guidance prompts available at `GET /v1/prompts/anonymous`
+- Copyable share prompt at `GET /v1/prompts/anonymous/share`
+
+**Configuration:**
+
+```bash
+MEAT_ANONYMOUS=true   # Enable anonymous mode (default: false)
+```
+
+**Use cases:**
+- Local development and prototyping
+- Team knowledge sharing where all AIs contribute to shared memory
+- Quick demos without complex setup
+- Internal tools where network isolation provides security
+
+**Share prompts** — When anonymous mode is enabled, the endpoint `GET /v1/prompts/anonymous/share` returns a pre-formatted prompt that users can copy to any AI. The prompt includes the node URL and instructions for reading/writing memory without authentication.
+
+**Timestamps and versioning** — All memory entries (both full memory and micro-memory) include `created_at` and `updated_at` timestamps plus `version` numbers, enabling AIs to track changes and detect conflicts even in a shared space.
+
+**Co-existence with normal mode** — A single AIMEAT node can have `MEAT_ANONYMOUS=true` along with registered owners and agents. Anonymous requests use the shared identity; authenticated requests use their own identity. This allows gradual migration from anonymous to authenticated as needs grow.
+
+**IMPORTANT:** Anonymous mode provides no isolation between agents. All agents see and can modify all data. Never enable it on nodes storing sensitive information or exposed to untrusted networks.
 
 #### 5.7.4.3 Auto-Identification from OTK
 

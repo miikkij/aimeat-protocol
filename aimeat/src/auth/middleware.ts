@@ -1,6 +1,18 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 
+// Anonymous mode: when enabled, inject this identity for unauthenticated requests
+let _anonymousMode = false;
+let _anonymousGaii = '';
+let _anonymousOwner = '';
+
+/** Called by server.ts after anonymous setup to enable anonymous fallback in auth middleware */
+export function enableAnonymousAuth(gaii: string, owner: string): void {
+  _anonymousMode = true;
+  _anonymousGaii = gaii;
+  _anonymousOwner = owner;
+}
+
 // Extend Express Request with auth info
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -28,15 +40,32 @@ export function optionalAuth() {
         }
       }
     }
+    // Anonymous mode: inject anonymous identity when no auth present
+    if (!req.auth && _anonymousMode) {
+      req.auth = {
+        sub: _anonymousGaii,
+        owner: _anonymousOwner,
+        node: '',
+        roles: ['agent'],
+        exp: Math.floor(Date.now() / 1000) + 86400,
+      };
+    }
     next();
   };
 }
 
 /**
  * Require authentication. Returns 401 if no valid JWT.
+ * If req.auth is already set (e.g. by optionalAuth() in anonymous mode), skips token check.
  */
 export function requireAuth() {
   return async (req: Request, res: Response, next: NextFunction) => {
+    // If auth was already resolved by global optionalAuth() (e.g. anonymous mode), pass through
+    if (req.auth) {
+      next();
+      return;
+    }
+
     const token = extractToken(req);
     if (!token) {
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));

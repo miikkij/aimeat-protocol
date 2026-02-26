@@ -15,6 +15,7 @@
 | POST | `/v1/auth/otk` | Bearer | Core | Generate one-time key for Tier 0.5 actions |
 | POST | `/v1/auth/initial-otk` | Bearer | Core | Generate Initial OTK (dormant until first use) |
 | GET | `/v1/prompts/{tier}` | None | Core | AI system prompts for tier |
+| GET | `/v1/prompts/anonymous/share` | None | Core | Share prompt for anonymous mode |
 
 **Micro-Memory (Tier 0.5)**
 

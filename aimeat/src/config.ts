@@ -44,6 +44,7 @@ export interface MeatConfig {
   dbUrl: string | null;
   adminPassword: string | null;
   devMode: boolean;
+  anonymousMode: boolean;
   jwtTtlSeconds: number;
   welcomeBonus: number;
   dailyAllowance: number;
@@ -84,6 +85,7 @@ export function loadConfig(): MeatConfig {
     dbUrl: process.env.DATABASE_URL ?? null,
     adminPassword: process.env.MEAT_ADMIN_PASSWORD ?? null,
     devMode: process.env.MEAT_DEV_MODE === 'true',
+    anonymousMode: process.env.MEAT_ANONYMOUS === 'true',
     jwtTtlSeconds: parseInt(process.env.MEAT_JWT_TTL ?? '3600', 10),
     welcomeBonus: parseInt(process.env.MEAT_WELCOME_BONUS ?? '100', 10),
     dailyAllowance: parseInt(process.env.MEAT_DAILY_ALLOWANCE ?? '50', 10),

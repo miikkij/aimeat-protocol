@@ -5,7 +5,7 @@ import type { MeatConfig } from './config.js';
 import { InMemoryStorage } from './storage/memory.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
-import { optionalAuth } from './auth/middleware.js';
+import { optionalAuth, enableAnonymousAuth } from './auth/middleware.js';
 import { logger } from './utils/logger.js';
 
 // Routes
@@ -80,6 +80,11 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
 
   // Initialize node keys asynchronously
   initializeNode(config, storage);
+
+  // Anonymous mode: auto-create anonymous owner + agent if not already present
+  if (config.anonymousMode) {
+    await setupAnonymousIdentity(config, storage);
+  }
 
   // Start daily allowance background job
   startDailyAllowanceJob(config, storage);
@@ -425,6 +430,55 @@ function startDisputeTimeoutJob(config: MeatConfig, storage: Storage): void {
 
   setInterval(processDisputes, 3_600_000); // Every hour
   logger.info('Dispute timeout job scheduled (every 1h)');
+}
+
+/** Set up the anonymous owner + agent for anonymous mode. Normal auth still works alongside. */
+async function setupAnonymousIdentity(config: MeatConfig, storage: Storage): Promise<void> {
+  const ANON_OWNER = 'anonymous';
+  const ANON_AGENT_NAME = 'shared';
+  const ANON_GAII = `${ANON_AGENT_NAME}#${ANON_OWNER}@${config.nodeId}`;
+
+  try {
+    // Create anonymous owner if doesn't exist
+    let owner = await storage.getOwner(ANON_OWNER);
+    if (!owner) {
+      const kp = await generateKeyPair();
+      await storage.createOwner({
+        name: ANON_OWNER,
+        displayName: 'Anonymous Node',
+        publicKey: kp.publicKey,
+        roles: ['owner', 'operator'],
+        createdAt: new Date().toISOString(),
+      });
+      logger.info('Anonymous owner created');
+    }
+
+    // Create anonymous agent if doesn't exist
+    let agent = await storage.getAgent(ANON_GAII);
+    if (!agent) {
+      const kp = await generateKeyPair();
+      await storage.createAgent({
+        name: ANON_AGENT_NAME,
+        owner: ANON_OWNER,
+        gaii: ANON_GAII,
+        displayName: 'Shared Anonymous Agent',
+        description: 'Shared agent for anonymous mode — all AI agents share this identity and memory space',
+        capabilities: ['memory', 'micro-memory', 'actions', 'catalogue'],
+        publicKey: kp.publicKey,
+        trustScore: 50,
+        morselBalance: config.welcomeBonus,
+        createdAt: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+      });
+      logger.info('Anonymous agent created', { gaii: ANON_GAII });
+    }
+
+    // Enable the anonymous auth fallback in middleware
+    enableAnonymousAuth(ANON_GAII, ANON_OWNER);
+    logger.info('Anonymous mode enabled — unauthenticated requests use shared identity', { gaii: ANON_GAII });
+  } catch (err) {
+    logger.error('Failed to setup anonymous identity', { error: err });
+  }
 }
 
 async function initializeNode(config: MeatConfig, storage: Storage): Promise<void> {

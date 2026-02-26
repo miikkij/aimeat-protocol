@@ -196,6 +196,11 @@ if (subcommand === 'init') {
     if (config.devMode) {
       logger.info(`   ⚠ DEV MODE: OTK validation bypassed on micro-memory`);
     }
+    if (config.anonymousMode) {
+      logger.info(`   ⚠ ANONYMOUS MODE: No auth required — all agents share one memory space`);
+      logger.info(`   Anonymous prompt: http://localhost:${config.port}/v1/prompts/anonymous`);
+      logger.info(`   Share prompt:     http://localhost:${config.port}/v1/prompts/anonymous/share`);
+    }
     logger.info(``);
     logger.info(`   Admin Setup: http://localhost:${config.port}/v1/admin/setup?pw=${config.adminPassword}`);
     if (!process.env.MEAT_ADMIN_PASSWORD) {

@@ -67,9 +67,83 @@ export function promptsRouter(config: MeatConfig, storage: Storage): Router {
         }));
         break;
       }
+      case 'anonymous': {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const anonGaii = `shared#anonymous@${config.nodeId}`;
+        res.json(success(config.nodeId, {
+          tier: 'anonymous',
+          enabled: config.anonymousMode,
+          system_prompt: config.anonymousMode
+            ? `You are connected to AIMEAT node ${config.nodeId} in Anonymous Mode. All agents share one memory space — no authentication required.\n\nYou can freely read and write memory:\n- POST /v1/memory with { "key": "...", "value": "...", "visibility": "public" }\n- GET /v1/memory to list keys\n- GET /v1/memory/{key} to read\n- GET /v1/memory/search?q={query} to search\n- DELETE /v1/memory/{key} to remove\n\nMicro-memory (simple GET-based key-value):\n- GET /v1/mm?op=add&set={set}&key={key}&value={value}\n- GET /v1/mm?op=list&set={set}\n- GET /v1/mm?op=mod&set={set}&key={key}&value={new_value}\n- GET /v1/mm?op=del&set={set}&key={key}\n\nAll memory entries have timestamps (created_at, updated_at) and version numbers for tracking changes.\n\nUse descriptive keys with prefixes for organization: "project/name", "notes/topic", "config/setting".\n\nTo share this node with other AIs, get the share prompt from GET /v1/prompts/anonymous/share and copy it to them.`
+            : `Anonymous mode is not enabled on this node. Set MEAT_ANONYMOUS=true to enable it. Normal authenticated operations still work.`,
+          available_endpoints: config.anonymousMode
+            ? ['/v1/memory', '/v1/memory/{key}', '/v1/memory/search', '/v1/mm', '/v1/prompts/anonymous/share']
+            : [],
+          share_prompt_url: config.anonymousMode ? `${baseUrl}/v1/prompts/anonymous/share` : null,
+          gaii: anonGaii,
+          note: 'Anonymous mode runs alongside normal authenticated mode. Both work simultaneously.',
+        }));
+        break;
+      }
       default:
-        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2`));
+        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2, anonymous`));
     }
+  });
+
+  // GET /v1/prompts/anonymous/share — Generate a share prompt for copying to other AIs
+  router.get('/v1/prompts/anonymous/share', async (req, res) => {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const anonGaii = `shared#anonymous@${config.nodeId}`;
+
+    const sharePrompt = `# AIMEAT Shared Memory Node — Quick Start
+
+You have access to a shared AIMEAT memory node. All AI agents share the same memory space — no authentication needed.
+
+**Node:** ${config.nodeId}
+**Base URL:** ${baseUrl}
+
+## How to Read Memory
+- List all keys: GET ${baseUrl}/v1/memory
+- Read a key: GET ${baseUrl}/v1/memory/{key}
+- Search: GET ${baseUrl}/v1/memory/search?q={query}
+
+## How to Write Memory
+- Write a key: POST ${baseUrl}/v1/memory  
+  Body: { "key": "my-key", "value": "my data", "visibility": "public" }
+- Update a key: PUT ${baseUrl}/v1/memory/{key}
+  Body: { "value": "updated data", "version": {current_version} }
+- Delete: DELETE ${baseUrl}/v1/memory/{key}
+
+## Micro-Memory (Simple Key-Value)
+- Add: GET ${baseUrl}/v1/mm?op=add&set=notes&key=topic&value=content
+- Read: GET ${baseUrl}/v1/mm?op=list&set=notes
+- Modify: GET ${baseUrl}/v1/mm?op=mod&set=notes&key=topic&value=new-content
+- Delete: GET ${baseUrl}/v1/mm?op=del&set=notes&key=topic
+- Batch: GET ${baseUrl}/v1/mm?op=batch&set=notes&key0=a&value0=x&key1=b&value1=y
+
+## Tips
+- Use descriptive keys with prefixes: "project/name", "notes/meeting-2024-01"
+- All data includes timestamps (created_at, updated_at) and version numbers
+- Memory entries support tags for organization: { "tags": ["project", "draft"] }
+- Visibility: "public" makes entries readable by all, "private" is agent-only
+- No OTK or JWT needed — just make HTTP requests directly
+
+## Node Info
+- GAII: ${anonGaii}
+- This is an anonymous shared node — all agents see the same data
+- Best for: development, prototyping, team knowledge sharing
+- Not for: production secrets or isolated agent data`;
+
+    res.json(success(config.nodeId, {
+      share_prompt: sharePrompt,
+      node_id: config.nodeId,
+      base_url: baseUrl,
+      gaii: anonGaii,
+    }, [
+      { description: 'View anonymous mode guidance', method: 'GET', url: '/v1/prompts/anonymous' },
+      { description: 'List memory keys', method: 'GET', url: '/v1/memory' },
+      { description: 'Micro-memory operations', method: 'GET', url: '/v1/mm?op=list' },
+    ]));
   });
 
   return router;

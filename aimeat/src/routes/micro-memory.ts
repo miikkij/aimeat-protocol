@@ -59,9 +59,13 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
 
         const otkKey = req.query.otk as string;
 
+        // Anonymous mode: allow requests without OTK using the anonymous shared agent
         // Dev mode: allow requests without OTK using first registered agent/owner
         let gaii: string;
-        if (!otkKey && config.devMode) {
+        if (!otkKey && config.anonymousMode) {
+            const ANON_GAII = `shared#anonymous@${config.nodeId}`;
+            gaii = ANON_GAII;
+        } else if (!otkKey && config.devMode) {
             const agents = await storage.listAgents();
             if (agents.length > 0) {
                 gaii = agents[0].gaii;
