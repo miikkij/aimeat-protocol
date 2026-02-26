@@ -4809,11 +4809,16 @@ Milestones are community-driven estimates. Solo-author project — timelines may
 | Milestone | Target | Status |
 |-----------|--------|--------|
 | RFC v1.1 locked | 2026-02-25 | ✅ |
-| Reference implementation (Node.js) — Phase 1 (core) | Q1 2026 | 🔄 In progress |
+| RFC v1.3 locked | 2026-02-26 | ✅ |
+| Reference implementation (Node.js) — Phase 1 (core) | Q1 2026 | ✅ Done |
+| Reference implementation — Phases 2-5 (economy, social, federation, polish) | Q1 2026 | ✅ Done |
+| Unit + E2E test suites (530+ tests) | Q1 2026 | ✅ Done |
+| Anonymous node mode + AI prompts v2 | Q1 2026 | ✅ Done |
+| Admin dashboard + setup wizard | Q1 2026 | ✅ Done |
+| MCP server (14 tools) | Q1 2026 | ✅ Done |
 | First cross-AI memory test (Claude ↔ ChatGPT ↔ Grok) | Q1 2026 | Pending |
 | Genesis node live (meat-finland-001-genesis) | Q2 2026 | Pending |
 | npm package: `pnpm i -g aimeat` | Q2 2026 | Pending |
-| Reference implementation — Phases 2-5 (economy, social, federation, polish) | Q2-Q3 2026 | Pending |
 | First federated peer | Q3 2026 | Pending |
 | Conformance test suite CLI | Q3 2026 | Pending |
 | Economics simulator (Python, open-source) | Q3 2026 | Deferred |
