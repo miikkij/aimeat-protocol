@@ -179,9 +179,9 @@ await test('Get anonymous prompt tier', async () => {
     // v2: structured metadata
     assert(Array.isArray(body.data.boot_sequence), 'Expected boot_sequence array');
     assert(body.data.boot_sequence.length === 5, `Expected 5 boot steps, got ${body.data.boot_sequence.length}`);
-    assert(body.data.key_conventions['context/latest'] !== undefined, 'Expected context/latest in key_conventions');
-    assert(body.data.key_conventions['handoff/pending'] !== undefined, 'Expected handoff/pending in key_conventions');
-    assert(body.data.key_conventions['agents/roster'] !== undefined, 'Expected agents/roster in key_conventions');
+    assert(body.data.key_conventions['context.latest'] !== undefined, 'Expected context.latest in key_conventions');
+    assert(body.data.key_conventions['handoff.pending'] !== undefined, 'Expected handoff.pending in key_conventions');
+    assert(body.data.key_conventions['agents.roster'] !== undefined, 'Expected agents.roster in key_conventions');
 });
 
 await test('Get share prompt', async () => {
@@ -193,8 +193,8 @@ await test('Get share prompt', async () => {
     assert(body.data.share_prompt.includes('/v1/mm'), 'Share prompt should include micro-memory endpoints');
     assert(body.data.share_prompt.includes('Orient Yourself'), 'Share prompt should include orientation');
     assert(body.data.share_prompt.includes('Session Continuity'), 'Share prompt should include session continuity');
-    assert(body.data.share_prompt.includes('handoff/pending'), 'Share prompt should include handoff convention');
-    assert(body.data.share_prompt.includes('context/latest'), 'Share prompt should include context convention');
+    assert(body.data.share_prompt.includes('handoff.pending'), 'Share prompt should include handoff convention');
+    assert(body.data.share_prompt.includes('context.latest'), 'Share prompt should include context convention');
     assert(body.data.gaii === ANON_GAII, `Expected gaii ${ANON_GAII}`);
 });
 

@@ -199,7 +199,7 @@ if (subcommand === 'init') {
     if (config.anonymousMode) {
       logger.info(`   ⚠ ANONYMOUS MODE: No auth required — all agents share one memory space`);
       logger.info(`   Anonymous prompt: ${config.baseUrl}/v1/prompts/anonymous`);
-      logger.info(`   Share prompt:     ${config.baseUrl}/v1/prompts/anonymous/share`);
+      logger.info(`   Share with others: ${config.baseUrl}/v1/prompts/anonymous/share?format=text`);
     }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup?pw=${config.adminPassword}`);
