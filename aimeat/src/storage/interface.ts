@@ -101,10 +101,12 @@ export interface BoardPostRecord {
 export interface OtkRecord {
   key: string;
   ownerGaii: string;
-  action: string;         // 'write_memory' | 'post_board'
+  action: string;         // 'write_memory' | 'post_board' | 'session'
   params: Record<string, unknown>;
   expiresAt: string;
   used: boolean;
+  usedAt: string | null;  // ISO timestamp of first use (60s post-use window)
+  sessionId: string | null; // links OTKs to a session for inactivity timeout
   createdAt: string;
 }
 
@@ -174,6 +176,15 @@ export interface ChunkedUploadRecord {
   expiresAt: string;   // 6 hours after creation
 }
 
+export interface BoardSubscriptionRecord {
+  id: string;
+  boardId: string;
+  gaii: string;
+  callbackUrl?: string;
+  filters?: { categories?: string[]; tags?: string[] };
+  createdAt: string;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -216,6 +227,7 @@ export interface Storage {
   // Transactions
   addTransaction(tx: WalletTransaction): Promise<WalletTransaction>;
   getTransactions(gaii: string, limit?: number): Promise<WalletTransaction[]>;
+  listAllTransactions(): Promise<WalletTransaction[]>;
   deleteTransactions(gaii: string): Promise<number>;
 
   // Boards
@@ -228,10 +240,19 @@ export interface Storage {
   listPosts(boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]>;
   addReaction(boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean>;
 
+  // Board Subscriptions
+  createBoardSubscription(sub: BoardSubscriptionRecord): Promise<BoardSubscriptionRecord>;
+  getBoardSubscription(boardId: string, gaii: string): Promise<BoardSubscriptionRecord | null>;
+  listBoardSubscriptions(boardId: string): Promise<BoardSubscriptionRecord[]>;
+  listSubscriptionsByAgent(gaii: string): Promise<BoardSubscriptionRecord[]>;
+  deleteBoardSubscription(boardId: string, gaii: string): Promise<boolean>;
+
   // OTK (One-Time Keys)
   createOtk(otk: OtkRecord): Promise<OtkRecord>;
   getOtk(key: string): Promise<OtkRecord | null>;
   consumeOtk(key: string): Promise<OtkRecord | null>;
+  listOtksBySession(sessionId: string): Promise<OtkRecord[]>;
+  expireSessionOtks(sessionId: string): Promise<number>;
 
   // Disputes
   createDispute(dispute: DisputeRecord): Promise<DisputeRecord>;
@@ -241,6 +262,7 @@ export interface Storage {
   addDisputeAuditEntry(disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry>;
   getDisputeAuditLog(disputeId: string): Promise<DisputeAuditEntry[]>;
   listDisputesByProvider(gaii: string): Promise<DisputeRecord[]>;
+  listAllDisputes(): Promise<DisputeRecord[]>;
 
   // Micro-Memory
   setMicroMemory(record: MicroMemoryRecord): Promise<MicroMemoryRecord>;

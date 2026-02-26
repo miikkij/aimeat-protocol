@@ -7,6 +7,9 @@ export interface SettlementResult {
     burned: number;
     providerNodeShare: number;
     requesterNodeShare: number;
+    relayShare: number;
+    registryShare: number;
+    relayNodes: string[];
 }
 
 /**
@@ -50,23 +53,28 @@ export async function holdEscrow(
 
 /**
  * Settle payment after successful delivery.
- * RFC Section 8: Network fee split — provider node 40%, requester node 20%, relay 20%, registry 20%.
- * Burn rate applied to network fee.
+ * RFC §10.11 / §16.2: Network fee split — provider node 40%, requester node 20%,
+ * relay nodes 20% (split among route), registry 20%. Burn applied first.
+ *
+ * @param relayPath Optional array of relay node IDs that forwarded the request.
  */
 export async function settlePayment(
     storage: Storage,
     config: MeatConfig,
     work: WorkRecord,
+    relayPath: string[] = [],
 ): Promise<SettlementResult> {
     const { basePrice, networkFee, total } = work.cost;
 
-    // Burn portion of network fee
+    // Burn portion of network fee (applied first)
     const burned = Math.floor(networkFee * config.burnRate);
     const remainingFee = networkFee - burned;
 
-    // Fee distribution (simplified for single-node: all stays on this node)
+    // Fee distribution per RFC §10.11
     const providerNodeShare = Math.floor(remainingFee * 0.4);
     const requesterNodeShare = Math.floor(remainingFee * 0.2);
+    const relayShare = Math.floor(remainingFee * 0.2);
+    const registryShare = remainingFee - providerNodeShare - requesterNodeShare - relayShare; // ~20%, absorbs rounding
 
     // Pay provider the base price
     const provider = await storage.getAgent(work.providerGaii);
@@ -109,7 +117,51 @@ export async function settlePayment(
         });
     }
 
-    return { providerEarnings: basePrice, networkFee, burned, providerNodeShare, requesterNodeShare };
+    // Log relay fee distribution — split equally among relay nodes
+    if (relayShare > 0 && relayPath.length > 0) {
+        const perRelay = Math.floor(relayShare / relayPath.length);
+        for (const relayNodeId of relayPath) {
+            if (perRelay > 0) {
+                await storage.addTransaction({
+                    id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                    gaii: work.requesterGaii,
+                    type: 'relay_fee',
+                    amount: -perRelay,
+                    trackingCode: work.trackingCode,
+                    counterpartyGaii: relayNodeId,
+                    timestamp: new Date().toISOString(),
+                });
+            }
+        }
+    } else if (relayShare > 0) {
+        // No relays in path — relay share stays on provider node (RFC fallback)
+        await storage.addTransaction({
+            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            gaii: work.requesterGaii,
+            type: 'relay_fee_unallocated',
+            amount: -relayShare,
+            trackingCode: work.trackingCode,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
+    // Log registry share
+    if (registryShare > 0) {
+        await storage.addTransaction({
+            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            gaii: work.requesterGaii,
+            type: 'registry_fee',
+            amount: -registryShare,
+            trackingCode: work.trackingCode,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
+    return {
+        providerEarnings: basePrice, networkFee, burned,
+        providerNodeShare, requesterNodeShare, relayShare, registryShare,
+        relayNodes: relayPath,
+    };
 }
 
 /**

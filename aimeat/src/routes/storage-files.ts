@@ -5,9 +5,14 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
+import { checkStorageQuota, chargeOverage } from '../services/quota.js';
+import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
 export function storageFilesRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
+
+    // Max chunked file size: 5 GB (RFC Appendix B)
+    const MAX_CHUNKED_FILE_SIZE = 5 * 1024 * 1024 * 1024;
 
     // POST /v1/storage — upload file (agent auth)
     router.post('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
@@ -42,9 +47,16 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
             mimeType = contentType || 'application/octet-stream';
         }
 
-        // 10MB limit
+        // 10MB per-file limit
         if (fileData.length > 10 * 1024 * 1024) {
             res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', 'File size exceeds 10MB limit'));
+            return;
+        }
+
+        // M-2: Total storage quota enforcement (§8.4, default 100MB per agent)
+        const storageQuota = await checkStorageQuota(config, storage, gaii, fileData.length);
+        if (!storageQuota.allowed) {
+            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', storageQuota.reason!));
             return;
         }
 
@@ -58,12 +70,21 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
             createdAt: new Date().toISOString(),
         });
 
+        // M-3: Charge overage morsels if over quota (§15)
+        if (storageQuota.overageMorsels > 0) {
+            await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
+        }
+
+        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(key)}`);
+        emitResourceListChanged(gaii);
+
         res.status(201).json(success(config.nodeId, {
             key: file.key,
             size: file.size,
             mime_type: file.mimeType,
             visibility: file.visibility,
             created_at: file.createdAt,
+            overage_charged: storageQuota.overageMorsels > 0 ? storageQuota.overageMorsels : undefined,
         }, [
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(key)}` },
             { description: 'List all files', method: 'GET', url: '/v1/storage' },
@@ -146,6 +167,9 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
             return;
         }
 
+        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(key)}`);
+        emitResourceListChanged(gaii);
+
         res.json(success(config.nodeId, { deleted: true, key }));
     });
 
@@ -160,6 +184,14 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         const uploadId = `upload-${randomBytes(12).toString('hex')}`;
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 6 * 3600_000).toISOString(); // 6 hours
+
+        // M-4: Reject if declared total size exceeds max chunked file size (5GB)
+        const chunkSz = chunk_size ?? 10 * 1024 * 1024;
+        if (total_chunks && chunkSz * total_chunks > MAX_CHUNKED_FILE_SIZE) {
+            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+                `Declared file size (${total_chunks} chunks × ${chunkSz} bytes) exceeds max chunked file size of 5 GB`));
+            return;
+        }
 
         await storage.createChunkedUpload({
             uploadId,
@@ -210,6 +242,17 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         }
         const data = Buffer.concat(chunks);
 
+        // M-4: Running total size check — reject early if exceeding 5GB
+        let currentTotal = data.length;
+        for (const [, buf] of upload.receivedChunks) {
+            currentTotal += buf.length;
+        }
+        if (currentTotal > MAX_CHUNKED_FILE_SIZE) {
+            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+                `Total uploaded size (${currentTotal} bytes) exceeds max chunked file size of 5 GB`));
+            return;
+        }
+
         const added = await storage.addChunk(uploadId, chunkIndex, data);
         if (!added) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
@@ -259,6 +302,14 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
             }
         }
 
+        // M-2: Total storage quota check before committing assembled file
+        const gaii = upload.ownerGaii;
+        const storageQuota = await checkStorageQuota(config, storage, gaii, assembledData.length);
+        if (!storageQuota.allowed) {
+            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', storageQuota.reason!));
+            return;
+        }
+
         // Create the final storage file
         const file = await storage.createStorageFile({
             key: upload.key,
@@ -270,8 +321,16 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
             createdAt: new Date().toISOString(),
         });
 
+        // M-3: Charge overage morsels if over quota (§15)
+        if (storageQuota.overageMorsels > 0) {
+            await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
+        }
+
         // Clean up chunked upload
         await storage.deleteChunkedUpload(uploadId);
+
+        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(upload.key)}`);
+        emitResourceListChanged(gaii);
 
         res.status(201).json(success(config.nodeId, {
             key: file.key,

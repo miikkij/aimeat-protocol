@@ -13,6 +13,28 @@ import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
 
+// Session inactivity tracking: sessionId → lastActivity timestamp
+const sessions = new Map<string, { ownerGaii: string; lastActivity: number }>();
+const SESSION_INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if an OTK's session is still active (not timed out by inactivity).
+ * Updates lastActivity on success. Returns false if session has expired.
+ * Non-session OTKs always return true.
+ */
+export async function checkOtkSession(otk: { sessionId: string | null }, storage: Storage): Promise<boolean> {
+  if (!otk.sessionId) return true;
+  const session = sessions.get(otk.sessionId);
+  if (!session) return true; // session not tracked (e.g. standalone OTK)
+  if (Date.now() - session.lastActivity > SESSION_INACTIVITY_MS) {
+    await storage.expireSessionOtks(otk.sessionId);
+    sessions.delete(otk.sessionId);
+    return false;
+  }
+  session.lastActivity = Date.now();
+  return true;
+}
+
 export function authRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -92,26 +114,50 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
     const agents = await storage.getAgentsByOwner(owner);
     const sessionGaii = agents.length > 0 ? agents[0].gaii : owner;
 
+    // Create a session for inactivity tracking
+    const sessionId = `sess-${randomBytes(8).toString('hex')}`;
+    sessions.set(sessionId, { ownerGaii: sessionGaii, lastActivity: Date.now() });
+
     // Generate OTK for Tier 0.5 operations
     const otk = generateOtk();
     const expiresAt = new Date(Date.now() + 300_000).toISOString(); // 5 minutes
-    const nextOtkActivates = new Date(Date.now() + 60_000).toISOString(); // 60s post-use window
 
     await storage.createOtk({
       key: otk,
       ownerGaii: sessionGaii,
       action: 'session',
-      params: { owner, sessionType: 'tier_0_5' },
+      params: { owner, sessionType: 'tier_0_5', sessionId },
       expiresAt,
       used: false,
+      usedAt: null,
+      sessionId,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Pre-rotate: generate next_otk so the AI always has a buffered key
+    const nextOtk = generateOtk();
+    const nextExpiresAt = new Date(Date.now() + 300_000).toISOString();
+    await storage.createOtk({
+      key: nextOtk,
+      ownerGaii: sessionGaii,
+      action: 'session',
+      params: { owner, sessionType: 'tier_0_5', sessionId },
+      expiresAt: nextExpiresAt,
+      used: false,
+      usedAt: null,
+      sessionId,
       createdAt: new Date().toISOString(),
     });
 
     res.json(success(config.nodeId, {
       otk,
       otk_expires: expiresAt,
-      next_otk_activates: nextOtkActivates,
+      next_otk: nextOtk,
+      next_otk_expires: nextExpiresAt,
+      session_id: sessionId,
       session_agent: sessionGaii,
+      session_inactivity_timeout_seconds: SESSION_INACTIVITY_MS / 1000,
+      note: 'OTKs remain valid for 60 seconds after first use to handle retries. Session expires after 5 minutes of inactivity.',
     }, [
       { description: 'Use OTK for micro-memory operations', method: 'GET', url: `/v1/mm?otk=${otk}&op=list` },
       { description: 'Accept work via GET', method: 'GET', url: `/v1/work/{tc}/accept?otk=${otk}` },
@@ -293,6 +339,8 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
       params: params ?? {},
       expiresAt,
       used: false,
+      usedAt: null,
+      sessionId: null,
       createdAt: new Date().toISOString(),
     });
 
@@ -314,6 +362,18 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
     if (!otk) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'One-time key not found, expired, or already used'));
       return;
+    }
+
+    // Check session inactivity timeout
+    if (otk.sessionId) {
+      const session = sessions.get(otk.sessionId);
+      if (session && Date.now() - session.lastActivity > SESSION_INACTIVITY_MS) {
+        await storage.expireSessionOtks(otk.sessionId);
+        sessions.delete(otk.sessionId);
+        res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
+        return;
+      }
+      if (session) session.lastActivity = Date.now();
     }
 
     if (otk.action === 'write_memory') {
@@ -341,11 +401,18 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Unsupported OTK action: ${otk.action}`));
   });
 
-  // Cleanup expired challenges periodically
+  // Cleanup expired challenges and inactive sessions periodically
   setInterval(() => {
     const now = Date.now();
     for (const [key, val] of challenges) {
       if (now > val.expiresAt) challenges.delete(key);
+    }
+    // Expire inactive sessions (5 min inactivity)
+    for (const [sessionId, session] of sessions) {
+      if (now - session.lastActivity > SESSION_INACTIVITY_MS) {
+        storage.expireSessionOtks(sessionId).catch(() => { });
+        sessions.delete(sessionId);
+      }
     }
   }, 30_000);
 

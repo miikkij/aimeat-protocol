@@ -35,9 +35,12 @@ export interface RateLimitsConfig {
   roleMultipliers: RoleMultipliers;
 }
 
+export type NodeType = 'full' | 'relay' | 'mirror';
+
 export interface MeatConfig {
   port: number;
   nodeId: string;
+  nodeType: NodeType;
   dbUrl: string | null;
   adminPassword: string | null;
   jwtTtlSeconds: number;
@@ -47,14 +50,33 @@ export interface MeatConfig {
   burnRate: number;
   keyedBrowseEnabled: boolean;
   extendedFeaturesEnabled: boolean;
+  maxRelayHops: number;
+  depeeringGracePeriodHours: number;
+  keyCacheRefreshMinutes: number;
+  memoryQuotaMb: number;
+  storageQuotaMb: number;
+  microMemoryQuotaKb: number;
+  memoryOverageMorselsPerMbMonth: number;
+  storageOverageMorselsPerGbMonth: number;
+  maxOperatorMintPerDay: number;
+  boardPostBaseCost: number;
+  boardPostCostPerKb: number;
+  webhookMaxRetries: number;
+  workQueueMaxPending: number;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
 }
 
 export function loadConfig(): MeatConfig {
+  const nodeType = (process.env.MEAT_NODE_TYPE ?? 'full') as NodeType;
+  if (!['full', 'relay', 'mirror'].includes(nodeType)) {
+    throw new Error(`Invalid MEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', or 'mirror'.`);
+  }
+
   return {
     port: parseInt(process.env.MEAT_PORT ?? '3117', 10),
     nodeId: process.env.MEAT_NODE_ID ?? 'meat-local-001-dev',
+    nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,
     adminPassword: process.env.MEAT_ADMIN_PASSWORD ?? null,
     jwtTtlSeconds: parseInt(process.env.MEAT_JWT_TTL ?? '3600', 10),
@@ -64,6 +86,19 @@ export function loadConfig(): MeatConfig {
     burnRate: parseFloat(process.env.MEAT_BURN_RATE ?? '0.10'),
     keyedBrowseEnabled: process.env.MEAT_KEYED_BROWSE !== 'false',
     extendedFeaturesEnabled: process.env.MEAT_EXTENDED_FEATURES !== 'false',
+    maxRelayHops: parseInt(process.env.MEAT_MAX_RELAY_HOPS ?? '3', 10),
+    depeeringGracePeriodHours: parseInt(process.env.MEAT_DEPEERING_GRACE_HOURS ?? '72', 10),
+    keyCacheRefreshMinutes: parseInt(process.env.MEAT_KEY_CACHE_REFRESH_MINUTES ?? '5', 10),
+    memoryQuotaMb: parseInt(process.env.MEAT_MEMORY_QUOTA_MB ?? '10', 10),
+    storageQuotaMb: parseInt(process.env.MEAT_STORAGE_QUOTA_MB ?? '100', 10),
+    microMemoryQuotaKb: parseInt(process.env.MEAT_MICRO_MEMORY_QUOTA_KB ?? '500', 10),
+    memoryOverageMorselsPerMbMonth: parseInt(process.env.MEAT_MEMORY_OVERAGE_MORSELS ?? '10', 10),
+    storageOverageMorselsPerGbMonth: parseInt(process.env.MEAT_STORAGE_OVERAGE_MORSELS ?? '100', 10),
+    maxOperatorMintPerDay: parseInt(process.env.MEAT_MAX_OPERATOR_MINT_PER_DAY ?? '10000', 10),
+    boardPostBaseCost: parseInt(process.env.MEAT_BOARD_POST_BASE_COST ?? '5', 10),
+    boardPostCostPerKb: parseInt(process.env.MEAT_BOARD_POST_COST_PER_KB ?? '2', 10),
+    webhookMaxRetries: parseInt(process.env.MEAT_WEBHOOK_MAX_RETRIES ?? '5', 10),
+    workQueueMaxPending: parseInt(process.env.MEAT_WORK_QUEUE_MAX_PENDING ?? '10', 10),
     extensionHooks: {
       pre_owner_registration: [],
       post_owner_registration: [],

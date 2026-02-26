@@ -4,6 +4,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
+import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
+import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
 export function memoryRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
@@ -50,6 +52,14 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
       }
     }
 
+    // M-1: Total memory quota enforcement (§8.2, default 10MB per agent)
+    const existingSize = existing ? Buffer.byteLength(JSON.stringify(existing.value), 'utf8') : 0;
+    const quotaCheck = await checkMemoryQuota(config, storage, gaii, valueSize, existingSize);
+    if (!quotaCheck.allowed) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
+      return;
+    }
+
     const record = await storage.setMemory({
       key,
       ownerGaii: gaii,
@@ -61,6 +71,15 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
+
+    // Charge overage morsels if over quota (§15)
+    if (quotaCheck.overageMorsels > 0) {
+      await chargeOverage(storage, gaii, quotaCheck.overageMorsels, 'memory_overage');
+    }
+
+    // MCP resource subscription notifications
+    emitResourceUpdated(gaii, `meat://memory/${encodeURIComponent(key)}`);
+    if (!existing) emitResourceListChanged(gaii);
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,
@@ -86,6 +105,12 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
 
     const records = await storage.listMemory(gaii, { prefix, visibility, tags });
 
+    // Calculate total size for quota reporting
+    let totalBytes = 0;
+    for (const r of records) {
+      totalBytes += Buffer.byteLength(JSON.stringify(r.value), 'utf8');
+    }
+
     res.json(success(config.nodeId, {
       items: records.map(r => ({
         key: r.key,
@@ -96,7 +121,12 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
         updated_at: r.updatedAt,
       })),
       total: records.length,
-      quota: { max_keys: 1000, used_keys: records.length },
+      quota: {
+        max_keys: 1000,
+        used_keys: records.length,
+        max_bytes: config.memoryQuotaMb * 1024 * 1024,
+        used_bytes: totalBytes,
+      },
     }, [
       {
         description: 'Write a new memory entry',
@@ -171,6 +201,9 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
       return;
     }
 
+    emitResourceUpdated(gaii, `meat://memory/${encodeURIComponent(key)}`);
+    emitResourceListChanged(gaii);
+
     res.json(success(config.nodeId, {
       deleted: true,
       key,
@@ -199,6 +232,15 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
       return;
     }
 
+    // M-1: Total memory quota check on update
+    const newValueSize = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    const existingSize = Buffer.byteLength(JSON.stringify(existing.value), 'utf8');
+    const quotaCheck = await checkMemoryQuota(config, storage, gaii, newValueSize, existingSize);
+    if (!quotaCheck.allowed) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
+      return;
+    }
+
     const now = new Date().toISOString();
     const record = await storage.setMemory({
       key,
@@ -211,6 +253,13 @@ export function memoryRouter(config: MeatConfig, storage: Storage): Router {
       createdAt: existing.createdAt,
       updatedAt: now,
     });
+
+    // Charge overage morsels if over quota (§15)
+    if (quotaCheck.overageMorsels > 0) {
+      await chargeOverage(storage, gaii, quotaCheck.overageMorsels, 'memory_overage');
+    }
+
+    emitResourceUpdated(gaii, `meat://memory/${encodeURIComponent(key)}`);
 
     res.json(success(config.nodeId, {
       key: record.key,

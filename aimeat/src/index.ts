@@ -51,9 +51,9 @@ if (values.version) {
   process.exit(0);
 }
 
-// Load config file if specified
+// Load config file: explicit --config flag, or auto-detect aimeat.config.json in CWD
 let fileConfig: Record<string, string> = {};
-const configPath = values.config;
+const configPath = values.config ?? (existsSync('aimeat.config.json') ? 'aimeat.config.json' : null);
 if (configPath) {
   try {
     fileConfig = JSON.parse(readFileSync(configPath, 'utf-8'));

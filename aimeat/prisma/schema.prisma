@@ -142,16 +142,19 @@ model BoardPost {
 }
 
 model Otk {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  key       String   @unique
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  key       String    @unique
   ownerGaii String
   action    String
   params    Json
   expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  used      Boolean   @default(false)
+  usedAt    DateTime?
+  sessionId String?
+  createdAt DateTime  @default(now())
 
   @@index([expiresAt])
+  @@index([sessionId])
 }
 
 model Dispute {

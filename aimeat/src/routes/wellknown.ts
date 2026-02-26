@@ -8,13 +8,20 @@ export function wellknownRouter(config: MeatConfig, storage: Storage): Router {
 
   router.get('/.well-known/aimeat', async (_req, res) => {
     const nodeKey = await storage.getNodeKey();
+
+    const capsByType = {
+      full: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
+      relay: ['federation', 'routing'],
+      mirror: ['memory', 'actions', 'catalogue', 'federation'],
+    };
+
     res.json(success(config.nodeId, {
       node_id: config.nodeId,
-      type: 'full',
+      type: config.nodeType,
       protocol: 'aimeat',
       version: 'v1',
       public_key: nodeKey?.publicKey ?? null,
-      capabilities: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
+      capabilities: capsByType[config.nodeType],
       endpoints: {
         bootstrap: '/',
         spec: '/v1/spec',

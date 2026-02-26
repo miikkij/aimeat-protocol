@@ -6,9 +6,41 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeHooks } from '../services/hooks.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
+import { checkOtkSession } from './auth.js';
+import { logger } from '../utils/logger.js';
 
 export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /** Notify board subscribers of a new post (fire-and-forget). */
+  function notifySubscribers(boardId: string, post: { id: string; authorGaii: string; title: string; category?: string; tags: string[] }): void {
+    storage.listBoardSubscriptions(boardId).then(subs => {
+      for (const sub of subs) {
+        // Don't notify the author of their own post
+        if (sub.gaii === post.authorGaii) continue;
+        // Apply category/tag filters if subscriber set them
+        if (sub.filters?.categories?.length && post.category && !sub.filters.categories.includes(post.category)) continue;
+        if (sub.filters?.tags?.length && !sub.filters.tags.some(t => post.tags.includes(t))) continue;
+        if (!sub.callbackUrl) continue;
+        fetch(sub.callbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'board.new_post',
+            board_id: boardId,
+            post_id: post.id,
+            author_gaii: post.authorGaii,
+            title: post.title,
+            category: post.category,
+            timestamp: new Date().toISOString(),
+          }),
+          signal: AbortSignal.timeout(10_000),
+        }).catch(err => {
+          logger.warn('Board subscription notification failed', { boardId, gaii: sub.gaii, error: String(err) });
+        });
+      }
+    }).catch(() => { /* ignore */ });
+  }
 
   // POST /v1/boards — create a board (agent auth)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
@@ -65,6 +97,23 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }));
   });
 
+  // GET /v1/boards/subscriptions — list agent's own subscriptions
+  // Must be registered before :boardId routes to avoid matching "subscriptions" as a boardId
+  router.get('/v1/boards/subscriptions', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const subs = await storage.listSubscriptionsByAgent(gaii);
+    res.json(success(config.nodeId, {
+      subscriptions: subs.map(s => ({
+        id: s.id,
+        board_id: s.boardId,
+        callback_url: s.callbackUrl,
+        filters: s.filters,
+        created_at: s.createdAt,
+      })),
+      total: subs.length,
+    }));
+  });
+
   // POST /v1/boards/:boardId/posts — post to a board (agent auth)
   router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
@@ -95,9 +144,9 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
 
     const { title, body, category, tags, ttl_hours } = req.body ?? {};
 
-    // Public board posting costs morsels
+    // Public board posting costs morsels (§15, Appendix B: configurable base + per-KB)
     if (board.visibility === 'public') {
-      const cost = 5 + Math.ceil((body.length / 1000) * 2);
+      const cost = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
       const agent = await storage.getAgent(gaii);
       if (!agent || agent.morselBalance < cost) {
         res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
@@ -142,6 +191,9 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
     }, [
       { description: 'View this post', method: 'GET', url: `/v1/boards/${boardId}/posts` },
     ]));
+
+    // §12.3: Notify board subscribers (fire-and-forget)
+    notifySubscribers(boardId, { id: post.id, authorGaii: gaii, title: post.title, category: post.category, tags: post.tags ?? [] });
   });
 
   // GET /v1/boards/:boardId/posts — read board posts (public = no auth)
@@ -297,6 +349,10 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
       res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
       return;
     }
+    if (!await checkOtkSession(otk, storage)) {
+      res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
+      return;
+    }
     const boardId = req.params.boardId as string;
     const board = await storage.getBoard(boardId);
     if (!board) {
@@ -327,6 +383,98 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
       title: post.title,
       body: post.body,
       tier: '0.5',
+    }));
+  });
+
+  // ───────────────────────────────────────────────
+  // Board Subscriptions (§12.3)
+  // ───────────────────────────────────────────────
+
+  // POST /v1/boards/:boardId/subscribe — subscribe to a board
+  router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+
+    const gaii = req.auth!.sub;
+
+    // Check access for non-public boards
+    if (board.visibility !== 'public') {
+      if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
+        return;
+      }
+    }
+
+    // Check if already subscribed
+    const existing = await storage.getBoardSubscription(boardId, gaii);
+    if (existing) {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', 'Already subscribed to this board'));
+      return;
+    }
+
+    const { callback_url, filters } = req.body ?? {};
+    const sub = await storage.createBoardSubscription({
+      id: `sub-${randomBytes(8).toString('hex')}`,
+      boardId,
+      gaii,
+      callbackUrl: callback_url,
+      filters,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json(success(config.nodeId, {
+      id: sub.id,
+      board_id: sub.boardId,
+      callback_url: sub.callbackUrl,
+      filters: sub.filters,
+      created_at: sub.createdAt,
+    }, [
+      { description: 'Unsubscribe', method: 'DELETE', url: `/v1/boards/${boardId}/subscribe` },
+      { description: 'View board posts', method: 'GET', url: `/v1/boards/${boardId}/posts` },
+    ]));
+  });
+
+  // DELETE /v1/boards/:boardId/subscribe — unsubscribe from a board
+  router.delete('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const gaii = req.auth!.sub;
+
+    const deleted = await storage.deleteBoardSubscription(boardId, gaii);
+    if (!deleted) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No subscription found for this board'));
+      return;
+    }
+
+    res.json(success(config.nodeId, { unsubscribed: true, board_id: boardId }));
+  });
+
+  // GET /v1/boards/:boardId/subscribers — list subscribers (board owner / operator only)
+  router.get('/v1/boards/:boardId/subscribers', requireAuth(), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+
+    if (board.ownerGaii !== req.auth!.sub && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can list subscribers'));
+      return;
+    }
+
+    const subs = await storage.listBoardSubscriptions(boardId);
+    res.json(success(config.nodeId, {
+      subscribers: subs.map(s => ({
+        id: s.id,
+        gaii: s.gaii,
+        filters: s.filters,
+        created_at: s.createdAt,
+      })),
+      total: subs.length,
     }));
   });
 

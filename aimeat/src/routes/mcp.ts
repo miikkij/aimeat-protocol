@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { EventEmitter } from 'node:events';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import type { MeatConfig } from '../config.js';
@@ -11,6 +12,24 @@ import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+
+// ── Resource change event bus ──
+// Allows REST routes and MCP tools to emit resource change events
+// that get forwarded to subscribed MCP sessions via SSE.
+export const resourceEvents = new EventEmitter();
+
+export interface ResourceChangeEvent {
+    agentGaii: string;
+    uri: string;
+}
+
+export function emitResourceUpdated(agentGaii: string, uri: string): void {
+    resourceEvents.emit('resource:updated', { agentGaii, uri } satisfies ResourceChangeEvent);
+}
+
+export function emitResourceListChanged(agentGaii: string): void {
+    resourceEvents.emit('resource:listChanged', { agentGaii } as { agentGaii: string });
+}
 
 // OAuth 2.1 state — in-memory (per RFC, clients register dynamically)
 interface OAuthClient {
@@ -56,8 +75,88 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
     function createMcpServer(agentGaii: string): McpServer {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
-            { capabilities: { tools: {} } },
+            { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
         );
+
+        // ── MCP Resources ──
+        // Resource template: memory entries
+        mcp.registerResource(
+            'agent-memory',
+            new ResourceTemplate('meat://memory/{key}', { list: async () => {
+                const entries = await storage.listMemory(agentGaii, {});
+                return {
+                    resources: entries.map(e => ({
+                        uri: `meat://memory/${encodeURIComponent(e.key)}`,
+                        name: e.key,
+                        mimeType: 'application/json',
+                        description: `Memory entry: ${e.key}`,
+                    })),
+                };
+            }}),
+            { mimeType: 'application/json', description: 'Agent memory entries' },
+            async (uri, variables) => {
+                const key = decodeURIComponent(variables.key as string);
+                const record = await storage.getMemory(agentGaii, key);
+                if (!record) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
+                return { contents: [{ uri: uri.toString(), text: JSON.stringify(record.value), mimeType: 'application/json' }] };
+            },
+        );
+
+        // Resource template: storage files
+        mcp.registerResource(
+            'agent-storage',
+            new ResourceTemplate('meat://storage/{key}', { list: async () => {
+                const files = await storage.listStorageFiles(agentGaii);
+                return {
+                    resources: files.map(f => ({
+                        uri: `meat://storage/${encodeURIComponent(f.key)}`,
+                        name: f.key,
+                        mimeType: f.mimeType,
+                        description: `Storage file: ${f.key} (${f.size} bytes)`,
+                    })),
+                };
+            }}),
+            { mimeType: 'application/octet-stream', description: 'Agent binary storage files' },
+            async (uri, variables) => {
+                const key = decodeURIComponent(variables.key as string);
+                const file = await storage.getStorageFile(agentGaii, key);
+                if (!file) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
+                return { contents: [{ uri: uri.toString(), blob: file.data.toString('base64'), mimeType: file.mimeType }] };
+            },
+        );
+
+        // Resource: wallet balance (static URI)
+        mcp.registerResource(
+            'agent-wallet',
+            `meat://wallet/${encodeURIComponent(agentGaii)}`,
+            { mimeType: 'application/json', description: 'Agent morsel wallet balance' },
+            async (uri) => {
+                const agent = await storage.getAgent(agentGaii);
+                if (!agent) return { contents: [{ uri: uri.toString(), text: '{}' }] };
+                return { contents: [{ uri: uri.toString(), text: JSON.stringify({ balance: agent.morselBalance }), mimeType: 'application/json' }] };
+            },
+        );
+
+        // ── Resource change listener ──
+        // Forward resource:updated events to this session's SSE stream
+        const onResourceUpdated = (evt: ResourceChangeEvent) => {
+            if (evt.agentGaii === agentGaii) {
+                mcp.server.sendResourceUpdated({ uri: evt.uri }).catch(() => {});
+            }
+        };
+        const onResourceListChanged = (evt: { agentGaii: string }) => {
+            if (evt.agentGaii === agentGaii) {
+                mcp.server.sendResourceListChanged().catch(() => {});
+            }
+        };
+        resourceEvents.on('resource:updated', onResourceUpdated);
+        resourceEvents.on('resource:listChanged', onResourceListChanged);
+
+        // Clean up listeners when the MCP server closes
+        mcp.server.onclose = () => {
+            resourceEvents.off('resource:updated', onResourceUpdated);
+            resourceEvents.off('resource:listChanged', onResourceListChanged);
+        };
 
         // ── Tool 1: meat_catalogue_search ──
         mcp.tool(
@@ -154,6 +253,8 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
                     createdAt: existing?.createdAt ?? new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 });
+                emitResourceUpdated(agentGaii, `meat://memory/${encodeURIComponent(key)}`);
+                if (!existing) emitResourceListChanged(agentGaii);
                 return {
                     content: [{
                         type: 'text' as const,
@@ -289,6 +390,9 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
                 if (!['accepted', 'in_progress'].includes(work.status)) return { content: [{ type: 'text' as const, text: `Cannot deliver: status is ${work.status}` }], isError: true };
                 await settlePayment(storage, config, work);
                 await storage.updateWork(tracking_code, { status: 'delivered', output, updatedAt: new Date().toISOString() });
+                // Wallet balance changed for both parties
+                emitResourceUpdated(agentGaii, `meat://wallet/${encodeURIComponent(agentGaii)}`);
+                emitResourceUpdated(work.requesterGaii, `meat://wallet/${encodeURIComponent(work.requesterGaii)}`);
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: 'delivered' }, null, 2) }] };
             },
         );
@@ -384,6 +488,8 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
                     data: fileData,
                     createdAt: new Date().toISOString(),
                 });
+                emitResourceUpdated(agentGaii, `meat://storage/${encodeURIComponent(key)}`);
+                emitResourceListChanged(agentGaii);
                 return {
                     content: [{ type: 'text' as const, text: JSON.stringify({ key: file.key, size: file.size, uploaded: true }, null, 2) }],
                 };

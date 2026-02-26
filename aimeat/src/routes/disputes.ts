@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
+import { checkOtkSession } from './auth.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -436,6 +437,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
         if (!otkKey) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required')); return; }
         const otk = await storage.consumeOtk(otkKey);
         if (!otk) { res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'OTK not found, expired, or used')); return; }
+        if (!await checkOtkSession(otk, storage)) { res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity')); return; }
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Work not found')); return; }
@@ -455,6 +457,7 @@ export function disputesRouter(config: MeatConfig, storage: Storage): Router {
         if (!otkKey) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required')); return; }
         const otk = await storage.consumeOtk(otkKey);
         if (!otk) { res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'OTK not found, expired, or used')); return; }
+        if (!await checkOtkSession(otk, storage)) { res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity')); return; }
         const tc = param(req.params.tc);
         const work = await storage.getWork(tc);
         if (!work) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Work not found')); return; }

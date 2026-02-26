@@ -2,6 +2,8 @@ import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { checkOtkSession } from './auth.js';
+import { checkMicroMemoryQuota } from '../services/quota.js';
 
 const VALID_VISIBILITY = ['private', 'public_read', 'shared_read', 'shared_write', 'public_write'] as const;
 const MAX_SETS_PER_AGENT = 50;
@@ -23,6 +25,10 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
         const otk = await storage.consumeOtk(otkKey);
         if (!otk) {
             res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
+            return;
+        }
+        if (!await checkOtkSession(otk, storage)) {
+            res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
             return;
         }
 
@@ -61,6 +67,16 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_KEYS_PER_SET} keys per set`));
                     return;
                 }
+                // M-5: Total micro-memory quota check (§5.7.4, default 500KB)
+                const addBytes = Buffer.byteLength(key, 'utf8') + Buffer.byteLength(value, 'utf8');
+                const existingAddBytes = record.entries[key]
+                    ? Buffer.byteLength(key, 'utf8') + Buffer.byteLength(record.entries[key], 'utf8')
+                    : 0;
+                const mmQuota = await checkMicroMemoryQuota(config, storage, gaii, addBytes - existingAddBytes);
+                if (!mmQuota.allowed) {
+                    res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', mmQuota.reason!));
+                    return;
+                }
                 record.entries[key] = value;
                 record.updatedAt = new Date().toISOString();
                 await storage.setMicroMemory(record);
@@ -89,6 +105,16 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                 if (!record2 || !(key in record2.entries)) {
                     res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Key "${key}" not found in set "${set}"`));
                     return;
+                }
+                // M-5: Total micro-memory quota check on mod
+                const modNewBytes = Buffer.byteLength(value, 'utf8');
+                const modOldBytes = Buffer.byteLength(record2.entries[key], 'utf8');
+                if (modNewBytes > modOldBytes) {
+                    const modQuota = await checkMicroMemoryQuota(config, storage, gaii, modNewBytes - modOldBytes);
+                    if (!modQuota.allowed) {
+                        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', modQuota.reason!));
+                        return;
+                    }
                 }
                 record2.entries[key] = value;
                 record2.updatedAt = new Date().toISOString();
@@ -188,6 +214,19 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                 if (value.length > MAX_VALUE_SIZE) {
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
                     return;
+                }
+                // M-5: Total micro-memory quota check for public/shared writes
+                const pubAddBytes = Buffer.byteLength(key, 'utf8') + Buffer.byteLength(value, 'utf8');
+                const pubExistingBytes = record.entries[key]
+                    ? Buffer.byteLength(key, 'utf8') + Buffer.byteLength(record.entries[key], 'utf8')
+                    : 0;
+                const pubDelta = pubAddBytes - pubExistingBytes;
+                if (pubDelta > 0) {
+                    const pubQuota = await checkMicroMemoryQuota(config, storage, record.gaii, pubDelta);
+                    if (!pubQuota.allowed) {
+                        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', pubQuota.reason!));
+                        return;
+                    }
                 }
                 record.entries[key] = value;
             } else if (writeOp === 'del') {

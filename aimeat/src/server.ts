@@ -1,4 +1,6 @@
 import express from 'express';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { MeatConfig } from './config.js';
 import { InMemoryStorage } from './storage/memory.js';
 import { generateKeyPair } from './auth/keypair.js';
@@ -101,10 +103,57 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   // Start federation heartbeat job (pings peers every 5 minutes)
   startHeartbeatJob(config, peers);
 
+  // ── Node-type guards ──
+  // Relay nodes: stateless routers — no agent hosting, memory, work, boards
+  const rejectForRelay: express.RequestHandler = (_req, res, next) => {
+    if (config.nodeType === 'relay') {
+      res.status(503).json({
+        ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+        timestamp: new Date().toISOString(),
+        error: { code: 'NODE_TYPE_UNSUPPORTED', message: 'Relay nodes do not host agents or data. Use a Full node.' },
+      });
+      return;
+    }
+    next();
+  };
+
+  // Mirror nodes: read-only replicas — block all write operations
+  const mirrorReadOnly: express.RequestHandler = (req, res, next) => {
+    if (config.nodeType === 'mirror' && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      // Allow federation replication inbound (mirror receives data from peers)
+      if (req.path.startsWith('/v1/federation/replicate') || req.path.startsWith('/v1/federation/catalogue-sync')) {
+        next();
+        return;
+      }
+      res.status(503).json({
+        ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+        timestamp: new Date().toISOString(),
+        error: { code: 'MIRROR_READ_ONLY', message: 'Mirror nodes are read-only. Direct writes to a Full node.' },
+      });
+      return;
+    }
+    next();
+  };
+
   // Mount routes
   app.use(bootstrapRouter(config));
   app.use(wellknownRouter(config, storage));
   app.use(authRouter(config, storage));
+
+  // Relay nodes skip agent-hosting routes entirely
+  app.use('/v1/owners', rejectForRelay);
+  app.use('/v1/agents', rejectForRelay);
+  app.use('/v1/memory', rejectForRelay);
+  app.use('/v1/work', rejectForRelay);
+  app.use('/v1/wallet', rejectForRelay);
+  app.use('/v1/boards', rejectForRelay);
+  app.use('/v1/disputes', rejectForRelay);
+  app.use('/v1/micro-memory', rejectForRelay);
+  app.use('/v1/storage', rejectForRelay);
+
+  // Mirror nodes block writes (except federation replication)
+  app.use(mirrorReadOnly);
+
   app.use(ownersRouter(config, storage));
   app.use(agentsRouter(config, storage));
   app.use(memoryRouter(config, storage));
@@ -379,15 +428,51 @@ async function initializeNode(config: MeatConfig, storage: Storage): Promise<voi
   try {
     let nodeKey = await storage.getNodeKey();
     if (!nodeKey) {
-      logger.info('Generating node keypair...');
-      const kp = await generateKeyPair();
-      await storage.setNodeKey(kp.publicKey, kp.privateKey);
-      nodeKey = kp;
-      logger.info('Node keypair generated');
+      // I-3: Try loading persisted key from ~/.aimeat/node-key.json
+      nodeKey = loadPersistedNodeKey();
+      if (nodeKey) {
+        await storage.setNodeKey(nodeKey.publicKey, nodeKey.privateKey);
+        logger.info('Node key loaded from ~/.aimeat/node-key.json');
+      } else {
+        logger.info('Generating node keypair...');
+        const kp = await generateKeyPair();
+        await storage.setNodeKey(kp.publicKey, kp.privateKey);
+        nodeKey = kp;
+        persistNodeKey(kp);
+        logger.info('Node keypair generated and saved to ~/.aimeat/node-key.json');
+      }
     }
     await initNodeKeys(nodeKey.publicKey, nodeKey.privateKey);
     logger.info('Node keys initialized for JWT signing');
   } catch (err) {
     logger.error('Failed to initialize node keys', { error: err });
+  }
+}
+
+function getNodeKeyPath(): string {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '.';
+  return join(home, '.aimeat', 'node-key.json');
+}
+
+function loadPersistedNodeKey(): { publicKey: string; privateKey: string } | null {
+  const keyPath = getNodeKeyPath();
+  try {
+    if (!existsSync(keyPath)) return null;
+    const data = JSON.parse(readFileSync(keyPath, 'utf-8'));
+    if (data.publicKey && data.privateKey) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function persistNodeKey(kp: { publicKey: string; privateKey: string }): void {
+  const keyPath = getNodeKeyPath();
+  try {
+    const dir = dirname(keyPath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(keyPath, JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey }, null, 2) + '\n', { mode: 0o600 });
+  } catch (err) {
+    logger.warn('Could not persist node key', { path: keyPath, error: err });
   }
 }

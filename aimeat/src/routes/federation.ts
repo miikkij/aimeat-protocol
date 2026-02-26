@@ -5,6 +5,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeHooks } from '../services/hooks.js';
+import { returnEscrow } from '../services/morsel.js';
+import { logger } from '../utils/logger.js';
 import { PeeringRequestSchema, PeeringDecisionSchema, validateBody } from '../models/schemas.js';
 import type { PeerInfo } from '../services/federation.js';
 
@@ -308,22 +310,103 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
         }));
     });
 
-    // DELETE /v1/federation/peers/:nodeId — remove a peer (operator only)
-    router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), (req, res) => {
+    // DELETE /v1/federation/peers/:nodeId — de-peer (operator only)
+    // Normal: grace period (configurable, default 72h) — in-flight work completes, new requests blocked
+    // Emergency (?emergency=true): immediate disconnect, cancel in-flight work, return escrow
+    router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), async (req, res) => {
         const nodeId = req.params.nodeId as string;
         const emergency = req.query.emergency === 'true';
+        const notifyNetwork = req.body?.notify_network === true;
+        const reason = (req.body?.reason as string) ?? (emergency ? 'emergency_depeer' : 'operator_decision');
 
-        if (!peers.delete(nodeId)) {
+        const peer = peers.get(nodeId);
+        if (!peer) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peer not found: ${nodeId}`));
             return;
         }
 
-        res.json(success(config.nodeId, {
-            deleted: true,
-            node_id: nodeId,
-            emergency,
-            note: emergency ? 'Peer immediately de-peered (emergency)' : 'Peer removed',
-        }));
+        if (emergency) {
+            // ── Emergency de-peering: immediate disconnect ──
+            // 1. Remove peer immediately
+            peers.delete(nodeId);
+
+            // 2. Cancel all in-flight cross-node work from/to this peer and return escrow
+            const allWork = await storage.listAllWork();
+            let cancelledCount = 0;
+            for (const work of allWork) {
+                if (work.status !== 'pending' && work.status !== 'accepted') continue;
+                // Check if the work involves an agent from the de-peered node
+                const isFromPeer = work.providerGaii.endsWith(`@${nodeId}`) || work.requesterGaii.endsWith(`@${nodeId}`);
+                if (!isFromPeer) continue;
+
+                await returnEscrow(storage, work);
+                await storage.updateWork(work.trackingCode, { status: 'cancelled', updatedAt: new Date().toISOString() });
+                cancelledCount++;
+            }
+
+            // 3. Notify other peers if requested
+            if (notifyNetwork) {
+                const activePeers = [...peers.values()].filter(p => p.status === 'active');
+                for (const otherPeer of activePeers) {
+                    try {
+                        await fetch(`${otherPeer.url}/v1/federation/trust-advisory`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                target_node: nodeId,
+                                advisory_type: 'suspend',
+                                reason,
+                                issued_by: config.nodeId,
+                            }),
+                            signal: AbortSignal.timeout(5_000),
+                        });
+                    } catch {
+                        logger.warn(`Failed to notify peer ${otherPeer.nodeId} about emergency de-peering of ${nodeId}`);
+                    }
+                }
+            }
+
+            res.json(success(config.nodeId, {
+                deleted: true,
+                node_id: nodeId,
+                emergency: true,
+                reason,
+                cancelled_work_items: cancelledCount,
+                network_notified: notifyNetwork,
+                note: 'Peer immediately de-peered — all in-flight work cancelled, escrow returned',
+            }));
+        } else {
+            // ── Normal de-peering: grace period ──
+            const graceHours = config.depeeringGracePeriodHours;
+            const gracePeriodEnd = new Date(Date.now() + graceHours * 3600_000).toISOString();
+
+            peer.status = 'depeering';
+            (peer as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd = gracePeriodEnd;
+
+            // Remove federated catalogue entries from this peer (mark expiring)
+            const allActions = await storage.listActions();
+            let expiredActions = 0;
+            for (const action of allActions) {
+                if (action.tags.includes(`federated:${nodeId}`)) {
+                    await storage.updateAction(action.id, action.providerGaii, {
+                        tags: [...action.tags.filter(t => t !== `federated:${nodeId}`), `expiring:${nodeId}`],
+                    });
+                    expiredActions++;
+                }
+            }
+
+            res.json(success(config.nodeId, {
+                deleted: false,
+                node_id: nodeId,
+                emergency: false,
+                status: 'depeering',
+                reason,
+                grace_period_hours: graceHours,
+                grace_period_ends: gracePeriodEnd,
+                expiring_actions: expiredActions,
+                note: `Peer set to depeering status. In-flight work may complete. Peer will be purged after ${graceHours}h grace period.`,
+            }));
+        }
     });
 
     // POST /v1/federation/ping — federation health check (used by peers)
@@ -382,8 +465,12 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
     });
 
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
+    // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
+    // Supports incremental sync: if `since_timestamp` is provided, only actions
+    // newer than that timestamp are expected. Existing actions are updated rather
+    // than duplicated (upsert by federated ID).
     router.post('/v1/federation/catalogue-sync', async (req, res) => {
-        const { source_node, actions: actionList } = req.body ?? {};
+        const { source_node, actions: actionList, since_timestamp, catalogue_hash } = req.body ?? {};
 
         if (!source_node || !Array.isArray(actionList)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and actions array required'));
@@ -397,33 +484,59 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
         }
 
         let synced = 0;
+        let updated = 0;
+        const now = new Date().toISOString();
+
         for (const action of actionList) {
             if (!action.id || !action.provider_gaii || !action.display_name) continue;
-            try {
-                await storage.createAction({
-                    id: `${source_node}:${action.id}`,
-                    providerGaii: action.provider_gaii,
-                    displayName: `[${source_node}] ${action.display_name}`,
-                    description: action.description ?? '',
-                    category: action.category,
-                    inputSchema: action.input_schema ?? {},
-                    outputSchema: action.output_schema ?? {},
-                    pricing: {
-                        baseMorsels: action.pricing?.base_morsels ?? 0,
-                        perUnit: action.pricing?.per_unit,
-                    },
-                    tags: [...(action.tags ?? []), `federated:${source_node}`],
-                    createdAt: action.created_at ?? new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+
+            const federatedId = `${source_node}:${action.id}`;
+            const actionData = {
+                id: federatedId,
+                providerGaii: action.provider_gaii,
+                displayName: `[${source_node}] ${action.display_name}`,
+                description: action.description ?? '',
+                category: action.category,
+                inputSchema: action.input_schema ?? {},
+                outputSchema: action.output_schema ?? {},
+                pricing: {
+                    baseMorsels: action.pricing?.base_morsels ?? 0,
+                    perUnit: action.pricing?.per_unit,
+                },
+                tags: [...(action.tags ?? []), `federated:${source_node}`],
+                createdAt: action.created_at ?? now,
+                updatedAt: now,
+            };
+
+            // Try to update existing federated action; create if not found
+            const existing = await storage.getAction(federatedId, action.provider_gaii);
+            if (existing) {
+                await storage.updateAction(federatedId, action.provider_gaii, {
+                    displayName: actionData.displayName,
+                    description: actionData.description,
+                    category: actionData.category,
+                    inputSchema: actionData.inputSchema,
+                    outputSchema: actionData.outputSchema,
+                    pricing: actionData.pricing,
+                    tags: actionData.tags,
+                    updatedAt: now,
                 });
-                synced++;
-            } catch { /* skip duplicates */ }
+                updated++;
+            } else {
+                try {
+                    await storage.createAction(actionData);
+                    synced++;
+                } catch { /* skip if race condition */ }
+            }
         }
 
         res.json(success(config.nodeId, {
             synced,
+            updated,
             source_node,
             total_received: actionList.length,
+            incremental: !!since_timestamp,
+            catalogue_hash: catalogue_hash ?? null,
         }));
     });
 
@@ -496,7 +609,7 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
 
     // ── Cross-Node Query Routing ──
 
-    // POST /v1/federation/route — Forward a request to a peer node
+    // POST /v1/federation/route — Forward a request to a peer node (multi-hop relay)
     router.post('/v1/federation/route', requireAuth(), async (req, res) => {
         const { target_node, method, path, body: reqBody, max_hops } = req.body ?? {};
 
@@ -505,17 +618,49 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
             return;
         }
 
-        const hops = max_hops ?? 3;
+        // Honour inbound X-Relay-Hops header from upstream relay, otherwise use body or config default
+        const inboundHops = req.headers['x-relay-hops'] ? parseInt(req.headers['x-relay-hops'] as string, 10) : null;
+        const hops = inboundHops ?? max_hops ?? config.maxRelayHops;
         if (hops <= 0) {
             res.status(400).json(error(config.nodeId, 'FEDERATION_ERROR', 'Max relay hops exceeded'));
             return;
         }
 
-        // Find the target peer
+        // Build relay path from inbound header
+        const inboundPath = req.headers['x-relay-path'] as string | undefined;
+        const relayPath = inboundPath ? `${inboundPath},${config.nodeId}` : config.nodeId;
+
+        // Prevent routing loops — reject if we already appear in the path
+        const pathNodes = relayPath.split(',');
+        if (pathNodes.filter(n => n === config.nodeId).length > 1) {
+            res.status(400).json(error(config.nodeId, 'FEDERATION_ERROR', 'Routing loop detected'));
+            return;
+        }
+
+        const requesterGaii = req.auth!.sub;
+
+        // Helper: charge 1 morsel routing fee per hop
+        async function chargeRoutingFee(): Promise<void> {
+            const agent = await storage.getAgent(requesterGaii);
+            if (agent && agent.morselBalance >= 1) {
+                await storage.updateAgent(requesterGaii, {
+                    morselBalance: agent.morselBalance - 1,
+                });
+                await storage.addTransaction({
+                    id: `txn-${randomBytes(8).toString('hex')}`,
+                    gaii: requesterGaii,
+                    type: 'federation_routing',
+                    amount: -1,
+                    trackingCode: `relay:${relayPath}`,
+                    timestamp: new Date().toISOString(),
+                });
+            }
+        }
+
+        // 1. Check if target is a direct peer
         const targetPeer = [...peers.values()].find(p => p.nodeId === target_node && p.status === 'active');
 
         if (targetPeer) {
-            // Direct peer — forward the request
             try {
                 const targetUrl = `${targetPeer.url}${path}`;
                 const response = await fetch(targetUrl, {
@@ -524,6 +669,7 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
                         'Content-Type': 'application/json',
                         'X-Forwarded-From': config.nodeId,
                         'X-Relay-Hops': String(hops - 1),
+                        'X-Relay-Path': relayPath,
                     },
                     ...(reqBody && ['POST', 'PUT', 'PATCH'].includes((method ?? 'GET').toUpperCase())
                         ? { body: JSON.stringify(reqBody) }
@@ -532,26 +678,12 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
                 });
 
                 const data = await response.json().catch(() => null);
-
-                // Charge 1 morsel per hop for cross-node routing
-                const requesterGaii = req.auth!.sub;
-                const agent = await storage.getAgent(requesterGaii);
-                if (agent && agent.morselBalance >= 1) {
-                    await storage.updateAgent(requesterGaii, {
-                        morselBalance: agent.morselBalance - 1,
-                    });
-                    await storage.addTransaction({
-                        id: `txn-${randomBytes(8).toString('hex')}`,
-                        gaii: requesterGaii,
-                        type: 'federation_routing',
-                        amount: -1,
-                        timestamp: new Date().toISOString(),
-                    });
-                }
+                await chargeRoutingFee();
 
                 res.status(response.status).json(success(config.nodeId, {
                     routed_to: target_node,
                     routed_via: config.nodeId,
+                    relay_path: relayPath.split(','),
                     hops_remaining: hops - 1,
                     response_status: response.status,
                     response_data: data,
@@ -563,14 +695,14 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
             return;
         }
 
-        // Not a direct peer — try to find a relay path
-        const activePeers = [...peers.values()].filter(p => p.status === 'active');
+        // 2. Not a direct peer — try multi-hop relay through active peers
+        const activePeers = [...peers.values()].filter(p =>
+            p.status === 'active' && !pathNodes.includes(p.nodeId));
         if (activePeers.length === 0) {
             res.status(404).json(error(config.nodeId, 'FEDERATION_ERROR', `No route to node ${target_node}`));
             return;
         }
 
-        // Ask each active peer if they can route to the target (relay)
         for (const relay of activePeers) {
             try {
                 const relayUrl = `${relay.url}/v1/federation/route`;
@@ -579,6 +711,8 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Forwarded-From': config.nodeId,
+                        'X-Relay-Hops': String(hops - 1),
+                        'X-Relay-Path': relayPath,
                     },
                     body: JSON.stringify({
                         target_node,
@@ -592,26 +726,12 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
 
                 if (response.ok) {
                     const data = await response.json().catch(() => null);
-
-                    // Charge 1 morsel for this hop
-                    const requesterGaii = req.auth!.sub;
-                    const agent = await storage.getAgent(requesterGaii);
-                    if (agent && agent.morselBalance >= 1) {
-                        await storage.updateAgent(requesterGaii, {
-                            morselBalance: agent.morselBalance - 1,
-                        });
-                        await storage.addTransaction({
-                            id: `txn-${randomBytes(8).toString('hex')}`,
-                            gaii: requesterGaii,
-                            type: 'federation_routing',
-                            amount: -1,
-                            timestamp: new Date().toISOString(),
-                        });
-                    }
+                    await chargeRoutingFee();
 
                     res.json(success(config.nodeId, {
                         routed_to: target_node,
                         routed_via: relay.nodeId,
+                        relay_path: relayPath.split(',').concat(relay.nodeId),
                         hops_remaining: hops - 1,
                         response_data: data,
                     }));

@@ -103,15 +103,16 @@ export function catalogueRouter(config: MeatConfig, storage: Storage): Router {
     }));
   });
 
-  // GET /v1/catalogue/hash — SHA-256 for change detection (Tier 0)
+  // GET /v1/catalogue/hash — SHA-256 for change detection (§17.3 Tier 0)
   router.get('/v1/catalogue/hash', async (_req, res) => {
     const actions = await storage.listActions();
     const agents = await storage.listAgents();
     const boards = await storage.listBoards();
 
+    // Include updatedAt so edits are detected, not just additions
     const content = JSON.stringify({
-      actions: actions.map(a => a.id).sort(),
-      agents: agents.map(a => a.gaii).sort(),
+      actions: actions.map(a => ({ id: a.id, u: a.updatedAt })).sort((x, y) => x.id.localeCompare(y.id)),
+      agents: agents.map(a => ({ g: a.gaii, s: a.lastSeen })).sort((x, y) => x.g.localeCompare(y.g)),
       boards: boards.map(b => b.id).sort(),
       counts: { actions: actions.length, agents: agents.length, boards: boards.length },
     });
@@ -120,6 +121,7 @@ export function catalogueRouter(config: MeatConfig, storage: Storage): Router {
 
     res.json(success(config.nodeId, {
       hash,
+      counts: { actions: actions.length, agents: agents.length, boards: boards.length },
       computed_at: new Date().toISOString(),
     }));
   });

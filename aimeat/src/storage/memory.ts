@@ -235,6 +235,14 @@ export class InMemoryStorage implements Storage {
     return list.slice(-limit);
   }
 
+  async listAllTransactions(): Promise<WalletTransaction[]> {
+    const all: WalletTransaction[] = [];
+    for (const list of this.transactions.values()) {
+      all.push(...list);
+    }
+    return all;
+  }
+
   async deleteTransactions(gaii: string): Promise<number> {
     const list = this.transactions.get(gaii) ?? [];
     this.transactions.delete(gaii);
@@ -302,6 +310,31 @@ export class InMemoryStorage implements Storage {
     return true;
   }
 
+  // ── Board Subscriptions ──
+
+  private boardSubscriptions = new Map<string, import('./interface.js').BoardSubscriptionRecord>();
+
+  async createBoardSubscription(sub: import('./interface.js').BoardSubscriptionRecord): Promise<import('./interface.js').BoardSubscriptionRecord> {
+    this.boardSubscriptions.set(`${sub.boardId}::${sub.gaii}`, sub);
+    return sub;
+  }
+
+  async getBoardSubscription(boardId: string, gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord | null> {
+    return this.boardSubscriptions.get(`${boardId}::${gaii}`) ?? null;
+  }
+
+  async listBoardSubscriptions(boardId: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+    return [...this.boardSubscriptions.values()].filter(s => s.boardId === boardId);
+  }
+
+  async listSubscriptionsByAgent(gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+    return [...this.boardSubscriptions.values()].filter(s => s.gaii === gaii);
+  }
+
+  async deleteBoardSubscription(boardId: string, gaii: string): Promise<boolean> {
+    return this.boardSubscriptions.delete(`${boardId}::${gaii}`);
+  }
+
   // ── OTK ──
 
   async createOtk(otk: OtkRecord): Promise<OtkRecord> {
@@ -315,13 +348,42 @@ export class InMemoryStorage implements Storage {
 
   async consumeOtk(key: string): Promise<OtkRecord | null> {
     const otk = this.otks.get(key);
-    if (!otk || otk.used) return null;
+    if (!otk) return null;
     if (new Date(otk.expiresAt) < new Date()) {
       this.otks.delete(key);
       return null;
     }
+    // 60-second post-use window: allow re-use within 60s of first use
+    if (otk.used && otk.usedAt) {
+      const usedAt = new Date(otk.usedAt).getTime();
+      if (Date.now() - usedAt > 60_000) {
+        this.otks.delete(key);
+        return null;
+      }
+      return otk; // still within 60s window
+    }
     otk.used = true;
+    otk.usedAt = new Date().toISOString();
     return otk;
+  }
+
+  async listOtksBySession(sessionId: string): Promise<OtkRecord[]> {
+    const results: OtkRecord[] = [];
+    for (const otk of this.otks.values()) {
+      if (otk.sessionId === sessionId) results.push(otk);
+    }
+    return results;
+  }
+
+  async expireSessionOtks(sessionId: string): Promise<number> {
+    let count = 0;
+    for (const [key, otk] of this.otks) {
+      if (otk.sessionId === sessionId) {
+        this.otks.delete(key);
+        count++;
+      }
+    }
+    return count;
   }
 
   // ── Node Key ──
@@ -373,9 +435,14 @@ export class InMemoryStorage implements Storage {
 
   async listDisputesByProvider(gaii: string): Promise<DisputeRecord[]> {
     return [...this.disputes.values()].filter(d => {
+
       const work = this.work.get(d.trackingCode);
       return work?.providerGaii === gaii;
     });
+  }
+
+  async listAllDisputes(): Promise<DisputeRecord[]> {
+    return [...this.disputes.values()];
   }
 
   // ── Micro-Memory ──

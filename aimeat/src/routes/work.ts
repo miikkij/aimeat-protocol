@@ -8,6 +8,7 @@ import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel
 import { logger } from '../utils/logger.js';
 import { executeHooks } from '../services/hooks.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
+import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
 
@@ -15,18 +16,69 @@ function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
 }
 
-/** Fire-and-forget webhook POST to callback_url. Retries once on failure. */
-function fireWebhook(url: string, payload: Record<string, unknown>): void {
+/** Webhook delivery log entry (in-memory, recent deliveries only). */
+interface WebhookLogEntry {
+  url: string;
+  trackingCode: string;
+  event: string;
+  attempt: number;
+  status: 'success' | 'failed' | 'retrying';
+  httpStatus?: number;
+  error?: string;
+  timestamp: string;
+}
+const webhookLog: WebhookLogEntry[] = [];
+const MAX_WEBHOOK_LOG = 500;
+
+/** Get recent webhook delivery log entries. */
+export function getWebhookLog(): WebhookLogEntry[] {
+  return webhookLog;
+}
+
+/**
+ * Webhook POST with exponential backoff (§10.7).
+ * Retries up to maxRetries times with delays: 1s, 2s, 4s, 8s, 16s, ...
+ */
+function fireWebhook(url: string, payload: Record<string, unknown>, maxRetries: number): void {
   const body = JSON.stringify(payload);
+  const event = (payload.event as string) ?? 'unknown';
+  const trackingCode = (payload.tracking_code as string) ?? '';
   const doFetch = (attempt: number) => {
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       signal: AbortSignal.timeout(10_000),
+    }).then(resp => {
+      const entry: WebhookLogEntry = {
+        url, trackingCode, event, attempt,
+        status: resp.ok ? 'success' : 'failed',
+        httpStatus: resp.status,
+        timestamp: new Date().toISOString(),
+      };
+      if (!resp.ok && attempt < maxRetries) {
+        entry.status = 'retrying';
+      }
+      webhookLog.push(entry);
+      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+      if (!resp.ok && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        setTimeout(() => doFetch(attempt + 1), delay);
+      }
     }).catch(err => {
-      logger.warn(`Webhook delivery failed (attempt ${attempt})`, { url, error: String(err) });
-      if (attempt < 2) setTimeout(() => doFetch(attempt + 1), 5000);
+      const entry: WebhookLogEntry = {
+        url, trackingCode, event, attempt,
+        status: attempt < maxRetries ? 'retrying' : 'failed',
+        error: String(err),
+        timestamp: new Date().toISOString(),
+      };
+      webhookLog.push(entry);
+      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+      logger.warn(`Webhook delivery failed (attempt ${attempt}/${maxRetries})`, { url, error: String(err) });
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        setTimeout(() => doFetch(attempt + 1), delay);
+      }
     });
   };
   doFetch(1);
@@ -39,7 +91,7 @@ async function createWorkItem(
   body: any,
   peers: Map<string, PeerInfo>,
 ) {
-  const { action_id, provider_gaii, input, ttl_hours, callback_url } = body;
+  const { action_id, provider_gaii, input, ttl_hours, callback_url, priority } = body;
 
   if (!action_id || !provider_gaii || input === undefined) {
     return { error: 'action_id, provider_gaii, and input are required', status: 400, code: 'INVALID_INPUT' };
@@ -56,6 +108,21 @@ async function createWorkItem(
   // Resolve provider location — local or remote?
   const resolved = await resolveGaii(provider_gaii, config, storage, peers);
   if (resolved && !resolved.local) {
+    // Charge 1 morsel cross-node routing fee (§15)
+    const requester = await storage.getAgent(requesterGaii);
+    if (!requester || requester.morselBalance < 1) {
+      return { error: 'Insufficient morsels for cross-node routing fee (1 morsel)', status: 402, code: 'INSUFFICIENT_MORSELS' };
+    }
+    await storage.updateAgent(requesterGaii, { morselBalance: requester.morselBalance - 1 });
+    await storage.addTransaction({
+      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      gaii: requesterGaii,
+      type: 'routing_fee',
+      amount: -1,
+      trackingCode: `route:${resolved.nodeId}`,
+      timestamp: new Date().toISOString(),
+    });
+
     // Forward work request to the remote node
     try {
       const resp = await fetch(`${resolved.nodeUrl}/v1/work/request`, {
@@ -83,8 +150,21 @@ async function createWorkItem(
   const actions = await storage.listActions();
   const action = actions.find(a => a.id === action_id && a.providerGaii === provider_gaii);
 
+  // W-2: Enforce max pending work items per provider (Appendix B)
+  const providerWork = await storage.listWorkByProvider(provider_gaii);
+  const pendingCount = providerWork.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status)).length;
+  if (pendingCount >= config.workQueueMaxPending) {
+    return {
+      error: `Provider ${provider_gaii} has ${pendingCount} pending work items (max ${config.workQueueMaxPending})`,
+      status: 429,
+      code: 'QUEUE_FULL',
+    };
+  }
+
   const baseMorsels = action?.pricing.baseMorsels ?? 0;
-  const cost = calculateWorkCost(baseMorsels, config.burnRate);
+  // §15: priority 'high' costs 2x base price
+  const effectiveBase = priority === 'high' ? baseMorsels * 2 : baseMorsels;
+  const cost = calculateWorkCost(effectiveBase, config.burnRate);
 
   // Hold escrow
   const held = await holdEscrow(storage, requesterGaii, provider_gaii, trackingCode, cost.total);
@@ -271,6 +351,47 @@ export function workRouter(config: MeatConfig, storage: Storage, peers: Map<stri
       tracking_code: updated!.trackingCode,
       status: updated!.status,
     }, [
+      { description: 'Mark work in progress', method: 'POST', url: `/v1/work/${tc}/progress` },
+      { description: 'Deliver the work result', method: 'POST', url: `/v1/work/${tc}/deliver` },
+    ]));
+  });
+
+  // POST /v1/work/:tc/progress — transition accepted → in_progress (§10.3)
+  router.post('/v1/work/:tc/progress', requireAuth(), requireRole('agent'), async (req, res) => {
+    const tc = param(req.params.tc);
+    const work = await storage.getWork(tc);
+    if (!work) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
+      return;
+    }
+    if (work.providerGaii !== req.auth!.sub) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can update work status'));
+      return;
+    }
+    if (work.status !== 'accepted') {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", can only transition to in_progress from accepted`));
+      return;
+    }
+
+    const updated = await storage.updateWork(tc, {
+      status: 'in_progress',
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Notify requester via webhook if callback_url provided
+    if (work.callbackUrl) {
+      fireWebhook(work.callbackUrl, {
+        event: 'work.in_progress',
+        tracking_code: tc,
+        status: 'in_progress',
+        timestamp: new Date().toISOString(),
+      }, config.webhookMaxRetries);
+    }
+
+    res.json(success(config.nodeId, {
+      tracking_code: updated!.trackingCode,
+      status: updated!.status,
+    }, [
       { description: 'Deliver the work result', method: 'POST', url: `/v1/work/${tc}/deliver` },
     ]));
   });
@@ -352,7 +473,7 @@ export function workRouter(config: MeatConfig, storage: Storage, peers: Map<stri
         status: 'delivered',
         output,
         timestamp: new Date().toISOString(),
-      });
+      }, config.webhookMaxRetries);
     }
 
     // Extension hook: post_work_delivery (fire-and-forget)
@@ -417,6 +538,10 @@ export function workRouter(config: MeatConfig, storage: Storage, peers: Map<stri
       res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
       return;
     }
+    if (!await checkOtkSession(otk, storage)) {
+      res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
+      return;
+    }
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -449,6 +574,10 @@ export function workRouter(config: MeatConfig, storage: Storage, peers: Map<stri
     const otk = await storage.consumeOtk(otkKey);
     if (!otk) {
       res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
+      return;
+    }
+    if (!await checkOtkSession(otk, storage)) {
+      res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
       return;
     }
     const tc = param(req.params.tc);

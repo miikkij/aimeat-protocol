@@ -87,6 +87,18 @@ export function startHeartbeatJob(
     const TIMEOUT_MS = 10_000;
 
     return setInterval(async () => {
+        // ── De-peering grace period enforcement ──
+        // Purge peers whose grace period has expired
+        const depeeringPeers = [...peers.entries()].filter(([, p]) => p.status === 'depeering');
+        for (const [key, peer] of depeeringPeers) {
+            const graceEnd = (peer as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd;
+            if (graceEnd && new Date(graceEnd).getTime() <= Date.now()) {
+                peers.delete(key);
+                logger.info(`Peer ${peer.nodeId} purged after de-peering grace period expired`);
+            }
+        }
+
+        // ── Heartbeat active/degraded peers ──
         const activePeers = [...peers.entries()].filter(([, p]) => p.status === 'active' || p.status === 'degraded');
         if (activePeers.length === 0) return;
 

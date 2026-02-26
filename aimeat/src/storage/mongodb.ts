@@ -447,6 +447,22 @@ export class MongoStorage implements Storage {
         }));
     }
 
+    async listAllTransactions(): Promise<WalletTransaction[]> {
+        this.ensureReady();
+        const rows = await this.prisma.transaction.findMany({
+            orderBy: { timestamp: 'desc' },
+        });
+        return rows.map((r: any) => ({
+            id: r.txId,
+            gaii: r.gaii,
+            type: r.type,
+            amount: r.amount,
+            counterpartyGaii: r.counterpartyGaii ?? undefined,
+            trackingCode: r.trackingCode ?? undefined,
+            timestamp: r.timestamp.toISOString(),
+        }));
+    }
+
     async deleteTransactions(gaii: string): Promise<number> {
         this.ensureReady();
         const result = await this.prisma.transaction.deleteMany({ where: { gaii } });
@@ -549,6 +565,32 @@ export class MongoStorage implements Storage {
         return true;
     }
 
+    // ── Board Subscriptions ─────────────────────────────────────
+    // Note: For MongoDB, subscriptions are stored in-memory (same as memory.ts)
+    // until a Prisma schema migration adds a BoardSubscription model.
+    private boardSubscriptions = new Map<string, import('./interface.js').BoardSubscriptionRecord>();
+
+    async createBoardSubscription(sub: import('./interface.js').BoardSubscriptionRecord): Promise<import('./interface.js').BoardSubscriptionRecord> {
+        this.boardSubscriptions.set(`${sub.boardId}::${sub.gaii}`, sub);
+        return sub;
+    }
+
+    async getBoardSubscription(boardId: string, gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord | null> {
+        return this.boardSubscriptions.get(`${boardId}::${gaii}`) ?? null;
+    }
+
+    async listBoardSubscriptions(boardId: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+        return [...this.boardSubscriptions.values()].filter(s => s.boardId === boardId);
+    }
+
+    async listSubscriptionsByAgent(gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+        return [...this.boardSubscriptions.values()].filter(s => s.gaii === gaii);
+    }
+
+    async deleteBoardSubscription(boardId: string, gaii: string): Promise<boolean> {
+        return this.boardSubscriptions.delete(`${boardId}::${gaii}`);
+    }
+
     // ── OTK ─────────────────────────────────────────────────────
 
     async createOtk(otk: OtkRecord): Promise<OtkRecord> {
@@ -567,19 +609,63 @@ export class MongoStorage implements Storage {
         return otk;
     }
 
+    private toOtkRecord(row: any): OtkRecord {
+        return {
+            key: row.key,
+            ownerGaii: row.ownerGaii,
+            action: row.action,
+            params: row.params as Record<string, unknown>,
+            expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+            used: row.used,
+            usedAt: row.usedAt ? (row.usedAt instanceof Date ? row.usedAt.toISOString() : row.usedAt) : null,
+            sessionId: row.sessionId ?? null,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+    }
+
     async getOtk(key: string): Promise<OtkRecord | null> {
         this.ensureReady();
         const row = await this.prisma.otk.findUnique({ where: { key } });
         if (!row) return null;
-        return { key: row.key, ownerGaii: row.ownerGaii, action: row.action, params: row.params as Record<string, unknown>, expiresAt: row.expiresAt.toISOString(), used: row.used, createdAt: row.createdAt.toISOString() };
+        return this.toOtkRecord(row);
     }
 
     async consumeOtk(key: string): Promise<OtkRecord | null> {
         this.ensureReady();
         try {
-            const row = await this.prisma.otk.update({ where: { key }, data: { used: true } });
-            return { key: row.key, ownerGaii: row.ownerGaii, action: row.action, params: row.params as Record<string, unknown>, expiresAt: row.expiresAt.toISOString(), used: true, createdAt: row.createdAt.toISOString() };
+            const row = await this.prisma.otk.findUnique({ where: { key } });
+            if (!row) return null;
+            if (new Date(row.expiresAt) < new Date()) {
+                await this.prisma.otk.delete({ where: { key } });
+                return null;
+            }
+            // 60-second post-use window
+            if (row.used && row.usedAt) {
+                const usedAt = new Date(row.usedAt).getTime();
+                if (Date.now() - usedAt > 60_000) {
+                    await this.prisma.otk.delete({ where: { key } });
+                    return null;
+                }
+                return this.toOtkRecord(row);
+            }
+            const updated = await this.prisma.otk.update({
+                where: { key },
+                data: { used: true, usedAt: new Date() },
+            });
+            return this.toOtkRecord(updated);
         } catch { return null; }
+    }
+
+    async listOtksBySession(sessionId: string): Promise<OtkRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.otk.findMany({ where: { sessionId } });
+        return rows.map((r: any) => this.toOtkRecord(r));
+    }
+
+    async expireSessionOtks(sessionId: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.otk.deleteMany({ where: { sessionId } });
+        return result.count;
     }
 
     // ── Disputes ────────────────────────────────────────────────
@@ -668,6 +754,12 @@ export class MongoStorage implements Storage {
         const tcs = workItems.map((w: any) => w.trackingCode);
         if (tcs.length === 0) return [];
         const rows = await this.prisma.dispute.findMany({ where: { trackingCode: { in: tcs } } });
+        return rows.map((r: any) => this.toDisputeRecord(r));
+    }
+
+    async listAllDisputes(): Promise<DisputeRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.dispute.findMany();
         return rows.map((r: any) => this.toDisputeRecord(r));
     }
 
