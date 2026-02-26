@@ -183,6 +183,11 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
         ]));
     });
 
+    // GET /v1/admin/ui — graphical admin dashboard (operator only, serves HTML)
+    router.get('/v1/admin/ui', requireAuth(), requireRole('operator'), (_req, res) => {
+        res.type('text/html').send(ADMIN_DASHBOARD_HTML);
+    });
+
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
     router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
         const schema: Record<string, { value: unknown; type: string; description: string; range?: string; mutable: boolean; path: string }> = {
@@ -528,3 +533,205 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
 
     return router;
 }
+
+// ── Admin Dashboard HTML ──
+const ADMIN_DASHBOARD_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AIMEAT Admin Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
+--green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;
+--cyan:#06b6d4;--font:system-ui,-apple-system,sans-serif}
+body{background:var(--bg);color:var(--text);font-family:var(--font);padding:20px;min-height:100vh}
+h1{font-size:1.6rem;font-weight:700;margin-bottom:4px}
+.subtitle{color:var(--muted);font-size:.85rem;margin-bottom:20px}
+.grid{display:grid;gap:16px;margin-bottom:20px}
+.grid-4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.grid-2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
+.card h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px}
+.stat{font-size:2rem;font-weight:700;line-height:1.1}
+.stat-label{color:var(--muted);font-size:.8rem;margin-top:2px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600;text-transform:uppercase}
+.badge-healthy{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
+.badge-watch{background:#ca8a0422;color:var(--yellow);border:1px solid #ca8a0455}
+.badge-danger{background:#dc262622;color:var(--red);border:1px solid #dc262655}
+.health-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.health-row:last-child{border-bottom:none}
+.health-metric{font-size:.85rem}
+.health-value{font-family:'SF Mono',Consolas,monospace;font-size:.85rem;color:var(--cyan)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:2px solid var(--border)}
+td{padding:8px 10px;border-bottom:1px solid var(--border)}
+tr:hover td{background:#ffffff08}
+.econ-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+.econ-row:last-child{border-bottom:none}
+.econ-label{color:var(--muted);font-size:.85rem}
+.econ-val{font-family:'SF Mono',Consolas,monospace;font-size:.85rem;color:var(--text)}
+.warn-card{border-left:3px solid var(--yellow);background:#ca8a0408}
+.warn-danger{border-left-color:var(--red);background:#dc262608}
+.warn-msg{font-size:.85rem;padding:6px 0}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.refresh{background:var(--blue);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600}
+.refresh:hover{opacity:.85}
+.refresh:disabled{opacity:.5;cursor:not-allowed}
+.auto-label{color:var(--muted);font-size:.75rem}
+#lastUpdate{color:var(--muted);font-size:.75rem}
+.loading{text-align:center;padding:40px;color:var(--muted)}
+.error-box{background:#dc262622;border:1px solid var(--red);border-radius:8px;padding:16px;color:var(--red);margin:20px 0}
+.node-meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:4px}
+.node-meta span{font-size:.8rem;color:var(--muted)}
+.node-meta strong{color:var(--cyan)}
+.agents-list{max-height:400px;overflow-y:auto}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <h1>&#x1F969; AIMEAT Node Dashboard</h1>
+    <div id="nodeMeta" class="node-meta"></div>
+  </div>
+  <div style="text-align:right">
+    <button class="refresh" id="btnRefresh" onclick="load()">Refresh</button>
+    <label class="auto-label"><input type="checkbox" id="autoRefresh" checked /> Auto 30s</label>
+    <div id="lastUpdate"></div>
+  </div>
+</div>
+<div id="app"><div class="loading">Loading dashboard&#8230;</div></div>
+<script>
+const TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('aimeat_token')||'';
+if(TOKEN)localStorage.setItem('aimeat_token',TOKEN);
+let timer;
+
+async function api(path){
+  const h={};
+  if(TOKEN)h['Authorization']='Bearer '+TOKEN;
+  const r=await fetch(path,{headers:h});
+  if(!r.ok)throw new Error(r.status+' '+r.statusText);
+  return r.json();
+}
+
+function badge(zone){return '<span class="badge badge-'+zone+'">'+zone+'</span>'}
+function num(n){return typeof n==='number'?n.toLocaleString():n}
+
+async function load(){
+  const btn=document.getElementById('btnRefresh');
+  btn.disabled=true;btn.textContent='Loading...';
+  try{
+    const [dash,agents]= await Promise.all([api('/v1/admin/dashboard'),api('/v1/admin/agents')]);
+    render(dash.data,agents.data);
+    document.getElementById('lastUpdate').textContent='Updated '+new Date().toLocaleTimeString();
+  }catch(e){
+    document.getElementById('app').innerHTML='<div class="error-box"><strong>Failed to load</strong><br/>'+esc(e.message)
+      +'<br/><br/>Pass your operator token: <code>/v1/admin/ui?token=YOUR_TOKEN</code></div>';
+  }
+  btn.disabled=false;btn.textContent='Refresh';
+  clearInterval(timer);
+  if(document.getElementById('autoRefresh').checked)timer=setInterval(load,30000);
+}
+
+function esc(s){const d=document.createElement('div');d.textContent=String(s);return d.innerHTML}
+
+function render(d,ag){
+  const h=d.health,c=d.counts,e=d.economy,w=d.warnings||[];
+  const hColor=h.status==='healthy'?'green':h.status==='watch'?'yellow':'red';
+
+  document.getElementById('nodeMeta').innerHTML=
+    '<span>Node: <strong>'+esc(d.node_id)+'</strong></span>'+
+    '<span>Storage: <strong>'+esc(d.storage_type)+'</strong></span>'+
+    '<span>Uptime: <strong>'+fmtUp(d.uptime_seconds)+'</strong></span>';
+
+  let o='';
+  // Health
+  o+='<div class="card" style="border-left:4px solid var(--'+hColor+');margin-bottom:20px">';
+  o+='<div style="display:flex;justify-content:space-between;align-items:center">';
+  o+='<div><h2>Node Health</h2><div class="stat" style="color:var(--'+hColor+')">'+h.status.toUpperCase()+'</div></div>';
+  o+='<div>'+badge(h.status)+'</div></div>';
+  o+='<div style="margin-top:14px">';
+  o+=hRow('Burn/Mint Ratio',h.burn_mint_ratio);
+  o+=hRow('Agent Churn (30d)',h.agent_churn_rate_30d);
+  o+=hRow('Work Expiry (30d)',h.work_expiry_rate_30d);
+  o+=hRow('Dispute Rate (30d)',h.dispute_rate_30d);
+  o+='</div></div>';
+
+  // Counts
+  o+='<div class="grid grid-4">';
+  o+=sc('Owners',c.owners,'','var(--blue)');
+  o+=sc('Agents',c.agents,'('+c.active_agents_24h+' active 24h)','var(--purple)');
+  o+=sc('Actions',c.actions,'','var(--cyan)');
+  o+=sc('Boards',c.boards,'','var(--green)');
+  o+='</div>';
+
+  // Economy
+  o+='<div class="grid grid-2">';
+  o+='<div class="card"><h2>Morsel Economy</h2>';
+  o+=er('In Circulation',num(e.total_morsels_in_circulation));
+  o+=er('Total Minted',num(e.total_minted_all_time));
+  o+=er('Total Burned',num(e.total_burned_all_time));
+  o+=er('Inflation (30d)',e.inflation_rate_30d_percent+'%');
+  o+=er('Burn/Mint Ratio',e.burn_mint_ratio);
+  o+='</div>';
+  o+='<div class="card"><h2>Today</h2>';
+  o+=er('Transactions',num(e.transactions_today));
+  o+=er('Morsels Moved',num(e.morsels_transacted_today));
+  o+=er('Network Fees',num(e.network_fees_today));
+  o+=er('Burned',num(e.burned_today));
+  o+=er('Allowances',num(e.daily_allowances_issued_today));
+  o+='</div></div>';
+
+  // Policy + Config
+  o+='<div class="grid grid-2">';
+  o+='<div class="card"><h2>Morsel Policy</h2>';
+  o+=er('Welcome Bonus',num(e.welcome_bonus));
+  o+=er('Daily Allowance',num(e.daily_allowance));
+  o+=er('Allowance Cap',num(e.daily_allowance_cap));
+  o+=er('Burn Rate',e.burn_rate);
+  o+=er('Max Mint/Day',num(e.max_operator_mint_per_day));
+  o+='</div>';
+  o+='<div class="card"><h2>Node Config</h2>';
+  o+=er('Port',d.config.port);
+  o+=er('JWT TTL',d.config.jwt_ttl_seconds+'s');
+  o+=er('Keyed Browse',d.config.keyed_browse_enabled?'Enabled':'Disabled');
+  o+='</div></div>';
+
+  // Warnings
+  if(w.length>0){
+    o+='<div class="card '+(w.some(function(x){return x.zone==="danger"})?'warn-danger':'warn-card')+'" style="margin-bottom:20px"><h2>Warnings ('+w.length+')</h2>';
+    o+='<table><thead><tr><th>Metric</th><th>Value</th><th>Zone</th><th>Threshold</th></tr></thead><tbody>';
+    for(const x of w)o+='<tr><td>'+esc(x.metric)+'</td><td>'+x.value+'</td><td>'+badge(x.zone)+'</td><td style="color:var(--muted)">'+esc(x.threshold)+'</td></tr>';
+    o+='</tbody></table></div>';
+  }
+
+  // Agents table
+  if(ag&&ag.agents&&ag.agents.length>0){
+    o+='<div class="card"><h2>Agents ('+ag.total+')</h2><div class="agents-list">';
+    o+='<table><thead><tr><th>GAII</th><th>Owner</th><th>Trust</th><th>Morsels</th><th>Last Seen</th></tr></thead><tbody>';
+    for(const a of ag.agents){
+      const trust=typeof a.trust_score==='number'?a.trust_score.toFixed(1):'—';
+      const tColor=a.trust_score>=70?'var(--green)':a.trust_score>=30?'var(--yellow)':'var(--red)';
+      const seen=a.last_seen?new Date(a.last_seen).toLocaleString():'Never';
+      o+='<tr><td style="font-family:monospace;font-size:.8rem">'+esc(a.gaii)+'</td><td>'+esc(a.owner)+'</td>';
+      o+='<td style="color:'+tColor+'">'+trust+'</td><td>'+num(a.morsel_balance)+'</td><td style="color:var(--muted)">'+seen+'</td></tr>';
+    }
+    o+='</tbody></table></div></div>';
+  }
+
+  document.getElementById('app').innerHTML=o;
+}
+
+function sc(l,v,sub,col){return '<div class="card"><h2>'+l+'</h2><div class="stat" style="color:'+col+'">'+num(v)+'</div>'+(sub?'<div class="stat-label">'+sub+'</div>':'')+'</div>'}
+function er(l,v){return '<div class="econ-row"><span class="econ-label">'+l+'</span><span class="econ-val">'+v+'</span></div>'}
+function hRow(l,obj){return '<div class="health-row"><span class="health-metric">'+l+'</span><span>'+badge(obj.zone)+' <span class="health-value">'+obj.value+'</span></span></div>'}
+function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m':'<1m')}
+
+document.getElementById('autoRefresh').addEventListener('change',function(){
+  clearInterval(timer);if(this.checked)timer=setInterval(load,30000);
+});
+load();
+</script>
+</body>
+</html>`;
