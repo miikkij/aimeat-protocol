@@ -1426,6 +1426,48 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/owners/{owner}/recover:
+    post:
+      operationId: recoverOwnerKeys
+      summary: Recovery key rotation
+      description: |
+        Operator-assisted owner key recovery. Generates a new Ed25519 keypair,
+        replacing the owner's existing public key. Old JWTs are invalidated.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: New keypair generated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          recovered:
+                            type: boolean
+                          owner:
+                            type: string
+                          private_key:
+                            type: string
+                            description: New Ed25519 private key (hex). Store securely.
+                          public_key:
+                            type: string
+                            description: New Ed25519 public key (hex)
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/agents:
     post:
       operationId: registerAgent
@@ -1500,6 +1542,352 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/MeatSuccess'
+
+  # ── Agent Portability ──────────────────────────────────────
+  /v1/agents/{gaii}/export:
+    post:
+      operationId: exportAgent
+      summary: Export agent data
+      description: |
+        Export full agent profile, memory, actions, and trust history for
+        portability to another AIMEAT node. Owner auth required.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URL-encoded GAII
+      responses:
+        '200':
+          description: Full agent export bundle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [portability_version, exported_at, source_node, agent, memory, actions, trust_history]
+                        properties:
+                          portability_version:
+                            type: string
+                            example: '1.0'
+                          exported_at:
+                            type: string
+                            format: date-time
+                          source_node:
+                            type: string
+                          agent:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              owner:
+                                type: string
+                              gaii:
+                                $ref: '#/components/schemas/GAII'
+                              display_name:
+                                type: string
+                              description:
+                                type: string
+                              capabilities:
+                                type: array
+                                items:
+                                  type: string
+                              trust_score:
+                                type: number
+                              morsel_balance:
+                                type: number
+                          memory:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key:
+                                  type: string
+                                value: {}
+                                visibility:
+                                  $ref: '#/components/schemas/Visibility'
+                                tags:
+                                  type: array
+                                  items:
+                                    type: string
+                                ttl_hours:
+                                  type: integer
+                                  nullable: true
+                                version:
+                                  type: integer
+                          actions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                display_name:
+                                  type: string
+                                description:
+                                  type: string
+                                category:
+                                  type: string
+                                input_schema:
+                                  type: object
+                                output_schema:
+                                  type: object
+                                pricing:
+                                  type: object
+                                tags:
+                                  type: array
+                                  items:
+                                    type: string
+                          trust_history:
+                            type: object
+                            properties:
+                              total_deliveries:
+                                type: integer
+                              successful_deliveries:
+                                type: integer
+                              positive_ratings:
+                                type: integer
+                              negative_ratings:
+                                type: integer
+                          transaction_count:
+                            type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/import:
+    post:
+      operationId: importAgent
+      summary: Import agent from another node
+      description: |
+        Import an exported agent bundle. A new GAII is minted on this node,
+        fresh Ed25519 keys are generated, trust is capped at 65, and the
+        node's welcome bonus is applied.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent]
+              properties:
+                agent:
+                  type: object
+                  required: [name, owner]
+                  properties:
+                    name:
+                      type: string
+                    owner:
+                      type: string
+                    display_name:
+                      type: string
+                    description:
+                      type: string
+                    capabilities:
+                      type: array
+                      items:
+                        type: string
+                    trust_score:
+                      type: number
+                      description: Capped to 65 on the receiving node
+                memory:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      value: {}
+                      visibility:
+                        $ref: '#/components/schemas/Visibility'
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                      ttl_hours:
+                        type: integer
+                        nullable: true
+                actions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      display_name:
+                        type: string
+                      description:
+                        type: string
+                      category:
+                        type: string
+                      input_schema:
+                        type: object
+                      output_schema:
+                        type: object
+                      pricing:
+                        type: object
+                      tags:
+                        type: array
+                        items:
+                          type: string
+      responses:
+        '201':
+          description: Agent imported with new keys
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          agent:
+                            type: object
+                            properties:
+                              gaii:
+                                $ref: '#/components/schemas/GAII'
+                              display_name:
+                                type: string
+                              trust_score:
+                                type: number
+                              morsel_balance:
+                                type: number
+                          imported:
+                            type: object
+                            properties:
+                              memories:
+                                type: integer
+                              actions:
+                                type: integer
+                          private_key:
+                            type: string
+                            description: New Ed25519 private key (hex). Store securely.
+                          public_key:
+                            type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Agent name already taken on this node
+
+  /v1/agents/{gaii}/rekey:
+    post:
+      operationId: rekeyAgent
+      summary: Rotate agent keys
+      description: |
+        Generate a new Ed25519 keypair for the agent. The old public key is
+        replaced and all previously issued JWTs are invalidated.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URL-encoded GAII
+      responses:
+        '200':
+          description: New keypair generated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          rekeyed:
+                            type: boolean
+                          gaii:
+                            $ref: '#/components/schemas/GAII'
+                          private_key:
+                            type: string
+                            description: New Ed25519 private key (hex). Store securely.
+                          public_key:
+                            type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{gaii}/port:
+    post:
+      operationId: portAgent
+      summary: Port agent to another node
+      description: |
+        Initiate agent migration by setting a redirect pointer on the current
+        node. Deducts a 50-morsel porting fee. After porting, use the export
+        and import endpoints to complete the transfer.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URL-encoded GAII
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_node_url]
+              properties:
+                target_node_url:
+                  type: string
+                  format: uri
+                  description: URL of the destination AIMEAT node
+                target_node_id:
+                  type: string
+                  description: Node ID of the destination (optional)
+      responses:
+        '200':
+          description: Redirect pointer set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ported:
+                            type: boolean
+                          gaii:
+                            $ref: '#/components/schemas/GAII'
+                          target_node_url:
+                            type: string
+                          porting_fee:
+                            type: integer
+                            example: 50
+        '402':
+          description: Insufficient morsels for porting fee
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
@@ -2849,6 +3237,308 @@ paths:
         '200':
           $ref: '#/components/responses/MeatSuccess'
 
+  # ── Federation Internal (node-to-node) ─────────────────────
+  /v1/federation/ping:
+    post:
+      operationId: federationPing
+      summary: Federation health check
+      description: |
+        Node-to-node ping. No auth required. If `from_node` matches a known
+        peer, that peer's `lastSeen` and status are updated.
+      tags: [Federation]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from_node:
+                  type: string
+                  description: Sending node's ID (optional)
+      responses:
+        '200':
+          description: Pong response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pong:
+                            type: boolean
+                          node_id:
+                            type: string
+                          timestamp:
+                            type: string
+                            format: date-time
+
+  /v1/federation/replicate:
+    post:
+      operationId: federationReplicate
+      summary: Receive replicated memory
+      description: |
+        Accept a memory entry replicated from a peer node. The source node must
+        be an active peer. Memory is stored with a `replica:{source}:` key prefix.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, gaii, key, value, version]
+              properties:
+                source_node:
+                  type: string
+                gaii:
+                  $ref: '#/components/schemas/GAII'
+                key:
+                  type: string
+                value: {}
+                visibility:
+                  $ref: '#/components/schemas/Visibility'
+                version:
+                  type: integer
+                timestamp:
+                  type: string
+                  format: date-time
+                signature:
+                  type: string
+                  description: Ed25519 signature of the payload
+      responses:
+        '200':
+          description: Replica accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          replicated:
+                            type: boolean
+                          key:
+                            type: string
+                          source_node:
+                            type: string
+                          version:
+                            type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/federation/catalogue-sync:
+    post:
+      operationId: federationCatalogueSync
+      summary: Receive catalogue updates from peer
+      description: |
+        Synchronise action catalogue entries from a peer node. Supports
+        incremental sync via `since_timestamp`. New actions are created;
+        existing federated actions are updated (upsert by federated ID).
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, actions]
+              properties:
+                source_node:
+                  type: string
+                actions:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, provider_gaii, display_name]
+                    properties:
+                      id:
+                        type: string
+                      provider_gaii:
+                        $ref: '#/components/schemas/GAII'
+                      display_name:
+                        type: string
+                      description:
+                        type: string
+                      category:
+                        type: string
+                      input_schema:
+                        type: object
+                      output_schema:
+                        type: object
+                      pricing:
+                        type: object
+                        properties:
+                          base_morsels:
+                            type: integer
+                          per_unit:
+                            type: number
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                since_timestamp:
+                  type: string
+                  format: date-time
+                  description: Only sync actions newer than this timestamp
+                catalogue_hash:
+                  type: string
+                  description: Hash of the sender's full catalogue for consistency checks
+      responses:
+        '200':
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          synced:
+                            type: integer
+                            description: Newly created actions
+                          updated:
+                            type: integer
+                            description: Updated existing actions
+                          source_node:
+                            type: string
+                          total_received:
+                            type: integer
+                          incremental:
+                            type: boolean
+                          catalogue_hash:
+                            type: string
+                            nullable: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/federation/key-exchange:
+    post:
+      operationId: federationKeyExchange
+      summary: Exchange public keys with peer
+      description: |
+        Synchronise Ed25519 public keys between peered nodes. The peer must
+        already exist in the federation registry.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [node_id, public_key]
+              properties:
+                node_id:
+                  type: string
+                public_key:
+                  type: string
+                  description: Ed25519 public key (hex)
+                capabilities:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Key exchange accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          node_id:
+                            type: string
+                          public_key:
+                            type: string
+                          capabilities:
+                            type: array
+                            items:
+                              type: string
+                          accepted:
+                            type: boolean
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/federation/trust-advisory:
+    post:
+      operationId: federationTrustAdvisory
+      summary: Issue trust advisory
+      description: |
+        Issue a trust warning, suspension, or ban against a target node.
+        Operator auth required. A `ban` advisory automatically de-peers the
+        target node.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_node, advisory_type, reason]
+              properties:
+                target_node:
+                  type: string
+                advisory_type:
+                  type: string
+                  enum: [warning, suspend, ban]
+                reason:
+                  type: string
+                evidence_hash:
+                  type: string
+                  description: SHA-256 hash of supporting evidence
+                issued_by:
+                  type: string
+                  description: Issuing node (defaults to this node)
+      responses:
+        '201':
+          description: Advisory recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          target_node:
+                            type: string
+                          advisory_type:
+                            type: string
+                            enum: [warning, suspend, ban]
+                          reason:
+                            type: string
+                          evidence_hash:
+                            type: string
+                          issued_by:
+                            type: string
+                          created_at:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   # ── Administration ─────────────────────────────────────────
   /v1/admin/dashboard:
     get:
@@ -2966,6 +3656,47 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/MeatSuccess'
+
+  /v1/otk/{key}:
+    get:
+      operationId: executeOtk
+      summary: Execute one-time key
+      description: |
+        Execute a previously generated one-time key (Tier 0.5). No auth
+        required — the key itself is the credential. Currently supports
+        the `write_memory` action. The key is consumed on first use.
+      tags: [Auth]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The one-time key token
+      responses:
+        '200':
+          description: OTK action executed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          action:
+                            type: string
+                            example: write_memory
+                          key:
+                            type: string
+                          written:
+                            type: boolean
+        '401':
+          description: Session expired due to inactivity
+        '404':
+          description: One-time key not found, expired, or already used
 
   # ── Chunked Upload ─────────────────────────────────────────
 
