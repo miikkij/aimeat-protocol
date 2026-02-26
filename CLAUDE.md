@@ -14,7 +14,7 @@ This is the **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an 
 - **Language:** TypeScript 5.9.3, strict mode, ES2022 target, NodeNext module resolution
 - **Crypto:** @noble/ed25519 3.0 for key generation/signing, jose 6.1 for EdDSA JWTs
 - **Package manager:** pnpm
-- **Port:** 3117
+- **Port:** 40050
 
 ## Key Commands
 
@@ -28,7 +28,7 @@ pnpm dev
 # Type-check (no emit)
 npx tsc --noEmit
 
-# Run E2E tests (server must be running on :3117)
+# Run E2E tests (server must be running on :40251)
 npx tsx test/e2e-full.ts
 
 # Build for production
@@ -113,7 +113,7 @@ import { foo } from '../services/foo';     // ❌
 
 ## Testing
 
-The E2E test file (`test/e2e-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 3117. The test creates its own owner/agents and cleans up via cascade delete at the end.
+The E2E test file (`test/e2e-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 40251. The test creates its own owner/agents and cleans up via cascade delete at the end.
 
 **Always run `npx tsc --noEmit` after changes** to verify the build compiles cleanly.
 

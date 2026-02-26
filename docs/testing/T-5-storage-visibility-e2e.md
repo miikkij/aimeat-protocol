@@ -12,7 +12,7 @@ Test storage file visibility enforcement (private/owner/public), cross-agent acc
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - One owner with 2 agents (agent-A, agent-B) to test cross-agent access
 - A second owner with 1 agent (agent-C) to test cross-owner access
 

@@ -1,7 +1,7 @@
 // T-3: Dispute Escalation Flow E2E Tests
 // Run: cd aimeat && pnpm exec tsx test/e2e-disputes.ts
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:3117';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
 
 let passed = 0;

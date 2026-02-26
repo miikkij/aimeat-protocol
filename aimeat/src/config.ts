@@ -74,7 +74,7 @@ export function loadConfig(): MeatConfig {
   }
 
   return {
-    port: parseInt(process.env.MEAT_PORT ?? '3117', 10),
+    port: parseInt(process.env.MEAT_PORT ?? '40050', 10),
     nodeId: process.env.MEAT_NODE_ID ?? 'meat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,
@@ -113,11 +113,11 @@ export function loadConfig(): MeatConfig {
       pre_federation_peer: [],
     },
     rateLimits: {
-      global: { windowMs: 60_000, max: 200 },
-      auth: { windowMs: 60_000, max: 20 },
-      work: { windowMs: 60_000, max: 60 },
-      memory: { windowMs: 60_000, max: 120 },
-      boards: { windowMs: 60_000, max: 60 },
+      global: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_GLOBAL ?? '200', 10) },
+      auth: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_AUTH ?? '20', 10) },
+      work: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_WORK ?? '60', 10) },
+      memory: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_MEMORY ?? '120', 10) },
+      boards: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_BOARDS ?? '60', 10) },
       roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },
   };

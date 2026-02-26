@@ -24,8 +24,8 @@ COPY --from=build /app/dist ./dist
 COPY package.json ./
 
 ENV NODE_ENV=production
-ENV MEAT_PORT=3117
-EXPOSE 3117
+ENV MEAT_PORT=40050
+EXPOSE 40050
 
 USER node
 CMD ["node", "dist/src/index.js"]

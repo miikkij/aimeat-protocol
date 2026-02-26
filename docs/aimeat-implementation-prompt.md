@@ -124,7 +124,7 @@ interface MeatResponse<T> {
 ### 4. CLI Entry Point
 
 ```bash
-aimeat                                    # start with defaults (in-memory, port 3117)
+aimeat                                    # start with defaults (in-memory, port 40050)
 aimeat --port 8080                        # custom port
 aimeat --db mongodb://localhost/aimeat     # persistent mode (override DATABASE_URL)
 aimeat --admin-password secret123         # set admin password
@@ -138,11 +138,11 @@ For development, create `.env`:
 ```properties
 DATABASE_URL="mongodb://dbuser:dbpassword@localhost:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin"
 MEAT_NODE_ID="meat-finland-001-genesis"
-MEAT_PORT=3117
+MEAT_PORT=40050
 MEAT_ADMIN_PASSWORD=TestAdminPw123!
 ```
 
-Default port: **3117** (MEAT on a phone keypad: M=6, E=3, A=2, T=8 → but let's use 3117 as the AIMEAT port).
+Default port: **40050** (MEAT on a phone keypad: M=6, E=3, A=2, T=8 → but let's use 40050 as the AIMEAT port).
 
 ### 5.5 Environment & Package Manager
 
@@ -308,9 +308,9 @@ After implementing each phase, verify by making actual HTTP calls:
 
 ```bash
 # Phase 1 verification
-curl http://localhost:3117/                          # should return full bootstrap JSON
-curl http://localhost:3117/.well-known/aimeat         # discovery
-curl http://localhost:3117/v1/catalogue               # empty catalogue
+curl http://localhost:40050/                          # should return full bootstrap JSON
+curl http://localhost:40050/.well-known/aimeat         # discovery
+curl http://localhost:40050/v1/catalogue               # empty catalogue
 
 # Register an agent (requires keypair generation helper)
 # ... test auth flow

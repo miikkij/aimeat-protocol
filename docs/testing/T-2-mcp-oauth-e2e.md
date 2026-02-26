@@ -12,7 +12,7 @@ Test the full MCP lifecycle: OAuth 2.1 dynamic client registration → authoriza
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - Registered owner + agent with keypair (created during test setup)
 
 ## Test Phases

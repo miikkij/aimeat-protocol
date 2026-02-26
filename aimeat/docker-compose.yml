@@ -2,9 +2,9 @@ services:
   aimeat:
     build: .
     ports:
-      - "${MEAT_PORT:-3117}:3117"
+      - "${MEAT_PORT:-40050}:40050"
     environment:
-      - MEAT_PORT=3117
+      - MEAT_PORT=40050
       - MEAT_NODE_ID=${MEAT_NODE_ID:-meat-local-001-dev}
       - MEAT_ADMIN_PASSWORD=${MEAT_ADMIN_PASSWORD:-TestAdminPw123!}
       - DATABASE_URL=mongodb://dbuser:dbpassword@mongo:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin

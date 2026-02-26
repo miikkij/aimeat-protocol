@@ -12,7 +12,7 @@ Test the full federation lifecycle including peering approval, activation, data 
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - Operator admin password set (for peering approval, de-peering)
 
 ## Test Phases
@@ -80,7 +80,7 @@ services:
     build: .
     environment:
       MEAT_NODE_ID: meat-test-node-a
-      MEAT_PORT: 3117
+      MEAT_PORT: 40251
   node-b:
     build: .
     environment:

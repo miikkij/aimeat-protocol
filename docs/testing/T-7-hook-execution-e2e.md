@@ -21,7 +21,7 @@ Hooks work as follows:
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - Operator admin access (to configure hooks via `PUT /v1/admin/config`)
 - A mock webhook server (HTTP listener in the test process)
 

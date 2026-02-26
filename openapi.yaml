@@ -28,7 +28,7 @@ info:
 servers:
   - url: https://meat-finland-001-genesis.overscalesolutions.com
     description: Genesis node (Helsinki, Finland)
-  - url: http://localhost:3117
+  - url: http://localhost:40050
     description: Local development
 
 tags:

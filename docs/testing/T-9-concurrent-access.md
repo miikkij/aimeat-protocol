@@ -12,7 +12,7 @@ Test system behavior under concurrent access: escrow race conditions, optimistic
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - Registered owner + multiple agents
 - Agent with sufficient morsel balance for parallel work submissions
 

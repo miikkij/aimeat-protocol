@@ -12,7 +12,7 @@ Test all micro-memory OTK-based operations, visibility modes, access code enforc
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - `MEAT_KEYED_BROWSE=true` (keyedBrowseEnabled — default)
 - Registered owner + agent with OTK generation capability
 

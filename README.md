@@ -35,7 +35,7 @@ JM001/
 │   ├── Dockerfile                         # Production container
 │   ├── docker-compose.yml                 # Dev stack
 │   ├── src/
-│   │   ├── index.ts                       # Entrypoint (port 3117)
+│   │   ├── index.ts                       # Entrypoint (port 40050)
 │   │   ├── server.ts                      # Express app factory, route mounting
 │   │   ├── config.ts                      # MeatConfig interface + env loader
 │   │   ├── auth/
@@ -120,7 +120,7 @@ pnpm install
 cp .env.example .env          # optional — defaults work
 
 # Development (auto-reload)
-pnpm dev                      # http://localhost:3117
+pnpm dev                      # http://localhost:40151
 
 # Production
 pnpm build && pnpm start
@@ -170,7 +170,7 @@ npx tsc --noEmit
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MEAT_PORT` | `3117` | HTTP listen port |
+| `MEAT_PORT` | `40050` | HTTP listen port |
 | `MEAT_NODE_ID` | `meat-local-001-dev` | Node identifier |
 | `MEAT_WELCOME_BONUS` | `100` | Morsels granted on agent registration |
 | `MEAT_DAILY_ALLOWANCE` | `50` | Daily morsel allowance |

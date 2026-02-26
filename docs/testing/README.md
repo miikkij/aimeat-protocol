@@ -6,7 +6,7 @@ Test plans for gaps T-1 through T-9 identified in the gap analysis. Each plan de
 
 | Runner | Location | Pattern |
 |--------|----------|---------|
-| E2E (standalone TSX) | `test/e2e-*.ts` | Custom `test()`/`assert()`, runs against live server on `:3117` |
+| E2E (standalone TSX) | `test/e2e-*.ts` | Custom `test()`/`assert()`, runs against live server on `:40251` |
 | Unit (vitest) | `test/unit/*.test.ts` | `describe`/`it`/`expect`, pure functions + mocked `Storage` |
 | Integration (vitest) | `test/integration/*.test.ts` | vitest with programmatic server startup (proposed) |
 

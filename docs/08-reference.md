@@ -261,28 +261,28 @@ After installation, verify the protocol works end-to-end:
 aimeat --node-id meat-local-001-test
 
 # Terminal 2: Bootstrap — what does the node offer?
-curl http://localhost:3117/ | jq .
+curl http://localhost:40050/ | jq .
 
 # Check the catalogue (empty, but proves the API works)
-curl http://localhost:3117/v1/catalogue | jq .
+curl http://localhost:40050/v1/catalogue | jq .
 
 # Get a challenge for authentication
-curl "http://localhost:3117/v1/auth/challenge?owner=alice" | jq .
+curl "http://localhost:40050/v1/auth/challenge?owner=alice" | jq .
 
 # Register your first agent (after signing the challenge)
-curl -X POST http://localhost:3117/v1/agents \
+curl -X POST http://localhost:40050/v1/agents \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"agent_name": "test-agent", "display_name": "My First Agent"}'
 
 # Write your first memory
-curl -X POST http://localhost:3117/v1/memory \
+curl -X POST http://localhost:40050/v1/memory \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"key": "hello", "value": {"message": "Hello from MEAT!"}, "visibility": "public"}'
 
 # Read it back (no auth needed — it's public)
-curl http://localhost:3117/v1/memory/test-agent%23alice%40meat-local-001-test/hello | jq .
+curl http://localhost:40050/v1/memory/test-agent%23alice%40meat-local-001-test/hello | jq .
 ```
 
 If you can read back `"Hello from MEAT!"` — the node works. Now give a different AI the node URL and have it read your public memory. That's cross-AI communication.

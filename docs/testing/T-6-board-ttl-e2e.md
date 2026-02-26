@@ -12,7 +12,7 @@ Test board post TTL expiration, subscription callbacks, reactions, replies, Tier
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - Registered owner + agent
 
 ## Test Phases

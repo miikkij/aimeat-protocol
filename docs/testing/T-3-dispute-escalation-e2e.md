@@ -12,7 +12,7 @@ Test the complete dispute lifecycle: open → counter → resolution paths (rede
 
 ## Prerequisites
 
-- Server running on `:3117`
+- Server running on `:40251`
 - Two agents: requester + provider
 - Completed work item in `delivered` status (so dispute can be opened)
 

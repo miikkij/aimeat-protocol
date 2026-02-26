@@ -1,7 +1,7 @@
 // T-4: Micro-Memory E2E Tests
 // Run: cd aimeat && pnpm exec tsx test/e2e-micro-memory.ts
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:3117';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
 
 let passed = 0;
@@ -378,12 +378,12 @@ await test('23. Value exceeding 1KB → error', async () => {
 });
 
 await test('24. Total micro-memory quota exceeded (500KB)', async () => {
-    // Fill up with large values to exceed the 500KB total quota
-    // Each value is ~1000 bytes, we need ~500 keys to approach 500KB
-    // But we already have 100 keys; let's use multiple sets with large values
+    // Fill up quota: use max-size values (1000 bytes) across sets.
+    // 500KB = 512,000 bytes. Need >512 keys of ~1000 bytes.
+    // Use 6 sets x 100 keys = 600 keys × 1000 bytes = 600KB > 512KB.
     const bigVal = 'x'.repeat(1000);
     let quotaHit = false;
-    for (let s = 0; s < 20 && !quotaHit; s++) {
+    for (let s = 0; s < 6 && !quotaHit; s++) {
         for (let k = 0; k < 100 && !quotaHit; k++) {
             const { status, body } = await mmOp(`op=add&set=fill_${s}&key=f${k}&value=${encodeURIComponent(bigVal)}`);
             if (status === 413 || (status === 400 && body.error?.code === 'QUOTA_EXCEEDED')) {

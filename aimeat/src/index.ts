@@ -30,7 +30,7 @@ USAGE
   aimeat restore --from FILE  Import data from JSON backup
 
 OPTIONS
-  -p, --port <port>          HTTP port (default: 3117)
+  -p, --port <port>          HTTP port (default: 40050)
   --db <url>                 MongoDB connection URL
   --node-id <id>             Node identity string
   --admin-password <pw>      Operator admin password
@@ -99,7 +99,7 @@ if (subcommand === 'init') {
   (async () => {
     console.log('\n🥩 AIMEAT Node Configuration Wizard\n');
     const nodeId = await ask('Node ID', 'meat-local-001');
-    const port = await ask('Port', '3117');
+    const port = await ask('Port', '40050');
     const welcomeBonus = await ask('Welcome bonus (morsels)', '100');
     const dailyAllowance = await ask('Daily allowance (morsels)', '50');
     const dailyAllowanceCap = await ask('Daily allowance cap', '500');

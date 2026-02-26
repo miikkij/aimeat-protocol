@@ -52,7 +52,7 @@ services:
       - /tmp
 ```
 
-- **Port 3200** — avoids collision with dev (:3117) and production
+- **Port 3200** — avoids collision with dev (:40151) and production
 - **In-memory storage** — no MongoDB needed for initial tests; DATABASE_URL omitted
 - **High rate limit** — 1000 req/60s to prevent rate-limit flakiness
 - **tmpfs** — nothing persisted to disk
@@ -92,13 +92,13 @@ echo "✅ Tests complete"
 All E2E test files read the base URL and node ID from environment variables:
 
 ```typescript
-const BASE = process.env.E2E_BASE ?? 'http://localhost:3117';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
 ```
 
 This allows the same test files to run against:
 - A Docker E2E container (`E2E_BASE=http://localhost:3200`)
-- A local dev server (`pnpm dev` on :3117, no env vars needed)
+- A local dev server (`pnpm dev` on :40151, no env vars needed)
 
 ### package.json Scripts
 
