@@ -19,6 +19,7 @@ services:
 
   mongo:
     image: mongo:7
+    command: ["--replSet", "myReplicaSet", "--bind_ip_all"]
     ports:
       - "27017:27017"
     environment:
@@ -27,10 +28,10 @@ services:
     volumes:
       - mongo_data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "-u", "dbuser", "-p", "dbpassword", "--authenticationDatabase", "admin", "--eval", "try { rs.status().ok } catch(e) { rs.initiate({ _id: 'myReplicaSet', members: [{ _id: 0, host: 'localhost:27017' }] }).ok }"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
     restart: unless-stopped
 
 volumes:

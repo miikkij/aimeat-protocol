@@ -146,7 +146,7 @@ pnpm dev   # starts on http://localhost:40151
 ```bash
 curl -s -X POST http://localhost:40151/v1/owners \
   -H "Content-Type: application/json" \
-  -d '{"name": "admin", "public_key": "<your-ed25519-public-key-hex>"}'
+  -d '{"name": "myname", "public_key": "<your-ed25519-public-key-hex>"}'
 ```
 
 2. **Get a JWT token** — sign `ownerName + nodeId + timestamp` with your Ed25519 private key:
@@ -154,7 +154,7 @@ curl -s -X POST http://localhost:40151/v1/owners \
 ```bash
 curl -s -X POST http://localhost:40151/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"ownerName": "admin", "nodeId": "meat-local-001-dev", "timestamp": "<ISO-8601>", "signature": "<hex-signature>"}'
+  -d '{"ownerName": "myname", "nodeId": "meat-local-001-dev", "timestamp": "<ISO-8601>", "signature": "<hex-signature>"}'
 ```
 
 3. **Open the dashboard** in your browser:

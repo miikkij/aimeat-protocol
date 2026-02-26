@@ -61,8 +61,8 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
         const keyPair = await generateKeyPair();
         const allOwners = await storage.listOwners();
         const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-        const roles = ['owner'];
-        if (realOwners.length === 0) roles.push('operator');
+        // Setup wizard is admin-password-protected — always grant operator
+        const roles = ['owner', 'operator'];
 
         const owner = await storage.createOwner({
             name,
@@ -968,9 +968,9 @@ a:hover{text-decoration:underline}
 <h2><span class="step-num" id="s1n">1</span>Register Owner</h2>
 <p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">The first owner automatically gets the <strong>operator</strong> role.</p>
 <label>Owner Name</label>
-<input type="text" id="ownerName" placeholder="e.g. admin" autocomplete="off"/>
+<input type="text" id="ownerName" placeholder="e.g. myname" autocomplete="off"/>
 <label>Display Name (optional)</label>
-<input type="text" id="displayName" placeholder="e.g. System Administrator"/>
+<input type="text" id="displayName" placeholder="e.g. Node Operator"/>
 <br/>
 <button class="btn-primary" id="btnRegister" onclick="doRegister()">Register Owner</button>
 <div id="regResult" class="hidden"></div>

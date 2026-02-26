@@ -920,6 +920,21 @@ components:
                       code:
                         example: ACCESS_DENIED
 
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/MeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        example: BAD_REQUEST
+
     NotFound:
       description: Resource not found
       content:
