@@ -128,6 +128,7 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
       action: 'session',
       params: { owner, sessionType: 'tier_0_5', sessionId },
       expiresAt,
+      initial: false,
       used: false,
       usedAt: null,
       sessionId,
@@ -143,6 +144,7 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
       action: 'session',
       params: { owner, sessionType: 'tier_0_5', sessionId },
       expiresAt: nextExpiresAt,
+      initial: false,
       used: false,
       usedAt: null,
       sessionId,
@@ -341,6 +343,7 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
       action,
       params: params ?? {},
       expiresAt,
+      initial: false,
       used: false,
       usedAt: null,
       sessionId: null,
@@ -355,6 +358,39 @@ export function authRouter(config: MeatConfig, storage: Storage): Router {
       note: 'This key can be used once via GET request. Share with a Tier 0 agent to allow a single write operation.',
     }, [
       { description: 'Use this one-time key', method: 'GET', url: `/v1/otk/${key}` },
+    ]));
+  });
+
+  // POST /v1/auth/initial-otk — generate an Initial OTK (timer starts on first use)
+  // The OTK remains dormant until the AI first uses it. Once used, the grace period starts.
+  // Ideal for embedding in prompts — the consumer can use it hours/days later.
+  router.post('/v1/auth/initial-otk', requireAuth(), async (req, res) => {
+    const key = generateOtk();
+    // Far-future expiry — effectively no expiry until first use activates the timer
+    const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
+
+    await storage.createOtk({
+      key,
+      ownerGaii: req.auth!.sub,
+      action: 'initial',
+      params: {},
+      expiresAt: farFuture,
+      initial: true,
+      used: false,
+      usedAt: null,
+      sessionId: null,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json(success(config.nodeId, {
+      otk: key,
+      initial: true,
+      grace_ms: config.otkGraceMs,
+      note: `This is an Initial OTK. It has no expiry until first use. Once used, it remains valid for ${config.otkGraceMs / 1000} seconds. Embed it in prompts for AI agents.`,
+      owner: req.auth!.sub,
+    }, [
+      { description: 'Use for micro-memory operations', method: 'GET', url: `/v1/mm?otk=${key}&op=list` },
+      { description: 'Generate AI prompt with this OTK', method: 'GET', url: `/v1/prompts/tier0?otk=${key}` },
     ]));
   });
 

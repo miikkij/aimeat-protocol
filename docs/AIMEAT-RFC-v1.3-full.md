@@ -1,8 +1,8 @@
-# AIMEAT Protocol Specification v1.2
+# AIMEAT Protocol Specification v1.3
 
 ## AI Memory Exchange and Action Transfer
 
-**Status:** LOCKED v1.2 (modularized, reviewer feedback round 2)  
+**Status:** v1.3 (Initial OTK, Dev Mode)  
 **Date:** 2026-02-25  
 **Author:** Jouni Miikki (Overscale Solutions Oy)  
 **License:** MIT  
@@ -727,6 +727,87 @@ GET /v1/mm?otk={key}&op=list&set=project-x
 - NOT suitable for automated high-frequency batch work
 
 **Security:** Keys valid for 60 seconds post-use (absorbs browser duplicates). Session-bound. Operator can disable entirely (`keyed_browse_enabled: false`). Full audit trail. Shared-write micro-memory sets require access codes.
+
+#### 5.7.4.1 Initial OTK — Dormant Keys for Prompt Embedding
+
+Standard OTKs expire on a timer that starts at creation. **Initial OTKs** solve a different problem: embedding a key in a prompt, system instruction, or AI configuration that may not be used for hours or days.
+
+**How Initial OTKs work:**
+
+1. Owner/agent generates an Initial OTK via `POST /v1/auth/initial-otk` (JWT auth) or `POST /v1/admin/setup/initial-otk` (admin password auth)
+2. The OTK is created with `initial: true` and a far-future expiry (effectively dormant)
+3. The key can be embedded in a prompt, system message, `.env` file, or AI agent configuration
+4. **Timer starts on first use:** When the AI first uses the OTK, the expiry is set to `now + grace_ms` (default 60 seconds)
+5. Within the grace window, the OTK behaves like a normal session OTK — reusable for multiple operations
+6. After the grace window expires, the key is dead
+
+**Example: embedding in a prompt**
+
+```
+You are an AI assistant. You can store notes using this AIMEAT node:
+  GET https://meat.example.com/v1/mm?otk=otk-abc123&op=add&set=notes&key=thought1&value=...
+
+The OTK above is dormant until you use it. Once you make your first call,
+you have 60 seconds to complete all operations.
+```
+
+**Creating an Initial OTK:**
+
+```
+POST /v1/auth/initial-otk
+Authorization: Bearer <jwt>
+
+→ {
+    "otk": "otk-abc123...",
+    "initial": true,
+    "grace_ms": 60000,
+    "note": "This is an Initial OTK. It has no expiry until first use.",
+    "owner": "agent#owner@node"
+  }
+```
+
+**Security considerations:**
+- Initial OTKs are still single-owner, single-session
+- Once activated (first use), they follow the same grace period rules as regular OTKs
+- Operators can audit all Initial OTKs via the admin endpoints
+- Revoking the owner also revokes all their Initial OTKs
+
+#### 5.7.4.2 Dev Mode — OTK Bypass for Local Development
+
+For home/development use, operators can enable **Dev Mode** (`MEAT_DEV_MODE=true`) which bypasses OTK validation on micro-memory endpoints. This allows basic AI integrations (e.g., simple LLMs without HTTP tooling) to write to micro-memory without managing OTKs.
+
+**Behavior when Dev Mode is enabled:**
+
+- Micro-memory requests without an `otk` parameter are accepted
+- The identity is resolved from the first registered agent (or owner if no agents exist)
+- All other endpoints continue to require normal authentication
+- A startup warning is logged: `⚠ DEV MODE: OTK validation bypassed on micro-memory`
+
+**Configuration:**
+
+```bash
+MEAT_DEV_MODE=true   # Enable dev mode (default: false)
+```
+
+**IMPORTANT:** Dev Mode is intended for local development and testing only. Never enable it on production or public-facing nodes. It effectively removes write authentication from micro-memory.
+
+#### 5.7.4.3 Auto-Identification from OTK
+
+When an AI uses an OTK, the server resolves the identity from the OTK's `ownerGaii` field. If the resolved identity is an owner (not a registered agent), the response includes `identity` hints guiding the AI to register a proper agent:
+
+```json
+{
+  "identity": {
+    "identity_status": "owner_only",
+    "message": "You are using an owner identity. Register an agent for proper GAII-based memory scoping.",
+    "register_url": "/v1/agents",
+    "register_method": "POST",
+    "register_body_example": { "name": "my-agent", "owner": "owner-name", "display_name": "My AI Agent" }
+  }
+}
+```
+
+This enables a progressive onboarding flow: an AI starts with just an OTK, and the protocol guides it toward full agent registration.
 
 #### 5.7.5 Tier 1 — Agent (MCP or Code Execution)
 

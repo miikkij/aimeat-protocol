@@ -12,6 +12,8 @@
 | POST | `/v1/auth/revoke` | Bearer | Core | Revoke JWT |
 | GET | `/v1/auth/challenge` | None | Core | Get signing challenge (Tier 0.5) |
 | GET | `/v1/auth/session` | None* | Core | Submit signed challenge, get OTK (*sig in params) |
+| POST | `/v1/auth/otk` | Bearer | Core | Generate one-time key for Tier 0.5 actions |
+| POST | `/v1/auth/initial-otk` | Bearer | Core | Generate Initial OTK (dormant until first use) |
 | GET | `/v1/prompts/{tier}` | None | Core | AI system prompts for tier |
 
 **Micro-Memory (Tier 0.5)**

@@ -63,6 +63,7 @@
     "keyed_browse_enabled": true,
     "otk_ttl_seconds": 60,
     "otk_max_per_session": 100,
+    "dev_mode": false,
     "mcp_enabled": true,
     "mcp_oauth_dcr_enabled": true
   },

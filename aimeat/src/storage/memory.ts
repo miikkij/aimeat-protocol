@@ -349,6 +349,15 @@ export class InMemoryStorage implements Storage {
   async consumeOtk(key: string, graceMs: number = 60_000): Promise<OtkRecord | null> {
     const otk = this.otks.get(key);
     if (!otk) return null;
+
+    // Initial OTK: timer hasn't started yet — activate on first use
+    if (otk.initial && !otk.used) {
+      otk.used = true;
+      otk.usedAt = new Date().toISOString();
+      otk.expiresAt = new Date(Date.now() + graceMs).toISOString();
+      return otk;
+    }
+
     if (new Date(otk.expiresAt) < new Date()) {
       this.otks.delete(key);
       return null;

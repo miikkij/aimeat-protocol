@@ -102,11 +102,12 @@ export interface BoardPostRecord {
 export interface OtkRecord {
   key: string;
   ownerGaii: string;
-  action: string;         // 'write_memory' | 'post_board' | 'session'
+  action: string;         // 'write_memory' | 'post_board' | 'session' | 'initial'
   params: Record<string, unknown>;
-  expiresAt: string;
+  expiresAt: string;      // ISO timestamp; for initial OTKs, set to far-future until first use
+  initial: boolean;       // true = timer starts on first use, not at creation
   used: boolean;
-  usedAt: string | null;  // ISO timestamp of first use (60s post-use window)
+  usedAt: string | null;  // ISO timestamp of first use (grace window starts here)
   sessionId: string | null; // links OTKs to a session for inactivity timeout
   createdAt: string;
 }

@@ -193,6 +193,9 @@ if (subcommand === 'init') {
     });
     logger.info(`   GET http://localhost:${config.port}/`);
     logger.info(`   Protocol: AIMEAT v1.2 | License: MIT`);
+    if (config.devMode) {
+      logger.info(`   ⚠ DEV MODE: OTK validation bypassed on micro-memory`);
+    }
     logger.info(``);
     logger.info(`   Admin Setup: http://localhost:${config.port}/v1/admin/setup?pw=${config.adminPassword}`);
     if (!process.env.MEAT_ADMIN_PASSWORD) {

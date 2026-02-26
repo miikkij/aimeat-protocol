@@ -616,6 +616,7 @@ export class MongoStorage implements Storage {
             action: row.action,
             params: row.params as Record<string, unknown>,
             expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+            initial: row.initial ?? false,
             used: row.used,
             usedAt: row.usedAt ? (row.usedAt instanceof Date ? row.usedAt.toISOString() : row.usedAt) : null,
             sessionId: row.sessionId ?? null,
@@ -635,6 +636,16 @@ export class MongoStorage implements Storage {
         try {
             const row = await this.prisma.otk.findUnique({ where: { key } });
             if (!row) return null;
+
+            // Initial OTK: timer hasn't started yet — activate on first use
+            if ((row as any).initial && !row.used) {
+                const updated = await this.prisma.otk.update({
+                    where: { key },
+                    data: { used: true, usedAt: new Date(), expiresAt: new Date(Date.now() + graceMs) },
+                });
+                return this.toOtkRecord(updated);
+            }
+
             if (new Date(row.expiresAt) < new Date()) {
                 await this.prisma.otk.delete({ where: { key } });
                 return null;

@@ -58,26 +58,54 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
         res.setHeader('X-Max-URL-Length', config.maxUrlLength);
 
         const otkKey = req.query.otk as string;
-        if (!otkKey) {
+
+        // Dev mode: allow requests without OTK using first registered agent/owner
+        let gaii: string;
+        if (!otkKey && config.devMode) {
+            const agents = await storage.listAgents();
+            if (agents.length > 0) {
+                gaii = agents[0].gaii;
+            } else {
+                const owners = await storage.listOwners();
+                if (owners.length > 0) {
+                    gaii = owners[0].name;
+                } else {
+                    res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Dev mode: no owners or agents registered yet'));
+                    return;
+                }
+            }
+        } else if (!otkKey) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required'));
             return;
+        } else {
+            const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
+            if (!otk) {
+                res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used', undefined, {
+                    initial_otk_hint: 'If this was an Initial OTK, its grace period may have expired. Request a new one via POST /v1/auth/initial-otk',
+                }));
+                return;
+            }
+            if (!await checkOtkSession(otk, storage)) {
+                res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
+                return;
+            }
+            gaii = otk.ownerGaii;
         }
 
-        const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
-        if (!otk) {
-            res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
-            return;
-        }
-        if (!await checkOtkSession(otk, storage)) {
-            res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
-            return;
-        }
+        // Auto-identification: check if GAII is a registered agent, add hints if not
+        const resolvedAgent = await storage.getAgent(gaii);
+        const identityHints = resolvedAgent ? undefined : {
+            identity_status: 'owner_only',
+            message: 'You are using an owner identity. Register an agent for proper GAII-based memory scoping.',
+            register_url: '/v1/agents',
+            register_method: 'POST',
+            register_body_example: { name: 'my-agent', owner: gaii, display_name: 'My AI Agent' },
+        };
 
         const op = req.query.op as string;
         const set = req.query.set as string;
         const key = req.query.key as string;
         const value = resolveValue(req as any);
-        const gaii = otk.ownerGaii;
 
         if (!op) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'op query parameter is required (add, del, mod, list, config, batch)'));
@@ -171,12 +199,14 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                         set,
                         entries: record3?.entries ?? {},
                         visibility: record3?.visibility ?? 'private',
+                        ...(identityHints ? { identity: identityHints } : {}),
                     }));
                 } else {
                     const sets = await storage.listMicroMemorySets(gaii);
                     res.json(success(config.nodeId, {
                         gaii,
                         sets: sets.map(s => ({ set: s.set, entry_count: Object.keys(s.entries).length, visibility: s.visibility })),
+                        ...(identityHints ? { identity: identityHints } : {}),
                     }));
                 }
                 break;

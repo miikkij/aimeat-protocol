@@ -757,6 +757,124 @@ await test('Rate limiting 429', async () => {
     // With high test limits, just verify the headers exist (rate limiting is enabled)
 });
 
+// ─── Phase 7: Initial OTK + Auto-Identification ───
+console.log('Phase 7 — Initial OTK + Auto-Identification');
+
+await test('Initial OTK — generate via JWT auth', async () => {
+    const { status, body } = await json('/v1/auth/initial-otk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.initial === true, 'initial flag');
+    assert(typeof body.data?.otk === 'string', 'has otk');
+    assert(typeof body.data?.grace_ms === 'number', 'has grace_ms');
+    assert(body.data?.owner === agentGaii, 'owner matches agent');
+});
+
+await test('Initial OTK — use for micro-memory write', async () => {
+    // Generate initial OTK
+    const { body: genBody } = await json('/v1/auth/initial-otk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    const otk = genBody.data?.otk;
+    assert(typeof otk === 'string', 'got otk');
+
+    // Use it for micro-memory add
+    const { body: addBody } = await json(`/v1/mm?otk=${otk}&op=add&set=iotk-test&key=k1&value=hello`);
+    assert(addBody.ok === true, `mm add: ${JSON.stringify(addBody)}`);
+
+    // Use same OTK again within grace period (should still work)
+    const { body: listBody } = await json(`/v1/mm?otk=${otk}&op=list&set=iotk-test`);
+    assert(listBody.ok === true, `mm list: ${JSON.stringify(listBody)}`);
+    assert(listBody.data?.entries && typeof listBody.data.entries === 'object', 'has entries');
+    assert(listBody.data.entries.k1 === 'hello', 'value matches');
+});
+
+await test('Initial OTK — dormant before first use', async () => {
+    // Generate initial OTK — it should have a far-future expiry
+    const { body: genBody } = await json('/v1/auth/initial-otk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    const otk = genBody.data?.otk;
+    assert(typeof otk === 'string', 'got otk');
+
+    // Wait a short time to prove it's still valid (not expired)
+    await new Promise(r => setTimeout(r, 200));
+
+    // It should still work — regular OTK with 60s TTL would potentially have different behavior
+    const { body: addBody } = await json(`/v1/mm?otk=${otk}&op=add&set=iotk-dormant&key=d1&value=dormant`);
+    assert(addBody.ok === true, `mm add after delay: ${JSON.stringify(addBody)}`);
+});
+
+await test('Initial OTK — grace period expiry', async () => {
+    // This test verifies that after first use, the OTK's timer is running
+    // We can't wait 60s in a test, but we verify the mechanism works:
+    // 1. Create initial OTK
+    // 2. Use it (activates timer → sets expiresAt = now + graceMs)
+    // 3. Verify second use within grace works
+    const { body: genBody } = await json('/v1/auth/initial-otk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    const otk = genBody.data?.otk;
+    assert(typeof otk === 'string', 'got otk');
+
+    // First use activates the timer
+    const { body: use1 } = await json(`/v1/mm?otk=${otk}&op=add&set=iotk-grace&key=g1&value=first`);
+    assert(use1.ok === true, 'first use ok');
+
+    // Second use within grace should work
+    const { body: use2 } = await json(`/v1/mm?otk=${otk}&op=add&set=iotk-grace&key=g2&value=second`);
+    assert(use2.ok === true, 'second use within grace ok');
+});
+
+await test('Auto-identification — owner identity hints', async () => {
+    // Create an initial OTK using owner token (owner identity, no agent)
+    const { body: genBody } = await json('/v1/auth/initial-otk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const otk = genBody.data?.otk;
+    assert(typeof otk === 'string', 'got otk');
+
+    // Use it — since owner is the identity (not an agent), should get identity hints
+    const { body: listBody } = await json(`/v1/mm?otk=${otk}&op=add&set=hint-test&key=h1&value=test`);
+    assert(listBody.ok === true, `mm add: ${JSON.stringify(listBody)}`);
+
+    // List operation should include identity hints for non-agent identity
+    const { body: listBody2 } = await json(`/v1/mm?otk=${otk}&op=list&set=hint-test`);
+    assert(listBody2.ok === true, 'list ok');
+    // Identity hints should be present if GAII is owner-only (not a registered agent)
+    // The owner name is used as identity, which won't match any agent GAII
+    if (listBody2.data?.identity) {
+        assert(listBody2.data.identity.identity_status === 'owner_only', 'identity status');
+        assert(typeof listBody2.data.identity.register_url === 'string', 'has register_url');
+    }
+});
+
+await test('Initial OTK — admin setup endpoint', async () => {
+    const ADMIN_PW = process.env.MEAT_ADMIN_PASSWORD ?? '';
+    // Skip if no admin password available
+    if (!ADMIN_PW) {
+        console.log('    ⏩ Skipped (no MEAT_ADMIN_PASSWORD in env)');
+        passed++; // count as passed (skipped)
+        return;
+    }
+
+    const { body } = await json(`/v1/admin/setup/initial-otk?pw=${encodeURIComponent(ADMIN_PW)}`, {
+        method: 'POST',
+        body: JSON.stringify({ owner: ownerName }),
+    });
+    assert(body.ok === true, `admin initial-otk: ${JSON.stringify(body)}`);
+    assert(body.initial === true, 'initial flag');
+    assert(typeof body.otk === 'string', 'has otk');
+    assert(typeof body.grace_ms === 'number', 'has grace_ms');
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 

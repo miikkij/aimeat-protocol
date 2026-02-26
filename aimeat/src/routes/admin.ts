@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
+import { generateOtk } from '../utils/otk.js';
 
 export function adminRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
@@ -118,6 +119,52 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
             roles: ownerRecord.roles,
             dashboard_url: `/v1/admin/ui?token=${token}`,
+        });
+    });
+
+    // POST /v1/admin/setup/initial-otk — generate an Initial OTK (password-protected)
+    router.post('/v1/admin/setup/initial-otk', async (req, res) => {
+        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
+        if (!config.adminPassword || pw !== config.adminPassword) {
+            res.status(401).json({ ok: false, error: 'Invalid admin password' });
+            return;
+        }
+
+        const { owner } = req.body ?? {};
+        if (!owner || typeof owner !== 'string') {
+            res.status(400).json({ ok: false, error: 'owner name is required' });
+            return;
+        }
+
+        // Find agent or use owner as identity
+        const agents = await storage.getAgentsByOwner(owner);
+        const ownerGaii = agents.length > 0 ? agents[0].gaii : owner;
+
+        const key = generateOtk();
+        const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
+
+        await storage.createOtk({
+            key,
+            ownerGaii,
+            action: 'initial',
+            params: {},
+            expiresAt: farFuture,
+            initial: true,
+            used: false,
+            usedAt: null,
+            sessionId: null,
+            createdAt: new Date().toISOString(),
+        });
+
+        res.json({
+            ok: true,
+            otk: key,
+            initial: true,
+            owner: ownerGaii,
+            grace_ms: config.otkGraceMs,
+            dev_mode: config.devMode,
+            node_url: `http://localhost:${config.port}`,
+            note: `Initial OTK — no expiry until first use. After first use, valid for ${config.otkGraceMs / 1000}s.`,
         });
     });
 
