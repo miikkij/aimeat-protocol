@@ -543,7 +543,9 @@ export function mcpRouter(config: MeatConfig, storage: Storage): Router {
         }
 
         // New session: authenticate the agent
-        let agentGaii = 'anonymous';
+        let agentGaii = config.anonymousMode
+            ? `shared#anonymous@${config.nodeId}`
+            : 'anonymous';
         if (token) {
             try {
                 const { verifyJWT } = await import('../auth/jwt.js');

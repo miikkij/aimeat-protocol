@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "aimeat": {
+      "type": "http",
+      "url": "https://aimeat.spechops.com/v1/mcp"
+    }
+  }
+}

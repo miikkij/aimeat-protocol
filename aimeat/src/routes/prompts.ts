@@ -152,6 +152,22 @@ Micro-Memory (simple GET-based key-value, good for quick notes):
   GET ${baseUrl}/v1/mm?op=del&set={set}&key={key}
   GET ${baseUrl}/v1/mm?op=batch&set={set}&key0=a&value0=x&key1=b&value1=y
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GET-ONLY PLATFORMS (Copilot, Gemini in browse mode, etc.)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If you can only make GET requests (no POST/PUT/DELETE), use Micro-Memory (/v1/mm)
+for ALL read and write operations. Everything works via GET query parameters:
+
+  WRITE:  GET ${baseUrl}/v1/mm?op=add&set=notes&key=hello&value=world
+  READ:   GET ${baseUrl}/v1/mm?op=list&set=notes
+  UPDATE: GET ${baseUrl}/v1/mm?op=mod&set=notes&key=hello&value=updated
+  DELETE: GET ${baseUrl}/v1/mm?op=del&set=notes&key=hello
+  BATCH:  GET ${baseUrl}/v1/mm?op=batch&set=notes&key0=a&value0=1&key1=b&value1=2
+
+Use "set" as your namespace (like a folder). Example sets: "context", "handoff", "notes", "agents"
+Do NOT ask the user to run curl or shell commands. Use these GET URLs directly.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 KEY NAMING CONVENTIONS — Follow these
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -375,6 +391,14 @@ Your GAII: ${anonGaii} | Mode: Anonymous (no auth needed)
   Requires version from your last read. Fails if someone else changed it since.
 - Delete:     DELETE ${baseUrl}/v1/memory/{key}
 - Quick KV:   GET ${baseUrl}/v1/mm?op=add&set={set}&key={key}&value={value}
+
+## GET-Only Platforms (Copilot, etc.)
+If you can only make GET requests, use Micro-Memory for everything:
+- Write:  GET ${baseUrl}/v1/mm?op=add&set={set}&key={key}&value={value}
+- Read:   GET ${baseUrl}/v1/mm?op=list&set={set}
+- Update: GET ${baseUrl}/v1/mm?op=mod&set={set}&key={key}&value={new}
+- Delete: GET ${baseUrl}/v1/mm?op=del&set={set}&key={key}
+Do NOT fall back to curl or shell commands. These GET URLs handle everything.
 
 ## Key Naming
 Use dot-separated keys (URL-safe, no encoding needed): agents.presence.{id}, context.latest, handoff.pending, project.{name}, notes.{topic}, inbox.{agent}, tmp.{anything}
