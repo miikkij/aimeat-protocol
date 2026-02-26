@@ -39,7 +39,7 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   const app = express();
 
   // Global middleware
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '15mb' }));
 
   // CORS for Tier 0 endpoints
   app.use((_req, res, next) => {
@@ -192,17 +192,21 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(specRouter());
 
   // Global error handler
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error('Unhandled error', { error: err.message, stack: err.stack });
-    res.status(500).json({
+  app.use((err: Error & { status?: number; type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = err.status ?? 500;
+    const isPayloadError = err.type === 'entity.too.large' || status === 413;
+    if (status >= 500) {
+      logger.error('Unhandled error', { error: err.message, stack: err.stack });
+    }
+    res.status(status).json({
       ok: false,
       protocol: 'aimeat',
       version: 'v1',
       node: config.nodeId,
       timestamp: new Date().toISOString(),
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'An unexpected error occurred',
+        code: isPayloadError ? 'QUOTA_EXCEEDED' : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR',
+        message: isPayloadError ? 'Request body too large' : status >= 500 ? 'An unexpected error occurred' : err.message,
       },
       hints: {
         next_actions: [

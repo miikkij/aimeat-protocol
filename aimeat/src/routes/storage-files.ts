@@ -108,6 +108,24 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         }));
     });
 
+    // HEAD /v1/storage/:key — file metadata (agent auth)
+    // Must be registered before GET to prevent Express auto-HEAD via GET handler
+    router.head('/v1/storage/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+        const gaii = req.auth!.sub;
+        const key = decodeURIComponent(req.params.key as string);
+        const file = await storage.getStorageFile(gaii, key);
+        if (!file) {
+            res.status(404).end();
+            return;
+        }
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.size);
+        res.setHeader('X-AIMEAT-Visibility', file.visibility);
+        res.setHeader('X-AIMEAT-Created', file.createdAt);
+        res.status(200).end();
+    });
+
     // GET /v1/storage/:key — download file (agent auth)
     router.get('/v1/storage/:key', requireAuth(), requireRole('agent'), async (req, res) => {
         const gaii = req.auth!.sub;
@@ -138,23 +156,6 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
-    });
-
-    // HEAD /v1/storage/:key — file metadata (agent auth)
-    router.head('/v1/storage/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
-        const key = decodeURIComponent(req.params.key as string);
-        const file = await storage.getStorageFile(gaii, key);
-        if (!file) {
-            res.status(404).end();
-            return;
-        }
-
-        res.setHeader('Content-Type', file.mimeType);
-        res.setHeader('Content-Length', file.size);
-        res.setHeader('X-AIMEAT-Visibility', file.visibility);
-        res.setHeader('X-AIMEAT-Created', file.createdAt);
-        res.status(200).end();
     });
 
     // DELETE /v1/storage/:key — delete file (agent auth)
