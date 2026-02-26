@@ -36,7 +36,8 @@
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:init": "node --env-file=.env --import tsx scripts/db-init.ts"
+    "db:init": "node --env-file=.env --import tsx scripts/db-init.ts",
+    "indexnow": "node --env-file=.env --import tsx scripts/indexnow.ts"
   },
   "keywords": [
     "aimeat",

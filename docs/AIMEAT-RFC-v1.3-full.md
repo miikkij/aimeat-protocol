@@ -4816,8 +4816,9 @@ Milestones are community-driven estimates. Solo-author project — timelines may
 | Anonymous node mode + AI prompts v2 | Q1 2026 | ✅ Done |
 | Admin dashboard + setup wizard | Q1 2026 | ✅ Done |
 | MCP server (14 tools) | Q1 2026 | ✅ Done |
-| First cross-AI memory test (Claude ↔ ChatGPT ↔ Grok) | Q1 2026 | Pending |
-| Genesis node live (meat-finland-001-genesis) | Q2 2026 | Pending |
+| First cross-AI memory test (Claude ↔ ChatGPT ↔ Grok ↔ Copilot) | Q1 2026 | ✅ Done |
+| Genesis node live (meat-finland-001-genesis) | Q1 2026 | ✅ Done |
+| MCP connector tested on live genesis node (VS Code + Copilot) | Q1 2026 | ✅ Done |
 | npm package: `pnpm i -g aimeat` | Q2 2026 | Pending |
 | First federated peer | Q3 2026 | Pending |
 | Conformance test suite CLI | Q3 2026 | Pending |

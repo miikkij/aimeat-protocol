@@ -144,6 +144,14 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   // Mount routes
   app.use(bootstrapRouter(config));
   app.use(wellknownRouter(config, storage));
+
+  // IndexNow key verification file (serves /{key}.txt for Bing/Yandex)
+  if (config.indexNowKey) {
+    app.get(`/${config.indexNowKey}.txt`, (_req, res) => {
+      res.type('text/plain').send(config.indexNowKey);
+    });
+  }
+
   app.use(authRouter(config, storage));
 
   // Relay nodes skip agent-hosting routes entirely

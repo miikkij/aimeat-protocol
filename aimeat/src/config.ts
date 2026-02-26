@@ -69,6 +69,7 @@ export interface MeatConfig {
   otkTtlMs: number;
   otkGraceMs: number;
   maxUrlLength: number;
+  indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
 }
@@ -113,6 +114,7 @@ export function loadConfig(): MeatConfig {
     otkTtlMs: parseInt(process.env.MEAT_OTK_TTL_MS ?? '300000', 10),
     otkGraceMs: parseInt(process.env.MEAT_OTK_GRACE_MS ?? '60000', 10),
     maxUrlLength: parseInt(process.env.MEAT_MAX_URL_LENGTH ?? '8192', 10),
+    indexNowKey: process.env.MEAT_INDEXNOW_KEY ?? null,
     extensionHooks: {
       pre_owner_registration: [],
       post_owner_registration: [],
