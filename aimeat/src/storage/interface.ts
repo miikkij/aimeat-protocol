@@ -44,6 +44,7 @@ export interface ActionRecord {
   estimatedTimeSeconds?: number;
   maxInputSizeBytes?: number;
   tags: string[];
+  webhookUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

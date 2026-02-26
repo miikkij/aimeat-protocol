@@ -82,6 +82,7 @@ export const ActionPublishSchema = z.object({
     estimated_time_seconds: z.number().int().positive().optional(),
     max_input_size_bytes: z.number().int().positive().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
+    webhook_url: z.string().url().max(2048).optional(),
 });
 
 export const ActionUpdateSchema = z.object({

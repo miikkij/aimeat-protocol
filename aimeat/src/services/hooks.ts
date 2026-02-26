@@ -40,7 +40,7 @@ export async function executeHooks(
             }
 
             // Execute the hook action via webhook if configured
-            const webhookUrl = (action as unknown as Record<string, unknown>).webhookUrl as string | undefined;
+            const webhookUrl = action.webhookUrl;
             if (webhookUrl) {
                 const response = await fetch(webhookUrl, {
                     method: 'POST',

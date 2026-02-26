@@ -19,7 +19,7 @@ export function actionsRouter(config: MeatConfig, storage: Storage): Router {
 
   // POST /v1/actions — publish an action (agent auth)
   router.post('/v1/actions', requireAuth(), requireRole('agent'), validateBody(ActionPublishSchema, config.nodeId), async (req, res) => {
-    const { id, display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags } = req.body ?? {};
+    const { id, display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, webhook_url } = req.body ?? {};
 
     // Category validation
     if (category && !ALLOWED_CATEGORIES.includes(category)) {
@@ -69,6 +69,7 @@ export function actionsRouter(config: MeatConfig, storage: Storage): Router {
         estimatedTimeSeconds: estimated_time_seconds,
         maxInputSizeBytes: max_input_size_bytes,
         tags: tags ?? [],
+        webhookUrl: webhook_url,
         createdAt: now,
         updatedAt: now,
       });
