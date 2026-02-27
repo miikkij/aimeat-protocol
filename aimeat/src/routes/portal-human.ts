@@ -557,6 +557,36 @@ body {
   margin-top: 0.5rem;
 }
 
+.demo-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.65rem 1.5rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: #fff;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 700;
+  transition: all 0.25s;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+}
+
+.demo-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+}
+
+.demo-link:active {
+  transform: translateY(0);
+}
+
+.demo-desc {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 0.5rem;
+  opacity: 0.8;
+}
+
 /* ── Morsels Footer ── */
 .morsels-footer {
   text-align: center;
@@ -777,8 +807,10 @@ body {
       <div class="card-body">
         <p class="card-desc">${esc(t('cards.apps.desc'))}</p>
         <div class="coming-soon">
-          <div class="coming-badge">${esc(t('comingSoon'))}</div>
-          <div class="teaser">${esc(t('cards.apps.tryNow'))}</div>
+          <a href="/demos/tictactoe.html" target="_blank" class="demo-link" onclick="event.stopPropagation()">
+            ${esc(t('cards.apps.tryNow'))} \u2192
+          </a>
+          <div class="demo-desc">${esc(t('cards.apps.tryNowDesc'))}</div>
         </div>
       </div>
     </div>

@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tic-Tac-Toe — AIME AT</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+/* ── Reset & Variables ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a1a;
+  --bg-grad-top: #12082a;
+  --bg-grad-mid: #0a0a1a;
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --card-border: rgba(255, 105, 180, 0.15);
+  --accent: #ff69b4;
+  --accent-bright: #ff8ecf;
+  --accent-deep: #c44569;
+  --accent-glow: rgba(255, 105, 180, 0.3);
+  --cyan: #00d4ff;
+  --cyan-glow: rgba(0, 212, 255, 0.3);
+  --text: #e0e0e0;
+  --text-bright: #ffffff;
+  --text-dim: #888;
+  --text-muted: #6b6b8a;
+  --success: #22c55e;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Animated background ── */
+.bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, var(--bg-grad-top) 0%, var(--bg-grad-mid) 60%, var(--bg) 100%);
+}
+
+.bg-canvas .star {
+  position: absolute;
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  animation: twinkle ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.1; transform: scale(0.8); }
+  50% { opacity: 0.8; transform: scale(1.2); box-shadow: 0 0 6px 1px rgba(255, 105, 180, 0.4); }
+}
+
+.bg-canvas .nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.12;
+  animation: nebulaDrift 20s ease-in-out infinite alternate;
+}
+
+@keyframes nebulaDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, -20px) scale(1.15); }
+}
+
+/* ── Top Navigation ── */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  background: rgba(10, 10, 26, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 105, 180, 0.1);
+}
+
+.topnav-back {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.topnav-back:hover {
+  color: var(--accent);
+}
+
+.topnav-brand {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text-bright);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-decoration: none;
+}
+
+.topnav-brand .heart {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 4px rgba(255, 105, 180, 0.6));
+  animation: heartPulse 2s ease-in-out infinite;
+}
+
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+/* ── Main Content ── */
+.main {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Page Title ── */
+.page-title {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+  color: var(--text-bright);
+  text-align: center;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+.page-title .x-mark { color: var(--accent); }
+.page-title .o-mark { color: var(--cyan); }
+
+.page-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Status Bar ── */
+#status {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  text-align: center;
+  padding: 0.75rem 1.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.25rem;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+#status.waiting { border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; }
+#status.your-turn { border-color: rgba(34, 197, 94, 0.4); color: var(--success); }
+#status.opponent-turn { border-color: rgba(99, 102, 241, 0.3); color: #a5b4fc; }
+#status.won { border-color: rgba(34, 197, 94, 0.5); color: var(--success); background: rgba(34, 197, 94, 0.08); }
+#status.lost { border-color: rgba(239, 68, 68, 0.4); color: #f87171; background: rgba(239, 68, 68, 0.06); }
+#status.draw { border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; background: rgba(245, 158, 11, 0.06); }
+#status.error { border-color: rgba(239, 68, 68, 0.4); color: #f87171; }
+
+/* ── Player indicator ── */
+.player-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.player-badge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.player-badge .mark {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.player-badge.x-badge .mark { color: var(--accent); }
+.player-badge.o-badge .mark { color: var(--cyan); }
+
+.player-badge.active {
+  border-color: rgba(255, 105, 180, 0.4);
+  background: rgba(255, 105, 180, 0.08);
+  color: var(--text-bright);
+}
+
+.player-badge.active.o-badge {
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(0, 212, 255, 0.08);
+}
+
+.player-badge.is-you::after {
+  content: '(you)';
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 0.15rem;
+}
+
+/* ── Game Board ── */
+#board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1;
+  margin-bottom: 1.5rem;
+}
+
+.cell {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.cell:hover:not(.taken):not(.game-over) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 105, 180, 0.3);
+  transform: scale(1.03);
+}
+
+.cell.taken {
+  cursor: default;
+}
+
+.cell.game-over {
+  cursor: default;
+}
+
+.cell .mark {
+  display: inline-block;
+  animation: markAppear 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes markAppear {
+  0% { opacity: 0; transform: scale(0.3) rotate(-15deg); }
+  60% { transform: scale(1.1) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+.cell .mark.x { color: var(--accent); text-shadow: 0 0 20px var(--accent-glow); }
+.cell .mark.o { color: var(--cyan); text-shadow: 0 0 20px var(--cyan-glow); }
+
+/* Winning cells */
+.cell.winner {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+  animation: winPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes winPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.2); }
+  50% { box-shadow: 0 0 35px rgba(34, 197, 94, 0.4); }
+}
+
+/* ── Share Section ── */
+#share {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  display: none;
+}
+
+#share.visible { display: block; animation: fadeSlideIn 0.4s ease; }
+
+#share p {
+  font-size: 0.88rem;
+  color: var(--text);
+  margin-bottom: 0.65rem;
+}
+
+.share-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#shareLink {
+  flex: 1;
+  padding: 0.6rem 0.85rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xs);
+  color: var(--text-bright);
+  font-size: 0.85rem;
+  font-family: var(--font);
+  outline: none;
+}
+
+#copyBtn {
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-xs);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+#copyBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3);
+}
+
+#copyBtn.copied {
+  background: linear-gradient(135deg, var(--success), #16a34a);
+}
+
+/* ── Buttons ── */
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.btn {
+  padding: 0.7rem 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.25s;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+  border-color: transparent;
+}
+
+/* ── Disconnection warning ── */
+#disconnectWarning {
+  display: none;
+  width: 100%;
+  text-align: center;
+  padding: 0.6rem;
+  font-size: 0.82rem;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius-xs);
+  margin-bottom: 1rem;
+}
+
+#disconnectWarning.visible { display: block; animation: fadeSlideIn 0.3s ease; }
+
+/* ── Footer ── */
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 1.5rem 1.25rem 2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+footer p + p { margin-top: 0.25rem; }
+
+/* ── Animations ── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.main { animation: pageIn 0.6s ease; }
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Loading dots ── */
+.loading-dots::after {
+  content: '';
+  animation: dots 1.4s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+
+/* ── Confetti overlay ── */
+.confetti-container {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 200;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: -20px;
+  animation: confettiFall linear forwards;
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 400px) {
+  .topnav { padding: 0 0.75rem; }
+  .main { padding: 1rem 0.75rem 2rem; }
+  #board { gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-canvas" id="bgCanvas">
+  <div class="nebula" style="width:400px;height:400px;background:radial-gradient(circle,rgba(255,105,180,0.3),transparent);top:5%;left:10%;"></div>
+  <div class="nebula" style="width:350px;height:350px;background:radial-gradient(circle,rgba(0,212,255,0.2),transparent);top:40%;right:5%;animation-delay:-8s;"></div>
+  <div class="nebula" style="width:300px;height:300px;background:radial-gradient(circle,rgba(196,69,105,0.2),transparent);bottom:10%;left:30%;animation-delay:-14s;"></div>
+</div>
+
+<!-- Top Navigation -->
+<nav class="topnav">
+  <a href="/v1/portal" class="topnav-back">&larr; Back to AIME AT</a>
+  <a href="/v1/portal" class="topnav-brand">
+    <span class="heart">&#x1F496;</span> AIME AT
+  </a>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+  <h1 class="page-title">
+    Tic-<span class="x-mark">T</span>ac-<span class="o-mark">T</span>oe
+  </h1>
+  <p class="page-subtitle">Multiplayer via AIME AT memory</p>
+
+  <!-- Status -->
+  <div id="status">Creating game<span class="loading-dots"></span></div>
+
+  <!-- Player indicators -->
+  <div class="player-indicator" id="playerIndicator" style="display:none;">
+    <div class="player-badge x-badge" id="badgeX">
+      <span class="mark">X</span> <span class="badge-label">Player 1</span>
+    </div>
+    <div class="player-badge o-badge" id="badgeO">
+      <span class="mark">O</span> <span class="badge-label">Player 2</span>
+    </div>
+  </div>
+
+  <!-- Board -->
+  <div id="board">
+    <div class="cell" data-idx="0"></div>
+    <div class="cell" data-idx="1"></div>
+    <div class="cell" data-idx="2"></div>
+    <div class="cell" data-idx="3"></div>
+    <div class="cell" data-idx="4"></div>
+    <div class="cell" data-idx="5"></div>
+    <div class="cell" data-idx="6"></div>
+    <div class="cell" data-idx="7"></div>
+    <div class="cell" data-idx="8"></div>
+  </div>
+
+  <!-- Share link -->
+  <div id="share">
+    <p>Send this link to a friend to play:</p>
+    <div class="share-row">
+      <input type="text" readonly id="shareLink">
+      <button id="copyBtn">Copy</button>
+    </div>
+  </div>
+
+  <!-- Disconnect warning -->
+  <div id="disconnectWarning">
+    Opponent may have left the game.
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn btn-primary" id="newGameBtn">New Game</button>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>Built with AIME AT memory &mdash; no backend code needed</p>
+  <p>Game state stored in anonymous memory with 24h TTL</p>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Constants ──
+  var POLL_INTERVAL = 2000;
+  var DISCONNECT_TIMEOUT = 60000;
+  var WIN_LINES = [
+    [0,1,2], [3,4,5], [6,7,8],  // rows
+    [0,3,6], [1,4,7], [2,5,8],  // cols
+    [0,4,8], [2,4,6]            // diagonals
+  ];
+
+  // ── DOM refs ──
+  var statusEl = document.getElementById('status');
+  var boardEl = document.getElementById('board');
+  var shareEl = document.getElementById('share');
+  var shareLinkEl = document.getElementById('shareLink');
+  var copyBtn = document.getElementById('copyBtn');
+  var newGameBtn = document.getElementById('newGameBtn');
+  var disconnectWarning = document.getElementById('disconnectWarning');
+  var playerIndicator = document.getElementById('playerIndicator');
+  var badgeX = document.getElementById('badgeX');
+  var badgeO = document.getElementById('badgeO');
+  var cells = boardEl.querySelectorAll('.cell');
+
+  // ── State ──
+  var myId = sessionStorage.getItem('ttt-player-id');
+  if (!myId) {
+    myId = Math.random().toString(36).substring(2, 10);
+    sessionStorage.setItem('ttt-player-id', myId);
+  }
+
+  var gameId = null;
+  var gameState = null;
+  var myMark = null; // 'X' or 'O'
+  var pollTimer = null;
+  var lastUpdateTime = 0;
+  var disconnectTimer = null;
+
+  // ── Starfield ──
+  var canvas = document.getElementById('bgCanvas');
+  if (canvas) {
+    for (var i = 0; i < 50; i++) {
+      var star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = (Math.random() * 100) + '%';
+      star.style.top = (Math.random() * 100) + '%';
+      star.style.animationDuration = (2 + Math.random() * 4) + 's';
+      star.style.animationDelay = (Math.random() * 4) + 's';
+      star.style.width = star.style.height = (1 + Math.random() * 2) + 'px';
+      canvas.appendChild(star);
+    }
+  }
+
+  // ── Helpers ──
+
+  function generateGameId() {
+    return Math.random().toString(36).substring(2, 10);
+  }
+
+  function memoryKey(id) {
+    return 'games.ttt.' + id;
+  }
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = cls || '';
+  }
+
+  function setStatusHtml(html, cls) {
+    statusEl.innerHTML = html;
+    statusEl.className = cls || '';
+  }
+
+  // ── API calls ──
+
+  async function saveGame(state) {
+    try {
+      var res = await fetch('/v1/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: memoryKey(gameId),
+          value: state,
+          visibility: 'public',
+          ttl_hours: 24
+        })
+      });
+      var data = await res.json();
+      if (!data.ok) {
+        console.error('Save failed:', data);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Save error:', err);
+      return false;
+    }
+  }
+
+  async function loadGame(id) {
+    try {
+      var res = await fetch('/v1/memory/' + encodeURIComponent(memoryKey(id)));
+      var data = await res.json();
+      if (data.ok && data.data && data.data.value) {
+        return data.data.value;
+      }
+      return null;
+    } catch (err) {
+      console.error('Load error:', err);
+      return null;
+    }
+  }
+
+  // ── Board rendering ──
+
+  function renderBoard(state) {
+    var board = state.board;
+    var winLine = null;
+
+    if (state.winner && state.winner !== 'draw') {
+      winLine = findWinLine(board, state.winner);
+    }
+
+    cells.forEach(function(cell, idx) {
+      var val = board[idx];
+      var wasEmpty = !cell.querySelector('.mark');
+      var currentMark = cell.querySelector('.mark');
+      var currentVal = currentMark ? currentMark.textContent : '';
+
+      // Clear game-over class first, re-add if needed
+      cell.classList.remove('winner');
+
+      if (val && val !== currentVal) {
+        cell.innerHTML = '<span class="mark ' + (val === 'X' ? 'x' : 'o') + '">' + val + '</span>';
+        cell.classList.add('taken');
+      } else if (!val) {
+        cell.innerHTML = '';
+        cell.classList.remove('taken');
+      }
+
+      if (state.status === 'won' || state.status === 'draw') {
+        cell.classList.add('game-over');
+      } else {
+        cell.classList.remove('game-over');
+      }
+
+      if (winLine && winLine.indexOf(idx) !== -1) {
+        cell.classList.add('winner');
+      }
+    });
+  }
+
+  function findWinLine(board, winner) {
+    for (var i = 0; i < WIN_LINES.length; i++) {
+      var line = WIN_LINES[i];
+      if (board[line[0]] === winner && board[line[1]] === winner && board[line[2]] === winner) {
+        return line;
+      }
+    }
+    return null;
+  }
+
+  // ── Player indicators ──
+
+  function updateIndicators(state) {
+    if (!state || state.status === 'waiting') {
+      playerIndicator.style.display = 'none';
+      return;
+    }
+
+    playerIndicator.style.display = 'flex';
+
+    // Active turn highlight
+    badgeX.classList.toggle('active', state.turn === 'X' && state.status === 'playing');
+    badgeO.classList.toggle('active', state.turn === 'O' && state.status === 'playing');
+
+    // Show (you) label
+    badgeX.classList.toggle('is-you', myMark === 'X');
+    badgeO.classList.toggle('is-you', myMark === 'O');
+  }
+
+  // ── Win / draw detection ──
+
+  function checkWinner(board) {
+    for (var i = 0; i < WIN_LINES.length; i++) {
+      var line = WIN_LINES[i];
+      if (board[line[0]] && board[line[0]] === board[line[1]] && board[line[1]] === board[line[2]]) {
+        return board[line[0]];
+      }
+    }
+    return null;
+  }
+
+  function isBoardFull(board) {
+    return board.every(function(c) { return c !== ''; });
+  }
+
+  // ── Confetti ──
+
+  function showConfetti() {
+    var container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+
+    var colors = ['#ff69b4', '#00d4ff', '#22c55e', '#fbbf24', '#a78bfa', '#f87171'];
+    for (var i = 0; i < 60; i++) {
+      var piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = (Math.random() * 100) + '%';
+      piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      piece.style.animationDelay = (Math.random() * 0.5) + 's';
+      piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      piece.style.width = (6 + Math.random() * 8) + 'px';
+      piece.style.height = (6 + Math.random() * 8) + 'px';
+      container.appendChild(piece);
+    }
+
+    setTimeout(function() {
+      container.remove();
+    }, 4000);
+  }
+
+  // ── Game status updates ──
+
+  function updateStatus(state) {
+    if (state.status === 'waiting') {
+      setStatusHtml('Waiting for opponent<span class="loading-dots"></span>', 'waiting');
+    } else if (state.status === 'won') {
+      if (state.winner === myMark) {
+        setStatus('You won!', 'won');
+        showConfetti();
+      } else {
+        setStatus('You lost!', 'lost');
+      }
+    } else if (state.status === 'draw') {
+      setStatus("It's a draw!", 'draw');
+    } else if (state.status === 'playing') {
+      if (isMyTurn(state)) {
+        setStatus('Your turn!', 'your-turn');
+      } else {
+        setStatusHtml("Opponent's turn<span class=\"loading-dots\"></span>", 'opponent-turn');
+      }
+    }
+  }
+
+  function isMyTurn(state) {
+    return state.turn === myMark && state.status === 'playing';
+  }
+
+  // ── Share link ──
+
+  function showShareLink() {
+    var url = window.location.origin + window.location.pathname + '#' + gameId;
+    shareLinkEl.value = url;
+    shareEl.classList.add('visible');
+  }
+
+  function hideShareLink() {
+    shareEl.classList.remove('visible');
+  }
+
+  // ── Copy button ──
+
+  copyBtn.addEventListener('click', function() {
+    shareLinkEl.select();
+    shareLinkEl.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(shareLinkEl.value).then(function() {
+      copyBtn.textContent = 'Copied!';
+      copyBtn.classList.add('copied');
+      setTimeout(function() {
+        copyBtn.textContent = 'Copy';
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    }).catch(function() {
+      // Fallback: the text is already selected
+      try { document.execCommand('copy'); } catch(e) {}
+      copyBtn.textContent = 'Copied!';
+      setTimeout(function() { copyBtn.textContent = 'Copy'; }, 2000);
+    });
+  });
+
+  // ── Polling ──
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(async function() {
+      if (!gameId) return;
+      var state = await loadGame(gameId);
+      if (!state) {
+        setStatus('Game not found. It may have expired.', 'error');
+        stopPolling();
+        return;
+      }
+
+      // Track last update time for disconnect detection
+      var stateStr = JSON.stringify(state);
+      var prevStr = JSON.stringify(gameState);
+      if (stateStr !== prevStr) {
+        lastUpdateTime = Date.now();
+        disconnectWarning.classList.remove('visible');
+        gameState = state;
+        renderBoard(state);
+        updateStatus(state);
+        updateIndicators(state);
+      }
+
+      // Disconnect detection: if playing and opponent hasn't moved for 60s
+      if (state.status === 'playing' && !isMyTurn(state) && lastUpdateTime > 0) {
+        if (Date.now() - lastUpdateTime > DISCONNECT_TIMEOUT) {
+          disconnectWarning.classList.add('visible');
+        }
+      }
+
+      // Stop polling if game is over
+      if (state.status === 'won' || state.status === 'draw') {
+        stopPolling();
+      }
+    }, POLL_INTERVAL);
+  }
+
+  function stopPolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  // ── Cell click handler ──
+
+  cells.forEach(function(cell) {
+    cell.addEventListener('click', async function() {
+      if (!gameState || !myMark) return;
+      if (gameState.status !== 'playing') return;
+      if (!isMyTurn(gameState)) return;
+
+      var idx = parseInt(cell.getAttribute('data-idx'));
+      if (gameState.board[idx] !== '') return;
+
+      // Make the move
+      var newBoard = gameState.board.slice();
+      newBoard[idx] = myMark;
+
+      var newState = Object.assign({}, gameState, { board: newBoard });
+
+      // Check for winner
+      var winner = checkWinner(newBoard);
+      if (winner) {
+        newState.winner = winner;
+        newState.status = 'won';
+      } else if (isBoardFull(newBoard)) {
+        newState.winner = 'draw';
+        newState.status = 'draw';
+      } else {
+        newState.turn = myMark === 'X' ? 'O' : 'X';
+      }
+
+      // Optimistic update
+      gameState = newState;
+      renderBoard(newState);
+      updateStatus(newState);
+      updateIndicators(newState);
+
+      // Save to server
+      var saved = await saveGame(newState);
+      if (!saved) {
+        setStatus('Failed to save move. Try again.', 'error');
+        // Revert
+        newBoard[idx] = '';
+        gameState.board = newBoard;
+        gameState.status = 'playing';
+        gameState.turn = myMark;
+        gameState.winner = null;
+        renderBoard(gameState);
+        updateStatus(gameState);
+        updateIndicators(gameState);
+        return;
+      }
+
+      lastUpdateTime = Date.now();
+
+      // If game is over, stop polling
+      if (newState.status === 'won' || newState.status === 'draw') {
+        stopPolling();
+      }
+    });
+  });
+
+  // ── Create a new game ──
+
+  async function createGame() {
+    gameId = generateGameId();
+    myMark = 'X';
+
+    gameState = {
+      board: ['', '', '', '', '', '', '', '', ''],
+      turn: 'X',
+      playerX: myId,
+      playerO: null,
+      status: 'waiting',
+      winner: null,
+      created: Date.now()
+    };
+
+    setStatusHtml('Creating game<span class="loading-dots"></span>', '');
+    disconnectWarning.classList.remove('visible');
+    hideShareLink();
+    renderBoard(gameState);
+    updateIndicators(gameState);
+
+    var saved = await saveGame(gameState);
+    if (!saved) {
+      setStatus('Failed to create game. Check your connection.', 'error');
+      return;
+    }
+
+    // Update URL hash
+    window.location.hash = gameId;
+
+    showShareLink();
+    updateStatus(gameState);
+    lastUpdateTime = Date.now();
+    startPolling();
+  }
+
+  // ── Join an existing game ──
+
+  async function joinGame(id) {
+    gameId = id;
+    setStatusHtml('Joining game<span class="loading-dots"></span>', '');
+    disconnectWarning.classList.remove('visible');
+    hideShareLink();
+
+    var state = await loadGame(id);
+    if (!state) {
+      setStatus('Game not found. It may have expired. Start a new one!', 'error');
+      return;
+    }
+
+    // If this is our own game (we are X), just resume
+    if (state.playerX === myId) {
+      myMark = 'X';
+      gameState = state;
+      renderBoard(state);
+      updateStatus(state);
+      updateIndicators(state);
+      showShareLink();
+      lastUpdateTime = Date.now();
+      if (state.status !== 'won' && state.status !== 'draw') {
+        startPolling();
+      }
+      return;
+    }
+
+    // If already joined as O, resume
+    if (state.playerO === myId) {
+      myMark = 'O';
+      gameState = state;
+      renderBoard(state);
+      updateStatus(state);
+      updateIndicators(state);
+      lastUpdateTime = Date.now();
+      if (state.status !== 'won' && state.status !== 'draw') {
+        startPolling();
+      }
+      return;
+    }
+
+    // Join as player O
+    if (state.playerO === null && state.status === 'waiting') {
+      myMark = 'O';
+      state.playerO = myId;
+      state.status = 'playing';
+      gameState = state;
+
+      var saved = await saveGame(state);
+      if (!saved) {
+        setStatus('Failed to join game. Try again.', 'error');
+        return;
+      }
+
+      renderBoard(state);
+      updateStatus(state);
+      updateIndicators(state);
+      lastUpdateTime = Date.now();
+      startPolling();
+      return;
+    }
+
+    // Game already has two players and we are neither
+    if (state.playerO !== null && state.playerO !== myId && state.playerX !== myId) {
+      setStatus('This game already has two players.', 'error');
+      renderBoard(state);
+      return;
+    }
+
+    // Game is in progress or finished, just spectate
+    gameState = state;
+    myMark = null;
+    renderBoard(state);
+    setStatus('Spectating (game in progress)', '');
+    updateIndicators(state);
+    if (state.status !== 'won' && state.status !== 'draw') {
+      startPolling();
+    }
+  }
+
+  // ── New game button ──
+
+  newGameBtn.addEventListener('click', function() {
+    stopPolling();
+    disconnectWarning.classList.remove('visible');
+
+    // Clear board visually
+    cells.forEach(function(cell) {
+      cell.innerHTML = '';
+      cell.classList.remove('taken', 'winner', 'game-over');
+    });
+
+    createGame();
+  });
+
+  // ── Initialize ──
+
+  function init() {
+    var hash = window.location.hash.substring(1);
+    if (hash && hash.length >= 4) {
+      joinGame(hash);
+    } else {
+      createGame();
+    }
+  }
+
+  // Listen for hash changes (e.g. user pastes a new link)
+  window.addEventListener('hashchange', function() {
+    stopPolling();
+    var hash = window.location.hash.substring(1);
+    if (hash && hash.length >= 4) {
+      cells.forEach(function(cell) {
+        cell.innerHTML = '';
+        cell.classList.remove('taken', 'winner', 'game-over');
+      });
+      joinGame(hash);
+    }
+  });
+
+  init();
+
+})();
+</script>
+</body>
+</html>
