@@ -59,13 +59,25 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
 
         const otkKey = req.query.otk as string;
 
+        // Access-code mode: allow read-only access with access_code (no OTK needed) — checked FIRST
         // Anonymous mode: allow requests without OTK using the anonymous shared agent
         // Dev mode: allow requests without OTK using first registered agent/owner
-        // Access-code mode: allow read-only access with access_code (no OTK needed)
         let gaii: string;
         let isAnonymous = false;
         let isAccessCodeOnly = false;
-        if (!otkKey && config.anonymousMode) {
+        if (!otkKey && req.query.access_code && req.query.op === 'list' && req.query.set) {
+            // Access-code-only mode: find the set across all agents by searching for matching access_code
+            const setName = req.query.set as string;
+            const accessCode = req.query.access_code as string;
+            const found = await storage.findMicroMemoryByAccessCode(setName, accessCode);
+            if (!found) {
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Invalid access_code or set not found'));
+                return;
+            }
+            gaii = found.gaii;
+            isAnonymous = true;
+            isAccessCodeOnly = true;
+        } else if (!otkKey && config.anonymousMode) {
             const ANON_GAII = `shared#anonymous@${config.nodeId}`;
             gaii = ANON_GAII;
             isAnonymous = true;
@@ -82,18 +94,6 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                     return;
                 }
             }
-        } else if (!otkKey && req.query.access_code && req.query.op === 'list' && req.query.set) {
-            // Access-code-only mode: find the set across all agents by searching for matching access_code
-            const setName = req.query.set as string;
-            const accessCode = req.query.access_code as string;
-            const found = await storage.findMicroMemoryByAccessCode(setName, accessCode);
-            if (!found) {
-                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Invalid access_code or set not found'));
-                return;
-            }
-            gaii = found.gaii;
-            isAnonymous = true;
-            isAccessCodeOnly = true;
         } else if (!otkKey) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required. For shared sets, provide access_code with op=list&set=name'));
             return;
@@ -154,6 +154,11 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                     const initCode = req.query.access_code as string | undefined;
                     const initVis = initCode ? 'shared_read' as const : 'private' as const;
                     record = { gaii, set, entries: {}, visibility: initVis, ...(initCode ? { accessCode: initCode } : {}), updatedAt: new Date().toISOString() };
+                } else if (req.query.access_code && record.visibility === 'private') {
+                    // Upgrade existing private set to shared_read when access_code is provided
+                    const upgradeCode = req.query.access_code as string;
+                    record.visibility = 'shared_read';
+                    record.accessCode = upgradeCode;
                 }
                 if (Object.keys(record.entries).length >= MAX_KEYS_PER_SET && !(key in record.entries)) {
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_KEYS_PER_SET} keys per set`));
