@@ -29,6 +29,7 @@ import { microMemoryRouter } from './routes/micro-memory.js';
 import { storageFilesRouter } from './routes/storage-files.js';
 import { validateRouter } from './routes/validate.js';
 import { mcpRouter } from './routes/mcp.js';
+import { portalRouter } from './routes/portal.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import type { Storage } from './storage/interface.js';
@@ -203,6 +204,7 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
   app.use(mcpRouter(config, storage));
+  app.use(portalRouter(config, storage));
   app.use(specRouter());
 
   // Global error handler

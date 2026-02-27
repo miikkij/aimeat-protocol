@@ -34,7 +34,7 @@ OPTIONS
   -p, --port <port>          HTTP port (default: 40050)
   --db <url>                 MongoDB connection URL
   --node-id <id>             Node identity string
-  --admin-password <pw>      Operator admin password
+  --admin-password <pw>      Operator admin secret
   -c, --config <path>        Config file path (JSON)
   -h, --help                 Show this help
   -v, --version              Show version
@@ -204,7 +204,7 @@ if (subcommand === 'init') {
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup?pw=${config.adminPassword}`);
     if (!process.env.MEAT_ADMIN_PASSWORD) {
-      logger.info(`   Admin Password: ${config.adminPassword}`);
+      logger.info(`   Admin Secret: ${config.adminPassword}`);
     }
   });
 }
