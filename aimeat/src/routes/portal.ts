@@ -617,7 +617,6 @@ p{margin-bottom:.75rem}
   <div class="topbar-left">💖 AIMEAT</div>
   <div class="topbar-right">
     <a href="/v1/profile" style="font-size:.85rem;color:var(--love4);margin-right:.5rem">\ud83d\udc64 Profile</a>
-    <span id="mode-indicator"></span>
     <div id="auth-container"></div>
   </div>
 </div>
@@ -721,18 +720,15 @@ if (auth) {
 function isLoggedIn() { return !!currentSession; }
 
 function updateMode() {
-  const indicator = document.getElementById('mode-indicator');
   const notice = document.getElementById('mode-notice');
 
   if (isLoggedIn()) {
-    indicator.innerHTML = '<span class="mode-badge mode-user">Logged In</span>';
     notice.innerHTML = '<div class="mode-notice mode-notice-user">'
       + '<div class="icon">✅</div>'
       + '<div><strong>Logged in as ' + escHtml(currentSession.ghii || currentSession.owner) + '</strong><br>'
       + '<span style="color:var(--muted);font-size:.85rem">You can upload apps and get a shareable download link. Other users can browse and download your apps.</span></div>'
       + '</div>';
   } else {
-    indicator.innerHTML = '<span class="mode-badge mode-anon">Anonymous</span>';
     notice.innerHTML = '<div class="mode-notice mode-notice-anon">'
       + '<div class="icon">👤</div>'
       + '<div><strong>Anonymous Mode</strong> — You can generate prompts and apps without logging in.<br>'
