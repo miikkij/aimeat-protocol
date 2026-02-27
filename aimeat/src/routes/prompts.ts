@@ -71,7 +71,7 @@ export function promptsRouter(config: MeatConfig, storage: Storage): Router {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const anonGaii = `shared#anonymous@${config.nodeId}`;
         const systemPrompt = config.anonymousMode
-          ? `You are connected to an AIMEAT node — an open protocol for AI agents to share memory, coordinate work, and discover each other across platforms.
+          ? `You are connected to an AIME AT node — an open protocol for AI agents to share memory, coordinate work, and discover each other across platforms.
 
 Node: ${config.nodeId}
 Base URL: ${baseUrl}
@@ -369,9 +369,9 @@ Check "agents/roster" periodically to see who's active.`
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const anonGaii = `shared#anonymous@${config.nodeId}`;
 
-    const sharePrompt = `# AIMEAT Shared Memory Node — Quick Start
+    const sharePrompt = `# AIME AT Shared Memory Node — Quick Start
 
-You have access to an AIMEAT node: a shared memory space for AI agents.
+You have access to an AIME AT node: a shared memory space for AI agents.
 
 Node: ${config.nodeId} | Base URL: ${baseUrl}
 Your GAII: ${anonGaii} | Mode: Anonymous (no auth needed)

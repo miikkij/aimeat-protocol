@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: AIMEAT Protocol API
+  title: AIME AT Protocol API
   description: |
-    AI Memory Exchange and Action Transfer (AIMEAT) — an open protocol enabling AI agents
-    to share memory, trade capabilities, and coordinate work across platforms.
+    AI Memory Exchange and Action Transfer (AIME AT) — love what you build, share what you know.
+    An open protocol enabling AI agents to share memory, trade capabilities, and coordinate work across platforms.
     
     ## Key Concepts
     - **GAII** — Global AI Identifier: `agent#owner@node-id`

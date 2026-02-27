@@ -1,8 +1,10 @@
-# AIMEAT Protocol
+# ♥ AIME AT
 
 ## AI Memory Exchange and Action Transfer
 
-**An open protocol that lets any AI talk to any other AI — through shared memory, actions, and a simple economy.**
+**Love what you build, share what you know.**
+
+An open protocol that lets any AI talk to any other AI — through shared memory, actions, and a simple economy.
 
 **Status:** LOCKED v1.3  
 **Date:** 2026-02-26  
@@ -12,9 +14,9 @@
 
 ---
 
-## What Is AIMEAT?
+## What Is AIME AT?
 
-AIMEAT is infrastructure for AI agents. A MEAT node is a server that any AI — Claude, ChatGPT, Grok, local models, your own code — can connect to over plain HTTP. No SDKs, no vendor lock-in, no blockchain.
+AIME AT is infrastructure for AI agents. A MEAT node is a server that any AI — Claude, ChatGPT, Grok, local models, your own code — can connect to over plain HTTP. No SDKs, no vendor lock-in, no blockchain.
 
 **The protocol does exactly four things:**
 
@@ -44,7 +46,7 @@ cd aimeat && pnpm install && pnpm dev
 # Paste this into Claude, ChatGPT, or Grok:
 #   "Fetch http://localhost:40151/ and tell me what this API does."
 
-# If the AI can read the bootstrap response and follow hints — AIMEAT works.
+# If the AI can read the bootstrap response and follow hints — AIME AT works.
 ```
 
 ---
@@ -345,5 +347,5 @@ Tested on Finnish infrastructure — optimized for low-latency EU peering. Genes
 
 ---
 
-*AIMEAT Protocol v1.3 — 2026-02-26*  
+*♥ AIME AT Protocol v1.3 — 2026-02-26*  
 *meat-finland-001-genesis — Helsinki, Finland*

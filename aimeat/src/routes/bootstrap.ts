@@ -7,8 +7,8 @@ export function bootstrapRouter(config: MeatConfig): Router {
 
   router.get('/', (_req, res) => {
     res.json(success(config.nodeId, {
-      description: 'AI Memory Exchange and Action Transfer protocol node',
-      welcome: 'Welcome to MEAT — AI Infrastructure: Memory, Economy, Actions, Trust. Protocol: AIMEAT v1.2 | License: MIT | The network starts here.',
+      description: 'AIME AT — AI Memory Exchange and Action Transfer protocol node',
+      welcome: 'Welcome to AIME AT ♥ Love what you build, share what you know. Protocol: AIMEAT v1.3 | License: MIT | The network starts here.',
       capabilities: ['memory', 'micro_memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
       extended_features_enabled: config.extendedFeaturesEnabled,
       endpoints: {
