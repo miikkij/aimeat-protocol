@@ -5,7 +5,7 @@ import type { MeatConfig } from '../config.js';
  * Depends on AIMEAT.auth being loaded first.
  */
 export function aimeatDataLib(config: MeatConfig): string {
-  return `// aimeat-data.js — AIMEAT Data Library (Memory + Micro-Memory)
+    return `// aimeat-data.js — AIMEAT Data Library (Memory + Micro-Memory)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first
 // Usage: await AIMEAT.data.set('key', {value}); await AIMEAT.data.get('key');

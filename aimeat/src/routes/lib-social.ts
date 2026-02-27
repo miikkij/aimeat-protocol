@@ -5,7 +5,7 @@ import type { MeatConfig } from '../config.js';
  * Depends on AIMEAT.auth being loaded first.
  */
 export function aimeatSocialLib(config: MeatConfig): string {
-  return `// aimeat-social.js — AIMEAT Social Library (Boards, Posts, Reactions)
+    return `// aimeat-social.js — AIMEAT Social Library (Boards, Posts, Reactions)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first
 // Usage: await AIMEAT.social.post('general', {title:'Hi', body:'Hello!'});

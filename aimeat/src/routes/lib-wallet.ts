@@ -5,7 +5,7 @@ import type { MeatConfig } from '../config.js';
  * Depends on AIMEAT.auth being loaded first.
  */
 export function aimeatWalletLib(config: MeatConfig): string {
-  return `// aimeat-wallet.js — AIMEAT Wallet Library (Morsel Economy)
+    return `// aimeat-wallet.js — AIMEAT Wallet Library (Morsel Economy)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first
 // Usage: const bal = await AIMEAT.wallet.balance(); console.log(bal.available);

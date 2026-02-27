@@ -5,7 +5,7 @@ import type { MeatConfig } from '../config.js';
  * Depends on AIMEAT.auth being loaded first.
  */
 export function aimeatWorkLib(config: MeatConfig): string {
-  return `// aimeat-work.js — AIMEAT Work Library (Actions, Catalogue & Work Exchange)
+    return `// aimeat-work.js — AIMEAT Work Library (Actions, Catalogue & Work Exchange)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first
 // Usage: const actions = await AIMEAT.work.catalogue(); await AIMEAT.work.request(actionId, providerGaii, input);

@@ -5,7 +5,7 @@ import type { MeatConfig } from '../config.js';
  * Depends on AIMEAT.auth being loaded first.
  */
 export function aimeatStorageLib(config: MeatConfig): string {
-  return `// aimeat-storage.js — AIMEAT Storage Library (File Upload & Download)
+    return `// aimeat-storage.js — AIMEAT Storage Library (File Upload & Download)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first
 // Usage: await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
