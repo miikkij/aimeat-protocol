@@ -25,7 +25,7 @@ interface AIPlatform {
 
 const PLATFORMS: AIPlatform[] = [
   {
-    id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '🤖',
+    id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '/img/platforms/chatgpt.png',
     variants: [
       { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
       { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
@@ -35,7 +35,7 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '🧠',
+    id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '/img/platforms/claude.png',
     variants: [
       { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
       { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
@@ -44,7 +44,7 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '🪟',
+    id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '/img/platforms/copilot.png',
     variants: [
       { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'Cannot make external HTTP calls' },
       { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'Can run terminal commands' },
@@ -52,14 +52,14 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '🔍',
+    id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '/img/platforms/deepseek.png',
     variants: [
       { id: 'chat', name: 'DeepSeek Chat', tier: 'D', path: 'prompt-package' },
       { id: 'api', name: 'DeepSeek API (external)', tier: 'B', path: 'api' },
     ],
   },
   {
-    id: 'grok', name: 'Grok', vendor: 'xAI', icon: '🚀',
+    id: 'grok', name: 'Grok', vendor: 'xAI', icon: '/img/platforms/grok.png',
     variants: [
       { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
       { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'Python sandbox, no internet' },
@@ -67,7 +67,7 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '💎',
+    id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '/img/platforms/gemini.png',
     variants: [
       { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
       { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
@@ -75,20 +75,20 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '🖥️',
+    id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '/img/platforms/lmstudio.png',
     variants: [
       { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'Models with function calling' },
       { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
     ],
   },
   {
-    id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '🦀',
+    id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '/img/platforms/openclaw.png',
     variants: [
       { id: 'instance', name: 'OpenClaw Instance', tier: 'B', path: 'api' },
     ],
   },
   {
-    id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '⚙️',
+    id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '/img/platforms/other.png',
     variants: [
       { id: 'mcp', name: 'MCP-capable AI', tier: 'A', path: 'mcp' },
       { id: 'http', name: 'HTTP-capable AI', tier: 'B', path: 'api' },
@@ -516,7 +516,8 @@ p{margin-bottom:.75rem}
 .platform-card{background:var(--card);border:2px solid transparent;border-radius:var(--radius);padding:1rem;text-align:center;cursor:pointer;transition:all .15s}
 .platform-card:hover{border-color:var(--love1);transform:translateY(-2px);box-shadow:0 4px 20px rgba(255,107,157,.15)}
 .platform-card.selected{border-color:var(--love1);background:var(--card2);box-shadow:0 0 20px rgba(255,107,157,.2)}
-.platform-card .icon{font-size:2rem;margin-bottom:.4rem}
+.platform-card .icon{margin-bottom:.4rem;display:flex;justify-content:center;align-items:center;height:56px}
+.platform-card .icon img{max-width:56px;max-height:56px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))}
 .platform-card .name{font-weight:600;font-size:.9rem}
 .platform-card .vendor{color:var(--muted);font-size:.75rem}
 
@@ -748,7 +749,7 @@ const grid = document.getElementById('platform-grid');
 PLATFORMS.forEach(function(p) {
   const card = document.createElement('div');
   card.className = 'platform-card';
-  card.innerHTML = '<div class="icon">' + escHtml(p.icon) + '</div><div class="name">' + escHtml(p.name) + '</div><div class="vendor">' + escHtml(p.vendor) + '</div>';
+  card.innerHTML = '<div class="icon"><img src="' + escHtml(p.icon) + '" alt="' + escHtml(p.name) + '"></div><div class="name">' + escHtml(p.name) + '</div><div class="vendor">' + escHtml(p.vendor) + '</div>';
   card.addEventListener('click', function() { selectPlatform(p); });
   grid.appendChild(card);
 });

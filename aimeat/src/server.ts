@@ -1,6 +1,7 @@
 import express from 'express';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { MeatConfig } from './config.js';
 import { InMemoryStorage } from './storage/memory.js';
 import { generateKeyPair } from './auth/keypair.js';
@@ -45,6 +46,14 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
 
   // Global middleware
   app.use(express.json({ limit: '15mb' }));
+
+  // Serve static assets (platform icons, etc.)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const publicDir = join(__dirname, '..', 'public');
+  if (existsSync(publicDir)) {
+    app.use(express.static(publicDir, { maxAge: '7d' }));
+  }
 
   // CORS for Tier 0 endpoints
   app.use((_req, res, next) => {
