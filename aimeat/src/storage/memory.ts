@@ -490,7 +490,7 @@ export class InMemoryStorage implements Storage {
   async findMicroMemoryByAccessCode(set: string, accessCode: string): Promise<MicroMemoryRecord | null> {
     for (const record of this.microMemory.values()) {
       if (record.set === set && record.accessCode === accessCode &&
-          (record.visibility === 'shared_read' || record.visibility === 'shared_write')) {
+        (record.visibility === 'shared_read' || record.visibility === 'shared_write')) {
         return record;
       }
     }
