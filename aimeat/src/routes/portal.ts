@@ -3,6 +3,7 @@ import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { createT, detectLocale, toLocale, LOCALES, type Locale, type TFunction } from '../i18n.js';
+import { humanPortalHtml } from './portal-human.js';
 
 /* ──────────────────────────────────────────────────────────
    Platform Registry — known AI platforms and their capabilities
@@ -1279,6 +1280,7 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/portal — serve the onboarding portal HTML page
+  // Default: human-facing portal. ?view=dev shows the developer portal.
   router.get('/v1/portal', async (req, res) => {
     const viewParam = req.query.view as string | undefined;
     const langParam = req.query.lang as string | undefined;
@@ -1291,7 +1293,14 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
       storage.listBoards(),
     ]);
     const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
-    res.type('text/html').send(portalHtml(config, stats));
+
+    if (viewParam === 'dev') {
+      // Existing developer portal
+      res.type('text/html').send(portalHtml(config, stats));
+    } else {
+      // Human-facing portal (default)
+      res.type('text/html').send(humanPortalHtml(config, t, locale, stats));
+    }
   });
 
   // GET /v1/portal/platforms — JSON list of known platforms
