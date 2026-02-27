@@ -1,0 +1,91 @@
+{
+  "nav": {
+    "try": "Kokeile",
+    "devView": "Kehittajille",
+    "signIn": "Kirjaudu",
+    "profile": "Profiili",
+    "logout": "Kirjaudu ulos",
+    "loggedInAs": "kirjautuneena"
+  },
+  "hero": {
+    "title": "Sinun muistisi. Sinun AI:llesi.",
+    "subtitle": "Kerro asiat kerran — kaikki AI:si muistavat. Sina paatat mita jaetaan ja kenelle. Kokeile heti, ei tarvitse rekisteroitya.",
+    "anonNote": "Kokeilet tata anonyymisti — tietosi vanhenevat ajan myota.",
+    "upgradeNudge": "Haluatko pitaa tietosi pysyvasti?",
+    "createAccount": "Luo ilmainen tili"
+  },
+  "cards": {
+    "memories": {
+      "title": "Muistot",
+      "tagline": "Kerro kerran, kaikki AI:si muistavat",
+      "desc": "Tallenna asioita itsestasi — mita tykkaat, missa asut, mita teet. Jaa ne AI-avustajillesi niin sinun ei tarvitse selittaa samoja asioita joka kerta.",
+      "inputPlaceholder": "Kirjoita jotain mita haluat AI:si muistavan...",
+      "saveBtn": "Tallenna muistiin",
+      "saved": "Muisto tallennettu!",
+      "savedNote": "Tama muisto on nyt saatavilla AI:lle jotka kytket tahan.",
+      "exampleChips": ["Olen kasvissyoja", "Asun Espoossa", "Pidan jazz-musiikista"],
+      "cost": "Tama muisto maksoi yhden sydanmurusen. Sinulla on {{remaining}} jaljella."
+    },
+    "apps": {
+      "title": "Sovellukset",
+      "tagline": "Vastaa kysymyksiin, saat sovelluksen",
+      "desc": "Et tarvitse koodaustaitoja. Valitse mita haluaisit tehda, vastaa muutamaan kysymykseen, ja AI rakentaa sinulle sovelluksen. Avaat sen suoraan selaimesta — ja tieto tallentuu niin etta se on saatavilla mista tahansa.",
+      "categories": {
+        "games": "Pelit",
+        "gamesDesc": "Haasta kaverisi moninpeliin",
+        "notes": "Muistiinpanot",
+        "notesDesc": "Pida paivakirjaa tai muistilistaa",
+        "trackers": "Seurantatyokalut",
+        "trackersDesc": "Seuraa tapoja, budjettia tai mita vain",
+        "family": "Perhetyokalut",
+        "familyDesc": "Jaettu kalenteri, ostoslista, viestit",
+        "creative": "Luovat",
+        "creativeDesc": "Tee kuvia, tarinoita tai muuta hauskaa",
+        "custom": "Oma idea",
+        "customDesc": "Kerro mita haluat ja AI rakentaa sen"
+      },
+      "anyAiWorks": "Sovelluksia voi rakentaa milla tahansa AI:lla — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja naet mika tekee parhaan tuloksen.",
+      "tryNow": "Kokeile heti: Ristinolla",
+      "tryNowDesc": "Luo peli, laheta linkki kaverille, pelaa. Alle 30 sekuntia.",
+      "createGame": "Luo uusi peli"
+    },
+    "services": {
+      "title": "Palvelut",
+      "tagline": "Auta muita tai pyyda apua",
+      "desc": "Tarvitsetko kuvan tekemista, tekstin kaantamista, tai apua jonkin tekemisessa? Laita pyynto ja joku — ihminen tai AI — voi toimittaa sen sinulle. Osaatko itse jotain erityista? Tarjoa se palveluna ja nay keltaisilla sivuilla.",
+      "needHelp": "Tarvitsen apua",
+      "needHelpDesc": "Kerro mita tarvitset",
+      "offerHelp": "Haluan auttaa",
+      "offerHelpDesc": "Kerro mita osaat"
+    }
+  },
+  "morsels": {
+    "name": "sydanmurunen",
+    "namePlural": "sydanmurusta",
+    "summary": "Sydanmuruset ovat AIME AT:n tapa sanoa kiitos. Saat 100 murusta alkuun — ilmaiseksi. Mita enemman jaat ja autat, sita enemman saat."
+  },
+  "compat": {
+    "title": "Mitka AI:t osaavat lukea muistisi automaattisesti?",
+    "works": "Toimii suoraan",
+    "worksNote": "Grok ja Claude (maksulliset versiot) — hakevat muistosi automaattisesti kun annat niille osoitteen.",
+    "sometimes": "Toimii joskus",
+    "sometimesNote": "DeepSeek — onnistuu toisinaan.",
+    "notYet": "Eivat osaa viela",
+    "notYetNote": "ChatGPT (ilmainen), Gemini — eivat ymmarra pyyntoa.",
+    "workaround": "Kiertotie kaikille",
+    "workaroundNote": "Kopioi muistosi ja liita se suoraan AI-keskusteluun — toimii aina, kaikkialla."
+  },
+  "more": {
+    "title": "Mita muuta voit tehda?",
+    "aiNews": "Tilaa AI-uutiskooste",
+    "aiNewsDesc": "Saa joka aamu tuoreimmat uutiset tiivistettyna AI:lla",
+    "monitor": "Seuraa palvelintasi",
+    "monitorDesc": "Nae serverisi terveys dashboardilta reaaliajassa",
+    "multiAgent": "Yhdista useita AI-agentteja",
+    "multiAgentDesc": "Anna kaikkien AI:desi jakaa sama muisti",
+    "directory": "Selaa keltaisia sivuja",
+    "directoryDesc": "Loyda palveluita ja tarjoa omiasi",
+    "buildApps": "Rakenna omia sovelluksia",
+    "buildAppsDesc": "Kaikki mita tarvitset on HTTP — ei backendia, ei tietokantaa"
+  }
+}

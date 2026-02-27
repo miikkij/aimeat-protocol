@@ -1,0 +1,91 @@
+{
+  "nav": {
+    "try": "Try it",
+    "devView": "For Developers",
+    "signIn": "Sign In",
+    "profile": "Profile",
+    "logout": "Log Out",
+    "loggedInAs": "logged in as"
+  },
+  "hero": {
+    "title": "Your memory. For your AIs.",
+    "subtitle": "Tell things once — all your AIs remember. You decide what's shared and with whom. Try now, no signup needed.",
+    "anonNote": "You're trying this anonymously — your data expires over time.",
+    "upgradeNudge": "Want to keep your data permanently?",
+    "createAccount": "Create a free account"
+  },
+  "cards": {
+    "memories": {
+      "title": "Memories",
+      "tagline": "Tell once, all your AIs remember",
+      "desc": "Save things about yourself — what you like, where you live, what you do. Share them with your AI assistants so you don't have to explain the same things every time.",
+      "inputPlaceholder": "Write something you want your AIs to remember...",
+      "saveBtn": "Save to memory",
+      "saved": "Memory saved!",
+      "savedNote": "This memory is now available to AIs you connect here.",
+      "exampleChips": ["I'm vegetarian", "I live in Espoo", "I like jazz"],
+      "cost": "This memory cost one heart morsel. You have {{remaining}} left."
+    },
+    "apps": {
+      "title": "Apps",
+      "tagline": "Answer questions, get an app",
+      "desc": "No coding skills needed. Pick what you'd like to do, answer a few questions, and an AI builds you an app. Open it right in your browser — your data is stored so it's available from anywhere.",
+      "categories": {
+        "games": "Games",
+        "gamesDesc": "Challenge a friend to multiplayer",
+        "notes": "Notes",
+        "notesDesc": "Keep a journal or checklist",
+        "trackers": "Trackers",
+        "trackersDesc": "Track habits, budget, or anything",
+        "family": "Family tools",
+        "familyDesc": "Shared calendar, shopping list, messages",
+        "creative": "Creative",
+        "creativeDesc": "Make images, stories, or fun stuff",
+        "custom": "Your idea",
+        "customDesc": "Tell what you want and AI builds it"
+      },
+      "anyAiWorks": "You can build apps with any AI — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them work! Try with different AIs and see which makes the best result.",
+      "tryNow": "Try now: Tic-Tac-Toe",
+      "tryNowDesc": "Create a game, send the link to a friend, play. Under 30 seconds.",
+      "createGame": "Create new game"
+    },
+    "services": {
+      "title": "Services",
+      "tagline": "Help others or ask for help",
+      "desc": "Need an image made, a text translated, or help with something? Post a request and someone — human or AI — can deliver it. Good at something? Offer it as a service and appear in the directory.",
+      "needHelp": "I need help",
+      "needHelpDesc": "Tell what you need",
+      "offerHelp": "I want to help",
+      "offerHelpDesc": "Tell what you can do"
+    }
+  },
+  "morsels": {
+    "name": "heart morsel",
+    "namePlural": "heart morsels",
+    "summary": "Heart morsels are AIME AT's way of saying thanks. You get 100 to start — for free. The more you share and help, the more you get."
+  },
+  "compat": {
+    "title": "Which AIs can read your memories automatically?",
+    "works": "Works directly",
+    "worksNote": "Grok and Claude (paid versions) — they fetch your memories automatically when you give them the address.",
+    "sometimes": "Works sometimes",
+    "sometimesNote": "DeepSeek — succeeds occasionally.",
+    "notYet": "Not yet",
+    "notYetNote": "ChatGPT (free), Gemini — they don't understand the request yet.",
+    "workaround": "Workaround for all",
+    "workaroundNote": "Copy your memories and paste directly into any AI chat — always works, everywhere."
+  },
+  "more": {
+    "title": "What else can you do?",
+    "aiNews": "Subscribe to AI news digest",
+    "aiNewsDesc": "Get the latest news summarized by AI every morning",
+    "monitor": "Monitor your server",
+    "monitorDesc": "See your server health on a real-time dashboard",
+    "multiAgent": "Connect multiple AI agents",
+    "multiAgentDesc": "Let all your AIs share the same memory",
+    "directory": "Browse the directory",
+    "directoryDesc": "Find services and offer your own",
+    "buildApps": "Build your own apps",
+    "buildAppsDesc": "All you need is HTTP — no backend, no database"
+  }
+}
