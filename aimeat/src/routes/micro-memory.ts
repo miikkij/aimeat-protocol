@@ -136,7 +136,10 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                         res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_SETS_PER_AGENT} sets per agent`));
                         return;
                     }
-                    record = { gaii, set, entries: {}, visibility: 'private', updatedAt: new Date().toISOString() };
+                    // If access_code is provided on first add, auto-set visibility to shared_read
+                    const initCode = req.query.access_code as string | undefined;
+                    const initVis = initCode ? 'shared_read' as const : 'private' as const;
+                    record = { gaii, set, entries: {}, visibility: initVis, ...(initCode ? { accessCode: initCode } : {}), updatedAt: new Date().toISOString() };
                 }
                 if (Object.keys(record.entries).length >= MAX_KEYS_PER_SET && !(key in record.entries)) {
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_KEYS_PER_SET} keys per set`));
