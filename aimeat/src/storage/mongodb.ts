@@ -830,6 +830,19 @@ export class MongoStorage implements Storage {
         return true;
     }
 
+    async findMicroMemoryByAccessCode(set: string, accessCode: string): Promise<MicroMemoryRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.microMemory.findFirst({
+            where: {
+                setName: set,
+                accessCode: accessCode,
+                visibility: { in: ['shared_read', 'shared_write'] },
+            },
+        });
+        if (!row) return null;
+        return { gaii: row.gaii, set: row.setName, entries: row.entries as Record<string, string>, visibility: row.visibility as any, accessCode: row.accessCode ?? undefined, updatedAt: row.updatedAt.toISOString() };
+    }
+
     // ── Storage Files ───────────────────────────────────────────
 
     async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {

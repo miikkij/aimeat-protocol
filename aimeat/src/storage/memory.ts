@@ -487,6 +487,16 @@ export class InMemoryStorage implements Storage {
     return true;
   }
 
+  async findMicroMemoryByAccessCode(set: string, accessCode: string): Promise<MicroMemoryRecord | null> {
+    for (const record of this.microMemory.values()) {
+      if (record.set === set && record.accessCode === accessCode &&
+          (record.visibility === 'shared_read' || record.visibility === 'shared_write')) {
+        return record;
+      }
+    }
+    return null;
+  }
+
   // ── Storage (Binary Files) ──
 
   private fileKey(gaii: string, key: string) { return `${gaii}::${key}`; }

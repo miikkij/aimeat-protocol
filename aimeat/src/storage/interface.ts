@@ -272,6 +272,7 @@ export interface Storage {
   listMicroMemorySets(gaii: string): Promise<MicroMemoryRecord[]>;
   deleteMicroMemory(gaii: string, set: string): Promise<boolean>;
   deleteMicroMemoryEntry(gaii: string, set: string, key: string): Promise<boolean>;
+  findMicroMemoryByAccessCode(set: string, accessCode: string): Promise<MicroMemoryRecord | null>;
 
   // Storage (binary files)
   createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord>;

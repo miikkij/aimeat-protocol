@@ -61,8 +61,10 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
 
         // Anonymous mode: allow requests without OTK using the anonymous shared agent
         // Dev mode: allow requests without OTK using first registered agent/owner
+        // Access-code mode: allow read-only access with access_code (no OTK needed)
         let gaii: string;
         let isAnonymous = false;
+        let isAccessCodeOnly = false;
         if (!otkKey && config.anonymousMode) {
             const ANON_GAII = `shared#anonymous@${config.nodeId}`;
             gaii = ANON_GAII;
@@ -80,8 +82,20 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
                     return;
                 }
             }
+        } else if (!otkKey && req.query.access_code && req.query.op === 'list' && req.query.set) {
+            // Access-code-only mode: find the set across all agents by searching for matching access_code
+            const setName = req.query.set as string;
+            const accessCode = req.query.access_code as string;
+            const found = await storage.findMicroMemoryByAccessCode(setName, accessCode);
+            if (!found) {
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Invalid access_code or set not found'));
+                return;
+            }
+            gaii = found.gaii;
+            isAnonymous = true;
+            isAccessCodeOnly = true;
         } else if (!otkKey) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required. For shared sets, provide access_code with op=list&set=name'));
             return;
         } else {
             const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
