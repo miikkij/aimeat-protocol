@@ -704,66 +704,108 @@ const ADMIN_DASHBOARD_HTML = `<!DOCTYPE html>
 :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
 --green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;
 --cyan:#06b6d4;--font:system-ui,-apple-system,sans-serif}
-body{background:var(--bg);color:var(--text);font-family:var(--font);padding:20px;min-height:100vh}
-h1{font-size:1.6rem;font-weight:700;margin-bottom:4px}
-.subtitle{color:var(--muted);font-size:.85rem;margin-bottom:20px}
+body{background:var(--bg);color:var(--text);font-family:var(--font);padding:0;min-height:100vh}
+h1{font-size:1.4rem;font-weight:700;margin-bottom:0}
+.layout{display:flex;min-height:100vh}
+/* Sidebar */
+.sidebar{width:220px;background:#0c1222;border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar h1{padding:0 16px;margin-bottom:16px;font-size:1.1rem}
+.sidebar .node-id{padding:0 16px;color:var(--muted);font-size:.7rem;margin-bottom:16px;word-break:break-all}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:var(--muted);font-size:.85rem;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit;transition:all .1s}
+.nav-item:hover{background:#1e293b;color:var(--text)}
+.nav-item.active{background:#1e293b;color:var(--cyan);border-left:3px solid var(--cyan);padding-left:13px}
+.nav-item .icon{font-size:1rem;width:20px;text-align:center}
+.nav-item .label{flex:1}
+.nav-item .count{background:var(--border);color:var(--muted);font-size:.7rem;padding:2px 7px;border-radius:10px}
+.nav-sep{height:1px;background:var(--border);margin:8px 16px}
+/* Main */
+.main{flex:1;padding:20px 28px;overflow-y:auto}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.refresh{background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600}
+.refresh:hover{opacity:.85}
+.refresh:disabled{opacity:.5;cursor:not-allowed}
+#lastUpdate{color:var(--muted);font-size:.7rem}
+/* Cards */
 .grid{display:grid;gap:16px;margin-bottom:20px}
-.grid-4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-.grid-2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.grid-4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.grid-2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
 .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
-.card h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px}
-.stat{font-size:2rem;font-weight:700;line-height:1.1}
-.stat-label{color:var(--muted);font-size:.8rem;margin-top:2px}
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600;text-transform:uppercase}
+.card h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px}
+.stat{font-size:1.8rem;font-weight:700;line-height:1.1}
+.stat-label{color:var(--muted);font-size:.75rem;margin-top:2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600;text-transform:uppercase}
 .badge-healthy{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
 .badge-watch{background:#ca8a0422;color:var(--yellow);border:1px solid #ca8a0455}
 .badge-danger{background:#dc262622;color:var(--red);border:1px solid #dc262655}
+.badge-info{background:#3b82f622;color:var(--blue);border:1px solid #3b82f655}
+.badge-private{background:#a855f722;color:var(--purple);border:1px solid #a855f755}
+.badge-public{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
+.badge-pending{background:#ca8a0422;color:var(--yellow);border:1px solid #ca8a0455}
+.badge-accepted,.badge-in_progress{background:#3b82f622;color:var(--blue);border:1px solid #3b82f655}
+.badge-delivered,.badge-settled{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
+.badge-cancelled,.badge-expired,.badge-disputed{background:#dc262622;color:var(--red);border:1px solid #dc262655}
 .health-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
 .health-row:last-child{border-bottom:none}
 .health-metric{font-size:.85rem}
 .health-value{font-family:'SF Mono',Consolas,monospace;font-size:.85rem;color:var(--cyan)}
-table{width:100%;border-collapse:collapse;font-size:.85rem}
-th{text-align:left;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:2px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
 td{padding:8px 10px;border-bottom:1px solid var(--border)}
-tr:hover td{background:#ffffff08}
+tr:hover td{background:#ffffff06}
 .econ-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
 .econ-row:last-child{border-bottom:none}
 .econ-label{color:var(--muted);font-size:.85rem}
 .econ-val{font-family:'SF Mono',Consolas,monospace;font-size:.85rem;color:var(--text)}
-.warn-card{border-left:3px solid var(--yellow);background:#ca8a0408}
-.warn-danger{border-left-color:var(--red);background:#dc262608}
-.warn-msg{font-size:.85rem;padding:6px 0}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
-.refresh{background:var(--blue);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600}
-.refresh:hover{opacity:.85}
-.refresh:disabled{opacity:.5;cursor:not-allowed}
-.auto-label{color:var(--muted);font-size:.75rem}
-#lastUpdate{color:var(--muted);font-size:.75rem}
+.mono{font-family:'SF Mono',Consolas,monospace;font-size:.78rem}
 .loading{text-align:center;padding:40px;color:var(--muted)}
 .error-box{background:#dc262622;border:1px solid var(--red);border-radius:8px;padding:16px;color:var(--red);margin:20px 0}
-.node-meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:4px}
-.node-meta span{font-size:.8rem;color:var(--muted)}
-.node-meta strong{color:var(--cyan)}
-.agents-list{max-height:400px;overflow-y:auto}
+.empty{color:var(--muted);text-align:center;padding:24px;font-size:.85rem}
+.detail-row{padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.detail-row:last-child{border-bottom:none}
+.detail-label{color:var(--muted);min-width:140px;display:inline-block}
+.expand-btn{background:none;border:1px solid var(--border);color:var(--cyan);padding:3px 10px;border-radius:4px;cursor:pointer;font-size:.75rem;font-family:inherit}
+.expand-btn:hover{background:var(--border)}
+.sub-panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:8px;font-size:.8rem}
+.page-title{font-size:1.1rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.page-title .icon{font-size:1.2rem}
+.tag{display:inline-block;background:var(--border);color:var(--muted);padding:1px 6px;border-radius:4px;font-size:.7rem;margin:1px}
+.scrollable{max-height:600px;overflow-y:auto}
+@media(max-width:768px){.sidebar{display:none}.main{padding:12px}}
 </style>
 </head>
 <body>
-<div class="topbar">
-  <div>
-    <h1>&#x1F969; AIMEAT Node Dashboard</h1>
-    <div id="nodeMeta" class="node-meta"></div>
+<div class="layout">
+<nav class="sidebar">
+  <h1>&#x1F969; AIMEAT</h1>
+  <div class="node-id" id="sideNodeId"></div>
+  <button class="nav-item active" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">Overview</span></button>
+  <button class="nav-item" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">Owners</span><span class="count" id="cntOwners">0</span></button>
+  <button class="nav-item" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">Agents</span><span class="count" id="cntAgents">0</span></button>
+  <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">Actions</span><span class="count" id="cntActions">0</span></button>
+  <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">Boards</span><span class="count" id="cntBoards">0</span></button>
+  <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">Work</span><span class="count" id="cntWork">0</span></button>
+  <div class="nav-sep"></div>
+  <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">Economy</span></button>
+  <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">Config</span></button>
+</nav>
+<div class="main">
+  <div class="topbar">
+    <div id="pageTitle" class="page-title"><span class="icon">&#x1F4CA;</span> Overview</div>
+    <div class="topbar-right">
+      <button class="refresh" id="btnRefresh" onclick="loadAll()">Refresh</button>
+      <span id="lastUpdate"></span>
+    </div>
   </div>
-  <div style="text-align:right">
-    <button class="refresh" id="btnRefresh" onclick="load()">Refresh</button>
-    <label class="auto-label"><input type="checkbox" id="autoRefresh" checked /> Auto 30s</label>
-    <div id="lastUpdate"></div>
-  </div>
+  <div id="app"><div class="loading">Loading&#8230;</div></div>
 </div>
-<div id="app"><div class="loading">Loading dashboard&#8230;</div></div>
+</div>
 <script>
 const TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('aimeat_token')||'';
 if(TOKEN)localStorage.setItem('aimeat_token',TOKEN);
-let timer;
+
+let D={};// cached data
+let currentPage='overview';
 
 async function api(path){
   const h={};
@@ -773,41 +815,96 @@ async function api(path){
   return r.json();
 }
 
-function badge(zone){return '<span class="badge badge-'+zone+'">'+zone+'</span>'}
-function num(n){return typeof n==='number'?n.toLocaleString():n}
+function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML}
+function badge(z){return '<span class="badge badge-'+z+'">'+z+'</span>'}
+function num(n){return typeof n==='number'?n.toLocaleString():String(n??'—')}
+function dt(s){return s?new Date(s).toLocaleString():'—'}
+function sc(l,v,sub,col){return '<div class="card"><h2>'+l+'</h2><div class="stat" style="color:'+col+'">'+num(v)+'</div>'+(sub?'<div class="stat-label">'+sub+'</div>':'')+'</div>'}
+function er(l,v){return '<div class="econ-row"><span class="econ-label">'+l+'</span><span class="econ-val">'+v+'</span></div>'}
+function hRow(l,obj){return '<div class="health-row"><span class="health-metric">'+l+'</span><span>'+badge(obj.zone)+' <span class="health-value">'+obj.value+'</span></span></div>'}
+function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m':'<1m')}
 
-async function load(){
-  const btn=document.getElementById('btnRefresh');
-  btn.disabled=true;btn.textContent='Loading...';
-  try{
-    const [dash,agents]= await Promise.all([api('/v1/admin/dashboard'),api('/v1/admin/agents')]);
-    render(dash.data,agents.data);
-    document.getElementById('lastUpdate').textContent='Updated '+new Date().toLocaleTimeString();
-  }catch(e){
-    document.getElementById('app').innerHTML='<div class="error-box"><strong>Failed to load</strong><br/>'+esc(e.message)
-      +'<br/><br/>Pass your operator token: <code>/v1/admin/ui?token=YOUR_TOKEN</code></div>';
-  }
-  btn.disabled=false;btn.textContent='Refresh';
-  clearInterval(timer);
-  if(document.getElementById('autoRefresh').checked)timer=setInterval(load,30000);
+function nav(page){
+  currentPage=page;
+  document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
+  var btns=document.querySelectorAll('.nav-item');
+  var pages=['overview','owners','agents','actions','boards','work','','economy','config'];
+  for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
+  var titles={overview:'&#x1F4CA; Overview',owners:'&#x1F464; Owners',agents:'&#x1F916; Agents',actions:'&#x26A1; Actions',boards:'&#x1F4CB; Boards',work:'&#x1F4E6; Work Contracts',economy:'&#x1FA99; Economy',config:'&#x2699; Configuration'};
+  document.getElementById('pageTitle').innerHTML=titles[page]||page;
+  render();
 }
 
-function esc(s){const d=document.createElement('div');d.textContent=String(s);return d.innerHTML}
+async function loadAll(){
+  var btn=document.getElementById('btnRefresh');
+  btn.disabled=true;btn.textContent='Loading...';
+  try{
+    var [dash,agents,actions,boards]=await Promise.all([
+      api('/v1/admin/dashboard'),
+      api('/v1/admin/agents'),
+      api('/v1/actions'),
+      api('/v1/boards')
+    ]);
+    D.dash=dash.data;D.agents=agents.data;D.actions=actions.data;D.boards=boards.data;
+    // Update sidebar counts
+    if(D.dash&&D.dash.counts){
+      document.getElementById('cntOwners').textContent=D.dash.counts.owners;
+      document.getElementById('cntAgents').textContent=D.dash.counts.agents;
+      document.getElementById('cntActions').textContent=D.dash.counts.actions;
+      document.getElementById('cntBoards').textContent=D.dash.counts.boards;
+    }
+    // Try work listing (may fail if no agent auth)
+    try{var w=await api('/v1/admin/backup');D.workItems=extractWork(w.data);}catch(e){D.workItems=[];}
+    // Load owners
+    try{
+      var ownerNames=D.agents&&D.agents.agents?[...new Set(D.agents.agents.map(function(a){return a.owner}))]:[];
+      D.owners=[];
+      for(var i=0;i<ownerNames.length;i++){
+        try{var o=await api('/v1/owners/'+encodeURIComponent(ownerNames[i]));D.owners.push(o.data);}catch(e){}
+      }
+    }catch(e){D.owners=[];}
+    if(D.workItems)document.getElementById('cntWork').textContent=D.workItems.length;
+    document.getElementById('sideNodeId').textContent=D.dash?D.dash.node_id:'';
+    document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString();
+    render();
+  }catch(e){
+    document.getElementById('app').innerHTML='<div class="error-box"><strong>Failed to load</strong><br/>'+esc(e.message)+'</div>';
+  }
+  btn.disabled=false;btn.textContent='Refresh';
+}
 
-function render(d,ag){
-  const h=d.health,c=d.counts,e=d.economy,w=d.warnings||[];
-  const hColor=h.status==='healthy'?'green':h.status==='watch'?'yellow':'red';
+function extractWork(backup){
+  if(!backup||!backup.agent_data)return[];
+  var items=[];
+  // Work items are in the backup as transactions or via agent_data
+  return items;
+}
 
-  document.getElementById('nodeMeta').innerHTML=
-    '<span>Node: <strong>'+esc(d.node_id)+'</strong></span>'+
-    '<span>Storage: <strong>'+esc(d.storage_type)+'</strong></span>'+
-    '<span>Uptime: <strong>'+fmtUp(d.uptime_seconds)+'</strong></span>';
+function render(){
+  var app=document.getElementById('app');
+  if(!D.dash){app.innerHTML='<div class="loading">Loading&#8230;</div>';return;}
+  switch(currentPage){
+    case 'overview':app.innerHTML=renderOverview();break;
+    case 'owners':app.innerHTML=renderOwners();break;
+    case 'agents':app.innerHTML=renderAgents();break;
+    case 'actions':app.innerHTML=renderActions();break;
+    case 'boards':app.innerHTML=renderBoards();break;
+    case 'work':app.innerHTML=renderWork();break;
+    case 'economy':app.innerHTML=renderEconomy();break;
+    case 'config':app.innerHTML=renderConfig();break;
+    default:app.innerHTML='<div class="empty">Unknown page</div>';
+  }
+}
 
-  let o='';
-  // Health
+/* ── OVERVIEW ── */
+function renderOverview(){
+  var d=D.dash,h=d.health,c=d.counts,e=d.economy,w=d.warnings||[];
+  var hColor=h.status==='healthy'?'green':h.status==='watch'?'yellow':'red';
+  var o='';
   o+='<div class="card" style="border-left:4px solid var(--'+hColor+');margin-bottom:20px">';
   o+='<div style="display:flex;justify-content:space-between;align-items:center">';
-  o+='<div><h2>Node Health</h2><div class="stat" style="color:var(--'+hColor+')">'+h.status.toUpperCase()+'</div></div>';
+  o+='<div><h2>Node Health</h2><div class="stat" style="color:var(--'+hColor+')">'+h.status.toUpperCase()+'</div>';
+  o+='<div class="stat-label">Uptime: '+fmtUp(d.uptime_seconds)+' &middot; Storage: '+esc(d.storage_type)+'</div></div>';
   o+='<div>'+badge(h.status)+'</div></div>';
   o+='<div style="margin-top:14px">';
   o+=hRow('Burn/Mint Ratio',h.burn_mint_ratio);
@@ -815,81 +912,220 @@ function render(d,ag){
   o+=hRow('Work Expiry (30d)',h.work_expiry_rate_30d);
   o+=hRow('Dispute Rate (30d)',h.dispute_rate_30d);
   o+='</div></div>';
-
-  // Counts
   o+='<div class="grid grid-4">';
   o+=sc('Owners',c.owners,'','var(--blue)');
   o+=sc('Agents',c.agents,'('+c.active_agents_24h+' active 24h)','var(--purple)');
   o+=sc('Actions',c.actions,'','var(--cyan)');
   o+=sc('Boards',c.boards,'','var(--green)');
   o+='</div>';
-
-  // Economy
   o+='<div class="grid grid-2">';
-  o+='<div class="card"><h2>Morsel Economy</h2>';
+  o+='<div class="card"><h2>Economy Today</h2>';
+  o+=er('Transactions',num(e.transactions_today));
+  o+=er('Morsels Moved',num(e.morsels_transacted_today));
   o+=er('In Circulation',num(e.total_morsels_in_circulation));
-  o+=er('Total Minted',num(e.total_minted_all_time));
-  o+=er('Total Burned',num(e.total_burned_all_time));
-  o+=er('Inflation (30d)',e.inflation_rate_30d_percent+'%');
+  o+=er('Burned Today',num(e.burned_today));
+  o+='</div>';
+  o+='<div class="card"><h2>Quick Config</h2>';
+  o+=er('Port',d.config.port);
+  o+=er('JWT TTL',d.config.jwt_ttl_seconds+'s');
+  o+=er('Keyed Browse',d.config.keyed_browse_enabled?'Enabled':'Disabled');
+  o+=er('Welcome Bonus',num(e.welcome_bonus));
+  o+='</div></div>';
+  if(w.length>0){
+    o+='<div class="card" style="border-left:3px solid var(--yellow);margin-bottom:20px"><h2>Warnings ('+w.length+')</h2>';
+    o+='<table><thead><tr><th>Metric</th><th>Value</th><th>Zone</th><th>Threshold</th></tr></thead><tbody>';
+    for(var i=0;i<w.length;i++){var x=w[i];o+='<tr><td>'+esc(x.metric)+'</td><td>'+x.value+'</td><td>'+badge(x.zone)+'</td><td style="color:var(--muted)">'+esc(x.threshold)+'</td></tr>';}
+    o+='</tbody></table></div>';
+  }
+  return o;
+}
+
+/* ── OWNERS ── */
+function renderOwners(){
+  var owners=D.owners||[];
+  if(owners.length===0)return '<div class="empty">No owners found</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>Name</th><th>Display Name</th><th>Agents</th><th>Created</th></tr></thead><tbody>';
+  for(var i=0;i<owners.length;i++){
+    var ow=owners[i];
+    var agCount=ow.agents?ow.agents.length:0;
+    var agNames=ow.agents?ow.agents.map(function(a){return esc(a.gaii)}).join(', '):'—';
+    o+='<tr><td><strong>'+esc(ow.name)+'</strong></td><td>'+esc(ow.display_name||'—')+'</td>';
+    o+='<td><span title="'+esc(agNames)+'">'+agCount+'</span></td>';
+    o+='<td style="color:var(--muted)">'+dt(ow.created_at)+'</td></tr>';
+  }
+  o+='</tbody></table></div></div>';
+  return o;
+}
+
+/* ── AGENTS ── */
+function renderAgents(){
+  var ag=D.agents;
+  if(!ag||!ag.agents||ag.agents.length===0)return '<div class="empty">No agents registered</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>GAII</th><th>Owner</th><th>Display Name</th><th>Trust</th><th>Morsels</th><th>Last Seen</th><th></th></tr></thead><tbody>';
+  for(var i=0;i<ag.agents.length;i++){
+    var a=ag.agents[i];
+    var trust=typeof a.trust_score==='number'?a.trust_score.toFixed(1):'—';
+    var tColor=a.trust_score>=70?'var(--green)':a.trust_score>=30?'var(--yellow)':'var(--red)';
+    o+='<tr><td class="mono">'+esc(a.gaii)+'</td><td>'+esc(a.owner)+'</td><td>'+esc(a.display_name||'—')+'</td>';
+    o+='<td style="color:'+tColor+'">'+trust+'</td><td>'+num(a.morsel_balance)+'</td>';
+    o+='<td style="color:var(--muted)">'+dt(a.last_seen)+'</td>';
+    o+='<td><button class="expand-btn" onclick="loadAgentDetail(\\''+esc(a.gaii)+'\\',this)">Details</button></td></tr>';
+    o+='<tr class="agent-detail" id="ad-'+i+'" style="display:none"><td colspan="7"></td></tr>';
+  }
+  o+='</tbody></table></div></div>';
+  return o;
+}
+
+/* ── ACTIONS ── */
+function renderActions(){
+  var ac=D.actions;
+  if(!ac||!ac.actions||ac.actions.length===0)return '<div class="empty">No actions published</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>ID</th><th>Name</th><th>Provider</th><th>Category</th><th>Base Cost</th><th>Tags</th></tr></thead><tbody>';
+  for(var i=0;i<ac.actions.length;i++){
+    var a=ac.actions[i];
+    var tags=(a.tags||[]).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join(' ');
+    var price=a.pricing?num(a.pricing.base_morsels)+' morsels':'—';
+    o+='<tr><td class="mono">'+esc(a.id)+'</td><td><strong>'+esc(a.display_name||a.id)+'</strong><br/><span style="color:var(--muted);font-size:.75rem">'+esc(a.description||'')+'</span></td>';
+    o+='<td class="mono" style="font-size:.75rem">'+esc(a.provider_gaii)+'</td>';
+    o+='<td>'+badge(a.category||'general')+'</td><td>'+price+'</td>';
+    o+='<td>'+tags+'</td></tr>';
+  }
+  o+='</tbody></table></div></div>';
+  return o;
+}
+
+/* ── BOARDS ── */
+function renderBoards(){
+  var bo=D.boards;
+  if(!bo||!bo.boards||bo.boards.length===0)return '<div class="empty">No boards created</div>';
+  var o='';
+  for(var i=0;i<bo.boards.length;i++){
+    var b=bo.boards[i];
+    o+='<div class="card" style="margin-bottom:16px">';
+    o+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+    o+='<div><h2>'+esc(b.name||b.id)+'</h2><p style="color:var(--muted);font-size:.8rem;margin-bottom:8px">'+esc(b.description||'No description')+'</p></div>';
+    o+='<div>'+badge(b.visibility||'public')+'</div></div>';
+    o+='<div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">ID: <span class="mono">'+esc(b.id)+'</span> &middot; Created: '+dt(b.created_at)+'</div>';
+    o+='<button class="expand-btn" onclick="loadBoardPosts(\\''+esc(b.id)+'\\',this)">Load Posts</button>';
+    o+='<div id="bp-'+esc(b.id)+'" style="margin-top:8px"></div>';
+    o+='</div>';
+  }
+  return o;
+}
+
+/* ── WORK ── */
+function renderWork(){
+  return '<div class="card"><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Work contracts are agent-scoped. Use the agent details view to see individual work items, or browse via the API.</p>'
+    +'<div style="font-size:.85rem">'
+    +er('API: List by provider','GET /v1/work/inbox')
+    +er('API: Work status','GET /v1/work/:tracking_code')
+    +er('API: Request work','POST /v1/work')
+    +'</div></div>';
+}
+
+/* ── ECONOMY ── */
+function renderEconomy(){
+  var e=D.dash.economy;
+  var o='<div class="grid grid-2">';
+  o+='<div class="card"><h2>Morsel Supply</h2>';
+  o+=er('In Circulation',num(e.total_morsels_in_circulation));
+  o+=er('Total Minted (all time)',num(e.total_minted_all_time));
+  o+=er('Total Burned (all time)',num(e.total_burned_all_time));
+  o+=er('Inflation Rate (30d)',e.inflation_rate_30d_percent+'%');
   o+=er('Burn/Mint Ratio',e.burn_mint_ratio);
   o+='</div>';
-  o+='<div class="card"><h2>Today</h2>';
+  o+='<div class="card"><h2>Today\\'s Activity</h2>';
   o+=er('Transactions',num(e.transactions_today));
   o+=er('Morsels Moved',num(e.morsels_transacted_today));
   o+=er('Network Fees',num(e.network_fees_today));
   o+=er('Burned',num(e.burned_today));
-  o+=er('Allowances',num(e.daily_allowances_issued_today));
+  o+=er('Daily Allowances Issued',num(e.daily_allowances_issued_today));
   o+='</div></div>';
-
-  // Policy + Config
-  o+='<div class="grid grid-2">';
   o+='<div class="card"><h2>Morsel Policy</h2>';
-  o+=er('Welcome Bonus',num(e.welcome_bonus));
-  o+=er('Daily Allowance',num(e.daily_allowance));
-  o+=er('Allowance Cap',num(e.daily_allowance_cap));
+  o+=er('Welcome Bonus',num(e.welcome_bonus)+' morsels');
+  o+=er('Daily Allowance',num(e.daily_allowance)+' morsels');
+  o+=er('Allowance Cap',num(e.daily_allowance_cap)+' morsels');
   o+=er('Burn Rate',e.burn_rate);
-  o+=er('Max Mint/Day',num(e.max_operator_mint_per_day));
+  o+=er('Max Operator Mint/Day',num(e.max_operator_mint_per_day)+' morsels');
   o+='</div>';
-  o+='<div class="card"><h2>Node Config</h2>';
+  return o;
+}
+
+/* ── CONFIG ── */
+function renderConfig(){
+  var d=D.dash;
+  var o='<div class="card"><h2>Node Settings</h2>';
+  o+=er('Node ID',esc(d.node_id));
+  o+=er('Storage',esc(d.storage_type));
   o+=er('Port',d.config.port);
   o+=er('JWT TTL',d.config.jwt_ttl_seconds+'s');
   o+=er('Keyed Browse',d.config.keyed_browse_enabled?'Enabled':'Disabled');
+  o+=er('Uptime',fmtUp(d.uptime_seconds));
+  o+='</div>';
+  o+='<div class="card" style="margin-top:16px"><h2>Config API</h2>';
+  o+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:8px">Use the API to view and update runtime config:</p>';
+  o+='<div style="font-size:.85rem">';
+  o+=er('View full config','GET /v1/admin/config');
+  o+=er('Update config','PUT /v1/admin/config');
+  o+=er('Backup all data','GET /v1/admin/backup');
+  o+=er('Restore data','POST /v1/admin/restore');
   o+='</div></div>';
-
-  // Warnings
-  if(w.length>0){
-    o+='<div class="card '+(w.some(function(x){return x.zone==="danger"})?'warn-danger':'warn-card')+'" style="margin-bottom:20px"><h2>Warnings ('+w.length+')</h2>';
-    o+='<table><thead><tr><th>Metric</th><th>Value</th><th>Zone</th><th>Threshold</th></tr></thead><tbody>';
-    for(const x of w)o+='<tr><td>'+esc(x.metric)+'</td><td>'+x.value+'</td><td>'+badge(x.zone)+'</td><td style="color:var(--muted)">'+esc(x.threshold)+'</td></tr>';
-    o+='</tbody></table></div>';
-  }
-
-  // Agents table
-  if(ag&&ag.agents&&ag.agents.length>0){
-    o+='<div class="card"><h2>Agents ('+ag.total+')</h2><div class="agents-list">';
-    o+='<table><thead><tr><th>GAII</th><th>Owner</th><th>Trust</th><th>Morsels</th><th>Last Seen</th></tr></thead><tbody>';
-    for(const a of ag.agents){
-      const trust=typeof a.trust_score==='number'?a.trust_score.toFixed(1):'—';
-      const tColor=a.trust_score>=70?'var(--green)':a.trust_score>=30?'var(--yellow)':'var(--red)';
-      const seen=a.last_seen?new Date(a.last_seen).toLocaleString():'Never';
-      o+='<tr><td style="font-family:monospace;font-size:.8rem">'+esc(a.gaii)+'</td><td>'+esc(a.owner)+'</td>';
-      o+='<td style="color:'+tColor+'">'+trust+'</td><td>'+num(a.morsel_balance)+'</td><td style="color:var(--muted)">'+seen+'</td></tr>';
-    }
-    o+='</tbody></table></div></div>';
-  }
-
-  document.getElementById('app').innerHTML=o;
+  return o;
 }
 
-function sc(l,v,sub,col){return '<div class="card"><h2>'+l+'</h2><div class="stat" style="color:'+col+'">'+num(v)+'</div>'+(sub?'<div class="stat-label">'+sub+'</div>':'')+'</div>'}
-function er(l,v){return '<div class="econ-row"><span class="econ-label">'+l+'</span><span class="econ-val">'+v+'</span></div>'}
-function hRow(l,obj){return '<div class="health-row"><span class="health-metric">'+l+'</span><span>'+badge(obj.zone)+' <span class="health-value">'+obj.value+'</span></span></div>'}
-function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m':'<1m')}
+/* ── Detail loaders ── */
+async function loadAgentDetail(gaii,btn){
+  btn.textContent='Loading...';btn.disabled=true;
+  try{
+    var r=await api('/v1/agents/'+encodeURIComponent(gaii));
+    var a=r.data;
+    var row=btn.closest('tr').nextElementSibling;
+    var o='<div class="sub-panel">';
+    o+='<strong>'+esc(a.display_name||a.gaii)+'</strong>';
+    if(a.description)o+='<p style="color:var(--muted);font-size:.8rem;margin:4px 0">'+esc(a.description)+'</p>';
+    if(a.capabilities&&a.capabilities.length){
+      o+='<div style="margin:6px 0">Capabilities: '+a.capabilities.map(function(c){return '<span class="tag">'+esc(c)+'</span>'}).join(' ')+'</div>';
+    }
+    if(a.trust){
+      o+='<div style="margin-top:8px"><strong style="font-size:.8rem;color:var(--muted)">TRUST DETAILS</strong></div>';
+      o+=er('Score',a.trust.score);
+      o+=er('Deliveries',a.trust.total_deliveries+' ('+a.trust.successful_deliveries+' ok)');
+      o+=er('Success Rate',(a.trust.success_rate*100).toFixed(1)+'%');
+      o+=er('Avg Delivery Time',a.trust.avg_delivery_time_seconds+'s');
+      o+=er('Ratings','+'+a.trust.positive_ratings+' / -'+a.trust.negative_ratings);
+      o+=er('Age',a.trust.age_days+' days');
+    }
+    o+='<div style="margin-top:8px;font-size:.75rem;color:var(--muted)">Created: '+dt(a.created_at)+' &middot; Home: '+esc(a.home_node)+'</div>';
+    o+='</div>';
+    row.querySelector('td').innerHTML=o;
+    row.style.display='';
+    btn.textContent='Hide';btn.disabled=false;
+    btn.onclick=function(){row.style.display=row.style.display?'':'none';btn.textContent=row.style.display?'Details':'Hide'};
+  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent='Details';btn.disabled=false},2000)}
+}
 
-document.getElementById('autoRefresh').addEventListener('change',function(){
-  clearInterval(timer);if(this.checked)timer=setInterval(load,30000);
-});
-load();
+async function loadBoardPosts(boardId,btn){
+  btn.textContent='Loading...';btn.disabled=true;
+  try{
+    var r=await api('/v1/boards/'+encodeURIComponent(boardId)+'/posts?limit=50');
+    var posts=r.data.posts||[];
+    var el=document.getElementById('bp-'+boardId);
+    if(posts.length===0){el.innerHTML='<div class="empty">No posts</div>';btn.textContent='Load Posts';btn.disabled=false;return;}
+    var o='<table><thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Created</th></tr></thead><tbody>';
+    for(var i=0;i<posts.length;i++){
+      var p=posts[i];
+      o+='<tr><td><strong>'+esc(p.title||'(untitled)')+'</strong><br/><span style="color:var(--muted);font-size:.75rem">'+esc((p.body||'').substring(0,120))+'</span></td>';
+      o+='<td class="mono" style="font-size:.75rem">'+esc(p.author_gaii)+'</td>';
+      o+='<td>'+badge(p.category||'general')+'</td>';
+      o+='<td style="color:var(--muted)">'+dt(p.created_at)+'</td></tr>';
+    }
+    o+='</tbody></table>';
+    el.innerHTML=o;
+    btn.textContent='Refresh Posts';btn.disabled=false;
+  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent='Load Posts';btn.disabled=false},2000)}
+}
+
+loadAll();
 </script>
 </body>
 </html>`;
@@ -897,7 +1133,7 @@ load();
 // ── Admin Login Page HTML ──
 const ADMIN_LOGIN_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AIMEAT Admin Login</title>
+<title>AIMEAT Admin</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
@@ -912,10 +1148,10 @@ button:hover{background:#2563eb}
 </style></head><body>
 <div class="box">
 <h1>&#x1F969; AIMEAT Admin</h1>
-<p class="sub">Enter the admin password from the server console log</p>
+<p class="sub">Enter the admin password to continue</p>
 <form onsubmit="go(event)">
 <input type="password" id="pw" placeholder="Admin password" autofocus/>
-<button type="submit">Enter Setup</button>
+<button type="submit">Continue</button>
 </form>
 <p class="hint">Password is printed when the server starts, or set via MEAT_ADMIN_PASSWORD</p>
 </div>
@@ -924,79 +1160,132 @@ function go(e){e.preventDefault();var pw=document.getElementById('pw').value;if(
 </script>
 </body></html>`;
 
-// ── Admin Setup Wizard HTML ──
+// ── Admin Setup Wizard HTML (Login + Register tabs) ──
 const ADMIN_SETUP_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AIMEAT Admin Setup</title>
+<title>AIMEAT Admin</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
 --green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;--cyan:#06b6d4}
-body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;padding:20px;min-height:100vh}
-.container{max-width:640px;margin:0 auto}
-h1{font-size:1.5rem;margin-bottom:4px}
-.sub{color:var(--muted);font-size:.85rem;margin-bottom:24px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px}
-.card h2{font-size:.95rem;margin-bottom:12px;color:var(--cyan)}
-label{display:block;color:var(--muted);font-size:.8rem;margin-bottom:4px;margin-top:12px}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;padding:20px;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding-top:60px}
+.container{max-width:480px;width:100%}
+h1{font-size:1.5rem;margin-bottom:4px;text-align:center}
+.sub{color:var(--muted);font-size:.85rem;margin-bottom:24px;text-align:center}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--border)}
+.tab{flex:1;padding:12px 16px;text-align:center;font-size:.95rem;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:0 0 10px 10px;padding:24px;margin-bottom:16px}
+.card.standalone{border-radius:10px}
+label{display:block;color:var(--muted);font-size:.8rem;margin-bottom:4px;margin-top:14px}
 label:first-child{margin-top:0}
-input[type=text]{width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem}
-input:focus{outline:none;border-color:var(--blue)}
-button{padding:10px 20px;border-radius:6px;border:none;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:14px}
+input[type=text],input[type=password],textarea{width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem;font-family:inherit}
+textarea{resize:vertical;min-height:60px;font-family:'SF Mono',Consolas,monospace;font-size:.8rem}
+input:focus,textarea:focus{outline:none;border-color:var(--blue)}
+button{padding:12px 24px;border-radius:8px;border:none;font-size:.95rem;font-weight:600;cursor:pointer;margin-top:16px;width:100%}
 .btn-primary{background:var(--blue);color:#fff}
 .btn-primary:hover{background:#2563eb}
 .btn-primary:disabled{opacity:.5;cursor:not-allowed}
-.btn-green{background:var(--green);color:#000}
+.btn-green{background:var(--green);color:#000;display:inline-block;text-decoration:none;text-align:center;padding:12px 24px;border-radius:8px;font-weight:600;font-size:.95rem;margin-top:16px;width:100%}
 .btn-green:hover{opacity:.85}
 .result{margin-top:14px;padding:12px;border-radius:8px;font-size:.85rem;word-break:break-all}
 .result-ok{background:#16a34a18;border:1px solid #16a34a55;color:var(--green)}
 .result-err{background:#dc262618;border:1px solid #dc262655;color:var(--red)}
-.result-info{background:#3b82f618;border:1px solid #3b82f655;color:var(--cyan)}
 .key-box{font-family:'SF Mono',Consolas,monospace;font-size:.8rem;background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border);margin-top:6px;word-break:break-all;user-select:all}
-.step-num{display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;background:var(--blue);color:#fff;font-size:.75rem;font-weight:700;margin-right:8px}
-.step-done{background:var(--green)}
 .hidden{display:none}
 a{color:var(--cyan);text-decoration:none}
 a:hover{text-decoration:underline}
 .warn{color:var(--yellow);font-size:.8rem;margin-top:8px}
+.divider{border-top:1px solid var(--border);margin:20px 0;position:relative}
+.divider span{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--card);padding:0 12px;color:var(--muted);font-size:.75rem}
+.success-panel{text-align:center;padding:16px 0}
+.success-panel h3{color:var(--green);font-size:1.1rem;margin-bottom:8px}
 </style></head><body>
 <div class="container">
-<h1>&#x1F969; AIMEAT Node Setup</h1>
+<h1>&#x1F969; AIMEAT</h1>
 <p class="sub">Node: <strong>{{NODE_ID}}</strong></p>
 
-<div class="card" id="step1card">
-<h2><span class="step-num" id="s1n">1</span>Register Owner</h2>
-<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">The first owner automatically gets the <strong>operator</strong> role.</p>
-<label>Owner Name</label>
-<input type="text" id="ownerName" placeholder="e.g. myname" autocomplete="off"/>
-<label>Display Name (optional)</label>
-<input type="text" id="displayName" placeholder="e.g. Node Operator"/>
-<br/>
-<button class="btn-primary" id="btnRegister" onclick="doRegister()">Register Owner</button>
-<div id="regResult" class="hidden"></div>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('login')">Login</button>
+  <button class="tab" onclick="switchTab('register')">Register</button>
 </div>
 
-<div class="card hidden" id="step2card">
-<h2><span class="step-num" id="s2n">2</span>Get JWT Token</h2>
-<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Signing happens server-side. The private key is only used for this one call.</p>
-<button class="btn-primary" id="btnToken" onclick="doToken()">Get Token</button>
-<div id="tokenResult" class="hidden"></div>
+<!-- ═══ LOGIN TAB ═══ -->
+<div class="tab-panel active" id="panel-login">
+<div class="card">
+  <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Sign in with your owner name and private key.</p>
+  <label>Owner Name</label>
+  <input type="text" id="loginOwner" placeholder="e.g. myname" autocomplete="off" autofocus/>
+  <label>Private Key</label>
+  <textarea id="loginKey" placeholder="Paste your private key here" rows="3"></textarea>
+  <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
+  <div id="loginResult" class="hidden"></div>
+  <div id="loginSuccess" class="hidden">
+    <div class="success-panel">
+      <h3>&#x2713; Authenticated</h3>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:4px" id="loginRoles"></p>
+      <a id="loginDashLink" href="#" class="btn-green">Open Dashboard &#x2192;</a>
+      <div style="margin-top:14px;text-align:left">
+        <label>JWT Token (for API use)</label>
+        <div class="key-box" id="loginJwtBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
 </div>
 
-<div class="card hidden" id="step3card">
-<h2><span class="step-num step-done" id="s3n">3</span>Open Dashboard</h2>
-<p style="font-size:.85rem;color:var(--muted);margin-bottom:8px">Your operator JWT is ready. Click below to open the dashboard.</p>
-<a id="dashLink" href="#" class="btn-green" style="display:inline-block;text-decoration:none;text-align:center;padding:10px 24px;border-radius:6px">Open Dashboard &#x2192;</a>
-<div style="margin-top:12px">
-<label>JWT Token (for API use)</label>
-<div class="key-box" id="jwtBox"></div>
+<!-- ═══ REGISTER TAB ═══ -->
+<div class="tab-panel" id="panel-register">
+<div class="card">
+  <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Create a new owner account. The first owner gets the <strong>operator</strong> role.</p>
+  <label>Owner Name</label>
+  <input type="text" id="regOwner" placeholder="e.g. myname" autocomplete="off"/>
+  <label>Display Name (optional)</label>
+  <input type="text" id="regDisplay" placeholder="e.g. Node Operator"/>
+  <button class="btn-primary" id="btnRegister" onclick="doRegister()">Create Account</button>
+  <div id="regResult" class="hidden"></div>
+  <div id="regKeys" class="hidden">
+    <div class="divider"><span>YOUR KEYS</span></div>
+    <div class="warn">&#x26A0; Save your private key NOW \u2014 it cannot be recovered!</div>
+    <label>Private Key</label>
+    <div class="key-box" id="regPrivateKey"></div>
+    <label>Public Key</label>
+    <div class="key-box" id="regPublicKey"></div>
+    <div class="divider"><span>CONTINUE</span></div>
+    <button class="btn-primary" id="btnRegToken" onclick="doRegToken()">Login &amp; Open Dashboard</button>
+    <div id="regTokenResult" class="hidden"></div>
+    <div id="regSuccess" class="hidden">
+      <div class="success-panel">
+        <h3>&#x2713; Authenticated</h3>
+        <p style="color:var(--muted);font-size:.85rem;margin-bottom:4px" id="regRoles"></p>
+        <a id="regDashLink" href="#" class="btn-green">Open Dashboard &#x2192;</a>
+        <div style="margin-top:14px;text-align:left">
+          <label>JWT Token (for API use)</label>
+          <div class="key-box" id="regJwtBox"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 </div>
 
 </div>
 <script>
 const PW='{{PW}}';
-let savedOwner='',savedKey='';
+let regOwner='',regKey='';
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
+  document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+}
 
 async function api(method,path,body){
   const h={'Content-Type':'application/json','X-Admin-Password':PW};
@@ -1005,43 +1294,61 @@ async function api(method,path,body){
 }
 
 function show(id,html,cls){const el=document.getElementById(id);el.className='result '+(cls||'');el.innerHTML=html;el.classList.remove('hidden');}
+function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML;}
 
+/* ── LOGIN ── */
+async function doLogin(){
+  const owner=document.getElementById('loginOwner').value.trim();
+  const key=document.getElementById('loginKey').value.trim();
+  if(!owner||!key){show('loginResult','Owner name and private key are required','result-err');return;}
+  document.getElementById('btnLogin').disabled=true;
+  document.getElementById('btnLogin').textContent='Signing in...';
+  document.getElementById('loginSuccess').classList.add('hidden');
+  try{
+    const r=await api('POST','/v1/admin/setup/token',{owner:owner,private_key:key});
+    if(!r.ok){show('loginResult',esc(r.error),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';return;}
+    document.getElementById('loginResult').classList.add('hidden');
+    document.getElementById('loginRoles').textContent='Roles: '+r.roles.join(', ');
+    document.getElementById('loginDashLink').href=r.dashboard_url;
+    document.getElementById('loginJwtBox').textContent=r.token;
+    document.getElementById('loginSuccess').classList.remove('hidden');
+    document.getElementById('btnLogin').textContent='Login';
+    document.getElementById('btnLogin').disabled=false;
+  }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';}
+}
+
+/* ── REGISTER ── */
 async function doRegister(){
-  const name=document.getElementById('ownerName').value.trim();
-  const dname=document.getElementById('displayName').value.trim();
+  const name=document.getElementById('regOwner').value.trim();
+  const dname=document.getElementById('regDisplay').value.trim();
   if(!name){show('regResult','Owner name is required','result-err');return;}
   document.getElementById('btnRegister').disabled=true;
   try{
-    const r=await api('POST','/v1/admin/setup/register',{name,display_name:dname||undefined});
+    const r=await api('POST','/v1/admin/setup/register',{name:name,display_name:dname||undefined});
     if(!r.ok){show('regResult',esc(r.error),'result-err');document.getElementById('btnRegister').disabled=false;return;}
-    savedOwner=r.owner.name;savedKey=r.private_key;
-    const isOp=r.owner.roles.includes('operator');
-    show('regResult',
-      '<strong>Owner registered!</strong> Roles: '+r.owner.roles.join(', ')
-      +(isOp?'<br/><span style="color:var(--green)">&#x2713; You are the operator</span>':'')
-      +'<div class="warn">&#x26A0; Save your private key securely \u2014 it cannot be recovered.</div>'
-      +'<label>Private Key</label><div class="key-box">'+esc(r.private_key)+'</div>'
-      +'<label>Public Key</label><div class="key-box">'+esc(r.public_key)+'</div>'
-    ,'result-ok');
-    document.getElementById('s1n').classList.add('step-done');
-    document.getElementById('step2card').classList.remove('hidden');
+    regOwner=r.owner.name;regKey=r.private_key;
+    var roles=r.owner.roles.join(', ');
+    show('regResult','<strong>Account created!</strong> Roles: '+roles,'result-ok');
+    document.getElementById('regPrivateKey').textContent=r.private_key;
+    document.getElementById('regPublicKey').textContent=r.public_key;
+    document.getElementById('regKeys').classList.remove('hidden');
   }catch(e){show('regResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnRegister').disabled=false;}
 }
 
-async function doToken(){
-  if(!savedOwner||!savedKey){show('tokenResult','Register an owner first','result-err');return;}
-  document.getElementById('btnToken').disabled=true;
+async function doRegToken(){
+  if(!regOwner||!regKey){show('regTokenResult','Register first','result-err');return;}
+  document.getElementById('btnRegToken').disabled=true;
+  document.getElementById('btnRegToken').textContent='Signing in...';
   try{
-    const r=await api('POST','/v1/admin/setup/token',{owner:savedOwner,private_key:savedKey});
-    if(!r.ok){show('tokenResult',esc(r.error),'result-err');document.getElementById('btnToken').disabled=false;return;}
-    document.getElementById('s2n').classList.add('step-done');
-    document.getElementById('step3card').classList.remove('hidden');
-    document.getElementById('dashLink').href=r.dashboard_url;
-    document.getElementById('jwtBox').textContent=r.token;
-    show('tokenResult','<strong>JWT issued!</strong> Roles: '+r.roles.join(', ')+' \u2014 expires: '+new Date(r.expires_at).toLocaleString(),'result-ok');
-  }catch(e){show('tokenResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnToken').disabled=false;}
+    const r=await api('POST','/v1/admin/setup/token',{owner:regOwner,private_key:regKey});
+    if(!r.ok){show('regTokenResult',esc(r.error),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';return;}
+    document.getElementById('regTokenResult').classList.add('hidden');
+    document.getElementById('regRoles').textContent='Roles: '+r.roles.join(', ');
+    document.getElementById('regDashLink').href=r.dashboard_url;
+    document.getElementById('regJwtBox').textContent=r.token;
+    document.getElementById('regSuccess').classList.remove('hidden');
+    document.getElementById('btnRegToken').classList.add('hidden');
+  }catch(e){show('regTokenResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';}
 }
-
-function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML;}
 </script>
 </body></html>`;
