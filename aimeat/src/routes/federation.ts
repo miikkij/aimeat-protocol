@@ -25,7 +25,7 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
         res.json(success(config.nodeId, {
             self: {
                 node_id: config.nodeId,
-                capabilities: ['memory', 'actions', 'work', 'wallet', 'boards'],
+                capabilities: ['memory', 'micro_memory', 'actions', 'work', 'wallet', 'boards'],
             },
             peers: peerList,
             total: peerList.length,
@@ -602,7 +602,7 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
         res.json(success(config.nodeId, {
             node_id: config.nodeId,
             public_key: nodeKey?.publicKey ?? '',
-            capabilities: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
+            capabilities: ['memory', 'micro_memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
             accepted: true,
         }));
     });

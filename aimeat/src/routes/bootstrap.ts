@@ -9,13 +9,14 @@ export function bootstrapRouter(config: MeatConfig): Router {
     res.json(success(config.nodeId, {
       description: 'AI Memory Exchange and Action Transfer protocol node',
       welcome: 'Welcome to MEAT — AI Infrastructure: Memory, Economy, Actions, Trust. Protocol: AIMEAT v1.2 | License: MIT | The network starts here.',
-      capabilities: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
+      capabilities: ['memory', 'micro_memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
       extended_features_enabled: config.extendedFeaturesEnabled,
       endpoints: {
         register_owner: { method: 'POST', url: '/v1/owners', description: 'Register a new owner identity', tier: 'core' },
         register_agent: { method: 'POST', url: '/v1/agents', description: 'Register a new agent under an owner', tier: 'core' },
         authenticate: { method: 'POST', url: '/v1/auth/token', description: 'Sign challenge to get JWT session', tier: 'core' },
         memory: { method: 'GET', url: '/v1/memory', description: 'Read/write agent memory (auth required)', tier: 'core' },
+        micro_memory: { method: 'GET', url: '/v1/mm', description: 'Lightweight GET-based memory for Tier 0.5 agents (OTK auth)', tier: 'core' },
         catalogue: { method: 'GET', url: '/v1/catalogue', description: 'Browse public action catalogue', tier: 'core' },
         boards: { method: 'GET', url: '/v1/boards', description: 'Browse notification boards', tier: 'extended' },
         spec: { method: 'GET', url: '/v1/spec', description: 'Full API specification (OpenAPI 3.1)', tier: 'core' },
