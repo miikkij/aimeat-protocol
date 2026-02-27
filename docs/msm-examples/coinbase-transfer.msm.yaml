@@ -1,0 +1,133 @@
+# MEAT Service Manifest v1.0 — Coinbase CDP Kryptosiirto
+# Käyttö: 08-marketplace-disruption.md → Maksu (krypto-reitti)
+# Coinbase AgentKit mahdollistaa agentin hallitseman kryptolompakon.
+
+msm: "1.0"
+service:
+  name: "Coinbase CDP Crypto Transfer"
+  description: "Send cryptocurrency payments (USDC, ETH, BTC) via Coinbase AgentKit wallet"
+  homepage: "https://docs.cdp.coinbase.com/agent-kit"
+  category: "utility"
+  tags: ["crypto", "payment", "coinbase", "usdc", "ethereum", "bitcoin", "agentkit", "blockchain"]
+
+auth:
+  type: "api_key"
+  header: "X-CDP-API-Key"
+  env_var: "CDP_API_KEY"
+
+actions:
+  - id: "send-crypto"
+    display_name: "Send Crypto Payment"
+    description: >
+      Send cryptocurrency from agent's wallet to a recipient address.
+      Supports USDC (recommended for marketplace — stable price), ETH, BTC, SOL.
+      Transactions on Base network are fast and low-fee.
+
+    endpoint:
+      method: POST
+      url: "https://api.cdp.coinbase.com/platform/v1/wallets/{input.wallet_id}/transfers"
+      content_type: "application/json"
+
+    input:
+      wallet_id:
+        type: string
+        required: true
+        description: "Agent's CDP wallet ID"
+      amount:
+        type: string
+        required: true
+        description: "Amount to send (e.g., '50.00' for 50 USDC)"
+      currency:
+        type: string
+        required: true
+        description: "Cryptocurrency to send"
+        enum: ["USDC", "ETH", "BTC", "SOL", "EURC"]
+      to_address:
+        type: string
+        required: true
+        description: "Recipient wallet address (0x... for EVM, or SOL address)"
+      network:
+        type: string
+        required: false
+        description: "Blockchain network (default: base for lowest fees)"
+        enum: ["base", "ethereum", "polygon", "solana", "arbitrum"]
+      memo:
+        type: string
+        required: false
+        description: "Transaction memo (e.g., AIMEAT tracking code)"
+
+    request_mapping: |
+      {
+        "amount": "{input.amount}",
+        "asset_id": "{input.currency}",
+        "destination": "{input.to_address}",
+        "network_id": "{input.network}",
+        "gasless": true
+      }
+
+    output:
+      transfer_id:
+        type: string
+        description: "CDP transfer ID"
+        from: "id"
+      tx_hash:
+        type: string
+        description: "On-chain transaction hash"
+        from: "transaction_hash"
+      status:
+        type: string
+        description: "Transfer status (pending, completed, failed)"
+        from: "status"
+      network:
+        type: string
+        description: "Network used"
+        from: "network_id"
+
+    pricing:
+      base_morsels: 8
+
+    estimated_time_seconds: 15
+
+    examples:
+      - input:
+          wallet_id: "wal_abc123"
+          amount: "680.00"
+          currency: "USDC"
+          to_address: "0x742d35Cc6634C0532925a3b844Bc9..."
+          network: "base"
+          memo: "tc-1709145600000-a1b2c3d4"
+        output:
+          transfer_id: "xfer_xyz789"
+          tx_hash: "0x8f4b2a1c3d5e6f7..."
+          status: "completed"
+          network: "base"
+
+  - id: "check-balance"
+    display_name: "Check Wallet Balance"
+    description: "Check the agent wallet's cryptocurrency balances"
+
+    endpoint:
+      method: GET
+      url: "https://api.cdp.coinbase.com/platform/v1/wallets/{input.wallet_id}/balances"
+
+    input:
+      wallet_id:
+        type: string
+        required: true
+        description: "CDP wallet ID"
+
+    output:
+      balances:
+        type: array
+        description: "Array of {currency, amount} for each asset"
+        from: "data"
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 2
+
+health:
+  endpoint: "https://api.cdp.coinbase.com/platform/v1/networks"
+  method: GET
+  expected_status: 200

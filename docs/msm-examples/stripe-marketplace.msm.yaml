@@ -1,0 +1,133 @@
+# MEAT Service Manifest v1.0 — Stripe Connect Marketplace-maksut
+# Käyttö: 08-marketplace-disruption.md → Maksu & Toimitus -vaihe
+# Stripe Connect mahdollistaa suorat maksut myyjälle ilman välikättä.
+
+msm: "1.0"
+service:
+  name: "Stripe Marketplace Payment"
+  description: "Create and manage marketplace payments between buyers and sellers via Stripe Connect"
+  homepage: "https://stripe.com/connect"
+  category: "utility"
+  tags: ["payment", "stripe", "marketplace", "fiat", "credit-card", "escrow"]
+
+auth:
+  type: "bearer"
+  env_var: "STRIPE_SECRET_KEY"
+
+actions:
+  - id: "create-payment-intent"
+    display_name: "Create Marketplace Payment"
+    description: >
+      Create a Stripe PaymentIntent for a marketplace transaction. Funds go directly
+      to the seller's connected Stripe account. Supports EUR, USD, GBP, SEK.
+      Optional application_fee for platform costs.
+
+    endpoint:
+      method: POST
+      url: "https://api.stripe.com/v1/payment_intents"
+      content_type: "application/x-www-form-urlencoded"
+
+    input:
+      amount_cents:
+        type: integer
+        required: true
+        description: "Amount in cents (e.g., 68000 = 680.00€)"
+      currency:
+        type: string
+        required: true
+        description: "ISO 4217 currency code"
+        enum: ["eur", "usd", "gbp", "sek", "nok", "dkk"]
+      seller_stripe_account:
+        type: string
+        required: true
+        description: "Seller's Stripe Connect account ID (acct_...)"
+      description:
+        type: string
+        required: true
+        description: "Payment description (e.g., 'iPhone 15 Pro - Marketplace Purchase')"
+      buyer_email:
+        type: string
+        required: false
+        description: "Buyer's email for receipt"
+      metadata_tracking_code:
+        type: string
+        required: false
+        description: "AIMEAT tracking code for reconciliation"
+    
+    request_mapping: |
+      amount={input.amount_cents}&currency={input.currency}&transfer_data[destination]={input.seller_stripe_account}&description={input.description}&receipt_email={input.buyer_email}&metadata[aimeat_tc]={input.metadata_tracking_code}
+
+    output:
+      payment_id:
+        type: string
+        description: "Stripe PaymentIntent ID"
+        from: "id"
+      client_secret:
+        type: string
+        description: "Client secret for frontend confirmation"
+        from: "client_secret"
+      status:
+        type: string
+        description: "Payment status (requires_payment_method, succeeded, etc.)"
+        from: "status"
+      amount:
+        type: integer
+        description: "Confirmed amount in cents"
+        from: "amount"
+
+    pricing:
+      base_morsels: 5
+
+    estimated_time_seconds: 3
+
+    examples:
+      - input:
+          amount_cents: 68000
+          currency: "eur"
+          seller_stripe_account: "acct_1MqVnGLk..."
+          description: "iPhone 15 Pro - AIMEAT Marketplace"
+          metadata_tracking_code: "tc-1709145600000-a1b2c3d4"
+        output:
+          payment_id: "pi_3OqV..."
+          client_secret: "pi_3OqV..._secret_..."
+          status: "requires_payment_method"
+          amount: 68000
+
+  - id: "check-payment-status"
+    display_name: "Check Payment Status"
+    description: "Check the status of an existing payment"
+
+    endpoint:
+      method: GET
+      url: "https://api.stripe.com/v1/payment_intents/{input.payment_id}"
+
+    input:
+      payment_id:
+        type: string
+        required: true
+        description: "Stripe PaymentIntent ID (pi_...)"
+
+    output:
+      status:
+        type: string
+        from: "status"
+      amount:
+        type: integer
+        from: "amount"
+      currency:
+        type: string
+        from: "currency"
+      paid:
+        type: boolean
+        description: "Whether payment has been received"
+        from: "charges.data[0].paid"
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 1
+
+health:
+  endpoint: "https://api.stripe.com/v1/balance"
+  method: GET
+  expected_status: 200

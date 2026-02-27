@@ -1,0 +1,220 @@
+# MEAT Service Manifest v1.0 — Posti SmartShip Pakettilähetys
+# Käyttö: 08-marketplace-disruption.md → Maksu & Toimitus -vaihe
+# Myyjän agentti luo lähetyksen ja saa seurantakoodin automaattisesti.
+
+msm: "1.0"
+service:
+  name: "Posti SmartShip"
+  description: "Create parcel shipments within Finland and to/from EU via Posti SmartShip API"
+  homepage: "https://www.posti.fi/en/for-businesses/parcel-and-logistics-services"
+  category: "utility"
+  tags: ["shipping", "logistics", "posti", "finland", "parcel", "tracking", "delivery"]
+
+auth:
+  type: "oauth2"
+  token_url: "https://oauth.posti.com/token"
+  env_var: "POSTI_CLIENT_ID"
+  env_var_secret: "POSTI_CLIENT_SECRET"
+
+actions:
+  - id: "create-shipment"
+    display_name: "Create Parcel Shipment"
+    description: >
+      Create a domestic or international parcel shipment. Returns tracking code
+      and shipping label URL. Supports Posti Economy, Express, and Pickup Point deliveries.
+
+    endpoint:
+      method: POST
+      url: "https://api.posti.fi/shipment/v3/shipments"
+      content_type: "application/json"
+
+    input:
+      sender_name:
+        type: string
+        required: true
+        description: "Sender's full name"
+      sender_address:
+        type: string
+        required: true
+        description: "Sender's street address"
+      sender_postcode:
+        type: string
+        required: true
+        description: "Sender's postal code"
+      sender_city:
+        type: string
+        required: true
+        description: "Sender's city"
+      sender_country:
+        type: string
+        required: false
+        description: "Sender's country code (default: FI)"
+        enum: ["FI", "SE", "EE", "DE", "FR", "NL"]
+      recipient_name:
+        type: string
+        required: true
+        description: "Recipient's full name"
+      recipient_address:
+        type: string
+        required: true
+        description: "Recipient's street address"
+      recipient_postcode:
+        type: string
+        required: true
+        description: "Recipient's postal code"
+      recipient_city:
+        type: string
+        required: true
+        description: "Recipient's city"
+      recipient_country:
+        type: string
+        required: false
+        description: "Recipient's country code (default: FI)"
+      recipient_phone:
+        type: string
+        required: false
+        description: "Recipient's phone for SMS notification"
+      recipient_email:
+        type: string
+        required: false
+        description: "Recipient's email for tracking updates"
+      weight_kg:
+        type: number
+        required: true
+        description: "Package weight in kilograms"
+      length_cm:
+        type: integer
+        required: false
+        description: "Package length in cm"
+      width_cm:
+        type: integer
+        required: false
+        description: "Package width in cm"
+      height_cm:
+        type: integer
+        required: false
+        description: "Package height in cm"
+      service_code:
+        type: string
+        required: false
+        description: "Delivery service type"
+        enum: ["2103", "2104", "2017"]
+        # 2103 = Postal Parcel, 2104 = Express, 2017 = Pickup Point
+      contents_description:
+        type: string
+        required: false
+        description: "Package contents for customs (international)"
+
+    request_mapping: |
+      {
+        "shipments": [{
+          "sender": {
+            "name": "{input.sender_name}",
+            "address": "{input.sender_address}",
+            "postcode": "{input.sender_postcode}",
+            "city": "{input.sender_city}",
+            "country": "{input.sender_country}"
+          },
+          "recipient": {
+            "name": "{input.recipient_name}",
+            "address": "{input.recipient_address}",
+            "postcode": "{input.recipient_postcode}",
+            "city": "{input.recipient_city}",
+            "country": "{input.recipient_country}",
+            "phone": "{input.recipient_phone}",
+            "email": "{input.recipient_email}"
+          },
+          "parcels": [{
+            "weight": {input.weight_kg},
+            "length": {input.length_cm},
+            "width": {input.width_cm},
+            "height": {input.height_cm},
+            "contents": "{input.contents_description}"
+          }],
+          "serviceCode": "{input.service_code}"
+        }]
+      }
+
+    output:
+      tracking_code:
+        type: string
+        description: "Posti tracking code (e.g., JJFI12345678901234)"
+        from: "shipments[0].trackingCodes[0]"
+      label_url:
+        type: string
+        description: "URL to download the shipping label PDF"
+        from: "shipments[0].labelUrl"
+      tracking_url:
+        type: string
+        description: "Public tracking page URL"
+        from: "shipments[0].trackingUrl"
+      estimated_delivery:
+        type: string
+        description: "Estimated delivery date"
+        from: "shipments[0].estimatedDelivery"
+
+    pricing:
+      base_morsels: 3
+
+    estimated_time_seconds: 5
+
+    examples:
+      - input:
+          sender_name: "Matti Meikäläinen"
+          sender_address: "Mannerheimintie 1"
+          sender_postcode: "00100"
+          sender_city: "Helsinki"
+          recipient_name: "Liisa Virtanen"
+          recipient_address: "Hämeenkatu 10"
+          recipient_postcode: "33100"
+          recipient_city: "Tampere"
+          weight_kg: 0.5
+          service_code: "2103"
+          contents_description: "iPhone 15 Pro"
+        output:
+          tracking_code: "JJFI64574900001234567"
+          label_url: "https://api.posti.fi/labels/JJFI64574900001234567.pdf"
+          tracking_url: "https://www.posti.fi/en/tracking?code=JJFI64574900001234567"
+          estimated_delivery: "2026-03-02"
+
+  - id: "track-shipment"
+    display_name: "Track Shipment"
+    description: "Get current status and location of a shipment"
+
+    endpoint:
+      method: GET
+      url: "https://api.posti.fi/shipment-tracking/v1/tracking/{input.tracking_code}"
+
+    input:
+      tracking_code:
+        type: string
+        required: true
+        description: "Posti tracking code"
+
+    output:
+      status:
+        type: string
+        description: "Current shipment status"
+        from: "shipments[0].events[0].status"
+      location:
+        type: string
+        description: "Current/last known location"
+        from: "shipments[0].events[0].location"
+      timestamp:
+        type: string
+        description: "Last event timestamp"
+        from: "shipments[0].events[0].timestamp"
+      delivered:
+        type: boolean
+        description: "Whether package has been delivered"
+        from: "shipments[0].delivered"
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 2
+
+health:
+  endpoint: "https://api.posti.fi/shipment/v3/health"
+  method: GET
+  expected_status: 200

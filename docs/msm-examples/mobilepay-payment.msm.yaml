@@ -1,0 +1,123 @@
+# MEAT Service Manifest v1.0 — MobilePay Mobiilimaksu
+# Käyttö: 08-marketplace-disruption.md → Maksuintegraatiot (pohjoismaat)
+# Ostajan agentti käynnistää MobilePay-maksun suoraan myyjälle.
+
+msm: "1.0"
+service:
+  name: "MobilePay App Payments"
+  description: "Accept and initiate MobilePay payments for Nordic marketplace transactions"
+  homepage: "https://developer.mobilepay.dk"
+  category: "utility"
+  tags: ["payment", "mobilepay", "vipps", "nordic", "mobile", "finland", "denmark"]
+
+auth:
+  type: "oauth2"
+  token_url: "https://api.mobilepay.dk/merchant-authentication-openidconnect/connect/token"
+  env_var: "MOBILEPAY_CLIENT_ID"
+  env_var_secret: "MOBILEPAY_CLIENT_SECRET"
+
+actions:
+  - id: "create-payment"
+    display_name: "Create MobilePay Payment"
+    description: >
+      Create a MobilePay payment request. The buyer receives a push notification
+      on their phone to approve the payment. Funds go to the merchant's settlement account.
+
+    endpoint:
+      method: POST
+      url: "https://api.mobilepay.dk/v1/payments"
+      content_type: "application/json"
+
+    input:
+      amount:
+        type: number
+        required: true
+        description: "Payment amount (e.g., 680.00)"
+      currency:
+        type: string
+        required: false
+        description: "Currency code (default: EUR)"
+        enum: ["EUR", "DKK"]
+      description:
+        type: string
+        required: true
+        description: "Payment description shown to buyer"
+      reference:
+        type: string
+        required: true
+        description: "Unique payment reference (e.g., AIMEAT tracking code)"
+      redirect_uri:
+        type: string
+        required: false
+        description: "URL to redirect after payment"
+
+    request_mapping: |
+      {
+        "amount": {input.amount},
+        "currency": "{input.currency}",
+        "description": "{input.description}",
+        "reference": "{input.reference}",
+        "redirectUri": "{input.redirect_uri}"
+      }
+
+    output:
+      payment_id:
+        type: string
+        description: "MobilePay payment ID"
+        from: "paymentId"
+      mobile_pay_deep_link:
+        type: string
+        description: "Deep link to open MobilePay app on user's phone"
+        from: "mobilePayAppRedirectUri"
+      state:
+        type: string
+        description: "Payment state (initiated, reserved, captured)"
+        from: "state"
+
+    pricing:
+      base_morsels: 3
+
+    estimated_time_seconds: 2
+
+    examples:
+      - input:
+          amount: 680.00
+          currency: "EUR"
+          description: "iPhone 15 Pro - AIMEAT Marketplace"
+          reference: "tc-1709145600000-a1b2c3d4"
+        output:
+          payment_id: "186d2b31-ff25-4414-9fd1-bdbf6aec0bc5"
+          mobile_pay_deep_link: "mobilepay://payment?id=186d2b31..."
+          state: "initiated"
+
+  - id: "check-payment"
+    display_name: "Check MobilePay Payment Status"
+    description: "Check whether a MobilePay payment has been approved by the buyer"
+
+    endpoint:
+      method: GET
+      url: "https://api.mobilepay.dk/v1/payments/{input.payment_id}"
+
+    input:
+      payment_id:
+        type: string
+        required: true
+        description: "MobilePay payment ID"
+
+    output:
+      state:
+        type: string
+        description: "Payment state"
+        from: "state"
+      amount:
+        type: number
+        from: "amount"
+      paid_at:
+        type: string
+        description: "Timestamp when payment was approved"
+        from: "paidAt"
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 1

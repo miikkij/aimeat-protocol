@@ -1,0 +1,154 @@
+# MEAT Service Manifest v1.0 — AI Logo Design
+# Käyttö: 09-service-ecosystem.md → Fiverr/Upwork-korvaaja (Agent C: Designer)
+# Keikkatyöagentti tarjoaa AI-pohjaista logosuunnittelua actionina.
+
+msm: "1.0"
+service:
+  name: "AI Logo Generator"
+  description: "Generate professional logos and brand designs using AI image generation"
+  homepage: "https://platform.openai.com/docs/guides/images"
+  category: "image"
+  tags: ["logo", "design", "branding", "ai-generation", "dall-e", "freelance", "gig"]
+
+auth:
+  type: "bearer"
+  env_var: "OPENAI_API_KEY"
+
+actions:
+  - id: "generate-logo"
+    display_name: "Generate Logo Concepts"
+    description: >
+      Generate logo design concepts based on a text description.
+      Returns multiple logo variants in different styles.
+      Replaces hiring a freelance designer for initial concepts.
+
+    endpoint:
+      method: POST
+      url: "https://api.openai.com/v1/images/generations"
+      content_type: "application/json"
+
+    input:
+      business_name:
+        type: string
+        required: true
+        description: "Name of the business or brand"
+      industry:
+        type: string
+        required: true
+        description: "Industry or business category (e.g., 'tech startup', 'bakery')"
+      style:
+        type: string
+        required: false
+        description: "Visual style preference"
+        enum: ["minimalist", "modern", "vintage", "playful", "corporate", "handdrawn"]
+      colors:
+        type: array
+        items:
+          type: string
+        required: false
+        description: "Preferred colors (e.g., ['blue', 'white'])"
+      variants:
+        type: integer
+        required: false
+        description: "Number of logo variants to generate (1-4, default: 3)"
+
+    request_mapping: |
+      {
+        "model": "dall-e-3",
+        "prompt": "Professional logo design for '{input.business_name}', a {input.industry} company. Style: {input.style}. Colors: {input.colors}. Clean vector-style logo on white background, suitable for business use.",
+        "n": {input.variants},
+        "size": "1024x1024",
+        "quality": "hd"
+      }
+
+    output:
+      images:
+        type: array
+        items:
+          type: object
+          properties:
+            url:
+              type: string
+              description: "URL to the generated logo image"
+            revised_prompt:
+              type: string
+              description: "Refined prompt used for generation"
+        from: "data"
+      model:
+        type: string
+        from: "model"
+
+    pricing:
+      base_morsels: 15
+      per_unit: 5
+      unit: "variant"
+
+    estimated_time_seconds: 30
+
+    examples:
+      - input:
+          business_name: "NordTech Oy"
+          industry: "technology consulting"
+          style: "minimalist"
+          colors: ["#0066CC", "#FFFFFF"]
+          variants: 3
+        output:
+          images:
+            - url: "https://oaidalleapi..."
+              revised_prompt: "A minimalist professional logo for NordTech Oy..."
+            - url: "https://oaidalleapi..."
+              revised_prompt: "Clean geometric logo design..."
+            - url: "https://oaidalleapi..."
+              revised_prompt: "Nordic-inspired tech logo..."
+          model: "dall-e-3"
+
+  - id: "refine-logo"
+    display_name: "Refine Logo Design"
+    description: >
+      Take an existing logo concept and generate refined variations
+      based on feedback. Uses image editing to modify specific aspects.
+
+    endpoint:
+      method: POST
+      url: "https://api.openai.com/v1/images/edits"
+      content_type: "multipart/form-data"
+
+    input:
+      image_url:
+        type: string
+        required: true
+        description: "URL of the logo to refine"
+      feedback:
+        type: string
+        required: true
+        description: "Refinement instructions (e.g., 'make the font bolder, add more blue')"
+
+    request_mapping: |
+      {
+        "model": "dall-e-2",
+        "image": "{input.image_url}",
+        "prompt": "Refine this logo: {input.feedback}. Maintain professional quality.",
+        "n": 2,
+        "size": "1024x1024"
+      }
+
+    output:
+      refined_images:
+        type: array
+        items:
+          type: object
+          properties:
+            url:
+              type: string
+        from: "data"
+
+    pricing:
+      base_morsels: 10
+
+    estimated_time_seconds: 20
+
+health:
+  endpoint: "https://api.openai.com/v1/models"
+  method: GET
+  interval_seconds: 300
+  expected_status: 200

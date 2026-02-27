@@ -1,0 +1,196 @@
+# MEAT Service Manifest v1.0 — Nuki Smart Lock
+# Käyttö: 09-service-ecosystem.md → Airbnb-korvaaja (KEY→LOCK integraatio)
+# Majoitusagentti hallinnoi etälukkoja vieraiden sisäänkirjautumista varten.
+
+msm: "1.0"
+service:
+  name: "Nuki Smart Lock Control"
+  description: "Remote smart lock management for AIMEAT accommodation agents — grant/revoke guest access"
+  homepage: "https://developer.nuki.io"
+  category: "utility"
+  tags: ["smartlock", "iot", "access-control", "accommodation", "airbnb", "nuki", "key-management"]
+
+auth:
+  type: "bearer"
+  env_var: "NUKI_API_TOKEN"
+
+actions:
+  - id: "grant-access"
+    display_name: "Grant Guest Access"
+    description: >
+      Create a time-limited access authorization for a guest.
+      The guest receives a 6-digit PIN code or Bluetooth key
+      valid only during their booking period. Automatically expires.
+
+    endpoint:
+      method: PUT
+      url: "https://api.nuki.io/smartlock/{input.smartlock_id}/auth"
+      content_type: "application/json"
+
+    input:
+      smartlock_id:
+        type: string
+        required: true
+        description: "Nuki Smart Lock device ID"
+      guest_name:
+        type: string
+        required: true
+        description: "Guest display name for the access log"
+      access_type:
+        type: string
+        required: false
+        description: "Type of access to grant"
+        enum: ["pin", "app"]
+      pin_code:
+        type: string
+        required: false
+        description: "Custom 6-digit PIN (auto-generated if omitted)"
+      valid_from:
+        type: string
+        required: true
+        description: "Access start time (ISO 8601)"
+      valid_until:
+        type: string
+        required: true
+        description: "Access end time (ISO 8601)"
+      allowed_times:
+        type: integer
+        required: false
+        description: "Max number of lock/unlock cycles (unlimited if omitted)"
+
+    request_mapping: |
+      {
+        "name": "{input.guest_name}",
+        "type": 13,
+        "code": {input.pin_code},
+        "allowedFromDate": "{input.valid_from}",
+        "allowedUntilDate": "{input.valid_until}",
+        "allowedCount": {input.allowed_times}
+      }
+
+    output:
+      auth_id:
+        type: string
+        description: "Authorization ID (for later revocation)"
+      pin_code:
+        type: string
+        description: "The PIN code assigned to the guest"
+      valid_from:
+        type: string
+      valid_until:
+        type: string
+      lock_name:
+        type: string
+        description: "Smart lock display name"
+
+    pricing:
+      base_morsels: 2
+
+    estimated_time_seconds: 3
+
+    examples:
+      - input:
+          smartlock_id: "512345678"
+          guest_name: "Matti V."
+          access_type: "pin"
+          valid_from: "2025-01-20T15:00:00+02:00"
+          valid_until: "2025-01-23T11:00:00+02:00"
+          allowed_times: 20
+        output:
+          auth_id: "auth-9a8b7c6d"
+          pin_code: "483921"
+          valid_from: "2025-01-20T15:00:00+02:00"
+          valid_until: "2025-01-23T11:00:00+02:00"
+          lock_name: "Asunto Kallio 3B"
+
+  - id: "revoke-access"
+    display_name: "Revoke Guest Access"
+    description: >
+      Immediately revoke a guest's access authorization.
+      Used after checkout or in case of security concerns.
+
+    endpoint:
+      method: DELETE
+      url: "https://api.nuki.io/smartlock/{input.smartlock_id}/auth/{input.auth_id}"
+
+    input:
+      smartlock_id:
+        type: string
+        required: true
+        description: "Nuki Smart Lock device ID"
+      auth_id:
+        type: string
+        required: true
+        description: "Authorization ID to revoke"
+
+    output:
+      revoked:
+        type: boolean
+        description: "Whether revocation was successful"
+      revoked_at:
+        type: string
+        description: "Revocation timestamp"
+
+    pricing:
+      base_morsels: 1
+
+    estimated_time_seconds: 2
+
+  - id: "lock-status"
+    display_name: "Get Lock Status"
+    description: "Check current lock state, battery level, and recent activity"
+
+    endpoint:
+      method: GET
+      url: "https://api.nuki.io/smartlock/{input.smartlock_id}"
+
+    input:
+      smartlock_id:
+        type: string
+        required: true
+        description: "Nuki Smart Lock device ID"
+
+    output:
+      state:
+        type: string
+        description: "Current lock state"
+        enum: ["locked", "unlocked", "unlatched", "motor_blocked"]
+      battery_critical:
+        type: boolean
+        description: "Whether battery is critically low"
+      battery_charge:
+        type: integer
+        description: "Battery charge percentage"
+      last_activity:
+        type: object
+        properties:
+          action:
+            type: string
+          name:
+            type: string
+            description: "Who performed the action"
+          timestamp:
+            type: string
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 1
+
+    examples:
+      - input:
+          smartlock_id: "512345678"
+        output:
+          state: "locked"
+          battery_critical: false
+          battery_charge: 78
+          last_activity:
+            action: "lock"
+            name: "Matti V."
+            timestamp: "2025-01-20T22:14:33+02:00"
+
+health:
+  endpoint: "https://api.nuki.io/api/info"
+  method: GET
+  interval_seconds: 600
+  expected_status: 200

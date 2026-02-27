@@ -1,0 +1,146 @@
+# MEAT Service Manifest v1.0 — Hinta-arvio Käytetyille Tuotteille
+# Käyttö: 08-marketplace-disruption.md → Myyjän agentti arvioi markkinahinnan
+# Perustuu hakutuloksiin + historiadataan. Vaihtoehtoisesti voi käyttää mm. PriceRunner-dataa.
+
+msm: "1.0"
+service:
+  name: "Used Product Price Estimation"
+  description: "Estimate fair market price for used products based on product details, condition, and current market data"
+  category: "analysis"
+  tags: ["pricing", "marketplace", "valuation", "used-goods", "estimation"]
+
+auth:
+  type: "bearer"
+  env_var: "OPENAI_API_KEY"
+
+actions:
+  - id: "estimate-price"
+    display_name: "Estimate Used Product Price"
+    description: >
+      Given a product name, condition score, and optional market context, estimate
+      a fair selling price range. Uses AI analysis combining product knowledge,
+      depreciation curves, and market positioning. Returns min/max/recommended prices
+      in the requested currency.
+
+    endpoint:
+      method: POST
+      url: "https://api.openai.com/v1/chat/completions"
+      content_type: "application/json"
+
+    input:
+      product_name:
+        type: string
+        required: true
+        description: "Product name with brand and model (e.g., 'Apple iPhone 15 Pro 256GB')"
+      condition_score:
+        type: integer
+        required: true
+        description: "Condition 1-10 (1=broken, 5=fair, 8=good, 10=like new)"
+      original_price:
+        type: number
+        required: false
+        description: "Original retail price if known (helps accuracy)"
+      age_months:
+        type: integer
+        required: false
+        description: "Product age in months"
+      currency:
+        type: string
+        required: false
+        description: "Currency for price (default: EUR)"
+        enum: ["EUR", "USD", "GBP", "SEK", "NOK", "DKK"]
+      market_region:
+        type: string
+        required: false
+        description: "Market region for local pricing"
+        enum: ["fi", "eu", "us", "uk", "global"]
+      accessories_included:
+        type: array
+        required: false
+        description: "List of included accessories (e.g., ['charger', 'original_box', 'case'])"
+        items: { type: string }
+
+    request_mapping: |
+      {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a used goods pricing expert. Given product details and condition, estimate a fair market price. Return JSON: {min_price: number, max_price: number, recommended_price: number, currency: string, confidence: 'high'|'medium'|'low', reasoning: string, price_factors: [{factor: string, impact: string}], quick_sale_price: number, premium_price: number}"
+          },
+          {
+            "role": "user",
+            "content": "Product: {input.product_name}\nCondition: {input.condition_score}/10\nOriginal price: {input.original_price}\nAge: {input.age_months} months\nCurrency: {input.currency}\nRegion: {input.market_region}\nAccessories: {input.accessories_included}"
+          }
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 500
+      }
+
+    output:
+      min_price:
+        type: number
+        description: "Minimum reasonable price"
+        from: "choices[0].message.content.min_price"
+      max_price:
+        type: number
+        description: "Maximum realistic price"
+        from: "choices[0].message.content.max_price"
+      recommended_price:
+        type: number
+        description: "Recommended listing price for balanced speed/value"
+        from: "choices[0].message.content.recommended_price"
+      quick_sale_price:
+        type: number
+        description: "Price for fast sale (undercut market)"
+        from: "choices[0].message.content.quick_sale_price"
+      currency:
+        type: string
+        from: "choices[0].message.content.currency"
+      confidence:
+        type: string
+        description: "Price confidence level"
+        from: "choices[0].message.content.confidence"
+      reasoning:
+        type: string
+        description: "Explanation of pricing rationale"
+        from: "choices[0].message.content.reasoning"
+
+    pricing:
+      base_morsels: 1
+
+    estimated_time_seconds: 4
+
+    examples:
+      - input:
+          product_name: "Apple iPhone 15 Pro 256GB Natural Titanium"
+          condition_score: 8
+          original_price: 1299
+          age_months: 14
+          currency: "EUR"
+          market_region: "fi"
+          accessories_included: ["charger", "original_box"]
+        output:
+          min_price: 620
+          max_price: 750
+          recommended_price: 680
+          quick_sale_price: 600
+          currency: "EUR"
+          confidence: "high"
+          reasoning: "iPhone 15 Pro retains value well. 14 months old in good condition with accessories. Finnish market slightly higher than EU average."
+
+      - input:
+          product_name: "IKEA KALLAX shelf unit 4x2"
+          condition_score: 6
+          original_price: 79
+          age_months: 36
+          currency: "EUR"
+          market_region: "fi"
+        output:
+          min_price: 15
+          max_price: 35
+          recommended_price: 25
+          quick_sale_price: 15
+          currency: "EUR"
+          confidence: "medium"
+          reasoning: "Common furniture, low margins on used market. Condition fair, age 3 years. Demand stable but supply high."

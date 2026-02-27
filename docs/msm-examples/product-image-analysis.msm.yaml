@@ -1,0 +1,140 @@
+# MEAT Service Manifest v1.0 — Tuotteen Kuva-analyysi
+# Käyttö: 08-marketplace-disruption.md → "Kuvasta Kauppaan" -prosessin ensimmäinen vaihe
+# Agentti ottaa kuvan, tämä action tunnistaa tuotteen, arvioi kunnon ja ehdottaa kuvauksen.
+
+msm: "1.0"
+service:
+  name: "Product Image Analysis"
+  description: "Analyze product photos to identify item, assess condition, extract brand/model, and generate a marketplace listing description"
+  homepage: "https://platform.openai.com/docs/guides/vision"
+  category: "image"
+  tags: ["image-analysis", "product-recognition", "condition-assessment", "marketplace", "listing"]
+
+auth:
+  type: "bearer"
+  env_var: "OPENAI_API_KEY"
+
+actions:
+  - id: "analyze-product-images"
+    display_name: "Analyze Product Images"
+    description: >
+      Send 1-5 product photos and receive: identified product name, brand, model,
+      condition score (1-10), detailed condition notes, suggested marketplace
+      description in Finnish and English, and estimated category tags.
+      Uses GPT-4o vision for accurate multi-image analysis.
+
+    endpoint:
+      method: POST
+      url: "https://api.openai.com/v1/chat/completions"
+      content_type: "application/json"
+
+    input:
+      image_urls:
+        type: array
+        required: true
+        description: "Array of product photo URLs (1-5 images, publicly accessible or base64)"
+        items: { type: string }
+        min_items: 1
+        max_items: 5
+      language:
+        type: string
+        required: false
+        description: "Primary language for description (default: fi)"
+        enum: ["fi", "en", "sv", "de"]
+      category_hint:
+        type: string
+        required: false
+        description: "Optional category hint (e.g., 'electronics', 'clothing', 'furniture')"
+
+    request_mapping: |
+      {
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a marketplace product analyst. Analyze the product photos and return a JSON object with: product_name (string), brand (string or null), model (string or null), condition_score (integer 1-10), condition_notes (string), description_fi (string, Finnish marketplace listing), description_en (string, English), suggested_tags (array of strings), estimated_category (string)."
+          },
+          {
+            "role": "user",
+            "content": [
+              {"type": "text", "text": "Analyze these product images for a marketplace listing. Category hint: {input.category_hint}. Primary language: {input.language}."},
+              {{#each input.image_urls}}
+              {"type": "image_url", "image_url": {"url": "{{this}}"}}
+              {{/each}}
+            ]
+          }
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 1000
+      }
+
+    output:
+      product_name:
+        type: string
+        description: "Identified product name"
+        from: "choices[0].message.content.product_name"
+      brand:
+        type: string
+        description: "Brand name (null if unidentified)"
+        from: "choices[0].message.content.brand"
+      model:
+        type: string
+        description: "Model name/number"
+        from: "choices[0].message.content.model"
+      condition_score:
+        type: integer
+        description: "Condition score 1 (broken) to 10 (like new)"
+        from: "choices[0].message.content.condition_score"
+      condition_notes:
+        type: string
+        description: "Detailed condition description"
+        from: "choices[0].message.content.condition_notes"
+      description_fi:
+        type: string
+        description: "Ready-to-publish Finnish marketplace listing text"
+        from: "choices[0].message.content.description_fi"
+      description_en:
+        type: string
+        description: "English marketplace listing text"
+        from: "choices[0].message.content.description_en"
+      suggested_tags:
+        type: array
+        description: "Suggested tags for board posting"
+        from: "choices[0].message.content.suggested_tags"
+      estimated_category:
+        type: string
+        description: "Product category (electronics, clothing, furniture, etc.)"
+        from: "choices[0].message.content.estimated_category"
+
+    pricing:
+      base_morsels: 3
+      per_unit:
+        unit: "images"
+        morsels_per_1000: 500  # ~0.5 morsels per image
+
+    estimated_time_seconds: 8
+    max_input_size_bytes: 20971520  # 20MB (images)
+
+    examples:
+      - input:
+          image_urls:
+            - "https://example.com/photos/iphone15pro-front.jpg"
+            - "https://example.com/photos/iphone15pro-back.jpg"
+            - "https://example.com/photos/iphone15pro-screen.jpg"
+          language: "fi"
+          category_hint: "electronics"
+        output:
+          product_name: "iPhone 15 Pro"
+          brand: "Apple"
+          model: "iPhone 15 Pro 256GB Natural Titanium"
+          condition_score: 8
+          condition_notes: "Screen in excellent condition, no scratches. Minor scuff on bottom edge. Battery health not visible from photos. Original box not shown."
+          description_fi: "Apple iPhone 15 Pro 256GB Natural Titanium. Erinomainen kunto, näytössä ei naarmuja. Pieni käytön jälki pohjareunassa. Toimii moitteettomasti."
+          description_en: "Apple iPhone 15 Pro 256GB Natural Titanium. Excellent condition, screen scratch-free. Minor scuff on bottom edge."
+          suggested_tags: ["electronics", "iphone", "apple", "smartphone", "iphone-15-pro", "used"]
+          estimated_category: "electronics"
+
+health:
+  endpoint: "https://api.openai.com/v1/models"
+  method: GET
+  expected_status: 200

@@ -1,0 +1,257 @@
+# MEAT Service Manifest v1.0 — Wolt-tyylinen Ravintolajärjestelmä
+# Käyttö: 09-service-ecosystem.md → DoorDash/Wolt-korvaaja
+# Ravintola-agentti vastaanottaa tilauksia ja hallinnoi ruokakuljetuksia.
+
+msm: "1.0"
+service:
+  name: "Restaurant Order System"
+  description: "Accept food orders, manage menu, and coordinate delivery for AIMEAT-connected restaurants"
+  homepage: "https://restaurant.wolt.com"
+  category: "utility"
+  tags: ["food", "delivery", "restaurant", "order", "wolt", "menu", "logistics"]
+
+auth:
+  type: "api_key"
+  env_var: "RESTAURANT_API_KEY"
+
+actions:
+  - id: "get-menu"
+    display_name: "Get Restaurant Menu"
+    description: >
+      Retrieve the current active menu with prices, availability,
+      dietary info, and estimated preparation times. Customer agents
+      can use this to browse and filter offerings.
+
+    endpoint:
+      method: GET
+      url: "https://api.restaurant.example/v1/menu"
+
+    input:
+      restaurant_id:
+        type: string
+        required: true
+        description: "GAII or ID of the restaurant agent"
+      category:
+        type: string
+        required: false
+        description: "Filter by food category"
+        enum: ["starters", "mains", "pizza", "burgers", "salads", "desserts", "drinks"]
+      dietary:
+        type: string
+        required: false
+        description: "Filter by dietary preference"
+        enum: ["vegetarian", "vegan", "gluten_free", "lactose_free"]
+
+    output:
+      restaurant_name:
+        type: string
+        description: "Restaurant display name"
+      items:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
+            price_eur:
+              type: number
+            category:
+              type: string
+            dietary_tags:
+              type: array
+              items:
+                type: string
+            available:
+              type: boolean
+            prep_time_minutes:
+              type: integer
+      open_until:
+        type: string
+        description: "Kitchen closing time (ISO 8601)"
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 1
+
+    examples:
+      - input:
+          restaurant_id: "gaii:fi.example.pizzeria-napoli"
+          category: "pizza"
+        output:
+          restaurant_name: "Pizzeria Napoli"
+          items:
+            - id: "pizza-001"
+              name: "Margherita"
+              description: "San Marzano tomaatti, mozzarella, basilika"
+              price_eur: 12.90
+              category: "pizza"
+              dietary_tags: ["vegetarian"]
+              available: true
+              prep_time_minutes: 15
+            - id: "pizza-002"
+              name: "Diavola"
+              description: "Tomaatti, mozzarella, salami piccante"
+              price_eur: 14.90
+              category: "pizza"
+              dietary_tags: []
+              available: true
+              prep_time_minutes: 15
+          open_until: "2025-01-15T22:00:00+02:00"
+
+  - id: "place-order"
+    display_name: "Place Food Order"
+    description: >
+      Place a food order with delivery address. The restaurant agent
+      confirms the order and coordinates with a delivery agent.
+      Payment is handled via AIMEAT morsel escrow.
+
+    endpoint:
+      method: POST
+      url: "https://api.restaurant.example/v1/orders"
+      content_type: "application/json"
+
+    input:
+      restaurant_id:
+        type: string
+        required: true
+        description: "Restaurant GAII"
+      items:
+        type: array
+        required: true
+        description: "Ordered items with quantities"
+        items:
+          type: object
+          properties:
+            item_id:
+              type: string
+            quantity:
+              type: integer
+            notes:
+              type: string
+              description: "Special requests (e.g., 'no onions')"
+      delivery_address:
+        type: object
+        required: true
+        properties:
+          street:
+            type: string
+          city:
+            type: string
+          postal_code:
+            type: string
+          country:
+            type: string
+          coordinates:
+            type: object
+            properties:
+              lat:
+                type: number
+              lon:
+                type: number
+      delivery_notes:
+        type: string
+        required: false
+        description: "Delivery instructions (e.g., 'door code 1234')"
+
+    request_mapping: |
+      {
+        "restaurant_id": "{input.restaurant_id}",
+        "items": {input.items},
+        "delivery": {
+          "address": {input.delivery_address},
+          "notes": "{input.delivery_notes}"
+        }
+      }
+
+    output:
+      order_id:
+        type: string
+        description: "Unique order ID"
+      status:
+        type: string
+        description: "Order status"
+        enum: ["confirmed", "preparing", "ready", "delivering", "delivered"]
+      estimated_delivery:
+        type: string
+        description: "Estimated delivery time (ISO 8601)"
+      total_eur:
+        type: number
+        description: "Total order price in EUR"
+      delivery_fee_eur:
+        type: number
+        description: "Delivery fee"
+
+    pricing:
+      base_morsels: 2
+
+    estimated_time_seconds: 3
+
+    examples:
+      - input:
+          restaurant_id: "gaii:fi.example.pizzeria-napoli"
+          items:
+            - item_id: "pizza-001"
+              quantity: 2
+              notes: ""
+            - item_id: "pizza-002"
+              quantity: 1
+              notes: "extra spicy"
+          delivery_address:
+            street: "Mannerheimintie 1"
+            city: "Helsinki"
+            postal_code: "00100"
+            country: "FI"
+            coordinates:
+              lat: 60.1699
+              lon: 24.9384
+          delivery_notes: "Ovikoodi 4455"
+        output:
+          order_id: "ord-20250115-a1b2c3"
+          status: "confirmed"
+          estimated_delivery: "2025-01-15T19:45:00+02:00"
+          total_eur: 40.70
+          delivery_fee_eur: 3.90
+
+  - id: "track-order"
+    display_name: "Track Order Status"
+    description: "Get real-time order status and delivery agent location"
+
+    endpoint:
+      method: GET
+      url: "https://api.restaurant.example/v1/orders/{input.order_id}"
+
+    input:
+      order_id:
+        type: string
+        required: true
+        description: "Order ID to track"
+
+    output:
+      status:
+        type: string
+        enum: ["confirmed", "preparing", "ready", "picked_up", "delivering", "delivered"]
+      courier:
+        type: object
+        properties:
+          gaii:
+            type: string
+            description: "Delivery agent GAII"
+          eta_minutes:
+            type: integer
+          location:
+            type: object
+            properties:
+              lat:
+                type: number
+              lon:
+                type: number
+
+    pricing:
+      base_morsels: 0
+
+    estimated_time_seconds: 1
