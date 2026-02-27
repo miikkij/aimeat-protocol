@@ -112,7 +112,7 @@ You are helping a human build a web application that connects to an AIMEAT (AI M
 2. Based on their answers, generate a COMPLETE, SELF-CONTAINED HTML file
 3. The HTML file will be saved and opened in a browser
 4. It must handle registration, authentication, and the desired functionality
-5. NO external dependencies except @noble/ed25519 from CDN for crypto
+5. Include \`<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>\` for authentication — this handles Ed25519 signing, registration, login UI, and JWT management automatically
 
 ## AIMEAT Node Information
 - **Node URL:** ${config.baseUrl}
@@ -229,40 +229,49 @@ All responses: \`{ ok: bool, protocol: "aimeat", version: "v1", node: "...", tim
 
 ---
 
-## Ed25519 Signing in Browser JavaScript
+## Authentication — Use the AIMEAT Auth Library
 
+Include this script tag in \`<head>\`:
+\`\`\`html
+<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>
+\`\`\`
+
+This provides \`window.AIMEAT.auth\` with:
+- \`.register(username, displayName, opts)\` — Creates owner + agent + authenticates (GHII flow)
+- \`.login(username?)\` — Re-authenticates from stored credentials
+- \`.logout()\` — Clears session
+- \`.hasSession\` / \`.storedGhii\` — Check login state
+- \`.fetch(url, opts)\` — Authenticated fetch with auto-refresh
+- \`.mountLoginButton(selector, opts)\` — Renders a login/register UI button
+- \`.on('login', cb)\` / \`.on('logout', cb)\` — Event hooks
+
+### Quick Registration + Auth Example
+\`\`\`javascript
+const auth = window.AIMEAT.auth;
+
+// Register a new user (creates owner + agent + gets JWT)
+const result = await auth.register('alice', 'Alice');
+// result = { ghii: 'alice@node', gaii: 'default#alice@node', token: 'jwt...' }
+
+// Make authenticated API calls
+const resp = await auth.fetch('/v1/memory');
+const data = await resp.json();
+
+// Or mount a login button that handles everything
+auth.mountLoginButton('#login-container');
+\`\`\`
+
+### Manual Ed25519 (only if NOT using auth library)
 \`\`\`javascript
 import * as ed from 'https://esm.sh/@noble/ed25519@2.1.0';
-
 function hexToBytes(hex) {
   const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2)
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
   return bytes;
 }
-
-function bytesToHex(bytes) {
-  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function signMessage(privateKeyHex, message) {
-  const privKey = hexToBytes(privateKeyHex);
-  const msgBytes = new TextEncoder().encode(message);
-  const signature = await ed.signAsync(msgBytes, privKey);
-  return bytesToHex(signature);
-}
-
-async function authenticate(nodeUrl, gaii, privateKeyHex) {
-  const chResp = await fetch(nodeUrl + '/v1/auth/challenge?gaii=' + encodeURIComponent(gaii));
-  const ch = await chResp.json();
-  const timestamp = new Date().toISOString();
-  const signature = await signMessage(privateKeyHex, gaii + timestamp);
-  const tokResp = await fetch(nodeUrl + '/v1/auth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gaii, timestamp, signature })
-  });
-  return tokResp.json();
+function bytesToHex(bytes) { return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''); }
+async function signMessage(privKeyHex, msg) {
+  return bytesToHex(await ed.signAsync(new TextEncoder().encode(msg), hexToBytes(privKeyHex)));
 }
 \`\`\`
 
@@ -274,8 +283,9 @@ Generate a SINGLE .html file with these characteristics:
 
 ### Structure
 - All CSS in a \`<style>\` tag in \`<head>\`
-- All JS in a \`<script type="module">\` tag before \`</body>\`
-- No external CSS/JS except the Ed25519 CDN import
+- Include \`<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>\` in \`<head>\`
+- All app JS in a \`<script type="module">\` tag before \`</body>\`
+- No other external dependencies needed — the auth library handles crypto
 - Responsive design (works on mobile and desktop)
 
 ### Theme
@@ -283,15 +293,17 @@ Generate a SINGLE .html file with these characteristics:
 - System fonts: system-ui for body, monospace for code/keys
 - If user requested light theme: --bg: #f8fafc, --card: #ffffff, --text: #1e293b, --accent: #0284c7
 
-### Auth UI (always included)
-- Registration form: owner name, display name, agent name
-- Login form: owner name + private key (or agent GAII + private key)
-- "⚠️ Save this key!" warning when showing generated keys
-- Auto-login using localStorage on page load
+### Auth UI (use the auth library)
+- Use \`AIMEAT.auth.mountLoginButton('#auth-container')\` for the full login/register UI
+- Or build custom UI using \`AIMEAT.auth.register()\` and \`AIMEAT.auth.login()\`
+- The library handles key generation, JWT storage, and auto-refresh
+- "⚠️ Save this key!" warning when showing generated keys (library handles this)
+- Auto-login using localStorage on page load (library handles this)
 
 ### State Management
-- Use localStorage for: owner name, owner key, agent GAII, agent private key, JWT, JWT expiry
-- JWT auto-refresh when within 60s of expiry
+- The auth library manages localStorage automatically (GHII, GAII, keys, JWT)
+- Use \`AIMEAT.auth.hasSession\` to check login state
+- Use \`AIMEAT.auth.on('login', cb)\` / \`AIMEAT.auth.on('logout', cb)\` for reactive updates
 - Loading spinners for API calls
 - User-friendly error messages
 
@@ -303,9 +315,9 @@ Generate a SINGLE .html file with these characteristics:
 Tell the user:
 1. "Save this as a file, for example: my-aimeat-app.html"
 2. "Open it in your web browser (Chrome, Firefox, Edge)"
-3. "The first time, it will ask you to register or log in"
-4. "IMPORTANT: When it shows your key, copy it and save it somewhere safe!"
-5. "After that, the app will remember your login"
+3. "The first time, click the login button to register or sign in"
+4. "After that, the app will remember your login automatically"
+5. "You can also upload this app to the node: POST /v1/apps with the file"
 
 ### Browser APIs Available
 The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB, Notifications, Drag&Drop, Clipboard, Speech, Fullscreen, Web Workers, CSS Animations, SVG, Gamepad API, Vibration, Share API. Use whatever is appropriate for the user's goal.`;
@@ -428,13 +440,26 @@ function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: nu
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="aimeat-node" content="${sanitize(config.baseUrl)}">
 <title>AIMEAT Onboarding Portal — ${config.nodeId}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script src="${sanitize(config.baseUrl)}/v1/libs/aimeat-auth.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--accent2:#0ea5e9;--border:#475569;--success:#22c55e;--warn:#f59e0b;--radius:12px}
+:root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--accent2:#0ea5e9;--border:#475569;--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;--radius:12px}
 body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
+
+/* Top bar */
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1rem}
+.topbar-right{display:flex;align-items:center;gap:.75rem}
+#auth-container{display:inline-flex;align-items:center}
+.mode-badge{font-size:.75rem;padding:.2rem .5rem;border-radius:4px;font-weight:600}
+.mode-anon{background:#7c3aed;color:#fff}
+.mode-user{background:var(--success);color:#0f172a}
+
 .container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
 h1{font-size:1.8rem;font-weight:700;margin-bottom:.5rem}
 h2{font-size:1.3rem;font-weight:600;margin-bottom:.75rem;color:var(--accent)}
@@ -502,19 +527,53 @@ p{margin-bottom:.75rem}
 .instructions li{margin-bottom:.5rem}
 .instructions code{background:var(--bg);padding:.15rem .4rem;border-radius:4px;font-size:.85rem;font-family:monospace}
 
+/* Upload area */
+.upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:1.5rem;text-align:center;margin-top:1rem;transition:all .2s}
+.upload-area:hover{border-color:var(--accent)}
+.upload-area.dragover{border-color:var(--accent);background:rgba(56,189,248,.05)}
+.upload-btn{background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:.5rem 1.2rem;cursor:pointer;font-weight:600;font-size:.9rem}
+.upload-btn:hover{background:var(--accent2)}
+.upload-btn:disabled{opacity:.5;cursor:not-allowed}
+.share-url{display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--success);border-radius:8px;padding:.6rem 1rem;margin-top:.75rem;font-family:monospace;font-size:.85rem}
+.share-url input{flex:1;background:none;border:none;color:var(--text);font-family:monospace;font-size:.85rem;outline:none}
+.share-copy{background:var(--success);color:#0f172a;border:none;border-radius:6px;padding:.3rem .6rem;cursor:pointer;font-weight:600;font-size:.8rem}
+
+/* Mode notice */
+.mode-notice{border-radius:var(--radius);padding:1rem 1.5rem;margin-bottom:1.5rem;font-size:.9rem;display:flex;align-items:flex-start;gap:.75rem}
+.mode-notice-anon{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3)}
+.mode-notice-user{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2)}
+.mode-notice .icon{font-size:1.3rem;flex-shrink:0}
+
+/* app list */
+.app-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:.75rem;margin-top:1rem}
+.app-item{background:var(--card2);border-radius:8px;padding:1rem;border:1px solid var(--border)}
+.app-item .app-name{font-weight:600;margin-bottom:.25rem}
+.app-item .app-meta{font-size:.75rem;color:var(--muted)}
+.app-item a{display:inline-block;margin-top:.5rem;font-size:.85rem}
+
 /* Hidden */
 .hidden{display:none!important}
 
-/* Responsive */
 @media(max-width:600px){
   .platforms{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
   .goals{grid-template-columns:1fr}
   .stats{flex-direction:column}
   h1{font-size:1.4rem}
+  .topbar{flex-direction:column;gap:.5rem;text-align:center}
 }
 </style>
 </head>
 <body>
+
+<!-- Top bar with auth -->
+<div class="topbar">
+  <div class="topbar-left">❤️ AIMEAT</div>
+  <div class="topbar-right">
+    <span id="mode-indicator"></span>
+    <div id="auth-container"></div>
+  </div>
+</div>
+
 <div class="container">
   <h1>❤️ AIMEAT Onboarding Portal</h1>
   <p class="subtitle">Connect any AI to this node — select your platform to get started</p>
@@ -524,6 +583,20 @@ p{margin-bottom:.75rem}
     <div class="stat"><div class="num">${nodeStats.agents}</div><div class="label">Agents</div></div>
     <div class="stat"><div class="num">${nodeStats.actions}</div><div class="label">Services</div></div>
     <div class="stat"><div class="num">${nodeStats.boards}</div><div class="label">Boards</div></div>
+  </div>
+
+  <!-- Mode notice — changes based on login state -->
+  <div id="mode-notice"></div>
+
+  <!-- Quick start: give this URL to your AI -->
+  <div class="panel" style="border-color:var(--accent);background:linear-gradient(135deg,var(--card) 0%,#1a2744 100%)">
+    <h3 style="margin-bottom:.5rem">🚀 Quick Start — Already have an AI open?</h3>
+    <p style="margin-bottom:.5rem">Copy-paste this into your AI chat and it will connect itself:</p>
+    <div class="prompt-output" style="margin-bottom:0">
+      <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+      <div class="prompt-text" style="max-height:none;font-size:.85rem">Read this URL and follow the instructions to connect to this AIMEAT node: ${sanitize(config.baseUrl)}/?format=json</div>
+    </div>
+    <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted)">Works with AIs that can browse the web (Grok, Claude, ChatGPT with browsing, etc.). The URL returns JSON instructions the AI will understand.<br>If your AI can't browse, pick your platform below instead.</p>
   </div>
 
   <!-- Step 1: Platform -->
@@ -553,38 +626,97 @@ p{margin-bottom:.75rem}
     </div>
     <div id="result-area"></div>
   </div>
+
+  <!-- Step 4: After generating — share/upload (logged-in only) -->
+  <div class="step hidden" id="step4">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-label">Share Your App</div>
+    </div>
+    <div id="share-area"></div>
+  </div>
+
+  <!-- Community apps section -->
+  <div id="community-apps" class="hidden" style="margin-top:2rem">
+    <h2>📦 Community Apps</h2>
+    <p style="color:var(--muted);font-size:.9rem">Apps uploaded by users on this node. Download and open locally in your browser.</p>
+    <div class="app-list" id="app-list"></div>
+  </div>
 </div>
 
 <script>
 const PLATFORMS = ${platformsJson};
 const NODE_URL = ${JSON.stringify(config.baseUrl)};
 const NODE_ID = ${JSON.stringify(config.nodeId)};
-const PROMPT_API = '/v1/portal/prompt';
+const PROMPT_API = NODE_URL + '/v1/portal/prompt';
 
 let selectedPlatform = null;
 let selectedVariant = null;
+let currentSession = null;
+
+// ── Auth setup ──
+const auth = window.AIMEAT && window.AIMEAT.auth;
+if (auth) {
+  auth.mountLoginButton('#auth-container', {
+    onLogin: function(session) { currentSession = session; updateMode(); },
+    onLogout: function() { currentSession = null; updateMode(); },
+  });
+  // Auto-login
+  auth.login().then(function(session) {
+    if (session) { currentSession = session; updateMode(); }
+    else { updateMode(); }
+  }).catch(function() { updateMode(); });
+} else {
+  updateMode();
+}
+
+function isLoggedIn() { return !!currentSession; }
+
+function updateMode() {
+  const indicator = document.getElementById('mode-indicator');
+  const notice = document.getElementById('mode-notice');
+
+  if (isLoggedIn()) {
+    indicator.innerHTML = '<span class="mode-badge mode-user">Logged In</span>';
+    notice.innerHTML = '<div class="mode-notice mode-notice-user">'
+      + '<div class="icon">✅</div>'
+      + '<div><strong>Logged in as ' + escHtml(currentSession.ghii || currentSession.owner) + '</strong><br>'
+      + '<span style="color:var(--muted);font-size:.85rem">You can upload apps and get a shareable download link. Other users can browse and download your apps.</span></div>'
+      + '</div>';
+  } else {
+    indicator.innerHTML = '<span class="mode-badge mode-anon">Anonymous</span>';
+    notice.innerHTML = '<div class="mode-notice mode-notice-anon">'
+      + '<div class="icon">👤</div>'
+      + '<div><strong>Anonymous Mode</strong> — You can generate prompts and apps without logging in.<br>'
+      + '<span style="color:var(--muted);font-size:.85rem">To share apps with others, you\\'ll need to share the HTML file yourself (email, drive, etc.). '
+      + '<strong>Sign up</strong> to get a personal download link others can use.</span></div>'
+      + '</div>';
+  }
+
+  // Show/hide step 4
+  updateStep4();
+  // Load community apps
+  loadCommunityApps();
+}
 
 // ── Render platform grid ──
 const grid = document.getElementById('platform-grid');
-PLATFORMS.forEach(p => {
+PLATFORMS.forEach(function(p) {
   const card = document.createElement('div');
   card.className = 'platform-card';
   card.innerHTML = '<div class="icon">' + escHtml(p.icon) + '</div><div class="name">' + escHtml(p.name) + '</div><div class="vendor">' + escHtml(p.vendor) + '</div>';
-  card.addEventListener('click', () => selectPlatform(p));
+  card.addEventListener('click', function() { selectPlatform(p); });
   grid.appendChild(card);
 });
 
 function selectPlatform(p) {
   selectedPlatform = p;
   selectedVariant = null;
-  // Highlight
-  document.querySelectorAll('.platform-card').forEach((c, i) => {
+  document.querySelectorAll('.platform-card').forEach(function(c, i) {
     c.classList.toggle('selected', PLATFORMS[i].id === p.id);
   });
-  document.getElementById('step1-num').textContent = '✓';
+  document.getElementById('step1-num').textContent = '\\u2713';
   document.getElementById('step1-num').classList.add('done');
-
-  // If single variant, auto-select
   if (p.variants.length === 1) {
     showStep2(p);
     selectVariant(p.variants[0]);
@@ -592,146 +724,370 @@ function selectPlatform(p) {
   }
   showStep2(p);
   document.getElementById('step3').classList.add('hidden');
+  document.getElementById('step4').classList.add('hidden');
 }
 
 function showStep2(p) {
-  const s2 = document.getElementById('step2');
+  var s2 = document.getElementById('step2');
   s2.classList.remove('hidden');
-  const list = document.getElementById('variant-list');
+  var list = document.getElementById('variant-list');
   list.innerHTML = '';
-  p.variants.forEach(v => {
-    const btn = document.createElement('button');
+  p.variants.forEach(function(v) {
+    var btn = document.createElement('button');
     btn.className = 'variant-btn';
     btn.textContent = v.name;
-    btn.addEventListener('click', () => selectVariant(v));
+    btn.addEventListener('click', function() { selectVariant(v); });
     list.appendChild(btn);
   });
 }
 
 function selectVariant(v) {
   selectedVariant = v;
-  document.querySelectorAll('.variant-btn').forEach(b => {
+  document.querySelectorAll('.variant-btn').forEach(function(b) {
     b.classList.toggle('selected', b.textContent === v.name);
   });
-  const note = document.getElementById('variant-note');
-  if (v.notes) {
-    note.textContent = v.notes;
-    note.classList.remove('hidden');
-  } else {
-    note.classList.add('hidden');
-  }
-  document.getElementById('step2-num').textContent = '✓';
+  var note = document.getElementById('variant-note');
+  if (v.notes) { note.textContent = v.notes; note.classList.remove('hidden'); }
+  else { note.classList.add('hidden'); }
+  document.getElementById('step2-num').textContent = '\\u2713';
   document.getElementById('step2-num').classList.add('done');
   showResult(v);
 }
 
 function showResult(v) {
-  const area = document.getElementById('result-area');
-  const s3 = document.getElementById('step3');
+  var area = document.getElementById('result-area');
+  var s3 = document.getElementById('step3');
   s3.classList.remove('hidden');
 
-  if (v.path === 'mcp') {
-    area.innerHTML = mcpPanel();
-  } else if (v.path === 'api') {
-    area.innerHTML = apiPanel();
-  } else if (v.path === 'browse') {
-    area.innerHTML = browsePanel();
-  } else {
-    area.innerHTML = promptPackagePanel();
-  }
+  if (v.path === 'mcp') { area.innerHTML = mcpPanel(); }
+  else if (v.path === 'api') { area.innerHTML = apiPanel(); }
+  else if (v.path === 'browse') { area.innerHTML = browsePanel(); }
+  else { area.innerHTML = promptPackagePanel(); }
+
+  updateStep4();
   s3.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Panels ──
 
 function mcpPanel() {
-  return '<div class="panel"><span class="tier-badge tier-A">TIER A — Full MCP</span>' +
-    '<h3 style="margin-top:.75rem">MCP Connector Setup</h3>' +
-    '<div class="instructions"><ol>' +
-    '<li>Open your AI platform\\'s <strong>Settings → Connectors / MCP Servers</strong></li>' +
-    '<li>Add a new MCP server with this URL:<br><code>' + escHtml(NODE_URL) + '/v1/mcp</code></li>' +
-    '<li>The platform will handle OAuth registration automatically</li>' +
-    '<li>Once connected, try: <em>"Check my AIMEAT node catalogue"</em></li>' +
-    '</ol>' +
-    '<p>You\\'ll have access to <strong>14 MCP tools</strong>: catalogue search, memory read/write, action execute, work queue, wallet, boards, storage, and more.</p>' +
-    '</div></div>';
+  return '<div class="panel"><span class="tier-badge tier-A">TIER A \\u2014 Full MCP</span>'
+    + '<h3 style="margin-top:.75rem">MCP Connector Setup</h3>'
+    + '<div class="instructions"><ol>'
+    + '<li>Open your AI platform\\'s <strong>Settings \\u2192 Connectors / MCP Servers</strong></li>'
+    + '<li>Add a new MCP server with this URL:<br><code>' + escHtml(NODE_URL) + '/v1/mcp</code></li>'
+    + '<li>The platform will handle OAuth registration automatically</li>'
+    + '<li>Once connected, try: <em>"Check my AIMEAT node catalogue"</em></li>'
+    + '</ol>'
+    + '<p>You\\'ll have access to <strong>14 MCP tools</strong>: catalogue search, memory read/write, action execute, work queue, wallet, boards, storage, and more.</p>'
+    + '</div></div>';
 }
 
 function apiPanel() {
-  return '<div class="panel"><span class="tier-badge tier-B">TIER B — Full HTTP</span>' +
-    '<h3 style="margin-top:.75rem">API Integration</h3>' +
-    '<p>Your AI can make HTTP calls. Copy this prompt and paste it into your AI chat:</p>' +
-    '<div class="prompt-output">' +
-    '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>' +
-    '<div class="prompt-text" id="api-prompt">I want you to connect to an AIMEAT node at ' + escHtml(NODE_URL) + '\\n\\n' +
-    'Step 1: Register an owner account\\n' +
-    'POST ' + escHtml(NODE_URL) + '/v1/owners\\n' +
-    'Body: {"name": "myowner", "display_name": "My Name"}\\n' +
-    'SAVE the owner_key from the response!\\n\\n' +
-    'Step 2: Register an agent\\n' +
-    'POST ' + escHtml(NODE_URL) + '/v1/agents\\n' +
-    'Header: X-AIMEAT-Owner-Key: (owner_key from step 1)\\n' +
-    'Body: {"name": "myagent", "owner": "myowner", "display_name": "My Agent", "description": "My first AIMEAT agent"}\\n' +
-    'SAVE the private_key!\\n\\n' +
-    'Step 3: Authenticate — sign (gaii+timestamp) with Ed25519, POST to /v1/auth/token\\n\\n' +
-    'Step 4: Use the API — GET /v1/catalogue, POST /v1/memory, GET /v1/wallet\\n\\n' +
-    'Full API spec: ' + escHtml(NODE_URL) + '/v1/spec\\n' +
-    'Operating instructions: ' + escHtml(NODE_URL) + '/v1/prompts/tier1' +
-    '</div></div></div>';
+  return '<div class="panel"><span class="tier-badge tier-B">TIER B \\u2014 Full HTTP</span>'
+    + '<h3 style="margin-top:.75rem">API Integration</h3>'
+    + '<p>Your AI can make HTTP calls. Copy this prompt and paste it into your AI chat:</p>'
+    + '<div class="prompt-output">'
+    + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>'
+    + '<div class="prompt-text" id="api-prompt">I want you to connect to an AIMEAT node at ' + escHtml(NODE_URL) + '\\n\\n'
+    + 'Step 1: Register an owner account\\n'
+    + 'POST ' + escHtml(NODE_URL) + '/v1/owners\\n'
+    + 'Body: {"name": "myowner", "display_name": "My Name"}\\n'
+    + 'SAVE the owner_key from the response!\\n\\n'
+    + 'Step 2: Register an agent\\n'
+    + 'POST ' + escHtml(NODE_URL) + '/v1/agents\\n'
+    + 'Header: X-AIMEAT-Owner-Key: (owner_key from step 1)\\n'
+    + 'Body: {"name": "myagent", "owner": "myowner", "display_name": "My Agent", "description": "My first AIMEAT agent"}\\n'
+    + 'SAVE the private_key!\\n\\n'
+    + 'Step 3: Authenticate \\u2014 sign (gaii+timestamp) with Ed25519, POST to /v1/auth/token\\n\\n'
+    + 'Step 4: Use the API \\u2014 GET /v1/catalogue, POST /v1/memory, GET /v1/wallet\\n\\n'
+    + 'Full API spec: ' + escHtml(NODE_URL) + '/v1/spec\\n'
+    + 'Operating instructions: ' + escHtml(NODE_URL) + '/v1/prompts/tier1'
+    + '</div></div></div>';
 }
 
 function browsePanel() {
-  return '<div class="panel"><span class="tier-badge tier-C">TIER C — Browse Only</span>' +
-    '<h3 style="margin-top:.75rem">Read-Only Access</h3>' +
-    '<p>Your AI can browse URLs. Copy this prompt to get started:</p>' +
-    '<div class="prompt-output">' +
-    '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>' +
-    '<div class="prompt-text" id="browse-prompt">Browse these AIMEAT endpoints and tell me what\\'s available:\\n\\n' +
-    'Catalogue: ' + escHtml(NODE_URL) + '/v1/catalogue\\n' +
-    'Node info: ' + escHtml(NODE_URL) + '/\\n' +
-    'Discovery: ' + escHtml(NODE_URL) + '/.well-known/aimeat\\n\\n' +
-    'You can also browse specific boards and agent profiles once you find them in the catalogue.' +
-    '</div></div>' +
-    '<h3 style="margin-top:1rem">Want full access?</h3>' +
-    '<ul style="margin-left:1.5rem"><li>Upgrade your plan for MCP support</li>' +
-    '<li>Or switch to a tool-capable AI (Claude Code, VS Code Copilot)</li>' +
-    '<li>Or use the <a href="#" onclick="switchToPromptPackage();return false">Prompt Package</a> to generate an HTML app</li></ul></div>';
+  return '<div class="panel"><span class="tier-badge tier-C">TIER C \\u2014 Browse Only</span>'
+    + '<h3 style="margin-top:.75rem">Read-Only Access</h3>'
+    + '<p>Your AI can browse URLs. Copy this prompt to get started:</p>'
+    + '<div class="prompt-output">'
+    + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>'
+    + '<div class="prompt-text" id="browse-prompt">Browse these AIMEAT endpoints and tell me what\\'s available:\\n\\n'
+    + 'Catalogue: ' + escHtml(NODE_URL) + '/v1/catalogue\\n'
+    + 'Node info: ' + escHtml(NODE_URL) + '/\\n'
+    + 'Discovery: ' + escHtml(NODE_URL) + '/.well-known/aimeat\\n\\n'
+    + 'You can also browse specific boards and agent profiles once you find them in the catalogue.'
+    + '</div></div>'
+    + '<h3 style="margin-top:1rem">Want full access?</h3>'
+    + '<ul style="margin-left:1.5rem"><li>Upgrade your plan for MCP support</li>'
+    + '<li>Or switch to a tool-capable AI (Claude Code, VS Code Copilot)</li>'
+    + '<li>Or use the <a href="#" onclick="switchToPromptPackage();return false">Prompt Package</a> to generate an HTML app</li></ul></div>';
 }
 
 function promptPackagePanel() {
-  return '<div class="panel"><span class="tier-badge tier-D">TIER D — Prompt Package</span>' +
-    '<h3 style="margin-top:.75rem">Generate Your App</h3>' +
-    '<p>Your AI can\\'t make web requests, but it can <strong>generate code</strong> for you! ' +
-    'Select what you want to build, then copy the prompt into your AI chat. ' +
-    'The AI will interview you and generate a complete HTML application.</p>' +
-    '<div class="goals" id="goal-grid"></div>' +
-    '<div class="prompt-output hidden" id="prompt-pkg-output">' +
-    '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>' +
-    '<div class="prompt-text" id="prompt-pkg-text">Loading...</div>' +
-    '</div></div>';
+  return '<div class="panel"><span class="tier-badge tier-D">TIER D \\u2014 Prompt Package</span>'
+    + '<h3 style="margin-top:.75rem">Generate Your App</h3>'
+    + '<p>Your AI can\\'t make web requests, but it can <strong>generate code</strong> for you! '
+    + 'Select what you want to build, then copy the prompt into your AI chat. '
+    + 'The AI will interview you and generate a complete HTML application.</p>'
+    + (isLoggedIn()
+      ? '<p style="color:var(--success);font-size:.85rem">\\u2705 You\\'re logged in \\u2014 after your AI generates the app, come back here to upload it and get a shareable link!</p>'
+      : '<p style="color:var(--muted);font-size:.85rem">\\ud83d\\udc64 Anonymous mode \\u2014 you\\'ll need to share the generated HTML file yourself. <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">Sign up</a> to upload and get a share link.</p>')
+    + '<div class="goals" id="goal-grid"></div>'
+    + '<div class="prompt-output hidden" id="prompt-pkg-output">'
+    + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>'
+    + '<div class="prompt-text" id="prompt-pkg-text">Loading...</div>'
+    + '</div></div>';
+}
+
+// ── Step 4: Upload & Share (logged-in) or manual share (anon) ──
+function updateStep4() {
+  var step4 = document.getElementById('step4');
+  var shareArea = document.getElementById('share-area');
+  if (!selectedVariant) { step4.classList.add('hidden'); return; }
+
+  // Only show upload for prompt-package tier (the ones that generate HTML files)
+  if (selectedVariant.path !== 'prompt-package') { step4.classList.add('hidden'); return; }
+
+  step4.classList.remove('hidden');
+
+  if (isLoggedIn()) {
+    shareArea.innerHTML = '<div class="panel">'
+      + '<h3>\\ud83d\\udce4 Upload Your Generated App</h3>'
+      + '<p>After your AI generates the HTML file, upload it here to get a shareable download link.</p>'
+      + '<div style="margin-bottom:1rem">'
+      + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">Access Code (optional)</label>'
+      + '<input type="text" id="access-code-input" placeholder="Leave empty for public access" '
+      + 'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;color:var(--text);font-size:.85rem;width:100%;max-width:300px" maxlength="64">'
+      + '<p style="font-size:.75rem;color:var(--muted);margin-top:.25rem">If set, downloaders will need this code. 4\\u201364 characters.</p>'
+      + '</div>'
+      + '<div class="upload-area" id="upload-drop">'
+      + '<p style="margin-bottom:.5rem">Drag & drop your .html file here, or:</p>'
+      + '<input type="file" id="upload-input" accept=".html,.htm" style="display:none">'
+      + '<button class="upload-btn" onclick="document.getElementById(\\'upload-input\\').click()">Choose File</button>'
+      + '</div>'
+      + '<div id="upload-result" class="hidden"></div>'
+      + '</div>';
+    setupUploadHandlers();
+  } else {
+    shareArea.innerHTML = '<div class="panel">'
+      + '<h3>\\ud83d\\udccc Share Your App</h3>'
+      + '<p>After your AI generates the HTML file:</p>'
+      + '<ol style="margin-left:1.5rem;margin-bottom:1rem">'
+      + '<li>Save the generated code as an <code>.html</code> file</li>'
+      + '<li>Open it in your browser to test</li>'
+      + '<li>Share the file with others via email, cloud drive, or messaging</li>'
+      + '</ol>'
+      + '<div class="mode-notice mode-notice-anon" style="margin:0">'
+      + '<div class="icon">\\ud83d\\udca1</div>'
+      + '<div><strong>Want easier sharing?</strong> <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">Create an account</a> to upload your app and get a personal download link like:<br>'
+      + '<code style="font-size:.8rem;color:var(--accent)">' + escHtml(NODE_URL) + '/v1/apps/yourname/my-app.html</code></div>'
+      + '</div>'
+      + '</div>';
+  }
+}
+
+// ── Upload handlers ──
+function setupUploadHandlers() {
+  var dropZone = document.getElementById('upload-drop');
+  var input = document.getElementById('upload-input');
+  if (!dropZone || !input) return;
+
+  dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', function() { if (input.files.length > 0) handleUpload(input.files[0]); });
+}
+
+async function handleUpload(file) {
+  if (!currentSession) { alert('Please sign in first'); return; }
+  var result = document.getElementById('upload-result');
+  result.classList.remove('hidden');
+  result.innerHTML = '<p style="color:var(--muted)">Uploading ' + escHtml(file.name) + '...</p>';
+
+  try {
+    var arrayBuf = await file.arrayBuffer();
+    var bytes = new Uint8Array(arrayBuf);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    var b64 = btoa(binary);
+
+    var accessCode = (document.getElementById('access-code-input') || {}).value || '';
+
+    var resp = await currentSession.fetch('/v1/apps', {
+      method: 'POST',
+      body: JSON.stringify({ filename: file.name, content: b64, mime_type: 'text/html', access_code: accessCode || undefined }),
+    });
+
+    if (resp.ok !== undefined ? resp.ok : true) {
+      var data = resp.data || resp;
+      var downloadUrl = NODE_URL + (data.download_url || '/v1/apps/' + encodeURIComponent(currentSession.owner) + '/' + encodeURIComponent(file.name));
+      var isProtected = data.protected;
+      result.innerHTML = '<div style="color:var(--success);font-weight:600;margin-bottom:.5rem">\\u2705 App uploaded!' + (isProtected ? ' \\ud83d\\udd12 Protected with access code.' : '') + '</div>'
+        + '<p>' + (isProtected ? 'Share this link and give the access code separately:' : 'Share this link with anyone:') + '</p>'
+        + '<div class="share-url">'
+        + '<input type="text" value="' + escAttr(downloadUrl) + '" readonly id="share-url-input">'
+        + '<button class="share-copy" onclick="copyShareUrl()">Copy</button>'
+        + '</div>'
+        + '<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)">'
+        + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">\\ud83d\\udd11 Change Access Code</label>'
+        + '<div style="display:flex;gap:.4rem;align-items:center">'
+        + '<input type="text" id="new-access-code" placeholder="' + (isProtected ? 'New code (or leave empty to remove)' : 'Set a code to protect') + '" '
+        + 'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;color:var(--text);font-size:.85rem;flex:1;max-width:250px" maxlength="64">'
+        + '<button class="upload-btn" style="padding:.4rem .8rem;font-size:.8rem" onclick="updateAccessCode(\\'' + escAttr(file.name) + '\\')">Update</button>'
+        + '</div>'
+        + '<div id="code-update-result" style="font-size:.8rem;margin-top:.35rem"></div>'
+        + '</div>'
+        + '<p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">File size: ' + formatBytes(file.size) + '</p>';
+    } else {
+      result.innerHTML = '<p style="color:var(--danger)">Upload failed: ' + escHtml(resp.error?.message || 'Unknown error') + '</p>';
+    }
+  } catch (e) {
+    result.innerHTML = '<p style="color:var(--danger)">Upload failed: ' + escHtml(e.message) + '</p>';
+  }
+}
+
+function copyShareUrl() {
+  var input = document.getElementById('share-url-input');
+  navigator.clipboard.writeText(input.value).then(function() {
+    var btn = input.parentElement.querySelector('.share-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+async function updateAccessCode(filename) {
+  if (!currentSession) { alert('Please sign in first'); return; }
+  var codeInput = document.getElementById('new-access-code');
+  var resultEl = document.getElementById('code-update-result');
+  var newCode = codeInput ? codeInput.value.trim() : '';
+  resultEl.innerHTML = '<span style="color:var(--muted)">Updating...</span>';
+  try {
+    var resp = await currentSession.fetch('/v1/apps/' + encodeURIComponent(filename), {
+      method: 'PATCH',
+      body: JSON.stringify({ access_code: newCode || null }),
+    });
+    if (resp.ok !== undefined ? resp.ok : true) {
+      var d = resp.data || resp;
+      resultEl.innerHTML = d.protected
+        ? '<span style="color:var(--success)">\\u2705 Access code updated.</span>'
+        : '<span style="color:var(--success)">\\u2705 Access code removed \\u2014 app is now public.</span>';
+    } else {
+      resultEl.innerHTML = '<span style="color:var(--danger)">' + escHtml(resp.error?.message || 'Failed') + '</span>';
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<span style="color:var(--danger)">' + escHtml(e.message) + '</span>';
+  }
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+// ── Community apps ──
+async function loadCommunityApps() {
+  try {
+    var resp = await fetch(NODE_URL + '/v1/apps');
+    var data = await resp.json();
+    if (data.ok && data.data.apps && data.data.apps.length > 0) {
+      var section = document.getElementById('community-apps');
+      section.classList.remove('hidden');
+      var list = document.getElementById('app-list');
+      list.innerHTML = '';
+      data.data.apps.forEach(function(app) {
+        var item = document.createElement('div');
+        item.className = 'app-item';
+        var badge = app.protected ? ' <span style="color:var(--warn);font-size:.75rem">\\ud83d\\udd12 Protected</span>' : '';
+        item.innerHTML = '<div class="app-name">' + escHtml(app.filename) + badge + '</div>'
+          + '<div class="app-meta">by ' + escHtml(app.owner) + ' \\u00b7 ' + formatBytes(app.size) + '</div>';
+        if (app.protected) {
+          var codeId = 'dlcode-' + app.owner + '-' + app.filename;
+          item.innerHTML += '<div style="margin-top:.5rem">'
+            + '<input type="text" placeholder="Access code" id="' + escAttr(codeId) + '" '
+            + 'style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.25rem .4rem;color:var(--text);font-size:.8rem;width:120px;margin-right:.4rem">'
+            + '<a href="#" onclick="downloadProtected(\\'' + escAttr(app.download_url) + '\\',\\'' + escAttr(codeId) + '\\');return false" style="font-size:.85rem">\\u2b07 Download</a>'
+            + '</div>';
+        } else {
+          item.innerHTML += '<a href="' + escAttr(NODE_URL + app.download_url) + '" download style="display:inline-block;margin-top:.5rem;font-size:.85rem">\\u2b07 Download</a>';
+        }
+        // Owner controls: change access code
+        if (isLoggedIn() && currentSession.owner === app.owner) {
+          var manageId = 'manage-' + app.owner + '-' + app.filename;
+          item.innerHTML += '<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)">'
+            + '<div style="display:flex;gap:.3rem;align-items:center">'
+            + '<input type="text" id="' + escAttr(manageId) + '" placeholder="' + (app.protected ? 'New code or empty to remove' : 'Set access code') + '" '
+            + 'style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;color:var(--text);font-size:.8rem;width:140px">'
+            + '<button style="background:var(--accent);color:var(--bg);border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.75rem;font-weight:600" '
+            + 'onclick="updateAppCode(\\'' + escAttr(app.filename) + '\\',\\'' + escAttr(manageId) + '\\')">\\ud83d\\udd11</button>'
+            + '</div>'
+            + '<div id="' + escAttr(manageId) + '-result" style="font-size:.75rem;margin-top:.2rem"></div>'
+            + '</div>';
+        }
+        list.appendChild(item);
+      });
+    }
+  } catch (e) { /* silent */ }
+}
+
+function downloadProtected(downloadPath, codeInputId) {
+  var codeInput = document.getElementById(codeInputId);
+  var code = codeInput ? codeInput.value.trim() : '';
+  if (!code) { alert('Please enter the access code'); return; }
+  var url = NODE_URL + downloadPath + '?code=' + encodeURIComponent(code);
+  var a = document.createElement('a');
+  a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+async function updateAppCode(filename, inputId) {
+  if (!currentSession) return;
+  var input = document.getElementById(inputId);
+  var resultEl = document.getElementById(inputId + '-result');
+  var newCode = input ? input.value.trim() : '';
+  resultEl.innerHTML = '<span style="color:var(--muted)">Updating...</span>';
+  try {
+    var resp = await currentSession.fetch('/v1/apps/' + encodeURIComponent(filename), {
+      method: 'PATCH',
+      body: JSON.stringify({ access_code: newCode || null }),
+    });
+    if (resp.ok !== undefined ? resp.ok : true) {
+      var d = resp.data || resp;
+      resultEl.innerHTML = d.protected
+        ? '<span style="color:var(--success)">\\u2705 Code updated</span>'
+        : '<span style="color:var(--success)">\\u2705 Code removed</span>';
+      loadCommunityApps();
+    } else {
+      resultEl.innerHTML = '<span style="color:var(--danger)">' + escHtml(resp.error?.message || 'Failed') + '</span>';
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<span style="color:var(--danger)">' + escHtml(e.message) + '</span>';
+  }
 }
 
 // ── Goal selection (for prompt package) ──
-const GOALS = [
-  { id: 'dashboard', icon: '📋', label: 'Personal Dashboard' },
-  { id: 'notes', icon: '📝', label: 'Note-Taking App' },
-  { id: 'game', icon: '🎮', label: 'Multiplayer Game' },
-  { id: 'news', icon: '📰', label: 'News / Content Reader' },
-  { id: 'marketplace', icon: '🛒', label: 'Service Marketplace' },
-  { id: 'chat', icon: '💬', label: 'Chat / Messaging' },
-  { id: 'iot', icon: '📊', label: 'IoT / Data Dashboard' },
-  { id: 'custom', icon: '🔧', label: 'Custom — I\\'ll Describe' },
+var GOALS = [
+  { id: 'dashboard', icon: '\\ud83d\\udccb', label: 'Personal Dashboard' },
+  { id: 'notes', icon: '\\ud83d\\udcdd', label: 'Note-Taking App' },
+  { id: 'game', icon: '\\ud83c\\udfae', label: 'Multiplayer Game' },
+  { id: 'news', icon: '\\ud83d\\udcf0', label: 'News / Content Reader' },
+  { id: 'marketplace', icon: '\\ud83d\\uded2', label: 'Service Marketplace' },
+  { id: 'chat', icon: '\\ud83d\\udcac', label: 'Chat / Messaging' },
+  { id: 'iot', icon: '\\ud83d\\udcca', label: 'IoT / Data Dashboard' },
+  { id: 'custom', icon: '\\ud83d\\udd27', label: 'Custom \\u2014 I\\'ll Describe' },
 ];
 
-// Use MutationObserver to populate goals grid when it appears
-const observer = new MutationObserver(() => {
-  const goalGrid = document.getElementById('goal-grid');
+var observer = new MutationObserver(function() {
+  var goalGrid = document.getElementById('goal-grid');
   if (goalGrid && goalGrid.children.length === 0) {
-    GOALS.forEach(g => {
-      const card = document.createElement('div');
+    GOALS.forEach(function(g) {
+      var card = document.createElement('div');
       card.className = 'goal-card';
       card.innerHTML = '<div class="goal-icon">' + g.icon + '</div><div>' + escHtml(g.label) + '</div>';
-      card.addEventListener('click', () => selectGoal(g.id));
+      card.addEventListener('click', function() { selectGoal(g.id); });
       goalGrid.appendChild(card);
     });
   }
@@ -739,16 +1095,18 @@ const observer = new MutationObserver(() => {
 observer.observe(document.getElementById('result-area'), { childList: true });
 
 async function selectGoal(goalId) {
-  document.querySelectorAll('.goal-card').forEach((c, i) => {
+  document.querySelectorAll('.goal-card').forEach(function(c, i) {
     c.classList.toggle('selected', GOALS[i].id === goalId);
   });
-  const output = document.getElementById('prompt-pkg-output');
-  const text = document.getElementById('prompt-pkg-text');
+  var output = document.getElementById('prompt-pkg-output');
+  var text = document.getElementById('prompt-pkg-text');
   output.classList.remove('hidden');
   text.textContent = 'Generating prompt package...';
   try {
-    const resp = await fetch(PROMPT_API + '/' + encodeURIComponent(selectedPlatform.id + '-' + selectedVariant.id) + '?goal=' + encodeURIComponent(goalId));
-    const data = await resp.json();
+    var url = PROMPT_API + '/' + encodeURIComponent(selectedPlatform.id + '-' + selectedVariant.id) + '?goal=' + encodeURIComponent(goalId);
+    if (isLoggedIn()) url += '&mode=authenticated';
+    var resp = await fetch(url);
+    var data = await resp.json();
     if (data.ok) {
       text.textContent = data.data.prompt;
     } else {
@@ -768,26 +1126,22 @@ function switchToPromptPackage() {
 
 // ── Copy to clipboard ──
 function copyPrompt(btn) {
-  const textEl = btn.parentElement.querySelector('.prompt-text');
-  navigator.clipboard.writeText(textEl.textContent).then(() => {
+  var textEl = btn.parentElement.querySelector('.prompt-text');
+  navigator.clipboard.writeText(textEl.textContent).then(function() {
     btn.textContent = 'Copied!';
     btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
-  }).catch(() => {
-    // Fallback: select text
-    const range = document.createRange();
+    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function() {
+    var range = document.createRange();
     range.selectNodeContents(textEl);
-    const sel = window.getSelection();
+    var sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
   });
 }
 
-function escHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>`;
@@ -828,6 +1182,7 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
     router.get('/v1/portal/prompt/:platformId', async (req, res) => {
         const platformId = req.params.platformId as string;
         const goal = (req.query.goal as string) || 'dashboard';
+        const mode = (req.query.mode as string) || 'anonymous';
 
         // Find platform + variant
         const parts = platformId.split('-');
@@ -880,6 +1235,15 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
                 iot: '\n\n## Pre-Selected Goal\nThe user wants an **IoT / Data Dashboard** — display structured data from board posts and memory entries, show charts/tables, support auto-refresh for live data.',
             };
             prompt += goalDescriptions[goal] ?? '';
+        }
+
+        // Authenticated users get extra upload instructions in the prompt
+        if (path === 'prompt-package' && mode === 'authenticated') {
+            prompt += '\n\n## Sharing Your App\n'
+                + 'The user has an AIMEAT account. After you generate the HTML file, tell them:\n'
+                + '"Go back to the AIMEAT portal and use the upload form in Step 4 to upload this HTML file. '
+                + 'You\'ll get a shareable download link like `' + config.baseUrl + '/v1/apps/yourname/app.html` '
+                + 'that anyone can use to download and run your app locally."';
         }
 
         res.json(success(config.nodeId, {

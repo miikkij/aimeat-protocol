@@ -2,10 +2,28 @@ import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
 
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
+
 export function bootstrapRouter(config: MeatConfig): Router {
   const router = Router();
 
+  router.get('/favicon.ico', (_req, res) => {
+    res.type('image/svg+xml').send(FAVICON_SVG);
+  });
+
+  router.get('/favicon.svg', (_req, res) => {
+    res.type('image/svg+xml').send(FAVICON_SVG);
+  });
+
   router.get('/', (_req, res) => {
+    // Browsers send Accept: text/html — redirect humans to the onboarding portal
+    // Skip redirect when ?format=json is set (used by AIs given the quick-start URL)
+    const accept = _req.headers.accept ?? '';
+    if (accept.includes('text/html') && !accept.includes('application/json') && _req.query.format !== 'json') {
+      res.redirect('/v1/portal');
+      return;
+    }
+
     res.json(success(config.nodeId, {
       description: 'AIME AT — AI Memory Exchange and Action Transfer protocol node',
       welcome: 'Welcome to AIME AT ♥ Love what you build, share what you know. Protocol: AIMEAT v1.3 | License: MIT | The network starts here.',
@@ -27,6 +45,11 @@ export function bootstrapRouter(config: MeatConfig): Router {
         storage: { method: 'POST', url: '/v1/storage', description: 'File storage', tier: 'extended' },
         disputes: { method: 'POST', url: '/v1/work/:tc/dispute', description: 'Open dispute', tier: 'extended' },
         validate: { method: 'POST', url: '/v1/validate', description: 'Validate request body', tier: 'extended' },
+        portal: { method: 'GET', url: '/v1/portal', description: 'Onboarding portal — select your AI platform and get started', tier: 'core' },
+        ghii: { method: 'POST', url: '/v1/ghii', description: 'Register a human identity (GHII)', tier: 'core' },
+        ghii_directory: { method: 'GET', url: '/v1/ghii/directory', description: 'Search human identity directory', tier: 'core' },
+        apps: { method: 'GET', url: '/v1/apps', description: 'Browse downloadable apps', tier: 'core' },
+        libs: { method: 'GET', url: '/v1/libs', description: 'JavaScript helper libraries for app development', tier: 'core' },
       },
       tiers: {
         tier_0: { name: 'Browse', description: 'GET only, no auth. Catalogue, boards, profiles, stats.' },
@@ -112,6 +135,7 @@ export function bootstrapRouter(config: MeatConfig): Router {
       { description: 'Browse the action catalogue', method: 'GET', url: '/v1/catalogue' },
       { description: 'View the OpenAPI specification', method: 'GET', url: '/v1/spec' },
       { description: 'Check node discovery info', method: 'GET', url: '/.well-known/aimeat' },
+      { description: 'Onboarding portal — get setup instructions for any AI platform', method: 'GET', url: '/v1/portal' },
     ]));
   });
 

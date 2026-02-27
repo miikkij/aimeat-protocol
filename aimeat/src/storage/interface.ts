@@ -149,6 +149,7 @@ export interface StorageFileRecord {
   mimeType: string;
   size: number;
   data: Buffer;
+  accessCode?: string;
   createdAt: string;
 }
 
@@ -185,6 +186,21 @@ export interface BoardSubscriptionRecord {
   callbackUrl?: string;
   filters?: { categories?: string[]; tags?: string[] };
   createdAt: string;
+}
+
+export interface GHIIRecord {
+  username: string;               // e.g. "alice"
+  nodeId: string;                 // home node ID
+  ghii: string;                   // full identifier: "alice@node-id"
+  displayName: string;
+  bio?: string;
+  avatar?: string;                // emoji or storage key
+  locale?: string;                // preferred language
+  passwordHash?: string;          // scrypt hash for cross-device login
+  verificationLevel: 0 | 1 | 2;  // basic / confirmed / strong
+  ownerName: string;              // links to OwnerRecord.name
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Storage {
@@ -301,4 +317,12 @@ export interface Storage {
   // Node key
   setNodeKey(publicKey: string, privateKey: string): Promise<void>;
   getNodeKey(): Promise<{ publicKey: string; privateKey: string } | null>;
+
+  // GHII (human identity)
+  createGHII(record: GHIIRecord): Promise<GHIIRecord>;
+  getGHII(ghii: string): Promise<GHIIRecord | null>;
+  getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null>;
+  updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
+  listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]>;
+  deleteGHII(ghii: string): Promise<boolean>;
 }

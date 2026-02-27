@@ -25,6 +25,7 @@ import type {
     StorageFileRecord,
     PeeringRequestRecord,
     ChunkedUploadRecord,
+    GHIIRecord,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -1012,5 +1013,53 @@ export class MongoStorage implements Storage {
 
     private toPeeringRecord(row: any): PeeringRequestRecord {
         return { id: row.requestId, fromNodeUrl: row.fromNodeUrl, fromNodeId: row.fromNodeId ?? undefined, toNodeId: row.toNodeId ?? undefined, targetUrl: row.targetUrl ?? undefined, publicKey: row.publicKey ?? undefined, message: row.message ?? undefined, status: row.status as any, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+    }
+
+    // ── GHII (in-memory fallback until Prisma schema is updated) ──
+
+    private ghiis = new Map<string, GHIIRecord>();
+
+    async createGHII(record: GHIIRecord): Promise<GHIIRecord> {
+        if (this.ghiis.has(record.ghii)) throw new Error('GHII_TAKEN');
+        this.ghiis.set(record.ghii, record);
+        return record;
+    }
+
+    async getGHII(ghii: string): Promise<GHIIRecord | null> {
+        return this.ghiis.get(ghii) ?? null;
+    }
+
+    async getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null> {
+        for (const r of this.ghiis.values()) {
+            if (r.ownerName === ownerName) return r;
+        }
+        return null;
+    }
+
+    async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
+        const record = this.ghiis.get(ghii);
+        if (!record) return null;
+        Object.assign(record, updates, { updatedAt: new Date().toISOString() });
+        return record;
+    }
+
+    async listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> {
+        let results = [...this.ghiis.values()];
+        if (opts?.q) {
+            const q = opts.q.toLowerCase();
+            results = results.filter(r =>
+                r.username.toLowerCase().includes(q) ||
+                r.displayName.toLowerCase().includes(q) ||
+                (r.bio?.toLowerCase().includes(q) ?? false)
+            );
+        }
+        if (opts?.level !== undefined) {
+            results = results.filter(r => r.verificationLevel >= opts.level!);
+        }
+        return results;
+    }
+
+    async deleteGHII(ghii: string): Promise<boolean> {
+        return this.ghiis.delete(ghii);
     }
 }

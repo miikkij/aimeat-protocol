@@ -206,5 +206,6 @@ if (subcommand === 'init') {
     if (!process.env.MEAT_ADMIN_PASSWORD) {
       logger.info(`   Admin Secret: ${config.adminPassword}`);
     }
+    logger.info(`──────────────────────────────────────────────────────────`);
   });
 }

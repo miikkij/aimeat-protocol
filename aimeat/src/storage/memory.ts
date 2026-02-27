@@ -4,6 +4,7 @@ import type {
   BoardRecord, BoardPostRecord, OtkRecord,
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
   StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord,
+  GHIIRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -23,6 +24,7 @@ export class InMemoryStorage implements Storage {
   private peeringRequests = new Map<string, PeeringRequestRecord>();
   private chunkedUploads = new Map<string, ChunkedUploadRecord>();
   private nodeKey: { publicKey: string; privateKey: string } | null = null;
+  private ghiis = new Map<string, GHIIRecord>();              // key: ghii string
 
   // ── Owners ──
 
@@ -606,5 +608,51 @@ export class InMemoryStorage implements Storage {
 
   async deleteChunkedUpload(uploadId: string): Promise<boolean> {
     return this.chunkedUploads.delete(uploadId);
+  }
+
+  // ── GHII ──
+
+  async createGHII(record: GHIIRecord): Promise<GHIIRecord> {
+    if (this.ghiis.has(record.ghii)) throw new Error('GHII_TAKEN');
+    this.ghiis.set(record.ghii, record);
+    return record;
+  }
+
+  async getGHII(ghii: string): Promise<GHIIRecord | null> {
+    return this.ghiis.get(ghii) ?? null;
+  }
+
+  async getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null> {
+    for (const r of this.ghiis.values()) {
+      if (r.ownerName === ownerName) return r;
+    }
+    return null;
+  }
+
+  async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
+    const record = this.ghiis.get(ghii);
+    if (!record) return null;
+    Object.assign(record, updates, { updatedAt: new Date().toISOString() });
+    return record;
+  }
+
+  async listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> {
+    let results = [...this.ghiis.values()];
+    if (opts?.q) {
+      const q = opts.q.toLowerCase();
+      results = results.filter(r =>
+        r.username.toLowerCase().includes(q) ||
+        r.displayName.toLowerCase().includes(q) ||
+        (r.bio?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    if (opts?.level !== undefined) {
+      results = results.filter(r => r.verificationLevel >= opts.level!);
+    }
+    return results;
+  }
+
+  async deleteGHII(ghii: string): Promise<boolean> {
+    return this.ghiis.delete(ghii);
   }
 }

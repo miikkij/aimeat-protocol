@@ -698,6 +698,7 @@ const ADMIN_DASHBOARD_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>AIMEAT Admin Dashboard</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -1133,10 +1134,8 @@ loadAll();
 // ── Admin Login Page HTML ──
 const ADMIN_LOGIN_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>AIMEAT Admin</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
 .box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:32px;width:380px;text-align:center}
 h1{font-size:1.4rem;margin-bottom:8px}
 .sub{color:#94a3b8;font-size:.85rem;margin-bottom:24px}
@@ -1163,6 +1162,7 @@ function go(e){e.preventDefault();var pw=document.getElementById('pw').value;if(
 // ── Admin Setup Wizard HTML (Login + Register tabs) ──
 const ADMIN_SETUP_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>AIMEAT Admin</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
