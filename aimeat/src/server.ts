@@ -30,6 +30,7 @@ import { storageFilesRouter } from './routes/storage-files.js';
 import { validateRouter } from './routes/validate.js';
 import { mcpRouter } from './routes/mcp.js';
 import { portalRouter } from './routes/portal.js';
+import { profileRouter } from './routes/profile.js';
 import { ghiiRouter } from './routes/ghii.js';
 import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
@@ -208,6 +209,7 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(validateRouter(config));
   app.use(mcpRouter(config, storage));
   app.use(portalRouter(config, storage));
+  app.use(profileRouter(config, storage));
   app.use(ghiiRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));

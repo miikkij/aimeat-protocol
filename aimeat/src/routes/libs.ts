@@ -13,98 +13,98 @@ import { aimeatWorkLib } from './lib-work.js';
  * The app files are served from the AIMEAT node itself — zero CORS issues.
  */
 export function libsRouter(config: MeatConfig, _storage: Storage): Router {
-    const router = Router();
+  const router = Router();
 
-    // GET /v1/libs/aimeat-auth.js — Auth helper library
-    router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
-        res.type('application/javascript').send(aimeatAuthLib(config));
+  // GET /v1/libs/aimeat-auth.js — Auth helper library
+  router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatAuthLib(config));
+  });
+
+  // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library
+  router.get('/v1/libs/aimeat-data.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatDataLib(config));
+  });
+
+  // GET /v1/libs/aimeat-storage.js — File storage library
+  router.get('/v1/libs/aimeat-storage.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatStorageLib(config));
+  });
+
+  // GET /v1/libs/aimeat-social.js — Boards & social library
+  router.get('/v1/libs/aimeat-social.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatSocialLib(config));
+  });
+
+  // GET /v1/libs/aimeat-wallet.js — Wallet library
+  router.get('/v1/libs/aimeat-wallet.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatWalletLib(config));
+  });
+
+  // GET /v1/libs/aimeat-work.js — Actions & work exchange library
+  router.get('/v1/libs/aimeat-work.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatWorkLib(config));
+  });
+
+  // GET /v1/libs/ — List available libraries
+  router.get('/v1/libs', (_req, res) => {
+    res.json({
+      ok: true,
+      libraries: [
+        {
+          name: 'aimeat-auth',
+          url: '/v1/libs/aimeat-auth.js',
+          description: 'Identity & session: registration, Ed25519 auth, JWT lifecycle, login UI',
+          size_estimate: '~25KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>`,
+        },
+        {
+          name: 'aimeat-data',
+          url: '/v1/libs/aimeat-data.js',
+          description: 'Memory & Micro-Memory: key-value storage, search, public reads, OTK sets',
+          size_estimate: '~8KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-data.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-storage',
+          url: '/v1/libs/aimeat-storage.js',
+          description: 'File storage: upload, download, chunked upload, drag & drop helper',
+          size_estimate: '~8KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-storage.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-social',
+          url: '/v1/libs/aimeat-social.js',
+          description: 'Boards & social: create boards, post, react, reply, subscribe',
+          size_estimate: '~6KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-social.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-wallet',
+          url: '/v1/libs/aimeat-wallet.js',
+          description: 'Morsel economy: balance, transactions, request morsels, UI badge',
+          size_estimate: '~6KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-wallet.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-work',
+          url: '/v1/libs/aimeat-work.js',
+          description: 'Actions & work: catalogue, work requests, inbox, deliver, rate, polling',
+          size_estimate: '~8KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-work.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+      ],
     });
+  });
 
-    // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library
-    router.get('/v1/libs/aimeat-data.js', (_req, res) => {
-        res.type('application/javascript').send(aimeatDataLib(config));
-    });
-
-    // GET /v1/libs/aimeat-storage.js — File storage library
-    router.get('/v1/libs/aimeat-storage.js', (_req, res) => {
-        res.type('application/javascript').send(aimeatStorageLib(config));
-    });
-
-    // GET /v1/libs/aimeat-social.js — Boards & social library
-    router.get('/v1/libs/aimeat-social.js', (_req, res) => {
-        res.type('application/javascript').send(aimeatSocialLib(config));
-    });
-
-    // GET /v1/libs/aimeat-wallet.js — Wallet library
-    router.get('/v1/libs/aimeat-wallet.js', (_req, res) => {
-        res.type('application/javascript').send(aimeatWalletLib(config));
-    });
-
-    // GET /v1/libs/aimeat-work.js — Actions & work exchange library
-    router.get('/v1/libs/aimeat-work.js', (_req, res) => {
-        res.type('application/javascript').send(aimeatWorkLib(config));
-    });
-
-    // GET /v1/libs/ — List available libraries
-    router.get('/v1/libs', (_req, res) => {
-        res.json({
-            ok: true,
-            libraries: [
-                {
-                    name: 'aimeat-auth',
-                    url: '/v1/libs/aimeat-auth.js',
-                    description: 'Identity & session: registration, Ed25519 auth, JWT lifecycle, login UI',
-                    size_estimate: '~25KB',
-                    include: `<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>`,
-                },
-                {
-                    name: 'aimeat-data',
-                    url: '/v1/libs/aimeat-data.js',
-                    description: 'Memory & Micro-Memory: key-value storage, search, public reads, OTK sets',
-                    size_estimate: '~8KB',
-                    include: `<script src="${config.baseUrl}/v1/libs/aimeat-data.js"></script>`,
-                    requires: 'aimeat-auth',
-                },
-                {
-                    name: 'aimeat-storage',
-                    url: '/v1/libs/aimeat-storage.js',
-                    description: 'File storage: upload, download, chunked upload, drag & drop helper',
-                    size_estimate: '~8KB',
-                    include: `<script src="${config.baseUrl}/v1/libs/aimeat-storage.js"></script>`,
-                    requires: 'aimeat-auth',
-                },
-                {
-                    name: 'aimeat-social',
-                    url: '/v1/libs/aimeat-social.js',
-                    description: 'Boards & social: create boards, post, react, reply, subscribe',
-                    size_estimate: '~6KB',
-                    include: `<script src="${config.baseUrl}/v1/libs/aimeat-social.js"></script>`,
-                    requires: 'aimeat-auth',
-                },
-                {
-                    name: 'aimeat-wallet',
-                    url: '/v1/libs/aimeat-wallet.js',
-                    description: 'Morsel economy: balance, transactions, request morsels, UI badge',
-                    size_estimate: '~6KB',
-                    include: `<script src="${config.baseUrl}/v1/libs/aimeat-wallet.js"></script>`,
-                    requires: 'aimeat-auth',
-                },
-                {
-                    name: 'aimeat-work',
-                    url: '/v1/libs/aimeat-work.js',
-                    description: 'Actions & work: catalogue, work requests, inbox, deliver, rate, polling',
-                    size_estimate: '~8KB',
-                    include: `<script src="${config.baseUrl}/v1/libs/aimeat-work.js"></script>`,
-                    requires: 'aimeat-auth',
-                },
-            ],
-        });
-    });
-
-    // GET /v1/libs/test-harness — HTML page that loads all libraries (dev mode only)
-    if (config.devMode) {
-        router.get('/v1/libs/test-harness', (_req, res) => {
-            res.type('text/html').send(`<!DOCTYPE html>
+  // GET /v1/libs/test-harness — HTML page that loads all libraries (dev mode only)
+  if (config.devMode) {
+    router.get('/v1/libs/test-harness', (_req, res) => {
+      res.type('text/html').send(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
 <title>AIMEAT Libraries Test Harness</title>
@@ -128,10 +128,10 @@ window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data
 window.__ready = true;
 </script>
 </body></html>`);
-        });
-    }
+    });
+  }
 
-    return router;
+  return router;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ window.__ready = true;
    ───────────────────────────────────────────────────────────────── */
 
 function aimeatAuthLib(config: MeatConfig): string {
-    return `// aimeat-auth.js — AIMEAT Auth Library
+  return `// aimeat-auth.js — AIMEAT Auth Library
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Include: <script src="${config.baseUrl}/v1/libs/aimeat-auth.js"><\\/script>
 // Usage: const session = await AIMEAT.auth.register('alice', 'Alice M.');
@@ -485,10 +485,27 @@ const auth = {
     function render() {
       const stored = load('session');
       if (stored) {
-        container.innerHTML = '<div style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;background:#1e293b;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-family:system-ui;font-size:14px">'
-          + '<span style="color:#22c55e">\\u25cf</span>'
-          + '<span>' + escHtml(stored.ghii || stored.owner) + '</span>'
-          + '<button id="aimeat-logout-btn" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px">Logout</button>'
+        container.innerHTML = '<div style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;'
+          + 'background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);'
+          + 'border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);'
+          + 'border-radius:10px;'
+          + 'box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);'
+          + 'font-family:system-ui;font-size:14px">'
+          + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">'
+          + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+          + 'background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);'
+          + 'box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span>'
+          + 'logged in</span>'
+          + '<span style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;'
+          + 'text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);'
+          + '-webkit-text-stroke:.2px rgba(120,85,20,.3)">'
+          + escHtml(stored.ghii || stored.owner) + '</span>'
+          + '<button id="aimeat-logout-btn" style="'
+          + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
+          + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
+          + 'border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;'
+          + 'box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);'
+          + 'text-shadow:0 1px 1px rgba(0,0,0,.4)">Logout</button>'
           + '</div>';
         document.getElementById('aimeat-logout-btn').addEventListener('click', () => {
           auth.logout();

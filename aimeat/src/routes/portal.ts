@@ -8,94 +8,94 @@ import { success } from '../middleware/envelope.js';
    ────────────────────────────────────────────────────────── */
 
 interface PlatformVariant {
-    id: string;
-    name: string;
-    tier: 'A' | 'B' | 'C' | 'D';
-    path: 'mcp' | 'api' | 'browse' | 'prompt-package';
-    notes?: string;
+  id: string;
+  name: string;
+  tier: 'A' | 'B' | 'C' | 'D';
+  path: 'mcp' | 'api' | 'browse' | 'prompt-package';
+  notes?: string;
 }
 
 interface AIPlatform {
-    id: string;
-    name: string;
-    vendor: string;
-    icon: string;
-    variants: PlatformVariant[];
+  id: string;
+  name: string;
+  vendor: string;
+  icon: string;
+  variants: PlatformVariant[];
 }
 
 const PLATFORMS: AIPlatform[] = [
-    {
-        id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '🤖',
-        variants: [
-            { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
-            { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
-            { id: 'pro', name: 'Pro', tier: 'A', path: 'mcp' },
-            { id: 'team', name: 'Team', tier: 'A', path: 'mcp' },
-            { id: 'enterprise', name: 'Enterprise', tier: 'A', path: 'mcp' },
-        ],
-    },
-    {
-        id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '🧠',
-        variants: [
-            { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
-            { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
-            { id: 'max', name: 'Max (claude.ai)', tier: 'A', path: 'mcp' },
-            { id: 'code', name: 'Claude Code (CLI)', tier: 'B', path: 'api' },
-        ],
-    },
-    {
-        id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '🪟',
-        variants: [
-            { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'Cannot make external HTTP calls' },
-            { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'Can run terminal commands' },
-            { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'Add as MCP server in VS Code settings' },
-        ],
-    },
-    {
-        id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '🔍',
-        variants: [
-            { id: 'chat', name: 'DeepSeek Chat', tier: 'D', path: 'prompt-package' },
-            { id: 'api', name: 'DeepSeek API (external)', tier: 'B', path: 'api' },
-        ],
-    },
-    {
-        id: 'grok', name: 'Grok', vendor: 'xAI', icon: '🚀',
-        variants: [
-            { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
-            { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'Python sandbox, no internet' },
-            { id: 'api', name: 'Grok API (external)', tier: 'B', path: 'api' },
-        ],
-    },
-    {
-        id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '💎',
-        variants: [
-            { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
-            { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
-            { id: 'api', name: 'Gemini API (external)', tier: 'B', path: 'api' },
-        ],
-    },
-    {
-        id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '🖥️',
-        variants: [
-            { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'Models with function calling' },
-            { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
-        ],
-    },
-    {
-        id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '🦀',
-        variants: [
-            { id: 'instance', name: 'OpenClaw Instance', tier: 'B', path: 'api' },
-        ],
-    },
-    {
-        id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '⚙️',
-        variants: [
-            { id: 'mcp', name: 'MCP-capable AI', tier: 'A', path: 'mcp' },
-            { id: 'http', name: 'HTTP-capable AI', tier: 'B', path: 'api' },
-            { id: 'browse', name: 'Browse-only AI', tier: 'C', path: 'browse' },
-            { id: 'chat', name: 'Chat-only AI (no HTTP)', tier: 'D', path: 'prompt-package' },
-        ],
-    },
+  {
+    id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '🤖',
+    variants: [
+      { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
+      { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
+      { id: 'pro', name: 'Pro', tier: 'A', path: 'mcp' },
+      { id: 'team', name: 'Team', tier: 'A', path: 'mcp' },
+      { id: 'enterprise', name: 'Enterprise', tier: 'A', path: 'mcp' },
+    ],
+  },
+  {
+    id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '🧠',
+    variants: [
+      { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
+      { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
+      { id: 'max', name: 'Max (claude.ai)', tier: 'A', path: 'mcp' },
+      { id: 'code', name: 'Claude Code (CLI)', tier: 'B', path: 'api' },
+    ],
+  },
+  {
+    id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '🪟',
+    variants: [
+      { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'Cannot make external HTTP calls' },
+      { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'Can run terminal commands' },
+      { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'Add as MCP server in VS Code settings' },
+    ],
+  },
+  {
+    id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '🔍',
+    variants: [
+      { id: 'chat', name: 'DeepSeek Chat', tier: 'D', path: 'prompt-package' },
+      { id: 'api', name: 'DeepSeek API (external)', tier: 'B', path: 'api' },
+    ],
+  },
+  {
+    id: 'grok', name: 'Grok', vendor: 'xAI', icon: '🚀',
+    variants: [
+      { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
+      { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'Python sandbox, no internet' },
+      { id: 'api', name: 'Grok API (external)', tier: 'B', path: 'api' },
+    ],
+  },
+  {
+    id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '💎',
+    variants: [
+      { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
+      { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
+      { id: 'api', name: 'Gemini API (external)', tier: 'B', path: 'api' },
+    ],
+  },
+  {
+    id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '🖥️',
+    variants: [
+      { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'Models with function calling' },
+      { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
+    ],
+  },
+  {
+    id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '🦀',
+    variants: [
+      { id: 'instance', name: 'OpenClaw Instance', tier: 'B', path: 'api' },
+    ],
+  },
+  {
+    id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '⚙️',
+    variants: [
+      { id: 'mcp', name: 'MCP-capable AI', tier: 'A', path: 'mcp' },
+      { id: 'http', name: 'HTTP-capable AI', tier: 'B', path: 'api' },
+      { id: 'browse', name: 'Browse-only AI', tier: 'C', path: 'browse' },
+      { id: 'chat', name: 'Chat-only AI (no HTTP)', tier: 'D', path: 'prompt-package' },
+    ],
+  },
 ];
 
 /* ──────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ const PLATFORMS: AIPlatform[] = [
    ────────────────────────────────────────────────────────── */
 
 function buildPromptPackage(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
-    return `# AIMEAT Application Builder
+  return `# AIMEAT Application Builder
 
 You are helping a human build a web application that connects to an AIMEAT (AI Memory Exchange and Action Transfer) node. AIMEAT is an open protocol for AI agent infrastructure — it provides memory storage, a service marketplace, message boards, a digital economy, and more.
 
@@ -324,7 +324,7 @@ The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Came
 }
 
 function buildMcpInstructions(config: MeatConfig): string {
-    return `## MCP Setup Instructions
+  return `## MCP Setup Instructions
 
 Your AI platform supports the Model Context Protocol (MCP), which provides the richest integration with AIMEAT.
 
@@ -355,7 +355,7 @@ After connecting, try saying: "Check my AIMEAT node catalogue" or "What services
 }
 
 function buildApiInstructions(config: MeatConfig): string {
-    return `## API Integration Instructions
+  return `## API Integration Instructions
 
 Your AI platform can make HTTP calls. Here's how to get started:
 
@@ -394,7 +394,7 @@ GET ${config.baseUrl}/v1/prompts/tier1 — Detailed operating instructions`;
 }
 
 function buildBrowseInstructions(config: MeatConfig): string {
-    return `## Browse-Only Access
+  return `## Browse-Only Access
 
 Your AI can browse URLs but cannot make POST requests. Here's what you can do:
 
@@ -434,8 +434,8 @@ This uses micro-memory — small key-value storage accessible via GET parameters
    ────────────────────────────────────────────────────────── */
 
 function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
-    const platformsJson = JSON.stringify(PLATFORMS);
-    return `<!DOCTYPE html>
+  const platformsJson = JSON.stringify(PLATFORMS);
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -446,13 +446,44 @@ function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: nu
 <script src="${sanitize(config.baseUrl)}/v1/libs/aimeat-auth.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--accent2:#0ea5e9;--border:#475569;--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;--radius:12px}
-body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
+:root{--bg:#0f0a14;--card:rgba(30,20,40,.85);--card2:rgba(60,30,60,.7);--text:#f0e6f6;--muted:#c4a6d0;--accent:#ff6b9d;--accent2:#c44569;--border:rgba(255,107,157,.25);--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;--radius:12px;--love1:#ff6b9d;--love2:#c44569;--love3:#ff8a80;--love4:#f48fb1;--love5:#880e4f}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden}
+a{color:var(--love1);text-decoration:none}
+a:hover{text-decoration:underline;color:var(--love3)}
+
+/* ── Background system ── */
+.bg-layer{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;transition:opacity .8s ease}
+.bg-layer.hidden{opacity:0}
+body>.topbar,body>.container{position:relative;z-index:1}
+
+/* BG 1: Floating Hearts */
+.bg-hearts{background:radial-gradient(ellipse at 50% 0%,#2d1133 0%,#0f0a14 70%)}
+.heart-particle{position:absolute;bottom:-60px;opacity:0;font-size:1.2rem;animation:floatUp linear infinite;filter:drop-shadow(0 0 6px rgba(255,107,157,.5))}
+@keyframes floatUp{0%{transform:translateY(0) rotate(0deg) scale(1);opacity:0}10%{opacity:.7}90%{opacity:.7}100%{transform:translateY(-110vh) rotate(720deg) scale(.3);opacity:0}}
+
+/* BG 2: Aurora Love */
+.bg-aurora{background:#0f0a14}
+.aurora-wave{position:absolute;width:200%;height:60%;left:-50%;border-radius:50%;filter:blur(80px);opacity:.35;animation:auroraShift 8s ease-in-out infinite alternate}
+.aurora-wave:nth-child(1){top:10%;background:linear-gradient(90deg,#ff6b9d,#c44569,#ff8a80,#f48fb1);animation-duration:8s}
+.aurora-wave:nth-child(2){top:30%;background:linear-gradient(90deg,#f48fb1,#880e4f,#ff6b9d,#e91e63);animation-duration:12s;animation-delay:-4s}
+.aurora-wave:nth-child(3){top:55%;background:linear-gradient(90deg,#ad1457,#ff6b9d,#f06292,#880e4f);animation-duration:10s;animation-delay:-2s}
+@keyframes auroraShift{0%{transform:translateX(-20%) scaleY(1)}50%{transform:translateX(10%) scaleY(1.3)}100%{transform:translateX(-10%) scaleY(.8)}}
+
+/* BG 3: Sparkle Galaxy */
+.bg-sparkle{background:radial-gradient(ellipse at 50% 50%,#1a0a24 0%,#0f0a14 100%)}
+.sparkle{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;animation:sparkleAnim ease-in-out infinite}
+@keyframes sparkleAnim{0%,100%{opacity:0;transform:scale(0)}50%{opacity:1;transform:scale(1);box-shadow:0 0 8px 2px var(--love1),0 0 20px 4px var(--love4)}}
+.nebula-blob{position:absolute;border-radius:50%;filter:blur(100px);opacity:.2;animation:nebulaFloat 15s ease-in-out infinite alternate}
+@keyframes nebulaFloat{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,-30px) scale(1.2)}}
+
+/* BG selector */
+.bg-selector{position:fixed;bottom:1.5rem;right:1.5rem;z-index:200;display:flex;gap:.5rem;background:rgba(15,10,20,.8);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:30px;padding:.4rem .6rem}
+.bg-btn{width:36px;height:36px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:var(--card2)}
+.bg-btn:hover{border-color:var(--love1);transform:scale(1.15)}
+.bg-btn.active{border-color:var(--love1);box-shadow:0 0 12px rgba(255,107,157,.5)}
 
 /* Top bar */
-.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar{background:rgba(30,20,40,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:.6rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .topbar-left{display:flex;align-items:center;gap:.5rem;font-weight:700;font-size:1rem}
 .topbar-right{display:flex;align-items:center;gap:.75rem}
 #auth-container{display:inline-flex;align-items:center}
@@ -462,7 +493,7 @@ a:hover{text-decoration:underline}
 
 .container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
 h1{font-size:1.8rem;font-weight:700;margin-bottom:.5rem}
-h2{font-size:1.3rem;font-weight:600;margin-bottom:.75rem;color:var(--accent)}
+h2{font-size:1.3rem;font-weight:600;margin-bottom:.75rem;color:var(--love1)}
 h3{font-size:1.1rem;font-weight:600;margin-bottom:.5rem}
 p{margin-bottom:.75rem}
 .subtitle{color:var(--muted);font-size:.95rem;margin-bottom:2rem}
@@ -470,21 +501,21 @@ p{margin-bottom:.75rem}
 .node-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block}
 .stats{display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
 .stat{background:var(--card);border-radius:var(--radius);padding:.75rem 1rem;flex:1;min-width:120px;text-align:center}
-.stat .num{font-size:1.5rem;font-weight:700;color:var(--accent)}
+.stat .num{font-size:1.5rem;font-weight:700;color:var(--love1)}
 .stat .label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 
 /* Steps */
 .step{margin-bottom:2rem}
 .step-header{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem}
-.step-num{width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
-.step-num.done{background:var(--success)}
+.step-num{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--love1),var(--love2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0;box-shadow:0 0 12px rgba(255,107,157,.3)}
+.step-num.done{background:linear-gradient(135deg,var(--success),#16a34a)}
 .step-label{font-size:1.1rem;font-weight:600}
 
 /* Platform grid */
 .platforms{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-bottom:1rem}
 .platform-card{background:var(--card);border:2px solid transparent;border-radius:var(--radius);padding:1rem;text-align:center;cursor:pointer;transition:all .15s}
-.platform-card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.platform-card.selected{border-color:var(--accent);background:var(--card2)}
+.platform-card:hover{border-color:var(--love1);transform:translateY(-2px);box-shadow:0 4px 20px rgba(255,107,157,.15)}
+.platform-card.selected{border-color:var(--love1);background:var(--card2);box-shadow:0 0 20px rgba(255,107,157,.2)}
 .platform-card .icon{font-size:2rem;margin-bottom:.4rem}
 .platform-card .name{font-weight:600;font-size:.9rem}
 .platform-card .vendor{color:var(--muted);font-size:.75rem}
@@ -492,8 +523,8 @@ p{margin-bottom:.75rem}
 /* Variants */
 .variants{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem}
 .variant-btn{background:var(--card);border:2px solid var(--border);border-radius:8px;padding:.4rem .8rem;cursor:pointer;color:var(--text);font-size:.85rem;transition:all .15s}
-.variant-btn:hover{border-color:var(--accent)}
-.variant-btn.selected{border-color:var(--accent);background:var(--card2)}
+.variant-btn:hover{border-color:var(--love1)}
+.variant-btn.selected{border-color:var(--love1);background:var(--card2)}
 .variant-note{font-size:.8rem;color:var(--muted);margin-top:.25rem}
 
 /* Tier badge */
@@ -510,15 +541,15 @@ p{margin-bottom:.75rem}
 /* Prompt output */
 .prompt-output{position:relative}
 .prompt-text{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:monospace;font-size:.8rem;white-space:pre-wrap;word-break:break-word;max-height:500px;overflow-y:auto;line-height:1.5;color:var(--text)}
-.copy-btn{position:absolute;top:.5rem;right:.5rem;background:var(--accent);color:var(--bg);border:none;border-radius:6px;padding:.4rem .8rem;cursor:pointer;font-weight:600;font-size:.8rem;z-index:1}
-.copy-btn:hover{background:var(--accent2)}
+.copy-btn{position:absolute;top:.5rem;right:.5rem;background:linear-gradient(135deg,var(--love1),var(--love2));color:#fff;border:none;border-radius:6px;padding:.4rem .8rem;cursor:pointer;font-weight:600;font-size:.8rem;z-index:1;transition:all .2s}
+.copy-btn:hover{background:linear-gradient(135deg,var(--love3),var(--love1));box-shadow:0 0 12px rgba(255,107,157,.4)}
 .copy-btn.copied{background:var(--success)}
 
 /* Goal selector */
 .goals{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;margin-bottom:1rem}
 .goal-card{background:var(--card);border:2px solid var(--border);border-radius:8px;padding:.75rem;cursor:pointer;transition:all .15s;font-size:.85rem}
-.goal-card:hover{border-color:var(--accent)}
-.goal-card.selected{border-color:var(--accent);background:var(--card2)}
+.goal-card:hover{border-color:var(--love1)}
+.goal-card.selected{border-color:var(--love1);background:var(--card2)}
 .goal-card .goal-icon{font-size:1.3rem;margin-bottom:.25rem}
 
 /* Instructions */
@@ -529,10 +560,10 @@ p{margin-bottom:.75rem}
 
 /* Upload area */
 .upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:1.5rem;text-align:center;margin-top:1rem;transition:all .2s}
-.upload-area:hover{border-color:var(--accent)}
-.upload-area.dragover{border-color:var(--accent);background:rgba(56,189,248,.05)}
-.upload-btn{background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:.5rem 1.2rem;cursor:pointer;font-weight:600;font-size:.9rem}
-.upload-btn:hover{background:var(--accent2)}
+.upload-area:hover{border-color:var(--love1)}
+.upload-area.dragover{border-color:var(--love1);background:rgba(255,107,157,.05)}
+.upload-btn{background:linear-gradient(135deg,var(--love1),var(--love2));color:#fff;border:none;border-radius:8px;padding:.5rem 1.2rem;cursor:pointer;font-weight:600;font-size:.9rem;transition:all .2s}
+.upload-btn:hover{background:linear-gradient(135deg,var(--love3),var(--love1));box-shadow:0 0 16px rgba(255,107,157,.4)}
 .upload-btn:disabled{opacity:.5;cursor:not-allowed}
 .share-url{display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--success);border-radius:8px;padding:.6rem 1rem;margin-top:.75rem;font-family:monospace;font-size:.85rem}
 .share-url input{flex:1;background:none;border:none;color:var(--text);font-family:monospace;font-size:.85rem;outline:none}
@@ -565,18 +596,35 @@ p{margin-bottom:.75rem}
 </head>
 <body>
 
+<!-- Animated backgrounds -->
+<div class="bg-layer bg-hearts hidden" id="bg-hearts"></div>
+<div class="bg-layer bg-aurora hidden" id="bg-aurora">
+  <div class="aurora-wave"></div>
+  <div class="aurora-wave"></div>
+  <div class="aurora-wave"></div>
+</div>
+<div class="bg-layer bg-sparkle" id="bg-sparkle"></div>
+
+<!-- Background selector -->
+<div class="bg-selector">
+  <button class="bg-btn" onclick="switchBg(1)" title="Floating Hearts">💕</button>
+  <button class="bg-btn" onclick="switchBg(2)" title="Aurora Love">🌌</button>
+  <button class="bg-btn active" onclick="switchBg(3)" title="Sparkle Galaxy">✨</button>
+</div>
+
 <!-- Top bar with auth -->
 <div class="topbar">
-  <div class="topbar-left">❤️ AIMEAT</div>
+  <div class="topbar-left">💖 AIMEAT</div>
   <div class="topbar-right">
+    <a href="/v1/profile" style="font-size:.85rem;color:var(--love4);margin-right:.5rem">\ud83d\udc64 Profile</a>
     <span id="mode-indicator"></span>
     <div id="auth-container"></div>
   </div>
 </div>
 
 <div class="container">
-  <h1>❤️ AIMEAT Onboarding Portal</h1>
-  <p class="subtitle">Connect any AI to this node — select your platform to get started</p>
+  <h1>💖 AIMEAT Onboarding Portal</h1>
+  <p class="subtitle" style="color:var(--love4)">Connect any AI to this node — select your platform to get started</p>
   <div class="node-badge"><span class="dot"></span> ${sanitize(config.nodeId)} &mdash; ${sanitize(config.baseUrl)}</div>
 
   <div class="stats">
@@ -589,7 +637,7 @@ p{margin-bottom:.75rem}
   <div id="mode-notice"></div>
 
   <!-- Quick start: give this URL to your AI -->
-  <div class="panel" style="border-color:var(--accent);background:linear-gradient(135deg,var(--card) 0%,#1a2744 100%)">
+  <div class="panel" style="border-color:var(--love1);background:linear-gradient(135deg,rgba(30,20,40,.9) 0%,rgba(60,10,40,.8) 100%)">
     <h3 style="margin-bottom:.5rem">🚀 Quick Start — Already have an AI open?</h3>
     <p style="margin-bottom:.5rem">Copy-paste this into your AI chat and it will connect itself:</p>
     <div class="prompt-output" style="margin-bottom:0">
@@ -1142,6 +1190,76 @@ function copyPrompt(btn) {
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Background animations ──
+var activeBg = 3;
+var heartInterval = null;
+var sparkleInterval = null;
+
+function initHearts() {
+  var c = document.getElementById('bg-hearts');
+  if (heartInterval) clearInterval(heartInterval);
+  var hearts = ['\u2764','\ud83d\udc95','\ud83d\udc96','\ud83d\udc97','\ud83d\udc93','\ud83e\ude77','\u2763','\ud83d\udc9e'];
+  heartInterval = setInterval(function() {
+    if (activeBg !== 1) return;
+    var h = document.createElement('div');
+    h.className = 'heart-particle';
+    h.textContent = hearts[Math.floor(Math.random()*hearts.length)];
+    h.style.left = Math.random()*100 + '%';
+    h.style.fontSize = (0.8 + Math.random()*1.8) + 'rem';
+    h.style.animationDuration = (6 + Math.random()*8) + 's';
+    h.style.animationDelay = '0s';
+    c.appendChild(h);
+    setTimeout(function(){ if(h.parentNode) h.remove(); }, 16000);
+  }, 400);
+}
+
+function initSparkles() {
+  var c = document.getElementById('bg-sparkle');
+  c.innerHTML = '';
+  // Nebula blobs
+  var colors = ['rgba(255,107,157,.3)','rgba(196,69,105,.25)','rgba(244,143,177,.2)','rgba(136,14,79,.2)'];
+  for (var n = 0; n < 5; n++) {
+    var blob = document.createElement('div');
+    blob.className = 'nebula-blob';
+    blob.style.width = (150 + Math.random()*250) + 'px';
+    blob.style.height = blob.style.width;
+    blob.style.left = Math.random()*90 + '%';
+    blob.style.top = Math.random()*90 + '%';
+    blob.style.background = colors[n % colors.length];
+    blob.style.animationDuration = (12 + Math.random()*10) + 's';
+    blob.style.animationDelay = (-Math.random()*10) + 's';
+    c.appendChild(blob);
+  }
+  // Sparkle particles
+  for (var i = 0; i < 80; i++) {
+    var s = document.createElement('div');
+    s.className = 'sparkle';
+    s.style.left = Math.random()*100 + '%';
+    s.style.top = Math.random()*100 + '%';
+    s.style.animationDuration = (2 + Math.random()*4) + 's';
+    s.style.animationDelay = (-Math.random()*6) + 's';
+    s.style.width = (2 + Math.random()*3) + 'px';
+    s.style.height = s.style.width;
+    c.appendChild(s);
+  }
+}
+
+function switchBg(num) {
+  activeBg = num;
+  var layers = ['bg-hearts','bg-aurora','bg-sparkle'];
+  layers.forEach(function(id, i) {
+    document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+  });
+  document.querySelectorAll('.bg-btn').forEach(function(b, i) {
+    b.classList.toggle('active', i + 1 === num);
+  });
+  if (num === 3) initSparkles();
+}
+
+// Init
+initHearts();
+initSparkles();
 </script>
 </body>
 </html>`;
@@ -1152,7 +1270,7 @@ function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').repl
    ────────────────────────────────────────────────────────── */
 
 function sanitize(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -1160,104 +1278,104 @@ function sanitize(s: string): string {
    ────────────────────────────────────────────────────────── */
 
 export function portalRouter(config: MeatConfig, storage: Storage): Router {
-    const router = Router();
+  const router = Router();
 
-    // GET /v1/portal — serve the onboarding portal HTML page
-    router.get('/v1/portal', async (_req, res) => {
-        const [agents, actions, boards] = await Promise.all([
-            storage.listAgents(),
-            storage.listActions(),
-            storage.listBoards(),
-        ]);
-        const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
-        res.type('text/html').send(portalHtml(config, stats));
-    });
+  // GET /v1/portal — serve the onboarding portal HTML page
+  router.get('/v1/portal', async (_req, res) => {
+    const [agents, actions, boards] = await Promise.all([
+      storage.listAgents(),
+      storage.listActions(),
+      storage.listBoards(),
+    ]);
+    const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
+    res.type('text/html').send(portalHtml(config, stats));
+  });
 
-    // GET /v1/portal/platforms — JSON list of known platforms
-    router.get('/v1/portal/platforms', (_req, res) => {
-        res.json(success(config.nodeId, { platforms: PLATFORMS }));
-    });
+  // GET /v1/portal/platforms — JSON list of known platforms
+  router.get('/v1/portal/platforms', (_req, res) => {
+    res.json(success(config.nodeId, { platforms: PLATFORMS }));
+  });
 
-    // GET /v1/portal/prompt/:platformId — generate prompt package for a platform
-    router.get('/v1/portal/prompt/:platformId', async (req, res) => {
-        const platformId = req.params.platformId as string;
-        const goal = (req.query.goal as string) || 'dashboard';
-        const mode = (req.query.mode as string) || 'anonymous';
+  // GET /v1/portal/prompt/:platformId — generate prompt package for a platform
+  router.get('/v1/portal/prompt/:platformId', async (req, res) => {
+    const platformId = req.params.platformId as string;
+    const goal = (req.query.goal as string) || 'dashboard';
+    const mode = (req.query.mode as string) || 'anonymous';
 
-        // Find platform + variant
-        const parts = platformId.split('-');
-        const pId = parts[0];
-        const vId = parts.slice(1).join('-');
-        const platform = PLATFORMS.find(p => p.id === pId);
-        const variant = platform?.variants.find(v => v.id === vId) ?? platform?.variants[0];
+    // Find platform + variant
+    const parts = platformId.split('-');
+    const pId = parts[0];
+    const vId = parts.slice(1).join('-');
+    const platform = PLATFORMS.find(p => p.id === pId);
+    const variant = platform?.variants.find(v => v.id === vId) ?? platform?.variants[0];
 
-        if (!platform) {
-            res.status(404).json({
-                ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
-                timestamp: new Date().toISOString(),
-                error: { code: 'NOT_FOUND', message: `Platform '${pId}' not found` },
-            });
-            return;
-        }
+    if (!platform) {
+      res.status(404).json({
+        ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+        timestamp: new Date().toISOString(),
+        error: { code: 'NOT_FOUND', message: `Platform '${pId}' not found` },
+      });
+      return;
+    }
 
-        const [agents, actions, boards] = await Promise.all([
-            storage.listAgents(),
-            storage.listActions(),
-            storage.listBoards(),
-        ]);
-        const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
+    const [agents, actions, boards] = await Promise.all([
+      storage.listAgents(),
+      storage.listActions(),
+      storage.listBoards(),
+    ]);
+    const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
 
-        const path = variant?.path ?? 'prompt-package';
-        let prompt: string;
-        switch (path) {
-            case 'mcp':
-                prompt = buildMcpInstructions(config);
-                break;
-            case 'api':
-                prompt = buildApiInstructions(config);
-                break;
-            case 'browse':
-                prompt = buildBrowseInstructions(config);
-                break;
-            default:
-                prompt = buildPromptPackage(config, stats);
-        }
+    const path = variant?.path ?? 'prompt-package';
+    let prompt: string;
+    switch (path) {
+      case 'mcp':
+        prompt = buildMcpInstructions(config);
+        break;
+      case 'api':
+        prompt = buildApiInstructions(config);
+        break;
+      case 'browse':
+        prompt = buildBrowseInstructions(config);
+        break;
+      default:
+        prompt = buildPromptPackage(config, stats);
+    }
 
-        // Append goal context if prompt-package
-        if (path === 'prompt-package' && goal !== 'custom') {
-            const goalDescriptions: Record<string, string> = {
-                dashboard: '\n\n## Pre-Selected Goal\nThe user wants a **Personal Dashboard** — show memory entries, wallet balance, work queue status, and board activity in a clean overview layout.',
-                notes: '\n\n## Pre-Selected Goal\nThe user wants a **Note-Taking App** — organize notes by folders/tags using AIMEAT memory keys as paths. Include search, create, edit, delete.',
-                game: '\n\n## Pre-Selected Goal\nThe user wants a **Multiplayer Game** — use AIMEAT memory for shared game state, boards for matchmaking. Suggest tic-tac-toe or similar turn-based game that works with polling.',
-                news: '\n\n## Pre-Selected Goal\nThe user wants a **News / Content Reader** — browse board posts across multiple boards, show in a timeline/feed view with categories and search.',
-                marketplace: '\n\n## Pre-Selected Goal\nThe user wants a **Service Marketplace** — browse the action catalogue, show trust scores, allow requesting work from providers.',
-                chat: '\n\n## Pre-Selected Goal\nThe user wants a **Chat / Messaging App** — use board posts as messages in topic-based channels. Include post creation, reactions, and auto-refresh.',
-                iot: '\n\n## Pre-Selected Goal\nThe user wants an **IoT / Data Dashboard** — display structured data from board posts and memory entries, show charts/tables, support auto-refresh for live data.',
-            };
-            prompt += goalDescriptions[goal] ?? '';
-        }
+    // Append goal context if prompt-package
+    if (path === 'prompt-package' && goal !== 'custom') {
+      const goalDescriptions: Record<string, string> = {
+        dashboard: '\n\n## Pre-Selected Goal\nThe user wants a **Personal Dashboard** — show memory entries, wallet balance, work queue status, and board activity in a clean overview layout.',
+        notes: '\n\n## Pre-Selected Goal\nThe user wants a **Note-Taking App** — organize notes by folders/tags using AIMEAT memory keys as paths. Include search, create, edit, delete.',
+        game: '\n\n## Pre-Selected Goal\nThe user wants a **Multiplayer Game** — use AIMEAT memory for shared game state, boards for matchmaking. Suggest tic-tac-toe or similar turn-based game that works with polling.',
+        news: '\n\n## Pre-Selected Goal\nThe user wants a **News / Content Reader** — browse board posts across multiple boards, show in a timeline/feed view with categories and search.',
+        marketplace: '\n\n## Pre-Selected Goal\nThe user wants a **Service Marketplace** — browse the action catalogue, show trust scores, allow requesting work from providers.',
+        chat: '\n\n## Pre-Selected Goal\nThe user wants a **Chat / Messaging App** — use board posts as messages in topic-based channels. Include post creation, reactions, and auto-refresh.',
+        iot: '\n\n## Pre-Selected Goal\nThe user wants an **IoT / Data Dashboard** — display structured data from board posts and memory entries, show charts/tables, support auto-refresh for live data.',
+      };
+      prompt += goalDescriptions[goal] ?? '';
+    }
 
-        // Authenticated users get extra upload instructions in the prompt
-        if (path === 'prompt-package' && mode === 'authenticated') {
-            prompt += '\n\n## Sharing Your App\n'
-                + 'The user has an AIMEAT account. After you generate the HTML file, tell them:\n'
-                + '"Go back to the AIMEAT portal and use the upload form in Step 4 to upload this HTML file. '
-                + 'You\'ll get a shareable download link like `' + config.baseUrl + '/v1/apps/yourname/app.html` '
-                + 'that anyone can use to download and run your app locally."';
-        }
+    // Authenticated users get extra upload instructions in the prompt
+    if (path === 'prompt-package' && mode === 'authenticated') {
+      prompt += '\n\n## Sharing Your App\n'
+        + 'The user has an AIMEAT account. After you generate the HTML file, tell them:\n'
+        + '"Go back to the AIMEAT portal and use the upload form in Step 4 to upload this HTML file. '
+        + 'You\'ll get a shareable download link like `' + config.baseUrl + '/v1/apps/yourname/app.html` '
+        + 'that anyone can use to download and run your app locally."';
+    }
 
-        res.json(success(config.nodeId, {
-            platform: platform.name,
-            variant: variant?.name ?? 'default',
-            tier: variant?.tier ?? 'D',
-            path,
-            goal,
-            prompt,
-        }, [
-            { description: 'View all platforms', method: 'GET', url: '/v1/portal/platforms' },
-            { description: 'Visit the portal', method: 'GET', url: '/v1/portal' },
-        ]));
-    });
+    res.json(success(config.nodeId, {
+      platform: platform.name,
+      variant: variant?.name ?? 'default',
+      tier: variant?.tier ?? 'D',
+      path,
+      goal,
+      prompt,
+    }, [
+      { description: 'View all platforms', method: 'GET', url: '/v1/portal/platforms' },
+      { description: 'Visit the portal', method: 'GET', url: '/v1/portal' },
+    ]));
+  });
 
-    return router;
+  return router;
 }
