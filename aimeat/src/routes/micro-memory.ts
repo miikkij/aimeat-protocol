@@ -51,6 +51,61 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
         }));
     });
 
+    // GET /v1/mm/help — Guide for agents on how to use micro-memory
+    router.get('/v1/mm/help', (_req, res) => {
+        res.json(success(config.nodeId, {
+            title: 'Micro-Memory Quick Reference',
+            description: 'Lightweight key-value storage accessible via GET requests. No registration needed in anonymous mode.',
+            quick_start: {
+                step_1: {
+                    action: 'Store data with password protection',
+                    url: '/v1/mm?op=add&set=MY_SET&key=MY_KEY&value=MY_VALUE&access_code=MY_SECRET',
+                    explanation: 'Creates a set named MY_SET with a key MY_KEY. The access_code acts as a password. Set is auto-configured as shared_read.',
+                },
+                step_2: {
+                    action: 'Read data back using password',
+                    url: '/v1/mm?op=list&set=MY_SET&access_code=MY_SECRET',
+                    explanation: 'No OTK or authentication needed — the access_code is all you need to read.',
+                },
+                step_3: {
+                    action: 'Store data WITHOUT password (anonymous, private)',
+                    url: '/v1/mm?op=add&set=MY_SET&key=MY_KEY&value=MY_VALUE',
+                    explanation: 'Set defaults to private. Only accessible via the same anonymous session or OTK.',
+                },
+            },
+            operations: {
+                add: { url: '/v1/mm?op=add&set=NAME&key=KEY&value=VALUE', description: 'Add or overwrite a key in a set' },
+                mod: { url: '/v1/mm?op=mod&set=NAME&key=KEY&value=NEW_VALUE', description: 'Modify an existing key (fails if key does not exist)' },
+                del: { url: '/v1/mm?op=del&set=NAME&key=KEY', description: 'Delete a key from a set' },
+                list_set: { url: '/v1/mm?op=list&set=NAME', description: 'List all entries in a set' },
+                list_all: { url: '/v1/mm?op=list', description: 'List all sets (names + entry counts)' },
+                config: { url: '/v1/mm?op=config&set=NAME&access=VISIBILITY', description: 'Change visibility mode of a set' },
+                batch: { url: '/v1/mm?op=batch&set=NAME&key0=K&value0=V&key1=K&value1=V', description: 'Add/update multiple keys at once' },
+            },
+            visibility_modes: {
+                private: 'Only the owner can read/write. Default when no access_code is provided.',
+                public_read: 'Anyone can read (no password), only owner can write.',
+                shared_read: 'Anyone with access_code can read, only owner can write. Auto-set when access_code is given during op=add.',
+                shared_write: 'Anyone with access_code can read AND write.',
+                public_write: 'Fully open — anyone can read and write without any authentication.',
+            },
+            password_protection: {
+                how_it_works: 'Pass access_code with op=add to auto-create a password-protected set (shared_read). Then use the same access_code with op=list to read without OTK.',
+                write_with_password: '/v1/mm?op=add&set=mydata&key=hello&value=world&access_code=mypassword',
+                read_with_password: '/v1/mm?op=list&set=mydata&access_code=mypassword',
+                change_visibility: '/v1/mm?op=config&set=mydata&access=shared_write&access_code=mypassword',
+            },
+            tips: [
+                'You do NOT need to register or authenticate to use micro-memory in anonymous mode',
+                'access_code on op=add auto-creates the set as shared_read (password-protected)',
+                'access_code on op=list works as authentication — no OTK needed',
+                'For fully public data, set visibility to public_read or public_write via op=config',
+                'Maximum 50 sets per agent, 100 keys per set, 1KB per value',
+                'Use value64 instead of value to pass base64-encoded content (for special characters)',
+            ],
+        }));
+    });
+
     // GET /v1/mm — Micro-memory operations via OTK (Tier 0.5)
     // Supports op=add, del, mod, list, config, batch
     router.get('/v1/mm', async (req, res) => {

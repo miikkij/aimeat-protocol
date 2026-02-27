@@ -60,6 +60,52 @@ export function bootstrapRouter(config: MeatConfig): Router {
           ],
           tell_your_human: 'If you cannot connect directly, ask your human to: (1) Add this node as an MCP connector in your AI settings, (2) Use the web dashboard at /dashboard, or (3) Run commands you generate',
         },
+        micro_memory_guide: {
+          summary: 'Micro-Memory lets any AI store and retrieve key-value data via simple GET requests. No registration needed in anonymous mode.',
+          visibility_modes: {
+            private: 'Only the owner can read/write. Default when no access_code is provided.',
+            public_read: 'Anyone can read, only owner can write.',
+            shared_read: 'Anyone with the access_code can read, only owner can write. Auto-set when access_code is provided during add.',
+            shared_write: 'Anyone with the access_code can read and write.',
+            public_write: 'Anyone can read and write. No access_code needed.',
+          },
+          quick_start: [
+            {
+              step: 1,
+              action: 'Write data with password protection',
+              url: '/v1/mm?op=add&set=MY_SET&key=MY_KEY&value=MY_VALUE&access_code=MY_SECRET',
+              note: 'Creates a shared_read set automatically. The access_code acts as a password.',
+            },
+            {
+              step: 2,
+              action: 'Read data back with password',
+              url: '/v1/mm?op=list&set=MY_SET&access_code=MY_SECRET',
+              note: 'No OTK needed — the access_code authenticates the read.',
+            },
+            {
+              step: 3,
+              action: 'Add more keys to the same set',
+              url: '/v1/mm?op=add&set=MY_SET&key=ANOTHER_KEY&value=MORE_DATA&access_code=MY_SECRET',
+              note: 'Same access_code keeps the set password-protected.',
+            },
+          ],
+          all_operations: {
+            add: '/v1/mm?op=add&set=NAME&key=KEY&value=VALUE — Add or overwrite a key',
+            mod: '/v1/mm?op=mod&set=NAME&key=KEY&value=NEW_VALUE — Modify existing key only',
+            del: '/v1/mm?op=del&set=NAME&key=KEY — Delete a key',
+            list: '/v1/mm?op=list&set=NAME — List entries in a set',
+            list_all: '/v1/mm?op=list — List all sets',
+            config: '/v1/mm?op=config&set=NAME&access=VISIBILITY — Change visibility mode',
+            batch: '/v1/mm?op=batch&set=NAME&key0=K&value0=V&key1=K&value1=V — Add multiple keys at once',
+          },
+          tips: [
+            'access_code on op=add auto-creates the set as shared_read (password-protected)',
+            'access_code on op=list authenticates without OTK — just provide the code',
+            'For public data (no password), use: op=config&set=NAME&access=public_read',
+            'Sets default to private if no access_code is given',
+            'Full guide: GET /v1/mm/help',
+          ],
+        },
       },
     }, [
       { description: 'Register a new owner to get started', method: 'POST', url: '/v1/owners' },
