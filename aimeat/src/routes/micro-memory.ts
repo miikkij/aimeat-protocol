@@ -62,9 +62,11 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
         // Anonymous mode: allow requests without OTK using the anonymous shared agent
         // Dev mode: allow requests without OTK using first registered agent/owner
         let gaii: string;
+        let isAnonymous = false;
         if (!otkKey && config.anonymousMode) {
             const ANON_GAII = `shared#anonymous@${config.nodeId}`;
             gaii = ANON_GAII;
+            isAnonymous = true;
         } else if (!otkKey && config.devMode) {
             const agents = await storage.listAgents();
             if (agents.length > 0) {
@@ -198,18 +200,38 @@ export function microMemoryRouter(config: MeatConfig, storage: Storage): Router 
             case 'list': {
                 if (set) {
                     const record3 = await storage.getMicroMemory(gaii, set);
+                    const vis = record3?.visibility ?? 'private';
+                    const reqCode = req.query.access_code as string | undefined;
+
+                    // Determine if entries should be shown to anonymous users
+                    let showEntries = true;
+                    let notice: string | undefined;
+                    if (isAnonymous) {
+                        if (vis === 'private') {
+                            showEntries = false;
+                            notice = 'Private set — authenticate with OTK to access entries';
+                        } else if ((vis === 'shared_read' || vis === 'shared_write') && reqCode !== record3?.accessCode) {
+                            showEntries = false;
+                            notice = 'Shared set — provide access_code to view entries';
+                        }
+                    }
+
                     res.json(success(config.nodeId, {
                         gaii,
                         set,
-                        entries: record3?.entries ?? {},
-                        visibility: record3?.visibility ?? 'private',
+                        entries: showEntries ? (record3?.entries ?? {}) : {},
+                        visibility: vis,
+                        ...(notice ? { notice } : {}),
                         ...(identityHints ? { identity: identityHints } : {}),
                     }));
                 } else {
                     const sets = await storage.listMicroMemorySets(gaii);
+                    const filteredSets = isAnonymous
+                        ? sets.filter(s => s.visibility !== 'private')
+                        : sets;
                     res.json(success(config.nodeId, {
                         gaii,
-                        sets: sets.map(s => ({ set: s.set, entry_count: Object.keys(s.entries).length, visibility: s.visibility })),
+                        sets: filteredSets.map(s => ({ set: s.set, entry_count: Object.keys(s.entries).length, visibility: s.visibility })),
                         ...(identityHints ? { identity: identityHints } : {}),
                     }));
                 }

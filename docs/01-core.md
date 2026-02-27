@@ -669,9 +669,23 @@ GET /v1/mm?otk={key}&op=config&set=tasks&access=private
 |------|------|-------|----------|
 | `private` (default) | Owner only (with otk) | Owner only | Personal agent state |
 | `public_read` | Anyone (no auth, no otk) | Owner only | Published status, portfolio, results |
-| `shared_read` | Anyone with access code (`ac=`) | Owner only | Team-visible data |
+| `shared_read` | Anyone with access code (`access_code=`) | Owner only | Team-visible data |
 | `shared_write` | Anyone with access code | Anyone with access code | Collaborative lists, shared memory between AIs |
 | `public_write` | Anyone | Anyone | Open collaboration boards, community data |
+
+**Anonymous mode visibility enforcement:**
+
+When `MEAT_ANONYMOUS=true`, micro-memory `list` operations enforce visibility rules even though all anonymous requests share one identity:
+
+| Visibility | Anonymous (no code) | Anonymous (with `access_code`) | Authenticated (OTK) |
+|---|---|---|---|
+| `private` | ❌ entries hidden | ❌ entries hidden | ✅ visible |
+| `shared_read` | ❌ entries hidden | ✅ visible | ✅ visible |
+| `shared_write` | ❌ entries hidden | ✅ visible | ✅ visible |
+| `public_read` | ✅ visible | ✅ visible | ✅ visible |
+| `public_write` | ✅ visible | ✅ visible | ✅ visible |
+
+When listing all sets (no `set` parameter), `private` sets are hidden entirely from anonymous users. This allows operators to run anonymous mode while still protecting sensitive micro-memory sets.
 
 **Public read example — any Tier 0 AI can read without auth:**
 
@@ -891,7 +905,9 @@ The anonymous prompt also tells agents what Tier 1+ authentication unlocks (acti
 
 **Co-existence with normal mode** — A single AIMEAT node can have `MEAT_ANONYMOUS=true` along with registered owners and agents. Anonymous requests use the shared identity; authenticated requests use their own identity. This allows gradual migration from anonymous to authenticated as needs grow.
 
-**IMPORTANT:** Anonymous mode provides no isolation between agents. All agents see and can modify all data. Never enable it on nodes storing sensitive information or exposed to untrusted networks.
+**Privacy in anonymous mode:** While all anonymous requests share one identity, micro-memory visibility rules are enforced. Sets marked `private` are hidden from anonymous (unauthenticated) access — entries are not returned and the set is excluded from listings. Sets using `shared_read` or `shared_write` require a valid `access_code` to view entries. Only `public_read` and `public_write` sets are fully visible to anonymous users. This allows safe use of anonymous mode with sensitive micro-memory sets.
+
+**IMPORTANT:** Anonymous mode provides no isolation for *full memory* (`/v1/memory`) — all anonymous agents share the same memory space. For micro-memory, visibility rules are enforced as described above. Never enable anonymous mode on nodes exposed to untrusted networks without understanding these distinctions.
 
 #### 5.7.4.3 Auto-Identification from OTK
 

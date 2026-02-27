@@ -1318,14 +1318,19 @@ paths:
     get:
       operationId: microMemoryOp
       summary: Micro-memory operations
-      description: GET-based write/read operations using one-time keys. Supports op=add, del, mod, list, config.
+      description: >
+        GET-based write/read operations using one-time keys. Supports op=add, del, mod, list, config, batch.
+        In anonymous mode (MEAT_ANONYMOUS=true), requests without OTK are accepted but visibility
+        rules are enforced: private sets are hidden, shared_read/shared_write require access_code.
       tags: [Micro-Memory]
       security:
         - OTK: []
+        - {} # Anonymous mode allows unauthenticated access
       parameters:
         - name: otk
           in: query
-          required: true
+          required: false
+          description: One-time key. Required unless anonymous mode or dev mode is enabled.
           schema:
             type: string
         - name: op
@@ -1333,7 +1338,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [add, del, mod, list, config]
+            enum: [add, del, mod, list, config, batch]
         - name: set
           in: query
           schema:
@@ -1347,6 +1352,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: access_code
+          in: query
+          schema:
+            type: string
+          description: Access code for shared_read/shared_write sets. Required for anonymous access to shared sets.
       responses:
         '200':
           $ref: '#/components/responses/MeatSuccess'

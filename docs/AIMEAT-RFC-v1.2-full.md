@@ -669,9 +669,23 @@ GET /v1/mm?otk={key}&op=config&set=tasks&access=private
 |------|------|-------|----------|
 | `private` (default) | Owner only (with otk) | Owner only | Personal agent state |
 | `public_read` | Anyone (no auth, no otk) | Owner only | Published status, portfolio, results |
-| `shared_read` | Anyone with access code (`ac=`) | Owner only | Team-visible data |
+| `shared_read` | Anyone with access code (`access_code=`) | Owner only | Team-visible data |
 | `shared_write` | Anyone with access code | Anyone with access code | Collaborative lists, shared memory between AIs |
 | `public_write` | Anyone | Anyone | Open collaboration boards, community data |
+
+**Anonymous mode visibility enforcement:**
+
+When `MEAT_ANONYMOUS=true`, micro-memory `list` operations enforce visibility rules even though all anonymous requests share one identity:
+
+| Visibility | Anonymous (no code) | Anonymous (with `access_code`) | Authenticated (OTK) |
+|---|---|---|---|
+| `private` | ❌ entries hidden | ❌ entries hidden | ✅ visible |
+| `shared_read` | ❌ entries hidden | ✅ visible | ✅ visible |
+| `shared_write` | ❌ entries hidden | ✅ visible | ✅ visible |
+| `public_read` | ✅ visible | ✅ visible | ✅ visible |
+| `public_write` | ✅ visible | ✅ visible | ✅ visible |
+
+When listing all sets (no `set` parameter), `private` sets are hidden entirely from anonymous users.
 
 **Public read example — any Tier 0 AI can read without auth:**
 
