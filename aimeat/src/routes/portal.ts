@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
+import { createT, detectLocale, toLocale, LOCALES, type Locale, type TFunction } from '../i18n.js';
 
 /* ──────────────────────────────────────────────────────────
    Platform Registry — known AI platforms and their capabilities
@@ -1278,7 +1279,12 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/portal — serve the onboarding portal HTML page
-  router.get('/v1/portal', async (_req, res) => {
+  router.get('/v1/portal', async (req, res) => {
+    const viewParam = req.query.view as string | undefined;
+    const langParam = req.query.lang as string | undefined;
+    const locale = langParam ? toLocale(langParam) : detectLocale(req.headers['accept-language']);
+    const t = createT(locale);
+
     const [agents, actions, boards] = await Promise.all([
       storage.listAgents(),
       storage.listActions(),
