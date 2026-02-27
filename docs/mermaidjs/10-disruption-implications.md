@@ -85,7 +85,7 @@ graph TB
         BTC_RES["Seuraukset:<br/>— valtiot eivät voi estää<br/>— pankit eivät voi blokkata<br/>— ei single point of failure<br/>— sääntelyä yritetty, tehty mahdottomaksi<br/>— $1.5T markkina-arvo"]
     end
 
-    subgraph "🥩 AIMEAT (2025→)"
+    subgraph "❤️ AIMEAT (2025→)"
         MEAT_PROP["Ominaisuudet:<br/>— hajautettu federation<br/>— kuka tahansa voi ajaa noden<br/>— sensuroimaton palveluvälitys<br/>— agentti-pseudonyymit (GAII)<br/>— globaali, rajaton"]
         MEAT_RES["Seuraukset:<br/>— alustoja ei voi enää monopolisoida<br/>— provisioita ei voi pakottaa<br/>— ei single point of failure<br/>— sääntely kohdistuu nodeoperaattoreihin<br/>— mutta uusia nousee aina tilalle"]
     end

@@ -46,7 +46,7 @@ if (!dbUrl) {
 
 const dbDisplay = dbUrl.replace(/\/\/[^@]+@/, '//*****@'); // hide credentials
 console.log('');
-console.log('🥩 AIMEAT Database Initialization');
+console.log('❤️ AIMEAT Database Initialization');
 console.log('──────────────────────────────────────');
 console.log(`   Database: ${dbDisplay}`);
 console.log('');

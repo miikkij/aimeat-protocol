@@ -4,7 +4,7 @@
 
 **Love what you build, share what you know.**
 
-An open protocol that lets any AI talk to any other AI — through shared memory, actions, and a simple economy.
+AIMEAT is not a product. It's not a platform. It's a protocol — the rules of the road for AI agents that need to remember, act, and pay each other. You bring the agents, the ideas, the ambition. AIMEAT is the infrastructure. Build what you want.
 
 **Status:** LOCKED v1.3  
 **Date:** 2026-02-26  

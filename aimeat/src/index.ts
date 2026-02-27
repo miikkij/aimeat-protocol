@@ -98,7 +98,7 @@ if (subcommand === 'init') {
     new Promise(resolve => rl.question(`${q} [${def}]: `, ans => resolve(ans.trim() || def)));
 
   (async () => {
-    console.log('\n🥩 AIMEAT Node Configuration Wizard\n');
+    console.log('\n❤️ AIMEAT Node Configuration Wizard\n');
     const nodeId = await ask('Node ID', 'meat-local-001');
     const port = await ask('Port', '40050');
     const welcomeBonus = await ask('Welcome bonus (morsels)', '100');
@@ -186,7 +186,7 @@ if (subcommand === 'init') {
   }
   const app = await createServer(config);
   app.listen(config.port, () => {
-    logger.info(`🥩 AIMEAT node started`, {
+    logger.info(`❤️ AIMEAT node started`, {
       nodeId: config.nodeId,
       port: config.port,
       storage: config.dbUrl ? 'mongodb' : 'in-memory',

@@ -350,4 +350,4 @@ The first node in the world will be `meat-finland-001-genesis`. Make the default
  Protocol: AIMEAT v1.2 | License: MIT | The network starts here."
 ```
 
-Now build it. 🥩
+Now build it. ❤️
