@@ -8,94 +8,94 @@ import { success } from '../middleware/envelope.js';
    ────────────────────────────────────────────────────────── */
 
 interface PlatformVariant {
-  id: string;
-  name: string;
-  tier: 'A' | 'B' | 'C' | 'D';
-  path: 'mcp' | 'api' | 'browse' | 'prompt-package';
-  notes?: string;
+    id: string;
+    name: string;
+    tier: 'A' | 'B' | 'C' | 'D';
+    path: 'mcp' | 'api' | 'browse' | 'prompt-package';
+    notes?: string;
 }
 
 interface AIPlatform {
-  id: string;
-  name: string;
-  vendor: string;
-  icon: string;
-  variants: PlatformVariant[];
+    id: string;
+    name: string;
+    vendor: string;
+    icon: string;
+    variants: PlatformVariant[];
 }
 
 const PLATFORMS: AIPlatform[] = [
-  {
-    id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '🤖',
-    variants: [
-      { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
-      { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
-      { id: 'pro', name: 'Pro', tier: 'A', path: 'mcp' },
-      { id: 'team', name: 'Team', tier: 'A', path: 'mcp' },
-      { id: 'enterprise', name: 'Enterprise', tier: 'A', path: 'mcp' },
-    ],
-  },
-  {
-    id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '🧠',
-    variants: [
-      { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
-      { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
-      { id: 'max', name: 'Max (claude.ai)', tier: 'A', path: 'mcp' },
-      { id: 'code', name: 'Claude Code (CLI)', tier: 'B', path: 'api' },
-    ],
-  },
-  {
-    id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '🪟',
-    variants: [
-      { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'Cannot make external HTTP calls' },
-      { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'Can run terminal commands' },
-      { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'Add as MCP server in VS Code settings' },
-    ],
-  },
-  {
-    id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '🔍',
-    variants: [
-      { id: 'chat', name: 'DeepSeek Chat', tier: 'D', path: 'prompt-package' },
-      { id: 'api', name: 'DeepSeek API (external)', tier: 'B', path: 'api' },
-    ],
-  },
-  {
-    id: 'grok', name: 'Grok', vendor: 'xAI', icon: '🚀',
-    variants: [
-      { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
-      { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'Python sandbox, no internet' },
-      { id: 'api', name: 'Grok API (external)', tier: 'B', path: 'api' },
-    ],
-  },
-  {
-    id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '💎',
-    variants: [
-      { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
-      { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
-      { id: 'api', name: 'Gemini API (external)', tier: 'B', path: 'api' },
-    ],
-  },
-  {
-    id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '🖥️',
-    variants: [
-      { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'Models with function calling' },
-      { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
-    ],
-  },
-  {
-    id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '🦀',
-    variants: [
-      { id: 'instance', name: 'OpenClaw Instance', tier: 'B', path: 'api' },
-    ],
-  },
-  {
-    id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '⚙️',
-    variants: [
-      { id: 'mcp', name: 'MCP-capable AI', tier: 'A', path: 'mcp' },
-      { id: 'http', name: 'HTTP-capable AI', tier: 'B', path: 'api' },
-      { id: 'browse', name: 'Browse-only AI', tier: 'C', path: 'browse' },
-      { id: 'chat', name: 'Chat-only AI (no HTTP)', tier: 'D', path: 'prompt-package' },
-    ],
-  },
+    {
+        id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '🤖',
+        variants: [
+            { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
+            { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
+            { id: 'pro', name: 'Pro', tier: 'A', path: 'mcp' },
+            { id: 'team', name: 'Team', tier: 'A', path: 'mcp' },
+            { id: 'enterprise', name: 'Enterprise', tier: 'A', path: 'mcp' },
+        ],
+    },
+    {
+        id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '🧠',
+        variants: [
+            { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
+            { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
+            { id: 'max', name: 'Max (claude.ai)', tier: 'A', path: 'mcp' },
+            { id: 'code', name: 'Claude Code (CLI)', tier: 'B', path: 'api' },
+        ],
+    },
+    {
+        id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '🪟',
+        variants: [
+            { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'Cannot make external HTTP calls' },
+            { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'Can run terminal commands' },
+            { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'Add as MCP server in VS Code settings' },
+        ],
+    },
+    {
+        id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '🔍',
+        variants: [
+            { id: 'chat', name: 'DeepSeek Chat', tier: 'D', path: 'prompt-package' },
+            { id: 'api', name: 'DeepSeek API (external)', tier: 'B', path: 'api' },
+        ],
+    },
+    {
+        id: 'grok', name: 'Grok', vendor: 'xAI', icon: '🚀',
+        variants: [
+            { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
+            { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'Python sandbox, no internet' },
+            { id: 'api', name: 'Grok API (external)', tier: 'B', path: 'api' },
+        ],
+    },
+    {
+        id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '💎',
+        variants: [
+            { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
+            { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
+            { id: 'api', name: 'Gemini API (external)', tier: 'B', path: 'api' },
+        ],
+    },
+    {
+        id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '🖥️',
+        variants: [
+            { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'Models with function calling' },
+            { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
+        ],
+    },
+    {
+        id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '🦀',
+        variants: [
+            { id: 'instance', name: 'OpenClaw Instance', tier: 'B', path: 'api' },
+        ],
+    },
+    {
+        id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '⚙️',
+        variants: [
+            { id: 'mcp', name: 'MCP-capable AI', tier: 'A', path: 'mcp' },
+            { id: 'http', name: 'HTTP-capable AI', tier: 'B', path: 'api' },
+            { id: 'browse', name: 'Browse-only AI', tier: 'C', path: 'browse' },
+            { id: 'chat', name: 'Chat-only AI (no HTTP)', tier: 'D', path: 'prompt-package' },
+        ],
+    },
 ];
 
 /* ──────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ const PLATFORMS: AIPlatform[] = [
    ────────────────────────────────────────────────────────── */
 
 function buildPromptPackage(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
-  return `# AIMEAT Application Builder
+    return `# AIMEAT Application Builder
 
 You are helping a human build a web application that connects to an AIMEAT (AI Memory Exchange and Action Transfer) node. AIMEAT is an open protocol for AI agent infrastructure — it provides memory storage, a service marketplace, message boards, a digital economy, and more.
 
@@ -312,7 +312,7 @@ The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Came
 }
 
 function buildMcpInstructions(config: MeatConfig): string {
-  return `## MCP Setup Instructions
+    return `## MCP Setup Instructions
 
 Your AI platform supports the Model Context Protocol (MCP), which provides the richest integration with AIMEAT.
 
@@ -343,7 +343,7 @@ After connecting, try saying: "Check my AIMEAT node catalogue" or "What services
 }
 
 function buildApiInstructions(config: MeatConfig): string {
-  return `## API Integration Instructions
+    return `## API Integration Instructions
 
 Your AI platform can make HTTP calls. Here's how to get started:
 
@@ -382,7 +382,7 @@ GET ${config.baseUrl}/v1/prompts/tier1 — Detailed operating instructions`;
 }
 
 function buildBrowseInstructions(config: MeatConfig): string {
-  return `## Browse-Only Access
+    return `## Browse-Only Access
 
 Your AI can browse URLs but cannot make POST requests. Here's what you can do:
 
@@ -422,8 +422,8 @@ This uses micro-memory — small key-value storage accessible via GET parameters
    ────────────────────────────────────────────────────────── */
 
 function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
-  const platformsJson = JSON.stringify(PLATFORMS);
-  return `<!DOCTYPE html>
+    const platformsJson = JSON.stringify(PLATFORMS);
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -798,7 +798,7 @@ function escHtml(s) {
    ────────────────────────────────────────────────────────── */
 
 function sanitize(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -806,94 +806,94 @@ function sanitize(s: string): string {
    ────────────────────────────────────────────────────────── */
 
 export function portalRouter(config: MeatConfig, storage: Storage): Router {
-  const router = Router();
+    const router = Router();
 
-  // GET /v1/portal — serve the onboarding portal HTML page
-  router.get('/v1/portal', async (_req, res) => {
-    const [agents, actions, boards] = await Promise.all([
-      storage.listAgents(),
-      storage.listActions(),
-      storage.listBoards(),
-    ]);
-    const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
-    res.type('text/html').send(portalHtml(config, stats));
-  });
+    // GET /v1/portal — serve the onboarding portal HTML page
+    router.get('/v1/portal', async (_req, res) => {
+        const [agents, actions, boards] = await Promise.all([
+            storage.listAgents(),
+            storage.listActions(),
+            storage.listBoards(),
+        ]);
+        const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
+        res.type('text/html').send(portalHtml(config, stats));
+    });
 
-  // GET /v1/portal/platforms — JSON list of known platforms
-  router.get('/v1/portal/platforms', (_req, res) => {
-    res.json(success(config.nodeId, { platforms: PLATFORMS }));
-  });
+    // GET /v1/portal/platforms — JSON list of known platforms
+    router.get('/v1/portal/platforms', (_req, res) => {
+        res.json(success(config.nodeId, { platforms: PLATFORMS }));
+    });
 
-  // GET /v1/portal/prompt/:platformId — generate prompt package for a platform
-  router.get('/v1/portal/prompt/:platformId', async (req, res) => {
-    const platformId = req.params.platformId as string;
-    const goal = (req.query.goal as string) || 'dashboard';
+    // GET /v1/portal/prompt/:platformId — generate prompt package for a platform
+    router.get('/v1/portal/prompt/:platformId', async (req, res) => {
+        const platformId = req.params.platformId as string;
+        const goal = (req.query.goal as string) || 'dashboard';
 
-    // Find platform + variant
-    const parts = platformId.split('-');
-    const pId = parts[0];
-    const vId = parts.slice(1).join('-');
-    const platform = PLATFORMS.find(p => p.id === pId);
-    const variant = platform?.variants.find(v => v.id === vId) ?? platform?.variants[0];
+        // Find platform + variant
+        const parts = platformId.split('-');
+        const pId = parts[0];
+        const vId = parts.slice(1).join('-');
+        const platform = PLATFORMS.find(p => p.id === pId);
+        const variant = platform?.variants.find(v => v.id === vId) ?? platform?.variants[0];
 
-    if (!platform) {
-      res.status(404).json({
-        ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
-        timestamp: new Date().toISOString(),
-        error: { code: 'NOT_FOUND', message: `Platform '${pId}' not found` },
-      });
-      return;
-    }
+        if (!platform) {
+            res.status(404).json({
+                ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+                timestamp: new Date().toISOString(),
+                error: { code: 'NOT_FOUND', message: `Platform '${pId}' not found` },
+            });
+            return;
+        }
 
-    const [agents, actions, boards] = await Promise.all([
-      storage.listAgents(),
-      storage.listActions(),
-      storage.listBoards(),
-    ]);
-    const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
+        const [agents, actions, boards] = await Promise.all([
+            storage.listAgents(),
+            storage.listActions(),
+            storage.listBoards(),
+        ]);
+        const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
 
-    const path = variant?.path ?? 'prompt-package';
-    let prompt: string;
-    switch (path) {
-      case 'mcp':
-        prompt = buildMcpInstructions(config);
-        break;
-      case 'api':
-        prompt = buildApiInstructions(config);
-        break;
-      case 'browse':
-        prompt = buildBrowseInstructions(config);
-        break;
-      default:
-        prompt = buildPromptPackage(config, stats);
-    }
+        const path = variant?.path ?? 'prompt-package';
+        let prompt: string;
+        switch (path) {
+            case 'mcp':
+                prompt = buildMcpInstructions(config);
+                break;
+            case 'api':
+                prompt = buildApiInstructions(config);
+                break;
+            case 'browse':
+                prompt = buildBrowseInstructions(config);
+                break;
+            default:
+                prompt = buildPromptPackage(config, stats);
+        }
 
-    // Append goal context if prompt-package
-    if (path === 'prompt-package' && goal !== 'custom') {
-      const goalDescriptions: Record<string, string> = {
-        dashboard: '\n\n## Pre-Selected Goal\nThe user wants a **Personal Dashboard** — show memory entries, wallet balance, work queue status, and board activity in a clean overview layout.',
-        notes: '\n\n## Pre-Selected Goal\nThe user wants a **Note-Taking App** — organize notes by folders/tags using AIMEAT memory keys as paths. Include search, create, edit, delete.',
-        game: '\n\n## Pre-Selected Goal\nThe user wants a **Multiplayer Game** — use AIMEAT memory for shared game state, boards for matchmaking. Suggest tic-tac-toe or similar turn-based game that works with polling.',
-        news: '\n\n## Pre-Selected Goal\nThe user wants a **News / Content Reader** — browse board posts across multiple boards, show in a timeline/feed view with categories and search.',
-        marketplace: '\n\n## Pre-Selected Goal\nThe user wants a **Service Marketplace** — browse the action catalogue, show trust scores, allow requesting work from providers.',
-        chat: '\n\n## Pre-Selected Goal\nThe user wants a **Chat / Messaging App** — use board posts as messages in topic-based channels. Include post creation, reactions, and auto-refresh.',
-        iot: '\n\n## Pre-Selected Goal\nThe user wants an **IoT / Data Dashboard** — display structured data from board posts and memory entries, show charts/tables, support auto-refresh for live data.',
-      };
-      prompt += goalDescriptions[goal] ?? '';
-    }
+        // Append goal context if prompt-package
+        if (path === 'prompt-package' && goal !== 'custom') {
+            const goalDescriptions: Record<string, string> = {
+                dashboard: '\n\n## Pre-Selected Goal\nThe user wants a **Personal Dashboard** — show memory entries, wallet balance, work queue status, and board activity in a clean overview layout.',
+                notes: '\n\n## Pre-Selected Goal\nThe user wants a **Note-Taking App** — organize notes by folders/tags using AIMEAT memory keys as paths. Include search, create, edit, delete.',
+                game: '\n\n## Pre-Selected Goal\nThe user wants a **Multiplayer Game** — use AIMEAT memory for shared game state, boards for matchmaking. Suggest tic-tac-toe or similar turn-based game that works with polling.',
+                news: '\n\n## Pre-Selected Goal\nThe user wants a **News / Content Reader** — browse board posts across multiple boards, show in a timeline/feed view with categories and search.',
+                marketplace: '\n\n## Pre-Selected Goal\nThe user wants a **Service Marketplace** — browse the action catalogue, show trust scores, allow requesting work from providers.',
+                chat: '\n\n## Pre-Selected Goal\nThe user wants a **Chat / Messaging App** — use board posts as messages in topic-based channels. Include post creation, reactions, and auto-refresh.',
+                iot: '\n\n## Pre-Selected Goal\nThe user wants an **IoT / Data Dashboard** — display structured data from board posts and memory entries, show charts/tables, support auto-refresh for live data.',
+            };
+            prompt += goalDescriptions[goal] ?? '';
+        }
 
-    res.json(success(config.nodeId, {
-      platform: platform.name,
-      variant: variant?.name ?? 'default',
-      tier: variant?.tier ?? 'D',
-      path,
-      goal,
-      prompt,
-    }, [
-      { description: 'View all platforms', method: 'GET', url: '/v1/portal/platforms' },
-      { description: 'Visit the portal', method: 'GET', url: '/v1/portal' },
-    ]));
-  });
+        res.json(success(config.nodeId, {
+            platform: platform.name,
+            variant: variant?.name ?? 'default',
+            tier: variant?.tier ?? 'D',
+            path,
+            goal,
+            prompt,
+        }, [
+            { description: 'View all platforms', method: 'GET', url: '/v1/portal/platforms' },
+            { description: 'Visit the portal', method: 'GET', url: '/v1/portal' },
+        ]));
+    });
 
-  return router;
+    return router;
 }
