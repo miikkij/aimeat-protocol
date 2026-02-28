@@ -22,14 +22,14 @@
       "inputPlaceholder": "Write something you want your AIs to remember...",
       "saveBtn": "Save to memory",
       "saved": "Memory saved!",
-      "savedNote": "This memory is now available to AIs you connect here.",
+      "savedNote": "Stored on your AIME AT server. Now connect any AI to read it.",
       "exampleChips": ["I'm vegetarian", "I live in Espoo", "I like jazz"],
       "cost": "This memory cost one heart morsel. You have {{remaining}} left.",
-      "useWithAi": "Use with any AI",
+      "useWithAi": "Connect any AI to your memories",
       "copyInstructions": "Copy to clipboard",
       "copiedInstructions": "Copied!",
-      "pasteHint": "Paste into any AI chat to share your preferences. For permanent setup, paste into Custom Instructions (ChatGPT) or Project Knowledge (Claude).",
-      "autoNote": "Bonus: Grok and Claude Pro can also fetch these automatically from your AIME AT address."
+      "pasteHint": "Paste this into any AI chat (ChatGPT, Claude, Grok, Gemini...) — it tells the AI how to read your memories via the API. For permanent setup, paste into Custom Instructions or Project Knowledge.",
+      "autoNote": "The AI will fetch your memories directly from the server. You can save more memories later — the AI always reads the latest."
     },
     "apps": {
       "title": "Apps",

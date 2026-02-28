@@ -1472,6 +1472,17 @@ body {
   var instructionBlock = document.getElementById('instructionBlock');
   var upgradeNudge = document.getElementById('upgradeNudge');
 
+  /* Generate or reuse an access code for this user's memory set */
+  function getAccessCode() {
+    var code = null;
+    try { code = localStorage.getItem('aimeat_access_code'); } catch(e) {}
+    if (!code) {
+      code = 'mem_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+      try { localStorage.setItem('aimeat_access_code', code); } catch(e) {}
+    }
+    return code;
+  }
+
   if (saveBtn && memoryInput) {
     saveBtn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -1479,13 +1490,15 @@ body {
       if (!text) { memoryInput.focus(); return; }
       if (text.length > 500) return;
 
+      var accessCode = getAccessCode();
+
       saveBtn.disabled = true;
       saveBtn.classList.add('loading');
 
       fetch('/v1/portal/try-memory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text })
+        body: JSON.stringify({ text: text, accessCode: accessCode })
       })
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
@@ -1494,7 +1507,17 @@ body {
         if (data.ok && saveResult) {
           saveResult.classList.add('visible');
           if (instructionBlock) {
-            instructionBlock.value = 'Things to remember about me: ' + text + '\\n\\nPlease keep this in mind in our conversations.';
+            var readUrl = data.data.readUrl || (nodeUrl + '/v1/mm?op=list&set=my_memories&access_code=' + encodeURIComponent(accessCode));
+            instructionBlock.value =
+              'I have a personal memory server (AIME AT protocol) where I store things about myself.\\n\\n' +
+              'READ MY MEMORIES FIRST by fetching this URL:\\n' +
+              readUrl + '\\n\\n' +
+              'The response is JSON. My memories are in data.entries (key-value pairs).\\n' +
+              'Use what you learn about me in our conversation.\\n\\n' +
+              'When I tell you something new to remember, STORE IT by fetching:\\n' +
+              nodeUrl + '/v1/mm?op=add&set=my_memories&key=KEY&value=VALUE&access_code=' + encodeURIComponent(accessCode) + '\\n\\n' +
+              'Replace KEY with a descriptive name (e.g. diet, city, job) and VALUE with what to remember.\\n' +
+              'This is a real API — try it now.';
           }
           if (upgradeNudge) {
             upgradeNudge.style.display = 'block';
@@ -1754,27 +1777,43 @@ export function humanPortalRouter(config: MeatConfig, storage: Storage): Router 
 
   router.post('/v1/portal/try-memory', requireAuth(), async (req, res) => {
     const text = req.body?.text;
+    const accessCode = req.body?.accessCode;
     if (!text || typeof text !== 'string' || text.length > 500) {
       res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Text required (max 500 chars)'));
       return;
     }
+    if (!accessCode || typeof accessCode !== 'string' || accessCode.length < 4) {
+      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'accessCode required (min 4 chars)'));
+      return;
+    }
 
     const gaii = req.auth!.sub;
-    const key = `try.${Date.now()}`;
+    const setName = 'my_memories';
+    const key = `mem_${Date.now()}`;
 
-    await storage.setMemory({
+    // Store via micro-memory with access_code (creates shared_read set)
+    let record = await storage.getMicroMemory(gaii, setName);
+    if (!record) {
+      record = {
+        gaii,
+        set: setName,
+        entries: {},
+        visibility: 'shared_read' as const,
+        accessCode,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    record.entries[key] = text;
+    record.updatedAt = new Date().toISOString();
+    await storage.setMicroMemory(record);
+
+    res.json(success(config.nodeId, {
       key,
-      ownerGaii: gaii,
-      value: { text },
-      visibility: 'public',
-      tags: [],
-      ttlHours: 24,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    res.json(success(config.nodeId, { key, saved: true }));
+      saved: true,
+      set: setName,
+      accessCode,
+      readUrl: `${config.baseUrl}/v1/mm?op=list&set=${setName}&access_code=${encodeURIComponent(accessCode)}`,
+    }));
   });
 
   return router;

@@ -22,14 +22,14 @@
       "inputPlaceholder": "Kirjoita jotain mitä haluat AI:si muistavan...",
       "saveBtn": "Tallenna muistiin",
       "saved": "Muisto tallennettu!",
-      "savedNote": "Tämä muisto on nyt saatavilla AI:lle jotka kytket tähän.",
+      "savedNote": "Tallennettu AIME AT -palvelimellesi. Kytke nyt mikä tahansa AI lukemaan se.",
       "exampleChips": ["Olen kasvissyöjä", "Asun Espoossa", "Pidän jazz-musiikista"],
       "cost": "Tämä muisto maksoi yhden sydänmurusen. Sinulla on {{remaining}} jäljellä.",
-      "useWithAi": "Käytä minkä tahansa AI:n kanssa",
+      "useWithAi": "Kytke mikä tahansa AI muisteihisi",
       "copyInstructions": "Kopioi leikepöydälle",
       "copiedInstructions": "Kopioitu!",
-      "pasteHint": "Liitä mihin tahansa AI-chattiin jakaaksesi mieltymyksesi. Pysyvään käyttöön liitä Custom Instructions -asetuksiin (ChatGPT) tai Project Knowledge -asetuksiin (Claude).",
-      "autoNote": "Bonus: Grok ja Claude Pro osaavat hakea nämä myös automaattisesti AIME AT -osoitteestasi."
+      "pasteHint": "Liitä tämä mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...) — se kertoo AI:lle miten lukea muistosi rajapinnan kautta. Pysyvään käyttöön liitä Custom Instructions- tai Project Knowledge -asetuksiin.",
+      "autoNote": "AI hakee muistosi suoraan palvelimelta. Voit tallentaa lisää muistoja myöhemmin — AI lukee aina uusimmat."
     },
     "apps": {
       "title": "Sovellukset",
