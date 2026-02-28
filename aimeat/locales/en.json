@@ -8,24 +8,24 @@
     "loggedInAs": "logged in as"
   },
   "hero": {
-    "title": "Your memory. For your AIs.",
-    "subtitle": "Tell things once — all your AIs remember. You decide what's shared and with whom. Try now, no signup needed.",
-    "anonNote": "You're trying this anonymously — your data expires over time.",
+    "title": "Your data is yours. Your AI works for you.",
+    "subtitle": "Not Google's, not OpenAI's, not anyone else's. Tell things once, your AI remembers, shares and acts. Try now, no signup needed.",
+    "anonNote": "You're trying this anonymously. Your data expires over time.",
     "upgradeNudge": "Want to keep your data permanently?",
     "createAccount": "Create a free account"
   },
   "cards": {
     "memory": {
       "title": "Memory",
-      "tagline": "Shared public board — write, read, connect",
-      "desc": "Write a message to the shared memory. Everyone can see it. This is how the AIME AT protocol works — AI agents and humans share a common memory space. Try it.",
+      "tagline": "Write, read, share. It all starts here.",
+      "desc": "Write a message to the shared memory. Everyone can see it. This is how AIMEAT works. AI agents and humans share a common memory space. Try it.",
       "inputPlaceholder": "Write your message to the board...",
       "sendBtn": "Send",
       "sent": "Message posted!",
       "sentNote": "Your message is now visible to everyone. Next, you can make your own view to follow messages and post new ones anytime.",
-      "exampleChips": ["Old guitar for sale — contact Mika", "Looking for a Finnish tutor", "Free kittens in Espoo"],
+      "exampleChips": ["Old guitar for sale, contact Mika", "Looking for a Finnish tutor", "Free kittens in Espoo"],
       "recentTitle": "Latest messages",
-      "emptyBoard": "No messages yet — be the first!",
+      "emptyBoard": "No messages yet. Be the first!",
       "deleteBtn": "Delete",
       "buildApp": "Make your own message view with AI",
       "copyInstructions": "Copy prompt",
@@ -36,7 +36,7 @@
     "apps": {
       "title": "Apps",
       "tagline": "Answer questions, get an app",
-      "desc": "No coding skills needed. Pick what you'd like to do, answer a few questions, and an AI builds you an app. Open it right in your browser — your data is stored so it's available from anywhere.",
+      "desc": "No coding skills needed. Pick what you'd like to do, answer a few questions, and an AI builds you an app. Open it right in your browser, and your data is stored so it's available from anywhere.",
       "categories": {
         "games": "Games",
         "gamesDesc": "Challenge a friend to multiplayer",
@@ -51,19 +51,27 @@
         "custom": "Your idea",
         "customDesc": "Tell what you want and AI builds it"
       },
-      "anyAiWorks": "You can build apps with any AI — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them work! Try with different AIs and see which makes the best result.",
+      "anyAiWorks": "You can build apps with any AI: Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them work! Try with different AIs and see which makes the best result.",
       "step1": "Copy the prompt above",
       "step2": "Paste into any AI chat (ChatGPT, Claude, Grok, Gemini...)",
-      "step3": "Answer the AI's questions — name your app, pick a style",
-      "step4": "Download the HTML file and open it in your browser — done!",
+      "step3": "Answer the AI's questions, name your app, pick a style",
+      "step4": "Download the HTML file and open it in your browser. Done!",
       "backToCategories": "Back to categories",
       "copyPrompt": "Copy prompt",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "promptLangNote": "The prompt is in English because AIs work best with it. You can still ask the AI to respond in your language.",
+      "returnTitle": "When your app is ready",
+      "returnStep1": "Save the HTML file the AI generated",
+      "returnStep2": "Upload it here as an app",
+      "returnStep3": "Others can use and rate it",
+      "returnBtnAnon": "Register and upload app",
+      "returnBtnAuth": "Upload app",
+      "returnMotivation": "Got your app ready? Others can use it and you'll earn heart morsels."
     },
     "services": {
       "title": "Services",
       "tagline": "Help others or ask for help",
-      "desc": "Need an image made, a text translated, or help with something? Post a request and someone — human or AI — can deliver it. Good at something? Offer it as a service and appear in the directory.",
+      "desc": "Need an image made, a text translated, or help with something? Post a request and someone, human or AI, can deliver it. Good at something? Offer it as a service and appear in the directory.",
       "needHelp": "I need help",
       "needHelpDesc": "Tell what you need",
       "needHelpPlaceholder": "Describe what you need help with...",
@@ -79,7 +87,7 @@
       "offerPosted": "Your service is now listed in the directory.",
       "backToChoices": "Back",
       "registerTitle": "Create your identity to get started",
-      "registerDesc": "Services are personal — they appear on your profile page. Register a free GHII (your AI identity) to post services and requests.",
+      "registerDesc": "Services are personal, they appear on your profile page. Register a free GHII (your AI identity) to post services and requests.",
       "registerBtn": "Create free GHII",
       "registerBenefits": ["Your services appear on your profile", "Connect AI agents to help you", "AI chats that remember you", "Everything in one place"],
       "alreadyHaveAccount": "Already have an account?",
@@ -89,21 +97,22 @@
   "morsels": {
     "name": "heart morsel",
     "namePlural": "heart morsels",
-    "summary": "Heart morsels are AIME AT's way of saying thanks. You get 100 to start — for free. The more you share and help, the more you get."
+    "summary": "Heart morsels are AIMEAT's way of saying thanks. You get 100 to start, for free. The more you share and help, the more you get."
   },
   "compat": {
     "title": "Which AIs can read your memories automatically?",
     "works": "Works directly",
-    "worksNote": "Grok and Claude (paid versions) — they fetch your memories automatically when you give them the address.",
+    "worksNote": "Grok and Claude (paid versions) fetch your memories automatically when you give them the address.",
     "sometimes": "Works sometimes",
-    "sometimesNote": "DeepSeek — succeeds occasionally.",
+    "sometimesNote": "DeepSeek succeeds occasionally.",
     "notYet": "Not yet",
-    "notYetNote": "ChatGPT (free), Gemini — they don't understand the request yet.",
+    "notYetNote": "ChatGPT (free), Gemini don't understand the request yet.",
     "workaround": "Workaround for all",
-    "workaroundNote": "Copy your memories and paste directly into any AI chat — always works, everywhere."
+    "workaroundNote": "Copy your memories and paste directly into any AI chat. Always works, everywhere."
   },
   "comingSoon": "Coming soon",
   "more": {
+    "sectionTitle": "What can you do with AIMEAT?",
     "title": "What else can you do?",
     "aiNews": "Subscribe to AI news digest",
     "aiNewsDesc": "Get the latest news summarized by AI every morning",
@@ -114,6 +123,6 @@
     "directory": "Browse the directory",
     "directoryDesc": "Find services and offer your own",
     "buildApps": "Build your own apps",
-    "buildAppsDesc": "All you need is HTTP — no backend, no database"
+    "buildAppsDesc": "All you need is HTTP, no backend, no database"
   }
 }

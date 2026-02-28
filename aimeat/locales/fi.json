@@ -8,24 +8,24 @@
     "loggedInAs": "kirjautuneena"
   },
   "hero": {
-    "title": "Sinun muistisi. Sinun AI:llesi.",
-    "subtitle": "Kerro asiat kerran — kaikki AI:si muistavat. Sinä päätät mitä jaetaan ja kenelle. Kokeile heti, ei tarvitse rekisteröityä.",
-    "anonNote": "Kokeilet tätä anonyymisti — tietosi vanhenevat ajan myötä.",
+    "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
+    "subtitle": "Ei Googlen, ei OpenAI:n, ei kenenkään muun. Kerro asiat kerran, tekoälysi muistaa, jakaa ja toimii. Kokeile heti, ei tarvitse rekisteröityä.",
+    "anonNote": "Kokeilet tätä anonyymisti. Tietosi vanhenevat ajan myötä.",
     "upgradeNudge": "Haluatko pitää tietosi pysyvästi?",
     "createAccount": "Luo ilmainen tili"
   },
   "cards": {
     "memory": {
       "title": "Muisti",
-      "tagline": "Jaettu ilmoitustaulu — kirjoita, lue, yhdistä",
-      "desc": "Kirjoita viesti jaettuun muistiin. Kaikki näkevät sen. Näin AIME AT -protokolla toimii — AI-agentit ja ihmiset jakavat yhteisen muistitilan. Kokeile.",
+      "tagline": "Kirjoita, lue, jaa. Tästä kaikki alkaa.",
+      "desc": "Kirjoita viesti jaettuun muistiin. Kaikki näkevät sen. Näin AIMEAT toimii. AI-agentit ja ihmiset jakavat yhteisen muistitilan. Kokeile.",
       "inputPlaceholder": "Kirjoita viestisi taululle...",
       "sendBtn": "Lähetä",
       "sent": "Viesti lähetetty!",
       "sentNote": "Viestisi näkyy nyt kaikille. Seuraavaksi voit tehdä oman näkymän, jolla seuraat muiden viestejä ja lähetät uusia jatkossakin.",
-      "exampleChips": ["Vanha kitara myytävänä — ota yhteyttä Mikaan", "Etsitään suomen kielen opettajaa", "Ilmaisia kissanpentuja Espoossa"],
+      "exampleChips": ["Vanha kitara myytävänä, ota yhteyttä Mikaan", "Etsitään suomen kielen opettajaa", "Ilmaisia kissanpentuja Espoossa"],
       "recentTitle": "Uusimmat viestit",
-      "emptyBoard": "Ei vielä viestejä — ole ensimmäinen!",
+      "emptyBoard": "Ei vielä viestejä. Ole ensimmäinen!",
       "deleteBtn": "Poista",
       "buildApp": "Tee oma näkymä viesteihin tekoälyllä",
       "copyInstructions": "Kopioi kehote",
@@ -36,7 +36,7 @@
     "apps": {
       "title": "Sovellukset",
       "tagline": "Vastaa kysymyksiin, saat sovelluksen",
-      "desc": "Et tarvitse koodaustaitoja. Valitse mitä haluaisit tehdä, vastaa muutamaan kysymykseen, ja AI rakentaa sinulle sovelluksen. Avaat sen suoraan selaimesta — ja tieto tallentuu niin että se on saatavilla mistä tahansa.",
+      "desc": "Et tarvitse koodaustaitoja. Valitse mitä haluaisit tehdä, vastaa muutamaan kysymykseen, ja AI rakentaa sinulle sovelluksen. Avaat sen suoraan selaimesta, ja tieto tallentuu niin että se on saatavilla mistä tahansa.",
       "categories": {
         "games": "Pelit",
         "gamesDesc": "Haasta kaverisi moninpeliin",
@@ -51,19 +51,27 @@
         "custom": "Oma idea",
         "customDesc": "Kerro mitä haluat ja AI rakentaa sen"
       },
-      "anyAiWorks": "Sovelluksia voi rakentaa millä tahansa AI:lla — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja näet mikä tekee parhaan tuloksen.",
+      "anyAiWorks": "Sovelluksia voi rakentaa millä tahansa AI:lla: Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja näet mikä tekee parhaan tuloksen.",
       "step1": "Kopioi ylläoleva kehote",
       "step2": "Liitä se mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...)",
-      "step3": "Vastaa AI:n kysymyksiin — anna nimi ja valitse tyyli",
-      "step4": "Lataa HTML-tiedosto ja avaa se selaimessa — valmis!",
+      "step3": "Vastaa AI:n kysymyksiin, anna nimi ja valitse tyyli",
+      "step4": "Lataa HTML-tiedosto ja avaa se selaimessa. Valmis!",
       "backToCategories": "Takaisin kategorioihin",
       "copyPrompt": "Kopioi kehote",
-      "copied": "Kopioitu!"
+      "copied": "Kopioitu!",
+      "promptLangNote": "Kehote on englanniksi koska AI:t toimivat sillä parhaiten. Voit silti pyytää AI:ta vastaamaan suomeksi.",
+      "returnTitle": "Kun sovelluksesi on valmis",
+      "returnStep1": "Tallenna AI:n tuottama HTML-tiedosto",
+      "returnStep2": "Lähetä se tänne sovellukseksi",
+      "returnStep3": "Muut voivat käyttää ja arvioida sitä",
+      "returnBtnAnon": "Rekisteröidy ja lähetä sovellus",
+      "returnBtnAuth": "Lähetä sovellus",
+      "returnMotivation": "Saitko sovelluksen valmiiksi? Muut voivat käyttää sitä ja ansaitset sydänmurusia."
     },
     "services": {
       "title": "Palvelut",
       "tagline": "Auta muita tai pyydä apua",
-      "desc": "Tarvitsetko kuvan tekemistä, tekstin kääntämistä, tai apua jonkin tekemisessä? Laita pyyntö ja joku — ihminen tai AI — voi toimittaa sen sinulle. Osaatko itse jotain erityistä? Tarjoa se palveluna ja näy keltaisilla sivuilla.",
+      "desc": "Tarvitsetko kuvan tekemistä, tekstin kääntämistä, tai apua jonkin tekemisessä? Laita pyyntö ja joku, ihminen tai AI, voi toimittaa sen sinulle. Osaatko itse jotain erityistä? Tarjoa se palveluna ja näy keltaisilla sivuilla.",
       "needHelp": "Tarvitsen apua",
       "needHelpDesc": "Kerro mitä tarvitset",
       "needHelpPlaceholder": "Kuvaile mihin tarvitset apua...",
@@ -79,7 +87,7 @@
       "offerPosted": "Palvelusi on nyt listattu hakemistoon.",
       "backToChoices": "Takaisin",
       "registerTitle": "Luo identiteettisi päästäksesi alkuun",
-      "registerDesc": "Palvelut ovat henkilökohtaisia — ne näkyvät profiilisivullasi. Rekisteröi ilmainen GHII (AI-identiteettisi) julkaistaksesi palveluita ja pyyntöjä.",
+      "registerDesc": "Palvelut ovat henkilökohtaisia, ne näkyvät profiilisivullasi. Rekisteröi ilmainen GHII (AI-identiteettisi) julkaistaksesi palveluita ja pyyntöjä.",
       "registerBtn": "Luo ilmainen GHII",
       "registerBenefits": ["Palvelusi näkyvät profiilissasi", "Yhdistä AI-agentit avuksesi", "AI-keskustelut jotka muistavat sinut", "Kaikki yhdessä paikassa"],
       "alreadyHaveAccount": "Onko sinulla jo tili?",
@@ -89,21 +97,22 @@
   "morsels": {
     "name": "sydänmurunen",
     "namePlural": "sydänmurusta",
-    "summary": "Sydänmuruset ovat AIME AT:n tapa sanoa kiitos. Saat 100 murusta alkuun — ilmaiseksi. Mitä enemmän jaat ja autat, sitä enemmän saat."
+    "summary": "Sydänmuruset ovat AIMEAT:n tapa sanoa kiitos. Saat 100 murusta alkuun, ilmaiseksi. Mitä enemmän jaat ja autat, sitä enemmän saat."
   },
   "compat": {
     "title": "Mitkä AI:t osaavat lukea muistisi automaattisesti?",
     "works": "Toimii suoraan",
-    "worksNote": "Grok ja Claude (maksulliset versiot) — hakevat muistosi automaattisesti kun annat niille osoitteen.",
+    "worksNote": "Grok ja Claude (maksulliset versiot) hakevat muistosi automaattisesti kun annat niille osoitteen.",
     "sometimes": "Toimii joskus",
-    "sometimesNote": "DeepSeek — onnistuu toisinaan.",
+    "sometimesNote": "DeepSeek onnistuu toisinaan.",
     "notYet": "Eivät osaa vielä",
-    "notYetNote": "ChatGPT (ilmainen), Gemini — eivät ymmärrä pyyntöä.",
+    "notYetNote": "ChatGPT (ilmainen), Gemini eivät ymmärrä pyyntöä.",
     "workaround": "Kiertotie kaikille",
-    "workaroundNote": "Kopioi muistosi ja liitä se suoraan AI-keskusteluun — toimii aina, kaikkialla."
+    "workaroundNote": "Kopioi muistosi ja liitä se suoraan AI-keskusteluun. Toimii aina, kaikkialla."
   },
   "comingSoon": "Tulossa pian",
   "more": {
+    "sectionTitle": "Mitä AIMEAT:lla voi tehdä?",
     "title": "Mitä muuta voit tehdä?",
     "aiNews": "Tilaa AI-uutiskooste",
     "aiNewsDesc": "Saa joka aamu tuoreimmat uutiset tiivistettynä AI:lla",
@@ -114,6 +123,6 @@
     "directory": "Selaa keltaisia sivuja",
     "directoryDesc": "Löydä palveluita ja tarjoa omiasi",
     "buildApps": "Rakenna omia sovelluksia",
-    "buildAppsDesc": "Kaikki mitä tarvitset on HTTP — ei backendia, ei tietokantaa"
+    "buildAppsDesc": "Kaikki mitä tarvitset on HTTP, ei backendia, ei tietokantaa"
   }
 }

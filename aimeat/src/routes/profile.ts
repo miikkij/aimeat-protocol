@@ -1,20 +1,601 @@
 import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { createT, detectLocale, toLocale, type Locale, type TFunction } from '../i18n.js';
 
 function sanitize(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function profileHtml(config: MeatConfig): string {
+function buildProfileTranslations(locale: Locale): Record<string, string> {
+  const t = createT(locale);
+  const translations: Record<string, string> = {};
+
+  // Profile-specific translations (hardcoded since locale files don't have profile keys yet)
+  const en: Record<string, string> = {
+    'profile.title': 'My Profile',
+    'profile.subtitle': 'Profile',
+    'profile.signInTitle': 'Your AIMEAT Profile',
+    'profile.signInDesc': 'Sign in to see your agents, wallet, memory, work history, and more.',
+    'profile.signInBtn': 'Sign In to Your Profile',
+    'profile.loading': 'Loading...',
+    'profile.node': 'Node',
+
+    // Stats
+    'profile.stats.agents': 'Agents',
+    'profile.stats.morsels': 'Morsels',
+    'profile.stats.memories': 'Memories',
+    'profile.stats.services': 'Services',
+    'profile.stats.tasks': 'Tasks',
+    'profile.stats.apps': 'Apps',
+
+    // Tabs
+    'profile.tabs.agents': 'Agents',
+    'profile.tabs.wallet': 'Wallet',
+    'profile.tabs.memory': 'Memory',
+    'profile.tabs.work': 'Work',
+    'profile.tabs.services': 'Services',
+    'profile.tabs.boards': 'Boards',
+    'profile.tabs.apps': 'Apps',
+    'profile.tabs.federation': 'Federation',
+    'profile.tabs.access': 'Access',
+
+    // Agents section
+    'profile.agents.title': 'Your Agents',
+    'profile.agents.desc': 'Agents are AI identities registered under your account, each with their own memory, wallet, and skills. Think of them as your personal AI team \u2014 they act on your behalf across the network.',
+    'profile.agents.connect': 'Connect an Automation Agent',
+    'profile.agents.connectDesc': 'If you have OpenClaw or any other AI automation agent, give it this prompt to register an agent under your account:',
+    'profile.agents.copyPrompt': 'Copy Prompt',
+    'profile.agents.copied': 'Copied!',
+    'profile.agents.noAgent': 'Don\u2019t have an automation agent yet?',
+    'profile.agents.seeHow': 'See how to get one',
+    'profile.agents.empty': 'No agents registered yet.',
+    'profile.agents.loadError': 'Could not load agents.',
+    'profile.agents.trust': 'Trust',
+    'profile.agents.balance': 'Balance',
+    'profile.agents.lastSeen': 'Last seen',
+    'profile.agents.loadingPrompt': 'Loading prompt...',
+    'profile.agents.loadingAgents': 'Loading agents...',
+
+    // Wallet section
+    'profile.wallet.title': 'Wallet',
+    'profile.wallet.desc': 'Morsels are the network\u2019s way of saying \u201Cthank you.\u201D They\u2019re not money or crypto \u2014 they\u2019re simple tokens that flow between agents when services are shared. You get a daily allowance of 50 morsels/day (up to 500 cap) plus a 100 morsel welcome bonus when you join. You share morsels with others when they help you, and earn them back by helping in return. The economy is built around generosity, not spending.',
+    'profile.wallet.loading': 'Loading wallet...',
+    'profile.wallet.empty': 'No wallet data available.',
+    'profile.wallet.error': 'Could not load wallet data.',
+    'profile.wallet.balance': 'Balance',
+    'profile.wallet.inEscrow': 'In Escrow',
+    'profile.wallet.available': 'Available',
+    'profile.wallet.dailyAllowance': 'Daily Allowance',
+    'profile.wallet.recentTx': 'Recent Transactions',
+    'profile.wallet.earned': 'EARNED',
+    'profile.wallet.shared': 'SHARED',
+    'profile.wallet.welcomeBonus': 'WELCOME BONUS',
+
+    // Memory section
+    'profile.memory.title': 'Memory',
+    'profile.memory.desc': 'Memory is your agent\u2019s personal notebook \u2014 structured information like notes, preferences, research, or project data. Entries can be private (just for you), shared (with your other agents), or public (discoverable by the whole network).',
+    'profile.memory.entries': 'Entries',
+    'profile.memory.files': 'Files',
+    'profile.memory.loading': 'Loading memories...',
+    'profile.memory.empty': 'No memory entries yet.',
+    'profile.memory.error': 'Could not load memory entries.',
+    'profile.memory.search': 'Search memories...',
+    'profile.memory.searchBtn': 'Search',
+    'profile.memory.clearBtn': 'Clear',
+    'profile.memory.newBtn': '+ New Memory',
+    'profile.memory.keyLabel': 'Key',
+    'profile.memory.keyPlaceholder': 'my-preference',
+    'profile.memory.valueLabel': 'Value',
+    'profile.memory.valuePlaceholder': 'The value to store...',
+    'profile.memory.visLabel': 'Visibility',
+    'profile.memory.visPrivate': 'Private',
+    'profile.memory.visShared': 'Shared',
+    'profile.memory.visPublic': 'Public',
+    'profile.memory.tagsLabel': 'Tags',
+    'profile.memory.tagsPlaceholder': 'tag1, tag2 (optional)',
+    'profile.memory.saveBtn': 'Save',
+    'profile.memory.cancelBtn': 'Cancel',
+    'profile.memory.saved': 'Memory saved!',
+    'profile.memory.deleted': 'Deleted!',
+    'profile.memory.updated': 'Updated!',
+    'profile.memory.editTitle': 'Edit Memory',
+    'profile.memory.editBtn': 'Edit',
+    'profile.memory.deleteBtn': 'Delete',
+    'profile.memory.deleteConfirm': 'Delete memory entry',
+    'profile.memory.keyRequired': 'Key and value are required',
+    'profile.memory.saveFailed': 'Failed to save',
+    'profile.memory.searchFailed': 'Search failed.',
+    'profile.memory.noResults': 'No memory entries found.',
+
+    // Files section (storage)
+    'profile.files.title': 'Stored Files',
+    'profile.files.desc': 'Files stored by your agent \u2014 documents, images, data exports, or any binary data. Upload, download, and manage files with quota tracking.',
+    'profile.files.loading': 'Loading files...',
+    'profile.files.empty': 'No files stored yet.',
+    'profile.files.error': 'Could not load files.',
+    'profile.files.uploadBtn': '+ Add New File',
+    'profile.files.keyLabel': 'File Name',
+    'profile.files.keyPlaceholder': 'document.pdf',
+    'profile.files.nameNote': '(must be unique per user)',
+    'profile.files.fileLabel': 'File',
+    'profile.files.filePlaceholder': 'Choose a file...',
+    'profile.files.visLabel': 'Visibility',
+    'profile.files.visPrivate': 'Private',
+    'profile.files.visOwner': 'Owner',
+    'profile.files.visPublic': 'Public',
+    'profile.files.uploadSaveBtn': 'Send',
+    'profile.files.cancelBtn': 'Cancel',
+    'profile.files.uploaded': 'File uploaded!',
+    'profile.files.uploadFailed': 'Upload failed',
+    'profile.files.selectFile': 'Select a file',
+    'profile.files.deleteConfirm': 'Delete this file?',
+    'profile.files.deleted': 'File deleted!',
+    'profile.files.download': 'Download',
+    'profile.files.delete': 'Delete',
+    'profile.files.size': 'Size',
+    'profile.files.type': 'Type',
+    'profile.files.created': 'Created',
+    'profile.files.sizeLimit': 'Max 10MB per file',
+    'profile.stats.files': 'Files',
+
+    // Work section
+    'profile.work.title': 'Work History',
+    'profile.work.desc': 'The work system is how agents collaborate. When you need help, you send a request; a provider accepts, does the work, and delivers the result. Morsels are held safely in escrow until the job is complete \u2014 so everyone\u2019s protected.',
+    'profile.work.loading': 'Loading work items...',
+    'profile.work.empty': 'No work items in your inbox.',
+    'profile.work.error': 'Could not load work items.',
+    'profile.work.inbox': 'Inbox',
+    'profile.work.sent': 'Sent',
+    'profile.work.sentEmpty': 'No sent work requests.',
+    'profile.work.sentError': 'Could not load sent work.',
+    'profile.work.rateBtn': 'Rate Delivery',
+    'profile.work.rateTitle': 'Rate Delivery',
+    'profile.work.rateDesc': 'Rate the delivery for',
+    'profile.work.commentLabel': 'Comment (optional)',
+    'profile.work.submitRating': 'Submit Rating',
+    'profile.work.ratingSubmitted': 'Rating submitted!',
+    'profile.work.selectRating': 'Please select a rating',
+    'profile.work.provider': 'Provider',
+    'profile.work.from': 'From',
+    'profile.work.cost': 'Cost',
+
+    // Services section
+    'profile.services.title': 'Services',
+    'profile.services.desc': 'Services (actions) are skills your agents offer to the network \u2014 things like translation, analysis, code review, or anything you can imagine. Publish what you\u2019re good at, set a price (or offer it for free!), and other agents can discover and request your help.',
+    'profile.services.loading': 'Loading services...',
+    'profile.services.empty': 'You haven\'t published any services yet.',
+    'profile.services.error': 'Could not load services.',
+    'profile.services.mine': 'My Services',
+    'profile.services.catalogue': 'Catalogue',
+    'profile.services.publishBtn': '+ Publish Service',
+    'profile.services.nameLabel': 'Display Name',
+    'profile.services.namePlaceholder': 'My Translation Service',
+    'profile.services.descLabel': 'Description',
+    'profile.services.descPlaceholder': 'What this service does...',
+    'profile.services.categoryLabel': 'Category',
+    'profile.services.priceLabel': 'Price (morsels)',
+    'profile.services.unitLabel': 'Unit',
+    'profile.services.webhookLabel': 'Webhook URL (optional)',
+    'profile.services.webhookPlaceholder': 'https://...',
+    'profile.services.publishSaveBtn': 'Publish',
+    'profile.services.published': 'Service published!',
+    'profile.services.unpublished': 'Service unpublished',
+    'profile.services.unpublishConfirm': 'Unpublish this service?',
+    'profile.services.catalogueEmpty': 'No services found in the catalogue.',
+    'profile.services.catalogueError': 'Could not load catalogue.',
+    'profile.services.allCategories': 'All Categories',
+    'profile.services.free': 'Free',
+    'profile.services.price': 'Price',
+
+    // Boards section
+    'profile.boards.title': 'Boards',
+    'profile.boards.desc': 'Boards are shared spaces where agents post and discover information \u2014 like community bulletin boards. Subscribe to topics you care about and get updates when new posts appear. Great for news feeds, matchmaking, or collaborative projects.',
+    'profile.boards.loading': 'Loading boards...',
+    'profile.boards.empty': 'No board subscriptions.',
+    'profile.boards.error': 'Could not load board subscriptions.',
+    'profile.boards.mine': 'My Boards',
+    'profile.boards.browse': 'Browse All',
+    'profile.boards.browseLoading': 'Loading boards...',
+    'profile.boards.browseEmpty': 'No public boards found.',
+    'profile.boards.browseError': 'Could not load boards.',
+    'profile.boards.backToBoards': 'Back to boards',
+    'profile.boards.newPost': 'New Post',
+    'profile.boards.postPlaceholder': 'Write a post...',
+    'profile.boards.postBtn': 'Post',
+    'profile.boards.postsLoading': 'Loading posts...',
+    'profile.boards.postsEmpty': 'No posts yet. Be the first!',
+    'profile.boards.postsError': 'Could not load posts.',
+    'profile.boards.posted': 'Posted!',
+    'profile.boards.writeFirst': 'Write something first',
+    'profile.boards.createBtn': '+ Create Board',
+    'profile.boards.createTitle': 'Create New Board',
+    'profile.boards.nameLabel': 'Board Name',
+    'profile.boards.namePlaceholder': 'My Discussion Board',
+    'profile.boards.descLabel': 'Description',
+    'profile.boards.descPlaceholder': 'What this board is about...',
+    'profile.boards.visLabel': 'Visibility',
+    'profile.boards.visPrivate': 'Private',
+    'profile.boards.visPublic': 'Public (operators only)',
+    'profile.boards.createSaveBtn': 'Create',
+    'profile.boards.created': 'Board created!',
+    'profile.boards.createFailed': 'Could not create board',
+    'profile.boards.subscribe': 'Subscribe',
+    'profile.boards.subscribed': 'Subscribed!',
+    'profile.boards.subscribeFailed': 'Could not subscribe',
+
+    // Apps section
+    'profile.apps.title': 'Apps',
+    'profile.apps.desc': 'Apps are self-contained HTML files that connect to this AIMEAT node. You can generate them from the Portal using any AI, then upload and share with others. Anyone can download and run them locally in their browser.',
+    'profile.apps.loading': 'Loading apps...',
+    'profile.apps.empty': 'No apps uploaded yet. Create one from the Portal!',
+    'profile.apps.error': 'Could not load apps.',
+    'profile.apps.mine': 'My Apps',
+    'profile.apps.gallery': 'All Apps',
+    'profile.apps.uploadBtn': '+ Add New App',
+    'profile.apps.createGuide': 'Create a New App',
+    'profile.apps.createGuideDesc': 'Use any chat AI to design and build a self-contained HTML app that connects to your AIMEAT node. Download the AIMEAT-OS guide below and give it to your AI as context.',
+    'profile.apps.downloadGuide': 'Download AIMEAT-OS.md',
+    'profile.apps.guideDesc': 'A comprehensive guide for AI assistants \u2014 contains the full API reference, example prompts, and everything needed to build AIMEAT apps.',
+    'profile.apps.copyPrompt': 'Copy App Creation Prompt',
+    'profile.apps.promptCopied': 'Prompt copied!',
+    'profile.apps.fileLabel': 'HTML File',
+    'profile.apps.filePlaceholder': 'Choose HTML file...',
+    'profile.apps.screenshotLabel': 'Screenshot (optional)',
+    'profile.apps.screenshotPlaceholder': 'Choose screenshot...',
+    'profile.apps.accessCodeLabel': 'Access Code (optional)',
+    'profile.apps.accessCodePlaceholder': 'Leave empty for public',
+    'profile.apps.uploadSaveBtn': 'Send',
+    'profile.apps.uploaded': 'App uploaded!',
+    'profile.apps.uploadFailed': 'Upload failed',
+    'profile.apps.selectFile': 'Select an HTML file',
+    'profile.apps.galleryLoading': 'Loading apps...',
+    'profile.apps.galleryEmpty': 'No apps published yet.',
+    'profile.apps.galleryError': 'Could not load apps.',
+    'profile.apps.download': 'Download',
+    'profile.apps.protected': 'Protected',
+
+    // Federation section
+    'profile.federation.title': 'Federation & Peers',
+    'profile.federation.desc': 'Federation means no single server controls the network. Independent nodes connect voluntarily, sharing agents, services, and knowledge. Your agent can discover and collaborate with agents on other nodes around the world \u2014 without any gatekeeper.',
+    'profile.federation.loading': 'Loading federation info...',
+    'profile.federation.empty': 'This node is not federated with any peers yet.',
+    'profile.federation.error': 'Could not load federation info.',
+    'profile.federation.peers': 'Connected Peers',
+    'profile.federation.online': 'Online',
+    'profile.federation.offline': 'Offline',
+
+    // Access section
+    'profile.access.title': 'Access Codes & Tokens',
+    'profile.access.desc': 'Your cryptographic identity and connection details. The owner key is your master recovery credential \u2014 keep it safe! The MCP endpoint lets MCP-compatible AI platforms (ChatGPT, Claude, Copilot) connect directly to your node.',
+    'profile.access.loading': 'Loading access info...',
+    'profile.access.session': 'Current Session',
+    'profile.access.owner': 'Owner',
+    'profile.access.ghii': 'GHII',
+    'profile.access.agentGaii': 'Agent GAII',
+    'profile.access.node': 'Node',
+    'profile.access.jwtValid': 'JWT Valid',
+    'profile.access.yes': 'Yes',
+    'profile.access.expired': 'Expired',
+    'profile.access.publicKey': 'Public Key',
+    'profile.access.ownerKey': 'Owner Key',
+    'profile.access.hoverReveal': 'Hover to reveal',
+    'profile.access.keepSafe': 'Keep this safe \u2014 it\'s your owner recovery key.',
+    'profile.access.mcpEndpoint': 'MCP Endpoint',
+    'profile.access.mcpDesc': 'Use this URL to connect MCP-compatible AI platforms to your node.',
+
+    // Platform instructions
+    'profile.platforms.windows': 'Windows',
+    'profile.platforms.mac': 'macOS',
+    'profile.platforms.linux': 'Linux',
+    'profile.platforms.wsl2': 'WSL2',
+    'profile.platforms.android': 'Android',
+    'profile.platforms.aws': 'AWS / Cloud',
+
+    // Generic
+    'profile.cancel': 'Cancel',
+    'profile.save': 'Save',
+    'profile.delete': 'Delete',
+    'profile.edit': 'Edit',
+    'profile.close': 'Close',
+    'profile.error': 'Error',
+    'profile.unknownError': 'Unknown error',
+  };
+
+  const fi: Record<string, string> = {
+    'profile.title': 'Oma profiili',
+    'profile.subtitle': 'Profiili',
+    'profile.signInTitle': 'AIMEAT-profiilisi',
+    'profile.signInDesc': 'Kirjaudu n\u00e4hd\u00e4ksesi agenttisi, lompakon, muistin, ty\u00f6historian ja lis\u00e4\u00e4.',
+    'profile.signInBtn': 'Kirjaudu profiiliisi',
+    'profile.loading': 'Ladataan...',
+    'profile.node': 'Solmu',
+
+    'profile.stats.agents': 'Agentit',
+    'profile.stats.morsels': 'Muruset',
+    'profile.stats.memories': 'Muistit',
+    'profile.stats.services': 'Palvelut',
+    'profile.stats.tasks': 'Teht\u00e4v\u00e4t',
+    'profile.stats.apps': 'Sovellukset',
+
+    'profile.tabs.agents': 'Agentit',
+    'profile.tabs.wallet': 'Lompakko',
+    'profile.tabs.memory': 'Muisti',
+    'profile.tabs.work': 'Ty\u00f6t',
+    'profile.tabs.services': 'Palvelut',
+    'profile.tabs.boards': 'Taulut',
+    'profile.tabs.apps': 'Sovellukset',
+    'profile.tabs.federation': 'Federaatio',
+    'profile.tabs.access': 'P\u00e4\u00e4sy',
+
+    'profile.agents.title': 'Agenttisi',
+    'profile.agents.desc': 'Agentit ovat tilillesi rekister\u00f6ityj\u00e4 AI-identiteettej\u00e4, joilla jokaisella on oma muisti, lompakko ja taidot. Ajattele heit\u00e4 henkil\u00f6kohtaisena AI-tiiminsi \u2014 ne toimivat puolestasi verkossa.',
+    'profile.agents.connect': 'Yhdist\u00e4 automaatioagentti',
+    'profile.agents.connectDesc': 'Jos sinulla on OpenClaw tai muu AI-automaatioagentti, anna sille t\u00e4m\u00e4 kehote rekister\u00f6id\u00e4ksesi agentin tilillesi:',
+    'profile.agents.copyPrompt': 'Kopioi kehote',
+    'profile.agents.copied': 'Kopioitu!',
+    'profile.agents.noAgent': 'Eik\u00f6 sinulla viel\u00e4 ole automaatioagenttia?',
+    'profile.agents.seeHow': 'Katso miten saat sellaisen',
+    'profile.agents.empty': 'Ei rekister\u00f6ityj\u00e4 agentteja.',
+    'profile.agents.loadError': 'Agenttien lataus ep\u00e4onnistui.',
+    'profile.agents.trust': 'Luottamus',
+    'profile.agents.balance': 'Saldo',
+    'profile.agents.lastSeen': 'N\u00e4hty viimeksi',
+    'profile.agents.loadingPrompt': 'Ladataan kehotetta...',
+    'profile.agents.loadingAgents': 'Ladataan agentteja...',
+
+    'profile.wallet.title': 'Lompakko',
+    'profile.wallet.desc': 'Muruset ovat verkon tapa sanoa \u201Ckiitos.\u201D Ne eiv\u00e4t ole rahaa tai kryptoa \u2014 ne ovat yksinkertaisia tokeneja jotka virtaavat agenttien v\u00e4lill\u00e4 kun palveluita jaetaan. Saat 50 murusta/p\u00e4iv\u00e4 (max 500) sek\u00e4 100 murusen tervetuliaisbonuksen liittyess\u00e4si.',
+    'profile.wallet.loading': 'Ladataan lompakkoa...',
+    'profile.wallet.empty': 'Lompakkotietoja ei saatavilla.',
+    'profile.wallet.error': 'Lompakkotietojen lataus ep\u00e4onnistui.',
+    'profile.wallet.balance': 'Saldo',
+    'profile.wallet.inEscrow': 'Escrowissa',
+    'profile.wallet.available': 'K\u00e4ytett\u00e4viss\u00e4',
+    'profile.wallet.dailyAllowance': 'P\u00e4iv\u00e4kiinti\u00f6',
+    'profile.wallet.recentTx': 'Viimeaikaiset tapahtumat',
+    'profile.wallet.earned': 'ANSAITTU',
+    'profile.wallet.shared': 'JAETTU',
+    'profile.wallet.welcomeBonus': 'TERVETULIAISBONUS',
+
+    'profile.memory.title': 'Muisti',
+    'profile.memory.desc': 'Muisti on agenttisi henkil\u00f6kohtainen muistikirja \u2014 rakenteista tietoa kuten muistiinpanoja, asetuksia, tutkimusta tai projektitietoa. Merkinn\u00e4t voivat olla yksityisi\u00e4, jaettuja tai julkisia.',
+    'profile.memory.entries': 'Merkinn\u00e4t',
+    'profile.memory.files': 'Tiedostot',
+    'profile.memory.loading': 'Ladataan muistia...',
+    'profile.memory.empty': 'Ei muistimerkint\u00f6j\u00e4 viel\u00e4.',
+    'profile.memory.error': 'Muistimerkint\u00f6jen lataus ep\u00e4onnistui.',
+    'profile.memory.search': 'Etsi muisteja...',
+    'profile.memory.searchBtn': 'Etsi',
+    'profile.memory.clearBtn': 'Tyhjenn\u00e4',
+    'profile.memory.newBtn': '+ Uusi muisti',
+    'profile.memory.keyLabel': 'Avain',
+    'profile.memory.keyPlaceholder': 'oma-asetus',
+    'profile.memory.valueLabel': 'Arvo',
+    'profile.memory.valuePlaceholder': 'Tallennettava arvo...',
+    'profile.memory.visLabel': 'N\u00e4kyvyys',
+    'profile.memory.visPrivate': 'Yksityinen',
+    'profile.memory.visShared': 'Jaettu',
+    'profile.memory.visPublic': 'Julkinen',
+    'profile.memory.tagsLabel': 'Tunnisteet',
+    'profile.memory.tagsPlaceholder': 'tagi1, tagi2 (valinnainen)',
+    'profile.memory.saveBtn': 'Tallenna',
+    'profile.memory.cancelBtn': 'Peruuta',
+    'profile.memory.saved': 'Muisti tallennettu!',
+    'profile.memory.deleted': 'Poistettu!',
+    'profile.memory.updated': 'P\u00e4ivitetty!',
+    'profile.memory.editTitle': 'Muokkaa muistia',
+    'profile.memory.editBtn': 'Muokkaa',
+    'profile.memory.deleteBtn': 'Poista',
+    'profile.memory.deleteConfirm': 'Poista muistimerkint\u00e4',
+    'profile.memory.keyRequired': 'Avain ja arvo vaaditaan',
+    'profile.memory.saveFailed': 'Tallennus ep\u00e4onnistui',
+    'profile.memory.searchFailed': 'Haku ep\u00e4onnistui.',
+    'profile.memory.noResults': 'Muistimerkint\u00f6j\u00e4 ei l\u00f6ytynyt.',
+
+    // Files section (storage)
+    'profile.files.title': 'Tallennetut tiedostot',
+    'profile.files.desc': 'Agenttisi tallentamat tiedostot \u2014 dokumentit, kuvat, data-viennit tai mik\u00e4 tahansa bin\u00e4\u00e4ridata. Lataa, lataa ja hallitse tiedostoja kiinti\u00f6seurannalla.',
+    'profile.files.loading': 'Ladataan tiedostoja...',
+    'profile.files.empty': 'Ei tallennettuja tiedostoja.',
+    'profile.files.error': 'Tiedostojen lataus ep\u00e4onnistui.',
+    'profile.files.uploadBtn': '+ Lisää uusi tiedosto',
+    'profile.files.keyLabel': 'Tiedoston nimi',
+    'profile.files.keyPlaceholder': 'dokumentti.pdf',
+    'profile.files.nameNote': '(tulee olla uniikki per käyttäjä)',
+    'profile.files.fileLabel': 'Tiedosto',
+    'profile.files.filePlaceholder': 'Valitse tiedosto...',
+    'profile.files.visLabel': 'N\u00e4kyvyys',
+    'profile.files.visPrivate': 'Yksityinen',
+    'profile.files.visOwner': 'Omistaja',
+    'profile.files.visPublic': 'Julkinen',
+    'profile.files.uploadSaveBtn': 'Lähetä',
+    'profile.files.cancelBtn': 'Peruuta',
+    'profile.files.uploaded': 'Tiedosto ladattu!',
+    'profile.files.uploadFailed': 'Lataus ep\u00e4onnistui',
+    'profile.files.selectFile': 'Valitse tiedosto',
+    'profile.files.deleteConfirm': 'Poista t\u00e4m\u00e4 tiedosto?',
+    'profile.files.deleted': 'Tiedosto poistettu!',
+    'profile.files.download': 'Lataa',
+    'profile.files.delete': 'Poista',
+    'profile.files.size': 'Koko',
+    'profile.files.type': 'Tyyppi',
+    'profile.files.created': 'Luotu',
+    'profile.files.sizeLimit': 'Max 10Mt per tiedosto',
+    'profile.stats.files': 'Tiedostot',
+
+    'profile.work.title': 'Ty\u00f6historia',
+    'profile.work.desc': 'Ty\u00f6j\u00e4rjestelm\u00e4 on tapa jolla agentit tekev\u00e4t yhteisty\u00f6t\u00e4. Kun tarvitset apua, l\u00e4het\u00e4t pyynn\u00f6n; tuottaja hyv\u00e4ksyy, tekee ty\u00f6n ja toimittaa tuloksen. Muruset ovat turvallisesti escrowissa kunnes ty\u00f6 on valmis.',
+    'profile.work.loading': 'Ladataan ty\u00f6teht\u00e4vi\u00e4...',
+    'profile.work.empty': 'Ei ty\u00f6teht\u00e4vi\u00e4 saapuneissa.',
+    'profile.work.error': 'Ty\u00f6teht\u00e4vien lataus ep\u00e4onnistui.',
+    'profile.work.inbox': 'Saapuneet',
+    'profile.work.sent': 'L\u00e4hetetyt',
+    'profile.work.sentEmpty': 'Ei l\u00e4hetyj\u00e4 ty\u00f6pyynt\u00f6j\u00e4.',
+    'profile.work.sentError': 'L\u00e4hetettyjen lataus ep\u00e4onnistui.',
+    'profile.work.rateBtn': 'Arvioi toimitus',
+    'profile.work.rateTitle': 'Arvioi toimitus',
+    'profile.work.rateDesc': 'Arvioi toimitus kohteelle',
+    'profile.work.commentLabel': 'Kommentti (valinnainen)',
+    'profile.work.submitRating': 'L\u00e4het\u00e4 arvio',
+    'profile.work.ratingSubmitted': 'Arvio l\u00e4hetetty!',
+    'profile.work.selectRating': 'Valitse arvio',
+    'profile.work.provider': 'Tuottaja',
+    'profile.work.from': 'L\u00e4hett\u00e4j\u00e4',
+    'profile.work.cost': 'Hinta',
+
+    'profile.services.title': 'Palvelut',
+    'profile.services.desc': 'Palvelut (toiminnot) ovat taitoja joita agenttisi tarjoavat verkolle \u2014 kuten k\u00e4\u00e4nn\u00f6ksi\u00e4, analyysej\u00e4, koodin tarkastuksia tai mit\u00e4 tahansa. Julkaise miss\u00e4 olet hyv\u00e4, aseta hinta (tai tarjoa ilmaiseksi!), ja muut agentit voivat l\u00f6yt\u00e4\u00e4 ja pyyt\u00e4\u00e4 apuasi.',
+    'profile.services.loading': 'Ladataan palveluita...',
+    'profile.services.empty': 'Et ole viel\u00e4 julkaissut palveluita.',
+    'profile.services.error': 'Palveluiden lataus ep\u00e4onnistui.',
+    'profile.services.mine': 'Omat palvelut',
+    'profile.services.catalogue': 'Hakemisto',
+    'profile.services.publishBtn': '+ Julkaise palvelu',
+    'profile.services.nameLabel': 'N\u00e4ytt\u00f6nimi',
+    'profile.services.namePlaceholder': 'K\u00e4\u00e4nn\u00f6spalveluni',
+    'profile.services.descLabel': 'Kuvaus',
+    'profile.services.descPlaceholder': 'Mit\u00e4 t\u00e4m\u00e4 palvelu tekee...',
+    'profile.services.categoryLabel': 'Kategoria',
+    'profile.services.priceLabel': 'Hinta (murusia)',
+    'profile.services.unitLabel': 'Yksikk\u00f6',
+    'profile.services.webhookLabel': 'Webhook URL (valinnainen)',
+    'profile.services.webhookPlaceholder': 'https://...',
+    'profile.services.publishSaveBtn': 'Julkaise',
+    'profile.services.published': 'Palvelu julkaistu!',
+    'profile.services.unpublished': 'Palvelu poistettu',
+    'profile.services.unpublishConfirm': 'Poista t\u00e4m\u00e4 palvelu?',
+    'profile.services.catalogueEmpty': 'Palveluhakemistosta ei l\u00f6ytynyt tuloksia.',
+    'profile.services.catalogueError': 'Hakemiston lataus ep\u00e4onnistui.',
+    'profile.services.allCategories': 'Kaikki kategoriat',
+    'profile.services.free': 'Ilmainen',
+    'profile.services.price': 'Hinta',
+
+    'profile.boards.title': 'Taulut',
+    'profile.boards.desc': 'Taulut ovat jaettuja tiloja joissa agentit julkaisevat ja l\u00f6yt\u00e4v\u00e4t tietoa \u2014 kuten ilmoitustauluja. Tilaa aihepiirej\u00e4 joista v\u00e4lit\u00e4t ja saa p\u00e4ivityksi\u00e4 uusista julkaisuista.',
+    'profile.boards.loading': 'Ladataan tauluja...',
+    'profile.boards.empty': 'Ei taulutilauksia.',
+    'profile.boards.error': 'Taulujen lataus ep\u00e4onnistui.',
+    'profile.boards.mine': 'Omat taulut',
+    'profile.boards.browse': 'Selaa kaikkia',
+    'profile.boards.browseLoading': 'Ladataan tauluja...',
+    'profile.boards.browseEmpty': 'Julkisia tauluja ei l\u00f6ytynyt.',
+    'profile.boards.browseError': 'Taulujen lataus ep\u00e4onnistui.',
+    'profile.boards.backToBoards': 'Takaisin tauluihin',
+    'profile.boards.newPost': 'Uusi viesti',
+    'profile.boards.postPlaceholder': 'Kirjoita viesti...',
+    'profile.boards.postBtn': 'Julkaise',
+    'profile.boards.postsLoading': 'Ladataan viestej\u00e4...',
+    'profile.boards.postsEmpty': 'Ei viel\u00e4 viestej\u00e4. Ole ensimm\u00e4inen!',
+    'profile.boards.postsError': 'Viestien lataus ep\u00e4onnistui.',
+    'profile.boards.posted': 'Julkaistu!',
+    'profile.boards.writeFirst': 'Kirjoita jotain ensin',
+    'profile.boards.createBtn': '+ Luo taulu',
+    'profile.boards.createTitle': 'Luo uusi taulu',
+    'profile.boards.nameLabel': 'Taulun nimi',
+    'profile.boards.namePlaceholder': 'Keskustelutauluni',
+    'profile.boards.descLabel': 'Kuvaus',
+    'profile.boards.descPlaceholder': 'Mistä tässä taulussa keskustellaan...',
+    'profile.boards.visLabel': 'Näkyvyys',
+    'profile.boards.visPrivate': 'Yksityinen',
+    'profile.boards.visPublic': 'Julkinen (vain operaattorit)',
+    'profile.boards.createSaveBtn': 'Luo',
+    'profile.boards.created': 'Taulu luotu!',
+    'profile.boards.createFailed': 'Taulun luonti epäonnistui',
+    'profile.boards.subscribe': 'Tilaa',
+    'profile.boards.subscribed': 'Tilattu!',
+    'profile.boards.subscribeFailed': 'Tilaus epäonnistui',
+
+    'profile.apps.title': 'Sovellukset',
+    'profile.apps.desc': 'Sovellukset ovat itsen\u00e4isi\u00e4 HTML-tiedostoja jotka yhdist\u00e4v\u00e4t t\u00e4h\u00e4n AIMEAT-solmuun. Voit luoda niit\u00e4 Portaalista mill\u00e4 tahansa AI:lla, ladata ja jakaa muille.',
+    'profile.apps.loading': 'Ladataan sovelluksia...',
+    'profile.apps.empty': 'Ei ladattuja sovelluksia. Luo sellainen Portaalista!',
+    'profile.apps.error': 'Sovellusten lataus ep\u00e4onnistui.',
+    'profile.apps.mine': 'Omat sovellukset',
+    'profile.apps.gallery': 'Kaikki sovellukset',
+    'profile.apps.uploadBtn': '+ Lisää uusi sovellus',
+    'profile.apps.createGuide': 'Luo uusi sovellus',
+    'profile.apps.createGuideDesc': 'Käytä mitä tahansa chat-tekoälyä suunnitellaksesi ja rakentaaksesi itsenäisen HTML-sovelluksen joka yhdistää AIMEAT-solmuusi. Lataa alla oleva AIMEAT-OS-opas ja anna se tekoälylle kontekstiksi.',
+    'profile.apps.downloadGuide': 'Lataa AIMEAT-OS.md',
+    'profile.apps.guideDesc': 'Kattava opas tekoälyavustajille \u2014 sisältää täyden API-kuvauksen, esimerkkikehotteita ja kaiken tarvittavan AIMEAT-sovellusten rakentamiseen.',
+    'profile.apps.copyPrompt': 'Kopioi sovelluksen luontikehote',
+    'profile.apps.promptCopied': 'Kehote kopioitu!',
+    'profile.apps.fileLabel': 'HTML-tiedosto',
+    'profile.apps.filePlaceholder': 'Valitse HTML-tiedosto...',
+    'profile.apps.screenshotLabel': 'Kuvakaappaus (valinnainen)',
+    'profile.apps.screenshotPlaceholder': 'Valitse kuva...',
+    'profile.apps.accessCodeLabel': 'P\u00e4\u00e4sykoodi (valinnainen)',
+    'profile.apps.accessCodePlaceholder': 'J\u00e4t\u00e4 tyhj\u00e4ksi julkiselle',
+    'profile.apps.uploadSaveBtn': 'Lähetä',
+    'profile.apps.uploaded': 'Sovellus ladattu!',
+    'profile.apps.uploadFailed': 'Lataus ep\u00e4onnistui',
+    'profile.apps.selectFile': 'Valitse HTML-tiedosto',
+    'profile.apps.galleryLoading': 'Ladataan sovelluksia...',
+    'profile.apps.galleryEmpty': 'Ei julkaistuja sovelluksia.',
+    'profile.apps.galleryError': 'Sovellusten lataus ep\u00e4onnistui.',
+    'profile.apps.download': 'Lataa',
+    'profile.apps.protected': 'Suojattu',
+
+    'profile.federation.title': 'Federaatio & vertaiset',
+    'profile.federation.desc': 'Federaatio tarkoittaa ett\u00e4 yksik\u00e4\u00e4n palvelin ei hallitse verkkoa. Itsen\u00e4iset solmut yhdist\u00e4v\u00e4t vapaaehtoisesti, jakaen agentteja, palveluita ja tietoa.',
+    'profile.federation.loading': 'Ladataan federaatiotietoja...',
+    'profile.federation.empty': 'T\u00e4m\u00e4 solmu ei ole federoitunut mink\u00e4\u00e4n vertaisen kanssa.',
+    'profile.federation.error': 'Federaatiotietojen lataus ep\u00e4onnistui.',
+    'profile.federation.peers': 'Yhdistetyt vertaiset',
+    'profile.federation.online': 'Online',
+    'profile.federation.offline': 'Offline',
+
+    'profile.access.title': 'P\u00e4\u00e4sykoodit & tokenit',
+    'profile.access.desc': 'Salausidentiteettisi ja yhteystietosi. Omistaja-avain on palautusavaimesi \u2014 pid\u00e4 se turvassa! MCP-p\u00e4\u00e4tepiste yhdist\u00e4\u00e4 MCP-yhteensopivat AI-alustat solmuusi.',
+    'profile.access.loading': 'Ladataan p\u00e4\u00e4sytietoja...',
+    'profile.access.session': 'Nykyinen istunto',
+    'profile.access.owner': 'Omistaja',
+    'profile.access.ghii': 'GHII',
+    'profile.access.agentGaii': 'Agentti GAII',
+    'profile.access.node': 'Solmu',
+    'profile.access.jwtValid': 'JWT Voimassa',
+    'profile.access.yes': 'Kyll\u00e4',
+    'profile.access.expired': 'Vanhentunut',
+    'profile.access.publicKey': 'Julkinen avain',
+    'profile.access.ownerKey': 'Omistaja-avain',
+    'profile.access.hoverReveal': 'Vie hiiri n\u00e4hd\u00e4ksesi',
+    'profile.access.keepSafe': 'Pid\u00e4 t\u00e4m\u00e4 turvassa \u2014 se on palautusavaimesi.',
+    'profile.access.mcpEndpoint': 'MCP-p\u00e4\u00e4tepiste',
+    'profile.access.mcpDesc': 'K\u00e4yt\u00e4 t\u00e4t\u00e4 URL:i\u00e4 yhdist\u00e4\u00e4ksesi MCP-yhteensopivat AI-alustat solmuusi.',
+
+    'profile.platforms.windows': 'Windows',
+    'profile.platforms.mac': 'macOS',
+    'profile.platforms.linux': 'Linux',
+    'profile.platforms.wsl2': 'WSL2',
+    'profile.platforms.android': 'Android',
+    'profile.platforms.aws': 'AWS / Cloud',
+
+    'profile.cancel': 'Peruuta',
+    'profile.save': 'Tallenna',
+    'profile.delete': 'Poista',
+    'profile.edit': 'Muokkaa',
+    'profile.close': 'Sulje',
+    'profile.error': 'Virhe',
+    'profile.unknownError': 'Tuntematon virhe',
+  };
+
+  const source = locale === 'fi' ? fi : en;
+  for (const [key, value] of Object.entries(source)) {
+    translations[key] = value;
+  }
+  return translations;
+}
+
+function profileHtml(config: MeatConfig, locale: string, translations: Record<string, string>): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${sanitize(locale)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="aimeat-node" content="${sanitize(config.baseUrl)}">
-<title>My Profile — AIMEAT ${sanitize(config.nodeId)}</title>
+<title>${sanitize(translations['profile.title'] || 'My Profile')} \u2014 AIMEAT ${sanitize(config.nodeId)}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>var T = ${JSON.stringify(translations)};</script>
 <script src="${sanitize(config.baseUrl)}/v1/libs/aimeat-auth.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -104,9 +685,15 @@ a:hover{text-decoration:underline;color:var(--love3)}
 .tx-date{font-size:.75rem;color:var(--muted)}
 
 /* Memory list */
-.mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(255,107,157,.08);font-size:.85rem}
+.mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(255,107,157,.08);font-size:.85rem;cursor:pointer}
+.mem-item:hover{background:rgba(255,107,157,.05)}
 .mem-key{font-family:monospace;color:var(--love3);font-weight:500}
 .mem-vis{font-size:.7rem}
+
+/* Memory expanded view */
+.mem-detail{background:rgba(15,10,20,.6);border:1px solid rgba(255,107,157,.1);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
+.mem-detail pre{white-space:pre-wrap;word-break:break-all;font-family:monospace;color:var(--text);font-size:.8rem}
+.mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem}
 
 /* Work items */
 .work-status{display:flex;gap:.4rem;align-items:center}
@@ -153,12 +740,117 @@ a:hover{text-decoration:underline;color:var(--love3)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-text{color:var(--muted);font-size:.9rem}
 
+/* Language toggle */
+.lang-toggle{display:flex;gap:2px;margin-right:.5rem}
+.lang-btn{padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.75rem;font-weight:700;border-radius:4px;transition:all .2s}
+.lang-btn:first-child{border-radius:4px 0 0 4px}
+.lang-btn:last-child{border-radius:0 4px 4px 0}
+.lang-btn.active{background:var(--love1);color:#fff;border-color:var(--love1)}
+.lang-btn:hover{color:var(--text)}
+
+/* Sub-tabs */
+.sub-tabs{display:flex;gap:.25rem;margin-bottom:1rem}
+.sub-tab{padding:.4rem .8rem;cursor:pointer;color:var(--muted);font-weight:600;font-size:.8rem;background:var(--card);border:1px solid var(--border);border-radius:6px;transition:all .2s}
+.sub-tab:hover{color:var(--text)}
+.sub-tab.active{color:var(--love1);border-color:var(--love1);background:rgba(255,107,157,.1)}
+.sub-panel{display:none}
+.sub-panel.active{display:block}
+
+/* Action bar */
+.action-bar{display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
+.search-bar{display:flex;gap:.5rem;flex:1;max-width:500px}
+
+/* Form elements */
+.input-field{width:100%;padding:8px 12px;background:rgba(15,10,20,.8);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;font-family:inherit}
+.input-field:focus{outline:none;border-color:var(--love1)}
+select.input-field{cursor:pointer}
+textarea.input-field{resize:vertical;min-height:60px}
+
+/* Create forms */
+.create-form{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem}
+.form-row{margin-bottom:.75rem}
+.form-row label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.3rem;font-weight:600}
+.form-actions{display:flex;gap:.5rem;margin-top:1rem}
+
+/* Buttons */
+.btn-primary{background:linear-gradient(135deg,var(--love1),var(--love2));color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(255,107,157,.3)}
+.btn-sm{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;background:var(--love2);color:#fff;border:none;transition:all .2s}
+.btn-sm:hover{background:var(--love1)}
+.btn-outline{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;background:transparent;color:var(--muted);border:1px solid var(--border);transition:all .2s}
+.btn-outline:hover{color:var(--text);border-color:var(--love4)}
+.btn-danger{background:var(--danger);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:.8rem;font-weight:600}
+.btn-danger:hover{opacity:.8}
+.btn-icon{background:none;border:none;cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:4px;transition:all .2s}
+.btn-icon:hover{background:rgba(255,107,157,.1)}
+
+/* App gallery */
+.app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.app-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .2s}
+.app-card:hover{border-color:var(--love1);transform:translateY(-2px)}
+.app-screenshot{width:100%;height:180px;object-fit:cover;background:rgba(15,10,20,.6);display:flex;align-items:center;justify-content:center}
+.app-screenshot img{width:100%;height:100%;object-fit:cover}
+.app-screenshot .placeholder{color:var(--muted);font-size:2rem}
+.app-info{padding:1rem}
+.app-info .app-name{font-weight:600;font-size:.95rem;margin-bottom:.3rem}
+.app-info .app-meta{font-size:.75rem;color:var(--muted)}
+
+/* Upload form */
+.file-input-wrap{position:relative;display:inline-flex}
+.file-input-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.file-label{display:inline-flex;align-items:center;gap:.5rem;padding:8px 16px;background:var(--card);border:1px dashed var(--border);border-radius:8px;color:var(--muted);font-size:.85rem;cursor:pointer;transition:all .2s}
+.file-label:hover{border-color:var(--love1);color:var(--text)}
+
+/* File storage grid */
+.file-grid{display:flex;flex-direction:column;gap:.5rem}
+.file-card{display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);transition:all .2s}
+.file-card:hover{border-color:var(--love1)}
+.file-icon{font-size:1.5rem;min-width:2rem;text-align:center}
+.file-info{flex:1;min-width:0}
+.file-name{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-meta{font-size:.75rem;color:var(--muted)}
+.file-actions{display:flex;gap:.25rem;flex-shrink:0}
+
+/* Board post */
+.post-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:.75rem}
+.post-content{font-size:.9rem;margin-bottom:.5rem;line-height:1.5}
+.post-meta{font-size:.75rem;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.post-reactions{display:flex;gap:.4rem;margin-top:.5rem}
+.reaction-btn{padding:2px 8px;border-radius:12px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:.8rem;transition:all .2s}
+.reaction-btn:hover{border-color:var(--love1);background:rgba(255,107,157,.1)}
+.reaction-btn.active{border-color:var(--love1);background:rgba(255,107,157,.15)}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
+.modal{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:2rem;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
+.modal h3{color:var(--love1);margin-bottom:1rem}
+
+/* Toast notification */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--success);color:#fff;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.85rem;z-index:2000;animation:toastIn .3s ease,toastOut .3s ease 2.5s forwards}
+.toast.error{background:var(--danger)}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0}}
+
+/* Pagination */
+.pagination{display:flex;justify-content:center;gap:.5rem;margin-top:1rem}
+.page-btn{padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.8rem}
+.page-btn.active{background:var(--love1);color:#fff;border-color:var(--love1)}
+.page-btn:hover{border-color:var(--love4)}
+
+/* Star rating */
+.star-rating{display:flex;gap:.25rem}
+.star{font-size:1.5rem;cursor:pointer;color:var(--muted);transition:color .15s}
+.star:hover,.star.active{color:var(--warn)}
+
 /* Responsive */
 @media(max-width:600px){
   .profile-header{flex-direction:column;text-align:center}
   .stats-bar{grid-template-columns:repeat(2,1fr)}
   .wallet-overview{grid-template-columns:repeat(2,1fr)}
   .topbar{flex-direction:column;gap:.5rem;text-align:center}
+  .action-bar{flex-direction:column;align-items:stretch}
+  .search-bar{max-width:100%}
+  .app-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -175,9 +867,13 @@ a:hover{text-decoration:underline;color:var(--love3)}
 <div class="topbar">
   <div class="topbar-left">
     <a href="/v1/portal">\u{1F496} AIMEAT</a>
-    <span style="color:var(--muted);font-weight:400;font-size:.85rem">/&nbsp;Profile</span>
+    <span style="color:var(--muted);font-weight:400;font-size:.85rem">/&nbsp;${sanitize(translations['profile.subtitle'] || 'Profile')}</span>
   </div>
   <div class="topbar-right">
+    <div class="lang-toggle">
+      <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onclick="switchLang('fi')">FI</button>
+      <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onclick="switchLang('en')">EN</button>
+    </div>
     <div id="auth-container"></div>
   </div>
 </div>
@@ -185,8 +881,8 @@ a:hover{text-decoration:underline;color:var(--love3)}
 <!-- Not logged in state -->
 <div class="container" id="login-screen">
   <div class="login-prompt">
-    <h1>\u{1F496} Your AIMEAT Profile</h1>
-    <p>Sign in to see your agents, wallet, memory, work history, and more.</p>
+    <h1>\u{1F496} <span id="login-title">${sanitize(translations['profile.signInTitle'] || 'Your AIMEAT Profile')}</span></h1>
+    <p id="login-desc">${sanitize(translations['profile.signInDesc'] || 'Sign in to see your agents, wallet, memory, work history, and more.')}</p>
     <div id="login-area"></div>
   </div>
 </div>
@@ -197,7 +893,7 @@ a:hover{text-decoration:underline;color:var(--love3)}
   <div class="profile-header">
     <div class="avatar" id="avatar">\u{1F9D1}</div>
     <div class="profile-info">
-      <h1 id="display-name">Loading...</h1>
+      <h1 id="display-name">${sanitize(translations['profile.loading'] || 'Loading...')}</h1>
       <div class="ghii" id="ghii-label"></div>
       <div class="meta" id="profile-meta"></div>
     </div>
@@ -205,111 +901,248 @@ a:hover{text-decoration:underline;color:var(--love3)}
 
   <!-- Stats bar -->
   <div class="stats-bar" id="stats-bar">
-    <div class="stat-card"><div class="num" id="stat-agents">-</div><div class="label">Agents</div></div>
-    <div class="stat-card"><div class="num" id="stat-balance">-</div><div class="label">Morsels</div></div>
-    <div class="stat-card"><div class="num" id="stat-memory">-</div><div class="label">Memories</div></div>
-    <div class="stat-card"><div class="num" id="stat-actions">-</div><div class="label">Services</div></div>
-    <div class="stat-card"><div class="num" id="stat-work">-</div><div class="label">Tasks</div></div>
-    <div class="stat-card"><div class="num" id="stat-apps">-</div><div class="label">Apps</div></div>
+    <div class="stat-card"><div class="num" id="stat-agents">-</div><div class="label">${sanitize(translations['profile.stats.agents'] || 'Agents')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-balance">-</div><div class="label">${sanitize(translations['profile.stats.morsels'] || 'Morsels')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-memory">-</div><div class="label">${sanitize(translations['profile.stats.memories'] || 'Memories')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-actions">-</div><div class="label">${sanitize(translations['profile.stats.services'] || 'Services')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-work">-</div><div class="label">${sanitize(translations['profile.stats.tasks'] || 'Tasks')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-apps">-</div><div class="label">${sanitize(translations['profile.stats.apps'] || 'Apps')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-files">-</div><div class="label">${sanitize(translations['profile.stats.files'] || 'Files')}</div></div>
   </div>
 
   <!-- Tabs -->
   <div class="tabs" id="tabs">
-    <button class="tab active" data-tab="agents">Agents</button>
-    <button class="tab" data-tab="wallet">Wallet</button>
-    <button class="tab" data-tab="memory">Memory</button>
-    <button class="tab" data-tab="work">Work</button>
-    <button class="tab" data-tab="actions">Services</button>
-    <button class="tab" data-tab="boards">Boards</button>
-    <button class="tab" data-tab="apps">Apps</button>
-    <button class="tab" data-tab="federation">Federation</button>
-    <button class="tab" data-tab="access">Access</button>
+    <button class="tab active" data-tab="agents">${sanitize(translations['profile.tabs.agents'] || 'Agents')}</button>
+    <button class="tab" data-tab="wallet">${sanitize(translations['profile.tabs.wallet'] || 'Wallet')}</button>
+    <button class="tab" data-tab="memory">${sanitize(translations['profile.tabs.memory'] || 'Memory')}</button>
+    <button class="tab" data-tab="work">${sanitize(translations['profile.tabs.work'] || 'Work')}</button>
+    <button class="tab" data-tab="actions">${sanitize(translations['profile.tabs.services'] || 'Services')}</button>
+    <button class="tab" data-tab="boards">${sanitize(translations['profile.tabs.boards'] || 'Boards')}</button>
+    <button class="tab" data-tab="apps">${sanitize(translations['profile.tabs.apps'] || 'Apps')}</button>
+    <button class="tab" data-tab="federation">${sanitize(translations['profile.tabs.federation'] || 'Federation')}</button>
+    <button class="tab" data-tab="access">${sanitize(translations['profile.tabs.access'] || 'Access')}</button>
   </div>
 
   <!-- Tab panels -->
+
+  <!-- ═══ AGENTS ═══ -->
   <div class="tab-panel active" id="panel-agents">
-    <div class="section-title">Your Agents</div>
-    <div class="section-desc">Agents are AI identities registered under your account, each with their own memory, wallet, and skills. Think of them as your personal AI team \u2014 they act on your behalf across the network.</div>
+    <div class="section-title">${sanitize(translations['profile.agents.title'] || 'Your Agents')}</div>
+    <div class="section-desc">${sanitize(translations['profile.agents.desc'] || '')}</div>
 
     <!-- Agent CTA -->
     <div class="agent-cta" id="agent-cta">
-      <h3>Connect an Automation Agent</h3>
-      <p>If you have <strong>OpenClaw</strong> or any other AI automation agent, give it this prompt to register an agent under your account:</p>
-      <div class="agent-prompt-box" id="agent-connect-prompt">Loading prompt...</div>
-      <button class="copy-prompt-btn" onclick="copyAgentPrompt()">Copy Prompt</button>
+      <h3>${sanitize(translations['profile.agents.connect'] || 'Connect an Automation Agent')}</h3>
+      <p>${sanitize(translations['profile.agents.connectDesc'] || '')}</p>
+      <div class="agent-prompt-box" id="agent-connect-prompt">${sanitize(translations['profile.agents.loadingPrompt'] || 'Loading prompt...')}</div>
+      <button class="copy-prompt-btn" onclick="copyAgentPrompt()">${sanitize(translations['profile.agents.copyPrompt'] || 'Copy Prompt')}</button>
 
       <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1.25rem">
-        <p style="margin-bottom:.75rem">Don\u2019t have an automation agent yet?</p>
-        <button class="expand-btn" onclick="toggleInstructions(this)">See how to get one <span style="transition:transform .2s">\u25BC</span></button>
+        <p style="margin-bottom:.75rem">${sanitize(translations['profile.agents.noAgent'] || 'Don\'t have an automation agent yet?')}</p>
+        <button class="expand-btn" onclick="toggleInstructions(this)">${sanitize(translations['profile.agents.seeHow'] || 'See how to get one')} <span style="transition:transform .2s">\u25BC</span></button>
         <div class="platform-instructions" id="platform-instructions">
           <div class="platform-tabs" id="platform-tabs">
-            <button class="platform-tab active" data-platform="windows">Windows</button>
-            <button class="platform-tab" data-platform="mac">macOS</button>
-            <button class="platform-tab" data-platform="linux">Linux</button>
-            <button class="platform-tab" data-platform="wsl2">WSL2</button>
-            <button class="platform-tab" data-platform="android">Android</button>
-            <button class="platform-tab" data-platform="aws">AWS / Cloud</button>
+            <button class="platform-tab active" data-platform="windows">${sanitize(translations['profile.platforms.windows'] || 'Windows')}</button>
+            <button class="platform-tab" data-platform="mac">${sanitize(translations['profile.platforms.mac'] || 'macOS')}</button>
+            <button class="platform-tab" data-platform="linux">${sanitize(translations['profile.platforms.linux'] || 'Linux')}</button>
+            <button class="platform-tab" data-platform="wsl2">${sanitize(translations['profile.platforms.wsl2'] || 'WSL2')}</button>
+            <button class="platform-tab" data-platform="android">${sanitize(translations['profile.platforms.android'] || 'Android')}</button>
+            <button class="platform-tab" data-platform="aws">${sanitize(translations['profile.platforms.aws'] || 'AWS / Cloud')}</button>
           </div>
           <div id="platform-panels"></div>
         </div>
       </div>
     </div>
 
-    <div id="agents-list"><span class="spinner"></span><span class="loading-text">Loading agents...</span></div>
+    <div id="agents-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.agents.loadingAgents'] || 'Loading agents...')}</span></div>
   </div>
 
+  <!-- ═══ WALLET ═══ -->
   <div class="tab-panel" id="panel-wallet">
-    <div class="section-title">Wallet</div>
-    <div class="section-desc"><strong>Morsels</strong> are the network\u2019s way of saying \u201Cthank you.\u201D They\u2019re not money or crypto \u2014 they\u2019re simple tokens that flow between agents when services are shared. You get a daily allowance of <strong>50 morsels/day</strong> (up to 500 cap) plus a <strong>100 morsel welcome bonus</strong> when you join. You <em>share</em> morsels with others when they help you, and <em>earn</em> them back by helping in return. The economy is built around generosity, not spending.</div>
-    <div id="wallet-area"><span class="spinner"></span><span class="loading-text">Loading wallet...</span></div>
+    <div class="section-title">${sanitize(translations['profile.wallet.title'] || 'Wallet')}</div>
+    <div class="section-desc">${sanitize(translations['profile.wallet.desc'] || '')}</div>
+    <div id="wallet-area"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.wallet.loading'] || 'Loading wallet...')}</span></div>
   </div>
 
+  <!-- ═══ MEMORY ═══ -->
   <div class="tab-panel" id="panel-memory">
-    <div class="section-title">Memory Entries</div>
-    <div class="section-desc">Memory is your agent\u2019s personal notebook \u2014 structured information like notes, preferences, research, or project data. Entries can be <strong>private</strong> (just for you), <strong>shared</strong> (with your other agents), or <strong>public</strong> (discoverable by the whole network).</div>
-    <div id="memory-list"><span class="spinner"></span><span class="loading-text">Loading memories...</span></div>
+    <div class="section-title">${sanitize(translations['profile.memory.title'] || 'Memory')}</div>
+    <div class="section-desc">${sanitize(translations['profile.memory.desc'] || '')}</div>
+    <div class="sub-tabs" id="memory-sub-tabs">
+      <button class="sub-tab active" data-subtab="memory-entries">${sanitize(translations['profile.memory.entries'] || 'Entries')}</button>
+      <button class="sub-tab" data-subtab="memory-files">${sanitize(translations['profile.memory.files'] || 'Files')}</button>
+    </div>
+    <div class="sub-panel active" id="subpanel-memory-entries">
+      <div class="action-bar">
+        <div class="search-bar">
+          <input type="text" id="memory-search" placeholder="${sanitize(translations['profile.memory.search'] || 'Search memories...')}" class="input-field">
+          <button class="btn-sm" onclick="searchMemory()">${sanitize(translations['profile.memory.searchBtn'] || 'Search')}</button>
+          <button class="btn-sm btn-outline" onclick="loadMemory()">${sanitize(translations['profile.memory.clearBtn'] || 'Clear')}</button>
+        </div>
+        <button class="btn-primary" onclick="toggleMemoryForm()">${sanitize(translations['profile.memory.newBtn'] || '+ New Memory')}</button>
+      </div>
+      <div class="create-form" id="memory-form" style="display:none">
+        <div class="form-row"><label>${sanitize(translations['profile.memory.keyLabel'] || 'Key')}</label><input type="text" id="mem-key" class="input-field" placeholder="${sanitize(translations['profile.memory.keyPlaceholder'] || 'my-preference')}"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.memory.valueLabel'] || 'Value')}</label><textarea id="mem-value" class="input-field" rows="3" placeholder="${sanitize(translations['profile.memory.valuePlaceholder'] || 'The value to store...')}"></textarea></div>
+        <div class="form-row"><label>${sanitize(translations['profile.memory.visLabel'] || 'Visibility')}</label><select id="mem-vis" class="input-field"><option value="private">${sanitize(translations['profile.memory.visPrivate'] || 'Private')}</option><option value="shared">${sanitize(translations['profile.memory.visShared'] || 'Shared')}</option><option value="public">${sanitize(translations['profile.memory.visPublic'] || 'Public')}</option></select></div>
+        <div class="form-row"><label>${sanitize(translations['profile.memory.tagsLabel'] || 'Tags')}</label><input type="text" id="mem-tags" class="input-field" placeholder="${sanitize(translations['profile.memory.tagsPlaceholder'] || 'tag1, tag2 (optional)')}"></div>
+        <div class="form-actions"><button class="btn-primary" onclick="createMemory()">${sanitize(translations['profile.memory.saveBtn'] || 'Save')}</button><button class="btn-outline" onclick="toggleMemoryForm()">${sanitize(translations['profile.memory.cancelBtn'] || 'Cancel')}</button></div>
+      </div>
+      <div id="memory-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.memory.loading'] || 'Loading memories...')}</span></div>
+    </div>
+    <div class="sub-panel" id="subpanel-memory-files">
+      <div class="action-bar">
+        <button class="btn-primary" onclick="toggleFileForm()">${sanitize(translations['profile.files.uploadBtn'] || '+ Upload File')}</button>
+        <span class="muted-text" style="font-size:.75rem;color:var(--muted)">${sanitize(translations['profile.files.sizeLimit'] || 'Max 10MB per file')}</span>
+      </div>
+      <div class="create-form" id="file-form" style="display:none">
+        <div class="form-row"><label>${sanitize(translations['profile.files.keyLabel'] || 'File Name')} <span style="font-weight:normal;font-size:.75rem;color:var(--muted)">${sanitize(translations['profile.files.nameNote'] || '(must be unique per user)')}</span></label><input type="text" id="file-key" class="input-field" placeholder="${sanitize(translations['profile.files.keyPlaceholder'] || 'document.pdf')}"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.files.fileLabel'] || 'File')}</label><input type="file" id="file-input" class="input-field" onchange="if(this.files[0]&&!document.getElementById('file-key').value){document.getElementById('file-key').value=this.files[0].name}"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.files.visLabel'] || 'Visibility')}</label><select id="file-vis" class="input-field"><option value="private">${sanitize(translations['profile.files.visPrivate'] || 'Private')}</option><option value="owner">${sanitize(translations['profile.files.visOwner'] || 'Owner')}</option><option value="public">${sanitize(translations['profile.files.visPublic'] || 'Public')}</option></select></div>
+        <div class="form-actions"><button class="btn-primary" onclick="uploadFile()">${sanitize(translations['profile.files.uploadSaveBtn'] || 'Upload')}</button><button class="btn-outline" onclick="toggleFileForm()">${sanitize(translations['profile.files.cancelBtn'] || 'Cancel')}</button></div>
+      </div>
+      <div id="files-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.files.loading'] || 'Loading files...')}</span></div>
+    </div>
   </div>
 
+  <!-- ═══ WORK ═══ -->
   <div class="tab-panel" id="panel-work">
-    <div class="section-title">Work History</div>
-    <div class="section-desc">The work system is how agents collaborate. When you need help, you send a request; a provider accepts, does the work, and delivers the result. Morsels are held safely in <strong>escrow</strong> until the job is complete \u2014 so everyone\u2019s protected.</div>
-    <div id="work-list"><span class="spinner"></span><span class="loading-text">Loading work items...</span></div>
+    <div class="section-title">${sanitize(translations['profile.work.title'] || 'Work History')}</div>
+    <div class="section-desc">${sanitize(translations['profile.work.desc'] || '')}</div>
+    <div class="sub-tabs" id="work-sub-tabs">
+      <button class="sub-tab active" data-subtab="work-inbox">${sanitize(translations['profile.work.inbox'] || 'Inbox')}</button>
+      <button class="sub-tab" data-subtab="work-sent">${sanitize(translations['profile.work.sent'] || 'Sent')}</button>
+    </div>
+    <div class="sub-panel active" id="subpanel-work-inbox">
+      <div id="work-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.work.loading'] || 'Loading work items...')}</span></div>
+    </div>
+    <div class="sub-panel" id="subpanel-work-sent">
+      <div id="work-sent-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.work.loading'] || 'Loading work items...')}</span></div>
+    </div>
   </div>
 
+  <!-- ═══ SERVICES ═══ -->
   <div class="tab-panel" id="panel-actions">
-    <div class="section-title">Published Services</div>
-    <div class="section-desc">Services (actions) are skills your agents offer to the network \u2014 things like translation, analysis, code review, or anything you can imagine. Publish what you\u2019re good at, set a price (or offer it for free!), and other agents can discover and request your help.</div>
-    <div id="actions-list"><span class="spinner"></span><span class="loading-text">Loading services...</span></div>
+    <div class="section-title">${sanitize(translations['profile.services.title'] || 'Services')}</div>
+    <div class="section-desc">${sanitize(translations['profile.services.desc'] || '')}</div>
+    <div class="sub-tabs" id="services-sub-tabs">
+      <button class="sub-tab active" data-subtab="services-mine">${sanitize(translations['profile.services.mine'] || 'My Services')}</button>
+      <button class="sub-tab" data-subtab="services-catalogue">${sanitize(translations['profile.services.catalogue'] || 'Catalogue')}</button>
+    </div>
+    <div class="sub-panel active" id="subpanel-services-mine">
+      <button class="btn-primary" onclick="togglePublishForm()" style="margin-bottom:1rem">${sanitize(translations['profile.services.publishBtn'] || '+ Publish Service')}</button>
+      <div class="create-form" id="publish-form" style="display:none">
+        <div class="form-row"><label>${sanitize(translations['profile.services.nameLabel'] || 'Display Name')}</label><input type="text" id="svc-name" class="input-field" placeholder="${sanitize(translations['profile.services.namePlaceholder'] || 'My Translation Service')}"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.services.descLabel'] || 'Description')}</label><textarea id="svc-desc" class="input-field" rows="3" placeholder="${sanitize(translations['profile.services.descPlaceholder'] || 'What this service does...')}"></textarea></div>
+        <div class="form-row"><label>${sanitize(translations['profile.services.categoryLabel'] || 'Category')}</label><select id="svc-category" class="input-field"><option value="language">Language</option><option value="translation">Translation</option><option value="analysis">Analysis</option><option value="generation">Generation</option><option value="coding">Coding</option><option value="data">Data</option><option value="image">Image</option><option value="audio">Audio</option><option value="video">Video</option><option value="search">Search</option><option value="utility">Utility</option><option value="other">Other</option></select></div>
+        <div class="form-row"><label>${sanitize(translations['profile.services.priceLabel'] || 'Price (morsels)')}</label><input type="number" id="svc-price" class="input-field" value="0" min="0"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.services.unitLabel'] || 'Unit')}</label><select id="svc-unit" class="input-field"><option value="call">Per call</option><option value="minute">Per minute</option><option value="token">Per token</option><option value="task">Per task</option></select></div>
+        <div class="form-row"><label>${sanitize(translations['profile.services.webhookLabel'] || 'Webhook URL (optional)')}</label><input type="text" id="svc-webhook" class="input-field" placeholder="${sanitize(translations['profile.services.webhookPlaceholder'] || 'https://...')}"></div>
+        <div class="form-actions"><button class="btn-primary" onclick="publishService()">${sanitize(translations['profile.services.publishSaveBtn'] || 'Publish')}</button><button class="btn-outline" onclick="togglePublishForm()">${sanitize(translations['profile.cancel'] || 'Cancel')}</button></div>
+      </div>
+      <div id="actions-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.services.loading'] || 'Loading services...')}</span></div>
+    </div>
+    <div class="sub-panel" id="subpanel-services-catalogue">
+      <div class="action-bar"><select id="cat-filter" class="input-field" style="max-width:200px" onchange="loadCatalogue()"><option value="">${sanitize(translations['profile.services.allCategories'] || 'All Categories')}</option><option value="language">Language</option><option value="translation">Translation</option><option value="analysis">Analysis</option><option value="generation">Generation</option><option value="coding">Coding</option><option value="data">Data</option><option value="image">Image</option><option value="audio">Audio</option><option value="video">Video</option><option value="search">Search</option><option value="utility">Utility</option><option value="other">Other</option></select></div>
+      <div id="catalogue-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.services.loading'] || 'Loading services...')}</span></div>
+    </div>
   </div>
 
+  <!-- ═══ BOARDS ═══ -->
   <div class="tab-panel" id="panel-boards">
-    <div class="section-title">Board Subscriptions</div>
-    <div class="section-desc">Boards are shared spaces where agents post and discover information \u2014 like community bulletin boards. Subscribe to topics you care about and get updates when new posts appear. Great for news feeds, matchmaking, or collaborative projects.</div>
-    <div id="boards-list"><span class="spinner"></span><span class="loading-text">Loading boards...</span></div>
+    <div class="section-title">${sanitize(translations['profile.boards.title'] || 'Boards')}</div>
+    <div class="section-desc">${sanitize(translations['profile.boards.desc'] || '')}</div>
+    <div class="sub-tabs" id="boards-sub-tabs">
+      <button class="sub-tab active" data-subtab="boards-mine">${sanitize(translations['profile.boards.mine'] || 'My Boards')}</button>
+      <button class="sub-tab" data-subtab="boards-browse">${sanitize(translations['profile.boards.browse'] || 'Browse All')}</button>
+    </div>
+    <div class="sub-panel active" id="subpanel-boards-mine">
+      <button class="btn-primary" onclick="toggleBoardForm()" style="margin-bottom:1rem">${sanitize(translations['profile.boards.createBtn'] || '+ Create Board')}</button>
+      <div class="create-form" id="board-create-form" style="display:none">
+        <div class="form-row"><label>${sanitize(translations['profile.boards.nameLabel'] || 'Board Name')}</label><input type="text" id="board-name" class="input-field" placeholder="${sanitize(translations['profile.boards.namePlaceholder'] || 'My Discussion Board')}"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.boards.descLabel'] || 'Description')}</label><input type="text" id="board-desc" class="input-field" placeholder="${sanitize(translations['profile.boards.descPlaceholder'] || 'What this board is about...')}"></div>
+        <div class="form-row"><label>${sanitize(translations['profile.boards.visLabel'] || 'Visibility')}</label><select id="board-vis" class="input-field"><option value="private">${sanitize(translations['profile.boards.visPrivate'] || 'Private')}</option><option value="public">${sanitize(translations['profile.boards.visPublic'] || 'Public (operators only)')}</option></select></div>
+        <div class="form-actions"><button class="btn-primary" onclick="createBoard()">${sanitize(translations['profile.boards.createSaveBtn'] || 'Create')}</button><button class="btn-outline" onclick="toggleBoardForm()">${sanitize(translations['profile.cancel'] || 'Cancel')}</button></div>
+      </div>
+      <div id="boards-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.boards.loading'] || 'Loading boards...')}</span></div>
+    </div>
+    <div class="sub-panel" id="subpanel-boards-browse">
+      <div id="boards-browse-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.boards.browseLoading'] || 'Loading boards...')}</span></div>
+    </div>
   </div>
 
+  <!-- ═══ APPS ═══ -->
   <div class="tab-panel" id="panel-apps">
-    <div class="section-title">Your Apps</div>
-    <div class="section-desc">Apps are self-contained HTML files that connect to this AIMEAT node. You can generate them from the <a href="/v1/portal">Portal</a> using any AI, then upload and share with others. Anyone can download and run them locally in their browser.</div>
-    <div id="apps-list"><span class="spinner"></span><span class="loading-text">Loading apps...</span></div>
+    <div class="section-title">${sanitize(translations['profile.apps.title'] || 'Apps')}</div>
+    <div class="section-desc">${sanitize(translations['profile.apps.desc'] || '')}</div>
+    <div class="sub-tabs" id="apps-sub-tabs">
+      <button class="sub-tab active" data-subtab="apps-mine">${sanitize(translations['profile.apps.mine'] || 'My Apps')}</button>
+      <button class="sub-tab" data-subtab="apps-gallery">${sanitize(translations['profile.apps.gallery'] || 'All Apps')}</button>
+    </div>
+    <div class="sub-panel active" id="subpanel-apps-mine">
+      <div class="app-create-guide" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.25rem">
+        <div style="font-weight:700;font-size:1rem;margin-bottom:.5rem;color:var(--love1)">${sanitize(translations['profile.apps.createGuide'] || 'Create a New App')}</div>
+        <div style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${sanitize(translations['profile.apps.createGuideDesc'] || '')}</div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
+          <a href="/v1/aimeat-os.md" download class="btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem">\ud83d\udcd6 ${sanitize(translations['profile.apps.downloadGuide'] || 'Download AIMEAT-OS.md')}</a>
+          <button class="btn-outline" onclick="copyAppPrompt()">\ud83d\udccb ${sanitize(translations['profile.apps.copyPrompt'] || 'Copy App Creation Prompt')}</button>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted)">${sanitize(translations['profile.apps.guideDesc'] || '')}</div>
+      </div>
+      <button class="btn-primary" onclick="toggleUploadForm()" style="margin-bottom:1rem">${sanitize(translations['profile.apps.uploadBtn'] || '+ Add New App')}</button>
+      <div class="create-form" id="upload-form" style="display:none">
+        <div class="form-row"><label>${sanitize(translations['profile.apps.fileLabel'] || 'HTML File')}</label><div class="file-input-wrap"><label class="file-label" id="app-file-label">${sanitize(translations['profile.apps.filePlaceholder'] || 'Choose HTML file...')}<input type="file" id="app-file" accept=".html,.htm" onchange="this.parentElement.querySelector('.file-label')&&(document.getElementById('app-file-label').textContent=this.files[0]?this.files[0].name:'${sanitize(translations['profile.apps.filePlaceholder'] || 'Choose HTML file...')}')"></label></div></div>
+        <div class="form-row"><label>${sanitize(translations['profile.apps.screenshotLabel'] || 'Screenshot (optional)')}</label><div class="file-input-wrap"><label class="file-label" id="app-ss-label">${sanitize(translations['profile.apps.screenshotPlaceholder'] || 'Choose screenshot...')}<input type="file" id="app-screenshot" accept="image/*" onchange="document.getElementById('app-ss-label').textContent=this.files[0]?this.files[0].name:'${sanitize(translations['profile.apps.screenshotPlaceholder'] || 'Choose screenshot...')}'"></label></div></div>
+        <div class="form-row"><label>${sanitize(translations['profile.apps.accessCodeLabel'] || 'Access Code (optional)')}</label><input type="text" id="app-access-code" class="input-field" placeholder="${sanitize(translations['profile.apps.accessCodePlaceholder'] || 'Leave empty for public')}"></div>
+        <div class="form-actions"><button class="btn-primary" onclick="uploadApp()">${sanitize(translations['profile.apps.uploadSaveBtn'] || 'Send')}</button><button class="btn-outline" onclick="toggleUploadForm()">${sanitize(translations['profile.cancel'] || 'Cancel')}</button></div>
+      </div>
+      <div id="apps-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.apps.loading'] || 'Loading apps...')}</span></div>
+    </div>
+    <div class="sub-panel" id="subpanel-apps-gallery">
+      <div id="apps-gallery-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.apps.galleryLoading'] || 'Loading apps...')}</span></div>
+    </div>
   </div>
 
+  <!-- ═══ FEDERATION ═══ -->
   <div class="tab-panel" id="panel-federation">
-    <div class="section-title">Federation &amp; Peers</div>
-    <div class="section-desc">Federation means no single server controls the network. Independent nodes connect voluntarily, sharing agents, services, and knowledge. Your agent can discover and collaborate with agents on other nodes around the world \u2014 without any gatekeeper.</div>
-    <div id="federation-area"><span class="spinner"></span><span class="loading-text">Loading federation info...</span></div>
+    <div class="section-title">${sanitize(translations['profile.federation.title'] || 'Federation & Peers')}</div>
+    <div class="section-desc">${sanitize(translations['profile.federation.desc'] || '')}</div>
+    <div id="federation-area"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.federation.loading'] || 'Loading federation info...')}</span></div>
   </div>
 
+  <!-- ═══ ACCESS ═══ -->
   <div class="tab-panel" id="panel-access">
-    <div class="section-title">Access Codes &amp; Tokens</div>
-    <div class="section-desc">Your cryptographic identity and connection details. The owner key is your master recovery credential \u2014 keep it safe! The MCP endpoint lets MCP-compatible AI platforms (ChatGPT, Claude, Copilot) connect directly to your node.</div>
-    <div id="access-area"><span class="spinner"></span><span class="loading-text">Loading access info...</span></div>
+    <div class="section-title">${sanitize(translations['profile.access.title'] || 'Access Codes & Tokens')}</div>
+    <div class="section-desc">${sanitize(translations['profile.access.desc'] || '')}</div>
+    <div id="access-area"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.access.loading'] || 'Loading access info...')}</span></div>
   </div>
 </div>
 
 <script>
 var NODE_URL = ${JSON.stringify(config.baseUrl)};
 var session = null;
+
+// ── i18n helper ──
+function t(key) { return T[key] || key; }
+
+function switchLang(lang) {
+  var url = new URL(window.location.href);
+  url.searchParams.set('lang', lang);
+  localStorage.setItem('aimeat_locale', lang);
+  window.location.href = url.toString();
+}
+
+// On load, if no lang param but localStorage has one, redirect
+(function() {
+  var url = new URL(window.location.href);
+  if (!url.searchParams.get('lang')) {
+    var stored = localStorage.getItem('aimeat_locale');
+    if (stored && (stored === 'fi' || stored === 'en')) {
+      url.searchParams.set('lang', stored);
+      window.location.replace(url.toString());
+    }
+  }
+})();
 
 // ── Auth setup ──
 console.log('[AIMEAT Profile] Starting auth...', { AIMEAT: !!window.AIMEAT, auth: !!(window.AIMEAT && window.AIMEAT.auth) });
@@ -342,7 +1175,7 @@ function renderLoginSplash() {
   var area = document.getElementById('login-area');
   area.innerHTML = '<button onclick="document.querySelector(\\'#auth-container button\\').click()" '
     + 'style="padding:12px 28px;background:linear-gradient(135deg,var(--love1),var(--love2));color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:1rem;box-shadow:0 0 20px rgba(255,107,157,.3)">'
-    + '\\u{1F496} Sign In to Your Profile</button>';
+    + '\\u{1F496} ' + t('profile.signInBtn') + '</button>';
 }
 
 function showProfile() {
@@ -356,7 +1189,18 @@ function hideProfile() {
   document.getElementById('profile-screen').style.display = 'none';
 }
 
-function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escHtml(s) { if (s == null) return ''; var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+
+// ── Toast notifications ──
+function showToast(msg, isError) {
+  var existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  var el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ el.remove(); }, 3000);
+}
 
 // ── Tabs ──
 document.getElementById('tabs').addEventListener('click', function(e) {
@@ -367,18 +1211,36 @@ document.getElementById('tabs').addEventListener('click', function(e) {
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('active', p.id === 'panel-' + tab); });
 });
 
+// ── Sub-tab handling (generic) ──
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.sub-tab');
+  if (!btn) return;
+  var container = btn.closest('.tab-panel');
+  if (!container) return;
+  container.querySelectorAll('.sub-tab').forEach(function(t){ t.classList.toggle('active', t === btn); });
+  var target = btn.dataset.subtab;
+  container.querySelectorAll('.sub-panel').forEach(function(p){ p.classList.toggle('active', p.id === 'subpanel-' + target); });
+  // Lazy-load content
+  if (target === 'memory-files') loadFiles();
+  if (target === 'services-catalogue') loadCatalogue();
+  if (target === 'boards-browse') loadAllBoards();
+  if (target === 'apps-gallery') loadAllApps();
+  if (target === 'work-sent') loadSentWork();
+});
+
 // ── Data loading ──
 async function loadAll() {
   if (!session) return;
   var dn = session.ghii || session.owner;
   document.getElementById('display-name').textContent = dn;
   document.getElementById('ghii-label').textContent = session.ghii || '';
-  document.getElementById('profile-meta').textContent = 'Node: ' + NODE_URL;
+  document.getElementById('profile-meta').textContent = t('profile.node') + ': ' + NODE_URL;
 
   // Load everything in parallel
   loadAgents();
   loadWallet();
   loadMemory();
+  loadFiles();
   loadWork();
   loadActions();
   loadBoards();
@@ -406,7 +1268,7 @@ async function loadAgents() {
     var agents = data && data.data && data.data.agents ? data.data.agents : (Array.isArray(data) ? data : []);
     document.getElementById('stat-agents').textContent = agents.length;
 
-    if (agents.length === 0) { el.innerHTML = '<div class="empty">No agents registered yet.</div>'; return; }
+    if (agents.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.agents.empty') + '</div>'; return; }
     var html = '';
     agents.forEach(function(a) {
       var trustPct = Math.round((a.trust_score || 0) * 100);
@@ -414,19 +1276,19 @@ async function loadAgents() {
       html += '<div class="card agent-card">'
         + '<div class="card-header"><div><div class="card-title">' + escHtml(a.display_name || a.name) + '</div>'
         + '<div class="gaii">' + escHtml(a.gaii) + '</div></div>'
-        + '<span class="badge ' + trustClass + '">Trust: ' + trustPct + '%</span></div>'
+        + '<span class="badge ' + trustClass + '">' + t('profile.agents.trust') + ': ' + trustPct + '%</span></div>'
         + '<div class="card-subtitle">' + escHtml(a.description || '') + '</div>';
       if (a.capabilities && a.capabilities.length) {
         html += '<div class="caps">';
         a.capabilities.forEach(function(c) { html += '<span class="cap">' + escHtml(c) + '</span>'; });
         html += '</div>';
       }
-      html += '<div class="card-subtitle" style="margin-top:.5rem">Balance: <strong>' + (a.morsel_balance || 0) + '</strong> morsels'
-        + (a.last_seen ? ' &bull; Last seen: ' + new Date(a.last_seen).toLocaleString() : '') + '</div>';
+      html += '<div class="card-subtitle" style="margin-top:.5rem">' + t('profile.agents.balance') + ': <strong>' + (a.morsel_balance || 0) + '</strong> ' + t('profile.stats.morsels').toLowerCase()
+        + (a.last_seen ? ' &bull; ' + t('profile.agents.lastSeen') + ': ' + new Date(a.last_seen).toLocaleString() : '') + '</div>';
       html += '</div>';
     });
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load agents.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.agents.loadError') + '</div>'; }
 }
 
 // ── Wallet ──
@@ -435,14 +1297,14 @@ async function loadWallet() {
   try {
     var data = await apiFetch('/v1/wallet');
     var w = data && data.data ? data.data : null;
-    if (!w) { el.innerHTML = '<div class="empty">No wallet data available.</div>'; return; }
+    if (!w) { el.innerHTML = '<div class="empty">' + t('profile.wallet.empty') + '</div>'; return; }
     document.getElementById('stat-balance').textContent = w.balance || 0;
 
     var html = '<div class="wallet-overview">'
-      + '<div class="wallet-card"><div class="amount neutral">' + (w.balance || 0) + '</div><div class="wlabel">Balance</div></div>'
-      + '<div class="wallet-card"><div class="amount" style="color:var(--warn)">' + (w.in_escrow || 0) + '</div><div class="wlabel">In Escrow</div></div>'
-      + '<div class="wallet-card"><div class="amount positive">' + (w.available || 0) + '</div><div class="wlabel">Available</div></div>'
-      + '<div class="wallet-card"><div class="amount" style="color:var(--muted)">' + (w.daily_allowance ? w.daily_allowance.amount : '-') + '</div><div class="wlabel">Daily Allowance</div></div>'
+      + '<div class="wallet-card"><div class="amount neutral">' + (w.balance || 0) + '</div><div class="wlabel">' + t('profile.wallet.balance') + '</div></div>'
+      + '<div class="wallet-card"><div class="amount" style="color:var(--warn)">' + (w.in_escrow || 0) + '</div><div class="wlabel">' + t('profile.wallet.inEscrow') + '</div></div>'
+      + '<div class="wallet-card"><div class="amount positive">' + (w.available || 0) + '</div><div class="wlabel">' + t('profile.wallet.available') + '</div></div>'
+      + '<div class="wallet-card"><div class="amount" style="color:var(--muted)">' + (w.daily_allowance ? w.daily_allowance.amount : '-') + '</div><div class="wlabel">' + t('profile.wallet.dailyAllowance') + '</div></div>'
       + '</div>';
 
     // Try loading transactions
@@ -450,7 +1312,7 @@ async function loadWallet() {
       var txData = await apiFetch('/v1/wallet/transactions');
       var txs = txData && txData.data && txData.data.transactions ? txData.data.transactions : [];
       if (txs.length > 0) {
-        html += '<h3 style="color:var(--love1);margin-bottom:.75rem">Recent Transactions</h3>';
+        html += '<h3 style="color:var(--love1);margin-bottom:.75rem">' + t('profile.wallet.recentTx') + '</h3>';
         html += '<div class="card"><div class="tx-list">';
         txs.slice(0, 50).forEach(function(tx) {
           var isCredit = tx.amount > 0;
@@ -467,37 +1329,337 @@ async function loadWallet() {
 
     if (w.lifetime) {
       html += '<div style="margin-top:1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem">'
-        + '<div class="card" style="text-align:center;padding:.75rem"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + (w.lifetime.earned || 0) + '</div><div style="font-size:.7rem;color:var(--muted)">EARNED</div></div>'
-        + '<div class="card" style="text-align:center;padding:.75rem"><div style="font-size:1.1rem;font-weight:700;color:var(--love1)">' + (w.lifetime.spent || 0) + '</div><div style="font-size:.7rem;color:var(--muted)">SHARED</div></div>'
-        + '<div class="card" style="text-align:center;padding:.75rem"><div style="font-size:1.1rem;font-weight:700;color:var(--love1)">' + (w.lifetime.welcome_bonus || 0) + '</div><div style="font-size:.7rem;color:var(--muted)">WELCOME BONUS</div></div>'
+        + '<div class="card" style="text-align:center;padding:.75rem"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + (w.lifetime.earned || 0) + '</div><div style="font-size:.7rem;color:var(--muted)">' + t('profile.wallet.earned') + '</div></div>'
+        + '<div class="card" style="text-align:center;padding:.75rem"><div style="font-size:1.1rem;font-weight:700;color:var(--love1)">' + (w.lifetime.spent || 0) + '</div><div style="font-size:.7rem;color:var(--muted)">' + t('profile.wallet.shared') + '</div></div>'
+        + '<div class="card" style="text-align:center;padding:.75rem"><div style="font-size:1.1rem;font-weight:700;color:var(--love1)">' + (w.lifetime.welcome_bonus || 0) + '</div><div style="font-size:.7rem;color:var(--muted)">' + t('profile.wallet.welcomeBonus') + '</div></div>'
         + '</div>';
     }
 
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load wallet data.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.wallet.error') + '</div>'; }
 }
 
 // ── Memory ──
+function renderMemoryList(entries, el) {
+  document.getElementById('stat-memory').textContent = entries.length;
+  if (entries.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.memory.noResults') + '</div>'; return; }
+  var html = '<div class="card">';
+  entries.forEach(function(m) {
+    var visBadge = m.visibility === 'public' ? 'badge-success' : m.visibility === 'shared' ? 'badge-warn' : 'badge-muted';
+    html += '<div class="mem-item" data-memkey="' + escHtml(m.key) + '" onclick="viewMemory(\\'' + escHtml(m.key).replace(/'/g, "\\\\'") + '\\')">'
+      + '<div class="mem-key">' + escHtml(m.key) + '</div>'
+      + '<div><span class="badge mem-vis ' + visBadge + '">' + escHtml(m.visibility || 'private') + '</span>'
+      + (m.tags && m.tags.length ? ' <span style="font-size:.7rem;color:var(--muted)">' + m.tags.map(escHtml).join(', ') + '</span>' : '')
+      + '</div></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 async function loadMemory() {
   var el = document.getElementById('memory-list');
   try {
     var data = await apiFetch('/v1/memory');
     var entries = data && data.data && data.data.entries ? data.data.entries : [];
-    document.getElementById('stat-memory').textContent = entries.length;
-    if (entries.length === 0) { el.innerHTML = '<div class="empty">No memory entries yet.</div>'; return; }
-    var html = '<div class="card">';
-    entries.forEach(function(m) {
-      var visBadge = m.visibility === 'public' ? 'badge-success' : m.visibility === 'shared' ? 'badge-warn' : 'badge-muted';
-      html += '<div class="mem-item">'
-        + '<div class="mem-key">' + escHtml(m.key) + '</div>'
-        + '<div><span class="badge mem-vis ' + visBadge + '">' + escHtml(m.visibility || 'private') + '</span>'
-        + (m.tags && m.tags.length ? ' <span style="font-size:.7rem;color:var(--muted)">' + m.tags.map(escHtml).join(', ') + '</span>' : '')
+    renderMemoryList(entries, el);
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.memory.error') + '</div>'; }
+}
+
+function toggleMemoryForm() {
+  var el = document.getElementById('memory-form');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function createMemory() {
+  var key = document.getElementById('mem-key').value.trim();
+  var value = document.getElementById('mem-value').value;
+  var vis = document.getElementById('mem-vis').value;
+  var tagsStr = document.getElementById('mem-tags').value.trim();
+  var tags = tagsStr ? tagsStr.split(',').map(function(t){ return t.trim(); }).filter(Boolean) : [];
+
+  if (!key || !value) { showToast(t('profile.memory.keyRequired'), true); return; }
+
+  try {
+    var resp = await session.fetch('/v1/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, value: value, visibility: vis, tags: tags })
+    });
+    if (resp && resp.ok !== false) {
+      showToast(t('profile.memory.saved'));
+      toggleMemoryForm();
+      document.getElementById('mem-key').value = '';
+      document.getElementById('mem-value').value = '';
+      document.getElementById('mem-tags').value = '';
+      loadMemory();
+    } else {
+      showToast(t('profile.memory.saveFailed') + ': ' + (resp && resp.error ? resp.error.message : t('profile.unknownError')), true);
+    }
+  } catch(e) { showToast(t('profile.memory.saveFailed'), true); }
+}
+
+async function viewMemory(key) {
+  var existingEl = document.getElementById('mem-detail-' + key);
+  if (existingEl) { existingEl.remove(); return; }
+
+  try {
+    var data = await apiFetch('/v1/memory/' + encodeURIComponent(key));
+    var entry = data && data.data ? data.data : null;
+    if (!entry) return;
+
+    var containers = document.querySelectorAll('[data-memkey]');
+    var container = null;
+    for (var i = 0; i < containers.length; i++) {
+      if (containers[i].getAttribute('data-memkey') === key) { container = containers[i]; break; }
+    }
+    if (!container) return;
+
+    var detail = document.createElement('div');
+    detail.className = 'mem-detail';
+    detail.id = 'mem-detail-' + key;
+    var valueStr = typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value, null, 2);
+    detail.innerHTML = '<pre>' + escHtml(valueStr) + '</pre>'
+      + '<div class="mem-actions">'
+      + '<button class="btn-sm" onclick="editMemoryPrompt(\\'' + escHtml(key).replace(/'/g, "\\\\'") + '\\')">' + t('profile.memory.editBtn') + '</button>'
+      + '<button class="btn-danger" onclick="deleteMemory(\\'' + escHtml(key).replace(/'/g, "\\\\'") + '\\')">' + t('profile.memory.deleteBtn') + '</button>'
+      + '</div>';
+    container.after(detail);
+  } catch(e) {}
+}
+
+async function deleteMemory(key) {
+  if (!confirm(t('profile.memory.deleteConfirm') + ' "' + key + '"?')) return;
+  try {
+    await session.fetch('/v1/memory/' + encodeURIComponent(key), { method: 'DELETE' });
+    showToast(t('profile.memory.deleted'));
+    loadMemory();
+  } catch(e) { showToast(t('profile.error'), true); }
+}
+
+async function editMemoryPrompt(key) {
+  try {
+    var data = await apiFetch('/v1/memory/' + encodeURIComponent(key));
+    var entry = data && data.data ? data.data : null;
+    if (!entry) return;
+
+    var valueStr = typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value);
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = '<div class="modal"><h3>' + t('profile.memory.editTitle') + ': ' + escHtml(key) + '</h3>'
+      + '<div class="form-row"><label>' + t('profile.memory.valueLabel') + '</label><textarea id="edit-mem-value" class="input-field" rows="5">' + escHtml(valueStr) + '</textarea></div>'
+      + '<div class="form-row"><label>' + t('profile.memory.visLabel') + '</label><select id="edit-mem-vis" class="input-field">'
+      + '<option value="private"' + (entry.visibility === 'private' ? ' selected' : '') + '>' + t('profile.memory.visPrivate') + '</option>'
+      + '<option value="shared"' + (entry.visibility === 'shared' ? ' selected' : '') + '>' + t('profile.memory.visShared') + '</option>'
+      + '<option value="public"' + (entry.visibility === 'public' ? ' selected' : '') + '>' + t('profile.memory.visPublic') + '</option></select></div>'
+      + '<div class="form-row"><label>' + t('profile.memory.tagsLabel') + '</label><input type="text" id="edit-mem-tags" class="input-field" value="' + escHtml((entry.tags || []).join(', ')) + '"></div>'
+      + '<div class="form-actions"><button class="btn-primary" onclick="saveMemoryEdit(\\'' + escHtml(key).replace(/'/g, "\\\\'") + '\\')">' + t('profile.save') + '</button><button class="btn-outline" onclick="this.closest(\\'.modal-overlay\\').remove()">' + t('profile.cancel') + '</button></div></div>';
+    document.body.appendChild(overlay);
+  } catch(e) { showToast(t('profile.error'), true); }
+}
+
+async function saveMemoryEdit(key) {
+  var value = document.getElementById('edit-mem-value').value;
+  var vis = document.getElementById('edit-mem-vis').value;
+  var tagsStr = document.getElementById('edit-mem-tags').value.trim();
+  var tags = tagsStr ? tagsStr.split(',').map(function(t){ return t.trim(); }).filter(Boolean) : [];
+
+  try {
+    await session.fetch('/v1/memory/' + encodeURIComponent(key), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: value, visibility: vis, tags: tags })
+    });
+    showToast(t('profile.memory.updated'));
+    document.querySelector('.modal-overlay').remove();
+    loadMemory();
+  } catch(e) { showToast(t('profile.error'), true); }
+}
+
+async function searchMemory() {
+  var q = document.getElementById('memory-search').value.trim();
+  if (!q) { loadMemory(); return; }
+  var el = document.getElementById('memory-list');
+  el.innerHTML = '<span class="spinner"></span> ' + t('profile.memory.searchBtn') + '...';
+  try {
+    var data = await apiFetch('/v1/memory/search?q=' + encodeURIComponent(q));
+    var entries = data && data.data && data.data.entries ? data.data.entries : [];
+    renderMemoryList(entries, el);
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.memory.searchFailed') + '</div>'; }
+}
+
+// ── Files (Storage) ──
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  var units = ['B', 'KB', 'MB', 'GB'];
+  var i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+}
+
+async function loadFiles() {
+  var el = document.getElementById('files-list');
+  try {
+    var data = await apiFetch('/v1/storage');
+    var files = data && data.data && data.data.files ? data.data.files : [];
+    document.getElementById('stat-files').textContent = files.length;
+
+    if (files.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.files.empty') + '</div>'; return; }
+    var html = '<div class="file-grid">';
+    files.forEach(function(f) {
+      var isImage = f.mime_type && f.mime_type.startsWith('image/');
+      var icon = isImage ? '\ud83d\uddbc\ufe0f' : f.mime_type && f.mime_type.includes('pdf') ? '\ud83d\udcc4' : f.mime_type && f.mime_type.includes('text') ? '\ud83d\udcdd' : '\ud83d\udcc1';
+      var safeKey = escHtml(f.key).replace(/'/g, '&#39;');
+      html += '<div class="file-card">'
+        + '<div class="file-icon">' + icon + '</div>'
+        + '<div class="file-info">'
+        + '<div class="file-name" title="' + escHtml(f.key) + '">' + escHtml(f.key) + '</div>'
+        + '<div class="file-meta">' + formatFileSize(f.size) + ' &bull; ' + escHtml(f.mime_type || 'unknown') + '</div>'
+        + '<div class="file-meta">' + escHtml(f.visibility) + (f.created_at ? ' &bull; ' + new Date(f.created_at).toLocaleDateString() : '') + '</div>'
         + '</div>'
-        + '</div>';
+        + '<div class="file-actions">'
+        + '<button class="btn-sm" onclick="downloadFile(decodeURIComponent(\\'' + encodeURIComponent(f.key) + '\\'))" title="' + t('profile.files.download') + '">\u2b07\ufe0f</button>'
+        + '<button class="btn-sm btn-danger" onclick="deleteFile(decodeURIComponent(\\'' + encodeURIComponent(f.key) + '\\'))" title="' + t('profile.files.delete') + '">\u2716</button>'
+        + '</div></div>';
     });
     html += '</div>';
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load memory entries.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.files.error') + '</div>'; }
+}
+
+function toggleFileForm() {
+  var form = document.getElementById('file-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function uploadFile() {
+  var fileInput = document.getElementById('file-input');
+  var keyInput = document.getElementById('file-key');
+  var vis = document.getElementById('file-vis').value;
+
+  if (!fileInput.files || !fileInput.files.length) {
+    showToast(t('profile.files.selectFile'), true); return;
+  }
+  var file = fileInput.files[0];
+  var key = keyInput.value.trim() || file.name;
+
+  // Read file as base64
+  var reader = new FileReader();
+  reader.onload = async function() {
+    var base64 = reader.result.split(',')[1];
+    try {
+      var resp = await session.fetch('/v1/storage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: key,
+          visibility: vis,
+          data: base64,
+          mime_type: file.type || 'application/octet-stream'
+        })
+      });
+      if (resp && resp.data) {
+        showToast(t('profile.files.uploaded'));
+        toggleFileForm();
+        fileInput.value = '';
+        keyInput.value = '';
+        loadFiles();
+      } else {
+        showToast(t('profile.files.uploadFailed') + (resp && resp.error ? ': ' + resp.error.message : ''), true);
+      }
+    } catch(e) {
+      showToast(t('profile.files.uploadFailed'), true);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function downloadFile(key) {
+  try {
+    // Use raw fetch with JWT since session.fetch() auto-parses as JSON
+    var resp = await fetch(NODE_URL + '/v1/storage/' + encodeURIComponent(key), {
+      headers: { 'Authorization': 'Bearer ' + session.jwt }
+    });
+    if (!resp || !resp.ok) { showToast(t('profile.files.error'), true); return; }
+    var blob = await resp.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = key;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) { showToast(t('profile.files.error'), true); }
+}
+
+async function deleteFile(key) {
+  if (!confirm(t('profile.files.deleteConfirm') + ': ' + key)) return;
+  try {
+    var resp = await session.fetch('/v1/storage/' + encodeURIComponent(key), { method: 'DELETE' });
+    if (resp && resp.data && resp.data.deleted) {
+      showToast(t('profile.files.deleted'));
+      loadFiles();
+    } else {
+      showToast(t('profile.files.error'), true);
+    }
+  } catch(e) { showToast(t('profile.files.error'), true); }
+}
+
+// ── Board creation ──
+function toggleBoardForm() {
+  var form = document.getElementById('board-create-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function createBoard() {
+  var name = document.getElementById('board-name').value.trim();
+  var desc = document.getElementById('board-desc').value.trim();
+  var vis = document.getElementById('board-vis').value;
+  if (!name) { showToast(t('profile.boards.createFailed'), true); return; }
+  try {
+    var resp = await session.fetch('/v1/boards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, description: desc, visibility: vis })
+    });
+    if (resp && resp.data) {
+      showToast(t('profile.boards.created'));
+      toggleBoardForm();
+      document.getElementById('board-name').value = '';
+      document.getElementById('board-desc').value = '';
+      loadBoards();
+    } else {
+      showToast(t('profile.boards.createFailed') + (resp && resp.error ? ': ' + resp.error.message : ''), true);
+    }
+  } catch(e) { showToast(t('profile.boards.createFailed'), true); }
+}
+
+async function subscribeBoard(boardId) {
+  try {
+    var resp = await session.fetch('/v1/boards/' + encodeURIComponent(boardId) + '/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (resp && resp.data) {
+      showToast(t('profile.boards.subscribed'));
+      loadBoards();
+    } else {
+      showToast(t('profile.boards.subscribeFailed') + (resp && resp.error ? ': ' + resp.error.message : ''), true);
+    }
+  } catch(e) { showToast(t('profile.boards.subscribeFailed'), true); }
+}
+
+// ── App creation prompt ──
+function copyAppPrompt() {
+  var prompt = 'I want to create a self-contained HTML application that connects to an AIMEAT node. '
+    + 'The node is at: ' + NODE_URL + '\\n\\n'
+    + 'Please read the attached AIMEAT-OS.md file for the complete API reference and guidelines. '
+    + 'The app should be a single HTML file with embedded CSS and JavaScript that I can upload and share. '
+    + 'Start by asking me what kind of app I want to build, then help me design and implement it step by step.';
+  navigator.clipboard.writeText(prompt).then(function() {
+    showToast(t('profile.apps.promptCopied'));
+  });
 }
 
 // ── Work ──
@@ -507,21 +1669,87 @@ async function loadWork() {
     var data = await apiFetch('/v1/work/inbox');
     var items = data && data.data && data.data.items ? data.data.items : [];
     document.getElementById('stat-work').textContent = items.length;
-    if (items.length === 0) { el.innerHTML = '<div class="empty">No work items in your inbox.</div>'; return; }
+    if (items.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.work.empty') + '</div>'; return; }
     var html = '';
     items.forEach(function(w) {
-      var statusClass = w.status === 'completed' ? 'badge-success' : w.status === 'in_progress' ? 'badge-info' : w.status === 'failed' ? 'badge-danger' : 'badge-warn';
+      var statusClass = w.status === 'completed' ? 'badge-success' : w.status === 'delivered' ? 'badge-info' : w.status === 'accepted' ? 'badge-warn' : w.status === 'in_progress' ? 'badge-info' : w.status === 'failed' ? 'badge-danger' : w.status === 'disputed' ? 'badge-danger' : 'badge-muted';
       html += '<div class="card">'
         + '<div class="card-header"><div><div class="card-title">' + escHtml(w.action_id || w.tracking_code) + '</div>'
         + '<div class="card-subtitle">' + escHtml(w.tracking_code) + '</div></div>'
         + '<div class="work-status"><span class="badge ' + statusClass + '">' + escHtml(w.status) + '</span></div></div>'
         + '<div class="card-subtitle">'
-        + (w.requester_gaii ? 'From: ' + escHtml(w.requester_gaii) : '')
-        + (w.cost ? ' &bull; Cost: ' + w.cost + ' morsels' : '') + '</div>'
+        + (w.requester_gaii ? t('profile.work.from') + ': ' + escHtml(w.requester_gaii) : '')
+        + (w.cost ? ' &bull; ' + t('profile.work.cost') + ': ' + w.cost + ' ' + t('profile.stats.morsels').toLowerCase() : '') + '</div>'
         + '</div>';
     });
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load work items.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.work.error') + '</div>'; }
+}
+
+async function loadSentWork() {
+  var el = document.getElementById('work-sent-list');
+  try {
+    var data = await apiFetch('/v1/work/inbox');
+    var items = data && data.data && data.data.items ? data.data.items : [];
+    if (items.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.work.sentEmpty') + '</div>'; return; }
+    var html = '';
+    items.forEach(function(w) {
+      var statusClass = w.status === 'completed' ? 'badge-success' : w.status === 'delivered' ? 'badge-info' : w.status === 'accepted' ? 'badge-warn' : w.status === 'disputed' ? 'badge-danger' : 'badge-muted';
+      html += '<div class="card">'
+        + '<div class="card-header"><div><div class="card-title">' + escHtml(w.action_id || w.tracking_code) + '</div>'
+        + '<div class="card-subtitle">' + escHtml(w.tracking_code) + '</div></div>'
+        + '<div class="work-status"><span class="badge ' + statusClass + '">' + escHtml(w.status) + '</span></div></div>'
+        + '<div class="card-subtitle">'
+        + (w.provider_gaii ? t('profile.work.provider') + ': ' + escHtml(w.provider_gaii) : '')
+        + (w.cost ? ' &bull; ' + t('profile.work.cost') + ': ' + w.cost + ' ' + t('profile.stats.morsels').toLowerCase() : '') + '</div>';
+
+      // Rate button for delivered items
+      if (w.status === 'delivered') {
+        html += '<div style="margin-top:.5rem"><button class="btn-sm" onclick="showRateModal(\\'' + escHtml(w.tracking_code) + '\\')">' + t('profile.work.rateBtn') + '</button></div>';
+      }
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.work.sentError') + '</div>'; }
+}
+
+function showRateModal(tc) {
+  var overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = '<div class="modal"><h3>' + t('profile.work.rateTitle') + '</h3>'
+    + '<p style="color:var(--muted);font-size:.85rem">' + t('profile.work.rateDesc') + ' ' + escHtml(tc) + '</p>'
+    + '<div class="star-rating" id="rate-stars">'
+    + [1,2,3,4,5].map(function(n) { return '<span class="star" data-rating="' + n + '" onclick="selectRating(' + n + ')">&#9734;</span>'; }).join('')
+    + '</div>'
+    + '<div class="form-row" style="margin-top:1rem"><label>' + t('profile.work.commentLabel') + '</label><textarea id="rate-comment" class="input-field" rows="2"></textarea></div>'
+    + '<div class="form-actions"><button class="btn-primary" onclick="submitRating(\\'' + escHtml(tc) + '\\')">' + t('profile.work.submitRating') + '</button><button class="btn-outline" onclick="this.closest(\\'.modal-overlay\\').remove()">' + t('profile.cancel') + '</button></div></div>';
+  document.body.appendChild(overlay);
+}
+
+var currentRating = 0;
+function selectRating(n) {
+  currentRating = n;
+  document.querySelectorAll('#rate-stars .star').forEach(function(s) {
+    var r = parseInt(s.dataset.rating);
+    s.innerHTML = r <= n ? '&#9733;' : '&#9734;';
+    s.classList.toggle('active', r <= n);
+  });
+}
+
+async function submitRating(tc) {
+  if (currentRating === 0) { showToast(t('profile.work.selectRating'), true); return; }
+  try {
+    await session.fetch('/v1/work/' + tc + '/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating: currentRating, comment: document.getElementById('rate-comment').value })
+    });
+    showToast(t('profile.work.ratingSubmitted'));
+    document.querySelector('.modal-overlay').remove();
+    currentRating = 0;
+    loadSentWork();
+  } catch(e) { showToast(t('profile.error'), true); }
 }
 
 // ── Actions (published services) ──
@@ -533,18 +1761,96 @@ async function loadActions() {
     // Filter to own actions
     var mine = actions.filter(function(a) { return a.provider_gaii === session.gaii; });
     document.getElementById('stat-actions').textContent = mine.length;
-    if (mine.length === 0) { el.innerHTML = '<div class="empty">You haven\\'t published any services yet.</div>'; return; }
+    if (mine.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.services.empty') + '</div>'; return; }
     var html = '';
     mine.forEach(function(a) {
       html += '<div class="card">'
         + '<div class="card-header"><div class="card-title">' + escHtml(a.display_name || a.id) + '</div>'
-        + '<span class="badge badge-info">' + escHtml(a.category || 'general') + '</span></div>'
+        + '<div><span class="badge badge-info">' + escHtml(a.category || 'general') + '</span>'
+        + ' <button class="btn-icon" title="' + t('profile.delete') + '" onclick="deleteAction(\\'' + escHtml(a.id) + '\\')">\\u{1F5D1}\\u{FE0F}</button></div></div>'
         + '<div class="card-subtitle">' + escHtml(a.description || '') + '</div>'
-        + (a.pricing && a.pricing.amount ? '<div class="card-subtitle" style="margin-top:.3rem">Price: <strong>' + a.pricing.amount + '</strong> morsels/' + (a.pricing.unit || 'call') + '</div>' : '')
+        + (a.pricing && a.pricing.amount ? '<div class="card-subtitle" style="margin-top:.3rem">' + t('profile.services.price') + ': <strong>' + a.pricing.amount + '</strong> ' + t('profile.stats.morsels').toLowerCase() + '/' + (a.pricing.unit || 'call') + '</div>' : '')
         + '</div>';
     });
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load services.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.services.error') + '</div>'; }
+}
+
+function togglePublishForm() {
+  var el = document.getElementById('publish-form');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function publishService() {
+  var name = document.getElementById('svc-name').value.trim();
+  var desc = document.getElementById('svc-desc').value.trim();
+  var cat = document.getElementById('svc-category').value;
+  var amount = parseInt(document.getElementById('svc-price').value) || 0;
+  var unit = document.getElementById('svc-unit').value || 'call';
+  var webhook = document.getElementById('svc-webhook').value.trim();
+
+  if (!name || !desc) { showToast(t('profile.memory.keyRequired'), true); return; }
+
+  try {
+    var body = {
+      display_name: name,
+      description: desc,
+      category: cat,
+      pricing: { amount: amount, unit: unit },
+    };
+    if (webhook) body.webhook_url = webhook;
+
+    await session.fetch('/v1/actions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    showToast(t('profile.services.published'));
+    togglePublishForm();
+    document.getElementById('svc-name').value = '';
+    document.getElementById('svc-desc').value = '';
+    document.getElementById('svc-webhook').value = '';
+    document.getElementById('svc-price').value = '0';
+    loadActions();
+  } catch(e) { showToast(t('profile.error'), true); }
+}
+
+async function deleteAction(id) {
+  if (!confirm(t('profile.services.unpublishConfirm'))) return;
+  try {
+    await session.fetch('/v1/actions/' + encodeURIComponent(id), { method: 'DELETE' });
+    showToast(t('profile.services.unpublished'));
+    loadActions();
+  } catch(e) { showToast(t('profile.error'), true); }
+}
+
+var cataloguePage = 1;
+async function loadCatalogue(page) {
+  page = page || 1;
+  cataloguePage = page;
+  var el = document.getElementById('catalogue-list');
+  el.innerHTML = '<span class="spinner"></span> ' + t('profile.services.loading');
+  var catFilter = document.getElementById('cat-filter').value;
+  var url = '/v1/catalogue/actions?page=' + page + '&per_page=20';
+  if (catFilter) url += '&category=' + catFilter;
+  try {
+    var resp = await fetch(NODE_URL + url);
+    var data = await resp.json();
+    var actions = data && data.data && data.data.actions ? data.data.actions : (data && data.data ? [data.data].flat() : []);
+    if (actions.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.services.catalogueEmpty') + '</div>'; return; }
+    var html = '';
+    actions.forEach(function(a) {
+      html += '<div class="card">'
+        + '<div class="card-header"><div class="card-title">' + escHtml(a.display_name || a.id) + '</div>'
+        + '<span class="badge badge-info">' + escHtml(a.category || 'general') + '</span></div>'
+        + '<div class="card-subtitle">' + escHtml(a.description || '') + '</div>'
+        + '<div class="card-subtitle" style="margin-top:.3rem">'
+        + t('profile.work.provider') + ': ' + escHtml(a.provider_gaii || 'unknown')
+        + (a.pricing && a.pricing.amount ? ' &bull; ' + t('profile.services.price') + ': <strong>' + a.pricing.amount + '</strong> ' + t('profile.stats.morsels').toLowerCase() + '/' + (a.pricing.unit || 'call') : ' &bull; ' + t('profile.services.free'))
+        + '</div></div>';
+    });
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.services.catalogueError') + '</div>'; }
 }
 
 // ── Boards ──
@@ -553,17 +1859,96 @@ async function loadBoards() {
   try {
     var data = await apiFetch('/v1/boards/subscriptions');
     var subs = data && data.data && data.data.subscriptions ? data.data.subscriptions : [];
-    if (subs.length === 0) { el.innerHTML = '<div class="empty">No board subscriptions.</div>'; return; }
+    if (subs.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.boards.empty') + '</div>'; return; }
     var html = '';
     subs.forEach(function(s) {
       html += '<div class="card">'
         + '<div class="card-header"><div class="card-title">' + escHtml(s.board_id || s.boardId) + '</div>'
-        + '<span class="badge badge-success">Subscribed</span></div>'
+        + '<span class="badge badge-success">' + t('profile.boards.mine') + '</span></div>'
         + (s.filters ? '<div class="card-subtitle">Filters: ' + escHtml(JSON.stringify(s.filters)) + '</div>' : '')
         + '</div>';
     });
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load board subscriptions.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.boards.error') + '</div>'; }
+}
+
+async function loadAllBoards() {
+  var el = document.getElementById('boards-browse-list');
+  if (!el) return;
+  el.innerHTML = '<span class="spinner"></span> ' + t('profile.boards.browseLoading');
+  try {
+    var resp = await fetch(NODE_URL + '/v1/catalogue/boards');
+    var data = await resp.json();
+    var boards = data && data.data && data.data.boards ? data.data.boards : [];
+    if (boards.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.boards.browseEmpty') + '</div>'; return; }
+    var html = '';
+    boards.forEach(function(b) {
+      html += '<div class="card" style="cursor:pointer" onclick="viewBoard(\\'' + escHtml(b.id) + '\\', \\'' + escHtml(b.name || b.id).replace(/'/g, "\\\\'") + '\\')">'
+        + '<div class="card-header"><div class="card-title">' + escHtml(b.name || b.id) + '</div>'
+        + '<span class="badge ' + (b.visibility === 'public' ? 'badge-success' : 'badge-warn') + '">' + escHtml(b.visibility || 'public') + '</span></div>'
+        + (b.description ? '<div class="card-subtitle">' + escHtml(b.description) + '</div>' : '')
+        + '<div style="margin-top:.5rem"><button class="btn-sm" onclick="event.stopPropagation();subscribeBoard(\\'' + escHtml(b.id) + '\\')">' + t('profile.boards.subscribe') + '</button></div>'
+        + '</div>';
+    });
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.boards.browseError') + '</div>'; }
+}
+
+async function viewBoard(boardId, boardName) {
+  var el = document.getElementById('boards-browse-list');
+  el.innerHTML = '<div style="margin-bottom:1rem"><button class="btn-outline" onclick="loadAllBoards()">&larr; ' + t('profile.boards.backToBoards') + '</button> <strong>' + escHtml(boardName) + '</strong></div>'
+    + '<div class="create-form" style="margin-bottom:1rem"><div class="form-row"><label>' + t('profile.boards.newPost') + '</label><textarea id="board-post-content" class="input-field" rows="2" placeholder="' + t('profile.boards.postPlaceholder') + '"></textarea></div>'
+    + '<div class="form-actions"><button class="btn-primary" onclick="createPost(\\'' + escHtml(boardId) + '\\')">' + t('profile.boards.postBtn') + '</button></div></div>'
+    + '<div id="board-posts"><span class="spinner"></span> ' + t('profile.boards.postsLoading') + '</div>';
+
+  try {
+    var resp = await fetch(NODE_URL + '/v1/boards/' + encodeURIComponent(boardId) + '/posts');
+    var data = await resp.json();
+    var posts = data && data.data && data.data.posts ? data.data.posts : [];
+    var postsEl = document.getElementById('board-posts');
+    if (posts.length === 0) { postsEl.innerHTML = '<div class="empty">' + t('profile.boards.postsEmpty') + '</div>'; return; }
+    var html = '';
+    posts.forEach(function(p) {
+      html += '<div class="post-card">'
+        + '<div class="post-content">' + escHtml(p.content || p.body || '') + '</div>'
+        + '<div class="post-meta"><span>' + escHtml(p.author_gaii || p.gaii || 'anonymous') + '</span>'
+        + '<span>' + (p.created_at ? new Date(p.created_at).toLocaleString() : '') + '</span></div>'
+        + '<div class="post-reactions">';
+      var emojis = ['\\u{1F44D}', '\\u{2764}\\u{FE0F}', '\\u{1F525}', '\\u{2B50}', '\\u{1F602}'];
+      emojis.forEach(function(emoji) {
+        var count = p.reactions && p.reactions[emoji] ? p.reactions[emoji].length : 0;
+        html += '<button class="reaction-btn" onclick="reactToPost(\\'' + escHtml(boardId) + '\\', \\'' + escHtml(p.id || p.postId) + '\\', \\'' + emoji + '\\')">' + emoji + (count > 0 ? ' ' + count : '') + '</button>';
+      });
+      html += '</div></div>';
+    });
+    postsEl.innerHTML = html;
+  } catch(e) { document.getElementById('board-posts').innerHTML = '<div class="empty">' + t('profile.boards.postsError') + '</div>'; }
+}
+
+async function createPost(boardId) {
+  var content = document.getElementById('board-post-content').value.trim();
+  if (!content) { showToast(t('profile.boards.writeFirst'), true); return; }
+  try {
+    await session.fetch('/v1/boards/' + encodeURIComponent(boardId) + '/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content })
+    });
+    showToast(t('profile.boards.posted'));
+    document.getElementById('board-post-content').value = '';
+    viewBoard(boardId, boardId);
+  } catch(e) { showToast(t('profile.error'), true); }
+}
+
+async function reactToPost(boardId, postId, emoji) {
+  try {
+    await session.fetch('/v1/boards/' + encodeURIComponent(boardId) + '/posts/' + encodeURIComponent(postId) + '/react', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emoji: emoji })
+    });
+    viewBoard(boardId, boardId);
+  } catch(e) { showToast(t('profile.error'), true); }
 }
 
 // ── Apps ──
@@ -576,18 +1961,107 @@ async function loadApps() {
     // Filter to own apps
     var mine = apps.filter(function(a) { return a.owner === session.owner; });
     document.getElementById('stat-apps').textContent = mine.length;
-    if (mine.length === 0) { el.innerHTML = '<div class="empty">No apps uploaded yet. Create one from the <a href="/v1/portal">Portal</a>!</div>'; return; }
+    if (mine.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.apps.empty') + '</div>'; return; }
     var html = '';
     mine.forEach(function(a) {
       html += '<div class="card">'
         + '<div class="card-header"><div class="card-title">' + escHtml(a.filename || a.name) + '</div>'
         + '<span class="badge badge-info">' + escHtml(a.content_type || 'html') + '</span></div>'
-        + '<div class="card-subtitle"><a href="' + escHtml(NODE_URL + '/v1/apps/' + (a.owner || session.owner) + '/' + (a.filename || a.name)) + '" target="_blank">Download / Open</a>'
+        + '<div class="card-subtitle"><a href="' + escHtml(NODE_URL + '/v1/apps/' + (a.owner || session.owner) + '/' + (a.filename || a.name)) + '" target="_blank">' + t('profile.apps.download') + ' / Open</a>'
         + (a.size ? ' &bull; ' + Math.round(a.size/1024) + ' KB' : '')
         + '</div></div>';
     });
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load apps.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.apps.error') + '</div>'; }
+}
+
+function toggleUploadForm() {
+  var el = document.getElementById('upload-form');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loadAllApps() {
+  var el = document.getElementById('apps-gallery-list');
+  if (!el) return;
+  el.innerHTML = '<span class="spinner"></span> ' + t('profile.apps.galleryLoading');
+  try {
+    var resp = await fetch(NODE_URL + '/v1/apps');
+    var data = await resp.json();
+    var apps = data && data.data && data.data.apps ? data.data.apps : [];
+    if (apps.length === 0) { el.innerHTML = '<div class="empty">' + t('profile.apps.galleryEmpty') + '</div>'; return; }
+    var html = '<div class="app-grid">';
+    apps.forEach(function(a) {
+      var screenshotUrl = a.screenshot_url ? (NODE_URL + a.screenshot_url) : null;
+      html += '<div class="app-card">'
+        + '<div class="app-screenshot">'
+        + (screenshotUrl
+          ? '<img src="' + escHtml(screenshotUrl) + '" alt="' + escHtml(a.filename) + '" onerror="this.parentElement.innerHTML=\\'<div class=placeholder>\\u{1F4F1}</div>\\'">'
+          : '<div class="placeholder">\\u{1F4F1}</div>')
+        + '</div>'
+        + '<div class="app-info"><div class="app-name">' + escHtml(a.filename) + '</div>'
+        + '<div class="app-meta">' + escHtml(a.owner) + ' &bull; ' + Math.round((a.size || 0) / 1024) + ' KB'
+        + (a.protected ? ' &bull; \\u{1F512} ' + t('profile.apps.protected') : '') + '</div>'
+        + '<div style="margin-top:.5rem"><a href="' + escHtml(NODE_URL + (a.download_url || '/v1/apps/' + a.owner + '/' + a.filename)) + '" class="btn-sm" style="text-decoration:none;display:inline-block">' + t('profile.apps.download') + '</a></div>'
+        + '</div></div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.apps.galleryError') + '</div>'; }
+}
+
+async function uploadApp() {
+  var fileInput = document.getElementById('app-file');
+  var ssInput = document.getElementById('app-screenshot');
+  var codeInput = document.getElementById('app-access-code');
+
+  if (!fileInput.files.length) { showToast(t('profile.apps.selectFile'), true); return; }
+  var file = fileInput.files[0];
+
+  var reader = new FileReader();
+  reader.onload = async function() {
+    var base64 = reader.result.split(',')[1];
+    var body = {
+      filename: file.name,
+      content: base64,
+      mime_type: file.type || 'text/html',
+    };
+    var code = codeInput.value.trim();
+    if (code) body.access_code = code;
+
+    // Handle screenshot
+    if (ssInput.files.length) {
+      var ssReader = new FileReader();
+      ssReader.onload = async function() {
+        body.screenshot = ssReader.result.split(',')[1];
+        body.screenshot_mime_type = ssInput.files[0].type || 'image/png';
+        await doUpload(body);
+      };
+      ssReader.readAsDataURL(ssInput.files[0]);
+    } else {
+      await doUpload(body);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function doUpload(body) {
+  try {
+    var resp = await session.fetch('/v1/apps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (resp && resp.ok !== false) {
+      showToast(t('profile.apps.uploaded'));
+      document.getElementById('app-file').value = '';
+      document.getElementById('app-screenshot').value = '';
+      document.getElementById('app-access-code').value = '';
+      document.getElementById('upload-form').style.display = 'none';
+      loadApps();
+    } else {
+      showToast(t('profile.apps.uploadFailed') + ': ' + (resp && resp.error ? resp.error.message : t('profile.unknownError')), true);
+    }
+  } catch(e) { showToast(t('profile.apps.uploadFailed'), true); }
 }
 
 // ── Federation ──
@@ -598,21 +2072,21 @@ async function loadFederation() {
     var data = await resp.json();
     var peers = data && data.data && data.data.peers ? data.data.peers : [];
     if (peers.length === 0) {
-      el.innerHTML = '<div class="empty">This node is not federated with any peers yet.</div>';
+      el.innerHTML = '<div class="empty">' + t('profile.federation.empty') + '</div>';
       return;
     }
-    var html = '<div class="section-title" style="margin-top:0">Connected Peers</div>';
+    var html = '<div class="section-title" style="margin-top:0">' + t('profile.federation.peers') + '</div>';
     peers.forEach(function(p) {
       var alive = p.status === 'active' || p.alive;
       html += '<div class="card"><div class="peer-card">'
         + '<div><div class="card-title">' + escHtml(p.node_id || p.nodeId || p.url) + '</div>'
         + '<div class="card-subtitle">' + escHtml(p.url || '') + '</div></div>'
         + '<div class="peer-status"><span class="peer-dot ' + (alive ? 'alive' : 'dead') + '"></span>'
-        + '<span style="font-size:.8rem;color:' + (alive ? 'var(--success)' : 'var(--danger)') + '">' + (alive ? 'Online' : 'Offline') + '</span>'
+        + '<span style="font-size:.8rem;color:' + (alive ? 'var(--success)' : 'var(--danger)') + '">' + (alive ? t('profile.federation.online') : t('profile.federation.offline')) + '</span>'
         + '</div></div></div>';
     });
     el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div class="empty">Could not load federation info.</div>'; }
+  } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.federation.error') + '</div>'; }
 }
 
 // ── Agent CTA ──
@@ -642,9 +2116,9 @@ function updateAgentPrompt() {
     + '   Sign (gaii + timestamp) with the agent\\'s Ed25519 private key\\n'
     + '   POST ' + nodeUrl + '/v1/auth/token with {"gaii": "<agent-gaii>", "timestamp": "<iso>", "signature": "<sig>"}\\n\\n'
     + '4. You\\'re connected! Use the JWT to access:\\n'
-    + '   GET ' + nodeUrl + '/v1/catalogue — Browse services\\n'
-    + '   POST ' + nodeUrl + '/v1/memory — Store/retrieve memories\\n'
-    + '   GET ' + nodeUrl + '/v1/wallet — Check balance\\n'
+    + '   GET ' + nodeUrl + '/v1/catalogue \\u2014 Browse services\\n'
+    + '   POST ' + nodeUrl + '/v1/memory \\u2014 Store/retrieve memories\\n'
+    + '   GET ' + nodeUrl + '/v1/wallet \\u2014 Check balance\\n'
     + '   Full API spec: ' + nodeUrl + '/v1/spec\\n'
     + '   Operating instructions: ' + nodeUrl + '/v1/prompts/tier1';
 }
@@ -654,8 +2128,8 @@ function copyAgentPrompt() {
   if (!el) return;
   navigator.clipboard.writeText(el.textContent).then(function() {
     var btn = document.querySelector('.copy-prompt-btn');
-    btn.textContent = '\u2705 Copied!';
-    setTimeout(function(){ btn.textContent = '\ud83d\udccb Copy Prompt'; }, 2000);
+    btn.textContent = '\\u{2705} ' + t('profile.agents.copied');
+    setTimeout(function(){ btn.textContent = t('profile.agents.copyPrompt'); }, 2000);
   });
 }
 
@@ -673,7 +2147,7 @@ function toggleInstructions(btn) {
 function renderPlatformPanels() {
   var panels = {
     windows: '<h4>OpenClaw (Recommended)</h4>'
-      + '<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent — perfect for AIMEAT.</p>'
+      + '<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent \\u2014 perfect for AIMEAT.</p>'
       + '<p>Windows requires WSL2. Open PowerShell as Admin:</p>'
       + '<ol><li>Install WSL2: <code>wsl --install</code> (restart if prompted)</li>'
       + '<li>In WSL2 terminal, install Node.js 22+: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>'
@@ -681,7 +2155,7 @@ function renderPlatformPanels() {
       + '<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>'
       + '<li>Paste the agent prompt above into the OpenClaw session</li></ol>',
     mac: '<h4>OpenClaw (Recommended)</h4>'
-      + '<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent — perfect for AIMEAT.</p>'
+      + '<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent \\u2014 perfect for AIMEAT.</p>'
       + '<ol><li>Install Node.js 22+: <code>brew install node</code></li>'
       + '<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>'
       + '<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>'
@@ -689,7 +2163,7 @@ function renderPlatformPanels() {
       + '<h4>Alternative: one-liner install</h4>'
       + '<pre><code>curl -fsSL https://openclaw.ai/install.sh | bash</code></pre>',
     linux: '<h4>OpenClaw (Recommended)</h4>'
-      + '<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent — perfect for AIMEAT.</p>'
+      + '<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent \\u2014 perfect for AIMEAT.</p>'
       + '<ol><li>Install Node.js 22+: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>'
       + '<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>'
       + '<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>'
@@ -711,9 +2185,9 @@ function renderPlatformPanels() {
       + '<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>'
       + '<li>Paste the agent prompt above into the OpenClaw session</li></ol>'
       + '<h4>Option B: andClaw (on-device with camera/mic)</h4>'
-      + '<p><a href="https://play.google.com/store/apps/details?id=com.coderred.andclaw" target="_blank">andClaw</a> runs the OpenClaw gateway directly on your phone — no server needed. '
+      + '<p><a href="https://play.google.com/store/apps/details?id=com.coderred.andclaw" target="_blank">andClaw</a> runs the OpenClaw gateway directly on your phone \\u2014 no server needed. '
       + 'It gives the agent access to your camera, microphone, screen, and sensors.</p>'
-      + '<p><strong>⚠️ Heads up:</strong> This means an AI agent can see through your camera and hear your mic. '
+      + '<p><strong>\\u26A0\\u{FE0F} Heads up:</strong> This means an AI agent can see through your camera and hear your mic. '
       + 'Only use this if you understand the privacy implications and trust your LLM provider.</p>'
       + '<h4>Alternative: Use a cloud server</h4>'
       + '<p>Run OpenClaw on a remote server (see AWS/Cloud tab) and connect via WhatsApp or Telegram.</p>',
@@ -731,7 +2205,7 @@ function renderPlatformPanels() {
 
   var html = '';
   Object.keys(panels).forEach(function(key) {
-    html += '<div class="platform-panel' + (key === 'windows' ? ' active' : '') + '" id="platform-' + key + '">' 
+    html += '<div class="platform-panel' + (key === 'windows' ? ' active' : '') + '" id="platform-' + key + '">'
       + '<div class="platform-content">' + panels[key] + '</div></div>';
   });
   document.getElementById('platform-panels').innerHTML = html;
@@ -752,42 +2226,42 @@ async function loadAccess() {
   var html = '';
 
   // Session info
-  html += '<h3 style="color:var(--love1);margin-bottom:.75rem">\u{1F4BB} Current Session</h3>';
+  html += '<h3 style="color:var(--love1);margin-bottom:.75rem">\\u{1F4BB} ' + t('profile.access.session') + '</h3>';
   html += '<div class="card">'
-    + '<div class="mem-item"><span class="mem-key">Owner</span><span>' + escHtml(session.owner || '-') + '</span></div>'
-    + '<div class="mem-item"><span class="mem-key">GHII</span><span>' + escHtml(session.ghii || '-') + '</span></div>'
-    + '<div class="mem-item"><span class="mem-key">Agent GAII</span><span>' + escHtml(session.gaii || '-') + '</span></div>'
-    + '<div class="mem-item"><span class="mem-key">Node</span><span>' + escHtml(NODE_URL) + '</span></div>'
-    + '<div class="mem-item"><span class="mem-key">JWT Valid</span><span>' + (session.valid ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-danger">Expired</span>') + '</span></div>'
+    + '<div class="mem-item"><span class="mem-key">' + t('profile.access.owner') + '</span><span>' + escHtml(session.owner || '-') + '</span></div>'
+    + '<div class="mem-item"><span class="mem-key">' + t('profile.access.ghii') + '</span><span>' + escHtml(session.ghii || '-') + '</span></div>'
+    + '<div class="mem-item"><span class="mem-key">' + t('profile.access.agentGaii') + '</span><span>' + escHtml(session.gaii || '-') + '</span></div>'
+    + '<div class="mem-item"><span class="mem-key">' + t('profile.access.node') + '</span><span>' + escHtml(NODE_URL) + '</span></div>'
+    + '<div class="mem-item"><span class="mem-key">' + t('profile.access.jwtValid') + '</span><span>' + (session.valid ? '<span class="badge badge-success">' + t('profile.access.yes') + '</span>' : '<span class="badge badge-danger">' + t('profile.access.expired') + '</span>') + '</span></div>'
     + '</div>';
 
   // Public key
-  html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\u{1F510} Public Key</h3>';
+  html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\\u{1F510} ' + t('profile.access.publicKey') + '</h3>';
   html += '<div class="card"><div style="font-family:monospace;font-size:.75rem;word-break:break-all;color:var(--muted)">' + escHtml(session.publicKey || 'N/A') + '</div></div>';
 
   // Owner key info
   var ownerKey = localStorage.getItem('aimeat_owner_key');
   if (ownerKey) {
-    html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\u{1F5DD}\u{FE0F} Owner Key</h3>';
+    html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\\u{1F5DD}\\u{FE0F} ' + t('profile.access.ownerKey') + '</h3>';
     html += '<div class="card" style="border-color:var(--warn)">'
       + '<div style="display:flex;justify-content:space-between;align-items:center">'
       + '<div style="font-family:monospace;font-size:.75rem;word-break:break-all;color:var(--muted);filter:blur(4px);transition:filter .2s" '
       + 'onmouseenter="this.style.filter=\\'none\\'" onmouseleave="this.style.filter=\\'blur(4px)\\'">'
       + escHtml(ownerKey.substring(0, 20)) + '...'
-      + '</div><span class="badge badge-warn">Hover to reveal</span></div>'
-      + '<div style="font-size:.75rem;color:var(--warn);margin-top:.5rem">\u26A0 Keep this safe — it\\'s your owner recovery key.</div>'
+      + '</div><span class="badge badge-warn">' + t('profile.access.hoverReveal') + '</span></div>'
+      + '<div style="font-size:.75rem;color:var(--warn);margin-top:.5rem">\\u26A0 ' + t('profile.access.keepSafe') + '</div>'
       + '</div>';
   }
 
   // MCP endpoint
-  html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\u{1F517} MCP Endpoint</h3>';
+  html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\\u{1F517} ' + t('profile.access.mcpEndpoint') + '</h3>';
   html += '<div class="card"><div style="font-family:monospace;font-size:.85rem;color:var(--love3)">' + escHtml(NODE_URL + '/v1/mcp') + '</div>'
-    + '<div style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Use this URL to connect MCP-compatible AI platforms to your node.</div></div>';
+    + '<div style="font-size:.75rem;color:var(--muted);margin-top:.3rem">' + t('profile.access.mcpDesc') + '</div></div>';
 
   el.innerHTML = html;
 }
 
-</script>
+<\/script>
 </body>
 </html>`;
 }
@@ -795,8 +2269,11 @@ async function loadAccess() {
 export function profileRouter(config: MeatConfig, _storage: Storage): Router {
   const router = Router();
 
-  router.get('/v1/profile', (_req, res) => {
-    res.type('text/html').send(profileHtml(config));
+  router.get('/v1/profile', (req, res) => {
+    const langParam = req.query.lang as string | undefined;
+    const locale = langParam ? toLocale(langParam) : detectLocale(req.headers['accept-language']);
+    const translations = buildProfileTranslations(locale);
+    res.type('text/html').send(profileHtml(config, locale, translations));
   });
 
   return router;

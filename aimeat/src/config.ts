@@ -129,11 +129,11 @@ export function loadConfig(): MeatConfig {
       pre_federation_peer: [],
     },
     rateLimits: {
-      global: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_GLOBAL ?? '200', 10) },
-      auth: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_AUTH ?? '20', 10) },
-      work: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_WORK ?? '60', 10) },
-      memory: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_MEMORY ?? '120', 10) },
-      boards: { windowMs: 60_000, max: parseInt(process.env.MEAT_RL_BOARDS ?? '60', 10) },
+      global: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_GLOBAL ?? '300', 10) },
+      auth: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_AUTH ?? '20', 10) },
+      work: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_WORK ?? '60', 10) },
+      memory: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_MEMORY ?? '120', 10) },
+      boards: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_BOARDS ?? '60', 10) },
       roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },
   };

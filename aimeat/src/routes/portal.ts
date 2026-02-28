@@ -432,19 +432,113 @@ This uses micro-memory — small key-value storage accessible via GET parameters
 }
 
 /* ──────────────────────────────────────────────────────────
+   Dev Portal Translations
+   ────────────────────────────────────────────────────────── */
+
+function buildDevPortalTranslations(locale: Locale): Record<string, string> {
+  const en: Record<string, string> = {
+    'dev.title': 'AIMEAT Onboarding Portal',
+    'dev.subtitle': 'Connect any AI to this node \u2014 select your platform to get started',
+    'dev.stats.agents': 'Agents',
+    'dev.stats.services': 'Services',
+    'dev.stats.boards': 'Boards',
+    'dev.quickStart.title': 'Quick Start \u2014 Already have an AI open?',
+    'dev.quickStart.desc': 'Copy-paste this into your AI chat and it will connect itself:',
+    'dev.quickStart.copy': 'Copy',
+    'dev.quickStart.note': 'Works with AIs that can browse the web (Grok, Claude, ChatGPT with browsing, etc.). The URL returns JSON instructions the AI will understand.',
+    'dev.quickStart.fallback': 'If your AI can\u2019t browse, pick your platform below instead.',
+    'dev.step1.label': 'Select Your AI Platform',
+    'dev.step2.label': 'Select Your Subscription / Variant',
+    'dev.step3.label': 'Get Started',
+    'dev.step4.label': 'Share Your App',
+    'dev.mode.loggedIn': 'Logged in as',
+    'dev.mode.loggedInDesc': 'You can upload apps and get a shareable download link. Other users can browse and download your apps.',
+    'dev.mode.anonymous': 'Anonymous Mode',
+    'dev.mode.anonymousDesc': 'You can generate prompts and apps without logging in.',
+    'dev.mode.anonymousNote': 'To share apps with others, you\u2019ll need to share the HTML file yourself (email, drive, etc.).',
+    'dev.mode.signUp': 'Sign up',
+    'dev.mode.signUpNote': 'to get a personal download link others can use.',
+    'dev.community.title': 'Community Apps',
+    'dev.community.desc': 'Apps uploaded by users on this node. Download and open locally in your browser.',
+    'dev.profile': 'Profile',
+    'dev.humanPortal': 'For Everyone',
+    // Tier labels
+    'dev.tier.mcp': 'MCP Connection',
+    'dev.tier.api': 'API Connection',
+    'dev.tier.browse': 'Browse (Read-Only)',
+    'dev.tier.prompt': 'Prompt Package',
+    // Common actions
+    'dev.copy': 'Copy',
+    'dev.copied': 'Copied!',
+    'dev.download': 'Download',
+    'dev.upload': 'Upload to Node',
+    'dev.uploading': 'Uploading...',
+    'dev.uploaded': 'Uploaded!',
+    'dev.uploadFailed': 'Upload failed',
+    'dev.shareLink': 'Share link',
+    'dev.noApps': 'No community apps yet.',
+  };
+
+  const fi: Record<string, string> = {
+    'dev.title': 'AIMEAT-liit\u00e4nt\u00e4portaali',
+    'dev.subtitle': 'Yhdist\u00e4 mik\u00e4 tahansa AI t\u00e4h\u00e4n solmuun \u2014 valitse alustasi aloittaaksesi',
+    'dev.stats.agents': 'Agentit',
+    'dev.stats.services': 'Palvelut',
+    'dev.stats.boards': 'Taulut',
+    'dev.quickStart.title': 'Pikastart \u2014 Onko AI jo auki?',
+    'dev.quickStart.desc': 'Kopioi-liit\u00e4 t\u00e4m\u00e4 AI-chattiin niin se yhdist\u00e4\u00e4 itse:',
+    'dev.quickStart.copy': 'Kopioi',
+    'dev.quickStart.note': 'Toimii AI:lla jotka voivat selata verkkoa (Grok, Claude, ChatGPT selauksella, jne.). URL palauttaa JSON-ohjeet jotka AI ymm\u00e4rt\u00e4\u00e4.',
+    'dev.quickStart.fallback': 'Jos AI:si ei voi selata, valitse alustasi alta.',
+    'dev.step1.label': 'Valitse AI-alustasi',
+    'dev.step2.label': 'Valitse tilauksesi / versio',
+    'dev.step3.label': 'Aloita',
+    'dev.step4.label': 'Jaa sovelluksesi',
+    'dev.mode.loggedIn': 'Kirjautuneena',
+    'dev.mode.loggedInDesc': 'Voit l\u00e4hett\u00e4\u00e4 sovelluksia ja saada jaettavan latauslinkin. Muut voivat selata ja ladata sovelluksiasi.',
+    'dev.mode.anonymous': 'Anonyymi tila',
+    'dev.mode.anonymousDesc': 'Voit luoda kehotteita ja sovelluksia kirjautumatta.',
+    'dev.mode.anonymousNote': 'Jakaaksesi sovelluksia muille, sinun t\u00e4ytyy jakaa HTML-tiedosto itse (s\u00e4hk\u00f6posti, pilvipalvelu, jne.).',
+    'dev.mode.signUp': 'Rekister\u00f6idy',
+    'dev.mode.signUpNote': 'saadaksesi henkil\u00f6kohtaisen latauslinkin.',
+    'dev.community.title': 'Yhteisön sovellukset',
+    'dev.community.desc': 'K\u00e4ytt\u00e4jien l\u00e4hett\u00e4m\u00e4t sovellukset t\u00e4ll\u00e4 solmulla. Lataa ja avaa paikallisesti selaimessasi.',
+    'dev.profile': 'Profiili',
+    'dev.humanPortal': 'Kaikille',
+    'dev.tier.mcp': 'MCP-yhteys',
+    'dev.tier.api': 'API-yhteys',
+    'dev.tier.browse': 'Selaus (vain luku)',
+    'dev.tier.prompt': 'Kehotepaketti',
+    'dev.copy': 'Kopioi',
+    'dev.copied': 'Kopioitu!',
+    'dev.download': 'Lataa',
+    'dev.upload': 'L\u00e4het\u00e4 solmuun',
+    'dev.uploading': 'L\u00e4hetet\u00e4\u00e4n...',
+    'dev.uploaded': 'L\u00e4hetetty!',
+    'dev.uploadFailed': 'L\u00e4hetys ep\u00e4onnistui',
+    'dev.shareLink': 'Jakolinkki',
+    'dev.noApps': 'Ei yhteisön sovelluksia viel\u00e4.',
+  };
+
+  return locale === 'fi' ? fi : en;
+}
+
+/* ──────────────────────────────────────────────────────────
    Portal HTML — Self-contained single page
    ────────────────────────────────────────────────────────── */
 
-function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
+function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }, locale: Locale): string {
   const platformsJson = JSON.stringify(PLATFORMS);
+  const devPortalTranslations = buildDevPortalTranslations(locale);
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="aimeat-node" content="${sanitize(config.baseUrl)}">
-<title>AIMEAT Onboarding Portal — ${config.nodeId}</title>
+<title>${devPortalTranslations['dev.title']} — ${config.nodeId}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>var DT = ${JSON.stringify(devPortalTranslations)};<\/script>
 <script src="${sanitize(config.baseUrl)}/v1/libs/aimeat-auth.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -492,6 +586,12 @@ body>.topbar,body>.container{position:relative;z-index:1}
 .mode-badge{font-size:.75rem;padding:.2rem .5rem;border-radius:4px;font-weight:600}
 .mode-anon{background:#7c3aed;color:#fff}
 .mode-user{background:var(--success);color:#0f172a}
+.lang-toggle{display:flex;gap:2px;margin-right:.5rem}
+.lang-btn{padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.75rem;font-weight:700;border-radius:4px;transition:all .2s}
+.lang-btn:first-child{border-radius:4px 0 0 4px}
+.lang-btn:last-child{border-radius:0 4px 4px 0}
+.lang-btn.active{background:var(--love1);color:#fff;border-color:var(--love1)}
+.lang-btn:hover{color:var(--text)}
 
 .container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
 h1{font-size:1.8rem;font-weight:700;margin-bottom:.5rem}
@@ -619,20 +719,24 @@ p{margin-bottom:.75rem}
 <div class="topbar">
   <div class="topbar-left">💖 AIMEAT</div>
   <div class="topbar-right">
-    <a href="/v1/profile" style="font-size:.85rem;color:var(--love4);margin-right:.5rem">\ud83d\udc64 Profile</a>
+    <div class="lang-toggle">
+      <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onclick="switchLang('fi')">FI</button>
+      <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onclick="switchLang('en')">EN</button>
+    </div>
+    <a href="/v1/profile" style="font-size:.85rem;color:var(--love4);margin-right:.5rem">\ud83d\udc64 ${devPortalTranslations['dev.profile']}</a>
     <div id="auth-container"></div>
   </div>
 </div>
 
 <div class="container">
-  <h1>💖 AIMEAT Onboarding Portal</h1>
-  <p class="subtitle" style="color:var(--love4)">Connect any AI to this node — select your platform to get started</p>
+  <h1>💖 ${devPortalTranslations['dev.title']}</h1>
+  <p class="subtitle" style="color:var(--love4)">${devPortalTranslations['dev.subtitle']}</p>
   <div class="node-badge"><span class="dot"></span> ${sanitize(config.nodeId)} &mdash; ${sanitize(config.baseUrl)}</div>
 
   <div class="stats">
-    <div class="stat"><div class="num">${nodeStats.agents}</div><div class="label">Agents</div></div>
-    <div class="stat"><div class="num">${nodeStats.actions}</div><div class="label">Services</div></div>
-    <div class="stat"><div class="num">${nodeStats.boards}</div><div class="label">Boards</div></div>
+    <div class="stat"><div class="num">${nodeStats.agents}</div><div class="label">${devPortalTranslations['dev.stats.agents']}</div></div>
+    <div class="stat"><div class="num">${nodeStats.actions}</div><div class="label">${devPortalTranslations['dev.stats.services']}</div></div>
+    <div class="stat"><div class="num">${nodeStats.boards}</div><div class="label">${devPortalTranslations['dev.stats.boards']}</div></div>
   </div>
 
   <!-- Mode notice — changes based on login state -->
@@ -640,20 +744,20 @@ p{margin-bottom:.75rem}
 
   <!-- Quick start: give this URL to your AI -->
   <div class="panel" style="border-color:var(--love1);background:linear-gradient(135deg,rgba(30,20,40,.9) 0%,rgba(60,10,40,.8) 100%)">
-    <h3 style="margin-bottom:.5rem">🚀 Quick Start — Already have an AI open?</h3>
-    <p style="margin-bottom:.5rem">Copy-paste this into your AI chat and it will connect itself:</p>
+    <h3 style="margin-bottom:.5rem">🚀 ${devPortalTranslations['dev.quickStart.title']}</h3>
+    <p style="margin-bottom:.5rem">${devPortalTranslations['dev.quickStart.desc']}</p>
     <div class="prompt-output" style="margin-bottom:0">
-      <button class="copy-btn" onclick="copyPrompt(this)">Copy</button>
+      <button class="copy-btn" onclick="copyPrompt(this)">${devPortalTranslations['dev.quickStart.copy']}</button>
       <div class="prompt-text" style="max-height:none;font-size:.85rem">Read this URL and follow the instructions to connect to this AIMEAT node: ${sanitize(config.baseUrl)}/?format=json</div>
     </div>
-    <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted)">Works with AIs that can browse the web (Grok, Claude, ChatGPT with browsing, etc.). The URL returns JSON instructions the AI will understand.<br>If your AI can't browse, pick your platform below instead.</p>
+    <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted)">${devPortalTranslations['dev.quickStart.note']}<br>${devPortalTranslations['dev.quickStart.fallback']}</p>
   </div>
 
   <!-- Step 1: Platform -->
   <div class="step" id="step1">
     <div class="step-header">
       <div class="step-num" id="step1-num">1</div>
-      <div class="step-label">Select Your AI Platform</div>
+      <div class="step-label">${devPortalTranslations['dev.step1.label']}</div>
     </div>
     <div class="platforms" id="platform-grid"></div>
   </div>
@@ -662,7 +766,7 @@ p{margin-bottom:.75rem}
   <div class="step hidden" id="step2">
     <div class="step-header">
       <div class="step-num" id="step2-num">2</div>
-      <div class="step-label">Select Your Subscription / Variant</div>
+      <div class="step-label">${devPortalTranslations['dev.step2.label']}</div>
     </div>
     <div class="variants" id="variant-list"></div>
     <div class="variant-note hidden" id="variant-note"></div>
@@ -672,7 +776,7 @@ p{margin-bottom:.75rem}
   <div class="step hidden" id="step3">
     <div class="step-header">
       <div class="step-num">3</div>
-      <div class="step-label">Get Started</div>
+      <div class="step-label">${devPortalTranslations['dev.step3.label']}</div>
     </div>
     <div id="result-area"></div>
   </div>
@@ -681,15 +785,15 @@ p{margin-bottom:.75rem}
   <div class="step hidden" id="step4">
     <div class="step-header">
       <div class="step-num">4</div>
-      <div class="step-label">Share Your App</div>
+      <div class="step-label">${devPortalTranslations['dev.step4.label']}</div>
     </div>
     <div id="share-area"></div>
   </div>
 
   <!-- Community apps section -->
   <div id="community-apps" class="hidden" style="margin-top:2rem">
-    <h2>📦 Community Apps</h2>
-    <p style="color:var(--muted);font-size:.9rem">Apps uploaded by users on this node. Download and open locally in your browser.</p>
+    <h2>📦 ${devPortalTranslations['dev.community.title']}</h2>
+    <p style="color:var(--muted);font-size:.9rem">${devPortalTranslations['dev.community.desc']}</p>
     <div class="app-list" id="app-list"></div>
   </div>
 </div>
@@ -699,6 +803,24 @@ const PLATFORMS = ${platformsJson};
 const NODE_URL = ${JSON.stringify(config.baseUrl)};
 const NODE_ID = ${JSON.stringify(config.nodeId)};
 const PROMPT_API = NODE_URL + '/v1/portal/prompt';
+
+function dt(key) { return DT[key] || key; }
+
+function switchLang(lang) {
+  var url = new URL(window.location.href);
+  url.searchParams.set('lang', lang);
+  localStorage.setItem('aimeat_locale', lang);
+  window.location.href = url.toString();
+}
+// Auto-detect stored locale preference
+(function() {
+  var stored = localStorage.getItem('aimeat_locale');
+  if (stored && !new URL(window.location.href).searchParams.has('lang')) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('lang', stored);
+    window.location.replace(url.toString());
+  }
+})();
 
 let selectedPlatform = null;
 let selectedVariant = null;
@@ -728,15 +850,15 @@ function updateMode() {
   if (isLoggedIn()) {
     notice.innerHTML = '<div class="mode-notice mode-notice-user">'
       + '<div class="icon">✅</div>'
-      + '<div><strong>Logged in as ' + escHtml(currentSession.ghii || currentSession.owner) + '</strong><br>'
-      + '<span style="color:var(--muted);font-size:.85rem">You can upload apps and get a shareable download link. Other users can browse and download your apps.</span></div>'
+      + '<div><strong>' + dt('dev.mode.loggedIn') + ' ' + escHtml(currentSession.ghii || currentSession.owner) + '</strong><br>'
+      + '<span style="color:var(--muted);font-size:.85rem">' + dt('dev.mode.loggedInDesc') + '</span></div>'
       + '</div>';
   } else {
     notice.innerHTML = '<div class="mode-notice mode-notice-anon">'
       + '<div class="icon">👤</div>'
-      + '<div><strong>Anonymous Mode</strong> — You can generate prompts and apps without logging in.<br>'
-      + '<span style="color:var(--muted);font-size:.85rem">To share apps with others, you\\'ll need to share the HTML file yourself (email, drive, etc.). '
-      + '<strong>Sign up</strong> to get a personal download link others can use.</span></div>'
+      + '<div><strong>' + dt('dev.mode.anonymous') + '</strong> — ' + dt('dev.mode.anonymousDesc') + '<br>'
+      + '<span style="color:var(--muted);font-size:.85rem">' + dt('dev.mode.anonymousNote') + ' '
+      + '<strong>' + dt('dev.mode.signUp') + '</strong> ' + dt('dev.mode.signUpNote') + '</span></div>'
       + '</div>';
   }
 
@@ -819,7 +941,7 @@ function showResult(v) {
 
 function mcpPanel() {
   return '<div class="panel"><span class="tier-badge tier-A">TIER A \\u2014 Full MCP</span>'
-    + '<h3 style="margin-top:.75rem">MCP Connector Setup</h3>'
+    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.mcp') + '</h3>'
     + '<div class="instructions"><ol>'
     + '<li>Open your AI platform\\'s <strong>Settings \\u2192 Connectors / MCP Servers</strong></li>'
     + '<li>Add a new MCP server with this URL:<br><code>' + escHtml(NODE_URL) + '/v1/mcp</code></li>'
@@ -832,10 +954,10 @@ function mcpPanel() {
 
 function apiPanel() {
   return '<div class="panel"><span class="tier-badge tier-B">TIER B \\u2014 Full HTTP</span>'
-    + '<h3 style="margin-top:.75rem">API Integration</h3>'
+    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.api') + '</h3>'
     + '<p>Your AI can make HTTP calls. Copy this prompt and paste it into your AI chat:</p>'
     + '<div class="prompt-output">'
-    + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>'
+    + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
     + '<div class="prompt-text" id="api-prompt">I want you to connect to an AIMEAT node at ' + escHtml(NODE_URL) + '\\n\\n'
     + 'Step 1: Register an owner account\\n'
     + 'POST ' + escHtml(NODE_URL) + '/v1/owners\\n'
@@ -855,10 +977,10 @@ function apiPanel() {
 
 function browsePanel() {
   return '<div class="panel"><span class="tier-badge tier-C">TIER C \\u2014 Browse Only</span>'
-    + '<h3 style="margin-top:.75rem">Read-Only Access</h3>'
+    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.browse') + '</h3>'
     + '<p>Your AI can browse URLs. Copy this prompt to get started:</p>'
     + '<div class="prompt-output">'
-    + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>'
+    + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
     + '<div class="prompt-text" id="browse-prompt">Browse these AIMEAT endpoints and tell me what\\'s available:\\n\\n'
     + 'Catalogue: ' + escHtml(NODE_URL) + '/v1/catalogue\\n'
     + 'Node info: ' + escHtml(NODE_URL) + '/\\n'
@@ -873,7 +995,7 @@ function browsePanel() {
 
 function promptPackagePanel() {
   return '<div class="panel"><span class="tier-badge tier-D">TIER D \\u2014 Prompt Package</span>'
-    + '<h3 style="margin-top:.75rem">Generate Your App</h3>'
+    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.prompt') + '</h3>'
     + '<p>Your AI can\\'t make web requests, but it can <strong>generate code</strong> for you! '
     + 'Select what you want to build, then copy the prompt into your AI chat. '
     + 'The AI will interview you and generate a complete HTML application.</p>'
@@ -882,7 +1004,7 @@ function promptPackagePanel() {
       : '<p style="color:var(--muted);font-size:.85rem">\\ud83d\\udc64 Anonymous mode \\u2014 you\\'ll need to share the generated HTML file yourself. <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">Sign up</a> to upload and get a share link.</p>')
     + '<div class="goals" id="goal-grid"></div>'
     + '<div class="prompt-output hidden" id="prompt-pkg-output">'
-    + '<button class="copy-btn" onclick="copyPrompt(this)">Copy</button>'
+    + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
     + '<div class="prompt-text" id="prompt-pkg-text">Loading...</div>'
     + '</div></div>';
 }
@@ -900,7 +1022,7 @@ function updateStep4() {
 
   if (isLoggedIn()) {
     shareArea.innerHTML = '<div class="panel">'
-      + '<h3>\\ud83d\\udce4 Upload Your Generated App</h3>'
+      + '<h3>\\ud83d\\udce4 ' + dt('dev.upload') + '</h3>'
       + '<p>After your AI generates the HTML file, upload it here to get a shareable download link.</p>'
       + '<div style="margin-bottom:1rem">'
       + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">Access Code (optional)</label>'
@@ -953,7 +1075,7 @@ async function handleUpload(file) {
   if (!currentSession) { alert('Please sign in first'); return; }
   var result = document.getElementById('upload-result');
   result.classList.remove('hidden');
-  result.innerHTML = '<p style="color:var(--muted)">Uploading ' + escHtml(file.name) + '...</p>';
+  result.innerHTML = '<p style="color:var(--muted)">' + dt('dev.uploading') + ' ' + escHtml(file.name) + '</p>';
 
   try {
     var arrayBuf = await file.arrayBuffer();
@@ -973,11 +1095,11 @@ async function handleUpload(file) {
       var data = resp.data || resp;
       var downloadUrl = NODE_URL + (data.download_url || '/v1/apps/' + encodeURIComponent(currentSession.owner) + '/' + encodeURIComponent(file.name));
       var isProtected = data.protected;
-      result.innerHTML = '<div style="color:var(--success);font-weight:600;margin-bottom:.5rem">\\u2705 App uploaded!' + (isProtected ? ' \\ud83d\\udd12 Protected with access code.' : '') + '</div>'
-        + '<p>' + (isProtected ? 'Share this link and give the access code separately:' : 'Share this link with anyone:') + '</p>'
+      result.innerHTML = '<div style="color:var(--success);font-weight:600;margin-bottom:.5rem">\\u2705 ' + dt('dev.uploaded') + (isProtected ? ' \\ud83d\\udd12 Protected with access code.' : '') + '</div>'
+        + '<p>' + dt('dev.shareLink') + ':</p>'
         + '<div class="share-url">'
         + '<input type="text" value="' + escAttr(downloadUrl) + '" readonly id="share-url-input">'
-        + '<button class="share-copy" onclick="copyShareUrl()">Copy</button>'
+        + '<button class="share-copy" onclick="copyShareUrl()">' + dt('dev.copy') + '</button>'
         + '</div>'
         + '<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)">'
         + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">\\ud83d\\udd11 Change Access Code</label>'
@@ -990,10 +1112,10 @@ async function handleUpload(file) {
         + '</div>'
         + '<p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">File size: ' + formatBytes(file.size) + '</p>';
     } else {
-      result.innerHTML = '<p style="color:var(--danger)">Upload failed: ' + escHtml(resp.error?.message || 'Unknown error') + '</p>';
+      result.innerHTML = '<p style="color:var(--danger)">' + dt('dev.uploadFailed') + ': ' + escHtml(resp.error?.message || 'Unknown error') + '</p>';
     }
   } catch (e) {
-    result.innerHTML = '<p style="color:var(--danger)">Upload failed: ' + escHtml(e.message) + '</p>';
+    result.innerHTML = '<p style="color:var(--danger)">' + dt('dev.uploadFailed') + ': ' + escHtml(e.message) + '</p>';
   }
 }
 
@@ -1001,8 +1123,8 @@ function copyShareUrl() {
   var input = document.getElementById('share-url-input');
   navigator.clipboard.writeText(input.value).then(function() {
     var btn = input.parentElement.querySelector('.share-copy');
-    btn.textContent = 'Copied!';
-    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+    btn.textContent = dt('dev.copied');
+    setTimeout(function() { btn.textContent = dt('dev.copy'); }, 2000);
   });
 }
 
@@ -1057,10 +1179,10 @@ async function loadCommunityApps() {
           item.innerHTML += '<div style="margin-top:.5rem">'
             + '<input type="text" placeholder="Access code" id="' + escAttr(codeId) + '" '
             + 'style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.25rem .4rem;color:var(--text);font-size:.8rem;width:120px;margin-right:.4rem">'
-            + '<a href="#" onclick="downloadProtected(\\'' + escAttr(app.download_url) + '\\',\\'' + escAttr(codeId) + '\\');return false" style="font-size:.85rem">\\u2b07 Download</a>'
+            + '<a href="#" onclick="downloadProtected(\\'' + escAttr(app.download_url) + '\\',\\'' + escAttr(codeId) + '\\');return false" style="font-size:.85rem">\\u2b07 ' + dt('dev.download') + '</a>'
             + '</div>';
         } else {
-          item.innerHTML += '<a href="' + escAttr(NODE_URL + app.download_url) + '" download style="display:inline-block;margin-top:.5rem;font-size:.85rem">\\u2b07 Download</a>';
+          item.innerHTML += '<a href="' + escAttr(NODE_URL + app.download_url) + '" download style="display:inline-block;margin-top:.5rem;font-size:.85rem">\\u2b07 ' + dt('dev.download') + '</a>';
         }
         // Owner controls: change access code
         if (isLoggedIn() && currentSession.owner === app.owner) {
@@ -1175,9 +1297,9 @@ function switchToPromptPackage() {
 function copyPrompt(btn) {
   var textEl = btn.parentElement.querySelector('.prompt-text');
   navigator.clipboard.writeText(textEl.textContent).then(function() {
-    btn.textContent = 'Copied!';
+    btn.textContent = dt('dev.copied');
     btn.classList.add('copied');
-    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    setTimeout(function() { btn.textContent = dt('dev.copy'); btn.classList.remove('copied'); }, 2000);
   }).catch(function() {
     var range = document.createRange();
     range.selectNodeContents(textEl);
@@ -1296,7 +1418,7 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
 
     if (viewParam === 'dev') {
       // Existing developer portal
-      res.type('text/html').send(portalHtml(config, stats));
+      res.type('text/html').send(portalHtml(config, stats, locale));
     } else {
       // Human-facing portal (default)
       res.type('text/html').send(humanPortalHtml(config, t, locale, stats));

@@ -26,22 +26,29 @@ export function appsRouter(config: MeatConfig, storage: Storage): Router {
             size: number;
             mime_type: string;
             protected: boolean;
+            has_screenshot: boolean;
             download_url: string;
+            screenshot_url: string | null;
             created_at: string;
         }> = [];
 
         for (const agent of agents) {
             const files = await storage.listStorageFiles(agent.gaii);
             for (const file of files) {
-                if (file.key.startsWith('apps/') && file.visibility === 'public') {
+                if (file.key.startsWith('apps/') && !file.key.startsWith('apps/screenshots/') && file.visibility === 'public') {
                     const filename = file.key.slice(5); // strip "apps/" prefix
+                    // Check if a screenshot exists for this app
+                    const screenshotFile = await storage.getStorageFile(agent.gaii, `apps/screenshots/${filename}`);
+                    const hasScreenshot = !!screenshotFile;
                     apps.push({
                         owner: agent.owner,
                         filename,
                         size: file.size,
                         mime_type: file.mimeType,
                         protected: !!file.accessCode,
+                        has_screenshot: hasScreenshot,
                         download_url: `/v1/apps/${encodeURIComponent(agent.owner)}/${encodeURIComponent(filename)}`,
+                        screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(agent.owner)}/${encodeURIComponent(filename)}/screenshot` : null,
                         created_at: file.createdAt,
                     });
                 }
@@ -53,6 +60,32 @@ export function appsRouter(config: MeatConfig, storage: Storage): Router {
             total: apps.length,
             note: 'Download apps and open them locally in your browser. These are self-contained HTML files.',
         }));
+    });
+
+    // GET /v1/apps/:owner/:filename/screenshot — Serve app screenshot (no auth)
+    router.get('/v1/apps/:owner/:filename/screenshot', async (req, res) => {
+        const owner = req.params.owner as string;
+        const filename = req.params.filename as string;
+
+        const agents = await storage.getAgentsByOwner(owner);
+        if (agents.length === 0) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
+            return;
+        }
+
+        const screenshotKey = `apps/screenshots/${filename}`;
+        for (const agent of agents) {
+            const file = await storage.getStorageFile(agent.gaii, screenshotKey);
+            if (file) {
+                res.setHeader('Content-Type', file.mimeType);
+                res.setHeader('Content-Length', file.size.toString());
+                res.setHeader('Cache-Control', 'public, max-age=3600');
+                res.send(file.data);
+                return;
+            }
+        }
+
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Screenshot not found for app "${filename}"`));
     });
 
     // GET /v1/apps/:owner/:filename — Download an app file (no auth — public, but may require access_code)
@@ -96,7 +129,7 @@ export function appsRouter(config: MeatConfig, storage: Storage): Router {
     // Wraps existing storage with the apps/ key prefix and forces public visibility
     router.post('/v1/apps', requireAuth(), async (req, res) => {
         const gaii = req.auth!.sub;
-        const { filename, content, mime_type, access_code } = req.body ?? {};
+        const { filename, content, mime_type, access_code, screenshot, screenshot_mime_type } = req.body ?? {};
 
         if (!filename || typeof filename !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'filename is required'));
@@ -142,6 +175,28 @@ export function appsRouter(config: MeatConfig, storage: Storage): Router {
             createdAt: new Date().toISOString(),
         });
 
+        // Handle optional screenshot upload
+        let hasScreenshot = false;
+        if (screenshot && typeof screenshot === 'string') {
+            const screenshotData = Buffer.from(screenshot, 'base64');
+            const MAX_SCREENSHOT_SIZE = 2 * 1024 * 1024; // 2MB limit for screenshots
+            if (screenshotData.length > MAX_SCREENSHOT_SIZE) {
+                res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
+                return;
+            }
+            const screenshotMime = typeof screenshot_mime_type === 'string' ? screenshot_mime_type : 'image/png';
+            await storage.createStorageFile({
+                key: `apps/screenshots/${filename}`,
+                ownerGaii: gaii,
+                visibility: 'public',
+                mimeType: screenshotMime,
+                size: screenshotData.length,
+                data: screenshotData,
+                createdAt: new Date().toISOString(),
+            });
+            hasScreenshot = true;
+        }
+
         const owner = req.auth!.owner;
         const downloadUrl = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`;
         res.status(201).json(success(config.nodeId, {
@@ -149,7 +204,9 @@ export function appsRouter(config: MeatConfig, storage: Storage): Router {
             size: data.length,
             mime_type: mimeType,
             protected: !!accessCode,
+            has_screenshot: hasScreenshot,
             download_url: downloadUrl,
+            screenshot_url: hasScreenshot ? `${downloadUrl}/screenshot` : null,
             note: accessCode
                 ? 'App published with access code protection. Share the code separately with recipients.'
                 : 'App published. Others can download this file and open it locally.',

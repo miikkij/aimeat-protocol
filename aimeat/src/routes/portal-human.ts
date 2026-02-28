@@ -933,55 +933,38 @@ body {
   color: #22c55e;
 }
 
-/* ── "What else" expandable section ── */
+/* ── "What can you do" features section ── */
 .more-section {
-  max-width: 600px;
-  margin: 0 auto 3rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius);
-  overflow: hidden;
+  max-width: 700px;
+  margin: 2rem auto 3rem;
+  padding: 0 1rem;
 }
 
-.more-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.25rem;
-  cursor: pointer;
-  color: var(--text-dim);
-  font-size: 0.92rem;
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.02);
-  transition: all 0.2s;
+.more-section-title {
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 1.25rem;
 }
 
-.more-header:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-}
-
-.more-arrow {
-  font-size: 0.75rem;
-  transition: transform 0.3s;
-}
-
-.more-section.expanded .more-arrow {
-  transform: rotate(180deg);
-}
-
-.more-body {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.4s ease;
-}
-
-.more-section.expanded .more-body {
-  max-height: 500px;
+.more-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
 }
 
 .more-item {
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 1rem;
+  background: var(--card-bg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.more-item:hover {
+  background: var(--card-bg-hover);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .more-item-title {
@@ -993,7 +976,8 @@ body {
 .more-item-desc {
   font-size: 0.82rem;
   color: var(--text-dim);
-  margin-top: 0.15rem;
+  margin-top: 0.25rem;
+  line-height: 1.4;
 }
 
 /* ── Apps: Category grid ── */
@@ -1384,6 +1368,7 @@ body {
             <button class="copy-prompt-btn" id="copyPromptBtn" type="button" onclick="event.stopPropagation()">${esc(t('cards.apps.copyPrompt'))}</button>
             <span class="back-to-cats" id="backToCats" onclick="event.stopPropagation()">\u2190 ${esc(t('cards.apps.backToCategories'))}</span>
           </div>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;font-style:italic">${esc(t('cards.apps.promptLangNote'))}</div>
           <div class="prompt-steps">
             <ol>
               <li>${esc(t('cards.apps.step1'))}</li>
@@ -1391,6 +1376,16 @@ body {
               <li>${esc(t('cards.apps.step3'))}</li>
               <li>${esc(t('cards.apps.step4'))}</li>
             </ol>
+          </div>
+          <div style="margin-top:1.5rem;padding:1.25rem;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);border-radius:12px">
+            <div style="font-weight:700;font-size:1rem;margin-bottom:.75rem">${esc(t('cards.apps.returnTitle'))}</div>
+            <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:.75rem">${esc(t('cards.apps.returnMotivation'))}</div>
+            <ol style="font-size:.85rem;color:var(--text-muted);margin:0 0 1rem 1.25rem;padding:0">
+              <li style="margin-bottom:.25rem">${esc(t('cards.apps.returnStep1'))}</li>
+              <li style="margin-bottom:.25rem">${esc(t('cards.apps.returnStep2'))}</li>
+              <li>${esc(t('cards.apps.returnStep3'))}</li>
+            </ol>
+            <button class="cta-btn" id="return-app-btn" data-auth-text="${esc(t('cards.apps.returnBtnAuth'))}" style="font-size:.85rem;padding:.5rem 1.25rem">${esc(t('cards.apps.returnBtnAnon'))}</button>
           </div>
         </div>
       </div>
@@ -1428,13 +1423,10 @@ body {
     <span class="heart-icon">\u{1F496}</span> ${esc(t('morsels.summary'))}
   </div>
 
-  <!-- What else expandable section -->
-  <div class="more-section" id="moreSection">
-    <div class="more-header" id="moreHeader">
-      <span>${esc(t('more.title'))}</span>
-      <span class="more-arrow">\u25BC</span>
-    </div>
-    <div class="more-body" id="moreBody">
+  <!-- What can you do with AIMEAT section -->
+  <div class="more-section">
+    <div class="more-section-title">${esc(t('more.sectionTitle'))}</div>
+    <div class="more-grid">
       <div class="more-item">
         <div class="more-item-title">${esc(t('more.aiNews'))}</div>
         <div class="more-item-desc">${esc(t('more.aiNewsDesc'))}</div>
@@ -1809,6 +1801,26 @@ body {
     });
   }
 
+  /* ── Apps: Return flow button ── */
+  var returnBtn = document.getElementById('return-app-btn');
+  if (returnBtn) {
+    returnBtn.addEventListener('click', function() {
+      if (typeof AIMEAT !== 'undefined' && AIMEAT.auth && AIMEAT.auth.hasSession) {
+        window.location.href = '/v1/profile?tab=apps';
+      } else {
+        var reg = document.getElementById('register');
+        if (reg) reg.scrollIntoView({ behavior: 'smooth' });
+        else window.location.href = '/v1/portal#services';
+      }
+    });
+    // Update text if already logged in
+    setTimeout(function() {
+      if (typeof AIMEAT !== 'undefined' && AIMEAT.auth && AIMEAT.auth.hasSession) {
+        returnBtn.textContent = returnBtn.dataset.authText;
+      }
+    }, 500);
+  }
+
   /* ── Services: need help / offer help → sign in modal ── */
   var needHelpBtn = document.getElementById('needHelpBtn');
   var offerHelpBtn = document.getElementById('offerHelpBtn');
@@ -1850,14 +1862,6 @@ body {
     offerHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceSignIn('offer'); });
   }
 
-  /* ── "What else" expand/collapse ── */
-  var moreHeader = document.getElementById('moreHeader');
-  var moreSection = moreHeader ? moreHeader.parentElement : null;
-  if (moreHeader && moreSection) {
-    moreHeader.addEventListener('click', function() {
-      moreSection.classList.toggle('expanded');
-    });
-  }
 
 })();
 <\/script>
