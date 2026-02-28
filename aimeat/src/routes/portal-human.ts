@@ -1640,7 +1640,11 @@ body {
               '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
               'Fetch the board URL above, show me the messages, and help me post new ones using the POST method described above.\\n\\n' +
               '## OPTION B — If you cannot fetch URLs:\\n' +
-              'Build a single self-contained HTML file that I will save and open in my browser. Requirements:\\n\\n' +
+              'Before building, ask me two questions:\\n' +
+              '1. What should the board be called? (e.g. "Neighborhood Board", "Game Night Chat", "Family Messages")\\n' +
+              '2. How should it feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
+              'Use my answers to customize the title, colors, fonts, and overall vibe of the board.\\n\\n' +
+              'Then build a single self-contained HTML file that I will save and open in my browser. Requirements:\\n\\n' +
               '1. On load, fetch GET ' + listUrl + ' and display all messages from data.value.messages\\n' +
               '2. Show each message with its text and a human-readable relative time (e.g. "2 minutes ago"), newest first\\n' +
               '3. Show a "Last updated: [time]" label so the user knows when data was last fetched\\n' +
