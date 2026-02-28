@@ -1716,16 +1716,31 @@ body {
   var baseEnd = '\\nMake the HTML a downloadable file. This is a live API — the URLs work right now.';
 
   var prompts = {
-    games: askUser +
-      'I want a multiplayer game as a single self-contained HTML file.\\n\\n' +
+    games: 'Before building, ask me:\\n' +
+      '1. What should the game be called?\\n' +
+      '2. What type of game? (e.g. "tic-tac-toe", "connect four", "battleship", "trivia quiz", "word game")\\n' +
+      '3. How should it look and feel? (e.g. "retro arcade", "cozy board game", "sleek and minimal", "fun and colorful")\\n' +
+      'Use my answers to customize the title, game type, colors, fonts, and overall vibe.\\n\\n' +
+      'I want a multiplayer game with a lobby system as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      '## Data structure\\n\\n' +
+      'Each game type gets its own memory area. The key format is:\\n' +
+      '- Lobby: "apps.games.[gametype].lobby"\\n' +
+      '- Individual game: "apps.games.[gametype].[gameId]"\\n\\n' +
+      'Lobby format (stored at apps.games.[gametype].lobby):\\n' +
+      '{"games": [{"id": "abc123", "name": "My Game Room", "host": "Mika", "status": "waiting", "players": 1, "maxPlayers": 2, "created": "ISO timestamp"}, ...]}\\n\\n' +
+      'Game data format (stored at apps.games.[gametype].[gameId]):\\n' +
+      '{"id": "abc123", "name": "My Game Room", "type": "[gametype]", "players": [{"name": "Mika", "joinedAt": "ISO"}, {"name": "Liisa", "joinedAt": "ISO"}], "state": {...game-specific state...}, "turn": "Mika", "status": "playing", "winner": null, "created": "ISO", "updated": "ISO"}\\n\\n' +
       'Game requirements:\\n' +
-      '- Player 1 creates a game and gets a shareable link (use URL hash #gameId)\\n' +
-      '- Player 2 opens the link to join\\n' +
-      '- Game state stored in memory: "apps.game.[random-id]"\\n' +
-      '- Poll every 2 seconds for opponent moves\\n' +
-      '- Show game status: waiting for opponent, your turn, opponent turn, winner, draw\\n' +
-      '- Reset / new game button\\n\\n' +
+      '1. On first visit, ask the player their name (save to localStorage)\\n' +
+      '2. Show lobby screen: list of open games (fetched from lobby key), with host name, status, and player count\\n' +
+      '3. "Create Game" button — creates a new game, adds it to the lobby, and waits for opponent\\n' +
+      '4. "Join" button on each waiting game — joins the game, updates lobby status\\n' +
+      '5. Once two players are in, the game starts. Poll every 2 seconds for opponent moves\\n' +
+      '6. Show game status: waiting for opponent, your turn, opponent\\'s turn, you won, you lost, draw\\n' +
+      '7. When game ends, update lobby to remove it or mark as finished\\n' +
+      '8. "Back to Lobby" button to return and play again\\n' +
+      '9. Lobby auto-refreshes every 5 seconds to show new games\\n\\n' +
       baseReqs + baseEnd,
 
     notes: askUser +
