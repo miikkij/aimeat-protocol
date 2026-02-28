@@ -1650,7 +1650,8 @@ body {
               '7. To send: GET existing board, append new {msg, t} to the messages array, POST the full updated object back to ' + writeUrl + '\\n' +
               '8. After sending, immediately refresh the message list to show the new message\\n' +
               '9. Dark theme (#0a0a1a background, #ff69b4 pink accent), mobile-friendly, clean readable layout\\n\\n' +
-              'I will save the HTML and open it in my browser. This is a live API — the URLs work right now.';
+              'If you can save files directly, save it as messageboard.html for me to download. If not, output the complete HTML so I can copy it into a text editor (like Notepad), save it as messageboard.html, and open it in my browser.\\n\\n' +
+              'This is a live API — the URLs work right now.';
           }
         }
       })
