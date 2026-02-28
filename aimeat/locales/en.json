@@ -24,7 +24,12 @@
       "saved": "Memory saved!",
       "savedNote": "This memory is now available to AIs you connect here.",
       "exampleChips": ["I'm vegetarian", "I live in Espoo", "I like jazz"],
-      "cost": "This memory cost one heart morsel. You have {{remaining}} left."
+      "cost": "This memory cost one heart morsel. You have {{remaining}} left.",
+      "useWithAi": "Use with any AI",
+      "copyInstructions": "Copy to clipboard",
+      "copiedInstructions": "Copied!",
+      "pasteHint": "Paste into any AI chat to share your preferences. For permanent setup, paste into Custom Instructions (ChatGPT) or Project Knowledge (Claude).",
+      "autoNote": "Bonus: Grok and Claude Pro can also fetch these automatically from your AIME AT address."
     },
     "apps": {
       "title": "Apps",

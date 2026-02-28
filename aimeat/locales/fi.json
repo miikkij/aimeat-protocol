@@ -24,7 +24,12 @@
       "saved": "Muisto tallennettu!",
       "savedNote": "Tama muisto on nyt saatavilla AI:lle jotka kytket tahan.",
       "exampleChips": ["Olen kasvissyoja", "Asun Espoossa", "Pidan jazz-musiikista"],
-      "cost": "Tama muisto maksoi yhden sydanmurusen. Sinulla on {{remaining}} jaljella."
+      "cost": "Tama muisto maksoi yhden sydanmurusen. Sinulla on {{remaining}} jaljella.",
+      "useWithAi": "Kayta minka tahansa AI:n kanssa",
+      "copyInstructions": "Kopioi leikepoydale",
+      "copiedInstructions": "Kopioitu!",
+      "pasteHint": "Liita mihin tahansa AI-chattiin jakaaksesi mieltymyksesi. Pysyvaan kayttoon liita Custom Instructions -asetuksiin (ChatGPT) tai Project Knowledge -asetuksiin (Claude).",
+      "autoNote": "Bonus: Grok ja Claude Pro osaavat hakea nama myos automaattisesti AIME AT -osoitteestasi."
     },
     "apps": {
       "title": "Sovellukset",

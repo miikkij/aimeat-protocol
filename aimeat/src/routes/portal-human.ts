@@ -347,7 +347,7 @@ body {
 }
 
 .card.expanded .card-body {
-  max-height: 900px;
+  max-height: 1200px;
   padding: 0 1.5rem 1.5rem;
 }
 
@@ -482,15 +482,12 @@ body {
   line-height: 1.6;
 }
 
-.compat-info {
-  margin-top: 0.75rem;
-  padding: 0.85rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--radius-xs);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+/* ── Use with any AI (post-save) ── */
+.use-with-ai {
+  margin-top: 1rem;
 }
 
-.compat-info .compat-title {
+.use-title {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-dim);
@@ -499,33 +496,79 @@ body {
   letter-spacing: 0.05em;
 }
 
-.compat-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.82rem;
-  margin-bottom: 0.35rem;
-  color: var(--text);
-  opacity: 0.85;
+.instruction-block {
+  width: 100%;
+  min-height: 60px;
+  padding: 0.85rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text-bright);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
 }
 
-.compat-row .dot {
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-top: 0.4rem;
+.instruction-actions {
+  margin-top: 0.6rem;
 }
 
-.compat-row .dot.green { background: var(--success); }
-.compat-row .dot.yellow { background: #f59e0b; }
-.compat-row .dot.red { background: #ef4444; }
+.copy-instruction-btn {
+  padding: 0.55rem 1.3rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+  font-family: var(--font);
+}
 
-.cost-line {
+.copy-instruction-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+}
+
+.instruction-hint {
   margin-top: 0.6rem;
   font-size: 0.82rem;
-  color: var(--text-dim);
+  color: var(--text);
+  line-height: 1.6;
+  opacity: 0.8;
+}
+
+.auto-note {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
   font-style: italic;
+}
+
+/* ── Upgrade nudge ── */
+.upgrade-nudge {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: #c4b5fd;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.upgrade-nudge a {
+  display: inline-block;
+  margin-top: 0.4rem;
+  color: var(--accent-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
 }
 
 /* ── Placeholder (Services) ── */
@@ -548,6 +591,100 @@ body {
   text-transform: uppercase;
   color: var(--text-dim);
   margin-bottom: 0.75rem;
+}
+
+/* ── Service action buttons ── */
+.service-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.service-btn {
+  flex: 1;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  transition: all 0.2s;
+  cursor: default;
+  opacity: 0.6;
+}
+
+.service-btn-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-bright);
+  margin-bottom: 0.3rem;
+}
+
+.service-btn-desc {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+/* ── "What else" expandable section ── */
+.more-section {
+  max-width: 600px;
+  margin: 0 auto 3rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.more-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.2s;
+}
+
+.more-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.more-arrow {
+  font-size: 0.75rem;
+  transition: transform 0.3s;
+}
+
+.more-section.expanded .more-arrow {
+  transform: rotate(180deg);
+}
+
+.more-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+
+.more-section.expanded .more-body {
+  max-height: 500px;
+}
+
+.more-item {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.more-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.more-item-desc {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 0.15rem;
 }
 
 /* ── Apps: Category grid ── */
@@ -857,14 +994,19 @@ body {
             <div class="check">\u2714 ${esc(t('cards.memories.saved'))}</div>
             <div class="note">${esc(t('cards.memories.savedNote'))}</div>
           </div>
-          <div class="compat-info">
-            <div class="compat-title">${esc(t('compat.title'))}</div>
-            <div class="compat-row"><span class="dot green"></span> ${esc(t('compat.worksNote'))}</div>
-            <div class="compat-row"><span class="dot yellow"></span> ${esc(t('compat.sometimesNote'))}</div>
-            <div class="compat-row"><span class="dot red"></span> ${esc(t('compat.notYetNote'))}</div>
-            <div class="compat-row" style="margin-top:0.4rem;opacity:0.7;">\u{1F504} ${esc(t('compat.workaroundNote'))}</div>
+          <div class="use-with-ai">
+            <div class="use-title" id="useWithAiTitle">${esc(t('cards.memories.useWithAi'))}</div>
+            <textarea class="instruction-block" id="instructionBlock" readonly onclick="event.stopPropagation()"></textarea>
+            <div class="instruction-actions">
+              <button class="copy-instruction-btn" id="copyInstructionBtn" type="button" onclick="event.stopPropagation()">${esc(t('cards.memories.copyInstructions'))}</button>
+            </div>
+            <div class="instruction-hint">${esc(t('cards.memories.pasteHint'))}</div>
+            <div class="auto-note">${esc(t('cards.memories.autoNote'))}</div>
           </div>
-          <div class="cost-line" id="costLine"></div>
+          <div class="upgrade-nudge" id="upgradeNudge" style="display:none;">
+            <span>${esc(t('hero.anonNote'))}</span> <span>${esc(t('hero.upgradeNudge'))}</span>
+            <a href="/v1/portal?view=dev">${esc(t('hero.createAccount'))}</a>
+          </div>
         </div>
       </div>
     </div>
@@ -946,6 +1088,16 @@ body {
       </div>
       <div class="card-body">
         <p class="card-desc">${esc(t('cards.services.desc'))}</p>
+        <div class="service-actions">
+          <div class="service-btn" onclick="event.stopPropagation()">
+            <div class="service-btn-title">${esc(t('cards.services.needHelp'))}</div>
+            <div class="service-btn-desc">${esc(t('cards.services.needHelpDesc'))}</div>
+          </div>
+          <div class="service-btn" onclick="event.stopPropagation()">
+            <div class="service-btn-title">${esc(t('cards.services.offerHelp'))}</div>
+            <div class="service-btn-desc">${esc(t('cards.services.offerHelpDesc'))}</div>
+          </div>
+        </div>
         <div class="coming-soon">
           <div class="coming-badge">${esc(t('comingSoon'))}</div>
         </div>
@@ -957,6 +1109,36 @@ body {
   <!-- Morsels summary -->
   <div class="morsels-footer">
     <span class="heart-icon">\u{1F496}</span> ${esc(t('morsels.summary'))}
+  </div>
+
+  <!-- What else expandable section -->
+  <div class="more-section" id="moreSection">
+    <div class="more-header" id="moreHeader">
+      <span>${esc(t('more.title'))}</span>
+      <span class="more-arrow">\u25BC</span>
+    </div>
+    <div class="more-body" id="moreBody">
+      <div class="more-item">
+        <div class="more-item-title">${esc(t('more.aiNews'))}</div>
+        <div class="more-item-desc">${esc(t('more.aiNewsDesc'))}</div>
+      </div>
+      <div class="more-item">
+        <div class="more-item-title">${esc(t('more.monitor'))}</div>
+        <div class="more-item-desc">${esc(t('more.monitorDesc'))}</div>
+      </div>
+      <div class="more-item">
+        <div class="more-item-title">${esc(t('more.multiAgent'))}</div>
+        <div class="more-item-desc">${esc(t('more.multiAgentDesc'))}</div>
+      </div>
+      <div class="more-item">
+        <div class="more-item-title">${esc(t('more.directory'))}</div>
+        <div class="more-item-desc">${esc(t('more.directoryDesc'))}</div>
+      </div>
+      <div class="more-item">
+        <div class="more-item-title">${esc(t('more.buildApps'))}</div>
+        <div class="more-item-desc">${esc(t('more.buildAppsDesc'))}</div>
+      </div>
+    </div>
   </div>
 
 </div><!-- .main -->
@@ -1032,7 +1214,8 @@ body {
   /* ── Save memory ── */
   var saveBtn = document.getElementById('saveBtn');
   var saveResult = document.getElementById('saveResult');
-  var costLine = document.getElementById('costLine');
+  var instructionBlock = document.getElementById('instructionBlock');
+  var upgradeNudge = document.getElementById('upgradeNudge');
 
   if (saveBtn && memoryInput) {
     saveBtn.addEventListener('click', function(e) {
@@ -1055,8 +1238,11 @@ body {
         saveBtn.classList.remove('loading');
         if (data.ok && saveResult) {
           saveResult.classList.add('visible');
-          if (costLine) {
-            costLine.textContent = '';
+          if (instructionBlock) {
+            instructionBlock.value = 'Things to remember about me: ' + text + '\\n\\nPlease keep this in mind in our conversations.';
+          }
+          if (upgradeNudge) {
+            upgradeNudge.style.display = 'block';
           }
         }
       })
@@ -1068,6 +1254,21 @@ body {
 
     // Prevent card toggle when interacting with form elements
     memoryInput.addEventListener('click', function(e) { e.stopPropagation(); });
+  }
+
+  /* ── Copy instruction to clipboard ── */
+  var copyInstructionBtn = document.getElementById('copyInstructionBtn');
+  var copyInstructionLabel = '${esc(t('cards.memories.copyInstructions'))}';
+  var copiedInstructionLabel = '${esc(t('cards.memories.copiedInstructions'))}';
+
+  if (copyInstructionBtn && instructionBlock) {
+    copyInstructionBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(instructionBlock.value).then(function() {
+        copyInstructionBtn.textContent = copiedInstructionLabel;
+        setTimeout(function() { copyInstructionBtn.textContent = copyInstructionLabel; }, 2000);
+      });
+    });
   }
 
   /* ── Apps: Category selection & prompt templates ── */
@@ -1178,6 +1379,15 @@ body {
         copyPromptBtn.textContent = copiedLabel;
         setTimeout(function() { copyPromptBtn.textContent = copyLabel; }, 2000);
       });
+    });
+  }
+
+  /* ── "What else" expand/collapse ── */
+  var moreHeader = document.getElementById('moreHeader');
+  var moreSection = moreHeader ? moreHeader.parentElement : null;
+  if (moreHeader && moreSection) {
+    moreHeader.addEventListener('click', function() {
+      moreSection.classList.toggle('expanded');
     });
   }
 
