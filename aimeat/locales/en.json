@@ -45,9 +45,13 @@
         "customDesc": "Tell what you want and AI builds it"
       },
       "anyAiWorks": "You can build apps with any AI — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them work! Try with different AIs and see which makes the best result.",
-      "tryNow": "Try now: Tic-Tac-Toe",
-      "tryNowDesc": "Create a game, send the link to a friend, play. Under 30 seconds.",
-      "createGame": "Create new game"
+      "step1": "Copy the prompt above",
+      "step2": "Paste into any AI chat (ChatGPT, Claude, Grok, Gemini...)",
+      "step3": "Save what the AI generates as a .html file",
+      "step4": "Open the file in your browser — it works!",
+      "backToCategories": "Back to categories",
+      "copyPrompt": "Copy prompt",
+      "copied": "Copied!"
     },
     "services": {
       "title": "Services",

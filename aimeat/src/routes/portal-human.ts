@@ -347,7 +347,7 @@ body {
 }
 
 .card.expanded .card-body {
-  max-height: 600px;
+  max-height: 900px;
   padding: 0 1.5rem 1.5rem;
 }
 
@@ -528,7 +528,7 @@ body {
   font-style: italic;
 }
 
-/* ── Placeholder (Apps & Services) ── */
+/* ── Placeholder (Services) ── */
 .coming-soon {
   text-align: center;
   padding: 1.5rem 0 0.5rem;
@@ -550,41 +550,116 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.coming-soon .teaser {
-  font-size: 0.88rem;
-  color: var(--text);
-  opacity: 0.75;
-  margin-top: 0.5rem;
+/* ── Apps: Category grid ── */
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 
-.demo-link {
-  display: inline-block;
+@media (min-width: 768px) {
+  .card.expanded .cat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.cat-card {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.cat-card:hover {
+  background: rgba(255, 105, 180, 0.08);
+  border-color: rgba(255, 105, 180, 0.25);
+  transform: translateY(-2px);
+}
+
+.cat-card .cat-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+.cat-card .cat-name { font-weight: 600; font-size: 0.9rem; color: var(--text-bright); }
+.cat-card .cat-desc { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.2rem; }
+
+.prompt-area { display: none; margin-top: 1rem; }
+.prompt-area.visible { display: block; animation: fadeSlideIn 0.3s ease; }
+
+.prompt-box {
+  width: 100%;
+  min-height: 200px;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+}
+
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   margin-top: 0.75rem;
-  padding: 0.65rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.copy-prompt-btn {
+  padding: 0.6rem 1.4rem;
   background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   color: #fff;
-  text-decoration: none;
+  border: none;
   border-radius: var(--radius-sm);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 700;
-  transition: all 0.25s;
+  cursor: pointer;
+  transition: all 0.2s;
   box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
 }
 
-.demo-link:hover {
+.copy-prompt-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
 }
 
-.demo-link:active {
-  transform: translateY(0);
+.back-to-cats {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.demo-desc {
+.back-to-cats:hover {
+  color: var(--text);
+}
+
+.prompt-steps {
+  margin-top: 0.75rem;
   font-size: 0.82rem;
   color: var(--text-dim);
-  margin-top: 0.5rem;
-  opacity: 0.8;
+  line-height: 1.7;
+}
+
+.prompt-steps ol {
+  padding-left: 1.2rem;
+}
+
+.any-ai-note {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: #a5b4fc;
+  line-height: 1.6;
 }
 
 /* ── Morsels Footer ── */
@@ -806,11 +881,55 @@ body {
       </div>
       <div class="card-body">
         <p class="card-desc">${esc(t('cards.apps.desc'))}</p>
-        <div class="coming-soon">
-          <a href="/demos/tictactoe.html" target="_blank" class="demo-link" onclick="event.stopPropagation()">
-            ${esc(t('cards.apps.tryNow'))} \u2192
-          </a>
-          <div class="demo-desc">${esc(t('cards.apps.tryNowDesc'))}</div>
+        <div id="appCategories">
+          <div class="cat-grid">
+            <div class="cat-card" data-category="games" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F3AE}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.games'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.gamesDesc'))}</div>
+            </div>
+            <div class="cat-card" data-category="notes" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F4DD}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.notes'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.notesDesc'))}</div>
+            </div>
+            <div class="cat-card" data-category="trackers" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F4CA}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.trackers'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.trackersDesc'))}</div>
+            </div>
+            <div class="cat-card" data-category="family" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.family'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.familyDesc'))}</div>
+            </div>
+            <div class="cat-card" data-category="creative" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F3A8}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.creative'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.creativeDesc'))}</div>
+            </div>
+            <div class="cat-card" data-category="custom" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F4A1}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.custom'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.customDesc'))}</div>
+            </div>
+          </div>
+          <div class="any-ai-note">${esc(t('cards.apps.anyAiWorks'))}</div>
+        </div>
+        <div class="prompt-area" id="promptArea">
+          <textarea class="prompt-box" id="promptBox" readonly onclick="event.stopPropagation()"></textarea>
+          <div class="prompt-actions">
+            <button class="copy-prompt-btn" id="copyPromptBtn" type="button" onclick="event.stopPropagation()">${esc(t('cards.apps.copyPrompt'))}</button>
+            <span class="back-to-cats" id="backToCats" onclick="event.stopPropagation()">\u2190 ${esc(t('cards.apps.backToCategories'))}</span>
+          </div>
+          <div class="prompt-steps">
+            <ol>
+              <li>${esc(t('cards.apps.step1'))}</li>
+              <li>${esc(t('cards.apps.step2'))}</li>
+              <li>${esc(t('cards.apps.step3'))}</li>
+              <li>${esc(t('cards.apps.step4'))}</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>
@@ -949,6 +1068,117 @@ body {
 
     // Prevent card toggle when interacting with form elements
     memoryInput.addEventListener('click', function(e) { e.stopPropagation(); });
+  }
+
+  /* ── Apps: Category selection & prompt templates ── */
+  var catCards = document.querySelectorAll('.cat-card');
+  var appCategories = document.getElementById('appCategories');
+  var promptArea = document.getElementById('promptArea');
+  var promptBox = document.getElementById('promptBox');
+  var copyPromptBtn = document.getElementById('copyPromptBtn');
+  var backToCats = document.getElementById('backToCats');
+  var copyLabel = '${esc(t('cards.apps.copyPrompt'))}';
+  var copiedLabel = '${esc(t('cards.apps.copied'))}';
+
+  var nodeUrl = (document.querySelector('meta[name="aimeat-node"]') || {}).content || window.location.origin;
+
+  var basePrompt = function(catDesc, extras) {
+    return 'Build me ' + catDesc + ' as a single self-contained HTML file with CSS and JavaScript.\\n\\n' +
+      'The app should store its data using this memory API:\\n' +
+      '- Server: ' + nodeUrl + '\\n' +
+      '- Save data: POST ' + nodeUrl + '/v1/memory with body: {"key": "apps.[APP_TYPE].[UNIQUE_ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}\\n' +
+      '- Read data: GET ' + nodeUrl + '/v1/memory/[key]\\n' +
+      '- List keys: GET ' + nodeUrl + '/v1/memory?prefix=apps.[APP_TYPE]\\n' +
+      '- No authentication needed (anonymous mode is enabled)\\n' +
+      '- Content-Type: application/json for POST requests\\n' +
+      '- The API returns JSON wrapped in: { "ok": true, "data": { ... } }\\n\\n' +
+      'Requirements:\\n' +
+      '- Single HTML file, all CSS and JS inline\\n' +
+      '- Dark theme with dark background (#0a0a1a) and pink accent (#ff69b4)\\n' +
+      '- Mobile-friendly, works on any screen size\\n' +
+      '- Clean, modern UI\\n' +
+      '- The app should work immediately when opened in a browser\\n' +
+      extras + '\\n\\n' +
+      'After generating the file, I will save it as .html and open it in my browser.';
+  };
+
+  var prompts = {
+    games: basePrompt('a multiplayer tic-tac-toe game',
+      '- Multiplayer game where Player 1 creates a game and gets a shareable link (use URL hash #gameId)\\n' +
+      '- Player 2 opens the link to join\\n' +
+      '- Poll every 2 seconds for opponent moves\\n' +
+      '- Game state stored in memory with key like "apps.ttt.[random-id]"\\n' +
+      '- Show game status: waiting for opponent, your turn, opponent turn, you won, you lost, draw'),
+    notes: basePrompt('a simple note-taking app',
+      '- Create, read, and list notes\\n' +
+      '- Each note stored as a separate memory key: "apps.notes.[note-id]"\\n' +
+      '- Show a list of saved notes with timestamps\\n' +
+      '- Click a note to view or edit it\\n' +
+      '- Add a delete button for each note'),
+    trackers: basePrompt('a habit and budget tracker',
+      '- Daily entries for habits or expenses\\n' +
+      '- Each entry stored as: "apps.tracker.[date]"\\n' +
+      '- Show a list view of past entries\\n' +
+      '- Simple progress indicators or summary stats\\n' +
+      '- Add and remove tracked items'),
+    family: basePrompt('a shared family shopping list',
+      '- Shareable via URL so family members can access the same list\\n' +
+      '- Real-time updates by polling memory every 3 seconds\\n' +
+      '- Add and check off items\\n' +
+      '- All data stored under a shared key like "apps.family.[list-id]"\\n' +
+      '- Show who added what (use a simple name prompt on first visit)'),
+    creative: basePrompt('a drawing canvas app',
+      '- Simple drawing canvas with color picker and brush size\\n' +
+      '- Save drawings to memory for persistence\\n' +
+      '- Gallery view of past creations (store as data URLs)\\n' +
+      '- Clear canvas and undo functionality\\n' +
+      '- Each drawing stored as "apps.art.[drawing-id]"'),
+    custom: 'Build me [DESCRIBE WHAT YOU WANT] as a single self-contained HTML file with CSS and JavaScript.\\n\\n' +
+      'The app should store its data using this memory API:\\n' +
+      '- Server: ' + nodeUrl + '\\n' +
+      '- Save data: POST ' + nodeUrl + '/v1/memory with body: {"key": "apps.[APP_TYPE].[UNIQUE_ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}\\n' +
+      '- Read data: GET ' + nodeUrl + '/v1/memory/[key]\\n' +
+      '- List keys: GET ' + nodeUrl + '/v1/memory?prefix=apps.[APP_TYPE]\\n' +
+      '- No authentication needed (anonymous mode is enabled)\\n' +
+      '- Content-Type: application/json for POST requests\\n' +
+      '- The API returns JSON wrapped in: { "ok": true, "data": { ... } }\\n\\n' +
+      'Requirements:\\n' +
+      '- Single HTML file, all CSS and JS inline\\n' +
+      '- Dark theme with dark background (#0a0a1a) and pink accent (#ff69b4)\\n' +
+      '- Mobile-friendly, works on any screen size\\n' +
+      '- Clean, modern UI\\n' +
+      '- The app should work immediately when opened in a browser\\n\\n' +
+      'After generating the file, I will save it as .html and open it in my browser.'
+  };
+
+  catCards.forEach(function(cat) {
+    cat.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var catId = cat.dataset.category;
+      if (prompts[catId] && promptBox) {
+        promptBox.value = prompts[catId];
+        if (appCategories) appCategories.style.display = 'none';
+        if (promptArea) promptArea.classList.add('visible');
+      }
+    });
+  });
+
+  if (backToCats) {
+    backToCats.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (promptArea) promptArea.classList.remove('visible');
+      if (appCategories) appCategories.style.display = '';
+    });
+  }
+
+  if (copyPromptBtn && promptBox) {
+    copyPromptBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(promptBox.value).then(function() {
+        copyPromptBtn.textContent = copiedLabel;
+        setTimeout(function() { copyPromptBtn.textContent = copyLabel; }, 2000);
+      });
+    });
   }
 
 })();
