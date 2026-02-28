@@ -10,7 +10,7 @@
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
     "subtitle": "Ei Googlen, ei OpenAI:n, ei kenenkään muun. Kerro asiat kerran, tekoälysi muistaa, jakaa ja toimii. Kokeile heti, ei tarvitse rekisteröityä.",
-    "anonNote": "Kokeilet tätä anonyymisti. Tietosi vanhenevat ajan myötä.",
+    "anonNote": "Olet kokeilemassa tätä anonyymisti. Tietosi vanhenevat ajan myötä.",
     "upgradeNudge": "Haluatko pitää tietosi pysyvästi?",
     "createAccount": "Luo ilmainen tili"
   },
@@ -64,8 +64,8 @@
       "returnStep1": "Tallenna AI:n tuottama HTML-tiedosto",
       "returnStep2": "Lähetä se tänne sovellukseksi",
       "returnStep3": "Muut voivat käyttää ja arvioida sitä",
-      "returnBtnAnon": "Rekisteröidy ja lähetä sovellus",
-      "returnBtnAuth": "Lähetä sovellus",
+      "returnBtnAnon": "Rekisteröidy ja lisää sovellus",
+      "returnBtnAuth": "Lisää uusi sovellus",
       "returnMotivation": "Saitko sovelluksen valmiiksi? Muut voivat käyttää sitä ja ansaitset sydänmurusia."
     },
     "services": {
@@ -120,8 +120,8 @@
     "monitorDesc": "Näe serverisi terveys dashboardilta reaaliajassa",
     "multiAgent": "Yhdistä useita AI-agentteja",
     "multiAgentDesc": "Anna kaikkien AI:desi jakaa sama muisti",
-    "directory": "Selaa keltaisia sivuja",
-    "directoryDesc": "Löydä palveluita ja tarjoa omiasi",
+    "directory": "Tee oma myynti-ilmoitustaulu",
+    "directoryDesc": "Julkaise ilmoituksia kuvineen, muut näkevät ne boardilta",
     "buildApps": "Rakenna omia sovelluksia",
     "buildAppsDesc": "Kaikki mitä tarvitset on HTTP, ei backendia, ei tietokantaa"
   }

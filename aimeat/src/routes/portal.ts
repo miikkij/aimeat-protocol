@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
-import { createT, detectLocale, toLocale, LOCALES, type Locale, type TFunction } from '../i18n.js';
+import { createT, detectLocale, toLocale, resolveLocale, LOCALES, type Locale, type TFunction } from '../i18n.js';
 import { humanPortalHtml } from './portal-human.js';
 
 /* ──────────────────────────────────────────────────────────
@@ -1406,7 +1406,8 @@ export function portalRouter(config: MeatConfig, storage: Storage): Router {
   router.get('/v1/portal', async (req, res) => {
     const viewParam = req.query.view as string | undefined;
     const langParam = req.query.lang as string | undefined;
-    const locale = langParam ? toLocale(langParam) : detectLocale(req.headers['accept-language']);
+    const locale = resolveLocale(langParam, req.headers.cookie, req.headers['accept-language']);
+    if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
     const t = createT(locale);
 
     const [agents, actions, boards] = await Promise.all([

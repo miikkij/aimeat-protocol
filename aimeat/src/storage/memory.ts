@@ -304,6 +304,13 @@ export class InMemoryStorage implements Storage {
     return results.slice(0, limit);
   }
 
+  async deletePost(boardId: string, postId: string): Promise<boolean> {
+    const key = `${boardId}::${postId}`;
+    if (!this.posts.has(key)) return false;
+    this.posts.delete(key);
+    return true;
+  }
+
   async addReaction(boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean> {
     const post = this.posts.get(`${boardId}::${postId}`);
     if (!post) return false;

@@ -552,6 +552,12 @@ export class MongoStorage implements Storage {
             .map((r: any) => this.toPostRecord(r));
     }
 
+    async deletePost(boardId: string, postId: string): Promise<boolean> {
+        this.ensureReady();
+        const result = await this.prisma.boardPost.deleteMany({ where: { boardId, id: postId } });
+        return result.count > 0;
+    }
+
     async addReaction(boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean> {
         this.ensureReady();
         const post = await this.prisma.boardPost.findFirst({ where: { boardId, postId } });

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { createT, detectLocale, toLocale, type Locale, type TFunction } from '../i18n.js';
+import { createT, resolveLocale, type Locale, type TFunction } from '../i18n.js';
 
 function sanitize(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1122,27 +1122,35 @@ textarea.input-field{resize:vertical;min-height:60px}
 var NODE_URL = ${JSON.stringify(config.baseUrl)};
 var session = null;
 
+// ── Clipboard helper (fallback for HTTP) ──
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(function() { return fallbackCopy(text); });
+  }
+  return fallbackCopy(text);
+}
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+  return Promise.resolve();
+}
+
 // ── i18n helper ──
 function t(key) { return T[key] || key; }
 
 function switchLang(lang) {
   var url = new URL(window.location.href);
   url.searchParams.set('lang', lang);
-  localStorage.setItem('aimeat_locale', lang);
+  localStorage.setItem('aimeat-lang', lang);
+  document.cookie = 'aimeat-lang=' + lang + ';path=/;max-age=31536000;SameSite=Lax';
   window.location.href = url.toString();
 }
-
-// On load, if no lang param but localStorage has one, redirect
-(function() {
-  var url = new URL(window.location.href);
-  if (!url.searchParams.get('lang')) {
-    var stored = localStorage.getItem('aimeat_locale');
-    if (stored && (stored === 'fi' || stored === 'en')) {
-      url.searchParams.set('lang', stored);
-      window.location.replace(url.toString());
-    }
-  }
-})();
 
 // ── Auth setup ──
 console.log('[AIMEAT Profile] Starting auth...', { AIMEAT: !!window.AIMEAT, auth: !!(window.AIMEAT && window.AIMEAT.auth) });
@@ -1657,7 +1665,7 @@ function copyAppPrompt() {
     + 'Please read the attached AIMEAT-OS.md file for the complete API reference and guidelines. '
     + 'The app should be a single HTML file with embedded CSS and JavaScript that I can upload and share. '
     + 'Start by asking me what kind of app I want to build, then help me design and implement it step by step.';
-  navigator.clipboard.writeText(prompt).then(function() {
+  copyToClipboard(prompt).then(function() {
     showToast(t('profile.apps.promptCopied'));
   });
 }
@@ -2126,7 +2134,7 @@ function updateAgentPrompt() {
 function copyAgentPrompt() {
   var el = document.getElementById('agent-connect-prompt');
   if (!el) return;
-  navigator.clipboard.writeText(el.textContent).then(function() {
+  copyToClipboard(el.textContent).then(function() {
     var btn = document.querySelector('.copy-prompt-btn');
     btn.textContent = '\\u{2705} ' + t('profile.agents.copied');
     setTimeout(function(){ btn.textContent = t('profile.agents.copyPrompt'); }, 2000);
@@ -2271,7 +2279,8 @@ export function profileRouter(config: MeatConfig, _storage: Storage): Router {
 
   router.get('/v1/profile', (req, res) => {
     const langParam = req.query.lang as string | undefined;
-    const locale = langParam ? toLocale(langParam) : detectLocale(req.headers['accept-language']);
+    const locale = resolveLocale(langParam, req.headers.cookie, req.headers['accept-language']);
+    if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
     const translations = buildProfileTranslations(locale);
     res.type('text/html').send(profileHtml(config, locale, translations));
   });

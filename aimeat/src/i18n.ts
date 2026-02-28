@@ -8,7 +8,7 @@ interface Dict { [key: string]: string | string[] | Dict; }
 
 export type Locale = 'en' | 'fi';
 export const LOCALES: readonly Locale[] = ['en', 'fi'] as const;
-export const DEFAULT_LOCALE: Locale = 'fi';
+export const DEFAULT_LOCALE: Locale = 'en';
 
 export type TFunction = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -67,4 +67,23 @@ export function detectLocale(acceptLang: string | undefined): Locale {
 export function toLocale(val: unknown): Locale {
   if (typeof val === 'string' && LOCALES.includes(val as Locale)) return val as Locale;
   return DEFAULT_LOCALE;
+}
+
+/** Extract locale from cookie header string (looks for aimeat-lang=xx). */
+export function localeFromCookie(cookieHeader: string | undefined): Locale | undefined {
+  if (!cookieHeader) return undefined;
+  const match = cookieHeader.match(/(?:^|;\s*)aimeat-lang=(en|fi)(?:;|$)/);
+  return match ? (match[1] as Locale) : undefined;
+}
+
+/** Resolve locale from request: ?lang= query > cookie > Accept-Language > default. */
+export function resolveLocale(
+  langParam: string | undefined,
+  cookieHeader: string | undefined,
+  acceptLang: string | undefined,
+): Locale {
+  if (langParam) return toLocale(langParam);
+  const fromCookie = localeFromCookie(cookieHeader);
+  if (fromCookie) return fromCookie;
+  return detectLocale(acceptLang);
 }

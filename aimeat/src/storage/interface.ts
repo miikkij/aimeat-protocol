@@ -256,6 +256,7 @@ export interface Storage {
   createPost(post: BoardPostRecord): Promise<BoardPostRecord>;
   getPost(boardId: string, postId: string): Promise<BoardPostRecord | null>;
   listPosts(boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]>;
+  deletePost(boardId: string, postId: string): Promise<boolean>;
   addReaction(boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean>;
 
   // Board Subscriptions

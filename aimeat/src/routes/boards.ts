@@ -45,11 +45,6 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
   // POST /v1/boards — create a board (agent auth)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
     const { name, visibility, allowed_gaiis, description } = req.body ?? {};
-    if (visibility === 'public' && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can create public boards'));
-      return;
-    }
-
     const id = `board-${randomBytes(8).toString('hex')}`;
     const board = await storage.createBoard({
       id,
@@ -337,6 +332,29 @@ export function boardsRouter(config: MeatConfig, storage: Storage): Router {
       { description: 'React to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/react` },
       { description: 'Reply to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/replies` },
     ]));
+  });
+
+  // DELETE /v1/boards/:boardId/posts/:postId — delete own post
+  router.delete('/v1/boards/:boardId/posts/:postId', requireAuth(), requireRole('agent'), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const postId = req.params.postId as string;
+    const gaii = req.auth!.sub;
+
+    const post = await storage.getPost(boardId, postId);
+    if (!post) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Post not found: ${postId}`));
+      return;
+    }
+
+    // Only the author or the board owner can delete a post
+    const board = await storage.getBoard(boardId);
+    if (post.authorGaii !== gaii && board?.ownerGaii !== gaii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the author or board owner can delete this post'));
+      return;
+    }
+
+    await storage.deletePost(boardId, postId);
+    res.json(success(config.nodeId, { deleted: true, post_id: postId }));
   });
 
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post

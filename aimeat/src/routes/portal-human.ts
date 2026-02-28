@@ -1385,7 +1385,7 @@ body {
               <li style="margin-bottom:.25rem">${esc(t('cards.apps.returnStep2'))}</li>
               <li>${esc(t('cards.apps.returnStep3'))}</li>
             </ol>
-            <button class="cta-btn" id="return-app-btn" data-auth-text="${esc(t('cards.apps.returnBtnAuth'))}" style="font-size:.85rem;padding:.5rem 1.25rem">${esc(t('cards.apps.returnBtnAnon'))}</button>
+            <button class="copy-prompt-btn" id="return-app-btn" data-auth-text="${esc(t('cards.apps.returnBtnAuth'))}" style="font-size:.85rem;padding:.5rem 1.25rem">${esc(t('cards.apps.returnBtnAnon'))}</button>
           </div>
         </div>
       </div>
@@ -1413,6 +1413,28 @@ body {
             <div class="service-btn-desc">${esc(t('cards.services.offerHelpDesc'))}</div>
           </div>
         </div>
+
+        <!-- Need help form -->
+        <div class="service-form" id="needHelpForm" onclick="event.stopPropagation()">
+          <textarea class="service-input" id="needHelpInput" rows="3" placeholder="${esc(t('cards.services.needHelpPlaceholder'))}"></textarea>
+          <div class="service-chips" id="needHelpChips"></div>
+          <div class="service-form-actions">
+            <button class="service-submit-btn" id="submitRequestBtn">${esc(t('cards.services.submitRequest'))}</button>
+            <span class="back-link" onclick="hideServiceForm()">${esc(t('cards.services.backToChoices'))}</span>
+          </div>
+          <div class="service-result" id="needHelpResult" style="display:none;margin-top:0.75rem;padding:0.75rem;background:rgba(34,197,94,0.1);border-radius:8px;color:#86efac;font-size:0.9rem"></div>
+        </div>
+
+        <!-- Offer help form -->
+        <div class="service-form" id="offerHelpForm" onclick="event.stopPropagation()">
+          <textarea class="service-input" id="offerHelpInput" rows="3" placeholder="${esc(t('cards.services.offerHelpPlaceholder'))}"></textarea>
+          <div class="service-chips" id="offerHelpChips"></div>
+          <div class="service-form-actions">
+            <button class="service-submit-btn" id="submitOfferBtn">${esc(t('cards.services.submitOffer'))}</button>
+            <span class="back-link" onclick="hideServiceForm()">${esc(t('cards.services.backToChoices'))}</span>
+          </div>
+          <div class="service-result" id="offerHelpResult" style="display:none;margin-top:0.75rem;padding:0.75rem;background:rgba(34,197,94,0.1);border-radius:8px;color:#86efac;font-size:0.9rem"></div>
+        </div>
       </div>
     </div>
 
@@ -1427,26 +1449,26 @@ body {
   <div class="more-section">
     <div class="more-section-title">${esc(t('more.sectionTitle'))}</div>
     <div class="more-grid">
-      <div class="more-item">
+      <a href="/v1/guide/ai-news" class="more-item" style="text-decoration:none;color:inherit">
         <div class="more-item-title">${esc(t('more.aiNews'))}</div>
         <div class="more-item-desc">${esc(t('more.aiNewsDesc'))}</div>
-      </div>
-      <div class="more-item">
+      </a>
+      <a href="/v1/guide/monitor" class="more-item" style="text-decoration:none;color:inherit">
         <div class="more-item-title">${esc(t('more.monitor'))}</div>
         <div class="more-item-desc">${esc(t('more.monitorDesc'))}</div>
-      </div>
-      <div class="more-item">
+      </a>
+      <a href="/v1/guide/multi-agent" class="more-item" style="text-decoration:none;color:inherit">
         <div class="more-item-title">${esc(t('more.multiAgent'))}</div>
         <div class="more-item-desc">${esc(t('more.multiAgentDesc'))}</div>
-      </div>
-      <div class="more-item">
+      </a>
+      <a href="/v1/guide/directory" class="more-item" style="text-decoration:none;color:inherit">
         <div class="more-item-title">${esc(t('more.directory'))}</div>
         <div class="more-item-desc">${esc(t('more.directoryDesc'))}</div>
-      </div>
-      <div class="more-item">
+      </a>
+      <a href="/v1/guide/build-apps" class="more-item" style="text-decoration:none;color:inherit">
         <div class="more-item-title">${esc(t('more.buildApps'))}</div>
         <div class="more-item-desc">${esc(t('more.buildAppsDesc'))}</div>
-      </div>
+      </a>
     </div>
   </div>
 
@@ -1457,6 +1479,25 @@ body {
 (function() {
   'use strict';
 
+  /* ── Clipboard helper (fallback for HTTP) ── */
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function() { return fallbackCopy(text); });
+    }
+    return fallbackCopy(text);
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+
   /* ── Language persistence ── */
   var LANG_KEY = 'aimeat-lang';
   var urlParams = new URLSearchParams(window.location.search);
@@ -1464,13 +1505,7 @@ body {
 
   if (langFromUrl) {
     try { localStorage.setItem(LANG_KEY, langFromUrl); } catch(e) {}
-  } else {
-    try {
-      var stored = localStorage.getItem(LANG_KEY);
-      if (stored && (stored === 'fi' || stored === 'en')) {
-        window.location.replace(window.location.pathname + '?lang=' + stored);
-      }
-    } catch(e) {}
+    document.cookie = LANG_KEY + '=' + langFromUrl + ';path=/;max-age=31536000;SameSite=Lax';
   }
 
   /* ── Starfield background ── */
@@ -1647,7 +1682,7 @@ body {
   if (copyInstructionBtn && instructionBlock) {
     copyInstructionBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      navigator.clipboard.writeText(instructionBlock.value).then(function() {
+      copyToClipboard(instructionBlock.value).then(function() {
         copyInstructionBtn.textContent = copiedInstructionLabel;
         setTimeout(function() { copyInstructionBtn.textContent = copyInstructionLabel; }, 2000);
       });
@@ -1794,7 +1829,7 @@ body {
   if (copyPromptBtn && promptBox) {
     copyPromptBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      navigator.clipboard.writeText(promptBox.value).then(function() {
+      copyToClipboard(promptBox.value).then(function() {
         copyPromptBtn.textContent = copiedLabel;
         setTimeout(function() { copyPromptBtn.textContent = copyLabel; }, 2000);
       });
@@ -1805,13 +1840,30 @@ body {
   var returnBtn = document.getElementById('return-app-btn');
   if (returnBtn) {
     returnBtn.addEventListener('click', function() {
-      if (typeof AIMEAT !== 'undefined' && AIMEAT.auth && AIMEAT.auth.hasSession) {
+      if (typeof AIMEAT === 'undefined' || !AIMEAT.auth) return;
+      var existing = AIMEAT.auth.getSession();
+
+      /* Already logged in → go to profile apps tab */
+      if (existing && existing.token) {
         window.location.href = '/v1/profile?tab=apps';
-      } else {
-        var reg = document.getElementById('register');
-        if (reg) reg.scrollIntoView({ behavior: 'smooth' });
-        else window.location.href = '/v1/portal#services';
+        return;
       }
+
+      /* Not logged in → open sign-in modal */
+      var tmp = document.createElement('div');
+      tmp.id = 'aimeat-return-auth';
+      tmp.style.position = 'fixed';
+      tmp.style.top = '-9999px';
+      document.body.appendChild(tmp);
+      AIMEAT.auth.mountLoginButton('#aimeat-return-auth', {
+        nodeUrl: '${jesc(config.baseUrl)}',
+        onLogin: function(session) {
+          tmp.remove();
+          window.location.href = '/v1/profile?tab=apps';
+        }
+      });
+      var loginBtn = document.getElementById('aimeat-login-btn');
+      if (loginBtn) loginBtn.click();
     });
     // Update text if already logged in
     setTimeout(function() {
@@ -1821,45 +1873,143 @@ body {
     }, 500);
   }
 
-  /* ── Services: need help / offer help → sign in modal ── */
+  /* ── Services: need help / offer help ── */
   var needHelpBtn = document.getElementById('needHelpBtn');
   var offerHelpBtn = document.getElementById('offerHelpBtn');
+  var needHelpForm = document.getElementById('needHelpForm');
+  var offerHelpForm = document.getElementById('offerHelpForm');
+  var serviceChoices = document.getElementById('serviceChoices');
 
-  function showServiceSignIn(mode) {
+  /* Populate example chips */
+  var needHelpExamples = [${t('cards.services.needHelpExamples').split(', ').map(s => `'${jesc(s)}'`).join(',')}];
+  var offerHelpExamples = [${t('cards.services.offerHelpExamples').split(', ').map(s => `'${jesc(s)}'`).join(',')}];
+
+  function populateChips(containerId, examples, inputId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    examples.forEach(function(ex) {
+      var chip = document.createElement('span');
+      chip.className = 'service-chip';
+      chip.textContent = ex;
+      chip.addEventListener('click', function() {
+        var input = document.getElementById(inputId);
+        if (input) input.value = ex;
+      });
+      container.appendChild(chip);
+    });
+  }
+  populateChips('needHelpChips', needHelpExamples, 'needHelpInput');
+  populateChips('offerHelpChips', offerHelpExamples, 'offerHelpInput');
+
+  function showServiceForm(mode) {
     if (typeof AIMEAT === 'undefined' || !AIMEAT.auth) return;
-
-    /* If already logged in, go straight to profile */
     var existing = AIMEAT.auth.getSession();
-    if (existing && existing.token) {
-      window.location.href = '/v1/profile';
+
+    /* Not logged in → open sign-in modal */
+    if (!existing || !existing.token) {
+      var tmp = document.createElement('div');
+      tmp.id = 'aimeat-service-auth';
+      tmp.style.position = 'fixed';
+      tmp.style.top = '-9999px';
+      document.body.appendChild(tmp);
+      AIMEAT.auth.mountLoginButton('#aimeat-service-auth', {
+        nodeUrl: '${jesc(config.baseUrl)}',
+        onLogin: function(session) {
+          tmp.remove();
+          showServiceForm(mode);
+        }
+      });
+      var loginBtn = document.getElementById('aimeat-login-btn');
+      if (loginBtn) loginBtn.click();
       return;
     }
 
-    /* Mount a hidden login button, then click it to open the modal */
-    var tmp = document.createElement('div');
-    tmp.id = 'aimeat-service-auth';
-    tmp.style.position = 'fixed';
-    tmp.style.top = '-9999px';
-    document.body.appendChild(tmp);
+    /* Logged in → show the form */
+    if (serviceChoices) serviceChoices.style.display = 'none';
+    if (mode === 'request') {
+      if (needHelpForm) needHelpForm.classList.add('visible');
+      if (offerHelpForm) offerHelpForm.classList.remove('visible');
+    } else {
+      if (offerHelpForm) offerHelpForm.classList.add('visible');
+      if (needHelpForm) needHelpForm.classList.remove('visible');
+    }
+  }
 
-    AIMEAT.auth.mountLoginButton('#aimeat-service-auth', {
-      nodeUrl: '${jesc(config.baseUrl)}',
-      onLogin: function(session) {
-        tmp.remove();
-        window.location.href = '/v1/profile';
-      }
-    });
-
-    /* The widget rendered a login button; click it to open the sign-in modal */
-    var loginBtn = document.getElementById('aimeat-login-btn');
-    if (loginBtn) loginBtn.click();
+  function hideServiceForm() {
+    if (needHelpForm) needHelpForm.classList.remove('visible');
+    if (offerHelpForm) offerHelpForm.classList.remove('visible');
+    if (serviceChoices) serviceChoices.style.display = '';
   }
 
   if (needHelpBtn) {
-    needHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceSignIn('request'); });
+    needHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceForm('request'); });
   }
   if (offerHelpBtn) {
-    offerHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceSignIn('offer'); });
+    offerHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceForm('offer'); });
+  }
+
+  /* Submit request */
+  var submitRequestBtn = document.getElementById('submitRequestBtn');
+  if (submitRequestBtn) {
+    submitRequestBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var input = document.getElementById('needHelpInput');
+      var text = input ? input.value.trim() : '';
+      if (!text) return;
+      var session = AIMEAT.auth.getSession();
+      if (!session || !session.token) return;
+      submitRequestBtn.disabled = true;
+      submitRequestBtn.textContent = '...';
+      fetch('${jesc(config.baseUrl)}/v1/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token },
+        body: JSON.stringify({ key: 'service-request:' + Date.now(), value: { type: 'service_request', text: text, created: new Date().toISOString() }, visibility: 'node' })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        var result = document.getElementById('needHelpResult');
+        if (result) {
+          result.textContent = '${jesc(t('cards.services.posted'))} ${jesc(t('cards.services.requestPosted'))}';
+          result.style.display = 'block';
+        }
+        if (input) input.value = '';
+        submitRequestBtn.disabled = false;
+        submitRequestBtn.textContent = '${jesc(t('cards.services.submitRequest'))}';
+      }).catch(function() {
+        submitRequestBtn.disabled = false;
+        submitRequestBtn.textContent = '${jesc(t('cards.services.submitRequest'))}';
+      });
+    });
+  }
+
+  /* Submit offer */
+  var submitOfferBtn = document.getElementById('submitOfferBtn');
+  if (submitOfferBtn) {
+    submitOfferBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var input = document.getElementById('offerHelpInput');
+      var text = input ? input.value.trim() : '';
+      if (!text) return;
+      var session = AIMEAT.auth.getSession();
+      if (!session || !session.token) return;
+      submitOfferBtn.disabled = true;
+      submitOfferBtn.textContent = '...';
+      fetch('${jesc(config.baseUrl)}/v1/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token },
+        body: JSON.stringify({ key: 'service-offer:' + Date.now(), value: { type: 'service_offer', text: text, created: new Date().toISOString() }, visibility: 'node' })
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        var result = document.getElementById('offerHelpResult');
+        if (result) {
+          result.textContent = '${jesc(t('cards.services.posted'))} ${jesc(t('cards.services.offerPosted'))}';
+          result.style.display = 'block';
+        }
+        if (input) input.value = '';
+        submitOfferBtn.disabled = false;
+        submitOfferBtn.textContent = '${jesc(t('cards.services.submitOffer'))}';
+      }).catch(function() {
+        submitOfferBtn.disabled = false;
+        submitOfferBtn.textContent = '${jesc(t('cards.services.submitOffer'))}';
+      });
+    });
   }
 
 

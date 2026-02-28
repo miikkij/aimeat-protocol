@@ -37,6 +37,7 @@ import { ghiiRouter } from './routes/ghii.js';
 import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
 import { aimeatOsRouter } from './routes/aimeat-os.js';
+import { guidesRouter } from './routes/guides.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import type { Storage } from './storage/interface.js';
@@ -226,6 +227,7 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));
   app.use(aimeatOsRouter(config));
+  app.use(guidesRouter(config));
   app.use(specRouter());
 
   // Global error handler

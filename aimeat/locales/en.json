@@ -64,8 +64,8 @@
       "returnStep1": "Save the HTML file the AI generated",
       "returnStep2": "Upload it here as an app",
       "returnStep3": "Others can use and rate it",
-      "returnBtnAnon": "Register and upload app",
-      "returnBtnAuth": "Upload app",
+      "returnBtnAnon": "Register and add app",
+      "returnBtnAuth": "Add new app",
       "returnMotivation": "Got your app ready? Others can use it and you'll earn heart morsels."
     },
     "services": {
@@ -120,8 +120,8 @@
     "monitorDesc": "See your server health on a real-time dashboard",
     "multiAgent": "Connect multiple AI agents",
     "multiAgentDesc": "Let all your AIs share the same memory",
-    "directory": "Browse the directory",
-    "directoryDesc": "Find services and offer your own",
+    "directory": "Create a sales bulletin board",
+    "directoryDesc": "Post listings with images, others see them on the board",
     "buildApps": "Build your own apps",
     "buildAppsDesc": "All you need is HTTP, no backend, no database"
   }

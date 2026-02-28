@@ -8,6 +8,16 @@ import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
+/**
+ * Extract storage key from Express 5 wildcard {*key} param.
+ * path-to-regexp v8 returns an array of path segments and auto-decodes %xx.
+ * Handles both encoded slashes (%2F → single element) and raw slashes (multiple elements).
+ */
+function extractKey(params: Record<string, string | string[]>): string {
+    const k = params.key;
+    return Array.isArray(k) ? k.join('/') : k;
+}
+
 export function storageFilesRouter(config: MeatConfig, storage: Storage): Router {
     const router = Router();
 
@@ -108,74 +118,10 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         }));
     });
 
-    // HEAD /v1/storage/:key — file metadata (agent auth)
-    // Must be registered before GET to prevent Express auto-HEAD via GET handler
-    router.head('/v1/storage/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
-        const key = decodeURIComponent(req.params.key as string);
-        const file = await storage.getStorageFile(gaii, key);
-        if (!file) {
-            res.status(404).end();
-            return;
-        }
-
-        res.setHeader('Content-Type', file.mimeType);
-        res.setHeader('Content-Length', file.size);
-        res.setHeader('X-AIMEAT-Visibility', file.visibility);
-        res.setHeader('X-AIMEAT-Created', file.createdAt);
-        res.status(200).end();
-    });
-
-    // GET /v1/storage/:key — download file (agent auth)
-    router.get('/v1/storage/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
-        const key = decodeURIComponent(req.params.key as string);
-        const file = await storage.getStorageFile(gaii, key);
-        if (!file) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
-            return;
-        }
-
-        // Range header support
-        const rangeHeader = req.headers.range;
-        if (rangeHeader) {
-            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-            if (match) {
-                const start = parseInt(match[1], 10);
-                const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
-                const chunk = file.data.subarray(start, end + 1);
-                res.status(206);
-                res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
-                res.setHeader('Content-Length', chunk.length);
-                res.setHeader('Content-Type', file.mimeType);
-                res.end(chunk);
-                return;
-            }
-        }
-
-        res.setHeader('Content-Type', file.mimeType);
-        res.setHeader('Content-Length', file.size);
-        res.end(file.data);
-    });
-
-    // DELETE /v1/storage/:key — delete file (agent auth)
-    router.delete('/v1/storage/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
-        const key = decodeURIComponent(req.params.key as string);
-        const deleted = await storage.deleteStorageFile(gaii, key);
-        if (!deleted) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
-            return;
-        }
-
-        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(key)}`);
-        emitResourceListChanged(gaii);
-
-        res.json(success(config.nodeId, { deleted: true, key }));
-    });
-
     // -----------------------------------------------
     // Chunked Upload — Large file support
+    // Must be registered BEFORE wildcard {*key} routes to prevent
+    // /v1/storage/upload/... from matching the wildcard pattern.
     // -----------------------------------------------
 
     // POST /v1/storage/upload/init — initiate chunked upload
@@ -361,6 +307,103 @@ export function storageFilesRouter(config: MeatConfig, storage: Storage): Router
         await storage.deleteChunkedUpload(uploadId);
 
         res.json(success(config.nodeId, { upload_id: uploadId, aborted: true }));
+    });
+
+    // -----------------------------------------------
+    // Public file access — no auth required for "public" visibility files.
+    // Mirrors the /v1/memory/:gaii/:key pattern.
+    // Registered BEFORE wildcard {*key} routes to take priority.
+    // -----------------------------------------------
+
+    // GET /v1/pub/:gaii/{*key} — public file download (no auth)
+    // Enables <img src="..."> and direct links for public files.
+    router.get('/v1/pub/:gaii/{*key}', async (req, res) => {
+        const gaii = req.params.gaii as string;
+        const key = extractKey(req.params);
+        const file = await storage.getStorageFile(gaii, key);
+        if (!file || file.visibility !== 'public') {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            return;
+        }
+
+        // Cache public files for 5 minutes
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.size);
+        res.end(file.data);
+    });
+
+    // -----------------------------------------------
+    // Authenticated file access routes — use {*key} wildcard to support
+    // keys containing slashes (e.g. "images/photo.png").
+    // Express 5 path-to-regexp v8 auto-decodes %xx in params,
+    // so no manual decodeURIComponent needed.
+    // -----------------------------------------------
+
+    // HEAD /v1/storage/{*key} — file metadata (agent auth)
+    // Must be registered before GET to prevent Express auto-HEAD via GET handler
+    router.head('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
+        const gaii = req.auth!.sub;
+        const key = extractKey(req.params);
+        const file = await storage.getStorageFile(gaii, key);
+        if (!file) {
+            res.status(404).end();
+            return;
+        }
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.size);
+        res.setHeader('X-AIMEAT-Visibility', file.visibility);
+        res.setHeader('X-AIMEAT-Created', file.createdAt);
+        res.status(200).end();
+    });
+
+    // GET /v1/storage/{*key} — download file (agent auth)
+    router.get('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
+        const gaii = req.auth!.sub;
+        const key = extractKey(req.params);
+        const file = await storage.getStorageFile(gaii, key);
+        if (!file) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+            return;
+        }
+
+        // Range header support
+        const rangeHeader = req.headers.range;
+        if (rangeHeader) {
+            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+            if (match) {
+                const start = parseInt(match[1], 10);
+                const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
+                const chunk = file.data.subarray(start, end + 1);
+                res.status(206);
+                res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
+                res.setHeader('Content-Length', chunk.length);
+                res.setHeader('Content-Type', file.mimeType);
+                res.end(chunk);
+                return;
+            }
+        }
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.size);
+        res.end(file.data);
+    });
+
+    // DELETE /v1/storage/{*key} — delete file (agent auth)
+    router.delete('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
+        const gaii = req.auth!.sub;
+        const key = extractKey(req.params);
+        const deleted = await storage.deleteStorageFile(gaii, key);
+        if (!deleted) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+            return;
+        }
+
+        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(key)}`);
+        emitResourceListChanged(gaii);
+
+        res.json(success(config.nodeId, { deleted: true, key }));
     });
 
     return router;
