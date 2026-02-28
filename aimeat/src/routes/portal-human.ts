@@ -1418,25 +1418,6 @@ body {
             <div class="service-btn-desc">${esc(t('cards.services.offerHelpDesc'))}</div>
           </div>
         </div>
-        <div class="service-form" id="serviceForm">
-          <textarea class="service-input" id="serviceInput" rows="2" maxlength="500" onclick="event.stopPropagation()"></textarea>
-          <div class="service-chips" id="serviceChips"></div>
-          <div class="service-form-actions">
-            <button class="service-submit-btn" id="serviceSubmitBtn" type="button" onclick="event.stopPropagation()"></button>
-            <span class="service-back" id="serviceBack" onclick="event.stopPropagation()">\u2190 ${esc(t('cards.services.backToChoices'))}</span>
-          </div>
-          <div class="service-register" id="serviceRegister">
-            <div class="register-cta" onclick="event.stopPropagation()">
-              <div class="register-cta-title">${esc(t('cards.services.registerTitle'))}</div>
-              <div class="register-cta-desc">${esc(t('cards.services.registerDesc'))}</div>
-              <ul class="register-benefits" id="registerBenefits"></ul>
-              <a class="register-cta-btn" href="/v1/portal?view=dev${locale !== 'fi' ? '&lang=' + locale : ''}" onclick="event.stopPropagation()">${esc(t('cards.services.registerBtn'))}</a>
-              <div class="register-signin">
-                ${esc(t('cards.services.alreadyHaveAccount'))} <a href="/v1/portal/profile">${esc(t('cards.services.signInLink'))}</a>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1479,6 +1460,7 @@ body {
 
 </div><!-- .main -->
 
+<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>
 <script>
 (function() {
   'use strict';
@@ -1827,97 +1809,45 @@ body {
     });
   }
 
-  /* ── Services: need help / offer help → registration CTA ── */
-  var serviceChoices = document.getElementById('serviceChoices');
-  var serviceForm = document.getElementById('serviceForm');
-  var serviceInput = document.getElementById('serviceInput');
-  var serviceChips = document.getElementById('serviceChips');
-  var serviceSubmitBtn = document.getElementById('serviceSubmitBtn');
-  var serviceBack = document.getElementById('serviceBack');
-  var serviceRegister = document.getElementById('serviceRegister');
-  var registerBenefits = document.getElementById('registerBenefits');
+  /* ── Services: need help / offer help → sign in modal ── */
   var needHelpBtn = document.getElementById('needHelpBtn');
   var offerHelpBtn = document.getElementById('offerHelpBtn');
 
-  var serviceMode = ''; // 'request' or 'offer'
+  function showServiceSignIn(mode) {
+    if (typeof AIMEAT === 'undefined' || !AIMEAT.auth) return;
 
-  var needHelpExamples = ${JSON.stringify(t('cards.services.needHelpExamples').split(', '))};
-  var offerHelpExamples = ${JSON.stringify(t('cards.services.offerHelpExamples').split(', '))};
-  var registerBenefitsList = ${JSON.stringify(t('cards.services.registerBenefits').split(', '))};
-
-  /* Populate benefits list */
-  if (registerBenefits) {
-    registerBenefitsList.forEach(function(b) {
-      var li = document.createElement('li');
-      li.textContent = b;
-      registerBenefits.appendChild(li);
-    });
-  }
-
-  function showServiceForm(mode) {
-    serviceMode = mode;
-    if (serviceChoices) serviceChoices.style.display = 'none';
-    if (serviceForm) serviceForm.classList.add('visible');
-    if (serviceRegister) serviceRegister.classList.remove('visible');
-
-    if (mode === 'request') {
-      if (serviceInput) serviceInput.placeholder = '${jesc(t('cards.services.needHelpPlaceholder'))}';
-      if (serviceSubmitBtn) serviceSubmitBtn.textContent = '${jesc(t('cards.services.submitRequest'))}';
-      renderServiceChips(needHelpExamples);
-    } else {
-      if (serviceInput) serviceInput.placeholder = '${jesc(t('cards.services.offerHelpPlaceholder'))}';
-      if (serviceSubmitBtn) serviceSubmitBtn.textContent = '${jesc(t('cards.services.submitOffer'))}';
-      renderServiceChips(offerHelpExamples);
+    /* If already logged in, go straight to profile */
+    var existing = AIMEAT.auth.getSession();
+    if (existing && existing.token) {
+      window.location.href = '/v1/portal/profile';
+      return;
     }
-    if (serviceInput) { serviceInput.value = ''; serviceInput.focus(); }
-  }
 
-  function renderServiceChips(examples) {
-    if (!serviceChips) return;
-    serviceChips.innerHTML = '';
-    examples.forEach(function(ex) {
-      var chip = document.createElement('span');
-      chip.className = 'service-chip';
-      chip.textContent = ex;
-      chip.addEventListener('click', function(e) {
-        e.stopPropagation();
-        if (serviceInput) { serviceInput.value = ex; serviceInput.focus(); }
-      });
-      serviceChips.appendChild(chip);
+    /* Mount a hidden login button, then click it to open the modal */
+    var tmp = document.createElement('div');
+    tmp.id = 'aimeat-service-auth';
+    tmp.style.position = 'fixed';
+    tmp.style.top = '-9999px';
+    document.body.appendChild(tmp);
+
+    AIMEAT.auth.mountLoginButton('#aimeat-service-auth', {
+      nodeUrl: '${jesc(config.baseUrl)}',
+      onLogin: function(session) {
+        tmp.remove();
+        window.location.href = '/v1/portal/profile';
+      }
     });
-  }
 
-  function hideServiceForm() {
-    if (serviceForm) serviceForm.classList.remove('visible');
-    if (serviceChoices) serviceChoices.style.display = '';
-    if (serviceRegister) serviceRegister.classList.remove('visible');
+    /* The widget rendered a login button; click it to open the sign-in modal */
+    var loginBtn = document.getElementById('aimeat-login-btn');
+    if (loginBtn) loginBtn.click();
   }
 
   if (needHelpBtn) {
-    needHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceForm('request'); });
+    needHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceSignIn('request'); });
   }
   if (offerHelpBtn) {
-    offerHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceForm('offer'); });
-  }
-  if (serviceBack) {
-    serviceBack.addEventListener('click', function(e) { e.stopPropagation(); hideServiceForm(); });
-  }
-
-  if (serviceSubmitBtn && serviceInput) {
-    serviceSubmitBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var text = serviceInput.value.trim();
-      if (!text) { serviceInput.focus(); return; }
-
-      /* Save draft so it survives registration flow */
-      try { localStorage.setItem('aimeat_service_draft', JSON.stringify({ text: text, type: serviceMode })); } catch(e) {}
-
-      /* Show registration CTA instead of posting */
-      if (serviceRegister) serviceRegister.classList.add('visible');
-      if (serviceInput) serviceInput.disabled = true;
-      if (serviceSubmitBtn) serviceSubmitBtn.style.display = 'none';
-      if (serviceChips) serviceChips.style.display = 'none';
-    });
+    offerHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceSignIn('offer'); });
   }
 
   /* ── "What else" expand/collapse ── */
