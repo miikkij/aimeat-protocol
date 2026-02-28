@@ -1819,7 +1819,7 @@ body {
     /* If already logged in, go straight to profile */
     var existing = AIMEAT.auth.getSession();
     if (existing && existing.token) {
-      window.location.href = '/v1/portal/profile';
+      window.location.href = '/v1/profile';
       return;
     }
 
@@ -1834,7 +1834,7 @@ body {
       nodeUrl: '${jesc(config.baseUrl)}',
       onLogin: function(session) {
         tmp.remove();
-        window.location.href = '/v1/portal/profile';
+        window.location.href = '/v1/profile';
       }
     });
 
