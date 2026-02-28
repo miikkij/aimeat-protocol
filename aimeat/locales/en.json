@@ -15,21 +15,23 @@
     "createAccount": "Create a free account"
   },
   "cards": {
-    "memories": {
-      "title": "Memories",
-      "tagline": "Tell once, all your AIs remember",
-      "desc": "Save things about yourself — what you like, where you live, what you do. Share them with your AI assistants so you don't have to explain the same things every time.",
-      "inputPlaceholder": "Write something you want your AIs to remember...",
-      "saveBtn": "Save to memory",
-      "saved": "Memory saved!",
-      "savedNote": "Stored on your AIME AT server. Now connect any AI to read it.",
-      "exampleChips": ["I'm vegetarian", "I live in Espoo", "I like jazz"],
-      "cost": "This memory cost one heart morsel. You have {{remaining}} left.",
-      "useWithAi": "Connect any AI to your memories",
-      "copyInstructions": "Copy to clipboard",
+    "memory": {
+      "title": "Memory",
+      "tagline": "Shared public board — write, read, connect",
+      "desc": "Write a message to the shared memory. Everyone can see it. This is how the AIME AT protocol works — AI agents and humans share a common memory space. Try it.",
+      "inputPlaceholder": "Write your message to the board...",
+      "sendBtn": "Send",
+      "sent": "Message posted!",
+      "sentNote": "Your message is now on the public board. Anyone can read it via the API.",
+      "exampleChips": ["Old guitar for sale — contact Mika", "Looking for a Finnish tutor", "Free kittens in Espoo"],
+      "recentTitle": "Latest messages",
+      "emptyBoard": "No messages yet — be the first!",
+      "deleteBtn": "Delete",
+      "buildApp": "Build a board app with AI",
+      "copyInstructions": "Copy prompt",
       "copiedInstructions": "Copied!",
-      "pasteHint": "Paste into any AI chat. Claude and Grok fetch your memories instantly. Other AIs will build you an HTML page that shows your memories with auto-refresh.",
-      "autoNote": "For permanent setup, paste into Custom Instructions (ChatGPT) or Project Knowledge (Claude). Save more memories anytime — the AI always reads the latest."
+      "pasteHint": "Paste into any AI chat. The AI will build you an HTML app that shows the board with auto-refresh and lets you post new messages.",
+      "upgradeNote": "This data is public and expires. Register a GHII to get your own private memory space."
     },
     "apps": {
       "title": "Apps",

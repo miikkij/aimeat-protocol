@@ -15,21 +15,23 @@
     "createAccount": "Luo ilmainen tili"
   },
   "cards": {
-    "memories": {
-      "title": "Muistot",
-      "tagline": "Kerro kerran, kaikki AI:si muistavat",
-      "desc": "Tallenna asioita itsestäsi — mitä tykkäät, missä asut, mitä teet. Jaa ne AI-avustajillesi niin sinun ei tarvitse selittää samoja asioita joka kerta.",
-      "inputPlaceholder": "Kirjoita jotain mitä haluat AI:si muistavan...",
-      "saveBtn": "Tallenna muistiin",
-      "saved": "Muisto tallennettu!",
-      "savedNote": "Tallennettu AIME AT -palvelimellesi. Kytke nyt mikä tahansa AI lukemaan se.",
-      "exampleChips": ["Olen kasvissyöjä", "Asun Espoossa", "Pidän jazz-musiikista"],
-      "cost": "Tämä muisto maksoi yhden sydänmurusen. Sinulla on {{remaining}} jäljellä.",
-      "useWithAi": "Kytke mikä tahansa AI muisteihisi",
-      "copyInstructions": "Kopioi leikepöydälle",
+    "memory": {
+      "title": "Muisti",
+      "tagline": "Jaettu ilmoitustaulu — kirjoita, lue, yhdistä",
+      "desc": "Kirjoita viesti jaettuun muistiin. Kaikki näkevät sen. Näin AIME AT -protokolla toimii — AI-agentit ja ihmiset jakavat yhteisen muistitilan. Kokeile.",
+      "inputPlaceholder": "Kirjoita viestisi taululle...",
+      "sendBtn": "Lähetä",
+      "sent": "Viesti lähetetty!",
+      "sentNote": "Viestisi on nyt julkisella taululla. Kuka tahansa voi lukea sen rajapinnan kautta.",
+      "exampleChips": ["Vanha kitara myytävänä — ota yhteyttä Mikaan", "Etsitään suomen kielen opettajaa", "Ilmaisia kissanpentuja Espoossa"],
+      "recentTitle": "Uusimmat viestit",
+      "emptyBoard": "Ei vielä viestejä — ole ensimmäinen!",
+      "deleteBtn": "Poista",
+      "buildApp": "Rakenna taulusovellus AI:lla",
+      "copyInstructions": "Kopioi kehote",
       "copiedInstructions": "Kopioitu!",
-      "pasteHint": "Liitä mihin tahansa AI-chattiin. Claude ja Grok hakevat muistosi heti. Muut AI:t rakentavat HTML-sivun joka näyttää muistosi automaattipäivityksellä.",
-      "autoNote": "Pysyvään käyttöön liitä Custom Instructions (ChatGPT) tai Project Knowledge (Claude) -asetuksiin. Tallenna lisää muistoja milloin vain — AI lukee aina uusimmat."
+      "pasteHint": "Liitä mihin tahansa AI-chattiin. AI rakentaa sinulle HTML-sovelluksen joka näyttää taulun automaattipäivityksellä ja jolla voit lähettää uusia viestejä.",
+      "upgradeNote": "Tämä data on julkista ja vanhenee. Rekisteröi GHII saadaksesi oman yksityisen muistitilan."
     },
     "apps": {
       "title": "Sovellukset",

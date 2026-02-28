@@ -29,9 +29,8 @@ export function humanPortalHtml(
   const otherLocaleLabel = locale === 'fi' ? 'EN' : 'FI';
   const currentLocaleLabel = locale === 'fi' ? 'FI' : 'EN';
 
-  // Example chips as JSON for JS usage
-  const chipsRaw = t('cards.memories.exampleChips');
-  const chips = chipsRaw.split(', ');
+  // Example chips — t() joins arrays with ', ' so chips must not contain commas
+  const chips = t('cards.memory.exampleChips').split(', ');
 
   return `<!DOCTYPE html>
 <html lang="${locale}">
@@ -448,6 +447,77 @@ body {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* ── Board messages ── */
+.board-messages {
+  margin-bottom: 1rem;
+}
+
+.board-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.board-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.board-empty {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.board-msg {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.5;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.board-msg:last-child {
+  border-bottom: none;
+}
+
+.board-msg-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.board-msg-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.board-msg-del {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.board-msg-del:hover {
+  color: #ef4444;
+  opacity: 1;
 }
 
 /* ── Success Message ── */
@@ -1205,45 +1275,56 @@ body {
   <!-- Three Cards -->
   <div class="cards-grid">
 
-    <!-- Card 1: Memories -->
-    <div class="card" id="card-memories" data-card="memories">
+    <!-- Card 1: Memory (shared public board) -->
+    <div class="card" id="card-memory" data-card="memory">
       <div class="card-header">
-        <div class="card-icon">\u{1F4AD}</div>
+        <div class="card-icon">\u{1F4AC}</div>
         <div class="card-text">
-          <div class="card-title">${esc(t('cards.memories.title'))}</div>
-          <div class="card-tagline">${esc(t('cards.memories.tagline'))}</div>
+          <div class="card-title">${esc(t('cards.memory.title'))}</div>
+          <div class="card-tagline">${esc(t('cards.memory.tagline'))}</div>
         </div>
         <div class="card-arrow">\u25BC</div>
       </div>
       <div class="card-body">
-        <p class="card-desc">${esc(t('cards.memories.desc'))}</p>
+        <p class="card-desc">${esc(t('cards.memory.desc'))}</p>
+
+        <!-- Recent messages -->
+        <div class="board-messages" id="boardMessages">
+          <div class="board-title">${esc(t('cards.memory.recentTitle'))}</div>
+          <div class="board-list" id="boardList">
+            <div class="board-empty" id="boardEmpty">${esc(t('cards.memory.emptyBoard'))}</div>
+          </div>
+        </div>
+
+        <!-- Send form -->
         <div class="memory-form">
           <textarea class="memory-input" id="memoryInput" rows="2"
-                    placeholder="${esc(t('cards.memories.inputPlaceholder'))}"
-                    maxlength="500"></textarea>
+                    placeholder="${esc(t('cards.memory.inputPlaceholder'))}"
+                    maxlength="280" onclick="event.stopPropagation()"></textarea>
           <div class="example-chips" id="exampleChips">
             ${chips.map(c => `<span class="chip">${esc(c)}</span>`).join('')}
           </div>
-          <button class="save-btn" id="saveBtn" type="button">
-            ${esc(t('cards.memories.saveBtn'))}
+          <button class="save-btn" id="sendBtn" type="button" onclick="event.stopPropagation()">
+            ${esc(t('cards.memory.sendBtn'))}
           </button>
         </div>
-        <div class="save-result" id="saveResult">
+
+        <!-- Post-send: prompt to build app -->
+        <div class="save-result" id="sendResult">
           <div class="success-box">
-            <div class="check">\u2714 ${esc(t('cards.memories.saved'))}</div>
-            <div class="note">${esc(t('cards.memories.savedNote'))}</div>
+            <div class="check">\u2714 ${esc(t('cards.memory.sent'))}</div>
+            <div class="note">${esc(t('cards.memory.sentNote'))}</div>
           </div>
           <div class="use-with-ai">
-            <div class="use-title" id="useWithAiTitle">${esc(t('cards.memories.useWithAi'))}</div>
+            <div class="use-title">${esc(t('cards.memory.buildApp'))}</div>
             <textarea class="instruction-block" id="instructionBlock" readonly onclick="event.stopPropagation()"></textarea>
             <div class="instruction-actions">
-              <button class="copy-instruction-btn" id="copyInstructionBtn" type="button" onclick="event.stopPropagation()">${esc(t('cards.memories.copyInstructions'))}</button>
+              <button class="copy-instruction-btn" id="copyInstructionBtn" type="button" onclick="event.stopPropagation()">${esc(t('cards.memory.copyInstructions'))}</button>
             </div>
-            <div class="instruction-hint">${esc(t('cards.memories.pasteHint'))}</div>
-            <div class="auto-note">${esc(t('cards.memories.autoNote'))}</div>
+            <div class="instruction-hint">${esc(t('cards.memory.pasteHint'))}</div>
           </div>
-          <div class="upgrade-nudge" id="upgradeNudge" style="display:none;">
-            <span>${esc(t('hero.anonNote'))}</span> <span>${esc(t('hero.upgradeNudge'))}</span>
+          <div class="upgrade-nudge">
+            ${esc(t('cards.memory.upgradeNote'))}
             <a href="/v1/portal?view=dev">${esc(t('hero.createAccount'))}</a>
           </div>
         </div>
@@ -1466,86 +1547,119 @@ body {
     });
   });
 
-  /* ── Save memory ── */
-  var saveBtn = document.getElementById('saveBtn');
-  var saveResult = document.getElementById('saveResult');
-  var instructionBlock = document.getElementById('instructionBlock');
-  var upgradeNudge = document.getElementById('upgradeNudge');
+  /* ── Board: fetch recent messages ── */
+  var boardList = document.getElementById('boardList');
+  var boardEmpty = document.getElementById('boardEmpty');
+  var BOARD_KEY = 'board.public';
 
-  /* Generate or reuse an access code for this user's memory set */
-  function getAccessCode() {
-    var code = null;
-    try { code = localStorage.getItem('aimeat_access_code'); } catch(e) {}
-    if (!code) {
-      code = 'mem_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
-      try { localStorage.setItem('aimeat_access_code', code); } catch(e) {}
-    }
-    return code;
+  function timeAgo(iso) {
+    var sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (sec < 60) return sec + 's';
+    var min = Math.floor(sec / 60);
+    if (min < 60) return min + 'm';
+    var hr = Math.floor(min / 60);
+    if (hr < 24) return hr + 'h';
+    return Math.floor(hr / 24) + 'd';
   }
 
-  if (saveBtn && memoryInput) {
-    saveBtn.addEventListener('click', function(e) {
+  function renderBoard(messages) {
+    if (!boardList) return;
+    if (!messages || messages.length === 0) {
+      boardList.innerHTML = '<div class="board-empty">${jesc(t('cards.memory.emptyBoard'))}</div>';
+      return;
+    }
+    boardList.innerHTML = '';
+    messages.slice(-20).reverse().forEach(function(m) {
+      var div = document.createElement('div');
+      div.className = 'board-msg';
+      div.innerHTML = '<span class="board-msg-text"></span><span class="board-msg-time">' + timeAgo(m.t) + '</span>';
+      div.querySelector('.board-msg-text').textContent = m.msg;
+      boardList.appendChild(div);
+    });
+  }
+
+  function loadBoard() {
+    fetch('/v1/memory/' + BOARD_KEY)
+      .then(function(r) {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function(d) {
+        if (d && d.ok && d.data && d.data.value && d.data.value.messages) {
+          renderBoard(d.data.value.messages);
+        }
+      })
+      .catch(function() {});
+  }
+
+  loadBoard();
+
+  /* ── Send message to board ── */
+  var sendBtn = document.getElementById('sendBtn');
+  var sendResult = document.getElementById('sendResult');
+  var instructionBlock = document.getElementById('instructionBlock');
+
+  if (sendBtn && memoryInput) {
+    sendBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       var text = memoryInput.value.trim();
       if (!text) { memoryInput.focus(); return; }
-      if (text.length > 500) return;
+      if (text.length > 280) return;
 
-      var accessCode = getAccessCode();
-
-      saveBtn.disabled = true;
-      saveBtn.classList.add('loading');
+      sendBtn.disabled = true;
+      sendBtn.classList.add('loading');
 
       fetch('/v1/portal/try-memory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, accessCode: accessCode })
+        body: JSON.stringify({ text: text })
       })
       .then(function(resp) { return resp.json(); })
       .then(function(data) {
-        saveBtn.disabled = false;
-        saveBtn.classList.remove('loading');
-        if (data.ok && saveResult) {
-          saveResult.classList.add('visible');
+        sendBtn.disabled = false;
+        sendBtn.classList.remove('loading');
+        if (data.ok) {
+          memoryInput.value = '';
+          /* Reload board to show new message */
+          loadBoard();
+          /* Show prompt section */
+          if (sendResult) sendResult.classList.add('visible');
           if (instructionBlock) {
-            var readUrl = data.data.readUrl || (nodeUrl + '/v1/mm?op=list&set=my_memories&access_code=' + encodeURIComponent(accessCode));
-            var writeUrl = nodeUrl + '/v1/mm?op=add&set=my_memories&key=KEY&value=VALUE&access_code=' + encodeURIComponent(accessCode);
+            var listUrl = nodeUrl + '/v1/memory/' + BOARD_KEY;
+            var writeUrl = nodeUrl + '/v1/memory';
             instructionBlock.value =
-              'I have a personal memory server (AIME AT protocol) where I store things about myself.\\n\\n' +
+              'There is an AIME AT protocol server at ' + nodeUrl + ' with a public message board.\\n\\n' +
               '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
-              'Fetch this URL now: ' + readUrl + '\\n' +
-              'My memories are in data.entries (key-value pairs). Use them in our conversation.\\n' +
-              'To store something new I tell you, fetch: ' + writeUrl + '\\n' +
-              '(Replace KEY with e.g. diet, city, job and VALUE with what to remember.)\\n\\n' +
-              '## OPTION B — If you cannot fetch URLs (ChatGPT, Gemini, others):\\n' +
-              'Generate a single self-contained HTML file that:\\n' +
-              '1. Fetches ' + readUrl + '\\n' +
-              '2. Displays all my memories from data.entries as a readable list\\n' +
-              '3. Auto-refreshes every 30 seconds so I always see the latest\\n' +
-              '4. Has a form to add new memories (key + value) that POSTs to the write URL\\n' +
-              '5. Dark theme, clean UI, mobile-friendly\\n' +
-              'Write URL for the form: ' + writeUrl + '\\n' +
-              'I will save the HTML file and open it in my browser to see and manage my memories.\\n\\n' +
-              'This is a real, live API — the URLs work right now.';
-          }
-          if (upgradeNudge) {
-            upgradeNudge.style.display = 'block';
+              'Read the board: GET ' + listUrl + '\\n' +
+              'Messages are in data.value.messages (array of {msg, t} objects, newest last).\\n' +
+              'Post a new message: POST ' + writeUrl + '\\n' +
+              'Body: {"key":"' + BOARD_KEY + '","value":{"messages":[...existing..., {"msg":"NEW MESSAGE","t":"ISO_DATE"}]},"visibility":"public"}\\n' +
+              'Read the existing messages first, then append the new one and POST the full array back.\\n\\n' +
+              '## OPTION B — If you cannot fetch URLs:\\n' +
+              'Build a single self-contained HTML file that:\\n' +
+              '1. Fetches ' + listUrl + ' and shows messages from data.value.messages\\n' +
+              '2. Displays each message with its timestamp, newest first\\n' +
+              '3. Has a text input + Send button to post new messages\\n' +
+              '4. To post: GET existing, append new msg to array, POST full updated object back to ' + writeUrl + '\\n' +
+              '5. Auto-refreshes every 15 seconds\\n' +
+              '6. Dark theme (#0a0a1a bg, pink #ff69b4 accent), mobile-friendly\\n' +
+              'Content-Type: application/json for POST requests.\\n' +
+              'I will save the HTML and open it in my browser.\\n\\n' +
+              'This is a live API — the URLs work right now.';
           }
         }
       })
       .catch(function() {
-        saveBtn.disabled = false;
-        saveBtn.classList.remove('loading');
+        sendBtn.disabled = false;
+        sendBtn.classList.remove('loading');
       });
     });
-
-    // Prevent card toggle when interacting with form elements
-    memoryInput.addEventListener('click', function(e) { e.stopPropagation(); });
   }
 
   /* ── Copy instruction to clipboard ── */
   var copyInstructionBtn = document.getElementById('copyInstructionBtn');
-  var copyInstructionLabel = '${jesc(t('cards.memories.copyInstructions'))}';
-  var copiedInstructionLabel = '${jesc(t('cards.memories.copiedInstructions'))}';
+  var copyInstructionLabel = '${jesc(t('cards.memory.copyInstructions'))}';
+  var copiedInstructionLabel = '${jesc(t('cards.memory.copiedInstructions'))}';
 
   if (copyInstructionBtn && instructionBlock) {
     copyInstructionBtn.addEventListener('click', function(e) {
@@ -1785,43 +1899,40 @@ export function humanPortalRouter(config: MeatConfig, storage: Storage): Router 
 
   router.post('/v1/portal/try-memory', requireAuth(), async (req, res) => {
     const text = req.body?.text;
-    const accessCode = req.body?.accessCode;
-    if (!text || typeof text !== 'string' || text.length > 500) {
-      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Text required (max 500 chars)'));
-      return;
-    }
-    if (!accessCode || typeof accessCode !== 'string' || accessCode.length < 4) {
-      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'accessCode required (min 4 chars)'));
+    if (!text || typeof text !== 'string' || text.length > 280) {
+      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Text required (max 280 chars)'));
       return;
     }
 
     const gaii = req.auth!.sub;
-    const setName = 'my_memories';
-    const key = `mem_${Date.now()}`;
+    const boardKey = 'board.public';
 
-    // Store via micro-memory with access_code (creates shared_read set)
-    let record = await storage.getMicroMemory(gaii, setName);
-    if (!record) {
-      record = {
-        gaii,
-        set: setName,
-        entries: {},
-        visibility: 'shared_read' as const,
-        accessCode,
-        updatedAt: new Date().toISOString(),
-      };
+    // Read existing board
+    const existing = await storage.getMemory(gaii, boardKey);
+    const val = existing?.value as Record<string, unknown> | undefined;
+    let messages: { msg: string; t: string }[] = [];
+    if (val?.messages && Array.isArray(val.messages)) {
+      messages = val.messages as { msg: string; t: string }[];
     }
-    record.entries[key] = text;
-    record.updatedAt = new Date().toISOString();
-    await storage.setMicroMemory(record);
 
-    res.json(success(config.nodeId, {
-      key,
-      saved: true,
-      set: setName,
-      accessCode,
-      readUrl: `${config.baseUrl}/v1/mm?op=list&set=${setName}&access_code=${encodeURIComponent(accessCode)}`,
-    }));
+    // Append new message, keep last 20
+    messages.push({ msg: text, t: new Date().toISOString() });
+    if (messages.length > 20) messages = messages.slice(-20);
+
+    // Write back
+    await storage.setMemory({
+      key: boardKey,
+      ownerGaii: gaii,
+      value: { messages },
+      visibility: 'public',
+      tags: ['board'],
+      ttlHours: 72,
+      version: (existing?.version ?? 0) + 1,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json(success(config.nodeId, { posted: true, count: messages.length }));
   });
 
   return router;
