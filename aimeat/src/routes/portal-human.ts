@@ -1741,7 +1741,11 @@ body {
       '7. When game ends, update lobby to remove it or mark as finished\\n' +
       '8. "Back to Lobby" button to return and play again\\n' +
       '9. Lobby auto-refreshes every 5 seconds to show new games\\n\\n' +
-      baseReqs + baseEnd,
+      'General requirements:\\n' +
+      '- Single HTML file, all CSS and JS inline, no external dependencies\\n' +
+      '- Mobile-friendly, works on any screen size\\n' +
+      '- Game-like UI — bold visuals, fun animations, satisfying interactions, sound effects if possible\\n' +
+      '- Works immediately when opened in a browser\\n' + baseEnd,
 
     notes: askUser +
       'I want a note-taking app as a single self-contained HTML file.\\n\\n' +
