@@ -1,7 +1,7 @@
 {
   "nav": {
     "try": "Kokeile",
-    "devView": "Kehittajille",
+    "devView": "Kehittäjille",
     "signIn": "Kirjaudu",
     "profile": "Profiili",
     "logout": "Kirjaudu ulos",
@@ -9,50 +9,50 @@
   },
   "hero": {
     "title": "Sinun muistisi. Sinun AI:llesi.",
-    "subtitle": "Kerro asiat kerran — kaikki AI:si muistavat. Sina paatat mita jaetaan ja kenelle. Kokeile heti, ei tarvitse rekisteroitya.",
-    "anonNote": "Kokeilet tata anonyymisti — tietosi vanhenevat ajan myota.",
-    "upgradeNudge": "Haluatko pitaa tietosi pysyvasti?",
+    "subtitle": "Kerro asiat kerran — kaikki AI:si muistavat. Sinä päätät mitä jaetaan ja kenelle. Kokeile heti, ei tarvitse rekisteröityä.",
+    "anonNote": "Kokeilet tätä anonyymisti — tietosi vanhenevat ajan myötä.",
+    "upgradeNudge": "Haluatko pitää tietosi pysyvästi?",
     "createAccount": "Luo ilmainen tili"
   },
   "cards": {
     "memories": {
       "title": "Muistot",
       "tagline": "Kerro kerran, kaikki AI:si muistavat",
-      "desc": "Tallenna asioita itsestasi — mita tykkaat, missa asut, mita teet. Jaa ne AI-avustajillesi niin sinun ei tarvitse selittaa samoja asioita joka kerta.",
-      "inputPlaceholder": "Kirjoita jotain mita haluat AI:si muistavan...",
+      "desc": "Tallenna asioita itsestäsi — mitä tykkäät, missä asut, mitä teet. Jaa ne AI-avustajillesi niin sinun ei tarvitse selittää samoja asioita joka kerta.",
+      "inputPlaceholder": "Kirjoita jotain mitä haluat AI:si muistavan...",
       "saveBtn": "Tallenna muistiin",
       "saved": "Muisto tallennettu!",
-      "savedNote": "Tama muisto on nyt saatavilla AI:lle jotka kytket tahan.",
-      "exampleChips": ["Olen kasvissyoja", "Asun Espoossa", "Pidan jazz-musiikista"],
-      "cost": "Tama muisto maksoi yhden sydanmurusen. Sinulla on {{remaining}} jaljella.",
-      "useWithAi": "Kayta minka tahansa AI:n kanssa",
-      "copyInstructions": "Kopioi leikepoydale",
+      "savedNote": "Tämä muisto on nyt saatavilla AI:lle jotka kytket tähän.",
+      "exampleChips": ["Olen kasvissyöjä", "Asun Espoossa", "Pidän jazz-musiikista"],
+      "cost": "Tämä muisto maksoi yhden sydänmurusen. Sinulla on {{remaining}} jäljellä.",
+      "useWithAi": "Käytä minkä tahansa AI:n kanssa",
+      "copyInstructions": "Kopioi leikepöydälle",
       "copiedInstructions": "Kopioitu!",
-      "pasteHint": "Liita mihin tahansa AI-chattiin jakaaksesi mieltymyksesi. Pysyvaan kayttoon liita Custom Instructions -asetuksiin (ChatGPT) tai Project Knowledge -asetuksiin (Claude).",
-      "autoNote": "Bonus: Grok ja Claude Pro osaavat hakea nama myos automaattisesti AIME AT -osoitteestasi."
+      "pasteHint": "Liitä mihin tahansa AI-chattiin jakaaksesi mieltymyksesi. Pysyvään käyttöön liitä Custom Instructions -asetuksiin (ChatGPT) tai Project Knowledge -asetuksiin (Claude).",
+      "autoNote": "Bonus: Grok ja Claude Pro osaavat hakea nämä myös automaattisesti AIME AT -osoitteestasi."
     },
     "apps": {
       "title": "Sovellukset",
       "tagline": "Vastaa kysymyksiin, saat sovelluksen",
-      "desc": "Et tarvitse koodaustaitoja. Valitse mita haluaisit tehda, vastaa muutamaan kysymykseen, ja AI rakentaa sinulle sovelluksen. Avaat sen suoraan selaimesta — ja tieto tallentuu niin etta se on saatavilla mista tahansa.",
+      "desc": "Et tarvitse koodaustaitoja. Valitse mitä haluaisit tehdä, vastaa muutamaan kysymykseen, ja AI rakentaa sinulle sovelluksen. Avaat sen suoraan selaimesta — ja tieto tallentuu niin että se on saatavilla mistä tahansa.",
       "categories": {
         "games": "Pelit",
         "gamesDesc": "Haasta kaverisi moninpeliin",
         "notes": "Muistiinpanot",
-        "notesDesc": "Pida paivakirjaa tai muistilistaa",
-        "trackers": "Seurantatyokalut",
-        "trackersDesc": "Seuraa tapoja, budjettia tai mita vain",
-        "family": "Perhetyokalut",
+        "notesDesc": "Pidä päiväkirjaa tai muistilistaa",
+        "trackers": "Seurantatyökalut",
+        "trackersDesc": "Seuraa tapoja, budjettia tai mitä vain",
+        "family": "Perhetyökalut",
         "familyDesc": "Jaettu kalenteri, ostoslista, viestit",
         "creative": "Luovat",
         "creativeDesc": "Tee kuvia, tarinoita tai muuta hauskaa",
         "custom": "Oma idea",
-        "customDesc": "Kerro mita haluat ja AI rakentaa sen"
+        "customDesc": "Kerro mitä haluat ja AI rakentaa sen"
       },
-      "anyAiWorks": "Sovelluksia voi rakentaa milla tahansa AI:lla — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja naet mika tekee parhaan tuloksen.",
-      "step1": "Kopioi yllaoleva kehote",
-      "step2": "Liita se mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...)",
-      "step3": "Tallenna AI:n tekema tulos .html-tiedostona",
+      "anyAiWorks": "Sovelluksia voi rakentaa millä tahansa AI:lla — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja näet mikä tekee parhaan tuloksen.",
+      "step1": "Kopioi ylläoleva kehote",
+      "step2": "Liitä se mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...)",
+      "step3": "Tallenna AI:n tekemä tulos .html-tiedostona",
       "step4": "Avaa tiedosto selaimessa — se toimii!",
       "backToCategories": "Takaisin kategorioihin",
       "copyPrompt": "Kopioi kehote",
@@ -60,42 +60,42 @@
     },
     "services": {
       "title": "Palvelut",
-      "tagline": "Auta muita tai pyyda apua",
-      "desc": "Tarvitsetko kuvan tekemista, tekstin kaantamista, tai apua jonkin tekemisessa? Laita pyynto ja joku — ihminen tai AI — voi toimittaa sen sinulle. Osaatko itse jotain erityista? Tarjoa se palveluna ja nay keltaisilla sivuilla.",
+      "tagline": "Auta muita tai pyydä apua",
+      "desc": "Tarvitsetko kuvan tekemistä, tekstin kääntämistä, tai apua jonkin tekemisessä? Laita pyyntö ja joku — ihminen tai AI — voi toimittaa sen sinulle. Osaatko itse jotain erityistä? Tarjoa se palveluna ja näy keltaisilla sivuilla.",
       "needHelp": "Tarvitsen apua",
-      "needHelpDesc": "Kerro mita tarvitset",
+      "needHelpDesc": "Kerro mitä tarvitset",
       "offerHelp": "Haluan auttaa",
-      "offerHelpDesc": "Kerro mita osaat"
+      "offerHelpDesc": "Kerro mitä osaat"
     }
   },
   "morsels": {
-    "name": "sydanmurunen",
-    "namePlural": "sydanmurusta",
-    "summary": "Sydanmuruset ovat AIME AT:n tapa sanoa kiitos. Saat 100 murusta alkuun — ilmaiseksi. Mita enemman jaat ja autat, sita enemman saat."
+    "name": "sydänmurunen",
+    "namePlural": "sydänmurusta",
+    "summary": "Sydänmuruset ovat AIME AT:n tapa sanoa kiitos. Saat 100 murusta alkuun — ilmaiseksi. Mitä enemmän jaat ja autat, sitä enemmän saat."
   },
   "compat": {
-    "title": "Mitka AI:t osaavat lukea muistisi automaattisesti?",
+    "title": "Mitkä AI:t osaavat lukea muistisi automaattisesti?",
     "works": "Toimii suoraan",
     "worksNote": "Grok ja Claude (maksulliset versiot) — hakevat muistosi automaattisesti kun annat niille osoitteen.",
     "sometimes": "Toimii joskus",
     "sometimesNote": "DeepSeek — onnistuu toisinaan.",
-    "notYet": "Eivat osaa viela",
-    "notYetNote": "ChatGPT (ilmainen), Gemini — eivat ymmarra pyyntoa.",
+    "notYet": "Eivät osaa vielä",
+    "notYetNote": "ChatGPT (ilmainen), Gemini — eivät ymmärrä pyyntöä.",
     "workaround": "Kiertotie kaikille",
-    "workaroundNote": "Kopioi muistosi ja liita se suoraan AI-keskusteluun — toimii aina, kaikkialla."
+    "workaroundNote": "Kopioi muistosi ja liitä se suoraan AI-keskusteluun — toimii aina, kaikkialla."
   },
   "comingSoon": "Tulossa pian",
   "more": {
-    "title": "Mita muuta voit tehda?",
+    "title": "Mitä muuta voit tehdä?",
     "aiNews": "Tilaa AI-uutiskooste",
-    "aiNewsDesc": "Saa joka aamu tuoreimmat uutiset tiivistettyna AI:lla",
+    "aiNewsDesc": "Saa joka aamu tuoreimmat uutiset tiivistettynä AI:lla",
     "monitor": "Seuraa palvelintasi",
-    "monitorDesc": "Nae serverisi terveys dashboardilta reaaliajassa",
-    "multiAgent": "Yhdista useita AI-agentteja",
+    "monitorDesc": "Näe serverisi terveys dashboardilta reaaliajassa",
+    "multiAgent": "Yhdistä useita AI-agentteja",
     "multiAgentDesc": "Anna kaikkien AI:desi jakaa sama muisti",
     "directory": "Selaa keltaisia sivuja",
-    "directoryDesc": "Loyda palveluita ja tarjoa omiasi",
+    "directoryDesc": "Löydä palveluita ja tarjoa omiasi",
     "buildApps": "Rakenna omia sovelluksia",
-    "buildAppsDesc": "Kaikki mita tarvitset on HTTP — ei backendia, ei tietokantaa"
+    "buildAppsDesc": "Kaikki mitä tarvitset on HTTP — ei backendia, ei tietokantaa"
   }
 }
