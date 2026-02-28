@@ -22,15 +22,15 @@
       "inputPlaceholder": "Write your message to the board...",
       "sendBtn": "Send",
       "sent": "Message posted!",
-      "sentNote": "Your message is now on the public board. Anyone can read it via the API.",
+      "sentNote": "Your message is now visible to everyone. Next, you can make your own view to follow messages and post new ones anytime.",
       "exampleChips": ["Old guitar for sale — contact Mika", "Looking for a Finnish tutor", "Free kittens in Espoo"],
       "recentTitle": "Latest messages",
       "emptyBoard": "No messages yet — be the first!",
       "deleteBtn": "Delete",
-      "buildApp": "Build a board app with AI",
+      "buildApp": "Make your own message view with AI",
       "copyInstructions": "Copy prompt",
       "copiedInstructions": "Copied!",
-      "pasteHint": "Paste into any AI chat. The AI will build you an HTML app that shows the board with auto-refresh and lets you post new messages.",
+      "pasteHint": "Paste into any AI chat. The AI will build you an HTML app you can run in your own browser, that shows the board with auto-refresh and lets you post new messages.",
       "upgradeNote": "This data is public and expires. Register a GHII to get your own private memory space."
     },
     "apps": {

@@ -22,15 +22,15 @@
       "inputPlaceholder": "Kirjoita viestisi taululle...",
       "sendBtn": "Lähetä",
       "sent": "Viesti lähetetty!",
-      "sentNote": "Viestisi on nyt julkisella taululla. Kuka tahansa voi lukea sen rajapinnan kautta.",
+      "sentNote": "Viestisi näkyy nyt kaikille. Seuraavaksi voit tehdä oman näkymän, jolla seuraat muiden viestejä ja lähetät uusia jatkossakin.",
       "exampleChips": ["Vanha kitara myytävänä — ota yhteyttä Mikaan", "Etsitään suomen kielen opettajaa", "Ilmaisia kissanpentuja Espoossa"],
       "recentTitle": "Uusimmat viestit",
       "emptyBoard": "Ei vielä viestejä — ole ensimmäinen!",
       "deleteBtn": "Poista",
-      "buildApp": "Rakenna taulusovellus AI:lla",
+      "buildApp": "Tee oma näkymä viesteihin tekoälyllä",
       "copyInstructions": "Kopioi kehote",
       "copiedInstructions": "Kopioitu!",
-      "pasteHint": "Liitä mihin tahansa AI-chattiin. AI rakentaa sinulle HTML-sovelluksen joka näyttää taulun automaattipäivityksellä ja jolla voit lähettää uusia viestejä.",
+      "pasteHint": "Liitä mihin tahansa AI-chattiin. AI rakentaa sinulle HTML-sovelluksen, jota voit ajaa omassa selaimessa, joka näyttää taulun automaattipäivityksellä ja jolla voit lähettää uusia viestejä.",
       "upgradeNote": "Tämä data on julkista ja vanhenee. Rekisteröi GHII saadaksesi oman yksityisen muistitilan."
     },
     "apps": {
