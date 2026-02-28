@@ -1629,23 +1629,28 @@ body {
             var writeUrl = nodeUrl + '/v1/memory';
             instructionBlock.value =
               'There is an AIME AT protocol server at ' + nodeUrl + ' with a public message board.\\n\\n' +
-              '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
+              '## Data structure\\n' +
               'Read the board: GET ' + listUrl + '\\n' +
-              'Messages are in data.value.messages (array of {msg, t} objects, newest last).\\n' +
-              'Post a new message: POST ' + writeUrl + '\\n' +
-              'Body: {"key":"' + BOARD_KEY + '","value":{"messages":[...existing..., {"msg":"NEW MESSAGE","t":"ISO_DATE"}]},"visibility":"public"}\\n' +
-              'Read the existing messages first, then append the new one and POST the full array back.\\n\\n' +
+              'Response JSON: { ok: true, data: { value: { messages: [ { msg: "text", t: "ISO timestamp" }, ... ] } } }\\n' +
+              'Messages are in data.value.messages — an array of objects, each with "msg" (the message text) and "t" (ISO 8601 timestamp). Newest messages are last in the array.\\n\\n' +
+              'Post / update the board: POST ' + writeUrl + '\\n' +
+              'Content-Type: application/json\\n' +
+              'Body: {"key":"' + BOARD_KEY + '","value":{"messages":[...existing messages..., {"msg":"NEW MESSAGE","t":"2026-01-15T12:00:00.000Z"}]},"visibility":"public"}\\n' +
+              'IMPORTANT: Always read the existing messages first (GET), then append the new one to the array, and POST the full updated array back. This is a read-modify-write pattern.\\n\\n' +
+              '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
+              'Fetch the board URL above, show me the messages, and help me post new ones using the POST method described above.\\n\\n' +
               '## OPTION B — If you cannot fetch URLs:\\n' +
-              'Build a single self-contained HTML file that:\\n' +
-              '1. Fetches ' + listUrl + ' and shows messages from data.value.messages\\n' +
-              '2. Displays each message with its timestamp, newest first\\n' +
-              '3. Has a text input + Send button to post new messages\\n' +
-              '4. To post: GET existing, append new msg to array, POST full updated object back to ' + writeUrl + '\\n' +
-              '5. Auto-refreshes every 15 seconds\\n' +
-              '6. Dark theme (#0a0a1a bg, pink #ff69b4 accent), mobile-friendly\\n' +
-              'Content-Type: application/json for POST requests.\\n' +
-              'I will save the HTML and open it in my browser.\\n\\n' +
-              'This is a live API — the URLs work right now.';
+              'Build a single self-contained HTML file that I will save and open in my browser. Requirements:\\n\\n' +
+              '1. On load, fetch GET ' + listUrl + ' and display all messages from data.value.messages\\n' +
+              '2. Show each message with its text and a human-readable relative time (e.g. "2 minutes ago"), newest first\\n' +
+              '3. Show a "Last updated: [time]" label so the user knows when data was last fetched\\n' +
+              '4. A "Refresh" button that manually re-fetches and updates the message list\\n' +
+              '5. An auto-refresh toggle (checkbox or button) — when enabled, re-fetches every 15 seconds. Default: off\\n' +
+              '6. A text input + Send button to post new messages\\n' +
+              '7. To send: GET existing board, append new {msg, t} to the messages array, POST the full updated object back to ' + writeUrl + '\\n' +
+              '8. After sending, immediately refresh the message list to show the new message\\n' +
+              '9. Dark theme (#0a0a1a background, #ff69b4 pink accent), mobile-friendly, clean readable layout\\n\\n' +
+              'I will save the HTML and open it in my browser. This is a live API — the URLs work right now.';
           }
         }
       })
