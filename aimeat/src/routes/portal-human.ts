@@ -766,6 +766,103 @@ body {
   line-height: 1.6;
 }
 
+/* ── Service registration CTA ── */
+.service-register {
+  display: none;
+  margin-top: 0.75rem;
+}
+
+.service-register.visible {
+  display: block;
+  animation: fadeSlideIn 0.4s ease;
+}
+
+.register-cta {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.06), rgba(34, 197, 94, 0.02));
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.register-cta-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 0.5rem;
+}
+
+.register-cta-desc {
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  opacity: 0.85;
+}
+
+.register-benefits {
+  list-style: none;
+  text-align: left;
+  max-width: 320px;
+  margin: 0 auto 1.25rem;
+}
+
+.register-benefits li {
+  padding: 0.35rem 0;
+  font-size: 0.88rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.register-benefits li::before {
+  content: '\u2714';
+  color: var(--success);
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.register-cta-btn {
+  display: inline-block;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+}
+
+.register-cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 30px rgba(34, 197, 94, 0.5);
+  color: #fff;
+  text-decoration: none;
+}
+
+.register-signin {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.register-signin a {
+  color: #86efac;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.register-signin a:hover {
+  color: #22c55e;
+}
+
 /* ── "What else" expandable section ── */
 .more-section {
   max-width: 600px;
@@ -1247,10 +1344,15 @@ body {
             <button class="service-submit-btn" id="serviceSubmitBtn" type="button" onclick="event.stopPropagation()"></button>
             <span class="service-back" id="serviceBack" onclick="event.stopPropagation()">\u2190 ${esc(t('cards.services.backToChoices'))}</span>
           </div>
-          <div class="service-result" id="serviceResult">
-            <div class="service-success">
-              <div class="check">\u2714 ${esc(t('cards.services.posted'))}</div>
-              <div class="note" id="serviceResultNote"></div>
+          <div class="service-register" id="serviceRegister">
+            <div class="register-cta" onclick="event.stopPropagation()">
+              <div class="register-cta-title">${esc(t('cards.services.registerTitle'))}</div>
+              <div class="register-cta-desc">${esc(t('cards.services.registerDesc'))}</div>
+              <ul class="register-benefits" id="registerBenefits"></ul>
+              <a class="register-cta-btn" href="/v1/portal?view=dev${locale !== 'fi' ? '&lang=' + locale : ''}" onclick="event.stopPropagation()">${esc(t('cards.services.registerBtn'))}</a>
+              <div class="register-signin">
+                ${esc(t('cards.services.alreadyHaveAccount'))} <a href="/v1/portal/profile">${esc(t('cards.services.signInLink'))}</a>
+              </div>
             </div>
           </div>
         </div>
@@ -1535,15 +1637,15 @@ body {
     });
   }
 
-  /* ── Services: need help / offer help ── */
+  /* ── Services: need help / offer help → registration CTA ── */
   var serviceChoices = document.getElementById('serviceChoices');
   var serviceForm = document.getElementById('serviceForm');
   var serviceInput = document.getElementById('serviceInput');
   var serviceChips = document.getElementById('serviceChips');
   var serviceSubmitBtn = document.getElementById('serviceSubmitBtn');
   var serviceBack = document.getElementById('serviceBack');
-  var serviceResult = document.getElementById('serviceResult');
-  var serviceResultNote = document.getElementById('serviceResultNote');
+  var serviceRegister = document.getElementById('serviceRegister');
+  var registerBenefits = document.getElementById('registerBenefits');
   var needHelpBtn = document.getElementById('needHelpBtn');
   var offerHelpBtn = document.getElementById('offerHelpBtn');
 
@@ -1551,12 +1653,22 @@ body {
 
   var needHelpExamples = ${JSON.stringify(t('cards.services.needHelpExamples').split(', '))};
   var offerHelpExamples = ${JSON.stringify(t('cards.services.offerHelpExamples').split(', '))};
+  var registerBenefitsList = ${JSON.stringify(t('cards.services.registerBenefits').split(', '))};
+
+  /* Populate benefits list */
+  if (registerBenefits) {
+    registerBenefitsList.forEach(function(b) {
+      var li = document.createElement('li');
+      li.textContent = b;
+      registerBenefits.appendChild(li);
+    });
+  }
 
   function showServiceForm(mode) {
     serviceMode = mode;
     if (serviceChoices) serviceChoices.style.display = 'none';
     if (serviceForm) serviceForm.classList.add('visible');
-    if (serviceResult) serviceResult.classList.remove('visible');
+    if (serviceRegister) serviceRegister.classList.remove('visible');
 
     if (mode === 'request') {
       if (serviceInput) serviceInput.placeholder = '${jesc(t('cards.services.needHelpPlaceholder'))}';
@@ -1588,7 +1700,7 @@ body {
   function hideServiceForm() {
     if (serviceForm) serviceForm.classList.remove('visible');
     if (serviceChoices) serviceChoices.style.display = '';
-    if (serviceResult) serviceResult.classList.remove('visible');
+    if (serviceRegister) serviceRegister.classList.remove('visible');
   }
 
   if (needHelpBtn) {
@@ -1607,31 +1719,14 @@ body {
       var text = serviceInput.value.trim();
       if (!text) { serviceInput.focus(); return; }
 
-      serviceSubmitBtn.disabled = true;
-      serviceSubmitBtn.classList.add('loading');
+      /* Save draft so it survives registration flow */
+      try { localStorage.setItem('aimeat_service_draft', JSON.stringify({ text: text, type: serviceMode })); } catch(e) {}
 
-      fetch('/v1/portal/try-service', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, type: serviceMode })
-      })
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        serviceSubmitBtn.disabled = false;
-        serviceSubmitBtn.classList.remove('loading');
-        if (data.ok && serviceResult) {
-          serviceResult.classList.add('visible');
-          if (serviceResultNote) {
-            serviceResultNote.textContent = serviceMode === 'request'
-              ? '${jesc(t('cards.services.requestPosted'))}'
-              : '${jesc(t('cards.services.offerPosted'))}';
-          }
-        }
-      })
-      .catch(function() {
-        serviceSubmitBtn.disabled = false;
-        serviceSubmitBtn.classList.remove('loading');
-      });
+      /* Show registration CTA instead of posting */
+      if (serviceRegister) serviceRegister.classList.add('visible');
+      if (serviceInput) serviceInput.disabled = true;
+      if (serviceSubmitBtn) serviceSubmitBtn.style.display = 'none';
+      if (serviceChips) serviceChips.style.display = 'none';
     });
   }
 
@@ -1680,36 +1775,6 @@ export function humanPortalRouter(config: MeatConfig, storage: Storage): Router 
     });
 
     res.json(success(config.nodeId, { key, saved: true }));
-  });
-
-  router.post('/v1/portal/try-service', requireAuth(), async (req, res) => {
-    const text = req.body?.text;
-    const type = req.body?.type;
-    if (!text || typeof text !== 'string' || text.length > 500) {
-      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Text required (max 500 chars)'));
-      return;
-    }
-    if (type !== 'request' && type !== 'offer') {
-      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Type must be "request" or "offer"'));
-      return;
-    }
-
-    const gaii = req.auth!.sub;
-    const key = `services.${type}.${Date.now()}`;
-
-    await storage.setMemory({
-      key,
-      ownerGaii: gaii,
-      value: { text, type },
-      visibility: 'public',
-      tags: [type],
-      ttlHours: 72,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    res.json(success(config.nodeId, { key, posted: true }));
   });
 
   return router;

@@ -75,7 +75,13 @@
       "posted": "Lähetetty!",
       "requestPosted": "Pyyntösi näkyy nyt auttajille tällä solmulla.",
       "offerPosted": "Palvelusi on nyt listattu hakemistoon.",
-      "backToChoices": "Takaisin"
+      "backToChoices": "Takaisin",
+      "registerTitle": "Luo identiteettisi päästäksesi alkuun",
+      "registerDesc": "Palvelut ovat henkilökohtaisia — ne näkyvät profiilisivullasi. Rekisteröi ilmainen GHII (AI-identiteettisi) julkaistaksesi palveluita ja pyyntöjä.",
+      "registerBtn": "Luo ilmainen GHII",
+      "registerBenefits": ["Palvelusi näkyvät profiilissasi", "Yhdistä AI-agentit avuksesi", "AI-keskustelut jotka muistavat sinut", "Kaikki yhdessä paikassa"],
+      "alreadyHaveAccount": "Onko sinulla jo tili?",
+      "signInLink": "Kirjaudu"
     }
   },
   "morsels": {

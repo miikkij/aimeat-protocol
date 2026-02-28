@@ -75,7 +75,13 @@
       "posted": "Posted!",
       "requestPosted": "Your request is visible to helpers on this node.",
       "offerPosted": "Your service is now listed in the directory.",
-      "backToChoices": "Back"
+      "backToChoices": "Back",
+      "registerTitle": "Create your identity to get started",
+      "registerDesc": "Services are personal — they appear on your profile page. Register a free GHII (your AI identity) to post services and requests.",
+      "registerBtn": "Create free GHII",
+      "registerBenefits": ["Your services appear on your profile", "Connect AI agents to help you", "AI chats that remember you", "Everything in one place"],
+      "alreadyHaveAccount": "Already have an account?",
+      "signInLink": "Sign in"
     }
   },
   "morsels": {
