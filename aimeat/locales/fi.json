@@ -28,8 +28,8 @@
       "useWithAi": "Kytke mikä tahansa AI muisteihisi",
       "copyInstructions": "Kopioi leikepöydälle",
       "copiedInstructions": "Kopioitu!",
-      "pasteHint": "Liitä tämä mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...) — se kertoo AI:lle miten lukea muistosi rajapinnan kautta. Pysyvään käyttöön liitä Custom Instructions- tai Project Knowledge -asetuksiin.",
-      "autoNote": "AI hakee muistosi suoraan palvelimelta. Voit tallentaa lisää muistoja myöhemmin — AI lukee aina uusimmat."
+      "pasteHint": "Liitä mihin tahansa AI-chattiin. Claude ja Grok hakevat muistosi heti. Muut AI:t rakentavat HTML-sivun joka näyttää muistosi automaattipäivityksellä.",
+      "autoNote": "Pysyvään käyttöön liitä Custom Instructions (ChatGPT) tai Project Knowledge (Claude) -asetuksiin. Tallenna lisää muistoja milloin vain — AI lukee aina uusimmat."
     },
     "apps": {
       "title": "Sovellukset",

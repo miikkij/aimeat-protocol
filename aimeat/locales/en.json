@@ -28,8 +28,8 @@
       "useWithAi": "Connect any AI to your memories",
       "copyInstructions": "Copy to clipboard",
       "copiedInstructions": "Copied!",
-      "pasteHint": "Paste this into any AI chat (ChatGPT, Claude, Grok, Gemini...) — it tells the AI how to read your memories via the API. For permanent setup, paste into Custom Instructions or Project Knowledge.",
-      "autoNote": "The AI will fetch your memories directly from the server. You can save more memories later — the AI always reads the latest."
+      "pasteHint": "Paste into any AI chat. Claude and Grok fetch your memories instantly. Other AIs will build you an HTML page that shows your memories with auto-refresh.",
+      "autoNote": "For permanent setup, paste into Custom Instructions (ChatGPT) or Project Knowledge (Claude). Save more memories anytime — the AI always reads the latest."
     },
     "apps": {
       "title": "Apps",

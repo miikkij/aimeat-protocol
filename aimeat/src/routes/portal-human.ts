@@ -1508,16 +1508,24 @@ body {
           saveResult.classList.add('visible');
           if (instructionBlock) {
             var readUrl = data.data.readUrl || (nodeUrl + '/v1/mm?op=list&set=my_memories&access_code=' + encodeURIComponent(accessCode));
+            var writeUrl = nodeUrl + '/v1/mm?op=add&set=my_memories&key=KEY&value=VALUE&access_code=' + encodeURIComponent(accessCode);
             instructionBlock.value =
               'I have a personal memory server (AIME AT protocol) where I store things about myself.\\n\\n' +
-              'READ MY MEMORIES FIRST by fetching this URL:\\n' +
-              readUrl + '\\n\\n' +
-              'The response is JSON. My memories are in data.entries (key-value pairs).\\n' +
-              'Use what you learn about me in our conversation.\\n\\n' +
-              'When I tell you something new to remember, STORE IT by fetching:\\n' +
-              nodeUrl + '/v1/mm?op=add&set=my_memories&key=KEY&value=VALUE&access_code=' + encodeURIComponent(accessCode) + '\\n\\n' +
-              'Replace KEY with a descriptive name (e.g. diet, city, job) and VALUE with what to remember.\\n' +
-              'This is a real API — try it now.';
+              '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
+              'Fetch this URL now: ' + readUrl + '\\n' +
+              'My memories are in data.entries (key-value pairs). Use them in our conversation.\\n' +
+              'To store something new I tell you, fetch: ' + writeUrl + '\\n' +
+              '(Replace KEY with e.g. diet, city, job and VALUE with what to remember.)\\n\\n' +
+              '## OPTION B — If you cannot fetch URLs (ChatGPT, Gemini, others):\\n' +
+              'Generate a single self-contained HTML file that:\\n' +
+              '1. Fetches ' + readUrl + '\\n' +
+              '2. Displays all my memories from data.entries as a readable list\\n' +
+              '3. Auto-refreshes every 30 seconds so I always see the latest\\n' +
+              '4. Has a form to add new memories (key + value) that POSTs to the write URL\\n' +
+              '5. Dark theme, clean UI, mobile-friendly\\n' +
+              'Write URL for the form: ' + writeUrl + '\\n' +
+              'I will save the HTML file and open it in my browser to see and manage my memories.\\n\\n' +
+              'This is a real, live API — the URLs work right now.';
           }
           if (upgradeNudge) {
             upgradeNudge.style.display = 'block';
