@@ -64,8 +64,18 @@
       "desc": "Tarvitsetko kuvan tekemistä, tekstin kääntämistä, tai apua jonkin tekemisessä? Laita pyyntö ja joku — ihminen tai AI — voi toimittaa sen sinulle. Osaatko itse jotain erityistä? Tarjoa se palveluna ja näy keltaisilla sivuilla.",
       "needHelp": "Tarvitsen apua",
       "needHelpDesc": "Kerro mitä tarvitset",
+      "needHelpPlaceholder": "Kuvaile mihin tarvitset apua...",
+      "needHelpExamples": ["Käännä tämä teksti espanjaksi", "Tee logo projektilleni", "Auta kirjoittamaan työhakemus"],
       "offerHelp": "Haluan auttaa",
-      "offerHelpDesc": "Kerro mitä osaat"
+      "offerHelpDesc": "Kerro mitä osaat",
+      "offerHelpPlaceholder": "Kuvaile missä olet hyvä...",
+      "offerHelpExamples": ["Osaan kääntää suomesta englanniksi", "Teen kuvituksia", "Autan matematiikassa"],
+      "submitRequest": "Lähetä pyyntö",
+      "submitOffer": "Tarjoa palvelu",
+      "posted": "Lähetetty!",
+      "requestPosted": "Pyyntösi näkyy nyt auttajille tällä solmulla.",
+      "offerPosted": "Palvelusi on nyt listattu hakemistoon.",
+      "backToChoices": "Takaisin"
     }
   },
   "morsels": {

@@ -14,6 +14,11 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** Escape for embedding in JS single-quoted strings inside template literals */
+function jesc(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export function humanPortalHtml(
   config: MeatConfig,
   t: TFunction,
@@ -571,28 +576,6 @@ body {
   font-weight: 600;
 }
 
-/* ── Placeholder (Services) ── */
-.coming-soon {
-  text-align: center;
-  padding: 1.5rem 0 0.5rem;
-  color: var(--text-dim);
-  font-size: 0.9rem;
-}
-
-.coming-soon .coming-badge {
-  display: inline-block;
-  padding: 0.3rem 0.8rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 0.75rem;
-}
-
 /* ── Service action buttons ── */
 .service-actions {
   display: flex;
@@ -608,8 +591,13 @@ body {
   border-radius: var(--radius-sm);
   text-align: center;
   transition: all 0.2s;
-  cursor: default;
-  opacity: 0.6;
+  cursor: pointer;
+}
+
+.service-btn:hover {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.25);
+  transform: translateY(-2px);
 }
 
 .service-btn-title {
@@ -622,6 +610,160 @@ body {
 .service-btn-desc {
   font-size: 0.82rem;
   color: var(--text-dim);
+}
+
+/* ── Service form ── */
+.service-form {
+  display: none;
+  margin-top: 0.5rem;
+}
+
+.service-form.visible {
+  display: block;
+  animation: fadeSlideIn 0.3s ease;
+}
+
+.service-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text-bright);
+  font-size: 0.95rem;
+  font-family: var(--font);
+  outline: none;
+  transition: all 0.25s;
+  resize: none;
+}
+
+.service-input:focus {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.service-input::placeholder {
+  color: var(--text-muted);
+}
+
+.service-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.service-chip {
+  padding: 0.4rem 0.85rem;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 20px;
+  font-size: 0.82rem;
+  color: #86efac;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.service-chip:hover {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.4);
+  transform: translateY(-1px);
+}
+
+.service-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.service-submit-btn {
+  padding: 0.7rem 1.6rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+}
+
+.service-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4);
+}
+
+.service-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.service-submit-btn.loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.service-submit-btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 18px; height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.service-back {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.service-back:hover {
+  color: var(--text);
+}
+
+.service-result {
+  display: none;
+  margin-top: 1rem;
+}
+
+.service-result.visible {
+  display: block;
+  animation: fadeSlideIn 0.4s ease;
+}
+
+.service-success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.25rem;
+}
+
+.service-success .check {
+  color: var(--success);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
+}
+
+.service-success .note {
+  font-size: 0.85rem;
+  color: var(--text);
+  opacity: 0.85;
+  line-height: 1.6;
 }
 
 /* ── "What else" expandable section ── */
@@ -1088,18 +1230,29 @@ body {
       </div>
       <div class="card-body">
         <p class="card-desc">${esc(t('cards.services.desc'))}</p>
-        <div class="service-actions">
-          <div class="service-btn" onclick="event.stopPropagation()">
+        <div class="service-actions" id="serviceChoices">
+          <div class="service-btn" id="needHelpBtn" onclick="event.stopPropagation()">
             <div class="service-btn-title">${esc(t('cards.services.needHelp'))}</div>
             <div class="service-btn-desc">${esc(t('cards.services.needHelpDesc'))}</div>
           </div>
-          <div class="service-btn" onclick="event.stopPropagation()">
+          <div class="service-btn" id="offerHelpBtn" onclick="event.stopPropagation()">
             <div class="service-btn-title">${esc(t('cards.services.offerHelp'))}</div>
             <div class="service-btn-desc">${esc(t('cards.services.offerHelpDesc'))}</div>
           </div>
         </div>
-        <div class="coming-soon">
-          <div class="coming-badge">${esc(t('comingSoon'))}</div>
+        <div class="service-form" id="serviceForm">
+          <textarea class="service-input" id="serviceInput" rows="2" maxlength="500" onclick="event.stopPropagation()"></textarea>
+          <div class="service-chips" id="serviceChips"></div>
+          <div class="service-form-actions">
+            <button class="service-submit-btn" id="serviceSubmitBtn" type="button" onclick="event.stopPropagation()"></button>
+            <span class="service-back" id="serviceBack" onclick="event.stopPropagation()">\u2190 ${esc(t('cards.services.backToChoices'))}</span>
+          </div>
+          <div class="service-result" id="serviceResult">
+            <div class="service-success">
+              <div class="check">\u2714 ${esc(t('cards.services.posted'))}</div>
+              <div class="note" id="serviceResultNote"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1258,8 +1411,8 @@ body {
 
   /* ── Copy instruction to clipboard ── */
   var copyInstructionBtn = document.getElementById('copyInstructionBtn');
-  var copyInstructionLabel = '${esc(t('cards.memories.copyInstructions'))}';
-  var copiedInstructionLabel = '${esc(t('cards.memories.copiedInstructions'))}';
+  var copyInstructionLabel = '${jesc(t('cards.memories.copyInstructions'))}';
+  var copiedInstructionLabel = '${jesc(t('cards.memories.copiedInstructions'))}';
 
   if (copyInstructionBtn && instructionBlock) {
     copyInstructionBtn.addEventListener('click', function(e) {
@@ -1278,8 +1431,8 @@ body {
   var promptBox = document.getElementById('promptBox');
   var copyPromptBtn = document.getElementById('copyPromptBtn');
   var backToCats = document.getElementById('backToCats');
-  var copyLabel = '${esc(t('cards.apps.copyPrompt'))}';
-  var copiedLabel = '${esc(t('cards.apps.copied'))}';
+  var copyLabel = '${jesc(t('cards.apps.copyPrompt'))}';
+  var copiedLabel = '${jesc(t('cards.apps.copied'))}';
 
   var nodeUrl = (document.querySelector('meta[name="aimeat-node"]') || {}).content || window.location.origin;
 
@@ -1382,6 +1535,106 @@ body {
     });
   }
 
+  /* ── Services: need help / offer help ── */
+  var serviceChoices = document.getElementById('serviceChoices');
+  var serviceForm = document.getElementById('serviceForm');
+  var serviceInput = document.getElementById('serviceInput');
+  var serviceChips = document.getElementById('serviceChips');
+  var serviceSubmitBtn = document.getElementById('serviceSubmitBtn');
+  var serviceBack = document.getElementById('serviceBack');
+  var serviceResult = document.getElementById('serviceResult');
+  var serviceResultNote = document.getElementById('serviceResultNote');
+  var needHelpBtn = document.getElementById('needHelpBtn');
+  var offerHelpBtn = document.getElementById('offerHelpBtn');
+
+  var serviceMode = ''; // 'request' or 'offer'
+
+  var needHelpExamples = ${JSON.stringify(t('cards.services.needHelpExamples').split(', '))};
+  var offerHelpExamples = ${JSON.stringify(t('cards.services.offerHelpExamples').split(', '))};
+
+  function showServiceForm(mode) {
+    serviceMode = mode;
+    if (serviceChoices) serviceChoices.style.display = 'none';
+    if (serviceForm) serviceForm.classList.add('visible');
+    if (serviceResult) serviceResult.classList.remove('visible');
+
+    if (mode === 'request') {
+      if (serviceInput) serviceInput.placeholder = '${jesc(t('cards.services.needHelpPlaceholder'))}';
+      if (serviceSubmitBtn) serviceSubmitBtn.textContent = '${jesc(t('cards.services.submitRequest'))}';
+      renderServiceChips(needHelpExamples);
+    } else {
+      if (serviceInput) serviceInput.placeholder = '${jesc(t('cards.services.offerHelpPlaceholder'))}';
+      if (serviceSubmitBtn) serviceSubmitBtn.textContent = '${jesc(t('cards.services.submitOffer'))}';
+      renderServiceChips(offerHelpExamples);
+    }
+    if (serviceInput) { serviceInput.value = ''; serviceInput.focus(); }
+  }
+
+  function renderServiceChips(examples) {
+    if (!serviceChips) return;
+    serviceChips.innerHTML = '';
+    examples.forEach(function(ex) {
+      var chip = document.createElement('span');
+      chip.className = 'service-chip';
+      chip.textContent = ex;
+      chip.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (serviceInput) { serviceInput.value = ex; serviceInput.focus(); }
+      });
+      serviceChips.appendChild(chip);
+    });
+  }
+
+  function hideServiceForm() {
+    if (serviceForm) serviceForm.classList.remove('visible');
+    if (serviceChoices) serviceChoices.style.display = '';
+    if (serviceResult) serviceResult.classList.remove('visible');
+  }
+
+  if (needHelpBtn) {
+    needHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceForm('request'); });
+  }
+  if (offerHelpBtn) {
+    offerHelpBtn.addEventListener('click', function(e) { e.stopPropagation(); showServiceForm('offer'); });
+  }
+  if (serviceBack) {
+    serviceBack.addEventListener('click', function(e) { e.stopPropagation(); hideServiceForm(); });
+  }
+
+  if (serviceSubmitBtn && serviceInput) {
+    serviceSubmitBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var text = serviceInput.value.trim();
+      if (!text) { serviceInput.focus(); return; }
+
+      serviceSubmitBtn.disabled = true;
+      serviceSubmitBtn.classList.add('loading');
+
+      fetch('/v1/portal/try-service', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, type: serviceMode })
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        serviceSubmitBtn.disabled = false;
+        serviceSubmitBtn.classList.remove('loading');
+        if (data.ok && serviceResult) {
+          serviceResult.classList.add('visible');
+          if (serviceResultNote) {
+            serviceResultNote.textContent = serviceMode === 'request'
+              ? '${jesc(t('cards.services.requestPosted'))}'
+              : '${jesc(t('cards.services.offerPosted'))}';
+          }
+        }
+      })
+      .catch(function() {
+        serviceSubmitBtn.disabled = false;
+        serviceSubmitBtn.classList.remove('loading');
+      });
+    });
+  }
+
   /* ── "What else" expand/collapse ── */
   var moreHeader = document.getElementById('moreHeader');
   var moreSection = moreHeader ? moreHeader.parentElement : null;
@@ -1427,6 +1680,36 @@ export function humanPortalRouter(config: MeatConfig, storage: Storage): Router 
     });
 
     res.json(success(config.nodeId, { key, saved: true }));
+  });
+
+  router.post('/v1/portal/try-service', requireAuth(), async (req, res) => {
+    const text = req.body?.text;
+    const type = req.body?.type;
+    if (!text || typeof text !== 'string' || text.length > 500) {
+      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Text required (max 500 chars)'));
+      return;
+    }
+    if (type !== 'request' && type !== 'offer') {
+      res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Type must be "request" or "offer"'));
+      return;
+    }
+
+    const gaii = req.auth!.sub;
+    const key = `services.${type}.${Date.now()}`;
+
+    await storage.setMemory({
+      key,
+      ownerGaii: gaii,
+      value: { text, type },
+      visibility: 'public',
+      tags: [type],
+      ttlHours: 72,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json(success(config.nodeId, { key, posted: true }));
   });
 
   return router;

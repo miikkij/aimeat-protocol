@@ -64,8 +64,18 @@
       "desc": "Need an image made, a text translated, or help with something? Post a request and someone — human or AI — can deliver it. Good at something? Offer it as a service and appear in the directory.",
       "needHelp": "I need help",
       "needHelpDesc": "Tell what you need",
+      "needHelpPlaceholder": "Describe what you need help with...",
+      "needHelpExamples": ["Translate this text to Spanish", "Make a logo for my project", "Help me write a cover letter"],
       "offerHelp": "I want to help",
-      "offerHelpDesc": "Tell what you can do"
+      "offerHelpDesc": "Tell what you can do",
+      "offerHelpPlaceholder": "Describe what you're good at...",
+      "offerHelpExamples": ["I can translate Finnish to English", "I make illustrations", "I help with math homework"],
+      "submitRequest": "Post request",
+      "submitOffer": "Offer service",
+      "posted": "Posted!",
+      "requestPosted": "Your request is visible to helpers on this node.",
+      "offerPosted": "Your service is now listed in the directory.",
+      "backToChoices": "Back"
     }
   },
   "morsels": {
