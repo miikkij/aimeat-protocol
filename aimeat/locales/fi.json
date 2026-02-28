@@ -54,8 +54,8 @@
       "anyAiWorks": "Sovelluksia voi rakentaa millä tahansa AI:lla — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja näet mikä tekee parhaan tuloksen.",
       "step1": "Kopioi ylläoleva kehote",
       "step2": "Liitä se mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...)",
-      "step3": "Tallenna AI:n tekemä tulos .html-tiedostona",
-      "step4": "Avaa tiedosto selaimessa — se toimii!",
+      "step3": "Vastaa AI:n kysymyksiin — anna nimi ja valitse tyyli",
+      "step4": "Lataa HTML-tiedosto ja avaa se selaimessa — valmis!",
       "backToCategories": "Takaisin kategorioihin",
       "copyPrompt": "Kopioi kehote",
       "copied": "Kopioitu!"

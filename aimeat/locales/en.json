@@ -54,8 +54,8 @@
       "anyAiWorks": "You can build apps with any AI — Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them work! Try with different AIs and see which makes the best result.",
       "step1": "Copy the prompt above",
       "step2": "Paste into any AI chat (ChatGPT, Claude, Grok, Gemini...)",
-      "step3": "Save what the AI generates as a .html file",
-      "step4": "Open the file in your browser — it works!",
+      "step3": "Answer the AI's questions — name your app, pick a style",
+      "step4": "Download the HTML file and open it in your browser — done!",
       "backToCategories": "Back to categories",
       "copyPrompt": "Copy prompt",
       "copied": "Copied!"

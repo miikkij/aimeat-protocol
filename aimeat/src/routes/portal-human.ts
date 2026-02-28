@@ -1692,73 +1692,90 @@ body {
 
   var nodeUrl = (document.querySelector('meta[name="aimeat-node"]') || {}).content || window.location.origin;
 
-  var basePrompt = function(catDesc, extras) {
-    return 'Build me ' + catDesc + ' as a single self-contained HTML file with CSS and JavaScript.\\n\\n' +
-      'The app should store its data using this memory API:\\n' +
-      '- Server: ' + nodeUrl + '\\n' +
-      '- Save data: POST ' + nodeUrl + '/v1/memory with body: {"key": "apps.[APP_TYPE].[UNIQUE_ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}\\n' +
-      '- Read data: GET ' + nodeUrl + '/v1/memory/[key]\\n' +
-      '- List keys: GET ' + nodeUrl + '/v1/memory?prefix=apps.[APP_TYPE]\\n' +
-      '- No authentication needed (anonymous mode is enabled)\\n' +
-      '- Content-Type: application/json for POST requests\\n' +
-      '- The API returns JSON wrapped in: { "ok": true, "data": { ... } }\\n\\n' +
-      'Requirements:\\n' +
-      '- Single HTML file, all CSS and JS inline\\n' +
-      '- Dark theme with dark background (#0a0a1a) and pink accent (#ff69b4)\\n' +
-      '- Mobile-friendly, works on any screen size\\n' +
-      '- Clean, modern UI\\n' +
-      '- The app should work immediately when opened in a browser\\n' +
-      extras + '\\n\\n' +
-      'After generating the file, I will save it as .html and open it in my browser.';
-  };
+  var askUser = 'Before building, ask me:\\n' +
+    '1. What should the app be called?\\n' +
+    '2. How should it look and feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
+    'Use my answers to customize the title, colors, fonts, and overall vibe.\\n\\n';
+
+  var apiRef = '## Data storage API\\n' +
+    'Server: ' + nodeUrl + ' (no authentication needed, anonymous mode)\\n' +
+    'Save data: POST ' + nodeUrl + '/v1/memory\\n' +
+    'Content-Type: application/json\\n' +
+    'Body: {"key": "apps.[TYPE].[ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}\\n' +
+    'Read data: GET ' + nodeUrl + '/v1/memory/apps.[TYPE].[ID]\\n' +
+    'Response: { ok: true, data: { key: "...", value: {...your data...}, ... } }\\n' +
+    'List keys: GET ' + nodeUrl + '/v1/memory?prefix=apps.[TYPE]\\n' +
+    'IMPORTANT: When updating, always GET first, modify, then POST back (read-modify-write).\\n\\n';
+
+  var baseReqs = 'General requirements:\\n' +
+    '- Single HTML file, all CSS and JS inline, no external dependencies\\n' +
+    '- Mobile-friendly, works on any screen size\\n' +
+    '- Clean, modern UI\\n' +
+    '- Works immediately when opened in a browser\\n';
+
+  var baseEnd = '\\nMake the HTML a downloadable file. This is a live API — the URLs work right now.';
 
   var prompts = {
-    games: basePrompt('a multiplayer tic-tac-toe game',
-      '- Multiplayer game where Player 1 creates a game and gets a shareable link (use URL hash #gameId)\\n' +
+    games: askUser +
+      'I want a multiplayer game as a single self-contained HTML file.\\n\\n' +
+      apiRef +
+      'Game requirements:\\n' +
+      '- Player 1 creates a game and gets a shareable link (use URL hash #gameId)\\n' +
       '- Player 2 opens the link to join\\n' +
+      '- Game state stored in memory: "apps.game.[random-id]"\\n' +
       '- Poll every 2 seconds for opponent moves\\n' +
-      '- Game state stored in memory with key like "apps.ttt.[random-id]"\\n' +
-      '- Show game status: waiting for opponent, your turn, opponent turn, you won, you lost, draw'),
-    notes: basePrompt('a simple note-taking app',
-      '- Create, read, and list notes\\n' +
-      '- Each note stored as a separate memory key: "apps.notes.[note-id]"\\n' +
-      '- Show a list of saved notes with timestamps\\n' +
+      '- Show game status: waiting for opponent, your turn, opponent turn, winner, draw\\n' +
+      '- Reset / new game button\\n\\n' +
+      baseReqs + baseEnd,
+
+    notes: askUser +
+      'I want a note-taking app as a single self-contained HTML file.\\n\\n' +
+      apiRef +
+      'App requirements:\\n' +
+      '- Create, view, edit, and delete notes\\n' +
+      '- Each note stored as: "apps.notes.[note-id]" with value: {title, body, created, updated}\\n' +
+      '- Sidebar or list view showing all saved notes with titles and timestamps\\n' +
       '- Click a note to view or edit it\\n' +
-      '- Add a delete button for each note'),
-    trackers: basePrompt('a habit and budget tracker',
-      '- Daily entries for habits or expenses\\n' +
-      '- Each entry stored as: "apps.tracker.[date]"\\n' +
-      '- Show a list view of past entries\\n' +
-      '- Simple progress indicators or summary stats\\n' +
-      '- Add and remove tracked items'),
-    family: basePrompt('a shared family shopping list',
-      '- Shareable via URL so family members can access the same list\\n' +
-      '- Real-time updates by polling memory every 3 seconds\\n' +
-      '- Add and check off items\\n' +
-      '- All data stored under a shared key like "apps.family.[list-id]"\\n' +
-      '- Show who added what (use a simple name prompt on first visit)'),
-    creative: basePrompt('a drawing canvas app',
-      '- Simple drawing canvas with color picker and brush size\\n' +
-      '- Save drawings to memory for persistence\\n' +
-      '- Gallery view of past creations (store as data URLs)\\n' +
-      '- Clear canvas and undo functionality\\n' +
-      '- Each drawing stored as "apps.art.[drawing-id]"'),
-    custom: 'Build me [DESCRIBE WHAT YOU WANT] as a single self-contained HTML file with CSS and JavaScript.\\n\\n' +
-      'The app should store its data using this memory API:\\n' +
-      '- Server: ' + nodeUrl + '\\n' +
-      '- Save data: POST ' + nodeUrl + '/v1/memory with body: {"key": "apps.[APP_TYPE].[UNIQUE_ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}\\n' +
-      '- Read data: GET ' + nodeUrl + '/v1/memory/[key]\\n' +
-      '- List keys: GET ' + nodeUrl + '/v1/memory?prefix=apps.[APP_TYPE]\\n' +
-      '- No authentication needed (anonymous mode is enabled)\\n' +
-      '- Content-Type: application/json for POST requests\\n' +
-      '- The API returns JSON wrapped in: { "ok": true, "data": { ... } }\\n\\n' +
-      'Requirements:\\n' +
-      '- Single HTML file, all CSS and JS inline\\n' +
-      '- Dark theme with dark background (#0a0a1a) and pink accent (#ff69b4)\\n' +
-      '- Mobile-friendly, works on any screen size\\n' +
-      '- Clean, modern UI\\n' +
-      '- The app should work immediately when opened in a browser\\n\\n' +
-      'After generating the file, I will save it as .html and open it in my browser.'
+      '- Search or filter notes\\n\\n' +
+      baseReqs + baseEnd,
+
+    trackers: askUser +
+      'I want a tracker app as a single self-contained HTML file.\\n\\n' +
+      apiRef +
+      'App requirements:\\n' +
+      '- Track daily habits, expenses, or anything the user wants\\n' +
+      '- Each entry stored as: "apps.tracker.[date]" with value: {items: [...], date}\\n' +
+      '- Calendar or list view of past entries\\n' +
+      '- Simple charts or progress indicators\\n' +
+      '- Add and remove tracked items\\n\\n' +
+      baseReqs + baseEnd,
+
+    family: askUser +
+      'I want a shared family tool as a single self-contained HTML file.\\n\\n' +
+      apiRef +
+      'App requirements:\\n' +
+      '- Shareable via URL so family members can access the same data (use URL hash #listId)\\n' +
+      '- Auto-refresh by polling memory every 3 seconds to see others\\' changes\\n' +
+      '- Add and check off items (shopping list, to-do, etc.)\\n' +
+      '- All data under shared key: "apps.family.[list-id]"\\n' +
+      '- Ask for name on first visit so items show who added them\\n\\n' +
+      baseReqs + baseEnd,
+
+    creative: askUser +
+      'I want a creative tool as a single self-contained HTML file.\\n\\n' +
+      apiRef +
+      'App requirements:\\n' +
+      '- Drawing canvas with color picker and brush size\\n' +
+      '- Save creations to memory: "apps.art.[drawing-id]"\\n' +
+      '- Gallery view of past creations\\n' +
+      '- Clear canvas, undo, and download image\\n\\n' +
+      baseReqs + baseEnd,
+
+    custom: askUser +
+      'I want [DESCRIBE YOUR IDEA HERE] as a single self-contained HTML file.\\n\\n' +
+      apiRef +
+      baseReqs + '\\n' +
+      'Ask me what the app should do before building it.' + baseEnd
   };
 
   catCards.forEach(function(cat) {
