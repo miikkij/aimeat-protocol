@@ -1,0 +1,363 @@
+/**
+ * CLI config display — shows all settings with current values, defaults, and descriptions.
+ * Usage: aimeat config
+ */
+
+import { existsSync } from 'node:fs';
+import type { MeatConfig } from '../config.js';
+
+interface ConfigEntry {
+  envVar: string;
+  description: string;
+  value: string;
+  defaultVal: string;
+  secret?: boolean;
+}
+
+interface ConfigSection {
+  title: string;
+  entries: ConfigEntry[];
+}
+
+function mask(val: string): string {
+  if (val.length <= 4) return '****';
+  return val.slice(0, 2) + '*'.repeat(val.length - 4) + val.slice(-2);
+}
+
+function maskUrl(url: string): string {
+  return url.replace(/\/\/([^@]+)@/, '//*****@');
+}
+
+export function formatConfig(config: MeatConfig): string {
+  const env = process.env;
+
+  const sections: ConfigSection[] = [
+    {
+      title: 'Node Identity',
+      entries: [
+        {
+          envVar: 'MEAT_NODE_ID',
+          description: 'Unique name for this node on the network',
+          value: config.nodeId,
+          defaultVal: 'meat-local-001-dev',
+        },
+        {
+          envVar: 'MEAT_NODE_TYPE',
+          description: 'Node role: full (all features), relay (forward only), mirror (read-only)',
+          value: config.nodeType,
+          defaultVal: 'full',
+        },
+        {
+          envVar: 'MEAT_BASE_URL',
+          description: 'Public URL where this node is reachable',
+          value: config.baseUrl,
+          defaultVal: 'http://localhost:<port>',
+        },
+        {
+          envVar: 'MEAT_PORT',
+          description: 'HTTP port the server listens on',
+          value: String(config.port),
+          defaultVal: '40050',
+        },
+      ],
+    },
+    {
+      title: 'Database',
+      entries: [
+        {
+          envVar: 'DATABASE_URL',
+          description: 'MongoDB connection URL. Leave empty for in-memory storage (data lost on restart)',
+          value: config.dbUrl ? maskUrl(config.dbUrl) : '(not set — using in-memory storage)',
+          defaultVal: '(none)',
+          secret: true,
+        },
+      ],
+    },
+    {
+      title: 'Security',
+      entries: [
+        {
+          envVar: 'MEAT_ADMIN_PASSWORD',
+          description: 'Password for the operator admin panel',
+          value: config.adminPassword ? mask(config.adminPassword) : '(auto-generated on startup)',
+          defaultVal: '(auto-generated)',
+          secret: true,
+        },
+        {
+          envVar: 'MEAT_JWT_TTL',
+          description: 'How long login tokens last (in seconds)',
+          value: String(config.jwtTtlSeconds),
+          defaultVal: '3600',
+        },
+        {
+          envVar: 'MEAT_OTK_TTL_MS',
+          description: 'One-time key expiry (in milliseconds)',
+          value: String(config.otkTtlMs),
+          defaultVal: '300000',
+        },
+        {
+          envVar: 'MEAT_OTK_GRACE_MS',
+          description: 'Grace period for expired one-time keys (in milliseconds)',
+          value: String(config.otkGraceMs),
+          defaultVal: '60000',
+        },
+      ],
+    },
+    {
+      title: 'Modes',
+      entries: [
+        {
+          envVar: 'MEAT_DEV_MODE',
+          description: 'Developer mode — bypasses some security checks for testing',
+          value: config.devMode ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'MEAT_ANONYMOUS',
+          description: 'Anonymous mode — anyone can use the node without registering',
+          value: config.anonymousMode ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+      ],
+    },
+    {
+      title: 'Morsel Economy (virtual currency)',
+      entries: [
+        {
+          envVar: 'MEAT_WELCOME_BONUS',
+          description: 'Morsels given to new users when they register',
+          value: String(config.welcomeBonus),
+          defaultVal: '100',
+        },
+        {
+          envVar: 'MEAT_DAILY_ALLOWANCE',
+          description: 'Morsels given to each user every day',
+          value: String(config.dailyAllowance),
+          defaultVal: '50',
+        },
+        {
+          envVar: 'MEAT_DAILY_ALLOWANCE_CAP',
+          description: 'Maximum morsels a user can accumulate from daily allowances',
+          value: String(config.dailyAllowanceCap),
+          defaultVal: '500',
+        },
+        {
+          envVar: 'MEAT_BURN_RATE',
+          description: 'Fraction of morsels destroyed per transaction (0 to 1)',
+          value: String(config.burnRate),
+          defaultVal: '0.10',
+        },
+        {
+          envVar: 'MEAT_MAX_OPERATOR_MINT_PER_DAY',
+          description: 'Maximum morsels the operator can create per day',
+          value: String(config.maxOperatorMintPerDay),
+          defaultVal: '10000',
+        },
+        {
+          envVar: 'MEAT_BOARD_POST_BASE_COST',
+          description: 'Base cost in morsels to post on a board',
+          value: String(config.boardPostBaseCost),
+          defaultVal: '5',
+        },
+        {
+          envVar: 'MEAT_BOARD_POST_COST_PER_KB',
+          description: 'Additional morsels per KB of board post content',
+          value: String(config.boardPostCostPerKb),
+          defaultVal: '2',
+        },
+      ],
+    },
+    {
+      title: 'Features',
+      entries: [
+        {
+          envVar: 'MEAT_KEYED_BROWSE',
+          description: 'Allow browsing with API keys (Tier 0.5)',
+          value: config.keyedBrowseEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'MEAT_EXTENDED_FEATURES',
+          description: 'Enable boards, federation, storage, and validation features',
+          value: config.extendedFeaturesEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'MEAT_PERSONAL_NODES_ENABLED',
+          description: 'Allow users to connect personal nodes via WebSocket tunnel',
+          value: config.personalNodesEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+      ],
+    },
+    {
+      title: 'Quotas & Limits',
+      entries: [
+        {
+          envVar: 'MEAT_MEMORY_QUOTA_MB',
+          description: 'Maximum memory storage per user (MB)',
+          value: String(config.memoryQuotaMb),
+          defaultVal: '10',
+        },
+        {
+          envVar: 'MEAT_STORAGE_QUOTA_MB',
+          description: 'Maximum file storage per user (MB)',
+          value: String(config.storageQuotaMb),
+          defaultVal: '100',
+        },
+        {
+          envVar: 'MEAT_MICRO_MEMORY_QUOTA_KB',
+          description: 'Maximum micro-memory storage per agent (KB)',
+          value: String(config.microMemoryQuotaKb),
+          defaultVal: '500',
+        },
+        {
+          envVar: 'MEAT_MAX_URL_LENGTH',
+          description: 'Maximum allowed URL length in requests',
+          value: String(config.maxUrlLength),
+          defaultVal: '8192',
+        },
+      ],
+    },
+    {
+      title: 'Federation',
+      entries: [
+        {
+          envVar: 'MEAT_MAX_RELAY_HOPS',
+          description: 'Maximum number of hops when relaying between nodes',
+          value: String(config.maxRelayHops),
+          defaultVal: '3',
+        },
+        {
+          envVar: 'MEAT_DEPEERING_GRACE_HOURS',
+          description: 'Hours to wait before removing a disconnected peer',
+          value: String(config.depeeringGracePeriodHours),
+          defaultVal: '72',
+        },
+        {
+          envVar: 'MEAT_KEY_CACHE_REFRESH_MINUTES',
+          description: 'How often to refresh peer key cache (minutes)',
+          value: String(config.keyCacheRefreshMinutes),
+          defaultVal: '5',
+        },
+      ],
+    },
+    {
+      title: 'Work Queue',
+      entries: [
+        {
+          envVar: 'MEAT_WEBHOOK_MAX_RETRIES',
+          description: 'Maximum retry attempts for webhook deliveries',
+          value: String(config.webhookMaxRetries),
+          defaultVal: '5',
+        },
+        {
+          envVar: 'MEAT_WORK_QUEUE_MAX_PENDING',
+          description: 'Maximum pending work items per agent',
+          value: String(config.workQueueMaxPending),
+          defaultVal: '10',
+        },
+      ],
+    },
+    {
+      title: 'Rate Limits (requests per second)',
+      entries: [
+        {
+          envVar: 'MEAT_RL_GLOBAL',
+          description: 'Global rate limit for all requests',
+          value: String(config.rateLimits.global.max),
+          defaultVal: '300',
+        },
+        {
+          envVar: 'MEAT_RL_AUTH',
+          description: 'Rate limit for authentication requests',
+          value: String(config.rateLimits.auth.max),
+          defaultVal: '20',
+        },
+        {
+          envVar: 'MEAT_RL_WORK',
+          description: 'Rate limit for work queue requests',
+          value: String(config.rateLimits.work.max),
+          defaultVal: '60',
+        },
+        {
+          envVar: 'MEAT_RL_MEMORY',
+          description: 'Rate limit for memory read/write requests',
+          value: String(config.rateLimits.memory.max),
+          defaultVal: '120',
+        },
+        {
+          envVar: 'MEAT_RL_BOARDS',
+          description: 'Rate limit for board requests',
+          value: String(config.rateLimits.boards.max),
+          defaultVal: '60',
+        },
+      ],
+    },
+    {
+      title: 'Personal Nodes',
+      entries: [
+        {
+          envVar: 'MEAT_PERSONAL_NODE_MAX_SLOTS',
+          description: 'Maximum number of personal nodes that can connect',
+          value: String(config.personalNodeMaxSlots),
+          defaultVal: '100',
+        },
+        {
+          envVar: 'MEAT_PERSONAL_MAILBOX_QUOTA_MB',
+          description: 'Mailbox storage quota per personal node (MB)',
+          value: String(config.personalNodeMailboxQuotaMb),
+          defaultVal: '50',
+        },
+        {
+          envVar: 'MEAT_PERSONAL_MAILBOX_RETENTION_DAYS',
+          description: 'How many days to keep messages in personal node mailbox',
+          value: String(config.personalNodeMailboxRetentionDays),
+          defaultVal: '7',
+        },
+      ],
+    },
+  ];
+
+  const lines: string[] = [];
+  lines.push('');
+  lines.push('  AIMEAT Node Configuration');
+  lines.push('  ══════════════════════════════════════════════════════');
+
+  const envFile = existsSync('.env');
+  if (envFile) {
+    lines.push('  Source: .env file in current directory');
+  } else {
+    lines.push('  Source: environment variables only (no .env file found)');
+  }
+  lines.push('');
+
+  for (const section of sections) {
+    lines.push(`  ${section.title}`);
+    lines.push('  ' + '─'.repeat(52));
+
+    for (const entry of section.entries) {
+      const isDefault = !entry.secret && entry.value === entry.defaultVal;
+      const isExplicit = !isDefault && env[entry.envVar] !== undefined;
+
+      const tag = entry.secret
+        ? ''
+        : isExplicit
+          ? ' (set)'
+          : ' (default)';
+
+      lines.push(`    ${entry.envVar}${tag}`);
+      lines.push(`      ${entry.description}`);
+      lines.push(`      Value: ${entry.value}`);
+      lines.push('');
+    }
+  }
+
+  lines.push('  ══════════════════════════════════════════════════════');
+  lines.push('  To change a setting, edit the .env file in your node directory.');
+  lines.push('  Run "aimeat validate" to check for problems.');
+  lines.push('');
+
+  return lines.join('\n');
+}
+

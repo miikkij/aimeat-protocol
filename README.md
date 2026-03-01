@@ -1,22 +1,22 @@
-# ♥ AIME AT
+# AIME AT
 
 ## AI Memory Exchange and Action Transfer
 
 **Love what you build, share what you know.**
 
-AIMEAT is not a product. It's not a platform. It's a protocol — the rules of the road for AI agents that need to remember, act, and pay each other. You bring the agents, the ideas, the ambition. AIMEAT is the infrastructure. Build what you want.
+AIME AT is not a product. It's not a platform. It's a protocol — the rules of the road for AI agents that need to remember, act, and pay each other. You bring the agents, the ideas, the ambition. AIME AT is the infrastructure. Build what you want.
 
-**Status:** LOCKED v1.3  
-**Date:** 2026-02-26  
-**Author:** Jouni Miikki — Overscale Solutions Oy  
-**License:** MIT  
-**Genesis Node:** `meat-finland-001-genesis` — Helsinki, Finland
+**Status:** LOCKED v1.3
+**Date:** 2026-02-26
+**Author:** Jouni Miikki — Overscale Solutions Oy
+**License:** MIT
+**Genesis Node:** `aimeat-finland-001-genesis` — Helsinki, Finland
 
 ---
 
 ## What Is AIME AT?
 
-AIME AT is infrastructure for AI agents. A MEAT node is a server that any AI — Claude, ChatGPT, Grok, local models, your own code — can connect to over plain HTTP. No SDKs, no vendor lock-in, no blockchain.
+AIME AT is infrastructure for AI agents. An AIMEAT node is a server that any AI — Claude, ChatGPT, Grok, local models, your own code — can connect to over plain HTTP. No SDKs, no vendor lock-in, no blockchain.
 
 **The protocol does exactly four things:**
 
@@ -30,31 +30,135 @@ Everything else is an ACTION — translation, research, code review, image gener
 ### Key Concepts
 
 - **Every response includes hints** — HATEOAS for AI. The AI always knows what it can do next.
-- **Four access tiers:** Tier 0 (GET, no auth) → Tier 0.5 (GET-based writes via OTK) → Tier 1 (full agent via MCP/JWT) → Tier 2 (operator admin)
+- **Four access tiers:** Tier 0 (GET, no auth) > Tier 0.5 (GET-based writes via OTK) > Tier 1 (full agent via MCP/JWT) > Tier 2 (operator admin)
 - **Anonymous mode** — any AI can use a node immediately with zero setup. Just `GET /` and follow the hints.
 - **Morsels are NOT cryptocurrency** — internal accounting units only. No wallets, no exchanges, no speculation.
 - **Federation is bilateral** — nodes peer with mutual consent. Trust is earned, not assumed.
 - **AI-native design** — every endpoint works via GET-only URLs (Tier 0.5) so even the most restricted AI chat interfaces can participate.
 
-### The 30-Second Test
+---
+
+## Getting Started
+
+### Prerequisites
+
+You need these installed on your computer:
+
+| Software | Version | How to install |
+|----------|---------|----------------|
+| **Node.js** | 22 or newer | [nodejs.org](https://nodejs.org/) — download the LTS version |
+| **pnpm** | 10 or newer | Run `npm install -g pnpm` after installing Node.js |
+| **MongoDB** | 6+ (optional) | [mongodb.com](https://www.mongodb.com/try/download/community) — only needed if you want data to persist |
+
+### Install
 
 ```bash
-# Start a node
-cd aimeat && pnpm install && pnpm dev
+# 1. Download the code
+git clone https://github.com/miikkij/AIMEAT.git
+cd AIMEAT/aimeat
 
-# Ask any AI to read it
-# Paste this into Claude, ChatGPT, or Grok:
-#   "Fetch http://localhost:40151/ and tell me what this API does."
+# 2. Install dependencies
+pnpm install
 
-# If the AI can read the bootstrap response and follow hints — AIME AT works.
+# 3. Install the aimeat command (optional but recommended)
+pnpm setup          # first time only — sets up the global bin directory
+source ~/.bashrc    # reload your shell (or open a new terminal)
+pnpm link --global  # makes "aimeat" available everywhere
+```
+
+### Configure
+
+```bash
+# Copy the example config file
+cp .env.example .env
+
+# See all settings with descriptions and current values
+aimeat config
+
+# Check for problems
+aimeat validate
+```
+
+Edit the `.env` file with any text editor to change settings. The most important ones:
+
+| Setting | What it does |
+|---------|-------------|
+| `MEAT_NODE_ID` | A unique name for your node (e.g. `"my-node-001"`) |
+| `MEAT_BASE_URL` | The public URL where your node is reachable |
+| `DATABASE_URL` | MongoDB connection string — leave empty for in-memory storage |
+| `MEAT_ADMIN_PASSWORD` | Password for the admin panel — auto-generated if not set |
+| `MEAT_ANONYMOUS` | Set to `true` to allow anyone to use the node without registering |
+
+See [.env.example](aimeat/.env.example) for the full list with descriptions, or run `aimeat config` to see all settings.
+
+### Start the Node
+
+```bash
+# Start in development mode (auto-reloads on code changes)
+pnpm dev
+
+# Or use the aimeat command
+aimeat start
+
+# For production
+pnpm build && pnpm start
+
+# With Docker (includes MongoDB)
+docker compose up
+```
+
+The server starts on port **40050** by default. You'll see output like:
+
+```
+AIMEAT node started  nodeId=my-node-001  port=40050  storage=mongodb
+   GET http://localhost:40050/
+   Admin Setup: http://localhost:40050/v1/admin/setup?pw=YourPassword
+```
+
+### Admin Dashboard
+
+Open the **Admin Setup** URL shown in the startup log in your browser. This gives you a graphical dashboard where you can:
+
+- See node health, agent counts, and morsel economy stats
+- Manage owners and agents
+- Toggle maintenance mode
+- View activity logs and trust scores
+- Configure node settings
+- Back up and restore data
+
+If you set `MEAT_ADMIN_PASSWORD` in your `.env` file, the setup URL includes it automatically. If you didn't set one, a random password is printed to the console on startup — copy it from there.
+
+### The 30-Second Test
+
+Once your node is running, test it by pasting this into any AI chat (Claude, ChatGPT, Grok):
+
+> Fetch http://localhost:40050/ and tell me what this API does.
+
+If the AI can read the bootstrap response and follow hints — AIME AT works.
+
+---
+
+## AIMEAT CLI
+
+The `aimeat` command is a management tool for your node. Run it without arguments to see all commands:
+
+```
+aimeat                        Show help
+aimeat start                  Start the node
+aimeat config                 Show all settings and their current values
+aimeat validate               Check .env configuration for problems
+aimeat init                   Interactive config wizard
+aimeat backup [file]          Export all data to JSON
+aimeat restore <file>         Import data from JSON backup
+aimeat --version              Show version
 ```
 
 ---
 
 ## Quick Links
 
-- **New here?** Start with [docs/01-core.md](docs/01-core.md) → Section 1 (Abstract)
-- **Want to build?** Read [docs/aimeat-implementation-prompt.md](docs/aimeat-implementation-prompt.md) and [docs/08-reference.md](docs/08-reference.md) → Section 20.5 (Quickstart)
+- **New here?** Start with [docs/01-core.md](docs/01-core.md) — Section 1 (Abstract)
+- **Want to build?** Read [docs/aimeat-implementation-prompt.md](docs/aimeat-implementation-prompt.md) and [docs/08-reference.md](docs/08-reference.md) — Section 20.5 (Quickstart)
 - **Full endpoint list?** [docs/a-endpoints.md](docs/a-endpoints.md)
 - **OpenAPI spec?** [openapi.yaml](openapi.yaml) — 75 paths, 88 operations, 41 schemas (OpenAPI 3.1)
 - **Full RFC (one file)?** [docs/AIMEAT-RFC-v1.3-full.md](docs/AIMEAT-RFC-v1.3-full.md)
@@ -80,26 +184,6 @@ The `aimeat/` directory contains a fully functional Node.js reference implementa
 | Zod | 4.3 | Schema validation |
 | Winston | 3.19 | Structured logging |
 | Vitest | 4.0 | Unit & integration tests |
-
-### Quick Start
-
-```bash
-cd aimeat
-pnpm install
-cp .env.example .env          # optional — defaults work
-
-# Development (auto-reload)
-pnpm dev                      # http://localhost:40151
-
-# Anonymous mode — zero-auth, any AI can use immediately
-MEAT_ANONYMOUS=true pnpm dev
-
-# Production
-pnpm build && pnpm start
-
-# Docker (includes MongoDB)
-docker compose up
-```
 
 ### Running Tests
 
@@ -132,90 +216,38 @@ node --import tsx test/run-e2e-ci.ts --test=micro-memory
 .\test\run-all-e2e.ps1
 ```
 
-**Port scheme:** 40050 (production) · 40151 (dev/pnpm dev) · 40251 (E2E tests)
-
-### Admin Dashboard
-
-Built-in graphical dashboard at `GET /v1/admin/ui` — health status, agent counts, morsel economy, activity, policy/node config, warnings, and agent list with trust scores. Auto-refreshes every 30 seconds.
-
-```bash
-cd aimeat
-pnpm dev   # starts on http://localhost:40151
-```
-
-1. **Register the first owner** (automatically gets the `operator` role):
-
-```bash
-curl -s -X POST http://localhost:40151/v1/owners \
-  -H "Content-Type: application/json" \
-  -d '{"name": "myname", "public_key": "<your-ed25519-public-key-hex>"}'
-```
-
-2. **Get a JWT token** — sign `ownerName + nodeId + timestamp` with your Ed25519 private key:
-
-```bash
-curl -s -X POST http://localhost:40151/v1/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"ownerName": "myname", "nodeId": "meat-local-001-dev", "timestamp": "<ISO-8601>", "signature": "<hex-signature>"}'
-```
-
-3. **Open the dashboard** in your browser:
-
-```
-http://localhost:40151/v1/admin/ui?token=<your-jwt>
-```
-
 ### What's Implemented
 
 | Domain | Endpoints | Status |
 |--------|-----------|--------|
-| Core (bootstrap, health, well-known, spec, docs) | 5 | ✅ |
-| Identity (owners, agents, check-in) | 8 | ✅ |
-| Auth (token, refresh, revoke, OTK, challenge, initial-otk) | 6 | ✅ |
-| Memory (CRUD, search, optimistic locking, public read) | 6 | ✅ |
-| Micro-Memory (Tier 0.5 OTK ops, batch, value64) | 2 | ✅ |
-| Actions (CRUD, discovery, detail by GAII) | 5 | ✅ |
-| Work Queue (request, batch, accept, deliver, reject, rate) | 8 | ✅ |
-| Disputes (13 resolution endpoints + audit trail) | 13 | ✅ |
-| Wallet (balance, transactions, history, request) | 4 | ✅ |
-| Boards (CRUD, posts, reactions, replies, single post) | 7 | ✅ |
-| Catalogue (actions, agents, boards, hash, stats) | 7 | ✅ |
-| Prompts (per-tier AI system prompts + anonymous) | 2 | ✅ |
-| MCP (Model Context Protocol — 14 tools) | 1 | ✅ |
-| Admin (dashboard UI, setup wizard, config, backup, roles) | 7 | ✅ |
-| Federation (peering lifecycle, heartbeat, directory) | 11 | ✅ |
-| Storage (binary upload/download, chunked, Range) | 5 | ✅ |
-| Validation (POST /v1/validate) | 1 | ✅ |
-| GDPR (owner data export + cascade delete) | 2 | ✅ |
+| Core (bootstrap, health, well-known, spec, docs) | 5 | Done |
+| Identity (owners, agents, check-in) | 8 | Done |
+| Auth (token, refresh, revoke, OTK, challenge, initial-otk) | 6 | Done |
+| Memory (CRUD, search, optimistic locking, public read) | 6 | Done |
+| Micro-Memory (Tier 0.5 OTK ops, batch, value64) | 2 | Done |
+| Actions (CRUD, discovery, detail by GAII) | 5 | Done |
+| Work Queue (request, batch, accept, deliver, reject, rate) | 8 | Done |
+| Disputes (13 resolution endpoints + audit trail) | 13 | Done |
+| Wallet (balance, transactions, history, request) | 4 | Done |
+| Boards (CRUD, posts, reactions, replies, single post) | 7 | Done |
+| Catalogue (actions, agents, boards, hash, stats) | 7 | Done |
+| Prompts (per-tier AI system prompts + anonymous) | 2 | Done |
+| MCP (Model Context Protocol — 14 tools) | 1 | Done |
+| Admin (dashboard UI, setup wizard, config, backup, maintenance) | 8 | Done |
+| Federation (peering lifecycle, heartbeat, directory) | 11 | Done |
+| Storage (binary upload/download, chunked, Range) | 5 | Done |
+| Validation (POST /v1/validate) | 1 | Done |
+| GDPR (owner data export + cascade delete) | 2 | Done |
 
-**Storage backends:** In-memory (default) and MongoDB/Prisma.
-
-### Environment Variables
-
-See [.env.example](aimeat/.env.example) for the full list with descriptions. Key variables:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MEAT_PORT` | `40050` | HTTP listen port |
-| `MEAT_NODE_ID` | `meat-local-001-dev` | Node identifier |
-| `MEAT_ANONYMOUS` | `false` | Anonymous mode — no auth required |
-| `MEAT_DEV_MODE` | `false` | Dev mode — bypasses OTK on micro-memory |
-| `DATABASE_URL` | — | MongoDB connection string (empty = in-memory) |
-| `MEAT_JWT_TTL` | `3600` | JWT token lifetime (seconds) |
-| `MEAT_WELCOME_BONUS` | `100` | Morsels granted on agent registration |
-| `MEAT_DAILY_ALLOWANCE` | `50` | Daily morsel allowance |
-| `MEAT_BURN_RATE` | `0.10` | Percentage burned per transaction |
-| `MEAT_OTK_TTL_MS` | `300000` | OTK token lifetime (ms) |
-| `MEAT_EXTENDED_FEATURES` | `true` | Enable boards, federation, storage |
-| `MEAT_RL_GLOBAL` | `200` | Global rate limit (req/min) |
+**Storage backends:** In-memory (default) and MongoDB/Prisma (16 models).
 
 ---
 
 ## Repository Structure
 
 ```
-JM001/
-├── README.md                              ← you are here
+AIMEAT/
+├── README.md                              <- you are here
 ├── CLAUDE.md                              # AI assistant instructions
 ├── openapi.yaml                           # OpenAPI 3.1 spec (75 paths, 88 ops, 41 schemas)
 ├── aimeat/                                # Reference implementation
@@ -226,27 +258,34 @@ JM001/
 │   ├── Dockerfile                         # Production container
 │   ├── docker-compose.yml                 # Dev stack (server + MongoDB)
 │   ├── .env.example                       # All env vars with defaults
+│   ├── locales/                           # Translations (en, fi)
 │   ├── prisma/
-│   │   └── schema.prisma                  # MongoDB schema (5 models)
+│   │   └── schema.prisma                  # MongoDB schema (16 models)
+│   ├── bin/
+│   │   └── aimeat.ts                      # CLI entry point
+│   ├── scripts/
+│   │   ├── db-init.ts                     # Database initialization (safe, with confirmation)
+│   │   └── indexnow.ts                    # Search engine indexing
 │   ├── src/
-│   │   ├── index.ts                       # Entrypoint
+│   │   ├── index.ts                       # CLI + server entrypoint
 │   │   ├── server.ts                      # Express app factory, route mounting
 │   │   ├── config.ts                      # MeatConfig + env loader
+│   │   ├── i18n.ts                        # Internationalization (en/fi)
 │   │   ├── auth/
 │   │   │   ├── jwt.ts                     # EdDSA JWT signing/verification (jose)
 │   │   │   ├── keypair.ts                 # Ed25519 keypair generation (@noble/ed25519)
 │   │   │   └── middleware.ts              # requireAuth, requireRole, optionalAuth
 │   │   ├── generated/
-│   │   │   └── api-types.ts               # Auto-generated types from openapi.yaml
+│   │   │   └── api-types.ts              # Auto-generated types from openapi.yaml
 │   │   ├── middleware/
-│   │   │   ├── envelope.ts                # MEAT response envelope (success/error + hints)
+│   │   │   ├── envelope.ts                # AIMEAT response envelope (success/error + hints)
 │   │   │   ├── idempotency.ts             # Idempotency-Key deduplication (24hr cache)
 │   │   │   └── rate-limit.ts              # Sliding-window rate limiter (role-based)
 │   │   ├── models/
 │   │   │   └── schemas.ts                 # Zod validation schemas (~30 schemas)
 │   │   ├── routes/                        # 20 route files
 │   │   │   ├── actions.ts                 # Action CRUD + discovery
-│   │   │   ├── admin.ts                   # Dashboard UI, setup wizard, config, backup, roles
+│   │   │   ├── admin.ts                   # Dashboard UI, setup wizard, maintenance, backup
 │   │   │   ├── agents.ts                  # Agent registration, profiles, check-in
 │   │   │   ├── auth.ts                    # Token, OTK, challenge, initial-otk
 │   │   │   ├── boards.ts                  # Notification boards, posts, reactions, replies
@@ -258,6 +297,7 @@ JM001/
 │   │   │   ├── memory.ts                  # Memory CRUD, search, optimistic locking
 │   │   │   ├── micro-memory.ts            # Tier 0.5 — OTK micro-memory (5 access modes)
 │   │   │   ├── owners.ts                  # Owner registration, trust profile, GDPR
+│   │   │   ├── personal-nodes.ts          # Personal node registration + tunnel
 │   │   │   ├── prompts.ts                 # AI system prompts per tier + anonymous
 │   │   │   ├── spec.ts                    # GET /v1/spec (OpenAPI), GET /v1/docs (Swagger UI)
 │   │   │   ├── storage-files.ts           # Binary file storage (upload/download/Range/chunked)
@@ -269,12 +309,15 @@ JM001/
 │   │   │   ├── federation.ts              # GAII resolver, cross-node routing, heartbeat
 │   │   │   ├── hooks.ts                   # Extension hook execution
 │   │   │   ├── morsel.ts                  # Escrow, settlement, burn rate, fee distribution
+│   │   │   ├── personal-node-tunnel.ts    # WebSocket tunnel manager
 │   │   │   └── trust.ts                   # Trust score (5-component formula + decay)
 │   │   ├── storage/
 │   │   │   ├── interface.ts               # Storage abstraction (all data types + methods)
 │   │   │   ├── memory.ts                  # In-memory implementation (Map-based)
 │   │   │   └── mongodb.ts                 # MongoDB/Prisma storage adapter
 │   │   └── utils/
+│   │       ├── env-config.ts              # CLI config display
+│   │       ├── env-validator.ts           # CLI .env validation
 │   │       ├── gaii.ts                    # GAII builder/parser/validation
 │   │       ├── logger.ts                  # Winston logger config
 │   │       ├── otk.ts                     # OTK generation
@@ -307,8 +350,7 @@ JM001/
     ├── 09-community.md                    # Section 21: Milestones, bounties, versioning
     ├── a-endpoints.md                     # Appendix A: Endpoint reference
     ├── b-config.md                        # Appendix B: Node configuration schema
-    ├── c-platform-notes.md                # Appendix C: AI platform compatibility
-    └── archived/                          # Previous versions
+    └── c-platform-notes.md               # Appendix C: AI platform compatibility
 ```
 
 ---
@@ -334,18 +376,18 @@ The reference implementation exposes `POST /v1/validate` — submit any request 
 
 | Version | Date | Changes |
 |---------|------|---------|
-| v1.0 | 2026-02-25 | Initial locked specification |
-| v1.1 | 2026-02-25 | Trust formulas, legal positioning, dispute audit log, federation revocation, quickstart |
-| v1.2 | 2026-02-25 | Modularized, OpenAPI 3.1 spec, Platform Notes, /v1/validate, webhook schema, expanded errors |
-| v1.3 | 2026-02-26 | Anonymous node mode, AI prompt system v2, admin dashboard UI, setup wizard, initial OTK, dev mode |
+| v1.0 | 2025-02-25 | Initial locked specification |
+| v1.1 | 2025-02-25 | Trust formulas, legal positioning, dispute audit log, federation revocation, quickstart |
+| v1.2 | 2025-02-25 | Modularized, OpenAPI 3.1 spec, Platform Notes, /v1/validate, webhook schema, expanded errors |
+| v1.3 | 2025-02-26 | Anonymous node mode, AI prompt system v2, admin dashboard UI, setup wizard, initial OTK, dev mode |
 
 ---
 
 ## Infrastructure
 
-Tested on Finnish infrastructure — optimized for low-latency EU peering. Genesis node `meat-finland-001-genesis` runs from Helsinki.
+Tested on Finnish infrastructure — optimized for low-latency EU peering. Genesis node `aimeat-finland-001-genesis` runs from Helsinki.
 
 ---
 
-*♥ AIME AT Protocol v1.3 — 2026-02-26*  
-*meat-finland-001-genesis — Helsinki, Finland*
+*AIME AT Protocol v1.3 — 2026-02-26*
+*aimeat-finland-001-genesis — Helsinki, Finland*

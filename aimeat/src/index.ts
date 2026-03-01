@@ -26,9 +26,10 @@ aimeat — AI Memory Exchange and Action Transfer protocol node
 USAGE
   aimeat start [options]      Start the node
   aimeat serve [options]      Alias for start
-  aimeat init                 Interactive config wizard
+  aimeat config               Show all settings and their current values
   aimeat validate             Validate .env configuration
   aimeat check                Alias for validate
+  aimeat init                 Interactive config wizard
   aimeat backup  [FILE]       Export all data to JSON
   aimeat restore <FILE>       Import data from JSON backup
 
@@ -41,10 +42,11 @@ OPTIONS
   -h, --help                 Show this help
   -v, --version              Show version
 
-ENVIRONMENT VARIABLES
-  MEAT_PORT, MEAT_NODE_ID, DATABASE_URL, MEAT_ADMIN_PASSWORD
-  MEAT_JWT_TTL, MEAT_WELCOME_BONUS, MEAT_DAILY_ALLOWANCE
-  MEAT_DAILY_ALLOWANCE_CAP, MEAT_BURN_RATE, MEAT_KEYED_BROWSE
+QUICK START
+  1. Edit the .env file in this directory to configure your node
+  2. Run "aimeat config" to see all settings
+  3. Run "aimeat validate" to check for problems
+  4. Run "aimeat start" to launch the node
 `;
 
 if (values.help) {
@@ -92,7 +94,11 @@ const config = loadConfig();
 const subcommand = positionals[0];
 
 // Handle subcommands
-if (subcommand === 'init') {
+if (subcommand === 'config') {
+  const { formatConfig } = await import('./utils/env-config.js');
+  console.log(formatConfig(config));
+  process.exit(0);
+} else if (subcommand === 'init') {
   const outFile = positionals[1] ?? 'aimeat.config.json';
   if (existsSync(outFile)) {
     console.log(`Config file already exists: ${outFile}`);
