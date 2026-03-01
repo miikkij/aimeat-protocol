@@ -32,6 +32,9 @@ USAGE
   aimeat check                Alias for validate
   aimeat init                 Interactive config wizard
   aimeat join [URL]            Join a federation network
+  aimeat maintenance on [MSG]  Enable maintenance mode (optional message)
+  aimeat maintenance off       Disable maintenance mode
+  aimeat maintenance           Show maintenance status
   aimeat backup  [FILE]       Export all data to JSON
   aimeat restore <FILE>       Import data from JSON backup
 
@@ -153,6 +156,48 @@ if (subcommand === 'config') {
   const { runFederationJoin } = await import('./cli/federation-join.js');
   await runFederationJoin(config, positionals[1] ?? config.genesisUrl ?? undefined);
   process.exit(0);
+} else if (subcommand === 'maintenance') {
+  const action = positionals[1]; // on | off | undefined (show status)
+  let storage;
+  if (config.dbUrl) {
+    const { MongoStorage } = await import('./storage/mongodb.js');
+    const mongo = new MongoStorage(config.dbUrl);
+    await mongo.ready;
+    storage = mongo;
+  } else {
+    const { InMemoryStorage } = await import('./storage/memory.js');
+    storage = new InMemoryStorage();
+  }
+
+  if (action === 'on') {
+    const message = positionals.slice(2).join(' ') || 'Maintenance';
+    await storage.setMaintenanceMode({
+      enabled: true,
+      message,
+      enabledAt: new Date().toISOString(),
+      enabledBy: 'cli',
+    });
+    console.log(`Maintenance mode ON: "${message}"`);
+  } else if (action === 'off') {
+    await storage.setMaintenanceMode({
+      enabled: false,
+      message: '',
+      enabledAt: null,
+      enabledBy: null,
+    });
+    console.log('Maintenance mode OFF');
+  } else {
+    const state = await storage.getMaintenanceMode();
+    if (state?.enabled) {
+      console.log('Maintenance mode: ON');
+      console.log(`  Message:    ${state.message || '(none)'}`);
+      console.log(`  Enabled at: ${state.enabledAt ?? 'unknown'}`);
+      console.log(`  Enabled by: ${state.enabledBy ?? 'unknown'}`);
+    } else {
+      console.log('Maintenance mode: OFF');
+    }
+  }
+  process.exit(0);
 } else if (subcommand === 'backup') {
   const outArg = positionals[1] ?? 'aimeat-backup.json';
   const { app } = await createServer(config);
@@ -254,6 +299,21 @@ if (subcommand === 'config') {
       logger.info(`   Admin Secret: ${config.adminPassword}`);
     }
     logger.info(`──────────────────────────────────────────────────────────`);
+
+    // Check and display maintenance mode warning
+    storage.getMaintenanceMode().then(state => {
+      if (state?.enabled) {
+        logger.info('');
+        logger.info(`   ┌──────────────────────────────────────────────────────┐`);
+        logger.info(`   │  🚧 MAINTENANCE MODE IS ON                          │`);
+        logger.info(`   │  Message: ${(state.message || '(none)').padEnd(41)}│`);
+        logger.info(`   │  Since:   ${(state.enabledAt ?? 'unknown').padEnd(41)}│`);
+        logger.info(`   │                                                      │`);
+        logger.info(`   │  Run "aimeat maintenance off" to disable             │`);
+        logger.info(`   └──────────────────────────────────────────────────────┘`);
+        logger.info('');
+      }
+    }).catch(() => { /* ignore */ });
   });
 
   // WebSocket upgrade handling for personal node tunnels

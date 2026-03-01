@@ -598,6 +598,132 @@ await test('Federation — heartbeat + peers list', async () => {
     assert(Array.isArray(plBody.data?.peers), 'has peers array');
 });
 
+// ─── Federation Join (introduce) ───
+console.log('Federation — Introduce (join flow)');
+
+await test('Federation — introduce contributor (auto-approve)', async () => {
+    const { status, body } = await json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: 'e2e-test-contributor',
+            node_url: 'http://localhost:19999',
+            node_type: 'full',
+            public_key: 'dGVzdC1wdWJsaWMta2V5LWNvbnRyaWJ1dG9y',
+            role: 'contributor',
+            message: 'E2E test join',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.ok === true, `introduce: ${JSON.stringify(body.error)}`);
+    assert(body.data?.status === 'auto_approved', `expected auto_approved, got ${body.data?.status}`);
+    assert(typeof body.data?.request_id === 'string', 'has request_id');
+});
+
+await test('Federation — introduce operator (pending)', async () => {
+    const { status, body } = await json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: 'e2e-test-operator',
+            node_url: 'http://localhost:19998',
+            node_type: 'full',
+            public_key: 'dGVzdC1wdWJsaWMta2V5LW9wZXJhdG9y',
+            role: 'operator',
+            message: 'E2E test operator join',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.ok === true, `introduce: ${JSON.stringify(body.error)}`);
+    assert(body.data?.status === 'pending', `expected pending, got ${body.data?.status}`);
+    const requestId = body.data?.request_id;
+    assert(typeof requestId === 'string', 'has request_id');
+
+    // Check status — should be pending
+    const { body: stBody } = await json(`/v1/federation/peer/introduce/${requestId}/status`);
+    assert(stBody.ok === true, `status check: ${JSON.stringify(stBody.error)}`);
+    assert(stBody.data?.status === 'pending', `status is pending, got ${stBody.data?.status}`);
+
+    // Approve via admin API
+    const { body: appBody } = await json(`/v1/admin/peering/requests/${requestId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ decision: 'approve' }),
+    });
+    assert(appBody.ok === true, `approve: ${JSON.stringify(appBody.error)}`);
+
+    // Check status again — should be approved
+    const { body: st2Body } = await json(`/v1/federation/peer/introduce/${requestId}/status`);
+    assert(st2Body.data?.status === 'approved', `expected approved, got ${st2Body.data?.status}`);
+});
+
+await test('Federation — introduce validation (missing fields)', async () => {
+    const { status } = await json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: 'incomplete' }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('Federation — introduce status (invalid id)', async () => {
+    const { status } = await json('/v1/federation/peer/introduce/nonexistent-id/status');
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+// ─── Maintenance Mode ───
+console.log('Maintenance Mode');
+
+await test('Maintenance — toggle on and off', async () => {
+    // Enable maintenance
+    const { body: onBody } = await json('/v1/admin/maintenance', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ enabled: true, message: 'E2E test maintenance' }),
+    });
+    assert(onBody.ok === true, `enable: ${JSON.stringify(onBody.error)}`);
+    assert(onBody.data?.enabled === true, 'enabled');
+    assert(onBody.data?.message === 'E2E test maintenance', 'message matches');
+
+    // Check status
+    const { body: getBody } = await json('/v1/admin/maintenance', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(getBody.ok === true, `get: ${JSON.stringify(getBody.error)}`);
+    assert(getBody.data?.enabled === true, 'still enabled');
+
+    // Non-essential endpoint should return 503
+    const { status: memStatus } = await json('/v1/memory/test', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(memStatus === 503, `expected 503 during maintenance, got ${memStatus}`);
+
+    // Federation introduce should still work (bypass)
+    const { status: introStatus } = await json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: 'e2e-maint-test',
+            node_url: 'http://localhost:19997',
+            node_type: 'full',
+            public_key: 'dGVzdA==',
+            role: 'contributor',
+        }),
+    });
+    assert(introStatus === 201, `introduce during maintenance should work, got ${introStatus}`);
+
+    // Disable maintenance
+    const { body: offBody } = await json('/v1/admin/maintenance', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ enabled: false }),
+    });
+    assert(offBody.ok === true, `disable: ${JSON.stringify(offBody.error)}`);
+    assert(offBody.data?.enabled === false, 'disabled');
+
+    // Endpoint should work again
+    const { status: memStatus2 } = await json('/v1/memory/test', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(memStatus2 !== 503, `should not be 503 after disabling maintenance, got ${memStatus2}`);
+});
+
 // ─── Phase 7: Advanced Scenarios ───
 console.log('Phase 7 — Advanced Scenarios');
 
