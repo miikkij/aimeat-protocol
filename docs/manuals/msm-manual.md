@@ -543,7 +543,7 @@ Consider a peer-to-peer marketplace where users sell items to each other. Here i
 
 Neither the CSM nor the MSM files contain any of this logic. They just describe shapes and APIs. AI reads both, understands the flow, and builds the automation that ties them together.
 
-For details on CSM format and how to define your data shapes, see the [CSM Manual](csm-manual.md).
+For details on CSM format and how to define your data shapes, see the [CSM Manual](./csm-manual.md). To deploy MSM-powered automations as part of a plugin, see the [Service Owner Manual](./service-owner-manual.md).
 
 ---
 

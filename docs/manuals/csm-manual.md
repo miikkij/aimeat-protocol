@@ -453,7 +453,7 @@ moderation:
 
 ### 4.7 `economy` (optional)
 
-Marketplace and auction economics. Only relevant for `type: "marketplace"` or auction-type services.
+Marketplace and auction economics. Only relevant for `type: "marketplace"` or auction-type services. For connecting external payment providers (Stripe, MobilePay) to your marketplace, see the [MSM Manual](./msm-manual.md).
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1046,7 +1046,7 @@ A CSM file is just a `.yaml` file. You can share it the same way you share any d
 
 - **Community libraries.** Collections of CSM files can be published and shared. An AIMEAT node operator might maintain a gallery of CSMs that community members can browse and activate with a single prompt to their AI assistant.
 
-For details on operating a node, managing multiple services, and federation configuration, see the [Service Owner Manual](./service-owner-manual.md).
+For details on operating a node, managing multiple services, and federation configuration, see the [Service Owner Manual](./service-owner-manual.md). To package a CSM together with external API integrations as a plugin, see the [Service Owner Manual](./service-owner-manual.md) section on YAML plugins.
 
 ---
 
