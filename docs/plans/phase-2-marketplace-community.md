@@ -1557,9 +1557,9 @@ Phase 2 (tämä dokumentti):
 
 ## Seuraava vaihe: Phase 3
 
-Phase 2 valmistuttua siirrytään Phase 3:een — viimeistely, standardit ja skaalaus.
+Phase 2 valmistuttua siirrytään [Phase 3: "Polish + tulevaisuus"](./phase-3-polish-future.md) — viimeistely, standardit ja skaalaus.
 
-Phase 3 rakentaa: PWA-mobiilisovelluksen (3.1), Graafisen personal node -asennusohjelman (3.2), EUDIW/MyData/W3C VC -integraatiot (3.3) ja Advanced federation (3.4).
+Phase 3 rakentaa: PWA-mobiilisovelluksen (3.1), Graafisen personal node -asennusohjelman (3.2), EUDIW/MyData/W3C VC -integraatiot (3.3) ja Advanced federation (3.4). Yksityiskohtaiset suunnitelmat löytyvät alidokumenteista [phase-3.1](./phase-3.1-pwa.md)–[phase-3.7](./phase-3.7-testing-strategy.md).
 
 ---
 
