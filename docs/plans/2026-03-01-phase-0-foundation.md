@@ -2925,6 +2925,16 @@ jobs:
 
 ---
 
+## Seuraava vaihe: Phase 1
+
+Phase 0 valmistuttua siirrytään Phase 1:een — ensimmäinen kokonainen end-to-end -palvelu (vertical slice).
+
+→ **[Phase 1: "Ensimmäinen yhteisö" — Kattava implementointisuunnitelma](./phase-1-first-community.md)**
+
+Phase 1 rakentaa: Email-järjestelmän (1.1), Web-wizardin (1.2), GHII-rekisteröinnin + tietolompakon (1.3), Hakemistot (1.4), Tiedon laatusuodatuksen (1.5), ja yhdistää kaiken Harrastehakemisto-vertikaalisliceksi (1.6).
+
+---
+
 *AIMEAT — AI Memory Exchange and Action Transfer*
 
 Overscale Solutions Oy, 2026
