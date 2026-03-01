@@ -662,24 +662,95 @@ function maintenancePageHtml(nodeId: string, message: string): string {
 <title>Maintenance — ${esc(nodeId)}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
-.box{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:48px 40px;max-width:480px;width:100%;text-align:center}
-.icon{font-size:3rem;margin-bottom:16px}
-h1{font-size:1.4rem;font-weight:700;margin-bottom:8px}
-.msg{color:#94a3b8;font-size:1rem;margin-bottom:24px;line-height:1.5}
-.reason{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 16px;color:#eab308;font-size:.9rem;margin-bottom:24px}
-.node{color:#475569;font-size:.75rem}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#eab308;margin-right:6px;animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.reload{color:#64748b;font-size:.75rem;margin-top:20px}
+body{background:#080c18;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;overflow:hidden}
+
+/* ── PlayStation-style flowing wave background ── */
+.waves{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.wave{position:absolute;width:200%;height:200%;opacity:.035;border-radius:42%;animation:drift linear infinite}
+.wave:nth-child(1){background:linear-gradient(135deg,#6366f1,#a855f7,#06b6d4);top:-60%;left:-50%;animation-duration:25s}
+.wave:nth-child(2){background:linear-gradient(225deg,#8b5cf6,#ec4899,#3b82f6);top:-65%;left:-55%;animation-duration:30s;animation-delay:-5s;opacity:.03}
+.wave:nth-child(3){background:linear-gradient(315deg,#06b6d4,#6366f1,#f43f5e);top:-70%;left:-45%;animation-duration:35s;animation-delay:-10s;opacity:.025}
+.wave:nth-child(4){background:linear-gradient(45deg,#a855f7,#2dd4bf,#818cf8);top:-55%;left:-60%;animation-duration:40s;animation-delay:-15s;opacity:.02}
+@keyframes drift{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* ── Floating particles ── */
+.particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.particle{position:absolute;border-radius:50%;opacity:0;animation:float linear infinite}
+.particle:nth-child(1){width:3px;height:3px;background:#6366f1;left:10%;animation-duration:12s;animation-delay:0s}
+.particle:nth-child(2){width:2px;height:2px;background:#a855f7;left:25%;animation-duration:15s;animation-delay:-3s}
+.particle:nth-child(3){width:4px;height:4px;background:#06b6d4;left:40%;animation-duration:10s;animation-delay:-6s}
+.particle:nth-child(4){width:2px;height:2px;background:#818cf8;left:55%;animation-duration:18s;animation-delay:-2s}
+.particle:nth-child(5){width:3px;height:3px;background:#2dd4bf;left:70%;animation-duration:14s;animation-delay:-8s}
+.particle:nth-child(6){width:2px;height:2px;background:#c084fc;left:85%;animation-duration:16s;animation-delay:-4s}
+.particle:nth-child(7){width:3px;height:3px;background:#38bdf8;left:15%;animation-duration:20s;animation-delay:-10s}
+.particle:nth-child(8){width:2px;height:2px;background:#a78bfa;left:60%;animation-duration:13s;animation-delay:-7s}
+@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.6}90%{opacity:.6}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+
+/* ── Card ── */
+.card{position:relative;z-index:1;background:rgba(15,23,42,.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(99,102,241,.15);border-radius:24px;padding:56px 48px;max-width:520px;width:100%;text-align:center;box-shadow:0 0 80px rgba(99,102,241,.08),0 4px 32px rgba(0,0,0,.3);animation:cardIn .8s cubic-bezier(.16,1,.3,1)}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* ── Glowing ring loader (uiverse-inspired) ── */
+.loader{position:relative;width:80px;height:80px;margin:0 auto 32px}
+.loader-ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent}
+.loader-ring:nth-child(1){border-top-color:#6366f1;animation:spin 1.8s cubic-bezier(.68,-.55,.27,1.55) infinite}
+.loader-ring:nth-child(2){inset:6px;border-right-color:#a855f7;animation:spin 2.2s cubic-bezier(.68,-.55,.27,1.55) infinite reverse}
+.loader-ring:nth-child(3){inset:12px;border-bottom-color:#06b6d4;animation:spin 1.5s cubic-bezier(.68,-.55,.27,1.55) infinite}
+.loader-core{position:absolute;inset:20px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.3),transparent);animation:glow 2s ease-in-out infinite alternate}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes glow{from{opacity:.4;transform:scale(.9)}to{opacity:.8;transform:scale(1.1)}}
+
+h1{font-size:1.5rem;font-weight:700;margin-bottom:12px;background:linear-gradient(135deg,#e2e8f0,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.02em}
+.msg{color:#94a3b8;font-size:1rem;margin-bottom:28px;line-height:1.6}
+.reason{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:14px 20px;color:#a5b4fc;font-size:.9rem;margin-bottom:28px;letter-spacing:.01em}
+.node-id{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:8px 16px;margin-bottom:20px}
+.node-id code{color:#64748b;font-family:'SF Mono',Consolas,monospace;font-size:.75rem}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#eab308;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(234,179,8,.4)}50%{opacity:.5;box-shadow:0 0 0 6px rgba(234,179,8,0)}}
+.footer{color:#475569;font-size:.7rem;margin-top:8px;letter-spacing:.03em;text-transform:uppercase}
+
+/* ── Progress bar ── */
+.progress{width:100%;height:3px;background:rgba(255,255,255,.05);border-radius:2px;margin-top:24px;overflow:hidden}
+.progress-bar{height:100%;width:100%;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4,#6366f1);background-size:300% 100%;border-radius:2px;animation:shimmer 2s linear infinite}
+@keyframes shimmer{from{background-position:300% 0}to{background-position:0 0}}
 </style></head><body>
-<div class="box">
-<div class="icon">&#x1F6A7;</div>
-<h1><span class="dot"></span>Under Maintenance</h1>
-<p class="msg">This node is temporarily offline. It will be back shortly.</p>
-${message ? `<div class="reason">${esc(message)}</div>` : ''}
-<p class="node">${esc(nodeId)}</p>
-<p class="reload">This page auto-refreshes every 30 seconds.</p>
+
+<!-- PS-style flowing waves -->
+<div class="waves">
+<div class="wave"></div>
+<div class="wave"></div>
+<div class="wave"></div>
+<div class="wave"></div>
+</div>
+
+<!-- Floating particles -->
+<div class="particles">
+<div class="particle"></div><div class="particle"></div>
+<div class="particle"></div><div class="particle"></div>
+<div class="particle"></div><div class="particle"></div>
+<div class="particle"></div><div class="particle"></div>
+</div>
+
+<div class="card">
+  <!-- Glowing ring loader -->
+  <div class="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-ring"></div>
+    <div class="loader-ring"></div>
+    <div class="loader-core"></div>
+  </div>
+
+  <h1>Under Maintenance</h1>
+  <p class="msg">This node is temporarily offline for improvements.<br>We'll be back shortly.</p>
+  ${message ? `<div class="reason">${esc(message)}</div>` : ''}
+
+  <div class="node-id">
+    <span class="status-dot"></span>
+    <code>${esc(nodeId)}</code>
+  </div>
+
+  <div class="progress"><div class="progress-bar"></div></div>
+  <p class="footer">Auto-refreshes every 30 seconds</p>
 </div>
 </body></html>`;
 }
