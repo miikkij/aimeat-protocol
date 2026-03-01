@@ -20,17 +20,17 @@ const { values, positionals } = parseArgs({
   },
 });
 
-if (values.help) {
-  console.log(`
+const HELP_TEXT = `
 aimeat — AI Memory Exchange and Action Transfer protocol node
 
 USAGE
-  aimeat [options]            Start the node
+  aimeat start [options]      Start the node
+  aimeat serve [options]      Alias for start
   aimeat init                 Interactive config wizard
   aimeat validate             Validate .env configuration
   aimeat check                Alias for validate
-  aimeat backup  --out FILE   Export all data to JSON
-  aimeat restore --from FILE  Import data from JSON backup
+  aimeat backup  [FILE]       Export all data to JSON
+  aimeat restore <FILE>       Import data from JSON backup
 
 OPTIONS
   -p, --port <port>          HTTP port (default: 40050)
@@ -45,7 +45,10 @@ ENVIRONMENT VARIABLES
   MEAT_PORT, MEAT_NODE_ID, DATABASE_URL, MEAT_ADMIN_PASSWORD
   MEAT_JWT_TTL, MEAT_WELCOME_BONUS, MEAT_DAILY_ALLOWANCE
   MEAT_DAILY_ALLOWANCE_CAP, MEAT_BURN_RATE, MEAT_KEYED_BROWSE
-`);
+`;
+
+if (values.help) {
+  console.log(HELP_TEXT);
   process.exit(0);
 }
 
@@ -186,8 +189,8 @@ if (subcommand === 'init') {
       server.close();
     }
   });
-} else {
-  // Default: start the server
+} else if (subcommand === 'start' || subcommand === 'serve') {
+  // Start the server
   // Auto-generate admin password if not set
   if (!config.adminPassword) {
     config.adminPassword = randomBytes(16).toString('base64url');
@@ -274,4 +277,12 @@ if (subcommand === 'init') {
 
     logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
   }
+} else if (subcommand) {
+  console.error(`Unknown command: ${subcommand}\n`);
+  console.log(HELP_TEXT);
+  process.exit(1);
+} else {
+  // No subcommand — show help
+  console.log(HELP_TEXT);
+  process.exit(0);
 }
