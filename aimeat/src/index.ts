@@ -110,14 +110,14 @@ if (subcommand === 'config') {
 
   (async () => {
     console.log('\n❤️ AIMEAT Node Configuration Wizard\n');
-    const nodeId = await ask('Node ID', 'meat-local-001');
-    const port = await ask('Port', '40050');
-    const welcomeBonus = await ask('Welcome bonus (morsels)', '100');
-    const dailyAllowance = await ask('Daily allowance (morsels)', '50');
-    const dailyAllowanceCap = await ask('Daily allowance cap', '500');
-    const burnRate = await ask('Burn rate (0-1)', '0.10');
-    const jwtTtlSeconds = await ask('JWT TTL (seconds)', '3600');
-    const db = await ask('MongoDB URL (blank for in-memory)', '');
+    const nodeId = await ask('Node ID', config.nodeId);
+    const port = await ask('Port', String(config.port));
+    const welcomeBonus = await ask('Welcome bonus (morsels)', String(config.welcomeBonus));
+    const dailyAllowance = await ask('Daily allowance (morsels)', String(config.dailyAllowance));
+    const dailyAllowanceCap = await ask('Daily allowance cap', String(config.dailyAllowanceCap));
+    const burnRate = await ask('Burn rate (0-1)', String(config.burnRate));
+    const jwtTtlSeconds = await ask('JWT TTL (seconds)', String(config.jwtTtlSeconds));
+    const db = await ask('MongoDB URL (blank for in-memory)', config.dbUrl ?? '');
     rl.close();
 
     const cfg: Record<string, unknown> = {
