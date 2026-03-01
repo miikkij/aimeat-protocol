@@ -2,6 +2,8 @@
 
 *Osa Phase 0 Foundation -kokonaisuutta. Ks. [Phase 0 yleiskatsaus](./2026-03-01-phase-0-foundation.md)*
 
+> **Sisardokumentti:** [Phase 0.7b — Olemassaolevien rajapintojen semanttinen retrofit](./phase-0.7b-semantic-retrofit.md) kattaa olemassaolevien API-endpointien (ActionRecord, AgentRecord, BoardPost, Catalogue, Federation, GHII) laajentamisen samoilla ontologioilla.
+
 ---
 
 ## 0.7 Semanttinen ontologia — Data Description Semantic Layer

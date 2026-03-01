@@ -18,7 +18,8 @@ Phase 0 rakentaa perusinfrastruktuurin, jonka päälle kaikki myöhemmät ominai
 | 0.4 | Kiinnostusprofiili-standardi | 0.1 (schema), 0.3 (consent) | Pieni |
 | 0.5 | OTP/TOTP-tuki | — | Keskisuuri |
 | 0.6 | DMZ-arkkitehtuurin formalisointi | 0.3 (consent) | Dokumentaatio |
-| 0.7 | Semanttinen ontologia | 0.1 (schema), 0.2 (CSM), 0.4 (profiilit) | Keskisuuri |
+| 0.7 | Semanttinen ontologia (uudet rakenteet) | 0.1 (schema), 0.2 (CSM), 0.4 (profiilit) | Keskisuuri |
+| 0.7b | Semanttinen retrofit (olemassaolevat API:t) | 0.7 | Suuri |
 | 0.8 | Dokumentaation ylläpitosuunnitelma | Kaikki | Dokumentaatio |
 | 0.9 | Testausstrategia | Kaikki | Keskisuuri |
 
@@ -27,7 +28,7 @@ Phase 0 rakentaa perusinfrastruktuurin, jonka päälle kaikki myöhemmät ominai
 ```
 0.1 Schema Locking ──────┐
                          ├──→ 0.2 CSM ──────────────┐
-0.3 Consent Layer ───────┤                           ├──→ 0.7 Semantic Ontology
+0.3 Consent Layer ───────┤                           ├──→ 0.7 Semantic Ontology ──→ 0.7b Semantic Retrofit
                          ├──→ 0.4 Kiinnostusprofiilit┘
 0.5 OTP/TOTP ────────────┤
                          └──→ 0.6 DMZ-formalisointi
@@ -36,7 +37,7 @@ Phase 0 rakentaa perusinfrastruktuurin, jonka päälle kaikki myöhemmät ominai
 0.9 Testausstrategia ─────────→ (pystytetään vitest ensin, sitten testit per komponentti)
 ```
 
-Komponentit 0.1, 0.3 ja 0.5 ovat toisistaan riippumattomia ja voidaan toteuttaa rinnakkain. Komponentit 0.2, 0.4 ja 0.6 riippuvat edeltävistä. 0.7 riippuu 0.1:stä, 0.2:sta ja 0.4:stä. 0.8 ja 0.9 ovat läpileikkaavia.
+Komponentit 0.1, 0.3 ja 0.5 ovat toisistaan riippumattomia ja voidaan toteuttaa rinnakkain. Komponentit 0.2, 0.4 ja 0.6 riippuvat edeltävistä. 0.7 riippuu 0.1:stä, 0.2:sta ja 0.4:stä. 0.7b riippuu 0.7:stä ja retrofittaa olemassaolevat rajapinnat. 0.8 ja 0.9 ovat läpileikkaavia.
 
 ### Alidokumentit
 
@@ -50,7 +51,8 @@ Jokainen komponentti on dokumentoitu myös omana tiedostonaan yksityiskohtaista 
 | 0.4 Kiinnostusprofiilit | [phase-0.4-interest-profiles.md](./phase-0.4-interest-profiles.md) |
 | 0.5 OTP/TOTP | [phase-0.5-otp-totp.md](./phase-0.5-otp-totp.md) |
 | 0.6 DMZ-arkkitehtuuri | [phase-0.6-dmz-architecture.md](./phase-0.6-dmz-architecture.md) |
-| 0.7 Semanttinen ontologia | [phase-0.7-semantic-ontology.md](./phase-0.7-semantic-ontology.md) |
+| 0.7 Semanttinen ontologia (uudet) | [phase-0.7-semantic-ontology.md](./phase-0.7-semantic-ontology.md) |
+| 0.7b Semantic retrofit (olemassa olevat) | [phase-0.7b-semantic-retrofit.md](./phase-0.7b-semantic-retrofit.md) |
 | 0.8 Dokumentaation ylläpito | [phase-0.8-documentation-plan.md](./phase-0.8-documentation-plan.md) |
 | 0.9 Testausstrategia | [phase-0.9-testing-strategy.md](./phase-0.9-testing-strategy.md) |
 
@@ -2821,6 +2823,26 @@ jobs:
 | `AIMEAT_TOTP_MAX_FAILED_ATTEMPTS` | 0.5 | `5` | Max TOTP-yrityksiä ennen lukitusta |
 | `AIMEAT_TOTP_LOCKOUT_SECONDS` | 0.5 | `300` | Lukitusaika (s) |
 
+### Muutokset olemassaoleviin endpointeihin (0.7b)
+
+| Endpoint | Muutos |
+|---|---|
+| `POST /v1/actions` | +`semantic` request body & response |
+| `GET /v1/actions/:gaii/:id` | +`semantic` response |
+| `PUT /v1/actions/:id` | +`semantic` request body & response |
+| `POST /v1/agents` | +`semantic` request body & response |
+| `GET /v1/agents/:gaii` | +`semantic` response |
+| `GET /v1/catalogue` | +`@context` root-level, +`semantic` actioneissa |
+| `GET /v1/catalogue/actions` | +`@context`, +`semantic` |
+| `GET /v1/catalogue/agents` | +`@context`, +`semantic` |
+| `POST /v1/boards/:id/posts` | +`semantic` request body & response |
+| `GET /v1/boards/:id/posts` | +`semantic` posteissa |
+| `POST /v1/ghii` | +`semantic` request body & response |
+| `GET /v1/ghii/:ghii` | +`semantic` response |
+| `GET /v1/ghii/directory` | +`semantic` listauksessa |
+| `POST /v1/federation/catalogue-sync` | +`semantic` actioneissa |
+| `GET /v1/federation/directory` | +`semantic` personal nodeissa |
+
 ### Uudet API-endpointit (yhteensä 17)
 
 | Metodi | Polku | Auth | Komponentti |
@@ -2866,8 +2888,8 @@ jobs:
 
 ### Koodin laatu
 - [ ] `npx tsc --noEmit` compileaa ilman virheitä
-- [ ] `pnpm test` (vitest yksikkötestit) passaa — ~72 testiä
-- [ ] `npx tsx test/e2e-full.ts` passaa — 111 testiä (35 nykyistä + 76 uutta)
+- [ ] `pnpm test` (vitest yksikkötestit) passaa — ~80 testiä
+- [ ] `npx tsx test/e2e-full.ts` passaa — 127 testiä (35 nykyistä + 76 uutta + 16 retrofit)
 
 ### E2E-testit per komponentti
 - [ ] Kaikki 18 schema locking -testiä (0.1) passaavat
@@ -2877,6 +2899,7 @@ jobs:
 - [ ] Kaikki 18 TOTP-testiä (0.5) passaavat
 - [ ] Kaikki 3 DMZ-testiä (0.6) passaavat
 - [ ] Kaikki 4 semantic-testiä (0.7) passaavat
+- [ ] Kaikki 16 semantic retrofit -testiä (0.7b) passaavat
 - [ ] Olemassaoleva E2E-testisarja (35 testiä) passaa edelleen (regressio)
 
 ### Yksikkötestit
@@ -2887,6 +2910,7 @@ jobs:
 - [ ] `test/unit/totp-service.test.ts` — 10 testiä
 - [ ] `test/unit/profile-schemas.test.ts` — 8 testiä
 - [ ] `test/unit/semantic-validation.test.ts` — 5 testiä
+- [ ] `test/unit/semantic-annotation.test.ts` — 8 testiä (0.7b)
 
 ### Dokumentaatio
 - [ ] Dokumentaatiot luotu: CSM spec, interest profile spec, DMZ architecture
