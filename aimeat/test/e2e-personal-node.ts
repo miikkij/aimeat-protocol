@@ -92,6 +92,7 @@ await test('POST /v1/personal/anchor — register personal node', async () => {
             owner_name: ownerName,
             public_key: 'test-key-base64',
             agent_gaiis: [],
+            visibility: 'private',
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -102,6 +103,7 @@ await test('POST /v1/personal/anchor — register personal node', async () => {
     assert(typeof body.data?.tunnel_url === 'string', 'has tunnel_url');
     assert(typeof body.data?.mailbox_quota_bytes === 'number', 'has mailbox_quota_bytes');
     assert(typeof body.data?.created_at === 'string', 'has created_at');
+    assert(body.data?.visibility === 'private', `visibility should be private: ${body.data?.visibility}`);
 });
 
 // ─── Phase 3: Status — Check personal node status ───
@@ -121,6 +123,7 @@ await test('GET /v1/personal/status — check personal node status', async () =>
     assert(Array.isArray(body.data?.agent_gaiis), 'has agent_gaiis array');
     assert(typeof body.data?.last_seen === 'string', 'has last_seen');
     assert(typeof body.data?.created_at === 'string', 'has created_at');
+    assert(body.data?.visibility === 'private', `visibility should be private: ${body.data?.visibility}`);
 });
 
 // ─── Phase 4: List — Operator list all nodes ───
@@ -137,10 +140,56 @@ await test('GET /v1/personal/nodes — operator lists all personal nodes', async
     assert(ourNode, 'our personal node appears in list');
     assert(ourNode.owner_name === ownerName, `owner_name: ${ourNode.owner_name}`);
     assert(ourNode.status === 'offline', `status: ${ourNode.status}`);
+    assert(ourNode.visibility === 'private', `visibility should be private: ${ourNode.visibility}`);
     assert(typeof body.data?.total === 'number', 'has total');
     assert(typeof body.data?.max_slots === 'number', 'has max_slots');
     assert(typeof body.data?.available_slots === 'number', 'has available_slots');
     assert(body.data.available_slots === body.data.max_slots - body.data.total, 'available_slots = max_slots - total');
+});
+
+// ─── Phase 4b: Visibility Toggle ───
+console.log('Phase 4b — Visibility Toggle');
+
+await test('PATCH /v1/personal/anchor/:nodeId — toggle visibility to public', async () => {
+    const { status, body } = await json(`/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: 'public' }),
+    });
+    assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.visibility === 'public', `Should be public: ${body.data?.visibility}`);
+    assert(body.data?.node_id === personalNodeId, `node_id: ${body.data?.node_id}`);
+    assert(typeof body.data?.updated_at === 'string', 'has updated_at');
+});
+
+await test('PATCH /v1/personal/anchor/:nodeId — toggle visibility back to private', async () => {
+    const { status, body } = await json(`/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: 'private' }),
+    });
+    assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.visibility === 'private', `Should be private: ${body.data?.visibility}`);
+});
+
+await test('PATCH /v1/personal/anchor/:nodeId — invalid visibility rejected', async () => {
+    const { status, body } = await json(`/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: 'invalid' }),
+    });
+    assert(status === 400, `Expected 400 for invalid visibility, got ${status}`);
+});
+
+await test('PATCH /v1/personal/anchor/:nodeId — empty body rejected', async () => {
+    const { status, body } = await json(`/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+    });
+    assert(status === 400, `Expected 400 for empty body, got ${status}`);
 });
 
 // ─── Phase 5: Mailbox — Check mailbox stats ───
@@ -159,18 +208,52 @@ await test('GET /v1/personal/mailbox/:nodeId — check mailbox stats', async () 
     assert(typeof body.data?.by_type === 'object', 'has by_type');
 });
 
-// ─── Phase 6: Federation — Check personal nodes appear in directory ───
-console.log('Phase 6 — Federation');
+// ─── Phase 6: Federation — Check visibility filtering in directory ───
+console.log('Phase 6 — Federation Visibility');
 
-await test('GET /v1/federation/directory — personal nodes in directory', async () => {
+await test('GET /v1/federation/directory — private node hidden from directory', async () => {
+    // Node is currently private (toggled back in Phase 4b)
     const { status, body } = await json('/v1/federation/directory');
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data?.peers), 'has peers array');
-    // personal_nodes may or may not be present depending on config — just verify directory works
-    if (body.data?.personal_nodes) {
-        assert(Array.isArray(body.data.personal_nodes), 'personal_nodes is array');
-    }
+    const personalNodes = body.data?.personal_nodes || [];
+    const found = personalNodes.find((n: any) => n.node_id === personalNodeId);
+    assert(!found, 'Private node should NOT appear in federation directory');
+});
+
+await test('Toggle to public then verify in directory', async () => {
+    // Toggle to public
+    const { status: patchStatus } = await json(`/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: 'public' }),
+    });
+    assert(patchStatus === 200, `PATCH failed: ${patchStatus}`);
+
+    // Check directory — public node should appear
+    const { body } = await json('/v1/federation/directory');
+    const personalNodes = body.data?.personal_nodes || [];
+    const found = personalNodes.find((n: any) => n.node_id === personalNodeId);
+    assert(found, 'Public node should appear in federation directory');
+    assert(found.node_id === personalNodeId, `node_id: ${found.node_id}`);
+    assert(found.type === 'personal', `type: ${found.type}`);
+});
+
+await test('Toggle back to private then verify hidden again', async () => {
+    // Toggle back to private
+    const { status: patchStatus } = await json(`/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: 'private' }),
+    });
+    assert(patchStatus === 200, `PATCH failed: ${patchStatus}`);
+
+    // Check directory — should be hidden again
+    const { body } = await json('/v1/federation/directory');
+    const personalNodes = body.data?.personal_nodes || [];
+    const found = personalNodes.find((n: any) => n.node_id === personalNodeId);
+    assert(!found, 'Private node should be hidden again after toggle');
 });
 
 // ─── Phase 7: Bootstrap — Check personal node info ───
