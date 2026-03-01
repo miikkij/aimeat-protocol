@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { EmailService } from '../services/email.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
-import { scrypt, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, scrypt, randomBytes, timingSafeEqual } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 
@@ -43,7 +44,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
  * - Operators/admins are owners with role=['owner','operator'] — they manage the node
  * - GHII users are owners with role=['owner'] + a GHII profile — they use apps
  */
-export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
+export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService): Router {
     const router = Router();
 
     // POST /v1/ghii — Register a new human identity (no auth required)
@@ -349,6 +350,389 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
         }, [
             { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
             { description: 'Upload an app', method: 'POST', url: '/v1/apps' },
+        ]));
+    });
+
+    // ── Phase 1.3 — Web Registration, Email Verification, Magic Link ──
+
+    // POST /v1/ghii/register-web — Web registration (no auth required)
+    // Creates owner + GHII profile with optional email verification
+    router.post('/v1/ghii/register-web', async (req, res) => {
+        const { username, display_name, email, locale, city, area, interests } = req.body ?? {};
+
+        if (!username || typeof username !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
+            return;
+        }
+
+        const nameError = validateOwnerName(username);
+        if (nameError) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
+            return;
+        }
+
+        if (!display_name || typeof display_name !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'display_name is required'));
+            return;
+        }
+
+        // Check if owner name is already taken
+        const existingOwner = await storage.getOwner(username);
+        if (existingOwner) {
+            res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`));
+            return;
+        }
+
+        // Hash email if provided
+        const emailHash = (typeof email === 'string' && email.length > 0)
+            ? createHash('sha256').update(email.toLowerCase().trim()).digest('hex')
+            : undefined;
+
+        // Generate keypair for the owner account
+        const keyPair = await generateKeyPair();
+
+        // Create owner with role=['owner']
+        const owner = await storage.createOwner({
+            name: username,
+            displayName: display_name,
+            publicKey: keyPair.publicKey,
+            roles: ['owner'],
+            createdAt: new Date().toISOString(),
+        });
+
+        // Create GHII profile with verificationLevel: 0
+        const now = new Date().toISOString();
+        const ghii = `${username}@${config.nodeId}`;
+        const ghiiRecord = await storage.createGHII({
+            username,
+            nodeId: config.nodeId,
+            ghii,
+            displayName: display_name,
+            locale: typeof locale === 'string' ? locale : undefined,
+            verificationLevel: 0,
+            ownerName: owner.name,
+            totpEnabled: false,
+            emailHash,
+            magicLinkEnabled: !!emailHash,
+            loginCount: 0,
+            createdAt: now,
+            updatedAt: now,
+        });
+
+        // Store interest profile in memory if interests provided
+        if (Array.isArray(interests) && interests.length > 0) {
+            const agentGaii = `app#${username}@${config.nodeId}`;
+            await storage.setMemory({
+                key: `profile.${username}.interests`,
+                ownerGaii: agentGaii,
+                value: interests,
+                visibility: 'public',
+                tags: ['profile', 'interests'],
+                ttlHours: null,
+                version: 1,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+
+        // Send verification email if email is provided and email service is enabled
+        let verificationId: string | undefined;
+        if (typeof email === 'string' && email.length > 0 && emailService?.enabled) {
+            const code = String(Math.floor(100000 + Math.random() * 900000));
+            const codeHash = createHash('sha256').update(code).digest('hex');
+            const verId = randomBytes(16).toString('hex');
+            await storage.createEmailVerification({
+                id: verId,
+                ownerName: username,
+                emailHash: emailHash!,
+                code: codeHash,
+                purpose: 'registration',
+                status: 'pending',
+                attempts: 0,
+                expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
+                createdAt: now,
+                verifiedAt: null,
+            });
+            await emailService.sendVerificationCode(email, code, typeof locale === 'string' ? locale : undefined);
+            verificationId = verId;
+        }
+
+        res.status(201).json(success(config.nodeId, {
+            ghii: {
+                ghii: ghiiRecord.ghii,
+                username: ghiiRecord.username,
+                display_name: ghiiRecord.displayName,
+                locale: ghiiRecord.locale,
+                verification_level: ghiiRecord.verificationLevel,
+                magic_link_enabled: ghiiRecord.magicLinkEnabled,
+                created_at: ghiiRecord.createdAt,
+            },
+            owner: {
+                name: owner.name,
+                roles: owner.roles,
+            },
+            private_key: keyPair.privateKey,
+            public_key: keyPair.publicKey,
+            verification_id: verificationId ?? null,
+            note: 'Store the private key securely. It cannot be retrieved again.',
+        }, [
+            ...(verificationId
+                ? [{ description: 'Verify your email', method: 'POST' as const, url: '/v1/ghii/verify-email' }]
+                : []),
+            { description: 'Create an agent', method: 'POST' as const, url: '/v1/agents' },
+            { description: 'View your profile', method: 'GET' as const, url: `/v1/ghii/${encodeURIComponent(ghii)}` },
+        ]));
+    });
+
+    // POST /v1/ghii/verify-email — Verify email code (no auth)
+    router.post('/v1/ghii/verify-email', async (req, res) => {
+        const { verification_id, code } = req.body ?? {};
+
+        if (!verification_id || typeof verification_id !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'verification_id is required'));
+            return;
+        }
+        if (!code || typeof code !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'code is required'));
+            return;
+        }
+
+        const record = await storage.getEmailVerification(verification_id);
+        if (!record) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Verification record not found'));
+            return;
+        }
+
+        if (record.status !== 'pending') {
+            res.status(400).json(error(config.nodeId, 'ALREADY_VERIFIED', 'This verification has already been completed'));
+            return;
+        }
+
+        if (new Date(record.expiresAt).getTime() < Date.now()) {
+            await storage.updateEmailVerification(verification_id, { status: 'expired' });
+            res.status(400).json(error(config.nodeId, 'EXPIRED', 'Verification code has expired'));
+            return;
+        }
+
+        if (record.attempts >= 5) {
+            res.status(429).json(error(config.nodeId, 'TOO_MANY_ATTEMPTS', 'Too many failed attempts'));
+            return;
+        }
+
+        // Hash the provided code and compare
+        const codeHash = createHash('sha256').update(code).digest('hex');
+        if (codeHash !== record.code) {
+            await storage.updateEmailVerification(verification_id, { attempts: record.attempts + 1 });
+            res.status(400).json(error(config.nodeId, 'INVALID_CODE', 'Invalid verification code'));
+            return;
+        }
+
+        // Mark as verified
+        const now = new Date().toISOString();
+        await storage.updateEmailVerification(verification_id, {
+            status: 'verified',
+            verifiedAt: now,
+        });
+
+        // Update GHII with verified email info
+        const ghii = `${record.ownerName}@${config.nodeId}`;
+        await storage.updateGHII(ghii, {
+            emailHash: record.emailHash,
+            emailVerifiedAt: now,
+            verificationLevel: 1,
+            verificationMethod: 'email',
+            magicLinkEnabled: true,
+        });
+
+        // Create an agent if not exists, then issue JWT
+        const agents = await storage.getAgentsByOwner(record.ownerName);
+        let agent = agents.find(a => a.name === 'app');
+        let agentPrivKey: string;
+
+        if (!agent) {
+            const agentKeyPair = await generateKeyPair();
+            const gaii = buildGAII('app', record.ownerName, config.nodeId);
+            agent = await storage.createAgent({
+                name: 'app',
+                owner: record.ownerName,
+                gaii,
+                displayName: `${record.ownerName}'s App Agent`,
+                description: 'Default agent for AIMEAT apps',
+                capabilities: [],
+                publicKey: agentKeyPair.publicKey,
+                trustScore: 50,
+                morselBalance: config.welcomeBonus,
+                createdAt: now,
+                lastSeen: now,
+            });
+            agentPrivKey = agentKeyPair.privateKey;
+        } else {
+            const agentKeyPair = await generateKeyPair();
+            await storage.updateAgent(agent.gaii, { publicKey: agentKeyPair.publicKey });
+            agentPrivKey = agentKeyPair.privateKey;
+        }
+
+        // Issue JWT
+        const ownerRecord = await storage.getOwner(record.ownerName);
+        const roles = ['agent'];
+        if (ownerRecord?.roles.includes('owner')) roles.push('owner');
+        if (ownerRecord?.roles.includes('operator')) roles.push('operator');
+
+        const token = await issueJWT({
+            sub: agent.gaii,
+            owner: record.ownerName,
+            node: config.nodeId,
+            roles,
+        }, config.jwtTtlSeconds);
+
+        res.json(success(config.nodeId, {
+            verified: true,
+            ghii,
+            verification_level: 1,
+            token,
+            expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+            agent: { gaii: agent.gaii },
+            agent_private_key: agentPrivKey,
+        }, [
+            { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
+            { description: 'View your profile', method: 'GET', url: `/v1/ghii/${encodeURIComponent(ghii)}` },
+        ]));
+    });
+
+    // POST /v1/ghii/magic-link — Request magic link login (no auth)
+    router.post('/v1/ghii/magic-link', async (req, res) => {
+        const { email } = req.body ?? {};
+
+        if (!email || typeof email !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'email is required'));
+            return;
+        }
+
+        // Hash email to find user
+        const emailHash = createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+        const ghiiRecord = await storage.getGHIIByEmailHash(emailHash);
+
+        // Always return 200 to not reveal if user exists
+        if (ghiiRecord && ghiiRecord.magicLinkEnabled && emailService?.enabled) {
+            const token = randomBytes(32).toString('hex');
+            const codeHash = createHash('sha256').update(token).digest('hex');
+            const now = new Date().toISOString();
+            await storage.createEmailVerification({
+                id: token,
+                ownerName: ghiiRecord.ownerName,
+                emailHash,
+                code: codeHash,
+                purpose: 'login',
+                status: 'pending',
+                attempts: 0,
+                expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
+                createdAt: now,
+                verifiedAt: null,
+            });
+
+            const loginUrl = `${config.baseUrl}/v1/ghii/magic-link/verify?token=${token}`;
+            await emailService.sendMagicLink(email, loginUrl, ghiiRecord.locale);
+        }
+
+        res.json(success(config.nodeId, {
+            sent: true,
+            note: 'If an account with that email exists, a magic link has been sent.',
+        }));
+    });
+
+    // GET /v1/ghii/magic-link/verify — Verify magic link (query param: token)
+    router.get('/v1/ghii/magic-link/verify', async (req, res) => {
+        const token = typeof req.query.token === 'string' ? req.query.token : undefined;
+
+        if (!token) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'token query parameter is required'));
+            return;
+        }
+
+        const record = await storage.getEmailVerification(token);
+        if (!record || record.status !== 'pending' || record.purpose !== 'login') {
+            res.status(401).json(error(config.nodeId, 'INVALID_TOKEN', 'Invalid or expired magic link'));
+            return;
+        }
+
+        if (new Date(record.expiresAt).getTime() < Date.now()) {
+            await storage.updateEmailVerification(token, { status: 'expired' });
+            res.status(401).json(error(config.nodeId, 'EXPIRED', 'Magic link has expired'));
+            return;
+        }
+
+        // Mark verification as used
+        const now = new Date().toISOString();
+        await storage.updateEmailVerification(token, {
+            status: 'verified',
+            verifiedAt: now,
+        });
+
+        // Update GHII last login
+        const ghii = `${record.ownerName}@${config.nodeId}`;
+        const ghiiRecord = await storage.getGHII(ghii);
+        if (ghiiRecord) {
+            await storage.updateGHII(ghii, {
+                lastLoginAt: now,
+                loginCount: (ghiiRecord.loginCount ?? 0) + 1,
+            });
+        }
+
+        // Re-key owner
+        const ownerKeyPair = await generateKeyPair();
+        await storage.updateOwner(record.ownerName, { publicKey: ownerKeyPair.publicKey });
+
+        // Find or create a default agent
+        const agents = await storage.getAgentsByOwner(record.ownerName);
+        let agent = agents.find(a => a.name === 'app');
+        let agentPrivKey: string;
+
+        if (agent) {
+            const agentKeyPair = await generateKeyPair();
+            await storage.updateAgent(agent.gaii, { publicKey: agentKeyPair.publicKey });
+            agentPrivKey = agentKeyPair.privateKey;
+        } else {
+            const agentKeyPair = await generateKeyPair();
+            const gaii = buildGAII('app', record.ownerName, config.nodeId);
+            agent = await storage.createAgent({
+                name: 'app',
+                owner: record.ownerName,
+                gaii,
+                displayName: `${record.ownerName}'s App Agent`,
+                description: 'Default agent for AIMEAT apps',
+                capabilities: [],
+                publicKey: agentKeyPair.publicKey,
+                trustScore: 50,
+                morselBalance: config.welcomeBonus,
+                createdAt: now,
+                lastSeen: now,
+            });
+            agentPrivKey = agentKeyPair.privateKey;
+        }
+
+        // Issue JWT
+        const ownerRecord = await storage.getOwner(record.ownerName);
+        const roles = ['agent'];
+        if (ownerRecord?.roles.includes('owner')) roles.push('owner');
+        if (ownerRecord?.roles.includes('operator')) roles.push('operator');
+
+        const jwtToken = await issueJWT({
+            sub: agent.gaii,
+            owner: record.ownerName,
+            node: config.nodeId,
+            roles,
+        }, config.jwtTtlSeconds);
+
+        res.json(success(config.nodeId, {
+            ghii,
+            token: jwtToken,
+            expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+            owner_private_key: ownerKeyPair.privateKey,
+            agent: { gaii: agent.gaii },
+            agent_private_key: agentPrivKey,
+        }, [
+            { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
+            { description: 'View your profile', method: 'GET', url: `/v1/ghii/${encodeURIComponent(ghii)}` },
         ]));
     });
 

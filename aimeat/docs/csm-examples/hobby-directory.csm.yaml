@@ -1,0 +1,41 @@
+csm: "1.0"
+service:
+  name: "Harrastehakemisto"
+  type: "directory"
+  description: "Löydä harrastuksia ja samanhenkisiä ihmisiä läheltäsi"
+  locale: "fi"
+
+schema_mode: "open"
+
+data_schema:
+  required:
+    interests:
+      type: array
+      items: { type: string }
+      minItems: 1
+    location:
+      type: object
+      properties:
+        city: { type: string }
+        country: { type: string, default: "FI" }
+      required: [city]
+  optional:
+    bio: { type: string, maxLength: 500 }
+    availability: { type: string, enum: ["anytime", "mornings", "evenings", "weekends", "evenings-weekends"] }
+    seeking: { type: array, items: { type: string } }
+
+consent_requirements:
+  visibility_default: "federation"
+  requires_consent: true
+  consent_purpose: "community-discovery"
+  data_retention: "until_revoked"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: false
+
+ui_hints:
+  list_view: ["displayName", "interests", "location.city"]
+  detail_view: ["displayName", "bio", "interests", "location", "availability", "seeking"]
+  search_fields: ["interests", "location.city", "location.area"]

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIMEAT Personal Node</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a1a;
+      color: #e0d4f5;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    .app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    nav {
+      background: rgba(26, 26, 46, 0.95);
+      border-bottom: 1px solid rgba(255, 105, 180, 0.2);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    nav .brand {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #ff69b4;
+    }
+    nav a {
+      color: #a78bfa;
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 6px 12px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    nav a:hover, nav a.active {
+      background: rgba(167, 139, 250, 0.15);
+      color: #d8b4fe;
+    }
+    .status-bar {
+      background: rgba(15, 15, 30, 0.8);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.8rem;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .status-dot.offline { background: #ef4444; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    main {
+      flex: 1;
+      padding: 32px 24px;
+      max-width: 960px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #f0abfc, #f9a8d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .card {
+      background: rgba(30, 20, 50, 0.6);
+      border: 1px solid rgba(167, 139, 250, 0.15);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      color: #d8b4fe;
+      margin-bottom: 12px;
+    }
+    .btn {
+      background: linear-gradient(135deg, #a78bfa, #f472b6);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn.secondary {
+      background: rgba(167, 139, 250, 0.15);
+      color: #d8b4fe;
+      border: 1px solid rgba(167, 139, 250, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav>
+      <span class="brand">AIMEAT</span>
+      <a href="#" class="active" data-page="dashboard">Dashboard</a>
+      <a href="#" data-page="connections">Connections</a>
+      <a href="#" data-page="ai-setup">AI Setup</a>
+      <a href="#" data-page="settings">Settings</a>
+      <a href="#" data-page="logs">Logs</a>
+    </nav>
+
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Checking node status...</span>
+      <span style="margin-left: auto; color: #a78bfa;">Port: 40050</span>
+    </div>
+
+    <main id="content">
+      <h1>Dashboard</h1>
+      <div class="card">
+        <h2>Node Status</h2>
+        <p id="nodeStatus">Loading...</p>
+        <br />
+        <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
+      </div>
+
+      <div class="card">
+        <h2>AI Services</h2>
+        <p id="aiStatus">Scanning for local AI services...</p>
+        <br />
+        <button class="btn secondary" onclick="detectAI()">Scan Again</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const { invoke } = window.__TAURI__.tauri;
+
+    async function checkStatus() {
+      try {
+        const status = await invoke('get_node_status');
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        const btn = document.getElementById('startStopBtn');
+
+        if (status.running) {
+          dot.className = 'status-dot';
+          text.textContent = `Node running (PID: ${status.pid})`;
+          btn.textContent = 'Stop Node';
+          document.getElementById('nodeStatus').textContent =
+            `Running on port ${status.port}`;
+        } else {
+          dot.className = 'status-dot offline';
+          text.textContent = 'Node stopped';
+          btn.textContent = 'Start Node';
+          document.getElementById('nodeStatus').textContent = 'Node is not running';
+        }
+      } catch (err) {
+        console.error('Status check failed:', err);
+      }
+    }
+
+    async function toggleNode() {
+      try {
+        const status = await invoke('get_node_status');
+        if (status.running) {
+          await invoke('stop_node', { pid: status.pid });
+        } else {
+          await invoke('start_node', { configPath: '.env' });
+        }
+        setTimeout(checkStatus, 1000);
+      } catch (err) {
+        alert('Error: ' + err);
+      }
+    }
+
+    async function detectAI() {
+      try {
+        const services = await invoke('detect_ai_services');
+        const el = document.getElementById('aiStatus');
+        const available = services.filter(s => s.status === 'available');
+        if (available.length > 0) {
+          el.innerHTML = available.map(s =>
+            `<strong>${s.service_type}</strong> @ ${s.url} — ${s.models.length} model(s)`
+          ).join('<br>');
+        } else {
+          el.textContent = 'No AI services detected. Start LM Studio or Ollama first.';
+        }
+      } catch (err) {
+        document.getElementById('aiStatus').textContent = 'Detection failed: ' + err;
+      }
+    }
+
+    // Initial checks
+    checkStatus();
+    detectAI();
+    setInterval(checkStatus, 5000);
+  </script>
+</body>
+</html>

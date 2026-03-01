@@ -1,0 +1,75 @@
+csm: "1.0"
+service:
+  name: "auction"
+  type: "marketplace"
+  description: "Time-limited auction listings with escrow and bidding system"
+  locale: "en"
+
+schema_mode: "strict"
+
+data_schema:
+  required:
+    title:
+      type: string
+      minLength: 5
+      maxLength: 200
+    description:
+      type: string
+      minLength: 10
+      maxLength: 3000
+    starting_price:
+      type: object
+      properties:
+        amount: { type: number, minimum: 0 }
+        currency: { type: string, default: "EUR" }
+      required: [amount]
+    category:
+      type: string
+      enum: ["art", "collectibles", "electronics", "antiques", "vehicles", "real_estate", "other"]
+    seller_gaii:
+      type: string
+    ends_at:
+      type: string
+      format: date-time
+  optional:
+    reserve_price:
+      type: object
+      properties:
+        amount: { type: number, minimum: 0 }
+        currency: { type: string }
+    buy_now_price:
+      type: object
+      properties:
+        amount: { type: number, minimum: 0 }
+        currency: { type: string }
+    images: { type: array, items: { type: string }, maxItems: 20 }
+    condition: { type: string, enum: ["new", "like_new", "good", "fair", "poor"] }
+    location:
+      type: object
+      properties:
+        city: { type: string }
+        country: { type: string }
+    shipping_options: { type: array, items: { type: string } }
+    provenance: { type: string, maxLength: 1000 }
+
+consent_requirements:
+  visibility_default: "federation"
+  requires_consent: true
+  consent_purpose: "auction-listing"
+  data_retention: "365d"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 2
+  appeals_enabled: true
+
+economy:
+  listing_fee_morsels: 10
+  escrow_enabled: true
+  escrow_release_on: "buyer_confirmation"
+  bid_increment_minimum: 1
+
+ui_hints:
+  list_view: ["title", "starting_price.amount", "starting_price.currency", "category", "ends_at"]
+  detail_view: ["title", "description", "starting_price", "reserve_price", "buy_now_price", "category", "condition", "images", "location", "ends_at", "provenance"]
+  search_fields: ["title", "category", "location.city"]

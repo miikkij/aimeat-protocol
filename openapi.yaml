@@ -70,6 +70,34 @@ tags:
     description: Phase 0.3 — Granular consent grants and audit
   - name: TOTP
     description: Phase 0.5 — Time-based one-time password two-factor authentication
+  - name: GHII-Web
+    description: Phase 1.3 — Web registration and magic link authentication for humans
+  - name: Directories
+    description: Phase 1.4 — Local and thematic directory search with faceted filtering
+  - name: Flags
+    description: Phase 1.5 — Content quality flagging and moderation
+  - name: Hobby-Portal
+    description: Phase 1.6 — HTML hobby directory portal for humans
+  - name: Matching
+    description: Phase 2.1 — AI-powered profile matching
+  - name: Organisms
+    description: Phase 2.2 — Group entities (clubs, teams, communities)
+  - name: Workspaces
+    description: Phase 2.3 — Collaborative memory namespaces
+  - name: Appeals
+    description: Phase 2.4 — Content moderation appeals
+  - name: CSM-Templates
+    description: Phase 2.5 — Community Service Manifest template library
+  - name: Marketplace
+    description: Phase 2.6 — Morsel-based marketplace
+  - name: PWA
+    description: Phase 3.1 — Progressive Web App features (push notifications)
+  - name: Verification
+    description: Phase 3.3 — Identity verification (EUDIW, FTN, W3C VC)
+  - name: Cross-Federation
+    description: Phase 3.4 — Advanced federation features (genesis peering)
+  - name: Reputation
+    description: Phase 3.4 — Organism reputation scoring
 
 components:
   securitySchemes:
@@ -173,6 +201,11 @@ components:
             - TOTP_ALREADY_ENABLED: TOTP already set up
             - CSM_NOT_FOUND: CSM service not found
             - VALIDATION_ERROR: Request body validation failed
+            - ALREADY_FLAGGED: User has already flagged this target
+            - EMAIL_UNAVAILABLE: Email service not configured
+            - FEATURE_DISABLED: Feature disabled on this node
+            - INVALID_STATUS: Invalid status transition
+            - MEMBERSHIP_EXISTS: Already a member of this organism
           example: INSUFFICIENT_MORSELS
         message:
           type: string
@@ -973,6 +1006,843 @@ components:
         service_type:
           type: string
 
+    # === Phase 1.3: GHII Web Registration ===
+    WebRegistrationRequest:
+      type: object
+      required: [username, displayName]
+      properties:
+        username:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$'
+          description: Unique username (becomes owner name)
+          example: jane-doe
+        displayName:
+          type: string
+          maxLength: 100
+          description: Human-readable display name
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          description: Optional email for verification and magic link login
+          example: jane@example.com
+        interests:
+          type: array
+          items:
+            type: string
+          description: List of interests/hobbies
+          example: [photography, hiking, cooking]
+        location:
+          type: object
+          properties:
+            city:
+              type: string
+              example: Helsinki
+            area:
+              type: string
+              example: Uusimaa
+            country:
+              type: string
+              example: FI
+
+    WebRegistrationResponse:
+      type: object
+      required: [ghii, verificationLevel]
+      properties:
+        ghii:
+          type: string
+          description: The generated GHII for the new owner
+          example: jane-doe
+        verificationId:
+          type: string
+          description: Verification session ID (present when email provided)
+        verificationLevel:
+          type: string
+          enum: [none, email_pending, email_verified]
+          description: Current verification level
+
+    EmailVerificationRequest:
+      type: object
+      required: [verificationId, code]
+      properties:
+        verificationId:
+          type: string
+          description: Verification session ID from registration
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: Six-digit verification code from email
+
+    MagicLinkRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address to send magic link to
+          example: jane@example.com
+
+    # === Phase 1.4: Directories ===
+    DirectoryEntry:
+      type: object
+      properties:
+        ghii:
+          type: string
+          description: Owner GHII
+          example: jane-doe
+        displayName:
+          type: string
+          example: Jane Doe
+        bio:
+          type: string
+          description: Short biography text
+        interests:
+          type: array
+          items:
+            type: string
+          example: [photography, hiking]
+        city:
+          type: string
+          example: Helsinki
+        area:
+          type: string
+          example: Uusimaa
+        country:
+          type: string
+          example: FI
+        semantic:
+          type: number
+          description: Semantic similarity score (0-1, present when search uses embeddings)
+
+    DirectorySearchResult:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoryEntry'
+        total:
+          type: integer
+          description: Total number of matching entries
+          example: 42
+        facets:
+          type: object
+          properties:
+            cities:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  count:
+                    type: integer
+            interests:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  count:
+                    type: integer
+
+    DirectoryStats:
+      type: object
+      properties:
+        totalPeople:
+          type: integer
+          description: Total registered people in the directory
+          example: 128
+        topInterests:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              count:
+                type: integer
+          example: [{ name: photography, count: 34 }, { name: hiking, count: 28 }]
+        topCities:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              count:
+                type: integer
+          example: [{ name: Helsinki, count: 45 }, { name: Espoo, count: 22 }]
+        updatedAt:
+          type: string
+          format: date-time
+
+    # === Phase 1.5: Data Quality Flags ===
+    FlagRequest:
+      type: object
+      required: [targetType, targetId, reason]
+      properties:
+        targetType:
+          type: string
+          enum: [profile, memory, action, board_post]
+          description: Type of resource being flagged
+          example: profile
+        targetId:
+          type: string
+          description: ID of the flagged resource
+          example: bad-actor-001
+        reason:
+          type: string
+          enum: [spam, inappropriate, misleading, duplicate, other]
+          description: Reason for the flag
+          example: spam
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional detailed description
+
+    FlagRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique flag ID
+          example: flag-a1b2c3d4
+        targetType:
+          type: string
+          enum: [profile, memory, action, board_post]
+        targetId:
+          type: string
+        flaggedBy:
+          type: string
+          description: GAII or owner who created the flag
+        reason:
+          type: string
+          enum: [spam, inappropriate, misleading, duplicate, other]
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, reviewed, dismissed, actioned]
+          default: pending
+        reviewNote:
+          type: string
+          description: Operator review note (present after review)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FlagSummary:
+      type: object
+      properties:
+        targetType:
+          type: string
+        targetId:
+          type: string
+        totalFlags:
+          type: integer
+          description: Total number of flags for this target
+          example: 3
+        byReason:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Flag count grouped by reason
+          example: { spam: 2, inappropriate: 1 }
+        latestFlag:
+          type: string
+          format: date-time
+          description: Timestamp of the most recent flag
+
+    # === Phase 2.1: Matching ===
+    MatchRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique match ID
+          example: match-a1b2c3d4
+        profileA:
+          type: string
+          description: GHII of the first profile
+          example: jane-doe
+        profileB:
+          type: string
+          description: GHII of the second profile
+          example: john-smith
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Overall match score (0-1)
+          example: 0.87
+        breakdown:
+          type: object
+          description: Score breakdown by matching dimension
+          properties:
+            interests:
+              type: number
+              example: 0.92
+            location:
+              type: number
+              example: 0.75
+            activity:
+              type: number
+              example: 0.85
+        status:
+          type: string
+          enum: [pending, accepted, dismissed, expired]
+          default: pending
+        semantic:
+          type: number
+          description: Semantic similarity score from embedding comparison
+          example: 0.84
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MatchResponse:
+      type: object
+      description: Match suggestion with enriched profile data
+      properties:
+        match:
+          $ref: '#/components/schemas/MatchRecord'
+        profile:
+          type: object
+          description: Enriched profile data of the matched person
+          properties:
+            ghii:
+              type: string
+            displayName:
+              type: string
+            interests:
+              type: array
+              items:
+                type: string
+            city:
+              type: string
+            country:
+              type: string
+            bio:
+              type: string
+
+    # === Phase 2.2: Organisms ===
+    OrganismRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique organism ID
+          example: org-a1b2c3d4
+        name:
+          type: string
+          description: Organism display name
+          example: Helsinki Photography Club
+        description:
+          type: string
+          description: Long description of the organism
+        type:
+          type: string
+          enum: [club, team, community, project]
+          description: Type of group entity
+          example: club
+        location:
+          type: object
+          properties:
+            city:
+              type: string
+              example: Helsinki
+            area:
+              type: string
+              example: Uusimaa
+            country:
+              type: string
+              example: FI
+        interests:
+          type: array
+          items:
+            type: string
+          example: [photography, urban-exploration]
+        joinPolicy:
+          type: string
+          enum: [open, approval, invite]
+          default: open
+          description: How new members can join
+        visibility:
+          type: string
+          enum: [public, unlisted, private]
+          default: public
+        memberCount:
+          type: integer
+          description: Current number of members
+          example: 42
+        boardId:
+          type: string
+          description: Associated notification board ID
+          example: board-org-a1b2c3d4
+        createdBy:
+          type: string
+          description: GHII of the creator
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrganismMembershipRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique membership ID
+          example: mem-a1b2c3d4
+        organismId:
+          type: string
+          description: Organism this membership belongs to
+        ghii:
+          type: string
+          description: Owner GHII of the member
+        role:
+          type: string
+          enum: [admin, moderator, member]
+          default: member
+        status:
+          type: string
+          enum: [active, suspended, left]
+          default: active
+        joinedAt:
+          type: string
+          format: date-time
+
+    JoinRequestRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique join request ID
+          example: jr-a1b2c3d4
+        organismId:
+          type: string
+          description: Organism being requested to join
+        ghii:
+          type: string
+          description: Owner GHII of the requester
+        message:
+          type: string
+          description: Optional message from the requester
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+          default: pending
+        reviewedBy:
+          type: string
+          description: GHII of the reviewer (present after review)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # === Phase 2.4: Appeals ===
+    AppealRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique appeal ID
+          example: appeal-a1b2c3d4
+        flagId:
+          type: string
+          description: ID of the flag being appealed
+        appealedBy:
+          type: string
+          description: GHII of the person appealing
+        reason:
+          type: string
+          description: Reason for the appeal
+          maxLength: 2000
+        status:
+          type: string
+          enum: [pending, upheld, overturned, dismissed]
+          default: pending
+        reviewNote:
+          type: string
+          description: Operator review note (present after review)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # === Phase 2.6: Marketplace ===
+    ListingRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique listing ID
+          example: listing-a1b2c3d4
+        title:
+          type: string
+          description: Listing title
+          example: Custom AI Training Dataset
+        description:
+          type: string
+          description: Detailed description of the listing
+        category:
+          type: string
+          description: Listing category
+          example: datasets
+        priceMorsels:
+          type: integer
+          minimum: 0
+          description: Price in morsels
+          example: 150
+        condition:
+          type: string
+          enum: [new, like_new, good, fair]
+          description: Condition of the item or service
+        availability:
+          type: string
+          enum: [available, reserved, sold]
+          default: available
+        location:
+          type: object
+          properties:
+            city:
+              type: string
+            country:
+              type: string
+        tags:
+          type: array
+          items:
+            type: string
+          example: [ai, dataset, training]
+        status:
+          type: string
+          enum: [active, paused, sold, removed]
+          default: active
+        semantic:
+          type: number
+          description: Semantic similarity score (present in search results)
+        sellerOwner:
+          type: string
+          description: GHII of the seller
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PurchaseRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique purchase ID
+          example: purchase-a1b2c3d4
+        listingId:
+          type: string
+          description: ID of the purchased listing
+        buyerOwner:
+          type: string
+          description: GHII of the buyer
+        sellerOwner:
+          type: string
+          description: GHII of the seller
+        priceMorsels:
+          type: integer
+          description: Price paid in morsels
+          example: 150
+        transactionFee:
+          type: integer
+          description: Network transaction fee in morsels
+          example: 8
+        status:
+          type: string
+          enum: [pending, paid, delivered, completed, disputed, refunded]
+          default: pending
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Buyer rating (present after rating)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # === Phase 3.1: PWA ===
+    PushSubscription:
+      type: object
+      required: [endpoint, keys]
+      properties:
+        id:
+          type: string
+          description: Unique subscription ID
+          example: push-a1b2c3d4
+        endpoint:
+          type: string
+          format: uri
+          description: Push service endpoint URL
+          example: https://fcm.googleapis.com/fcm/send/abc123
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh:
+              type: string
+              description: P-256 ECDH public key (base64url)
+            auth:
+              type: string
+              description: Authentication secret (base64url)
+        ownerGhii:
+          type: string
+          description: GHII of the subscription owner
+        createdAt:
+          type: string
+          format: date-time
+
+    # === Phase 3.3: Verification ===
+    VerifiableCredential:
+      type: object
+      properties:
+        '@context':
+          type: array
+          items:
+            type: string
+          example: ['https://www.w3.org/2018/credentials/v1']
+        type:
+          type: array
+          items:
+            type: string
+          example: ['VerifiableCredential', 'AimeatIdentityCredential']
+        issuer:
+          type: string
+          description: DID or URL of the issuer
+          example: did:web:meat-finland-001-genesis.overscalesolutions.com
+        issuanceDate:
+          type: string
+          format: date-time
+        expirationDate:
+          type: string
+          format: date-time
+        credentialSubject:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Subject DID or GHII
+            ghii:
+              type: string
+            verificationLevel:
+              type: string
+              enum: [basic, enhanced, verified]
+
+    MyDataConsentReceipt:
+      type: object
+      properties:
+        version:
+          type: string
+          description: MyData consent receipt spec version
+          example: '1.0'
+        jurisdiction:
+          type: string
+          description: Legal jurisdiction
+          example: EU
+        consentTimestamp:
+          type: string
+          format: date-time
+        collectionMethod:
+          type: string
+          example: web_form
+        consentReceiptID:
+          type: string
+        publicKey:
+          type: string
+        language:
+          type: string
+          example: en
+        piiPrincipalId:
+          type: string
+          description: GHII of the data subject
+        piiControllers:
+          type: array
+          items:
+            type: object
+            properties:
+              piiController:
+                type: string
+              contact:
+                type: string
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              service:
+                type: string
+              purposes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    purpose:
+                      type: string
+                    consentType:
+                      type: string
+                    piiCategory:
+                      type: array
+                      items:
+                        type: string
+        sensitive:
+          type: boolean
+        spiCat:
+          type: array
+          items:
+            type: string
+
+    TrustedIssuerRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique trusted issuer ID
+          example: issuer-a1b2c3d4
+        name:
+          type: string
+          description: Human-readable issuer name
+          example: Finnish Digital Agency
+        url:
+          type: string
+          format: uri
+          description: Issuer endpoint URL
+        publicKey:
+          type: string
+          description: Ed25519 or ECDSA public key (base64url)
+        type:
+          type: string
+          enum: [eudiw, ftn, w3c_vc, custom]
+          description: Type of credentials this issuer provides
+        trusted:
+          type: boolean
+          default: true
+          description: Whether this issuer is currently trusted
+        addedBy:
+          type: string
+          description: GHII of the operator who added this issuer
+        createdAt:
+          type: string
+          format: date-time
+
+    # === Phase 3.4: Cross-Federation ===
+    GenesisPeerRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique genesis peer ID
+          example: gpeer-a1b2c3d4
+        genesisNodeId:
+          type: string
+          description: Node ID of the genesis peer
+          example: meat-usa-001-genesis
+        genesisUrl:
+          type: string
+          format: uri
+          description: Base URL of the genesis peer
+          example: https://meat-usa-001-genesis.example.com
+        publicKey:
+          type: string
+          description: Ed25519 public key (base64url)
+        status:
+          type: string
+          enum: [pending, approved, active, suspended, revoked]
+          default: pending
+          description: Peering status
+        sharedCatalogueEntries:
+          type: integer
+          description: Number of catalogue entries shared
+          default: 0
+        lastSyncAt:
+          type: string
+          format: date-time
+          description: Last successful catalogue sync
+        requestedBy:
+          type: string
+          description: GHII of the operator who requested peering
+        approvedBy:
+          type: string
+          description: GHII of the operator who approved peering
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # === Phase 3.4: Reputation ===
+    OrganismReputationRecord:
+      type: object
+      properties:
+        organismId:
+          type: string
+          description: Organism ID
+        score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Overall reputation score (0-100)
+          example: 85.5
+        breakdown:
+          type: object
+          properties:
+            memberActivity:
+              type: number
+              format: float
+              description: Score component from member activity
+            workCompletion:
+              type: number
+              format: float
+              description: Score component from work queue completion rate
+            disputeRate:
+              type: number
+              format: float
+              description: Score component from dispute rate (lower is better)
+            communityFeedback:
+              type: number
+              format: float
+              description: Score component from community feedback
+            age:
+              type: number
+              format: float
+              description: Score component from organism age
+        totalMembers:
+          type: integer
+          description: Current member count
+        totalWorkCompleted:
+          type: integer
+          description: Total work items completed
+        calculatedAt:
+          type: string
+          format: date-time
+          description: When the reputation was last calculated
+
   # === Reusable Response Wrappers ===
   responses:
     MeatSuccess:
@@ -1107,6 +1977,36 @@ components:
                             type: integer
                           available:
                             type: integer
+
+    Conflict:
+      description: Conflict — resource already exists or invalid status transition
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/MeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        example: INVALID_STATUS
+
+    FeatureDisabled:
+      description: Feature is disabled on this node
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/MeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        example: FEATURE_DISABLED
 
   parameters:
     TrackingCode:
@@ -4896,3 +5796,2889 @@ paths:
                         properties:
                           code:
                             example: VALIDATION_ERROR
+
+  # ============================================================
+  # Phase 1.3: GHII Web Registration & Magic Link
+  # ============================================================
+
+  /v1/ghii/register-web:
+    post:
+      operationId: ghiiRegisterWeb
+      summary: Web registration for humans
+      description: |
+        Register a new human owner via the web portal. Creates an owner record,
+        GHII, and profile. No authentication required. If email is provided,
+        a verification code is sent and the response includes a verificationId.
+      tags: [GHII-Web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebRegistrationRequest'
+      responses:
+        '201':
+          description: Owner registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WebRegistrationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NAME_TAKEN
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Email service not configured (registration succeeds but email not sent)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: EMAIL_UNAVAILABLE
+
+  /v1/ghii/verify-email:
+    post:
+      operationId: ghiiVerifyEmail
+      summary: Verify email with code
+      description: |
+        Verify an email address using the six-digit code sent during registration.
+        On success, returns the GHII, updated verification level, and a JWT token.
+      tags: [GHII-Web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerificationRequest'
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          verificationLevel:
+                            type: string
+                            enum: [email_verified]
+                          token:
+                            type: string
+                            description: JWT session token
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Verification session not found or expired
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NOT_FOUND
+        '422':
+          description: Invalid verification code
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/ghii/magic-link:
+    post:
+      operationId: ghiiMagicLink
+      summary: Request magic link login
+      description: |
+        Request a magic link to be sent to the specified email address.
+        Always returns 200 to prevent email enumeration attacks.
+        If the email is registered, a magic link is sent.
+      tags: [GHII-Web]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MagicLinkRequest'
+      responses:
+        '200':
+          description: Magic link request acknowledged (always 200)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: If this email is registered, a magic link has been sent.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/ghii/magic-link/verify:
+    get:
+      operationId: ghiiMagicLinkVerify
+      summary: Verify magic link token
+      description: |
+        Verify a magic link token from the email. Returns the GHII and
+        a JWT session token on success. The token is single-use and expires
+        after a short period.
+      tags: [GHII-Web]
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Magic link token from the email
+      responses:
+        '200':
+          description: Magic link verified, session created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          token:
+                            type: string
+                            description: JWT session token
+        '400':
+          description: Invalid or expired magic link token
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: INVALID_INPUT
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ============================================================
+  # Phase 1.4: Directories
+  # ============================================================
+
+  /v1/catalogue/directory:
+    get:
+      operationId: searchDirectory
+      summary: Search the people directory
+      description: |
+        Search the people directory with faceted filtering. Supports filtering
+        by type, city, area, country, interests, and geo-radius. Returns
+        paginated results with facet counts for cities and interests.
+        No authentication required (Tier 0).
+      tags: [Directories]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [people, agents]
+          description: Directory type to search
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: Filter by city name
+        - name: area
+          in: query
+          schema:
+            type: string
+          description: Filter by area/region
+        - name: country
+          in: query
+          schema:
+            type: string
+          description: Filter by ISO country code
+        - name: interest
+          in: query
+          schema:
+            type: string
+          description: Filter by a single interest
+        - name: interests
+          in: query
+          schema:
+            type: string
+          description: Comma-separated list of interests (OR match)
+        - name: radius_km
+          in: query
+          schema:
+            type: number
+          description: Radius in kilometers for geo search (requires lat/lon)
+        - name: lat
+          in: query
+          schema:
+            type: number
+          description: Latitude for geo-radius search
+        - name: lon
+          in: query
+          schema:
+            type: number
+          description: Longitude for geo-radius search
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Directory search results with facets
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DirectorySearchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/catalogue/directory/stats:
+    get:
+      operationId: getDirectoryStats
+      summary: Directory statistics
+      description: |
+        Get aggregate statistics for the people directory including total
+        registered people, top interests, and top cities. No authentication
+        required (Tier 0).
+      tags: [Directories]
+      responses:
+        '200':
+          description: Directory statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DirectoryStats'
+
+  # ============================================================
+  # Phase 1.5: Data Quality Flags
+  # ============================================================
+
+  /v1/flags:
+    post:
+      operationId: createFlag
+      summary: Create a quality flag
+      description: |
+        Flag a resource (profile, memory, action, board post) for quality issues.
+        Requires authentication. Each user can only flag a given target once.
+      tags: [Flags]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FlagRequest'
+      responses:
+        '201':
+          description: Flag created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FlagRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: User has already flagged this target
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: ALREADY_FLAGGED
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    get:
+      operationId: listFlags
+      summary: List all flags (operator only)
+      description: |
+        List all quality flags across the node. Operator-only endpoint.
+        Supports filtering by status and target type with pagination.
+      tags: [Flags]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, reviewed, dismissed, actioned]
+          description: Filter by flag status
+        - name: targetType
+          in: query
+          schema:
+            type: string
+            enum: [profile, memory, action, board_post]
+          description: Filter by target resource type
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of flags
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          flags:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/FlagRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/flags/summary/{targetType}/{targetId}:
+    get:
+      operationId: getFlagSummary
+      summary: Get flag summary for a target
+      description: |
+        Get a summary of flags for a specific target resource. Public endpoint
+        (no auth required). Returns total flags, breakdown by reason, and
+        timestamp of the latest flag.
+      tags: [Flags]
+      parameters:
+        - name: targetType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [profile, memory, action, board_post]
+          description: Type of the flagged resource
+        - name: targetId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID of the flagged resource
+      responses:
+        '200':
+          description: Flag summary for the target
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FlagSummary'
+
+  /v1/flags/{id}:
+    put:
+      operationId: updateFlag
+      summary: Update flag status (operator only)
+      description: |
+        Update the status of a quality flag. Operator-only endpoint.
+        Used for reviewing, dismissing, or actioning flags.
+      tags: [Flags]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Flag ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [reviewed, dismissed, actioned]
+                  description: New flag status
+                reviewNote:
+                  type: string
+                  maxLength: 1000
+                  description: Optional operator review note
+      responses:
+        '200':
+          description: Flag updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FlagRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Phase 1.6: Hobby Portal (HTML)
+  # ============================================================
+
+  /v1/portal/human/hobbies:
+    get:
+      operationId: portalHobbyDirectory
+      summary: Hobby directory browse page
+      description: |
+        HTML page for browsing the hobby directory. Displays people grouped
+        by interests and location. Server-rendered HTML — not a JSON API endpoint.
+      tags: [Hobby-Portal]
+      responses:
+        '200':
+          description: HTML hobby directory page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /v1/portal/human/hobbies/search:
+    get:
+      operationId: portalHobbySearch
+      summary: Hobby search page
+      description: |
+        HTML page for searching the hobby directory with filters for interests,
+        city, and area. Server-rendered HTML — not a JSON API endpoint.
+      tags: [Hobby-Portal]
+      responses:
+        '200':
+          description: HTML hobby search page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /v1/portal/human/hobbies/profile/{ghii}:
+    get:
+      operationId: portalHobbyProfile
+      summary: Hobby profile page
+      description: |
+        HTML page showing a person's hobby profile including interests,
+        location, and bio. Server-rendered HTML — not a JSON API endpoint.
+      tags: [Hobby-Portal]
+      parameters:
+        - name: ghii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Owner GHII to view profile for
+      responses:
+        '200':
+          description: HTML hobby profile page
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Profile not found (HTML error page)
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /v1/portal/human/hobbies/join:
+    get:
+      operationId: portalHobbyJoin
+      summary: Join hobby directory page
+      description: |
+        HTML page with the registration form to join the hobby directory.
+        Server-rendered HTML — not a JSON API endpoint.
+      tags: [Hobby-Portal]
+      responses:
+        '200':
+          description: HTML join page with registration form
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /v1/portal/human/hobbies/me:
+    get:
+      operationId: portalHobbyMe
+      summary: My hobby profile page
+      description: |
+        HTML page showing the authenticated user's hobby profile with
+        edit capabilities. Requires session cookie or token.
+        Server-rendered HTML — not a JSON API endpoint.
+      tags: [Hobby-Portal]
+      responses:
+        '200':
+          description: HTML my-profile page
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          description: Not authenticated (redirects to login)
+          content:
+            text/html:
+              schema:
+                type: string
+
+  # ============================================================
+  # Phase 2.1: Matching
+  # ============================================================
+
+  /v1/matches:
+    get:
+      operationId: listMatches
+      summary: List own match suggestions
+      description: |
+        List match suggestions for the authenticated user. Returns AI-powered
+        profile matches based on interests, location, and activity patterns.
+        Supports pagination and filtering by status.
+      tags: [Matching]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, dismissed, expired]
+          description: Filter by match status
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of match suggestions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          matches:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MatchResponse'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
+
+  /v1/matches/stats:
+    get:
+      operationId: getMatchingStats
+      summary: Matching statistics (operator only)
+      description: |
+        Get aggregate matching statistics for the node. Operator-only endpoint.
+        Returns total matches, acceptance rates, score distributions, and
+        top matching dimensions.
+      tags: [Matching]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Matching statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalMatches:
+                            type: integer
+                          acceptanceRate:
+                            type: number
+                          averageScore:
+                            type: number
+                          statusBreakdown:
+                            type: object
+                            additionalProperties:
+                              type: integer
+                          topDimensions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                dimension:
+                                  type: string
+                                averageScore:
+                                  type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/matches/{id}/respond:
+    post:
+      operationId: respondToMatch
+      summary: Accept or dismiss a match
+      description: |
+        Respond to a match suggestion by accepting or dismissing it.
+        Only the authenticated user who is part of the match can respond.
+      tags: [Matching]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Match ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [accept, dismiss]
+                  description: Response action
+      responses:
+        '200':
+          description: Match response recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MatchRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ============================================================
+  # Phase 2.2: Organisms
+  # ============================================================
+
+  /v1/organisms:
+    post:
+      operationId: createOrganism
+      summary: Create an organism
+      description: |
+        Create a new organism (club, team, community, or project).
+        The creator automatically becomes the admin member.
+        A notification board is created automatically for the organism.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  description: Organism display name
+                  example: Helsinki Photography Club
+                description:
+                  type: string
+                  maxLength: 2000
+                type:
+                  type: string
+                  enum: [club, team, community, project]
+                location:
+                  type: object
+                  properties:
+                    city:
+                      type: string
+                    area:
+                      type: string
+                    country:
+                      type: string
+                interests:
+                  type: array
+                  items:
+                    type: string
+                  example: [photography, urban-exploration]
+                joinPolicy:
+                  type: string
+                  enum: [open, approval, invite]
+                  default: open
+                visibility:
+                  type: string
+                  enum: [public, unlisted, private]
+                  default: public
+      responses:
+        '201':
+          description: Organism created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrganismRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    get:
+      operationId: listOrganisms
+      summary: List organisms
+      description: |
+        List public organisms with optional filtering by type, interest,
+        and location. No authentication required for public organisms.
+        Supports pagination.
+      tags: [Organisms]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [club, team, community, project]
+          description: Filter by organism type
+        - name: interest
+          in: query
+          schema:
+            type: string
+          description: Filter by interest tag
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: Filter by city
+        - name: country
+          in: query
+          schema:
+            type: string
+          description: Filter by country code
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Free-text search query
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of organisms
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organisms:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/OrganismRecord'
+                          total:
+                            type: integer
+
+  /v1/organisms/{id}:
+    get:
+      operationId: getOrganism
+      summary: Get organism detail
+      description: |
+        Get detailed information about a specific organism including
+        member count and board reference.
+      tags: [Organisms]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: Organism details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrganismRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateOrganism
+      summary: Update organism
+      description: |
+        Update an organism's details. Only organism admins can update.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 2000
+                location:
+                  type: object
+                  properties:
+                    city:
+                      type: string
+                    area:
+                      type: string
+                    country:
+                      type: string
+                interests:
+                  type: array
+                  items:
+                    type: string
+                joinPolicy:
+                  type: string
+                  enum: [open, approval, invite]
+                visibility:
+                  type: string
+                  enum: [public, unlisted, private]
+      responses:
+        '200':
+          description: Organism updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrganismRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deleteOrganism
+      summary: Delete organism
+      description: |
+        Delete an organism. Only organism admins or node operators can delete.
+        This removes all memberships and the associated board.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: Organism deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Organism deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/join:
+    post:
+      operationId: joinOrganism
+      summary: Join an organism
+      description: |
+        Request to join an organism. For open organisms, the user is added
+        immediately. For approval-based organisms, a join request is created
+        for admin review. For invite-only organisms, returns 403.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  maxLength: 500
+                  description: Optional message for approval-based joins
+      responses:
+        '200':
+          description: Joined organism (open policy) or join request created (approval policy)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          membership:
+                            $ref: '#/components/schemas/OrganismMembershipRecord'
+                          joinRequest:
+                            $ref: '#/components/schemas/JoinRequestRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already a member of this organism
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: MEMBERSHIP_EXISTS
+
+  /v1/organisms/{id}/leave:
+    post:
+      operationId: leaveOrganism
+      summary: Leave an organism
+      description: |
+        Leave an organism. The last admin cannot leave without transferring
+        the admin role first.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: Left organism
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Left organism
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/organisms/{id}/members:
+    get:
+      operationId: listOrganismMembers
+      summary: List organism members
+      description: |
+        List all members of an organism. Public organisms show members
+        to anyone. Private organisms require membership to view.
+        Supports pagination.
+      tags: [Organisms]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, moderator, member]
+          description: Filter by member role
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          members:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/OrganismMembershipRecord'
+                          total:
+                            type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/join-requests:
+    get:
+      operationId: listJoinRequests
+      summary: List join requests (admin only)
+      description: |
+        List pending join requests for an organism. Only organism admins
+        can view join requests. Supports filtering by status and pagination.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+          description: Filter by request status
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of join requests
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          requests:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/JoinRequestRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/join-requests/{requestId}/review:
+    post:
+      operationId: reviewJoinRequest
+      summary: Review a join request
+      description: |
+        Approve or reject a join request for an organism. Only organism
+        admins can review join requests. Approved requests automatically
+        create a membership.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Join request ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject]
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Optional reason for the decision
+      responses:
+        '200':
+          description: Join request reviewed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          joinRequest:
+                            $ref: '#/components/schemas/JoinRequestRecord'
+                          membership:
+                            $ref: '#/components/schemas/OrganismMembershipRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ============================================================
+  # Phase 2.4: Appeals
+  # ============================================================
+
+  /v1/flags/{flagId}/appeal:
+    post:
+      operationId: appealFlag
+      summary: Appeal a flag
+      description: |
+        Appeal a quality flag that has been actioned against the user's content.
+        The user must be the owner of the flagged resource. Only flags with
+        status 'actioned' or 'reviewed' can be appealed.
+      tags: [Appeals]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: flagId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Flag ID to appeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  maxLength: 2000
+                  description: Reason for the appeal
+      responses:
+        '201':
+          description: Appeal created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AppealRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/appeals:
+    get:
+      operationId: listAppeals
+      summary: List appeals (operator only)
+      description: |
+        List all content moderation appeals. Operator-only endpoint.
+        Supports filtering by status and pagination.
+      tags: [Appeals]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, upheld, overturned, dismissed]
+          description: Filter by appeal status
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of appeals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          appeals:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AppealRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/appeals/{id}/review:
+    post:
+      operationId: reviewAppeal
+      summary: Review an appeal (operator only)
+      description: |
+        Review a content moderation appeal. Operator-only endpoint.
+        The operator can uphold the original flag, overturn it, or dismiss
+        the appeal.
+      tags: [Appeals]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Appeal ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [uphold, overturn, dismiss]
+                  description: Appeal review decision
+                reviewNote:
+                  type: string
+                  maxLength: 2000
+                  description: Operator review note
+      responses:
+        '200':
+          description: Appeal reviewed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AppealRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ============================================================
+  # Phase 2.5: CSM Templates
+  # ============================================================
+
+  /v1/csm/templates:
+    get:
+      operationId: listCsmTemplates
+      summary: List CSM templates
+      description: |
+        List available Community Service Manifest templates. Templates provide
+        starting-point YAML definitions for common service types. No authentication
+        required (Tier 0).
+      tags: [CSM-Templates]
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by template category
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: List of available CSM templates
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          templates:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                type:
+                                  type: string
+                                  description: Template type identifier
+                                  example: hobby-club
+                                name:
+                                  type: string
+                                  example: Hobby Club Template
+                                description:
+                                  type: string
+                                category:
+                                  type: string
+                                  example: community
+                          total:
+                            type: integer
+
+  /v1/csm/templates/{type}:
+    get:
+      operationId: getCsmTemplate
+      summary: Get CSM template YAML
+      description: |
+        Get the full YAML definition for a specific CSM template. Returns
+        the template as a downloadable YAML document. No authentication
+        required (Tier 0).
+      tags: [CSM-Templates]
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Template type identifier
+          example: hobby-club
+      responses:
+        '200':
+          description: CSM template YAML
+          content:
+            application/x-yaml:
+              schema:
+                type: string
+                description: YAML template content
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          name:
+                            type: string
+                          yaml:
+                            type: string
+                            description: Raw YAML template content
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Phase 2.6: Marketplace
+  # ============================================================
+
+  /v1/marketplace/listings:
+    post:
+      operationId: createListing
+      summary: Create a marketplace listing
+      description: |
+        Create a new listing in the morsel-based marketplace. Requires
+        authentication. Listings are priced in morsels and can be
+        categorized and tagged for discovery.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, priceMorsels]
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                  description: Listing title
+                  example: Custom AI Training Dataset
+                description:
+                  type: string
+                  maxLength: 5000
+                  description: Detailed description
+                category:
+                  type: string
+                  maxLength: 50
+                  example: datasets
+                priceMorsels:
+                  type: integer
+                  minimum: 0
+                  description: Price in morsels
+                  example: 150
+                condition:
+                  type: string
+                  enum: [new, like_new, good, fair]
+                location:
+                  type: object
+                  properties:
+                    city:
+                      type: string
+                    country:
+                      type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: [ai, dataset, training]
+      responses:
+        '201':
+          description: Listing created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ListingRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
+
+    get:
+      operationId: browseListings
+      summary: Browse marketplace listings
+      description: |
+        Browse and search marketplace listings. Supports filtering by
+        category, price range, tags, and free-text search. No authentication
+        required (Tier 0). Supports pagination.
+      tags: [Marketplace]
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category
+        - name: minPrice
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Minimum price in morsels
+        - name: maxPrice
+          in: query
+          schema:
+            type: integer
+          description: Maximum price in morsels
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter by tag
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Free-text search query
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, paused, sold]
+          description: Filter by listing status
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of marketplace listings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          listings:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ListingRecord'
+                          total:
+                            type: integer
+
+  /v1/marketplace/listings/{id}:
+    get:
+      operationId: getListing
+      summary: Get a single listing
+      description: |
+        Get detailed information about a specific marketplace listing.
+        No authentication required (Tier 0).
+      tags: [Marketplace]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Listing ID
+      responses:
+        '200':
+          description: Listing details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ListingRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateListing
+      summary: Update a listing
+      description: |
+        Update a marketplace listing. Only the listing owner can update.
+        Cannot update listings that are in a completed sale.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Listing ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 5000
+                category:
+                  type: string
+                  maxLength: 50
+                priceMorsels:
+                  type: integer
+                  minimum: 0
+                condition:
+                  type: string
+                  enum: [new, like_new, good, fair]
+                tags:
+                  type: array
+                  items:
+                    type: string
+                status:
+                  type: string
+                  enum: [active, paused]
+                  description: Toggle listing visibility
+      responses:
+        '200':
+          description: Listing updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ListingRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    delete:
+      operationId: deleteListing
+      summary: Delist a marketplace listing
+      description: |
+        Remove a listing from the marketplace. Only the listing owner
+        or a node operator can delist. Sets status to 'removed'.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Listing ID
+      responses:
+        '200':
+          description: Listing removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Listing removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/marketplace/listings/{id}/purchase:
+    post:
+      operationId: purchaseListing
+      summary: Purchase a listing
+      description: |
+        Purchase a marketplace listing with morsels. The price is held in
+        escrow until delivery is confirmed. Requires sufficient morsel balance.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Listing ID
+      responses:
+        '201':
+          description: Purchase initiated, morsels held in escrow
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PurchaseRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Listing not available for purchase
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: INVALID_STATUS
+
+  /v1/marketplace/purchases/{id}/deliver:
+    post:
+      operationId: markDelivery
+      summary: Mark a purchase as delivered
+      description: |
+        Mark a purchase as delivered. Only the seller can mark delivery.
+        Releases escrowed morsels to the seller (minus transaction fee).
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Purchase ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deliveryNote:
+                  type: string
+                  maxLength: 1000
+                  description: Optional delivery note or instructions
+      responses:
+        '200':
+          description: Delivery confirmed, escrow released
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PurchaseRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/marketplace/purchases/{id}/rate:
+    post:
+      operationId: ratePurchase
+      summary: Rate a purchase
+      description: |
+        Rate a completed purchase. Only the buyer can rate, and only
+        after delivery. Rating affects the seller's trust score.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Purchase ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [score]
+              properties:
+                score:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Rating score (1-5)
+                comment:
+                  type: string
+                  maxLength: 1000
+                  description: Optional review comment
+      responses:
+        '200':
+          description: Rating recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PurchaseRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/marketplace/my-listings:
+    get:
+      operationId: getMyListings
+      summary: List own marketplace listings
+      description: |
+        List the authenticated user's own marketplace listings.
+        Includes all statuses (active, paused, sold, removed).
+        Supports pagination.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, paused, sold, removed]
+          description: Filter by listing status
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of own listings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          listings:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ListingRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/marketplace/my-purchases:
+    get:
+      operationId: getMyPurchases
+      summary: List own purchases
+      description: |
+        List the authenticated user's marketplace purchases.
+        Includes all purchase statuses. Supports pagination.
+      tags: [Marketplace]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, paid, delivered, completed, disputed, refunded]
+          description: Filter by purchase status
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of own purchases
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          purchases:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PurchaseRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Phase 3.1: PWA ──────────────────────────────────────────
+
+  /v1/push/subscribe:
+    post:
+      operationId: pushSubscribe
+      summary: Register push subscription
+      description: |
+        Register a Web Push subscription for the authenticated user.
+        Uses the Web Push API standard with VAPID. The subscription
+        endpoint and keys are stored server-side for sending notifications.
+      tags: [PWA]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, keys]
+              properties:
+                endpoint:
+                  type: string
+                  format: uri
+                  description: Push service endpoint URL
+                  example: https://fcm.googleapis.com/fcm/send/abc123
+                keys:
+                  type: object
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh:
+                      type: string
+                      description: P-256 ECDH public key (base64url)
+                    auth:
+                      type: string
+                      description: Authentication secret (base64url)
+      responses:
+        '201':
+          description: Push subscription registered
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PushSubscription'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      operationId: pushUnsubscribe
+      summary: Unsubscribe push notifications
+      description: |
+        Remove the push subscription for the authenticated user.
+        Stops all future push notifications to this device.
+      tags: [PWA]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Push subscription removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          unsubscribed:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/push/test:
+    post:
+      operationId: pushTest
+      summary: Send test push notification
+      description: |
+        Send a test push notification to the authenticated user's
+        registered subscription. Useful for verifying push setup.
+      tags: [PWA]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Test notification sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sent:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No push subscription found
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NOT_FOUND
+
+  /v1/push/vapid-key:
+    get:
+      operationId: getVapidKey
+      summary: Get public VAPID key
+      description: |
+        Retrieve the server's public VAPID key for Web Push subscription.
+        No authentication required. Clients use this key when calling
+        `pushManager.subscribe()` in the browser.
+      tags: [PWA]
+      responses:
+        '200':
+          description: VAPID public key
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          vapidPublicKey:
+                            type: string
+                            description: Base64url-encoded VAPID public key
+
+  # ── Phase 3.3: Verification ─────────────────────────────────
+
+  /v1/consent/{id}/receipt:
+    get:
+      operationId: getConsentReceipt
+      summary: Get MyData consent receipt
+      description: |
+        Retrieve a MyData-compliant consent receipt for a specific
+        consent grant. Follows the Kantara Initiative consent receipt
+        specification. Useful for GDPR compliance and data portability.
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Consent grant ID
+      responses:
+        '200':
+          description: MyData consent receipt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          receipt:
+                            $ref: '#/components/schemas/MyDataConsentReceipt'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/ghii/{ghii}/credential:
+    get:
+      operationId: issueVerifiableCredential
+      summary: Issue W3C Verifiable Credential
+      description: |
+        Issue a W3C Verifiable Credential for the specified GHII.
+        The credential attests to the identity verification level
+        and attributes verified through EUDIW, FTN, or other methods.
+        Only available for GHIIs that have completed verification.
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ghii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: GHII to issue credential for
+      responses:
+        '200':
+          description: Verifiable Credential issued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          credential:
+                            $ref: '#/components/schemas/VerifiableCredential'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/ghii/verify/eudiw:
+    post:
+      operationId: verifyEudiw
+      summary: Verify EUDIW VP token
+      description: |
+        Verify a Verifiable Presentation token from an EU Digital Identity
+        Wallet (EUDIW). Validates the VP token and presentation submission
+        against the previously generated authorization request. On success,
+        updates the GHII verification level and stores verified attributes.
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vp_token, presentation_submission]
+              properties:
+                vp_token:
+                  type: string
+                  description: Verifiable Presentation token (JWT or JSON-LD)
+                presentation_submission:
+                  type: object
+                  description: OpenID4VP presentation submission descriptor
+                  properties:
+                    id:
+                      type: string
+                    definition_id:
+                      type: string
+                    descriptor_map:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          format:
+                            type: string
+                          path:
+                            type: string
+      responses:
+        '200':
+          description: EUDIW verification result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          verificationLevel:
+                            type: string
+                            enum: [basic, enhanced, verified]
+                          verifiedAttributes:
+                            type: array
+                            items:
+                              type: string
+                            example: [given_name, family_name, date_of_birth]
+                          issuer:
+                            type: string
+                            description: Credential issuer identifier
+                          verifiedAt:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/ghii/verify/eudiw/request:
+    get:
+      operationId: getEudiwAuthRequest
+      summary: Generate EUDIW OpenID4VP authorization request
+      description: |
+        Generate an OpenID4VP authorization request for EU Digital Identity
+        Wallet verification. Returns the authorization request URL and state
+        parameter. The client redirects the user to their EUDIW app to
+        complete the presentation.
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: EUDIW authorization request
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          authorizationRequest:
+                            type: object
+                            description: OpenID4VP authorization request object
+                            properties:
+                              response_type:
+                                type: string
+                                example: vp_token
+                              client_id:
+                                type: string
+                              redirect_uri:
+                                type: string
+                                format: uri
+                              scope:
+                                type: string
+                              nonce:
+                                type: string
+                              presentation_definition:
+                                type: object
+                          state:
+                            type: string
+                            description: State parameter for correlating the response
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
+
+  /v1/ghii/verify/ftn:
+    post:
+      operationId: verifyFtn
+      summary: Finnish Trust Network verification
+      description: |
+        Verify identity through the Finnish Trust Network (FTN).
+        Accepts a callback token from the FTN authentication flow.
+        On success, updates the GHII verification level with strong
+        identity assurance (eIDAS substantial/high).
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [callback_token]
+              properties:
+                callback_token:
+                  type: string
+                  description: Token received from FTN callback
+      responses:
+        '200':
+          description: FTN verification result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          verificationLevel:
+                            type: string
+                            enum: [basic, enhanced, verified]
+                          ftnVerified:
+                            type: boolean
+                            example: true
+                          verifiedAt:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/FeatureDisabled'
+
+  /v1/trusted-issuers:
+    post:
+      operationId: addTrustedIssuer
+      summary: Add a trusted credential issuer
+      description: |
+        Register a new trusted credential issuer. Only operators can
+        add trusted issuers. Trusted issuers are used to validate
+        Verifiable Credentials and VP tokens during identity verification.
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url, publicKey, type]
+              properties:
+                name:
+                  type: string
+                  maxLength: 200
+                  description: Human-readable issuer name
+                  example: Finnish Digital Agency
+                url:
+                  type: string
+                  format: uri
+                  description: Issuer endpoint URL
+                publicKey:
+                  type: string
+                  description: Ed25519 or ECDSA public key (base64url)
+                type:
+                  type: string
+                  enum: [eudiw, ftn, w3c_vc, custom]
+                  description: Type of credentials this issuer provides
+      responses:
+        '201':
+          description: Trusted issuer added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrustedIssuerRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      operationId: listTrustedIssuers
+      summary: List trusted credential issuers
+      description: |
+        List all trusted credential issuers registered on this node.
+        Optionally filter by issuer type. Requires authentication.
+      tags: [Verification]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [eudiw, ftn, w3c_vc, custom]
+          description: Filter by issuer type
+      responses:
+        '200':
+          description: List of trusted issuers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          issuers:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/TrustedIssuerRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Phase 3.4: Cross-Federation ─────────────────────────────
+
+  /v1/federation/cross-catalogue:
+    get:
+      operationId: getCrossFederationCatalogue
+      summary: Browse cross-federation catalogue
+      description: |
+        Browse the merged catalogue of actions and agents across
+        all genesis-peered federations. No authentication required (Tier 0).
+        Entries are aggregated from connected genesis peers.
+      tags: [Cross-Federation]
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Free-text search query
+        - name: federation
+          in: query
+          schema:
+            type: string
+          description: Filter by federation (genesis node ID)
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Cross-federation catalogue entries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          entries:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                type:
+                                  type: string
+                                  enum: [action, agent]
+                                sourceNodeId:
+                                  type: string
+                                sourceFederation:
+                                  type: string
+                                name:
+                                  type: string
+                                description:
+                                  type: string
+                                gaii:
+                                  type: string
+                                syncedAt:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+
+  /v1/federation/genesis-peer:
+    post:
+      operationId: requestGenesisPeering
+      summary: Request genesis peering
+      description: |
+        Request a genesis-level peering relationship with another federation's
+        genesis node. Only operators can initiate genesis peering. This enables
+        cross-federation catalogue sharing and agent mobility.
+      tags: [Cross-Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [genesisNodeId, genesisUrl, publicKey]
+              properties:
+                genesisNodeId:
+                  type: string
+                  description: Node ID of the target genesis node
+                  example: meat-usa-001-genesis
+                genesisUrl:
+                  type: string
+                  format: uri
+                  description: Base URL of the target genesis node
+                  example: https://meat-usa-001-genesis.example.com
+                publicKey:
+                  type: string
+                  description: Ed25519 public key for federation auth (base64url)
+      responses:
+        '201':
+          description: Genesis peering request created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GenesisPeerRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/federation/genesis-peer/{id}:
+    delete:
+      operationId: removeGenesisPeer
+      summary: Remove a genesis peering
+      description: |
+        Remove a genesis peering relationship. Only operators can remove
+        genesis peers. Removes the peer and stops catalogue synchronization.
+      tags: [Cross-Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Genesis peer ID
+      responses:
+        '200':
+          description: Genesis peer removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          removed:
+                            type: boolean
+                            example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/federation/genesis-peer/{id}/approve:
+    put:
+      operationId: approveGenesisPeer
+      summary: Approve a genesis peering request
+      description: |
+        Approve a pending genesis peering request. Only operators can
+        approve peering. Once approved, catalogue synchronization begins.
+      tags: [Cross-Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Genesis peer ID
+      responses:
+        '200':
+          description: Genesis peer approved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GenesisPeerRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/federation/genesis-peers:
+    get:
+      operationId: listGenesisPeers
+      summary: List genesis peers
+      description: |
+        List all genesis peering relationships for this node.
+        Only operators can view genesis peers. Optionally filter by status.
+      tags: [Cross-Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, active, suspended, revoked]
+          description: Filter by peering status
+      responses:
+        '200':
+          description: List of genesis peers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          peers:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GenesisPeerRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/federation/network-stats:
+    get:
+      operationId: getNetworkStats
+      summary: Get federation network statistics
+      description: |
+        Retrieve aggregate statistics about the federation network.
+        Includes peer count, total agents, cross-federation metrics,
+        and health information. No authentication required (Tier 0).
+      tags: [Cross-Federation]
+      responses:
+        '200':
+          description: Federation network statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stats:
+                            type: object
+                            properties:
+                              totalPeers:
+                                type: integer
+                                description: Total number of active peers
+                              totalGenesisPeers:
+                                type: integer
+                                description: Number of genesis-level peers
+                              totalAgents:
+                                type: integer
+                                description: Total agents across federation
+                              totalActions:
+                                type: integer
+                                description: Total actions across federation
+                              crossFederationEntries:
+                                type: integer
+                                description: Entries in cross-federation catalogue
+                              lastSyncAt:
+                                type: string
+                                format: date-time
+                              uptime:
+                                type: string
+                                description: Node uptime
+                                example: 14d 6h 32m
+
+  # ── Phase 3.4: Reputation ───────────────────────────────────
+
+  /v1/organisms/{id}/reputation:
+    get:
+      operationId: getOrganismReputation
+      summary: Get organism reputation
+      description: |
+        Retrieve the reputation score and breakdown for an organism.
+        Reputation is calculated from member activity, work completion rate,
+        dispute rate, community feedback, and organism age.
+        No authentication required (Tier 0).
+      tags: [Reputation]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: Organism reputation details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrganismReputationRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'

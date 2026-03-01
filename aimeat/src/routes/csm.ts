@@ -1,10 +1,53 @@
 import { Router } from 'express';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseCsm, validateCsm, csmToJsonSchema } from '../services/csm-parser.js';
 import type { CsmDefinition } from '../services/csm-parser.js';
+
+// Load CSM templates at startup
+interface CsmTemplateMeta {
+  type: string;         // filename stem (e.g. "marketplace")
+  name: string;         // service.name from YAML
+  description: string;  // service.description from YAML
+  schemaMode: string;   // schema_mode from YAML
+  yaml: string;         // raw YAML content
+}
+
+function loadCsmTemplates(): CsmTemplateMeta[] {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const templatesDir = join(__dirname, '..', '..', 'docs', 'csm-examples');
+  const templates: CsmTemplateMeta[] = [];
+
+  if (!existsSync(templatesDir)) return templates;
+
+  const files = readdirSync(templatesDir).filter(f => f.endsWith('.csm.yaml'));
+  for (const file of files) {
+    try {
+      const yaml = readFileSync(join(templatesDir, file), 'utf-8');
+      const parsed = parseCsm(yaml);
+      const type = file.replace('.csm.yaml', '');
+      templates.push({
+        type,
+        name: parsed.service.name,
+        description: parsed.service.description ?? '',
+        schemaMode: parsed.schemaMode,
+        yaml,
+      });
+    } catch {
+      // Skip templates that fail to parse
+    }
+  }
+
+  return templates;
+}
+
+const csmTemplates = loadCsmTemplates();
 
 export function csmRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -134,6 +177,38 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       })),
       total: csms.length,
     }));
+  });
+
+  // GET /v1/csm/templates — List available CSM templates (public, Tier 0)
+  router.get('/v1/csm/templates', (_req, res) => {
+    res.json(success(config.nodeId, {
+      templates: csmTemplates.map(t => ({
+        type: t.type,
+        name: t.name,
+        description: t.description,
+        schema_mode: t.schemaMode,
+      })),
+      total: csmTemplates.length,
+    }, [
+      ...csmTemplates.map(t => ({
+        description: `View ${t.type} template`,
+        method: 'GET',
+        url: `/v1/csm/templates/${t.type}`,
+      })),
+    ]));
+  });
+
+  // GET /v1/csm/templates/:type — Get a specific CSM template as YAML
+  router.get('/v1/csm/templates/:type', (req, res) => {
+    const type = req.params.type as string;
+    const template = csmTemplates.find(t => t.type === type);
+    if (!template) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `CSM template "${type}" not found. Use GET /v1/csm/templates to list available templates.`));
+      return;
+    }
+
+    res.status(200).type('application/x-yaml').send(template.yaml);
   });
 
   // GET /v1/csm/:name — Get a single CSM service

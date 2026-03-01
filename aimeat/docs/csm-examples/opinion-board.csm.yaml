@@ -1,0 +1,51 @@
+csm: "1.0"
+service:
+  name: "opinion-board"
+  type: "forum"
+  description: "Public opinion board with optional anonymous posting and structured discussions"
+  locale: "en"
+
+schema_mode: "open"
+
+data_schema:
+  required:
+    title:
+      type: string
+      minLength: 3
+      maxLength: 200
+    body:
+      type: string
+      minLength: 10
+      maxLength: 5000
+    topic:
+      type: string
+      enum: ["general", "politics", "technology", "environment", "culture", "economy", "health", "education"]
+  optional:
+    author_display_name: { type: string, maxLength: 50 }
+    anonymous: { type: boolean, default: false }
+    tags: { type: array, items: { type: string }, maxItems: 5 }
+    poll:
+      type: object
+      properties:
+        question: { type: string }
+        options: { type: array, items: { type: string }, minItems: 2, maxItems: 10 }
+        expires_at: { type: string, format: date-time }
+    reply_to: { type: string }
+    sentiment: { type: string, enum: ["positive", "negative", "neutral", "mixed"] }
+
+consent_requirements:
+  visibility_default: "federation"
+  requires_consent: false
+  consent_purpose: "public-discussion"
+  data_retention: "until_revoked"
+  anonymous_option: true
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 3
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["title", "topic", "author_display_name", "anonymous"]
+  detail_view: ["title", "body", "topic", "author_display_name", "tags", "poll", "sentiment"]
+  search_fields: ["title", "body", "tags", "topic"]

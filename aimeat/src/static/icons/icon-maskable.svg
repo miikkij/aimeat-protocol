@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="heart" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="50%" stop-color="#f472b6"/>
+      <stop offset="100%" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+  <!-- Maskable safe zone: content within center 80% (51.2px padding) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256, 230)">
+    <!-- Heart shape — slightly smaller for maskable safe area -->
+    <path d="M0 40 C0 40 -80 -25 -80 -55 C-80 -90 -45 -100 -22 -90 C-9 -84 0 -72 0 -72 C0 -72 9 -84 22 -90 C45 -100 80 -90 80 -55 C80 -25 0 40 0 40 Z"
+          fill="url(#heart)" opacity="0.9"/>
+    <!-- AI circuit dots -->
+    <circle cx="-26" cy="-50" r="5" fill="#fff" opacity="0.8"/>
+    <circle cx="26" cy="-50" r="5" fill="#fff" opacity="0.8"/>
+    <circle cx="0" cy="-27" r="5" fill="#fff" opacity="0.8"/>
+    <line x1="-26" y1="-50" x2="0" y2="-27" stroke="#fff" stroke-width="2" opacity="0.5"/>
+    <line x1="26" y1="-50" x2="0" y2="-27" stroke="#fff" stroke-width="2" opacity="0.5"/>
+  </g>
+  <text x="256" y="360" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="42" fill="#f0abfc" letter-spacing="5">AIMEAT</text>
+</svg>

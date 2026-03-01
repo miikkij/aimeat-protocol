@@ -1,0 +1,60 @@
+csm: "1.0"
+service:
+  name: "video-directory"
+  type: "directory"
+  description: "Community video directory with categorization and size limits"
+  locale: "en"
+
+schema_mode: "open"
+
+data_schema:
+  required:
+    title:
+      type: string
+      minLength: 3
+      maxLength: 200
+    video_url:
+      type: string
+      format: uri
+    creator_gaii:
+      type: string
+    category:
+      type: string
+      enum: ["tutorial", "entertainment", "documentary", "music", "news", "sports", "education", "other"]
+  optional:
+    description: { type: string, maxLength: 2000 }
+    thumbnail_url: { type: string, format: uri }
+    duration_seconds: { type: number, minimum: 1 }
+    tags: { type: array, items: { type: string }, maxItems: 15 }
+    language: { type: string }
+    resolution: { type: string, enum: ["360p", "480p", "720p", "1080p", "4k"] }
+    file_size_mb: { type: number, minimum: 0, maximum: 5000 }
+    transcript: { type: string, maxLength: 50000 }
+    chapters:
+      type: array
+      items:
+        type: object
+        properties:
+          title: { type: string }
+          start_seconds: { type: number }
+    license: { type: string, enum: ["cc-by", "cc-by-sa", "cc-by-nc", "cc0", "all-rights-reserved"] }
+
+consent_requirements:
+  visibility_default: "federation"
+  requires_consent: false
+  consent_purpose: "video-sharing"
+  data_retention: "until_revoked"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 3
+  appeals_enabled: true
+
+limits:
+  max_file_size_mb: 5000
+  allowed_formats: ["mp4", "webm", "mov", "avi"]
+
+ui_hints:
+  list_view: ["title", "category", "creator_gaii", "duration_seconds", "thumbnail_url"]
+  detail_view: ["title", "description", "video_url", "category", "creator_gaii", "tags", "duration_seconds", "resolution", "language", "chapters", "license"]
+  search_fields: ["title", "description", "tags", "category", "language"]

@@ -9,9 +9,11 @@ import { returnEscrow } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
 import { PeeringRequestSchema, PeeringDecisionSchema, validateBody } from '../models/schemas.js';
 import type { PeerInfo } from '../services/federation.js';
+import { createGenesisPeeringService } from '../services/genesis-peering.js';
 
 export function federationRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
+    const genesisPeeringService = createGenesisPeeringService(config, storage);
 
     // GET /v1/federation/directory — public peer directory (Tier 0)
     router.get('/v1/federation/directory', async (_req, res) => {
@@ -993,6 +995,91 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         } catch (err) {
             res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
                 `Failed to submit cross-node work: ${err instanceof Error ? err.message : 'unknown error'}`));
+        }
+    });
+
+    // ── Phase 3.4: Genesis Peering ──
+
+    // POST /v1/federation/genesis-peer — Request genesis peering (operator only)
+    router.post('/v1/federation/genesis-peer', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const { genesisNodeId, genesisUrl, publicKey } = req.body;
+            if (!genesisNodeId || !genesisUrl || !publicKey) {
+                res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Missing: genesisNodeId, genesisUrl, publicKey'));
+                return;
+            }
+            const peer = await genesisPeeringService.requestPeering(genesisNodeId, genesisUrl, publicKey);
+            res.status(201).json(success(config.nodeId, {
+                peer,
+                semantic: {
+                    '@context': { schema: 'https://schema.org/' },
+                    '@type': 'schema:Organization',
+                    'schema:memberOf': 'aimeat:CrossFederation',
+                },
+            }));
+        } catch (err) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', String(err)));
+        }
+    });
+
+    // GET /v1/federation/genesis-peers — List genesis peers (operator only)
+    router.get('/v1/federation/genesis-peers', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const status = req.query.status as string | undefined;
+            const peers = await storage.listGenesisPeers(status ? { status } : undefined);
+            res.json(success(config.nodeId, { peers, total: peers.length }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // PUT /v1/federation/genesis-peer/:id/approve — Approve genesis peering
+    router.put('/v1/federation/genesis-peer/:id/approve', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const id = req.params.id as string;
+            const peer = await genesisPeeringService.approvePeering(id);
+            if (!peer) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Genesis peer not found'));
+                return;
+            }
+            res.json(success(config.nodeId, { peer }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // DELETE /v1/federation/genesis-peer/:id — Remove genesis peering
+    router.delete('/v1/federation/genesis-peer/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const id = req.params.id as string;
+            const removed = await genesisPeeringService.removePeering(id);
+            if (!removed) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Genesis peer not found'));
+                return;
+            }
+            res.json(success(config.nodeId, { removed: true }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // GET /v1/federation/cross-catalogue — Cross-federation catalogue
+    router.get('/v1/federation/cross-catalogue', async (_req, res) => {
+        try {
+            const catalogue = await genesisPeeringService.getCrossCatalogue();
+            res.json(success(config.nodeId, { entries: catalogue, total: catalogue.length }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // GET /v1/federation/network-stats — Network statistics
+    router.get('/v1/federation/network-stats', async (_req, res) => {
+        try {
+            const stats = await genesisPeeringService.getNetworkStats();
+            res.json(success(config.nodeId, { stats }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }
     });
 

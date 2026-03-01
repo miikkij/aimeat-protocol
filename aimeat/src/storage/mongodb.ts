@@ -32,6 +32,9 @@ import type {
     ConsentRecord,
     ConsentAuditEntry,
     CsmRecord,
+    EmailVerificationRecord,
+    PushSubscriptionRecord,
+    TrustedIssuerRecord,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -1050,6 +1053,13 @@ export class MongoStorage implements Storage {
         return null;
     }
 
+    async getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null> {
+        for (const r of this.ghiis.values()) {
+            if (r.emailHash === emailHash) return r;
+        }
+        return null;
+    }
+
     async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
         const record = this.ghiis.get(ghii);
         if (!record) return null;
@@ -1390,6 +1400,492 @@ export class MongoStorage implements Storage {
 
     async deleteCsm(name: string): Promise<boolean> {
         return this.csms.delete(name);
+    }
+
+    // ── Email Verification (in-memory fallback until Prisma schema is updated) ──
+
+    private emailVerifications = new Map<string, EmailVerificationRecord>();
+
+    async createEmailVerification(record: EmailVerificationRecord): Promise<EmailVerificationRecord> {
+        this.emailVerifications.set(record.id, record);
+        return record;
+    }
+
+    async getEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
+        return this.emailVerifications.get(id) ?? null;
+    }
+
+    async getActiveEmailVerification(ownerName: string, purpose: string): Promise<EmailVerificationRecord | null> {
+        const now = new Date().toISOString();
+        for (const record of this.emailVerifications.values()) {
+            if (record.ownerName === ownerName && record.purpose === purpose &&
+                record.status === 'pending' && record.expiresAt > now) {
+                return record;
+            }
+        }
+        return null;
+    }
+
+    async updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
+        const existing = this.emailVerifications.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates };
+        this.emailVerifications.set(id, updated);
+        return updated;
+    }
+
+    async deleteExpiredEmailVerifications(): Promise<number> {
+        const now = new Date().toISOString();
+        let count = 0;
+        for (const [id, record] of this.emailVerifications) {
+            if (record.status === 'pending' && record.expiresAt < now) {
+                this.emailVerifications.delete(id);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // ── Flags (Phase 1.5) ──────────────────────────────────
+
+    private flags = new Map<string, import('./interface.js').FlagRecord>();
+
+    async createFlag(record: import('./interface.js').FlagRecord): Promise<import('./interface.js').FlagRecord> {
+        this.flags.set(record.id, record);
+        return record;
+    }
+
+    async getFlag(id: string): Promise<import('./interface.js').FlagRecord | null> {
+        return this.flags.get(id) ?? null;
+    }
+
+    async getFlagsByTarget(targetType: string, targetId: string): Promise<import('./interface.js').FlagRecord[]> {
+        return [...this.flags.values()].filter(
+            f => f.targetType === targetType && f.targetId === targetId,
+        );
+    }
+
+    async getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<import('./interface.js').FlagRecord | null> {
+        for (const f of this.flags.values()) {
+            if (f.targetType === targetType && f.targetId === targetId && f.flaggedBy === flaggedBy) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    async getFlagSummary(targetType: string, targetId: string): Promise<import('./interface.js').FlagSummary | null> {
+        const matching = [...this.flags.values()].filter(
+            f => f.targetType === targetType && f.targetId === targetId,
+        );
+        if (matching.length === 0) return null;
+
+        const byReason: Record<string, number> = {};
+        let latestFlag = '';
+        for (const f of matching) {
+            byReason[f.reason] = (byReason[f.reason] ?? 0) + 1;
+            if (f.createdAt > latestFlag) latestFlag = f.createdAt;
+        }
+
+        return {
+            targetType,
+            targetId,
+            totalFlags: matching.length,
+            byReason,
+            latestFlag,
+        };
+    }
+
+    async updateFlag(id: string, updates: Partial<import('./interface.js').FlagRecord>): Promise<import('./interface.js').FlagRecord | null> {
+        const existing = this.flags.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates };
+        this.flags.set(id, updated);
+        return updated;
+    }
+
+    async listFlags(opts?: { status?: string; targetType?: string; page?: number; perPage?: number }): Promise<import('./interface.js').FlagRecord[]> {
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        let results = [...this.flags.values()];
+
+        if (opts?.status) results = results.filter(f => f.status === opts.status);
+        if (opts?.targetType) results = results.filter(f => f.targetType === opts.targetType);
+
+        // Sort newest first
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+        const start = (page - 1) * perPage;
+        return results.slice(start, start + perPage);
+    }
+
+    // ── Matches (Phase 2.1 — in-memory fallback until Prisma schema is updated) ──
+
+    private matchRecords = new Map<string, import('./interface.js').MatchRecord>();
+
+    async createMatch(record: import('./interface.js').MatchRecord): Promise<import('./interface.js').MatchRecord> {
+        this.matchRecords.set(record.id, record);
+        return record;
+    }
+
+    async getMatch(id: string): Promise<import('./interface.js').MatchRecord | null> {
+        return this.matchRecords.get(id) ?? null;
+    }
+
+    async getMatchByPair(profileA: string, profileB: string): Promise<import('./interface.js').MatchRecord | null> {
+        for (const m of this.matchRecords.values()) {
+            if (
+                (m.profileA === profileA && m.profileB === profileB) ||
+                (m.profileA === profileB && m.profileB === profileA)
+            ) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    async listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<import('./interface.js').MatchRecord[]> {
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 10;
+        let results = [...this.matchRecords.values()].filter(
+            m => m.profileA === profile || m.profileB === profile,
+        );
+
+        if (opts?.status) results = results.filter(m => m.status === opts.status);
+
+        // Sort newest first
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+        const start = (page - 1) * perPage;
+        return results.slice(start, start + perPage);
+    }
+
+    async updateMatch(id: string, updates: Partial<import('./interface.js').MatchRecord>): Promise<import('./interface.js').MatchRecord | null> {
+        const existing = this.matchRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates };
+        this.matchRecords.set(id, updated);
+        return updated;
+    }
+
+    async deleteExpiredMatches(): Promise<number> {
+        const now = Date.now();
+        let count = 0;
+        for (const [id, match] of this.matchRecords) {
+            if (new Date(match.expiresAt).getTime() < now && match.status !== 'accepted') {
+                this.matchRecords.delete(id);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    // ── Organisms (Phase 2.2 — in-memory fallback until Prisma schema is updated) ──
+
+    private organismRecords = new Map<string, import('./interface.js').OrganismRecord>();
+    private membershipRecords = new Map<string, import('./interface.js').OrganismMembershipRecord>();
+    private joinRequestRecords = new Map<string, import('./interface.js').JoinRequestRecord>();
+
+    async createOrganism(record: import('./interface.js').OrganismRecord): Promise<import('./interface.js').OrganismRecord> {
+        this.organismRecords.set(record.id, record);
+        return record;
+    }
+
+    async getOrganism(id: string): Promise<import('./interface.js').OrganismRecord | null> {
+        return this.organismRecords.get(id) ?? null;
+    }
+
+    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<import('./interface.js').OrganismRecord[]> {
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        let results = [...this.organismRecords.values()];
+
+        if (opts?.type) results = results.filter(o => o.type === opts.type);
+        if (opts?.city) results = results.filter(o => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+        if (opts?.interest) results = results.filter(o => o.interests.some(i => i.toLowerCase() === opts.interest!.toLowerCase()));
+        if (opts?.visibility) results = results.filter(o => o.visibility === opts.visibility);
+
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+        const start = (page - 1) * perPage;
+        return results.slice(start, start + perPage);
+    }
+
+    async updateOrganism(id: string, updates: Partial<import('./interface.js').OrganismRecord>): Promise<import('./interface.js').OrganismRecord | null> {
+        const existing = this.organismRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id: existing.id };
+        this.organismRecords.set(id, updated);
+        return updated;
+    }
+
+    async deleteOrganism(id: string): Promise<boolean> {
+        for (const [mid, m] of this.membershipRecords) {
+            if (m.organismId === id) this.membershipRecords.delete(mid);
+        }
+        for (const [jid, j] of this.joinRequestRecords) {
+            if (j.organismId === id) this.joinRequestRecords.delete(jid);
+        }
+        return this.organismRecords.delete(id);
+    }
+
+    async createMembership(record: import('./interface.js').OrganismMembershipRecord): Promise<import('./interface.js').OrganismMembershipRecord> {
+        this.membershipRecords.set(record.id, record);
+        return record;
+    }
+
+    async getMembership(organismId: string, ghii: string): Promise<import('./interface.js').OrganismMembershipRecord | null> {
+        for (const m of this.membershipRecords.values()) {
+            if (m.organismId === organismId && m.ghii === ghii) return m;
+        }
+        return null;
+    }
+
+    async listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<import('./interface.js').OrganismMembershipRecord[]> {
+        let results = [...this.membershipRecords.values()].filter(m => m.organismId === organismId);
+        if (opts?.role) results = results.filter(m => m.role === opts.role);
+        if (opts?.status) results = results.filter(m => m.status === opts.status);
+        return results;
+    }
+
+    async listMembershipsByGhii(ghii: string): Promise<import('./interface.js').OrganismMembershipRecord[]> {
+        return [...this.membershipRecords.values()].filter(m => m.ghii === ghii);
+    }
+
+    async updateMembership(id: string, updates: Partial<import('./interface.js').OrganismMembershipRecord>): Promise<import('./interface.js').OrganismMembershipRecord | null> {
+        const existing = this.membershipRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id: existing.id };
+        this.membershipRecords.set(id, updated);
+        return updated;
+    }
+
+    async deleteMembership(id: string): Promise<boolean> {
+        return this.membershipRecords.delete(id);
+    }
+
+    async createJoinRequest(record: import('./interface.js').JoinRequestRecord): Promise<import('./interface.js').JoinRequestRecord> {
+        this.joinRequestRecords.set(record.id, record);
+        return record;
+    }
+
+    async getJoinRequest(id: string): Promise<import('./interface.js').JoinRequestRecord | null> {
+        return this.joinRequestRecords.get(id) ?? null;
+    }
+
+    async listJoinRequests(organismId: string, opts?: { status?: string }): Promise<import('./interface.js').JoinRequestRecord[]> {
+        let results = [...this.joinRequestRecords.values()].filter(j => j.organismId === organismId);
+        if (opts?.status) results = results.filter(j => j.status === opts.status);
+        return results;
+    }
+
+    async updateJoinRequest(id: string, updates: Partial<import('./interface.js').JoinRequestRecord>): Promise<import('./interface.js').JoinRequestRecord | null> {
+        const existing = this.joinRequestRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id: existing.id };
+        this.joinRequestRecords.set(id, updated);
+        return updated;
+    }
+
+    // ── Appeals (Phase 2.4 — in-memory fallback until Prisma schema is updated) ──
+
+    private appealRecords = new Map<string, import('./interface.js').AppealRecord>();
+
+    async createAppeal(record: import('./interface.js').AppealRecord): Promise<import('./interface.js').AppealRecord> {
+        this.appealRecords.set(record.id, record);
+        return record;
+    }
+
+    async getAppeal(id: string): Promise<import('./interface.js').AppealRecord | null> {
+        return this.appealRecords.get(id) ?? null;
+    }
+
+    async getAppealByFlagId(flagId: string): Promise<import('./interface.js').AppealRecord | null> {
+        for (const a of this.appealRecords.values()) {
+            if (a.flagId === flagId) return a;
+        }
+        return null;
+    }
+
+    async listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<import('./interface.js').AppealRecord[]> {
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        let results = [...this.appealRecords.values()];
+
+        if (opts?.status) results = results.filter(a => a.status === opts.status);
+
+        // Sort newest first
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+        const start = (page - 1) * perPage;
+        return results.slice(start, start + perPage);
+    }
+
+    async updateAppeal(id: string, updates: Partial<import('./interface.js').AppealRecord>): Promise<import('./interface.js').AppealRecord | null> {
+        const existing = this.appealRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id: existing.id };
+        this.appealRecords.set(id, updated);
+        return updated;
+    }
+
+    // ── Marketplace (Phase 2.6 — in-memory fallback until Prisma schema is updated) ──
+
+    private listingRecords = new Map<string, import('./interface.js').ListingRecord>();
+    private purchaseRecords = new Map<string, import('./interface.js').PurchaseRecord>();
+
+    async createListing(record: import('./interface.js').ListingRecord): Promise<import('./interface.js').ListingRecord> {
+        this.listingRecords.set(record.id, record);
+        return record;
+    }
+
+    async getListing(id: string): Promise<import('./interface.js').ListingRecord | null> {
+        return this.listingRecords.get(id) ?? null;
+    }
+
+    async listListings(opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<import('./interface.js').ListingRecord[]> {
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        let results = [...this.listingRecords.values()];
+
+        if (opts?.category) results = results.filter(l => l.category === opts.category);
+        if (opts?.city) results = results.filter(l => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+        if (opts?.minPrice !== undefined) results = results.filter(l => l.priceMorsels >= opts.minPrice!);
+        if (opts?.maxPrice !== undefined) results = results.filter(l => l.priceMorsels <= opts.maxPrice!);
+        if (opts?.status) results = results.filter(l => l.status === opts.status);
+        if (opts?.sellerOwner) results = results.filter(l => l.ownerName === opts.sellerOwner);
+
+        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+        const start = (page - 1) * perPage;
+        return results.slice(start, start + perPage);
+    }
+
+    async updateListing(id: string, updates: Partial<import('./interface.js').ListingRecord>): Promise<import('./interface.js').ListingRecord | null> {
+        const existing = this.listingRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id: existing.id };
+        this.listingRecords.set(id, updated);
+        return updated;
+    }
+
+    async deleteListing(id: string): Promise<boolean> {
+        return this.listingRecords.delete(id);
+    }
+
+    async createPurchase(record: import('./interface.js').PurchaseRecord): Promise<import('./interface.js').PurchaseRecord> {
+        this.purchaseRecords.set(record.id, record);
+        return record;
+    }
+
+    async getPurchase(id: string): Promise<import('./interface.js').PurchaseRecord | null> {
+        return this.purchaseRecords.get(id) ?? null;
+    }
+
+    async listPurchasesByBuyer(buyerOwner: string): Promise<import('./interface.js').PurchaseRecord[]> {
+        return [...this.purchaseRecords.values()]
+            .filter(p => p.buyerOwner === buyerOwner)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+
+    async listPurchasesBySeller(sellerOwner: string): Promise<import('./interface.js').PurchaseRecord[]> {
+        return [...this.purchaseRecords.values()]
+            .filter(p => p.sellerOwner === sellerOwner)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+
+    async updatePurchase(id: string, updates: Partial<import('./interface.js').PurchaseRecord>): Promise<import('./interface.js').PurchaseRecord | null> {
+        const existing = this.purchaseRecords.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id: existing.id };
+        this.purchaseRecords.set(id, updated);
+        return updated;
+    }
+
+    // ── Push Subscriptions (Phase 3.1) ──
+    private pushSubscriptions = new Map<string, PushSubscriptionRecord>();
+    private trustedIssuers = new Map<string, TrustedIssuerRecord>();
+
+    async createPushSubscription(record: PushSubscriptionRecord): Promise<PushSubscriptionRecord> {
+        this.pushSubscriptions.set(record.ownerName, record);
+        return record;
+    }
+    async getPushSubscription(ownerName: string): Promise<PushSubscriptionRecord | null> {
+        return this.pushSubscriptions.get(ownerName) ?? null;
+    }
+    async deletePushSubscription(ownerName: string): Promise<boolean> {
+        return this.pushSubscriptions.delete(ownerName);
+    }
+    async listPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
+        return [...this.pushSubscriptions.values()];
+    }
+
+    // ── Trusted Issuers (Phase 3.3) ──
+
+    async createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord> {
+        this.trustedIssuers.set(record.id, record);
+        return record;
+    }
+    async getTrustedIssuer(id: string): Promise<TrustedIssuerRecord | null> {
+        return this.trustedIssuers.get(id) ?? null;
+    }
+    async getTrustedIssuerByUrl(url: string): Promise<TrustedIssuerRecord | null> {
+        for (const issuer of this.trustedIssuers.values()) {
+            if (issuer.url === url) return issuer;
+        }
+        return null;
+    }
+    async listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]> {
+        let issuers = [...this.trustedIssuers.values()];
+        if (opts?.type) issuers = issuers.filter(i => i.type === opts.type);
+        return issuers;
+    }
+    async deleteTrustedIssuer(id: string): Promise<boolean> {
+        return this.trustedIssuers.delete(id);
+    }
+
+    // ── Genesis Peers (Phase 3.4) ──
+
+    private genesisPeers = new Map<string, import('./interface.js').GenesisPeerRecord>();
+    private organismReputations = new Map<string, import('./interface.js').OrganismReputationRecord>();
+
+    async createGenesisPeer(record: import('./interface.js').GenesisPeerRecord): Promise<import('./interface.js').GenesisPeerRecord> {
+        this.genesisPeers.set(record.id, record);
+        return record;
+    }
+    async getGenesisPeer(id: string): Promise<import('./interface.js').GenesisPeerRecord | null> {
+        return this.genesisPeers.get(id) ?? null;
+    }
+    async getGenesisPeerByNodeId(nodeId: string): Promise<import('./interface.js').GenesisPeerRecord | null> {
+        for (const peer of this.genesisPeers.values()) {
+            if (peer.genesisNodeId === nodeId) return peer;
+        }
+        return null;
+    }
+    async listGenesisPeers(opts?: { status?: string }): Promise<import('./interface.js').GenesisPeerRecord[]> {
+        let peers = [...this.genesisPeers.values()];
+        if (opts?.status) peers = peers.filter(p => p.status === opts.status);
+        return peers;
+    }
+    async updateGenesisPeer(id: string, updates: Partial<import('./interface.js').GenesisPeerRecord>): Promise<import('./interface.js').GenesisPeerRecord | null> {
+        const peer = this.genesisPeers.get(id);
+        if (!peer) return null;
+        const updated = { ...peer, ...updates };
+        this.genesisPeers.set(id, updated);
+        return updated;
+    }
+    async deleteGenesisPeer(id: string): Promise<boolean> {
+        return this.genesisPeers.delete(id);
+    }
+
+    // ── Organism Reputation (Phase 3.4) ──
+
+    async setOrganismReputation(record: import('./interface.js').OrganismReputationRecord): Promise<import('./interface.js').OrganismReputationRecord> {
+        this.organismReputations.set(record.organismId, record);
+        return record;
+    }
+    async getOrganismReputation(organismId: string): Promise<import('./interface.js').OrganismReputationRecord | null> {
+        return this.organismReputations.get(organismId) ?? null;
     }
 }
 

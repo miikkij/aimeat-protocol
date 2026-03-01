@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import type { DirectoryService } from '../services/directory.js';
 
-export function catalogueRouter(config: AimeatConfig, storage: Storage): Router {
+export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService): Router {
   const router = Router();
 
   // GET /v1/catalogue — public action catalogue (Tier 0, no auth)
@@ -161,6 +162,70 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage): Router 
         burn_rate: config.burnRate,
       },
     }));
+  });
+
+  // GET /v1/catalogue/directory — people directory search (Tier 0, Phase 1.4)
+  router.get('/v1/catalogue/directory', async (req, res) => {
+    if (!directoryService) {
+      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Directory service is not available'));
+      return;
+    }
+
+    const type = req.query.type as string | undefined;
+    const city = req.query.city as string | undefined;
+    const area = req.query.area as string | undefined;
+    const country = req.query.country as string | undefined;
+    const interest = req.query.interest as string | undefined;
+    const interestsRaw = req.query.interests as string | undefined;
+    const radiusKm = req.query.radius_km ? parseFloat(req.query.radius_km as string) : undefined;
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lon = req.query.lon ? parseFloat(req.query.lon as string) : undefined;
+    const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
+
+    const interests = interestsRaw ? interestsRaw.split(',').map(s => s.trim()).filter(Boolean) : undefined;
+
+    const result = await directoryService.search({
+      type: type as 'people' | 'organisms' | undefined,
+      city,
+      area,
+      country,
+      interest,
+      interests,
+      radiusKm,
+      lat,
+      lon,
+      page,
+      perPage,
+    });
+
+    res.json(success(config.nodeId, {
+      entries: result.entries,
+      facets: result.facets,
+      total: result.total,
+    }, [
+      { description: 'View directory statistics', method: 'GET', url: '/v1/catalogue/directory/stats' },
+      { description: 'Browse action catalogue', method: 'GET', url: '/v1/catalogue' },
+    ], { page, per_page: perPage, total: result.total }));
+  });
+
+  // GET /v1/catalogue/directory/stats — directory statistics (Tier 0, Phase 1.4)
+  router.get('/v1/catalogue/directory/stats', async (_req, res) => {
+    if (!directoryService) {
+      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Directory service is not available'));
+      return;
+    }
+
+    const stats = directoryService.getStats();
+
+    res.json(success(config.nodeId, {
+      total_people: stats.totalPeople,
+      top_interests: stats.topInterests,
+      top_cities: stats.topCities,
+      updated_at: stats.updatedAt,
+    }, [
+      { description: 'Search the directory', method: 'GET', url: '/v1/catalogue/directory' },
+    ]));
   });
 
   // GET /v1/catalogue/:actionId — action detail (Tier 0, no auth)

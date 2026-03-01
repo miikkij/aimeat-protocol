@@ -1,0 +1,54 @@
+csm: "1.0"
+service:
+  name: "dating-directory"
+  type: "directory"
+  description: "Privacy-first dating profile directory with DMZ visibility and anonymous browsing"
+  locale: "en"
+
+schema_mode: "strict"
+
+data_schema:
+  required:
+    display_name:
+      type: string
+      minLength: 2
+      maxLength: 50
+    age_range:
+      type: string
+      enum: ["18-25", "26-35", "36-45", "46-55", "56+"]
+    looking_for:
+      type: array
+      items: { type: string, enum: ["friendship", "dating", "relationship", "activity_partner"] }
+      minItems: 1
+    interests:
+      type: array
+      items: { type: string }
+      minItems: 1
+      maxItems: 15
+  optional:
+    bio: { type: string, maxLength: 500 }
+    location:
+      type: object
+      properties:
+        city: { type: string }
+        country: { type: string }
+    availability: { type: string, enum: ["anytime", "weekdays", "evenings", "weekends"] }
+    languages: { type: array, items: { type: string }, maxItems: 5 }
+    values: { type: array, items: { type: string }, maxItems: 10 }
+
+consent_requirements:
+  visibility_default: "dmz"
+  requires_consent: true
+  consent_purpose: "dating-discovery"
+  data_retention: "90d"
+  anonymous_browsing: true
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 2
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["display_name", "age_range", "interests", "location.city"]
+  detail_view: ["display_name", "bio", "age_range", "looking_for", "interests", "location", "availability", "languages", "values"]
+  search_fields: ["interests", "location.city", "looking_for", "age_range"]

@@ -6,6 +6,11 @@ import type {
   StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord,
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, MaintenanceState,
   SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord,
+  EmailVerificationRecord, FlagRecord, FlagSummary, MatchRecord,
+  OrganismRecord, OrganismMembershipRecord, JoinRequestRecord,
+  AppealRecord, ListingRecord, PurchaseRecord,
+  PushSubscriptionRecord, TrustedIssuerRecord,
+  GenesisPeerRecord, OrganismReputationRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -32,6 +37,19 @@ export class InMemoryStorage implements Storage {
   private consents = new Map<string, ConsentRecord>();      // key: id
   private consentAudit: ConsentAuditEntry[] = [];
   private csms = new Map<string, CsmRecord>();              // key: name
+  private emailVerifications = new Map<string, EmailVerificationRecord>(); // key: id
+  private flags = new Map<string, FlagRecord>();                          // key: id
+  private matches = new Map<string, MatchRecord>();                        // key: id
+  private organisms = new Map<string, OrganismRecord>();                    // key: id
+  private memberships = new Map<string, OrganismMembershipRecord>();        // key: id
+  private joinRequests = new Map<string, JoinRequestRecord>();              // key: id
+  private appeals = new Map<string, AppealRecord>();                        // key: id
+  private listings = new Map<string, ListingRecord>();                      // key: id
+  private purchases = new Map<string, PurchaseRecord>();                    // key: id
+  private pushSubscriptions = new Map<string, PushSubscriptionRecord>();    // key: ownerName
+  private trustedIssuers = new Map<string, TrustedIssuerRecord>();          // key: id
+  private genesisPeers = new Map<string, GenesisPeerRecord>();              // key: id
+  private organismReputations = new Map<string, OrganismReputationRecord>(); // key: organismId
 
   // ── Owners ──
 
@@ -643,6 +661,13 @@ export class InMemoryStorage implements Storage {
     return null;
   }
 
+  async getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null> {
+    for (const r of this.ghiis.values()) {
+      if (r.emailHash === emailHash) return r;
+    }
+    return null;
+  }
+
   async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
     const record = this.ghiis.get(ghii);
     if (!record) return null;
@@ -984,6 +1009,483 @@ export class InMemoryStorage implements Storage {
 
   async deleteCsm(name: string): Promise<boolean> {
     return this.csms.delete(name);
+  }
+
+  // ── Email Verification (Phase 1.1) ──────────────────────
+
+  async createEmailVerification(record: EmailVerificationRecord): Promise<EmailVerificationRecord> {
+    this.emailVerifications.set(record.id, record);
+    return record;
+  }
+
+  async getEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
+    return this.emailVerifications.get(id) ?? null;
+  }
+
+  async getActiveEmailVerification(ownerName: string, purpose: string): Promise<EmailVerificationRecord | null> {
+    const now = new Date().toISOString();
+    for (const record of this.emailVerifications.values()) {
+      if (record.ownerName === ownerName && record.purpose === purpose &&
+          record.status === 'pending' && record.expiresAt > now) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  async updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
+    const existing = this.emailVerifications.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.emailVerifications.set(id, updated);
+    return updated;
+  }
+
+  async getEmailVerificationsByOwner(ownerName: string): Promise<EmailVerificationRecord[]> {
+    return Array.from(this.emailVerifications.values()).filter(v => v.ownerName === ownerName);
+  }
+
+  async deleteExpiredEmailVerifications(): Promise<number> {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const [id, record] of this.emailVerifications) {
+      if (record.status === 'pending' && record.expiresAt < now) {
+        this.emailVerifications.delete(id);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // ── Flags (Phase 1.5) ──────────────────────────────────
+
+  async createFlag(record: FlagRecord): Promise<FlagRecord> {
+    this.flags.set(record.id, record);
+    return record;
+  }
+
+  async getFlag(id: string): Promise<FlagRecord | null> {
+    return this.flags.get(id) ?? null;
+  }
+
+  async getFlagsByTarget(targetType: string, targetId: string): Promise<FlagRecord[]> {
+    return [...this.flags.values()].filter(
+      f => f.targetType === targetType && f.targetId === targetId,
+    );
+  }
+
+  async getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<FlagRecord | null> {
+    for (const f of this.flags.values()) {
+      if (f.targetType === targetType && f.targetId === targetId && f.flaggedBy === flaggedBy) {
+        return f;
+      }
+    }
+    return null;
+  }
+
+  async getFlagSummary(targetType: string, targetId: string): Promise<FlagSummary | null> {
+    const matching = [...this.flags.values()].filter(
+      f => f.targetType === targetType && f.targetId === targetId,
+    );
+    if (matching.length === 0) return null;
+
+    const byReason: Record<string, number> = {};
+    let latestFlag = '';
+    for (const f of matching) {
+      byReason[f.reason] = (byReason[f.reason] ?? 0) + 1;
+      if (f.createdAt > latestFlag) latestFlag = f.createdAt;
+    }
+
+    return {
+      targetType,
+      targetId,
+      totalFlags: matching.length,
+      byReason,
+      latestFlag,
+    };
+  }
+
+  async updateFlag(id: string, updates: Partial<FlagRecord>): Promise<FlagRecord | null> {
+    const existing = this.flags.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.flags.set(id, updated);
+    return updated;
+  }
+
+  async listFlags(opts?: { status?: string; targetType?: string; page?: number; perPage?: number }): Promise<FlagRecord[]> {
+    const page = opts?.page ?? 1;
+    const perPage = opts?.perPage ?? 20;
+    let results = [...this.flags.values()];
+
+    if (opts?.status) results = results.filter(f => f.status === opts.status);
+    if (opts?.targetType) results = results.filter(f => f.targetType === opts.targetType);
+
+    // Sort newest first
+    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const start = (page - 1) * perPage;
+    return results.slice(start, start + perPage);
+  }
+
+  // ── Matches (Phase 2.1) ──────────────────────────────────
+
+  async createMatch(record: MatchRecord): Promise<MatchRecord> {
+    this.matches.set(record.id, record);
+    return record;
+  }
+
+  async getMatch(id: string): Promise<MatchRecord | null> {
+    return this.matches.get(id) ?? null;
+  }
+
+  async getMatchByPair(profileA: string, profileB: string): Promise<MatchRecord | null> {
+    for (const m of this.matches.values()) {
+      if (
+        (m.profileA === profileA && m.profileB === profileB) ||
+        (m.profileA === profileB && m.profileB === profileA)
+      ) {
+        return m;
+      }
+    }
+    return null;
+  }
+
+  async listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<MatchRecord[]> {
+    const page = opts?.page ?? 1;
+    const perPage = opts?.perPage ?? 10;
+    let results = [...this.matches.values()].filter(
+      m => m.profileA === profile || m.profileB === profile,
+    );
+
+    if (opts?.status) results = results.filter(m => m.status === opts.status);
+
+    // Sort newest first
+    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const start = (page - 1) * perPage;
+    return results.slice(start, start + perPage);
+  }
+
+  async updateMatch(id: string, updates: Partial<MatchRecord>): Promise<MatchRecord | null> {
+    const existing = this.matches.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.matches.set(id, updated);
+    return updated;
+  }
+
+  async deleteExpiredMatches(): Promise<number> {
+    const now = Date.now();
+    let count = 0;
+    for (const [id, match] of this.matches) {
+      if (new Date(match.expiresAt).getTime() < now && match.status !== 'accepted') {
+        this.matches.delete(id);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // ── Organisms (Phase 2.2) ──────────────────────────────────
+
+  async createOrganism(record: OrganismRecord): Promise<OrganismRecord> {
+    this.organisms.set(record.id, record);
+    return record;
+  }
+
+  async getOrganism(id: string): Promise<OrganismRecord | null> {
+    return this.organisms.get(id) ?? null;
+  }
+
+  async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<OrganismRecord[]> {
+    const page = opts?.page ?? 1;
+    const perPage = opts?.perPage ?? 20;
+    let results = [...this.organisms.values()];
+
+    if (opts?.type) results = results.filter(o => o.type === opts.type);
+    if (opts?.city) results = results.filter(o => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+    if (opts?.interest) results = results.filter(o => o.interests.some(i => i.toLowerCase() === opts.interest!.toLowerCase()));
+    if (opts?.visibility) results = results.filter(o => o.visibility === opts.visibility);
+
+    // Sort newest first
+    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const start = (page - 1) * perPage;
+    return results.slice(start, start + perPage);
+  }
+
+  async updateOrganism(id: string, updates: Partial<OrganismRecord>): Promise<OrganismRecord | null> {
+    const existing = this.organisms.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.organisms.set(id, updated);
+    return updated;
+  }
+
+  async deleteOrganism(id: string): Promise<boolean> {
+    // Cascade: delete memberships and join requests
+    for (const [mid, m] of this.memberships) {
+      if (m.organismId === id) this.memberships.delete(mid);
+    }
+    for (const [jid, j] of this.joinRequests) {
+      if (j.organismId === id) this.joinRequests.delete(jid);
+    }
+    return this.organisms.delete(id);
+  }
+
+  // ── Memberships (Phase 2.2) ──────────────────────────────────
+
+  async createMembership(record: OrganismMembershipRecord): Promise<OrganismMembershipRecord> {
+    this.memberships.set(record.id, record);
+    return record;
+  }
+
+  async getMembership(organismId: string, ghii: string): Promise<OrganismMembershipRecord | null> {
+    for (const m of this.memberships.values()) {
+      if (m.organismId === organismId && m.ghii === ghii) return m;
+    }
+    return null;
+  }
+
+  async listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<OrganismMembershipRecord[]> {
+    let results = [...this.memberships.values()].filter(m => m.organismId === organismId);
+    if (opts?.role) results = results.filter(m => m.role === opts.role);
+    if (opts?.status) results = results.filter(m => m.status === opts.status);
+    return results;
+  }
+
+  async listMembershipsByGhii(ghii: string): Promise<OrganismMembershipRecord[]> {
+    return [...this.memberships.values()].filter(m => m.ghii === ghii);
+  }
+
+  async updateMembership(id: string, updates: Partial<OrganismMembershipRecord>): Promise<OrganismMembershipRecord | null> {
+    const existing = this.memberships.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.memberships.set(id, updated);
+    return updated;
+  }
+
+  async deleteMembership(id: string): Promise<boolean> {
+    return this.memberships.delete(id);
+  }
+
+  // ── Join Requests (Phase 2.2) ──────────────────────────────────
+
+  async createJoinRequest(record: JoinRequestRecord): Promise<JoinRequestRecord> {
+    this.joinRequests.set(record.id, record);
+    return record;
+  }
+
+  async getJoinRequest(id: string): Promise<JoinRequestRecord | null> {
+    return this.joinRequests.get(id) ?? null;
+  }
+
+  async listJoinRequests(organismId: string, opts?: { status?: string }): Promise<JoinRequestRecord[]> {
+    let results = [...this.joinRequests.values()].filter(j => j.organismId === organismId);
+    if (opts?.status) results = results.filter(j => j.status === opts.status);
+    return results;
+  }
+
+  async updateJoinRequest(id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null> {
+    const existing = this.joinRequests.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.joinRequests.set(id, updated);
+    return updated;
+  }
+
+  // ── Appeals (Phase 2.4) ──────────────────────────────────
+
+  async createAppeal(record: AppealRecord): Promise<AppealRecord> {
+    this.appeals.set(record.id, record);
+    return record;
+  }
+
+  async getAppeal(id: string): Promise<AppealRecord | null> {
+    return this.appeals.get(id) ?? null;
+  }
+
+  async getAppealByFlagId(flagId: string): Promise<AppealRecord | null> {
+    for (const a of this.appeals.values()) {
+      if (a.flagId === flagId) return a;
+    }
+    return null;
+  }
+
+  async listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<AppealRecord[]> {
+    const page = opts?.page ?? 1;
+    const perPage = opts?.perPage ?? 20;
+    let results = [...this.appeals.values()];
+
+    if (opts?.status) results = results.filter(a => a.status === opts.status);
+
+    // Sort newest first
+    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const start = (page - 1) * perPage;
+    return results.slice(start, start + perPage);
+  }
+
+  async updateAppeal(id: string, updates: Partial<AppealRecord>): Promise<AppealRecord | null> {
+    const existing = this.appeals.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.appeals.set(id, updated);
+    return updated;
+  }
+
+  // ── Marketplace (Phase 2.6) ──
+
+  async createListing(record: ListingRecord): Promise<ListingRecord> {
+    this.listings.set(record.id, record);
+    return record;
+  }
+
+  async getListing(id: string): Promise<ListingRecord | null> {
+    return this.listings.get(id) ?? null;
+  }
+
+  async listListings(opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<ListingRecord[]> {
+    const page = opts?.page ?? 1;
+    const perPage = opts?.perPage ?? 20;
+    let results = [...this.listings.values()];
+
+    if (opts?.category) results = results.filter(l => l.category === opts.category);
+    if (opts?.city) results = results.filter(l => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+    if (opts?.minPrice !== undefined) results = results.filter(l => l.priceMorsels >= opts.minPrice!);
+    if (opts?.maxPrice !== undefined) results = results.filter(l => l.priceMorsels <= opts.maxPrice!);
+    if (opts?.status) results = results.filter(l => l.status === opts.status);
+    if (opts?.sellerOwner) results = results.filter(l => l.ownerName === opts.sellerOwner);
+
+    // Sort newest first
+    results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    const start = (page - 1) * perPage;
+    return results.slice(start, start + perPage);
+  }
+
+  async updateListing(id: string, updates: Partial<ListingRecord>): Promise<ListingRecord | null> {
+    const existing = this.listings.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.listings.set(id, updated);
+    return updated;
+  }
+
+  async deleteListing(id: string): Promise<boolean> {
+    return this.listings.delete(id);
+  }
+
+  async createPurchase(record: PurchaseRecord): Promise<PurchaseRecord> {
+    this.purchases.set(record.id, record);
+    return record;
+  }
+
+  async getPurchase(id: string): Promise<PurchaseRecord | null> {
+    return this.purchases.get(id) ?? null;
+  }
+
+  async listPurchasesByBuyer(buyerOwner: string): Promise<PurchaseRecord[]> {
+    return [...this.purchases.values()]
+      .filter(p => p.buyerOwner === buyerOwner)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listPurchasesBySeller(sellerOwner: string): Promise<PurchaseRecord[]> {
+    return [...this.purchases.values()]
+      .filter(p => p.sellerOwner === sellerOwner)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async updatePurchase(id: string, updates: Partial<PurchaseRecord>): Promise<PurchaseRecord | null> {
+    const existing = this.purchases.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.purchases.set(id, updated);
+    return updated;
+  }
+
+  // ── Push Subscriptions (Phase 3.1) ──
+
+  async createPushSubscription(record: PushSubscriptionRecord): Promise<PushSubscriptionRecord> {
+    this.pushSubscriptions.set(record.ownerName, record);
+    return record;
+  }
+  async getPushSubscription(ownerName: string): Promise<PushSubscriptionRecord | null> {
+    return this.pushSubscriptions.get(ownerName) ?? null;
+  }
+  async deletePushSubscription(ownerName: string): Promise<boolean> {
+    return this.pushSubscriptions.delete(ownerName);
+  }
+  async listPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
+    return [...this.pushSubscriptions.values()];
+  }
+
+  // ── Trusted Issuers (Phase 3.3) ──
+
+  async createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord> {
+    this.trustedIssuers.set(record.id, record);
+    return record;
+  }
+  async getTrustedIssuer(id: string): Promise<TrustedIssuerRecord | null> {
+    return this.trustedIssuers.get(id) ?? null;
+  }
+  async getTrustedIssuerByUrl(url: string): Promise<TrustedIssuerRecord | null> {
+    for (const issuer of this.trustedIssuers.values()) {
+      if (issuer.url === url) return issuer;
+    }
+    return null;
+  }
+  async listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]> {
+    let issuers = [...this.trustedIssuers.values()];
+    if (opts?.type) issuers = issuers.filter(i => i.type === opts.type);
+    return issuers;
+  }
+  async deleteTrustedIssuer(id: string): Promise<boolean> {
+    return this.trustedIssuers.delete(id);
+  }
+
+  // ── Genesis Peers (Phase 3.4) ──
+
+  async createGenesisPeer(record: GenesisPeerRecord): Promise<GenesisPeerRecord> {
+    this.genesisPeers.set(record.id, record);
+    return record;
+  }
+  async getGenesisPeer(id: string): Promise<GenesisPeerRecord | null> {
+    return this.genesisPeers.get(id) ?? null;
+  }
+  async getGenesisPeerByNodeId(nodeId: string): Promise<GenesisPeerRecord | null> {
+    for (const peer of this.genesisPeers.values()) {
+      if (peer.genesisNodeId === nodeId) return peer;
+    }
+    return null;
+  }
+  async listGenesisPeers(opts?: { status?: string }): Promise<GenesisPeerRecord[]> {
+    let peers = [...this.genesisPeers.values()];
+    if (opts?.status) peers = peers.filter(p => p.status === opts.status);
+    return peers;
+  }
+  async updateGenesisPeer(id: string, updates: Partial<GenesisPeerRecord>): Promise<GenesisPeerRecord | null> {
+    const peer = this.genesisPeers.get(id);
+    if (!peer) return null;
+    const updated = { ...peer, ...updates };
+    this.genesisPeers.set(id, updated);
+    return updated;
+  }
+  async deleteGenesisPeer(id: string): Promise<boolean> {
+    return this.genesisPeers.delete(id);
+  }
+
+  // ── Organism Reputation (Phase 3.4) ──
+
+  async setOrganismReputation(record: OrganismReputationRecord): Promise<OrganismReputationRecord> {
+    this.organismReputations.set(record.organismId, record);
+    return record;
+  }
+  async getOrganismReputation(organismId: string): Promise<OrganismReputationRecord | null> {
+    return this.organismReputations.get(organismId) ?? null;
   }
 }
 

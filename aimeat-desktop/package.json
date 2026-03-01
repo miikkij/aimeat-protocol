@@ -1,0 +1,15 @@
+{
+  "name": "aimeat-desktop",
+  "version": "0.1.0",
+  "description": "AIMEAT Personal Node — Desktop GUI (Tauri)",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

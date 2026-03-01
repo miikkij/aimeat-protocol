@@ -42,7 +42,19 @@ import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
 import { aimeatOsRouter } from './routes/aimeat-os.js';
 import { guidesRouter } from './routes/guides.js';
+import { flagsRouter } from './routes/flags.js';
+import { appealsRouter } from './routes/appeals.js';
+import { matchesRouter } from './routes/matches.js';
+import { organismsRouter } from './routes/organisms.js';
+import { marketplaceRouter } from './routes/marketplace.js';
+import { portalMarketplaceRouter } from './routes/portal-marketplace.js';
 import { personalRouter } from './routes/personal.js';
+import { pushRouter } from './routes/push.js';
+import { createPushService } from './services/push.js';
+import { verificationRouter } from './routes/verification.js';
+import { createEudiwService } from './services/eudiw.js';
+import { createVcIssuerService } from './services/vc-issuer.js';
+import { createMyDataReceiptService } from './services/mydata-receipt.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import type { Storage, MaintenanceState } from './storage/interface.js';
@@ -51,6 +63,11 @@ import type { PeerInfo } from './services/federation.js';
 import { TunnelManager } from './services/personal-tunnel.js';
 import { startConsentExpiryJob } from './services/consent.js';
 import { seedProfileSchemas } from './services/profile-schemas.js';
+import { createEmailService } from './services/email.js';
+import { DirectoryService } from './services/directory.js';
+import { portalHobbiesRouter } from './routes/portal-hobbies.js';
+import { startMatchNotificationJob } from './services/match-notification.js';
+import { createMatchingEngine, startMatchingScheduler } from './services/matching.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -71,6 +88,12 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   const publicDir = join(__dirname, '..', 'public');
   if (existsSync(publicDir)) {
     app.use(express.static(publicDir, { maxAge: '7d' }));
+  }
+
+  // PWA static files (manifest.json, sw.js, offline.html, icons)
+  const pwaStaticDir = join(__dirname, '..', 'src', 'static');
+  if (existsSync(pwaStaticDir)) {
+    app.use(express.static(pwaStaticDir, { maxAge: '1d' }));
   }
 
   // CORS for Tier 0 endpoints
@@ -151,6 +174,12 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   seedProfileSchemas(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} profile schemas`); })
     .catch(err => logger.error('Failed to seed profile schemas', { error: err }));
+
+  // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
+  const directoryService = new DirectoryService(config, storage);
+  directoryService.rebuildIndex()
+    .then(() => logger.info('Directory index built'))
+    .catch(err => logger.error('Failed to build directory index', { error: String(err) }));
 
   // Federation peer registry (shared between routes and heartbeat)
   const peers = new Map<string, PeerInfo>();
@@ -273,7 +302,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(memoryRouter(config, storage));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(actionsRouter(config, storage));
-  app.use(catalogueRouter(config, storage));
+  app.use(catalogueRouter(config, storage, directoryService));
   app.use(workRouter(config, storage, peers));
   app.use(walletRouter(config, storage));
 
@@ -309,15 +338,42 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   }));
   app.use(federationRouter(config, storage, peers));
   app.use(disputesRouter(config, storage));
+  app.use(flagsRouter(config, storage));
+  app.use(appealsRouter(config, storage));
+  app.use(matchesRouter(config, storage));
+  app.use(organismsRouter(config, storage));
+  app.use(marketplaceRouter(config, storage));
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
   app.use(mcpRouter(config, storage));
   app.use(portalRouter(config, storage));
   app.use(humanPortalRouter(config, storage));
+  app.use(portalHobbiesRouter(config, storage, directoryService));
+  app.use(portalMarketplaceRouter(config, storage));
   app.use(profileRouter(config, storage));
+  // Phase 1.1 — Email service for verification and magic links
+  const emailService = createEmailService(config);
+
+  // Push notification service — Phase 3.1
+  const pushService = createPushService(config, storage);
+  app.use(pushRouter(config, storage, pushService));
+
+  // EUDIW / VC / MyData services — Phase 3.3
+  const eudiwService = createEudiwService(config, storage);
+  const vcIssuerService = createVcIssuerService(config);
+  const mydataReceiptService = createMyDataReceiptService(config);
+  app.use(verificationRouter(config, storage, eudiwService, vcIssuerService, mydataReceiptService));
+
+  // Match notification job — Phase 1.6
+  startMatchNotificationJob(config, storage, emailService, directoryService);
+
+  // AI Matching — Phase 2.1
+  const matchingEngine = createMatchingEngine(config, storage, directoryService, emailService);
+  startMatchingScheduler(config, matchingEngine);
+
   app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
-  app.use(ghiiRouter(config, storage));
+  app.use(ghiiRouter(config, storage, emailService));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));
   app.use(aimeatOsRouter(config));

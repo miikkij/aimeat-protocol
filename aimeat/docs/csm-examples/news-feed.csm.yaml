@@ -1,0 +1,59 @@
+csm: "1.0"
+service:
+  name: "news-feed"
+  type: "feed"
+  description: "Community news feed with freshness scoring and topic categorization"
+  locale: "en"
+
+schema_mode: "open"
+
+data_schema:
+  required:
+    title:
+      type: string
+      minLength: 5
+      maxLength: 300
+    content:
+      type: string
+      minLength: 10
+      maxLength: 10000
+    author_gaii:
+      type: string
+    category:
+      type: string
+      enum: ["news", "announcement", "discussion", "event", "update", "question"]
+  optional:
+    summary: { type: string, maxLength: 500 }
+    source_url: { type: string, format: uri }
+    tags: { type: array, items: { type: string }, maxItems: 10 }
+    images: { type: array, items: { type: string }, maxItems: 5 }
+    location:
+      type: object
+      properties:
+        city: { type: string }
+        region: { type: string }
+        country: { type: string }
+    priority: { type: string, enum: ["normal", "important", "urgent"] }
+    expires_at: { type: string, format: date-time }
+
+consent_requirements:
+  visibility_default: "federation"
+  requires_consent: false
+  consent_purpose: "news-distribution"
+  data_retention: "365d"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: true
+
+scoring:
+  freshness_weight: 0.6
+  engagement_weight: 0.3
+  relevance_weight: 0.1
+  decay_half_life_hours: 24
+
+ui_hints:
+  list_view: ["title", "category", "author_gaii", "summary"]
+  detail_view: ["title", "content", "category", "author_gaii", "tags", "source_url", "images", "location"]
+  search_fields: ["title", "content", "tags", "category", "location.city"]

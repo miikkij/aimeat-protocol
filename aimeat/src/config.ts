@@ -100,6 +100,53 @@ export interface AimeatConfig {
   personalNodeMailboxRetentionDays: number;
   personalNodeHeartbeatIntervalMs: number;
   personalNodeOfflineThresholdMs: number;
+
+  // Email / SMTP (Phase 1.1)
+  smtpHost: string | null;
+  smtpPort: number;
+  smtpUser: string | null;
+  smtpPass: string | null;
+  smtpFrom: string;
+  smtpSecure: boolean;
+  emailConfirmationRequired: boolean;
+  emailEnabled: boolean;
+
+  // Match Notifications (Phase 1.6)
+  matchNotificationIntervalHours: number;
+  matchNotificationEnabled: boolean;
+
+  // AI Matching (Phase 2.1)
+  matchingEnabled: boolean;
+  matchIntervalHours: number;
+  matchThreshold: number;
+  matchMaxSuggestions: number;
+  matchMaxDistanceKm: number;
+  matchCooldownDays: number;
+
+  // Marketplace (Phase 2.6)
+  marketplaceEnabled: boolean;
+  marketplaceListingFeeMorsels: number;
+  marketplaceTransactionFeePercent: number;
+  marketplaceEscrowEnabled: boolean;
+
+  // Push Notifications / PWA (Phase 3.1)
+  pushEnabled: boolean;
+  vapidPublicKey: string | null;
+  vapidPrivateKey: string | null;
+  vapidSubject: string;
+
+  // EUDIW / Identity Verification (Phase 3.3)
+  eudiwEnabled: boolean;
+  eudiwClientId: string;
+  eudiwRedirectUri: string;
+  ftnEnabled: boolean;
+  ftnProviderUrl: string;
+  vcIssuerDid: string;
+
+  // Cross-Federation (Phase 3.4)
+  crossFederationEnabled: boolean;
+  maxGenesisPeers: number;
+  genesisSyncIntervalHours: number;
 }
 
 export function loadConfig(): AimeatConfig {
@@ -175,6 +222,39 @@ export function loadConfig(): AimeatConfig {
     personalNodeMailboxRetentionDays: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS ?? '7', 10),
     personalNodeHeartbeatIntervalMs: parseInt(process.env.AIMEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
     personalNodeOfflineThresholdMs: parseInt(process.env.AIMEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),
+    smtpHost: process.env.AIMEAT_SMTP_HOST ?? null,
+    smtpPort: parseInt(process.env.AIMEAT_SMTP_PORT ?? '587', 10),
+    smtpUser: process.env.AIMEAT_SMTP_USER ?? null,
+    smtpPass: process.env.AIMEAT_SMTP_PASS ?? null,
+    smtpFrom: process.env.AIMEAT_SMTP_FROM ?? 'AIMEAT <noreply@localhost>',
+    smtpSecure: process.env.AIMEAT_SMTP_SECURE === 'true',
+    emailConfirmationRequired: process.env.AIMEAT_EMAIL_CONFIRMATION_REQUIRED === 'true',
+    emailEnabled: (process.env.AIMEAT_SMTP_HOST ?? null) !== null,
+    matchNotificationIntervalHours: parseInt(process.env.AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS ?? '24', 10),
+    matchNotificationEnabled: process.env.AIMEAT_MATCH_NOTIFICATION_ENABLED !== 'false',
+    matchingEnabled: process.env.AIMEAT_MATCHING_ENABLED !== 'false',
+    matchIntervalHours: parseInt(process.env.AIMEAT_MATCH_INTERVAL_HOURS ?? '24', 10),
+    matchThreshold: parseFloat(process.env.AIMEAT_MATCH_THRESHOLD ?? '0.5'),
+    matchMaxSuggestions: parseInt(process.env.AIMEAT_MATCH_MAX_SUGGESTIONS ?? '5', 10),
+    matchMaxDistanceKm: parseInt(process.env.AIMEAT_MATCH_MAX_DISTANCE_KM ?? '100', 10),
+    matchCooldownDays: parseInt(process.env.AIMEAT_MATCH_COOLDOWN_DAYS ?? '7', 10),
+    marketplaceEnabled: process.env.AIMEAT_MARKETPLACE_ENABLED !== 'false',
+    marketplaceListingFeeMorsels: parseInt(process.env.AIMEAT_MARKETPLACE_LISTING_FEE ?? '2', 10),
+    marketplaceTransactionFeePercent: parseInt(process.env.AIMEAT_MARKETPLACE_TX_FEE_PERCENT ?? '5', 10),
+    marketplaceEscrowEnabled: process.env.AIMEAT_MARKETPLACE_ESCROW !== 'false',
+    pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
+    vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
+    vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,
+    vapidSubject: process.env.AIMEAT_VAPID_SUBJECT ?? 'mailto:admin@aimeat.example.com',
+    eudiwEnabled: process.env.AIMEAT_EUDIW_ENABLED === 'true',
+    eudiwClientId: process.env.AIMEAT_EUDIW_CLIENT_ID ?? 'aimeat-verifier-001',
+    eudiwRedirectUri: process.env.AIMEAT_EUDIW_REDIRECT_URI ?? '',
+    ftnEnabled: process.env.AIMEAT_FTN_ENABLED === 'true',
+    ftnProviderUrl: process.env.AIMEAT_FTN_PROVIDER_URL ?? 'https://tunnistautuminen.suomi.fi',
+    vcIssuerDid: process.env.AIMEAT_VC_ISSUER_DID ?? '',
+    crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
+    maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
+    genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },

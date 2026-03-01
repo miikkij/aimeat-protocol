@@ -221,6 +221,18 @@ export interface GHIIRecord {
   totpFailedAttempts?: number;  // Failed attempts (rate limiting)
   totpLockedUntil?: string;     // Locked until (rate limiting)
   semantic?: SemanticAnnotation;  // Phase 0.7b
+  // Phase 1.3 — Web registration & email verification
+  emailHash?: string;           // SHA-256 of verified email
+  emailVerifiedAt?: string;     // ISO timestamp
+  verificationMethod?: 'email' | 'phone' | 'operator' | 'eidas';
+  magicLinkEnabled?: boolean;
+  lastLoginAt?: string;
+  loginCount?: number;
+  // Phase 3.3 — EUDIW/VC identity verification
+  verifiedAttributes?: string[];
+  verificationIssuer?: string;
+  verificationCredentialHash?: string;
+  ftnVerified?: boolean;
 }
 
 export interface PersonalNodeRecord {
@@ -292,6 +304,7 @@ export interface CsmRecord {
   registeredBy: string;          // owner name who registered this CSM
   registeredAt: string;          // ISO timestamp
   updatedAt: string;             // ISO timestamp
+  federate?: boolean;            // Phase 3.4 — auto-distribute to federation peers
 }
 
 export interface SemanticContext {
@@ -309,6 +322,216 @@ export interface SchemaRecord {
   setAt: string;              // ISO timestamp
   updatedAt: string;          // ISO timestamp
   semanticContext?: SemanticContext;  // Phase 0.7 — optional JSON-LD-compatible semantic type
+}
+
+export interface EmailVerificationRecord {
+  id: string;
+  ownerName: string;
+  emailHash: string;
+  code: string;           // SHA-256 hash of 6-digit code
+  purpose: 'registration' | 'login' | 'change';
+  status: 'pending' | 'verified' | 'expired';
+  attempts: number;
+  expiresAt: string;
+  createdAt: string;
+  verifiedAt: string | null;
+}
+
+export interface FlagRecord {
+  id: string;
+  targetType: 'memory' | 'board_post' | 'action' | 'agent';
+  targetId: string;
+  flaggedBy: string;
+  reason: 'unreliable' | 'inappropriate' | 'illegal' | 'spam' | 'other';
+  description?: string;
+  status: 'active' | 'dismissed' | 'actioned';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  createdAt: string;
+}
+
+export interface FlagSummary {
+  targetType: string;
+  targetId: string;
+  totalFlags: number;
+  byReason: Record<string, number>;
+  latestFlag: string;
+  hidden?: boolean;  // Phase 2.4 — auto-hide when flag count >= threshold
+}
+
+export interface MatchRecord {
+  id: string;
+  profileA: string;       // GHII of suggestion recipient
+  profileB: string;       // GHII of matched profile
+  score: number;          // 0.0-1.0
+  breakdown: {
+    sharedInterests: string[];
+    distanceKm: number | null;
+    activityDays: number;
+    sharedInterestsScore: number;
+    distanceScore: number;
+    activityScore: number;
+    compatibilityScore: number;
+  };
+  status: 'suggested' | 'notified' | 'accepted' | 'dismissed' | 'expired';
+  notifiedAt: string | null;
+  respondedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
+// Phase 2.2 — Organisms (groups/communities)
+export interface OrganismRecord {
+  id: string;
+  name: string;
+  description: string;
+  type: 'community' | 'team' | 'club' | 'cooperative' | 'project';
+  location?: {
+    city?: string;
+    area?: string;
+    country?: string;
+    geo?: [number, number];
+  };
+  interests: string[];
+  creatorGhii: string;
+  admins: string[];
+  members: string[];
+  agentGaiis: string[];
+  boardId: string;
+  joinPolicy: 'open' | 'approval_required' | 'invite_only';
+  maxMembers: number;
+  visibility: 'public' | 'listed' | 'private';
+  moderationConfig: {
+    flagsEnabled: boolean;
+    autoHideThreshold: number;
+    appealsEnabled: boolean;
+  };
+  memoryNamespace: string;
+  semantic?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrganismMembershipRecord {
+  id: string;
+  organismId: string;
+  ghii: string;
+  role: 'creator' | 'admin' | 'member';
+  status: 'active' | 'pending' | 'banned';
+  joinedAt: string;
+  invitedBy?: string;
+}
+
+export interface JoinRequestRecord {
+  id: string;
+  organismId: string;
+  ghii: string;
+  message?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+// Phase 2.6 — Marketplace
+export interface ListingRecord {
+  id: string;
+  ownerName: string;        // Seller's owner name
+  sellerGhii: string;       // Seller's GHII
+  title: string;
+  description: string;
+  category: 'palvelut' | 'tuotteet' | 'data' | 'osaaminen' | 'muu';
+  priceMorsels: number;
+  condition?: 'new' | 'used' | 'digital';
+  availability?: 'immediate' | 'on_request' | 'scheduled';
+  location?: { city?: string; area?: string };
+  tags?: string[];
+  images?: string[];
+  status: 'active' | 'sold' | 'expired' | 'hidden' | 'delisted';
+  memoryKey: string;        // marketplace.{owner}.listing.{id}
+  flagCount: number;
+  createdAt: string;
+  updatedAt: string;
+  semantic?: Record<string, unknown>;
+}
+
+export interface PurchaseRecord {
+  id: string;
+  listingId: string;
+  buyerOwner: string;
+  sellerOwner: string;
+  priceMorsels: number;
+  transactionFeeMorsels: number;
+  totalCostMorsels: number;
+  status: 'pending_delivery' | 'delivered' | 'disputed' | 'completed' | 'cancelled';
+  rating?: { score: number; comment?: string };
+  trackingCode: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+// Phase 2.4 — Appeals (Advanced Moderation)
+export interface AppealRecord {
+  id: string;
+  flagId: string;
+  appealedBy: string;       // Content owner's GAII/GHII
+  reason: string;
+  status: 'pending' | 'upheld' | 'overturned';
+  reviewedBy?: string;
+  reviewNote?: string;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+// Phase 3.1 — Push Subscriptions (PWA)
+export interface PushSubscriptionRecord {
+  ownerName: string;
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  createdAt: string;
+  lastUsedAt: string;
+}
+
+// Phase 3.3 — Trusted Issuers
+export interface TrustedIssuerRecord {
+  id: string;
+  name: string;
+  url: string;
+  publicKey: string;
+  type: 'eudiw' | 'ftn' | 'w3c_vc' | 'custom';
+  trusted: boolean;
+  addedBy: string;
+  createdAt: string;
+}
+
+// Phase 3.4 — Genesis Peering (Cross-Federation)
+export interface GenesisPeerRecord {
+  id: string;
+  genesisNodeId: string;
+  genesisUrl: string;
+  publicKey: string;
+  status: 'pending' | 'active' | 'suspended';
+  lastSyncAt: string;
+  catalogueHash: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Phase 3.4 — Organism Reputation
+export interface OrganismReputationRecord {
+  organismId: string;
+  score: number;
+  breakdown: {
+    memberScore: number;
+    activityScore: number;
+    trustScore: number;
+    ageScore: number;
+    flagScore: number;
+  };
+  calculatedAt: string;
 }
 
 export interface Storage {
@@ -432,6 +655,7 @@ export interface Storage {
   getGHII(ghii: string): Promise<GHIIRecord | null>;
   getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null>;
   updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
+  getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null>;
   listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]>;
   deleteGHII(ghii: string): Promise<boolean>;
 
@@ -488,4 +712,97 @@ export interface Storage {
     consentId?: string;
     accessorGaii?: string;
   }): Promise<ConsentAuditEntry[]>;
+
+  // Email Verification (Phase 1.1)
+  createEmailVerification(record: EmailVerificationRecord): Promise<EmailVerificationRecord>;
+  getEmailVerification(id: string): Promise<EmailVerificationRecord | null>;
+  getActiveEmailVerification(ownerName: string, purpose: string): Promise<EmailVerificationRecord | null>;
+  updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null>;
+  deleteExpiredEmailVerifications(): Promise<number>;
+
+  // Email Verification by Owner (Phase 1.6)
+  getEmailVerificationsByOwner?(ownerName: string): Promise<EmailVerificationRecord[]>;
+
+  // Flags (Phase 1.5)
+  createFlag(record: FlagRecord): Promise<FlagRecord>;
+  getFlag(id: string): Promise<FlagRecord | null>;
+  getFlagsByTarget(targetType: string, targetId: string): Promise<FlagRecord[]>;
+  getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<FlagRecord | null>;
+  getFlagSummary(targetType: string, targetId: string): Promise<FlagSummary | null>;
+  updateFlag(id: string, updates: Partial<FlagRecord>): Promise<FlagRecord | null>;
+  listFlags(opts?: { status?: string; targetType?: string; page?: number; perPage?: number }): Promise<FlagRecord[]>;
+
+  // Matches (Phase 2.1)
+  createMatch(record: MatchRecord): Promise<MatchRecord>;
+  getMatch(id: string): Promise<MatchRecord | null>;
+  getMatchByPair(profileA: string, profileB: string): Promise<MatchRecord | null>;
+  listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<MatchRecord[]>;
+  updateMatch(id: string, updates: Partial<MatchRecord>): Promise<MatchRecord | null>;
+  deleteExpiredMatches(): Promise<number>;
+
+  // Organisms (Phase 2.2)
+  createOrganism(record: OrganismRecord): Promise<OrganismRecord>;
+  getOrganism(id: string): Promise<OrganismRecord | null>;
+  listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<OrganismRecord[]>;
+  updateOrganism(id: string, updates: Partial<OrganismRecord>): Promise<OrganismRecord | null>;
+  deleteOrganism(id: string): Promise<boolean>;
+
+  // Memberships (Phase 2.2)
+  createMembership(record: OrganismMembershipRecord): Promise<OrganismMembershipRecord>;
+  getMembership(organismId: string, ghii: string): Promise<OrganismMembershipRecord | null>;
+  listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<OrganismMembershipRecord[]>;
+  listMembershipsByGhii(ghii: string): Promise<OrganismMembershipRecord[]>;
+  updateMembership(id: string, updates: Partial<OrganismMembershipRecord>): Promise<OrganismMembershipRecord | null>;
+  deleteMembership(id: string): Promise<boolean>;
+
+  // Join Requests (Phase 2.2)
+  createJoinRequest(record: JoinRequestRecord): Promise<JoinRequestRecord>;
+  getJoinRequest(id: string): Promise<JoinRequestRecord | null>;
+  listJoinRequests(organismId: string, opts?: { status?: string }): Promise<JoinRequestRecord[]>;
+  updateJoinRequest(id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null>;
+
+  // Appeals (Phase 2.4)
+  createAppeal(record: AppealRecord): Promise<AppealRecord>;
+  getAppeal(id: string): Promise<AppealRecord | null>;
+  getAppealByFlagId(flagId: string): Promise<AppealRecord | null>;
+  listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<AppealRecord[]>;
+  updateAppeal(id: string, updates: Partial<AppealRecord>): Promise<AppealRecord | null>;
+
+  // Push Subscriptions (Phase 3.1)
+  createPushSubscription(record: PushSubscriptionRecord): Promise<PushSubscriptionRecord>;
+  getPushSubscription(ownerName: string): Promise<PushSubscriptionRecord | null>;
+  deletePushSubscription(ownerName: string): Promise<boolean>;
+  listPushSubscriptions(): Promise<PushSubscriptionRecord[]>;
+
+  // Trusted Issuers (Phase 3.3)
+  createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord>;
+  getTrustedIssuer(id: string): Promise<TrustedIssuerRecord | null>;
+  getTrustedIssuerByUrl(url: string): Promise<TrustedIssuerRecord | null>;
+  listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]>;
+  deleteTrustedIssuer(id: string): Promise<boolean>;
+
+  // Genesis Peers (Phase 3.4)
+  createGenesisPeer(record: GenesisPeerRecord): Promise<GenesisPeerRecord>;
+  getGenesisPeer(id: string): Promise<GenesisPeerRecord | null>;
+  getGenesisPeerByNodeId(nodeId: string): Promise<GenesisPeerRecord | null>;
+  listGenesisPeers(opts?: { status?: string }): Promise<GenesisPeerRecord[]>;
+  updateGenesisPeer(id: string, updates: Partial<GenesisPeerRecord>): Promise<GenesisPeerRecord | null>;
+  deleteGenesisPeer(id: string): Promise<boolean>;
+
+  // Organism Reputation (Phase 3.4)
+  setOrganismReputation(record: OrganismReputationRecord): Promise<OrganismReputationRecord>;
+  getOrganismReputation(organismId: string): Promise<OrganismReputationRecord | null>;
+
+  // Marketplace (Phase 2.6)
+  createListing(record: ListingRecord): Promise<ListingRecord>;
+  getListing(id: string): Promise<ListingRecord | null>;
+  listListings(opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<ListingRecord[]>;
+  updateListing(id: string, updates: Partial<ListingRecord>): Promise<ListingRecord | null>;
+  deleteListing(id: string): Promise<boolean>;
+
+  createPurchase(record: PurchaseRecord): Promise<PurchaseRecord>;
+  getPurchase(id: string): Promise<PurchaseRecord | null>;
+  listPurchasesByBuyer(buyerOwner: string): Promise<PurchaseRecord[]>;
+  listPurchasesBySeller(sellerOwner: string): Promise<PurchaseRecord[]>;
+  updatePurchase(id: string, updates: Partial<PurchaseRecord>): Promise<PurchaseRecord | null>;
 }
