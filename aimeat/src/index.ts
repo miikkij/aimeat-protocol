@@ -132,8 +132,13 @@ if (subcommand === 'config') {
     if (db) cfg.db = db;
 
     writeFileSync(outFile, JSON.stringify(cfg, null, 2) + '\n');
-    console.log(`\nConfig written to ${outFile}`);
-    console.log(`Start the node: aimeat --config ${outFile}`);
+    console.log(`\nConfig written to ${outFile}\n`);
+    console.log(`Next steps:`);
+    console.log(`  1. Review the config:   cat ${outFile}`);
+    console.log(`  2. Validate settings:   aimeat validate`);
+    console.log(`  3. Start the node:      aimeat start --config ${outFile}`);
+    console.log('');
+    process.exit(0);
   })();
 } else if (subcommand === 'validate' || subcommand === 'check') {
   const { validateEnv, formatValidationResults } = await import('./utils/env-validator.js');
