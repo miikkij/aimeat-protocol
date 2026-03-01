@@ -27,6 +27,8 @@ aimeat — AI Memory Exchange and Action Transfer protocol node
 USAGE
   aimeat [options]            Start the node
   aimeat init                 Interactive config wizard
+  aimeat validate             Validate .env configuration
+  aimeat check                Alias for validate
   aimeat backup  --out FILE   Export all data to JSON
   aimeat restore --from FILE  Import data from JSON backup
 
@@ -124,6 +126,12 @@ if (subcommand === 'init') {
     console.log(`\nConfig written to ${outFile}`);
     console.log(`Start the node: aimeat --config ${outFile}`);
   })();
+} else if (subcommand === 'validate' || subcommand === 'check') {
+  const { validateEnv, formatValidationResults } = await import('./utils/env-validator.js');
+  const results = validateEnv();
+  console.log(formatValidationResults(results));
+  const hasErrors = results.some(r => r.level === 'error');
+  process.exit(hasErrors ? 1 : 0);
 } else if (subcommand === 'backup') {
   const outArg = positionals[1] ?? 'aimeat-backup.json';
   const { app } = await createServer(config);

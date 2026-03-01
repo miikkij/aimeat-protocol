@@ -1180,4 +1180,23 @@ export class MongoStorage implements Storage {
         }
         return count;
     }
+
+    // ── Maintenance Mode ────────────────────────────────────────
+
+    async getMaintenanceMode(): Promise<import('./interface.js').MaintenanceState> {
+        this.ensureReady();
+        const row = await this.prisma.systemSetting.findUnique({ where: { key: 'maintenance' } });
+        if (!row) return { enabled: false, message: '', enabledAt: null, enabledBy: null };
+        return JSON.parse(row.value) as import('./interface.js').MaintenanceState;
+    }
+
+    async setMaintenanceMode(state: import('./interface.js').MaintenanceState): Promise<import('./interface.js').MaintenanceState> {
+        this.ensureReady();
+        await this.prisma.systemSetting.upsert({
+            where: { key: 'maintenance' },
+            create: { key: 'maintenance', value: JSON.stringify(state) },
+            update: { value: JSON.stringify(state) },
+        });
+        return state;
+    }
 }

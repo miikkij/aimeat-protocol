@@ -4,7 +4,7 @@ import type {
   BoardRecord, BoardPostRecord, OtkRecord,
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
   StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord,
-  GHIIRecord, PersonalNodeRecord, MailboxItemRecord,
+  GHIIRecord, PersonalNodeRecord, MailboxItemRecord, MaintenanceState,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -785,5 +785,18 @@ export class InMemoryStorage implements Storage {
       }
     }
     return count;
+  }
+
+  // ── Maintenance Mode ──
+
+  private maintenanceState: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
+
+  async getMaintenanceMode(): Promise<MaintenanceState> {
+    return this.maintenanceState;
+  }
+
+  async setMaintenanceMode(state: MaintenanceState): Promise<MaintenanceState> {
+    this.maintenanceState = state;
+    return state;
   }
 }

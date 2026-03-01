@@ -230,6 +230,13 @@ export interface MailboxItemRecord {
   createdAt: string;
 }
 
+export interface MaintenanceState {
+  enabled: boolean;
+  message: string;
+  enabledAt: string | null;
+  enabledBy: string | null;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -370,4 +377,8 @@ export interface Storage {
   deleteMailboxItemsByNode(personalNodeId: string): Promise<number>;
   getMailboxStats(personalNodeId: string): Promise<{ count: number; totalBytes: number }>;
   cleanExpiredMailboxItems(): Promise<number>;
+
+  // Maintenance mode
+  getMaintenanceMode(): Promise<MaintenanceState>;
+  setMaintenanceMode(state: MaintenanceState): Promise<MaintenanceState>;
 }

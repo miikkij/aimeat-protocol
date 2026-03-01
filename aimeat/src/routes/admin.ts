@@ -12,7 +12,14 @@ import { validateOwnerName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
 
-export function adminRouter(config: MeatConfig, storage: Storage): Router {
+export function adminRouter(
+    config: MeatConfig,
+    storage: Storage,
+    maintenanceCache?: {
+        get: () => import('../storage/interface.js').MaintenanceState;
+        set: (state: import('../storage/interface.js').MaintenanceState) => void;
+    },
+): Router {
     const router = Router();
 
     // ── Admin Setup Pages (password-protected, no JWT needed) ──
@@ -655,6 +662,30 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
         }));
     });
 
+    // GET /v1/admin/maintenance — get maintenance mode status (operator only)
+    router.get('/v1/admin/maintenance', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const state = maintenanceCache ? maintenanceCache.get() : await storage.getMaintenanceMode();
+        res.json(success(config.nodeId, state));
+    });
+
+    // POST /v1/admin/maintenance — toggle maintenance mode (operator only)
+    router.post('/v1/admin/maintenance', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { enabled, message } = req.body ?? {};
+        if (typeof enabled !== 'boolean') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', '"enabled" (boolean) is required'));
+            return;
+        }
+        const state: import('../storage/interface.js').MaintenanceState = {
+            enabled,
+            message: typeof message === 'string' ? message : '',
+            enabledAt: enabled ? new Date().toISOString() : null,
+            enabledBy: enabled ? (req.auth?.sub ?? null) : null,
+        };
+        await storage.setMaintenanceMode(state);
+        if (maintenanceCache) maintenanceCache.set(state);
+        res.json(success(config.nodeId, state));
+    });
+
     // POST /v1/admin/mint — operator mints morsels for an agent (§16.1)
     router.post('/v1/admin/mint', requireAuth(), requireRole('operator'), async (req, res) => {
         const { gaii, amount } = req.body ?? {};
@@ -806,6 +837,7 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">Work</span><span class="count" id="cntWork">0</span></button>
   <div class="nav-sep"></div>
   <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">Economy</span></button>
+  <button class="nav-item" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">Maintenance</span></button>
   <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">Config</span></button>
 </nav>
 <div class="main">
@@ -847,9 +879,9 @@ function nav(page){
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
   var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','work','','economy','config'];
+  var pages=['overview','owners','agents','actions','boards','work','','economy','maintenance','config'];
   for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'&#x1F4CA; Overview',owners:'&#x1F464; Owners',agents:'&#x1F916; Agents',actions:'&#x26A1; Actions',boards:'&#x1F4CB; Boards',work:'&#x1F4E6; Work Contracts',economy:'&#x1FA99; Economy',config:'&#x2699; Configuration'};
+  var titles={overview:'&#x1F4CA; Overview',owners:'&#x1F464; Owners',agents:'&#x1F916; Agents',actions:'&#x26A1; Actions',boards:'&#x1F4CB; Boards',work:'&#x1F4E6; Work Contracts',economy:'&#x1FA99; Economy',maintenance:'&#x1F6A7; Maintenance',config:'&#x2699; Configuration'};
   document.getElementById('pageTitle').innerHTML=titles[page]||page;
   render();
 }
@@ -872,6 +904,8 @@ async function loadAll(){
       document.getElementById('cntActions').textContent=D.dash.counts.actions;
       document.getElementById('cntBoards').textContent=D.dash.counts.boards;
     }
+    // Load maintenance state
+    try{var mt=await api('/v1/admin/maintenance');D.maintenance=mt.data;}catch(e){D.maintenance=null;}
     // Try work listing (may fail if no agent auth)
     try{var w=await api('/v1/admin/backup');D.workItems=extractWork(w.data);}catch(e){D.workItems=[];}
     // Load owners
@@ -910,6 +944,7 @@ function render(){
     case 'boards':app.innerHTML=renderBoards();break;
     case 'work':app.innerHTML=renderWork();break;
     case 'economy':app.innerHTML=renderEconomy();break;
+    case 'maintenance':app.innerHTML=renderMaintenance();break;
     case 'config':app.innerHTML=renderConfig();break;
     default:app.innerHTML='<div class="empty">Unknown page</div>';
   }
@@ -1068,6 +1103,47 @@ function renderEconomy(){
   o+=er('Max Operator Mint/Day',num(e.max_operator_mint_per_day)+' morsels');
   o+='</div>';
   return o;
+}
+
+/* ── MAINTENANCE ── */
+function renderMaintenance(){
+  var m=D.maintenance||{enabled:false,message:'',enabledAt:null,enabledBy:null};
+  var color=m.enabled?'red':'green';
+  var status=m.enabled?'MAINTENANCE ON':'OPERATIONAL';
+  var o='<div class="card" style="border-left:4px solid var(--'+color+')">';
+  o+='<h2>Maintenance Mode</h2>';
+  o+='<div class="stat" style="color:var(--'+color+');margin-bottom:12px">'+status+'</div>';
+  if(m.enabled){
+    o+='<div style="margin-bottom:12px">';
+    if(m.message)o+=er('Message',esc(m.message));
+    if(m.enabledAt)o+=er('Since',dt(m.enabledAt));
+    if(m.enabledBy)o+=er('By',esc(m.enabledBy));
+    o+='</div>';
+  }
+  o+='<div style="margin-top:16px">';
+  o+='<label style="display:block;color:var(--muted);font-size:.8rem;margin-bottom:4px">Custom Message (optional)</label>';
+  o+='<input type="text" id="maintMsg" value="'+esc(m.message||'')+'" placeholder="e.g. Upgrading to v1.3" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;margin-bottom:12px"/>';
+  if(m.enabled){
+    o+='<button class="refresh" style="background:var(--green);width:100%" onclick="toggleMaintenance(false)">Disable Maintenance Mode</button>';
+  }else{
+    o+='<button class="refresh" style="background:var(--red);width:100%" onclick="toggleMaintenance(true)">Enable Maintenance Mode</button>';
+  }
+  o+='</div>';
+  o+='<p style="color:var(--muted);font-size:.75rem;margin-top:12px">When maintenance mode is on, all non-essential endpoints return 503. Operators, health checks, and admin routes remain accessible.</p>';
+  o+='</div>';
+  return o;
+}
+
+async function toggleMaintenance(on){
+  try{
+    var msg=document.getElementById('maintMsg')?document.getElementById('maintMsg').value:'';
+    var h={'Content-Type':'application/json'};
+    if(TOKEN)h['Authorization']='Bearer '+TOKEN;
+    var r=await fetch('/v1/admin/maintenance',{method:'POST',headers:h,body:JSON.stringify({enabled:on,message:msg})});
+    var data=await r.json();
+    if(data.ok!==false)D.maintenance=data.data;
+    render();
+  }catch(e){alert('Failed: '+e.message)}
 }
 
 /* ── CONFIG ── */

@@ -41,7 +41,7 @@ import { guidesRouter } from './routes/guides.js';
 import { personalRouter } from './routes/personal.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
-import type { Storage } from './storage/interface.js';
+import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
 import { TunnelManager } from './services/personal-tunnel.js';
@@ -105,6 +105,12 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
     logger.info('Using in-memory storage (data will not persist across restarts)');
   }
 
+  // Maintenance mode cache — loaded once from storage, updated on toggle
+  let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
+  try {
+    maintenanceCache = await storage.getMaintenanceMode();
+  } catch { /* default to disabled */ }
+
   // Initialize node keys asynchronously
   initializeNode(config, storage);
 
@@ -144,6 +150,37 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
     // Start mailbox cleanup job (every 10m)
     startMailboxCleanupJob(storage);
   }
+
+  // ── Maintenance mode guard ──
+  // Returns 503 for non-essential paths when maintenance is enabled.
+  // Operators always pass. Essential paths (health, admin, spec, well-known) always pass.
+  app.use((req, res, next) => {
+    if (!maintenanceCache.enabled) { next(); return; }
+
+    // Operators always bypass
+    if (req.auth?.roles?.includes('operator')) { next(); return; }
+
+    // Essential paths always bypass
+    const p = req.path;
+    if (
+      p === '/' ||
+      p === '/v1/health' ||
+      p.startsWith('/v1/admin') ||
+      p.startsWith('/v1/spec') ||
+      p.startsWith('/.well-known') ||
+      p.startsWith('/favicon') ||
+      req.method === 'OPTIONS'
+    ) { next(); return; }
+
+    res.status(503).json({
+      ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+      timestamp: new Date().toISOString(),
+      error: {
+        code: 'MAINTENANCE_MODE',
+        message: maintenanceCache.message || 'This node is temporarily offline for maintenance. Please try again later.',
+      },
+    });
+  });
 
   // ── Node-type guards ──
   // Relay nodes: stateless routers — no agent hosting, memory, work, boards
@@ -232,7 +269,10 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
 
   app.use(boardsRouter(config, storage));
   app.use(promptsRouter(config, storage));
-  app.use(adminRouter(config, storage));
+  app.use(adminRouter(config, storage, {
+    get: () => maintenanceCache,
+    set: (state: MaintenanceState) => { maintenanceCache = state; },
+  }));
   app.use(federationRouter(config, storage, peers));
   app.use(disputesRouter(config, storage));
   app.use(microMemoryRouter(config, storage));
