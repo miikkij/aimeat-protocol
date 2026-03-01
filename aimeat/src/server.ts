@@ -172,13 +172,18 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
       req.method === 'OPTIONS'
     ) { next(); return; }
 
+    const msg = maintenanceCache.message || 'This node is temporarily offline for maintenance.';
+
+    // Serve HTML for browsers, JSON for API clients
+    if (req.accepts(['html', 'json']) === 'html') {
+      res.status(503).type('text/html').send(maintenancePageHtml(config.nodeId, msg));
+      return;
+    }
+
     res.status(503).json({
       ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
       timestamp: new Date().toISOString(),
-      error: {
-        code: 'MAINTENANCE_MODE',
-        message: maintenanceCache.message || 'This node is temporarily offline for maintenance. Please try again later.',
-      },
+      error: { code: 'MAINTENANCE_MODE', message: msg },
     });
   });
 
@@ -635,6 +640,40 @@ function loadPersistedNodeKey(): { publicKey: string; privateKey: string } | nul
   } catch {
     return null;
   }
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function maintenancePageHtml(nodeId: string, message: string): string {
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="refresh" content="30"/>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Maintenance — ${esc(nodeId)}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.box{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:48px 40px;max-width:480px;width:100%;text-align:center}
+.icon{font-size:3rem;margin-bottom:16px}
+h1{font-size:1.4rem;font-weight:700;margin-bottom:8px}
+.msg{color:#94a3b8;font-size:1rem;margin-bottom:24px;line-height:1.5}
+.reason{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 16px;color:#eab308;font-size:.9rem;margin-bottom:24px}
+.node{color:#475569;font-size:.75rem}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#eab308;margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.reload{color:#64748b;font-size:.75rem;margin-top:20px}
+</style></head><body>
+<div class="box">
+<div class="icon">&#x1F6A7;</div>
+<h1><span class="dot"></span>Under Maintenance</h1>
+<p class="msg">This node is temporarily offline. It will be back shortly.</p>
+${message ? `<div class="reason">${esc(message)}</div>` : ''}
+<p class="node">${esc(nodeId)}</p>
+<p class="reload">This page auto-refreshes every 30 seconds.</p>
+</div>
+</body></html>`;
 }
 
 function persistNodeKey(kp: { publicKey: string; privateKey: string }): void {
