@@ -50,7 +50,17 @@ export function bootstrapRouter(config: MeatConfig): Router {
         ghii_directory: { method: 'GET', url: '/v1/ghii/directory', description: 'Search human identity directory', tier: 'core' },
         apps: { method: 'GET', url: '/v1/apps', description: 'Browse downloadable apps', tier: 'core' },
         libs: { method: 'GET', url: '/v1/libs', description: 'JavaScript helper libraries for app development', tier: 'core' },
+        personal_anchor: { method: 'POST', url: '/v1/personal/anchor', description: 'Register a personal node with this operator', tier: 'core' },
+        personal_status: { method: 'GET', url: '/v1/personal/status', description: 'Check personal node status', tier: 'core' },
       },
+      ...(config.personalNodesEnabled ? {
+        personal_nodes: {
+          enabled: true,
+          tunnel_url: config.baseUrl.replace(/^http/, 'ws') + '/v1/personal/tunnel',
+          anchor_endpoint: 'POST /v1/personal/anchor',
+          status_endpoint: 'GET /v1/personal/status',
+        },
+      } : {}),
       tiers: {
         tier_0: { name: 'Browse', description: 'GET only, no auth. Catalogue, boards, profiles, stats.' },
         tier_0_5: { name: 'Keyed Browse', description: 'GET-based writes via one-time keys.' },

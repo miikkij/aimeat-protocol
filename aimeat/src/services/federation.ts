@@ -45,6 +45,15 @@ export async function resolveGaii(
         return { nodeId: config.nodeId, nodeUrl: config.baseUrl, local: true };
     }
 
+    // 2b. Check personal nodes anchored to this operator
+    const personalNodes = await storage.listPersonalNodes();
+    for (const pn of personalNodes) {
+        if (pn.agentGaiis.includes(gaii)) {
+            gaiiCache.set(gaii, { nodeId: pn.nodeId, nodeUrl: config.baseUrl, expiresAt: Date.now() + CACHE_TTL_MS });
+            return { nodeId: pn.nodeId, nodeUrl: config.baseUrl, local: false };
+        }
+    }
+
     // 3. Parse node hint from GAII (agent#owner@node)
     const atIdx = gaii.lastIndexOf('@');
     if (atIdx !== -1) {

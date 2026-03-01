@@ -203,6 +203,33 @@ export interface GHIIRecord {
   updatedAt: string;
 }
 
+export interface PersonalNodeRecord {
+  nodeId: string;               // e.g. "personal-jouni-001"
+  ownerName: string;            // links to OwnerRecord
+  anchorNodeId: string;         // the operator node hosting this personal node
+  publicKey: string;            // Ed25519 public key for tunnel auth
+  status: 'online' | 'offline' | 'degraded' | 'detached';
+  agentGaiis: string[];         // agents hosted on this personal node
+  lastSeen: string;             // ISO timestamp
+  mailboxQuotaBytes: number;    // allocated quota
+  mailboxUsedBytes: number;     // current usage
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MailboxItemRecord {
+  id: string;                   // unique message ID
+  personalNodeId: string;       // target personal node
+  type: 'action_request' | 'work_assignment' | 'board_notification' | 'federation_sync';
+  fromGaii: string;             // sender GAII
+  toGaii: string;               // target GAII on the personal node
+  payload: string;              // encrypted JSON string
+  sizeBytes: number;
+  retentionDays: number;        // 7 for action/work, 3 for board, 7 for federation
+  expiresAt: string;            // ISO timestamp
+  createdAt: string;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -326,4 +353,21 @@ export interface Storage {
   updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
   listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]>;
   deleteGHII(ghii: string): Promise<boolean>;
+
+  // Personal Nodes
+  createPersonalNode(node: PersonalNodeRecord): Promise<PersonalNodeRecord>;
+  getPersonalNode(nodeId: string): Promise<PersonalNodeRecord | null>;
+  getPersonalNodeByOwner(ownerName: string): Promise<PersonalNodeRecord | null>;
+  listPersonalNodes(opts?: { status?: string }): Promise<PersonalNodeRecord[]>;
+  updatePersonalNode(nodeId: string, updates: Partial<PersonalNodeRecord>): Promise<PersonalNodeRecord | null>;
+  deletePersonalNode(nodeId: string): Promise<boolean>;
+
+  // Mailbox (for offline personal nodes)
+  createMailboxItem(item: MailboxItemRecord): Promise<MailboxItemRecord>;
+  getMailboxItem(id: string): Promise<MailboxItemRecord | null>;
+  listMailboxItems(personalNodeId: string, opts?: { type?: string; limit?: number }): Promise<MailboxItemRecord[]>;
+  deleteMailboxItem(id: string): Promise<boolean>;
+  deleteMailboxItemsByNode(personalNodeId: string): Promise<number>;
+  getMailboxStats(personalNodeId: string): Promise<{ count: number; totalBytes: number }>;
+  cleanExpiredMailboxItems(): Promise<number>;
 }

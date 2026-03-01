@@ -38,13 +38,21 @@ import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
 import { aimeatOsRouter } from './routes/aimeat-os.js';
 import { guidesRouter } from './routes/guides.js';
+import { personalRouter } from './routes/personal.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import type { Storage } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
+import { TunnelManager } from './services/personal-tunnel.js';
 
-export async function createServer(config: MeatConfig): Promise<express.Express> {
+export interface ServerResult {
+  app: express.Express;
+  tunnelManager: TunnelManager | null;
+  storage: Storage;
+}
+
+export async function createServer(config: MeatConfig): Promise<ServerResult> {
   const app = express();
 
   // Global middleware
@@ -125,6 +133,17 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
 
   // Start federation heartbeat job (pings peers every 5 minutes)
   startHeartbeatJob(config, peers);
+
+  // Personal Node tunnel manager (operator-side)
+  let tunnelManager: TunnelManager | null = null;
+  if (config.personalNodesEnabled && config.nodeType === 'full') {
+    tunnelManager = new TunnelManager(config, storage);
+    tunnelManager.startHeartbeatMonitor();
+    logger.info('Personal node support enabled', { maxSlots: config.personalNodeMaxSlots });
+
+    // Start mailbox cleanup job (every 10m)
+    startMailboxCleanupJob(storage);
+  }
 
   // ── Node-type guards ──
   // Relay nodes: stateless routers — no agent hosting, memory, work, boards
@@ -230,6 +249,11 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
   app.use(guidesRouter(config));
   app.use(specRouter());
 
+  // Personal node management routes
+  if (config.personalNodesEnabled) {
+    app.use(personalRouter(config, storage, tunnelManager));
+  }
+
   // Global error handler
   app.use((err: Error & { status?: number; type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = err.status ?? 500;
@@ -255,7 +279,7 @@ export async function createServer(config: MeatConfig): Promise<express.Express>
     });
   });
 
-  return app;
+  return { app, tunnelManager, storage };
 }
 
 // Daily allowance: credit all agents every 24 hours (or on first activity)
@@ -465,6 +489,21 @@ function startDisputeTimeoutJob(config: MeatConfig, storage: Storage): void {
 
   setInterval(processDisputes, 3_600_000); // Every hour
   logger.info('Dispute timeout job scheduled (every 1h)');
+}
+
+// Mailbox cleanup: remove expired mailbox items for offline personal nodes
+function startMailboxCleanupJob(storage: Storage): void {
+  const cleanup = async () => {
+    try {
+      const removed = await storage.cleanExpiredMailboxItems();
+      if (removed > 0) logger.info(`Mailbox cleanup: removed ${removed} expired items`);
+    } catch (err) {
+      logger.error('Mailbox cleanup job failed', { error: err });
+    }
+  };
+
+  setInterval(cleanup, 10 * 60_000); // Every 10 minutes
+  logger.info('Mailbox cleanup job scheduled (every 10m)');
 }
 
 /** Set up the anonymous owner + agent for anonymous mode. Normal auth still works alongside. */

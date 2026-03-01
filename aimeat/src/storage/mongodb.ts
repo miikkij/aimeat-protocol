@@ -26,6 +26,8 @@ import type {
     PeeringRequestRecord,
     ChunkedUploadRecord,
     GHIIRecord,
+    PersonalNodeRecord,
+    MailboxItemRecord,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -1024,6 +1026,8 @@ export class MongoStorage implements Storage {
     // ── GHII (in-memory fallback until Prisma schema is updated) ──
 
     private ghiis = new Map<string, GHIIRecord>();
+    private personalNodes = new Map<string, PersonalNodeRecord>();
+    private mailboxItems = new Map<string, MailboxItemRecord>();
 
     async createGHII(record: GHIIRecord): Promise<GHIIRecord> {
         if (this.ghiis.has(record.ghii)) throw new Error('GHII_TAKEN');
@@ -1067,5 +1071,113 @@ export class MongoStorage implements Storage {
 
     async deleteGHII(ghii: string): Promise<boolean> {
         return this.ghiis.delete(ghii);
+    }
+
+    // ── Personal Nodes ──
+
+    async createPersonalNode(node: PersonalNodeRecord): Promise<PersonalNodeRecord> {
+        this.personalNodes.set(node.nodeId, { ...node });
+        return { ...node };
+    }
+
+    async getPersonalNode(nodeId: string): Promise<PersonalNodeRecord | null> {
+        const node = this.personalNodes.get(nodeId);
+        return node ? { ...node } : null;
+    }
+
+    async getPersonalNodeByOwner(ownerName: string): Promise<PersonalNodeRecord | null> {
+        for (const node of this.personalNodes.values()) {
+            if (node.ownerName === ownerName) return { ...node };
+        }
+        return null;
+    }
+
+    async listPersonalNodes(opts?: { status?: string }): Promise<PersonalNodeRecord[]> {
+        let results = [...this.personalNodes.values()];
+        if (opts?.status) {
+            results = results.filter(n => n.status === opts.status);
+        }
+        return results.map(n => ({ ...n }));
+    }
+
+    async updatePersonalNode(nodeId: string, updates: Partial<PersonalNodeRecord>): Promise<PersonalNodeRecord | null> {
+        const node = this.personalNodes.get(nodeId);
+        if (!node) return null;
+        Object.assign(node, updates, { updatedAt: new Date().toISOString() });
+        return { ...node };
+    }
+
+    async deletePersonalNode(nodeId: string): Promise<boolean> {
+        return this.personalNodes.delete(nodeId);
+    }
+
+    // ── Mailbox ──
+
+    async createMailboxItem(item: MailboxItemRecord): Promise<MailboxItemRecord> {
+        this.mailboxItems.set(item.id, { ...item });
+        const node = this.personalNodes.get(item.personalNodeId);
+        if (node) node.mailboxUsedBytes += item.sizeBytes;
+        return { ...item };
+    }
+
+    async getMailboxItem(id: string): Promise<MailboxItemRecord | null> {
+        const item = this.mailboxItems.get(id);
+        return item ? { ...item } : null;
+    }
+
+    async listMailboxItems(personalNodeId: string, opts?: { type?: string; limit?: number }): Promise<MailboxItemRecord[]> {
+        let results = [...this.mailboxItems.values()]
+            .filter(i => i.personalNodeId === personalNodeId)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        if (opts?.type) results = results.filter(i => i.type === opts.type);
+        if (opts?.limit) results = results.slice(0, opts.limit);
+        return results.map(i => ({ ...i }));
+    }
+
+    async deleteMailboxItem(id: string): Promise<boolean> {
+        const item = this.mailboxItems.get(id);
+        if (!item) return false;
+        const node = this.personalNodes.get(item.personalNodeId);
+        if (node) node.mailboxUsedBytes = Math.max(0, node.mailboxUsedBytes - item.sizeBytes);
+        return this.mailboxItems.delete(id);
+    }
+
+    async deleteMailboxItemsByNode(personalNodeId: string): Promise<number> {
+        let count = 0;
+        for (const [id, item] of this.mailboxItems) {
+            if (item.personalNodeId === personalNodeId) {
+                this.mailboxItems.delete(id);
+                count++;
+            }
+        }
+        const node = this.personalNodes.get(personalNodeId);
+        if (node) node.mailboxUsedBytes = 0;
+        return count;
+    }
+
+    async getMailboxStats(personalNodeId: string): Promise<{ count: number; totalBytes: number }> {
+        let count = 0;
+        let totalBytes = 0;
+        for (const item of this.mailboxItems.values()) {
+            if (item.personalNodeId === personalNodeId) {
+                count++;
+                totalBytes += item.sizeBytes;
+            }
+        }
+        return { count, totalBytes };
+    }
+
+    async cleanExpiredMailboxItems(): Promise<number> {
+        const now = Date.now();
+        let count = 0;
+        for (const [id, item] of this.mailboxItems) {
+            if (new Date(item.expiresAt).getTime() < now) {
+                const node = this.personalNodes.get(item.personalNodeId);
+                if (node) node.mailboxUsedBytes = Math.max(0, node.mailboxUsedBytes - item.sizeBytes);
+                this.mailboxItems.delete(id);
+                count++;
+            }
+        }
+        return count;
     }
 }

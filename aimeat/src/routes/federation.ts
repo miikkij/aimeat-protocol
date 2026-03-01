@@ -14,13 +14,37 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
     const router = Router();
 
     // GET /v1/federation/directory — public peer directory (Tier 0)
-    router.get('/v1/federation/directory', (_req, res) => {
+    router.get('/v1/federation/directory', async (_req, res) => {
         const peerList = [...peers.values()].map(p => ({
             node_id: p.nodeId,
             url: p.url,
             status: p.status,
             last_seen: p.lastSeen,
         }));
+
+        // Include personal nodes in the directory
+        let personalNodesList: {
+            node_id: string;
+            type: string;
+            anchor_operator: string;
+            status: string;
+            last_seen: string;
+            agent_count: number;
+            note: string;
+        }[] = [];
+
+        if (config.personalNodesEnabled) {
+            const personalNodes = await storage.listPersonalNodes();
+            personalNodesList = personalNodes.map(pn => ({
+                node_id: pn.nodeId,
+                type: 'personal',
+                anchor_operator: pn.anchorNodeId,
+                status: pn.status,
+                last_seen: pn.lastSeen,
+                agent_count: pn.agentGaiis.length,
+                note: 'Personal node. Availability not guaranteed. Use async patterns.',
+            }));
+        }
 
         res.json(success(config.nodeId, {
             self: {
@@ -29,6 +53,7 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
             },
             peers: peerList,
             total: peerList.length,
+            ...(personalNodesList.length > 0 ? { personal_nodes: personalNodesList } : {}),
         }, [
             { description: 'Request peering', method: 'POST', url: '/v1/federation/peer/request' },
         ]));

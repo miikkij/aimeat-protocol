@@ -13,6 +13,7 @@ export function wellknownRouter(config: MeatConfig, storage: Storage): Router {
       full: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
       relay: ['federation', 'routing'],
       mirror: ['memory', 'actions', 'catalogue', 'federation'],
+      personal: ['memory', 'actions', 'work', 'wallet'],
     };
 
     res.json(success(config.nodeId, {

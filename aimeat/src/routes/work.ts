@@ -107,7 +107,13 @@ async function createWorkItem(
 
   // Resolve provider location — local or remote?
   const resolved = await resolveGaii(provider_gaii, config, storage, peers);
-  if (resolved && !resolved.local) {
+
+  // Check if the resolved GAII is on a personal node anchored to this operator
+  let personalNodeTarget: string | null = null;
+  if (resolved && !resolved.local && resolved.nodeUrl === config.baseUrl) {
+    // This is a personal node agent — treat as local work, notify via tunnel/mailbox later
+    personalNodeTarget = resolved.nodeId;
+  } else if (resolved && !resolved.local) {
     // Charge 1 morsel cross-node routing fee (§15)
     const requester = await storage.getAgent(requesterGaii);
     if (!requester || requester.morselBalance < 1) {
@@ -192,7 +198,27 @@ async function createWorkItem(
     updatedAt: now.toISOString(),
   });
 
-  return { work };
+  // If the provider is on a personal node, queue a notification
+  if (personalNodeTarget) {
+    const { MailboxService } = await import('../services/mailbox.js');
+    const mailboxService = new MailboxService(config, storage);
+    await mailboxService.enqueue(personalNodeTarget, {
+      personalNodeId: personalNodeTarget,
+      type: 'work_assignment',
+      fromGaii: requesterGaii,
+      toGaii: provider_gaii,
+      payload: JSON.stringify({
+        event: 'work.assigned',
+        tracking_code: trackingCode,
+        action_id,
+        input,
+      }),
+      sizeBytes: 0,
+      retentionDays: 7,
+    }).catch(err => logger.warn('Failed to queue work notification for personal node', { nodeId: personalNodeTarget, error: String(err) }));
+  }
+
+  return { work, personalNodeTarget };
 }
 
 export function workRouter(config: MeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {

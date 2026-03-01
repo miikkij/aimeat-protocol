@@ -335,6 +335,24 @@ export function adminRouter(config: MeatConfig, storage: Storage): Router {
                 jwt_ttl_seconds: config.jwtTtlSeconds,
                 keyed_browse_enabled: config.keyedBrowseEnabled,
             },
+            ...(config.personalNodesEnabled ? await (async () => {
+                const personalNodes = await storage.listPersonalNodes();
+                let mailboxTotalBytes = 0;
+                const statusCounts = { online: 0, offline: 0, degraded: 0, detached: 0 };
+                for (const pn of personalNodes) {
+                    statusCounts[pn.status] = (statusCounts[pn.status] ?? 0) + 1;
+                    const stats = await storage.getMailboxStats(pn.nodeId);
+                    mailboxTotalBytes += stats.totalBytes;
+                }
+                return {
+                    personal_nodes: {
+                        total: personalNodes.length,
+                        max_slots: config.personalNodeMaxSlots,
+                        ...statusCounts,
+                        mailbox_total_bytes: mailboxTotalBytes,
+                    },
+                };
+            })() : {}),
         }, [
             { description: 'View all agents', method: 'GET', url: '/v1/agents' },
             { description: 'Update config', method: 'PUT', url: '/v1/admin/config' },

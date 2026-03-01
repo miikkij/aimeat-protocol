@@ -35,7 +35,7 @@ export interface RateLimitsConfig {
   roleMultipliers: RoleMultipliers;
 }
 
-export type NodeType = 'full' | 'relay' | 'mirror';
+export type NodeType = 'full' | 'relay' | 'mirror' | 'personal';
 
 export interface MeatConfig {
   port: number;
@@ -72,12 +72,20 @@ export interface MeatConfig {
   indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
+
+  // Personal Node support (operator-side)
+  personalNodesEnabled: boolean;
+  personalNodeMaxSlots: number;
+  personalNodeMailboxQuotaMb: number;
+  personalNodeMailboxRetentionDays: number;
+  personalNodeHeartbeatIntervalMs: number;
+  personalNodeOfflineThresholdMs: number;
 }
 
 export function loadConfig(): MeatConfig {
   const nodeType = (process.env.MEAT_NODE_TYPE ?? 'full') as NodeType;
-  if (!['full', 'relay', 'mirror'].includes(nodeType)) {
-    throw new Error(`Invalid MEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', or 'mirror'.`);
+  if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
+    throw new Error(`Invalid MEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
   }
 
   const port = parseInt(process.env.MEAT_PORT ?? '40050', 10);
@@ -128,6 +136,12 @@ export function loadConfig(): MeatConfig {
       pre_board_post: [],
       pre_federation_peer: [],
     },
+    personalNodesEnabled: process.env.MEAT_PERSONAL_NODES_ENABLED !== 'false',
+    personalNodeMaxSlots: parseInt(process.env.MEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
+    personalNodeMailboxQuotaMb: parseInt(process.env.MEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),
+    personalNodeMailboxRetentionDays: parseInt(process.env.MEAT_PERSONAL_MAILBOX_RETENTION_DAYS ?? '7', 10),
+    personalNodeHeartbeatIntervalMs: parseInt(process.env.MEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
+    personalNodeOfflineThresholdMs: parseInt(process.env.MEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.MEAT_RL_AUTH ?? '20', 10) },

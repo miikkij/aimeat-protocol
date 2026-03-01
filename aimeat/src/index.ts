@@ -126,7 +126,7 @@ if (subcommand === 'init') {
   })();
 } else if (subcommand === 'backup') {
   const outArg = positionals[1] ?? 'aimeat-backup.json';
-  const app = await createServer(config);
+  const { app } = await createServer(config);
   // Start server temporarily to access storage
   const server = app.listen(0, async () => {
     try {
@@ -152,7 +152,7 @@ if (subcommand === 'init') {
     console.error('Usage: aimeat restore <file.json>');
     process.exit(1);
   }
-  const app = await createServer(config);
+  const { app } = await createServer(config);
   const server = app.listen(0, async () => {
     try {
       const addr = server.address();
@@ -184,15 +184,15 @@ if (subcommand === 'init') {
   if (!config.adminPassword) {
     config.adminPassword = randomBytes(16).toString('base64url');
   }
-  const app = await createServer(config);
-  app.listen(config.port, () => {
+  const { app, tunnelManager, storage } = await createServer(config);
+  const server = app.listen(config.port, () => {
     logger.info(`❤️ AIMEAT node started`, {
       nodeId: config.nodeId,
       port: config.port,
       storage: config.dbUrl ? 'mongodb' : 'in-memory',
     });
     logger.info(`   GET ${config.baseUrl}/`);
-    logger.info(`   Protocol: AIMEAT v1.2 | License: MIT`);
+    logger.info(`   Protocol: AIMEAT v1.3 | License: MIT`);
     if (config.devMode) {
       logger.info(`   ⚠ DEV MODE: OTK validation bypassed on micro-memory`);
     }
@@ -201,6 +201,9 @@ if (subcommand === 'init') {
       logger.info(`   Anonymous prompt: ${config.baseUrl}/v1/prompts/anonymous`);
       logger.info(`   Share with others: ${config.baseUrl}/v1/prompts/anonymous/share?format=text`);
     }
+    if (tunnelManager) {
+      logger.info(`   🔌 Personal Node tunnel: ws://localhost:${config.port}/v1/personal/tunnel`);
+    }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup?pw=${config.adminPassword}`);
     if (!process.env.MEAT_ADMIN_PASSWORD) {
@@ -208,4 +211,59 @@ if (subcommand === 'init') {
     }
     logger.info(`──────────────────────────────────────────────────────────`);
   });
+
+  // WebSocket upgrade handling for personal node tunnels
+  if (tunnelManager) {
+    const { WebSocketServer } = await import('ws');
+    const { verifyJWT } = await import('./auth/jwt.js');
+    const wss = new WebSocketServer({ noServer: true });
+
+    server.on('upgrade', async (request, socket, head) => {
+      const url = new URL(request.url ?? '', `http://${request.headers.host}`);
+      if (url.pathname !== '/v1/personal/tunnel') {
+        socket.destroy();
+        return;
+      }
+
+      // Authenticate: JWT from Authorization header or ?token= query param
+      const authHeader = request.headers.authorization;
+      const tokenParam = url.searchParams.get('token');
+      const token = authHeader?.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : tokenParam;
+
+      if (!token) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      try {
+        const payload = await verifyJWT(token);
+        if (!payload || !payload.sub) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        // Extract owner name and look up their personal node
+        const ownerName = (payload.owner as string) ?? '';
+        const personalNode = await storage.getPersonalNodeByOwner(ownerName);
+        if (!personalNode) {
+          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          tunnelManager.handleConnection(ws, personalNode.nodeId, ownerName, personalNode.agentGaiis);
+        });
+      } catch {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+      }
+    });
+
+    logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
+  }
 }

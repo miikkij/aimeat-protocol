@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+// ── Personal Nodes ──────────────────────────────────────────
+
+export const AnchorRequestSchema = z.object({
+    node_id: z.string().min(3).max(80).regex(/^personal-[a-z0-9][a-z0-9-]*[a-z0-9]$/),
+    owner_name: z.string().min(3).max(64),
+    public_key: z.string().min(10),
+    agent_gaiis: z.array(z.string()).optional(),
+});
+
 // ── Identity ────────────────────────────────────────────────
 
 export const OwnerRegistrationSchema = z.object({
