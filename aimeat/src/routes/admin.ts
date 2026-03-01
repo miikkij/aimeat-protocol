@@ -1246,7 +1246,7 @@ button:hover{background:#2563eb}
 <input type="password" id="pw" placeholder="Admin password" autofocus/>
 <button type="submit">Continue</button>
 </form>
-<p class="hint">Password is printed when the server starts, or set via MEAT_ADMIN_PASSWORD</p>
+<p class="hint">Password is printed when the server starts, or set via AIMEAT_ADMIN_PASSWORD</p>
 </div>
 <script>
 function go(e){e.preventDefault();var pw=document.getElementById('pw').value;if(pw)location.href='/v1/admin/setup?pw='+encodeURIComponent(pw);}

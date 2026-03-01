@@ -677,7 +677,7 @@ GET /v1/mm?otk={key}&op=config&set=tasks&access=private
 
 **Anonymous mode visibility enforcement:**
 
-When `MEAT_ANONYMOUS=true`, micro-memory `list` operations enforce visibility rules even though all anonymous requests share one identity:
+When `AIMEAT_ANONYMOUS=true`, micro-memory `list` operations enforce visibility rules even though all anonymous requests share one identity:
 
 | Visibility | Anonymous (no code) | Anonymous (with `access_code`) | Authenticated (OTK) |
 |---|---|---|---|
@@ -790,7 +790,7 @@ Authorization: Bearer <jwt>
 
 #### 5.7.4.2 Dev Mode — OTK Bypass for Local Development
 
-For home/development use, operators can enable **Dev Mode** (`MEAT_DEV_MODE=true`) which bypasses OTK validation on micro-memory endpoints. This allows basic AI integrations (e.g., simple LLMs without HTTP tooling) to write to micro-memory without managing OTKs.
+For home/development use, operators can enable **Dev Mode** (`AIMEAT_DEV_MODE=true`) which bypasses OTK validation on micro-memory endpoints. This allows basic AI integrations (e.g., simple LLMs without HTTP tooling) to write to micro-memory without managing OTKs.
 
 **Behavior when Dev Mode is enabled:**
 
@@ -802,14 +802,14 @@ For home/development use, operators can enable **Dev Mode** (`MEAT_DEV_MODE=true
 **Configuration:**
 
 ```bash
-MEAT_DEV_MODE=true   # Enable dev mode (default: false)
+AIMEAT_DEV_MODE=true   # Enable dev mode (default: false)
 ```
 
 **IMPORTANT:** Dev Mode is intended for local development and testing only. Never enable it on production or public-facing nodes. It effectively removes write authentication from micro-memory.
 
 #### 5.7.4.2.1 Anonymous Node Mode — Zero-Config Shared Memory
 
-For the fastest possible deployment, operators can enable **Anonymous Node Mode** (`MEAT_ANONYMOUS=true`). This removes all authentication requirements — any AI agent can read and write memory directly without registration, OTKs, or JWTs. All agents share one memory space under a single anonymous identity.
+For the fastest possible deployment, operators can enable **Anonymous Node Mode** (`AIMEAT_ANONYMOUS=true`). This removes all authentication requirements — any AI agent can read and write memory directly without registration, OTKs, or JWTs. All agents share one memory space under a single anonymous identity.
 
 Anonymous mode runs **alongside** normal authenticated mode on the same server. Authenticated endpoints continue to work as before; anonymous mode simply provides an unauthenticated fallback for requests without credentials.
 
@@ -827,7 +827,7 @@ Anonymous mode runs **alongside** normal authenticated mode on the same server. 
 **Configuration:**
 
 ```bash
-MEAT_ANONYMOUS=true   # Enable anonymous mode (default: false)
+AIMEAT_ANONYMOUS=true   # Enable anonymous mode (default: false)
 ```
 
 **Use cases:**
@@ -905,7 +905,7 @@ The anonymous prompt also tells agents what Tier 1+ authentication unlocks (acti
 
 **Timestamps and versioning** — All memory entries (both full memory and micro-memory) include `created_at` and `updated_at` timestamps plus `version` numbers, enabling AIs to track changes and detect conflicts even in a shared space.
 
-**Co-existence with normal mode** — A single AIMEAT node can have `MEAT_ANONYMOUS=true` along with registered owners and agents. Anonymous requests use the shared identity; authenticated requests use their own identity. This allows gradual migration from anonymous to authenticated as needs grow.
+**Co-existence with normal mode** — A single AIMEAT node can have `AIMEAT_ANONYMOUS=true` along with registered owners and agents. Anonymous requests use the shared identity; authenticated requests use their own identity. This allows gradual migration from anonymous to authenticated as needs grow.
 
 **Privacy in anonymous mode:** While all anonymous requests share one identity, micro-memory visibility rules are enforced. Sets marked `private` are hidden from anonymous (unauthenticated) access — entries are not returned and the set is excluded from listings. Sets using `shared_read` or `shared_write` require a valid `access_code` to view entries. Only `public_read` and `public_write` sets are fully visible to anonymous users. This allows safe use of anonymous mode with sensitive micro-memory sets.
 

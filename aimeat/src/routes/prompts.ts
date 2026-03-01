@@ -325,7 +325,7 @@ No setup, no auth, no keys needed. Just paste the link.
 
 When another AI joins, they should follow the same boot sequence above.
 Check "agents/roster" periodically to see who's active.`
-          : `Anonymous mode is not enabled on this node. Set MEAT_ANONYMOUS=true to enable it. Normal authenticated operations still work.`;
+          : `Anonymous mode is not enabled on this node. Set AIMEAT_ANONYMOUS=true to enable it. Normal authenticated operations still work.`;
 
         res.json(success(config.nodeId, {
           tier: 'anonymous',

@@ -29,7 +29,7 @@ A single command starts a fully functional MEAT node that any AI agent can conne
 
 ### 1. Dual-Mode Database
 - **Default (no config):** In-memory storage using Map/object stores. Data lost on restart. Perfect for dev/home/IoT.
-- **Production (env: `MEAT_DB_URL`):** MongoDB via Prisma. Persistent. For real deployments.
+- **Production (env: `AIMEAT_DB_URL`):** MongoDB via Prisma. Persistent. For real deployments.
 - Abstract behind a storage interface so both modes share the same API internally.
 
 ### 2. Project Structure
@@ -137,9 +137,9 @@ aimeat restore --from backup.json         # import data
 For development, create `.env`:
 ```properties
 DATABASE_URL="mongodb://dbuser:dbpassword@localhost:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin"
-MEAT_NODE_ID="meat-finland-001-genesis"
-MEAT_PORT=40050
-MEAT_ADMIN_PASSWORD=TestAdminPw123!
+AIMEAT_NODE_ID="meat-finland-001-genesis"
+AIMEAT_PORT=40050
+AIMEAT_ADMIN_PASSWORD=TestAdminPw123!
 ```
 
 Default port: **40050** (MEAT on a phone keypad: M=6, E=3, A=2, T=8 → but let's use 40050 as the AIMEAT port).

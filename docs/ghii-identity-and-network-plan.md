@@ -869,13 +869,13 @@ Uses in-memory storage by default (data lost on restart). Good for trying things
 # Pull and run
 docker run -d --name aimeat \
   -p 40050:40050 \
-  -e MEAT_ADMIN_PASSWORD=your-secret \
+  -e AIMEAT_ADMIN_PASSWORD=your-secret \
   aimeat/aimeat:latest
 
 # Or with persistent data (MongoDB)
 docker run -d --name aimeat \
   -p 40050:40050 \
-  -e MEAT_ADMIN_PASSWORD=your-secret \
+  -e AIMEAT_ADMIN_PASSWORD=your-secret \
   -e DATABASE_URL=mongodb://user:pass@host:27017/aimeat \
   aimeat/aimeat:latest
 ```

@@ -35,12 +35,12 @@ Add `'personal'` to `NodeType` union (for when a node identifies itself as perso
 **Changes to `MeatConfig`:**
 ```typescript
 // New fields:
-personalNodesEnabled: boolean;      // MEAT_PERSONAL_NODES_ENABLED (default: true)
-personalNodeMaxSlots: number;       // MEAT_PERSONAL_NODE_MAX_SLOTS (default: 100)
-personalNodeMailboxQuotaMb: number; // MEAT_PERSONAL_MAILBOX_QUOTA_MB (default: 50)
-personalNodeMailboxRetentionDays: number; // MEAT_PERSONAL_MAILBOX_RETENTION_DAYS (default: 7)
-personalNodeHeartbeatIntervalMs: number; // MEAT_PERSONAL_HEARTBEAT_MS (default: 30000)
-personalNodeOfflineThresholdMs: number;  // MEAT_PERSONAL_OFFLINE_MS (default: 300000 = 5min)
+personalNodesEnabled: boolean;      // AIMEAT_PERSONAL_NODES_ENABLED (default: true)
+personalNodeMaxSlots: number;       // AIMEAT_PERSONAL_NODE_MAX_SLOTS (default: 100)
+personalNodeMailboxQuotaMb: number; // AIMEAT_PERSONAL_MAILBOX_QUOTA_MB (default: 50)
+personalNodeMailboxRetentionDays: number; // AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS (default: 7)
+personalNodeHeartbeatIntervalMs: number; // AIMEAT_PERSONAL_HEARTBEAT_MS (default: 30000)
+personalNodeOfflineThresholdMs: number;  // AIMEAT_PERSONAL_OFFLINE_MS (default: 300000 = 5min)
 ```
 
 **Changes to `NodeType`:**

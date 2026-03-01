@@ -35,14 +35,14 @@ services:
     ports:
       - "${E2E_PORT:-3200}:3200"
     environment:
-      MEAT_PORT: 3200
-      MEAT_NODE_ID: meat-e2e-001-test
-      MEAT_ADMIN_PASSWORD: e2e-test-password
-      MEAT_WELCOME_BONUS: 100
-      MEAT_DAILY_ALLOWANCE: 50
-      MEAT_BURN_RATE: "0.10"
-      MEAT_RATE_LIMIT_MAX: 1000        # High limit for testing
-      MEAT_RATE_LIMIT_WINDOW_MS: 60000
+      AIMEAT_PORT: 3200
+      AIMEAT_NODE_ID: meat-e2e-001-test
+      AIMEAT_ADMIN_PASSWORD: e2e-test-password
+      AIMEAT_WELCOME_BONUS: 100
+      AIMEAT_DAILY_ALLOWANCE: 50
+      AIMEAT_BURN_RATE: "0.10"
+      AIMEAT_RATE_LIMIT_MAX: 1000        # High limit for testing
+      AIMEAT_RATE_LIMIT_WINDOW_MS: 60000
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3200/.well-known/aimeat"]
       interval: 2s
@@ -124,14 +124,14 @@ services:
     build: ../..
     ports: ["3200:3200"]
     environment:
-      MEAT_PORT: 3200
-      MEAT_NODE_ID: meat-e2e-node-a
+      AIMEAT_PORT: 3200
+      AIMEAT_NODE_ID: meat-e2e-node-a
   node-b:
     build: ../..
     ports: ["3201:3201"]
     environment:
-      MEAT_PORT: 3201
-      MEAT_NODE_ID: meat-e2e-node-b
+      AIMEAT_PORT: 3201
+      AIMEAT_NODE_ID: meat-e2e-node-b
 ```
 
 ## Migration Plan

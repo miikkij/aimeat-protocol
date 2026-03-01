@@ -20,49 +20,49 @@ export function validateEnv(): ValidationResult[] {
   const env = process.env;
 
   // ── Port ──
-  const portRaw = env.MEAT_PORT;
+  const portRaw = env.AIMEAT_PORT;
   if (portRaw !== undefined) {
     const port = parseInt(portRaw, 10);
     if (isNaN(port) || port < 1 || port > 65535) {
-      results.push({ level: 'error', variable: 'MEAT_PORT', message: `Invalid port "${portRaw}". Must be 1-65535.` });
+      results.push({ level: 'error', variable: 'AIMEAT_PORT', message: `Invalid port "${portRaw}". Must be 1-65535.` });
     } else if (port < 1024) {
-      results.push({ level: 'warning', variable: 'MEAT_PORT', message: `Privileged port ${port} requires root/admin privileges.` });
+      results.push({ level: 'warning', variable: 'AIMEAT_PORT', message: `Privileged port ${port} requires root/admin privileges.` });
     }
   } else {
-    results.push({ level: 'info', variable: 'MEAT_PORT', message: 'Not set. Default: 40050' });
+    results.push({ level: 'info', variable: 'AIMEAT_PORT', message: 'Not set. Default: 40050' });
   }
 
   // ── Node ID ──
-  const nodeId = env.MEAT_NODE_ID;
+  const nodeId = env.AIMEAT_NODE_ID;
   if (nodeId) {
     if (nodeId === 'meat-local-001-dev') {
-      results.push({ level: 'warning', variable: 'MEAT_NODE_ID', message: 'Using default node ID. Set a unique ID for production.' });
+      results.push({ level: 'warning', variable: 'AIMEAT_NODE_ID', message: 'Using default node ID. Set a unique ID for production.' });
     }
   } else {
-    results.push({ level: 'info', variable: 'MEAT_NODE_ID', message: 'Not set. Default: meat-local-001-dev' });
+    results.push({ level: 'info', variable: 'AIMEAT_NODE_ID', message: 'Not set. Default: meat-local-001-dev' });
   }
 
   // ── Node Type ──
-  const nodeType = env.MEAT_NODE_TYPE;
+  const nodeType = env.AIMEAT_NODE_TYPE;
   if (nodeType !== undefined && !['full', 'relay', 'mirror'].includes(nodeType)) {
-    results.push({ level: 'error', variable: 'MEAT_NODE_TYPE', message: `Invalid node type "${nodeType}". Must be "full", "relay", or "mirror".` });
+    results.push({ level: 'error', variable: 'AIMEAT_NODE_TYPE', message: `Invalid node type "${nodeType}". Must be "full", "relay", or "mirror".` });
   } else if (!nodeType) {
-    results.push({ level: 'info', variable: 'MEAT_NODE_TYPE', message: 'Not set. Default: full' });
+    results.push({ level: 'info', variable: 'AIMEAT_NODE_TYPE', message: 'Not set. Default: full' });
   }
 
   // ── Base URL ──
-  const baseUrl = env.MEAT_BASE_URL;
+  const baseUrl = env.AIMEAT_BASE_URL;
   if (baseUrl) {
     try {
       const u = new URL(baseUrl);
       if (u.protocol === 'http:' && !['localhost', '127.0.0.1', '::1'].includes(u.hostname)) {
-        results.push({ level: 'warning', variable: 'MEAT_BASE_URL', message: 'HTTP on a public address. Use HTTPS in production.' });
+        results.push({ level: 'warning', variable: 'AIMEAT_BASE_URL', message: 'HTTP on a public address. Use HTTPS in production.' });
       }
     } catch {
-      results.push({ level: 'error', variable: 'MEAT_BASE_URL', message: `Invalid URL format: "${baseUrl}"` });
+      results.push({ level: 'error', variable: 'AIMEAT_BASE_URL', message: `Invalid URL format: "${baseUrl}"` });
     }
   } else {
-    results.push({ level: 'info', variable: 'MEAT_BASE_URL', message: 'Not set. Default: http://localhost:<port>' });
+    results.push({ level: 'info', variable: 'AIMEAT_BASE_URL', message: 'Not set. Default: http://localhost:<port>' });
   }
 
   // ── Database URL ──
@@ -78,27 +78,27 @@ export function validateEnv(): ValidationResult[] {
   }
 
   // ── Admin Password ──
-  const adminPw = env.MEAT_ADMIN_PASSWORD;
+  const adminPw = env.AIMEAT_ADMIN_PASSWORD;
   if (adminPw) {
     if (adminPw.length < 8) {
-      results.push({ level: 'warning', variable: 'MEAT_ADMIN_PASSWORD', message: `Short password (${adminPw.length} chars). Minimum 8 recommended.` });
+      results.push({ level: 'warning', variable: 'AIMEAT_ADMIN_PASSWORD', message: `Short password (${adminPw.length} chars). Minimum 8 recommended.` });
     }
     if (WEAK_PASSWORDS.includes(adminPw.toLowerCase())) {
-      results.push({ level: 'warning', variable: 'MEAT_ADMIN_PASSWORD', message: 'Insecure password detected. Use a strong, unique password.' });
+      results.push({ level: 'warning', variable: 'AIMEAT_ADMIN_PASSWORD', message: 'Insecure password detected. Use a strong, unique password.' });
     }
   } else {
-    results.push({ level: 'info', variable: 'MEAT_ADMIN_PASSWORD', message: 'Not set. A random password will be generated at startup.' });
+    results.push({ level: 'info', variable: 'AIMEAT_ADMIN_PASSWORD', message: 'Not set. A random password will be generated at startup.' });
   }
 
   // ── Numeric fields ──
   const numericFields: Array<{ key: string; name: string; defaultVal: string; min?: number; max?: number }> = [
-    { key: 'MEAT_JWT_TTL', name: 'JWT TTL', defaultVal: '3600', min: 60 },
-    { key: 'MEAT_WELCOME_BONUS', name: 'Welcome Bonus', defaultVal: '100', min: 0 },
-    { key: 'MEAT_DAILY_ALLOWANCE', name: 'Daily Allowance', defaultVal: '50', min: 0 },
-    { key: 'MEAT_DAILY_ALLOWANCE_CAP', name: 'Daily Allowance Cap', defaultVal: '500', min: 0 },
-    { key: 'MEAT_MAX_RELAY_HOPS', name: 'Max Relay Hops', defaultVal: '3', min: 1, max: 10 },
-    { key: 'MEAT_MEMORY_QUOTA_MB', name: 'Memory Quota MB', defaultVal: '10', min: 1 },
-    { key: 'MEAT_STORAGE_QUOTA_MB', name: 'Storage Quota MB', defaultVal: '100', min: 1 },
+    { key: 'AIMEAT_JWT_TTL', name: 'JWT TTL', defaultVal: '3600', min: 60 },
+    { key: 'AIMEAT_WELCOME_BONUS', name: 'Welcome Bonus', defaultVal: '100', min: 0 },
+    { key: 'AIMEAT_DAILY_ALLOWANCE', name: 'Daily Allowance', defaultVal: '50', min: 0 },
+    { key: 'AIMEAT_DAILY_ALLOWANCE_CAP', name: 'Daily Allowance Cap', defaultVal: '500', min: 0 },
+    { key: 'AIMEAT_MAX_RELAY_HOPS', name: 'Max Relay Hops', defaultVal: '3', min: 1, max: 10 },
+    { key: 'AIMEAT_MEMORY_QUOTA_MB', name: 'Memory Quota MB', defaultVal: '10', min: 1 },
+    { key: 'AIMEAT_STORAGE_QUOTA_MB', name: 'Storage Quota MB', defaultVal: '100', min: 1 },
   ];
 
   for (const field of numericFields) {
@@ -121,16 +121,16 @@ export function validateEnv(): ValidationResult[] {
   }
 
   // ── Burn Rate ──
-  const burnRateRaw = env.MEAT_BURN_RATE;
+  const burnRateRaw = env.AIMEAT_BURN_RATE;
   if (burnRateRaw !== undefined) {
     const br = parseFloat(burnRateRaw);
     if (isNaN(br)) {
-      results.push({ level: 'error', variable: 'MEAT_BURN_RATE', message: `Non-numeric value "${burnRateRaw}".` });
+      results.push({ level: 'error', variable: 'AIMEAT_BURN_RATE', message: `Non-numeric value "${burnRateRaw}".` });
     } else if (br < 0 || br > 1) {
-      results.push({ level: 'error', variable: 'MEAT_BURN_RATE', message: `Burn rate ${br} is outside valid range 0-1.` });
+      results.push({ level: 'error', variable: 'AIMEAT_BURN_RATE', message: `Burn rate ${br} is outside valid range 0-1.` });
     }
   } else {
-    results.push({ level: 'info', variable: 'MEAT_BURN_RATE', message: 'Not set. Default: 0.10' });
+    results.push({ level: 'info', variable: 'AIMEAT_BURN_RATE', message: 'Not set. Default: 0.10' });
   }
 
   return results;

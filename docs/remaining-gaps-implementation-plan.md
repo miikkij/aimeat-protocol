@@ -158,7 +158,7 @@
    ```typescript
    extendedFeaturesEnabled: boolean;  // default: true
    ```
-   Load from env: `MEAT_EXTENDED_FEATURES !== 'false'`
+   Load from env: `AIMEAT_EXTENDED_FEATURES !== 'false'`
 
 2. **Create guard middleware `requireExtended()` in `src/middleware/`** (or add to existing file):
    ```typescript

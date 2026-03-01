@@ -72,23 +72,23 @@ if (configPath) {
 }
 
 // CLI flags override config file override env vars
-if (values.port) process.env.MEAT_PORT = values.port;
-else if (fileConfig.port) process.env.MEAT_PORT = String(fileConfig.port);
+if (values.port) process.env.AIMEAT_PORT = values.port;
+else if (fileConfig.port) process.env.AIMEAT_PORT = String(fileConfig.port);
 
 if (values.db) process.env.DATABASE_URL = values.db;
 else if (fileConfig.db) process.env.DATABASE_URL = fileConfig.db;
 
-if (values['node-id']) process.env.MEAT_NODE_ID = values['node-id'];
-else if (fileConfig.nodeId) process.env.MEAT_NODE_ID = fileConfig.nodeId;
+if (values['node-id']) process.env.AIMEAT_NODE_ID = values['node-id'];
+else if (fileConfig.nodeId) process.env.AIMEAT_NODE_ID = fileConfig.nodeId;
 
-if (values['admin-password']) process.env.MEAT_ADMIN_PASSWORD = values['admin-password'];
-else if (fileConfig.adminPassword) process.env.MEAT_ADMIN_PASSWORD = fileConfig.adminPassword;
+if (values['admin-password']) process.env.AIMEAT_ADMIN_PASSWORD = values['admin-password'];
+else if (fileConfig.adminPassword) process.env.AIMEAT_ADMIN_PASSWORD = fileConfig.adminPassword;
 
-if (fileConfig.jwtTtlSeconds) process.env.MEAT_JWT_TTL = String(fileConfig.jwtTtlSeconds);
-if (fileConfig.welcomeBonus) process.env.MEAT_WELCOME_BONUS = String(fileConfig.welcomeBonus);
-if (fileConfig.dailyAllowance) process.env.MEAT_DAILY_ALLOWANCE = String(fileConfig.dailyAllowance);
-if (fileConfig.dailyAllowanceCap) process.env.MEAT_DAILY_ALLOWANCE_CAP = String(fileConfig.dailyAllowanceCap);
-if (fileConfig.burnRate) process.env.MEAT_BURN_RATE = String(fileConfig.burnRate);
+if (fileConfig.jwtTtlSeconds) process.env.AIMEAT_JWT_TTL = String(fileConfig.jwtTtlSeconds);
+if (fileConfig.welcomeBonus) process.env.AIMEAT_WELCOME_BONUS = String(fileConfig.welcomeBonus);
+if (fileConfig.dailyAllowance) process.env.AIMEAT_DAILY_ALLOWANCE = String(fileConfig.dailyAllowance);
+if (fileConfig.dailyAllowanceCap) process.env.AIMEAT_DAILY_ALLOWANCE_CAP = String(fileConfig.dailyAllowanceCap);
+if (fileConfig.burnRate) process.env.AIMEAT_BURN_RATE = String(fileConfig.burnRate);
 
 const config = loadConfig();
 const subcommand = positionals[0];
@@ -223,7 +223,7 @@ if (subcommand === 'config') {
     }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup?pw=${config.adminPassword}`);
-    if (!process.env.MEAT_ADMIN_PASSWORD) {
+    if (!process.env.AIMEAT_ADMIN_PASSWORD) {
       logger.info(`   Admin Secret: ${config.adminPassword}`);
     }
     logger.info(`──────────────────────────────────────────────────────────`);

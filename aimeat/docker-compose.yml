@@ -2,16 +2,16 @@ services:
   aimeat:
     build: .
     ports:
-      - "${MEAT_PORT:-40050}:40050"
+      - "${AIMEAT_PORT:-40050}:40050"
     environment:
-      - MEAT_PORT=40050
-      - MEAT_NODE_ID=${MEAT_NODE_ID:-meat-local-001-dev}
-      - MEAT_ADMIN_PASSWORD=${MEAT_ADMIN_PASSWORD:-TestAdminPw123!}
+      - AIMEAT_PORT=40050
+      - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-meat-local-001-dev}
+      - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:-TestAdminPw123!}
       - DATABASE_URL=mongodb://dbuser:dbpassword@mongo:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin
-      - MEAT_WELCOME_BONUS=${MEAT_WELCOME_BONUS:-100}
-      - MEAT_DAILY_ALLOWANCE=${MEAT_DAILY_ALLOWANCE:-50}
-      - MEAT_DAILY_ALLOWANCE_CAP=${MEAT_DAILY_ALLOWANCE_CAP:-500}
-      - MEAT_BURN_RATE=${MEAT_BURN_RATE:-0.10}
+      - AIMEAT_WELCOME_BONUS=${AIMEAT_WELCOME_BONUS:-100}
+      - AIMEAT_DAILY_ALLOWANCE=${AIMEAT_DAILY_ALLOWANCE:-50}
+      - AIMEAT_DAILY_ALLOWANCE_CAP=${AIMEAT_DAILY_ALLOWANCE_CAP:-500}
+      - AIMEAT_BURN_RATE=${AIMEAT_BURN_RATE:-0.10}
     depends_on:
       mongo:
         condition: service_healthy

@@ -26,7 +26,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 
 // All AIMEAT Prisma model collection names (must match prisma/schema.prisma)
-const AIMEAT_COLLECTIONS = [
+const AIAIMEAT_COLLECTIONS = [
   'Owner', 'Agent', 'Memory', 'Action', 'Work',
   'Transaction', 'Board', 'BoardPost', 'Otk',
   'Dispute', 'DisputeAudit', 'MicroMemory', 'StorageFile',
@@ -77,14 +77,14 @@ console.log('  AIMEAT Database Initialization');
 console.log('  ══════════════════════════════════════');
 console.log(`   Database:  ${dbName}`);
 console.log(`   URL:       ${dbDisplay}`);
-console.log(`   Models:    ${AIMEAT_COLLECTIONS.length} collections`);
+console.log(`   Models:    ${AIAIMEAT_COLLECTIONS.length} collections`);
 console.log('');
 
 // ─── Step 1: Reset database (optional) ──────────────────────
 
 if (flagReset) {
-  console.log(`  ! WARNING: This will drop ALL ${AIMEAT_COLLECTIONS.length} AIMEAT collections in "${dbName}"`);
-  console.log(`    Collections: ${AIMEAT_COLLECTIONS.join(', ')}`);
+  console.log(`  ! WARNING: This will drop ALL ${AIAIMEAT_COLLECTIONS.length} AIMEAT collections in "${dbName}"`);
+  console.log(`    Collections: ${AIAIMEAT_COLLECTIONS.join(', ')}`);
   console.log(`    Other databases on this server will NOT be affected.`);
   console.log('');
 
@@ -109,7 +109,7 @@ if (flagReset) {
     await prisma.$connect();
 
     let dropped = 0;
-    for (const name of AIMEAT_COLLECTIONS) {
+    for (const name of AIAIMEAT_COLLECTIONS) {
       try {
         await prisma.$runCommandRaw({ drop: name });
         console.log(`   - Dropped: ${name}`);
@@ -120,7 +120,7 @@ if (flagReset) {
     }
 
     await prisma.$disconnect();
-    console.log(`   Dropped ${dropped}/${AIMEAT_COLLECTIONS.length} collections\n`);
+    console.log(`   Dropped ${dropped}/${AIAIMEAT_COLLECTIONS.length} collections\n`);
   } catch (err: any) {
     console.error(`   x Reset failed: ${err.message}`);
     process.exit(1);

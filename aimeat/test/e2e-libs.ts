@@ -1,6 +1,6 @@
 // E2E tests for aimeat helper libraries (data, storage, social, wallet, work)
 // Tests the same API calls that the browser libraries make
-// Run: cd aimeat && MEAT_PORT=40251 npx tsx test/e2e-libs.ts
+// Run: cd aimeat && AIMEAT_PORT=40251 npx tsx test/e2e-libs.ts
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';

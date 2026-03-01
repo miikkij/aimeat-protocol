@@ -6,8 +6,8 @@
  * browse-mode LLMs (Copilot, Gemini) can discover AIMEAT endpoints.
  *
  * Prerequisites:
- *   - Set MEAT_INDEXNOW_KEY in your .env
- *   - Set MEAT_BASE_URL in your .env
+ *   - Set AIMEAT_INDEXNOW_KEY in your .env
+ *   - Set AIMEAT_BASE_URL in your .env
  *   - The key verification file must be served at {baseUrl}/{key}.txt
  *
  * Usage:
@@ -25,7 +25,7 @@ const ROOT = resolve(__dirname, '..');
 // ─── Resolve env vars ───────────────────────────────────────
 
 // Node 24 --env-file loads .env automatically, but handle manual fallback
-if (!process.env.MEAT_INDEXNOW_KEY) {
+if (!process.env.AIMEAT_INDEXNOW_KEY) {
   const envPath = resolve(ROOT, '.env');
   if (existsSync(envPath)) {
     for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
@@ -43,17 +43,17 @@ if (!process.env.MEAT_INDEXNOW_KEY) {
   }
 }
 
-const key = process.env.MEAT_INDEXNOW_KEY;
-const baseUrl = process.env.MEAT_BASE_URL;
+const key = process.env.AIMEAT_INDEXNOW_KEY;
+const baseUrl = process.env.AIMEAT_BASE_URL;
 
 if (!key) {
-  console.error('Error: MEAT_INDEXNOW_KEY is not set. Add it to your .env file.');
+  console.error('Error: AIMEAT_INDEXNOW_KEY is not set. Add it to your .env file.');
   console.error('Generate a key: any hex string (e.g. openssl rand -hex 16)');
   process.exit(1);
 }
 
 if (!baseUrl) {
-  console.error('Error: MEAT_BASE_URL is not set. Add it to your .env file.');
+  console.error('Error: AIMEAT_BASE_URL is not set. Add it to your .env file.');
   process.exit(1);
 }
 

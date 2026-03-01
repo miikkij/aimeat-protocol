@@ -4,7 +4,7 @@
 
 **Goal:** Replace the developer-focused portal with a human-first "try it now" experience in Finnish/English, while preserving the current developer portal behind a toggle.
 
-**Architecture:** New file `src/routes/portal-human.ts` renders the human-facing view. The existing `portal.ts` is preserved as-is (developer view). A shared `src/i18n.ts` module provides translations from `locales/fi.json` and `locales/en.json`. The portal router detects the `?view=dev` param to switch views, defaulting to the human view. Anonymous mode (`MEAT_ANONYMOUS=true`) must be enabled for try-before-signup features.
+**Architecture:** New file `src/routes/portal-human.ts` renders the human-facing view. The existing `portal.ts` is preserved as-is (developer view). A shared `src/i18n.ts` module provides translations from `locales/fi.json` and `locales/en.json`. The portal router detects the `?view=dev` param to switch views, defaulting to the human view. Anonymous mode (`AIMEAT_ANONYMOUS=true`) must be enabled for try-before-signup features.
 
 **Tech Stack:** Express 5, TypeScript (ESM), custom i18n (~50 lines, zero deps), existing AIMEAT memory API, HTML template literals.
 
@@ -508,7 +508,7 @@ The client-side JS in the human portal calls this via `fetch('/v1/portal/try-mem
 
 ```bash
 cd aimeat && npx tsc --noEmit
-# Start server with MEAT_ANONYMOUS=true
+# Start server with AIMEAT_ANONYMOUS=true
 # Visit portal, type a memory, click save — should work
 ```
 
@@ -809,7 +809,7 @@ git commit -m "feat: polish human portal — compat matrix, mobile fixes, final 
 
 - **Type checking:** `npx tsc --noEmit` after every task
 - **Manual browser testing:** After each phase, verify in browser at `http://localhost:40050/v1/portal`
-- **Anonymous mode:** Start server with `MEAT_ANONYMOUS=true` for all try-it features
+- **Anonymous mode:** Start server with `AIMEAT_ANONYMOUS=true` for all try-it features
 - **E2E tests:** Run `npx tsx test/e2e-full.ts` after Phases 0-1 to ensure nothing is broken
 - **Mobile:** Test at 375px width after Phase 1 and Phase 6
 
@@ -818,4 +818,4 @@ git commit -m "feat: polish human portal — compat matrix, mobile fixes, final 
 - No new npm packages needed
 - i18n is custom (~50 lines)
 - Language preference stored in client localStorage (no cookie-parser)
-- Anonymous mode must be enabled (`MEAT_ANONYMOUS=true`)
+- Anonymous mode must be enabled (`AIMEAT_ANONYMOUS=true`)

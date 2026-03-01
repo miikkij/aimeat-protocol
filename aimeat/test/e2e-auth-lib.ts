@@ -1,6 +1,6 @@
 // E2E test for aimeat-auth.js library flow (server-side simulation)
 // Tests the exact same API calls the browser auth library makes
-// Run: cd aimeat && MEAT_PORT=40251 npx tsx test/e2e-auth-lib.ts
+// Run: cd aimeat && AIMEAT_PORT=40251 npx tsx test/e2e-auth-lib.ts
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';

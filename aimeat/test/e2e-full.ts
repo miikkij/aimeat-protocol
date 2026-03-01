@@ -857,10 +857,10 @@ await test('Auto-identification — owner identity hints', async () => {
 });
 
 await test('Initial OTK — admin setup endpoint', async () => {
-    const ADMIN_PW = process.env.MEAT_ADMIN_PASSWORD ?? '';
+    const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? '';
     // Skip if no admin password available
     if (!ADMIN_PW) {
-        console.log('    ⏩ Skipped (no MEAT_ADMIN_PASSWORD in env)');
+        console.log('    ⏩ Skipped (no AIMEAT_ADMIN_PASSWORD in env)');
         passed++; // count as passed (skipped)
         return;
     }

@@ -8,8 +8,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-full --test=e2e-mcp  # run selected
  *
  * Environment variables:
- *   MEAT_BASE_URL — base URL of a running server (skips auto-start)
- *   MEAT_PORT     — port for auto-started server (default 40251)
+ *   AIMEAT_BASE_URL — base URL of a running server (skips auto-start)
+ *   AIMEAT_PORT     — port for auto-started server (default 40251)
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -28,9 +28,9 @@ const ALL_SUITES = [
     'test/e2e-board-ttl.ts',
 ];
 
-const PORT = process.env.MEAT_PORT ?? '40251';
-const BASE_URL = process.env.MEAT_BASE_URL ?? `http://localhost:${PORT}`;
-const USE_EXTERNAL_SERVER = !!process.env.MEAT_BASE_URL;
+const PORT = process.env.AIMEAT_PORT ?? '40251';
+const BASE_URL = process.env.AIMEAT_BASE_URL ?? `http://localhost:${PORT}`;
+const USE_EXTERNAL_SERVER = !!process.env.AIMEAT_BASE_URL;
 
 // ── Parse CLI args ──
 function parseArgs(): string[] {
@@ -59,12 +59,12 @@ function parseArgs(): string[] {
 async function startServer(): Promise<ChildProcess> {
     const env = {
         ...process.env,
-        MEAT_PORT: PORT,
-        MEAT_RL_GLOBAL: process.env.MEAT_RL_GLOBAL ?? '10000',
-        MEAT_RL_AUTH: process.env.MEAT_RL_AUTH ?? '1000',
-        MEAT_RL_WORK: process.env.MEAT_RL_WORK ?? '1000',
-        MEAT_RL_MEMORY: process.env.MEAT_RL_MEMORY ?? '1000',
-        MEAT_RL_BOARDS: process.env.MEAT_RL_BOARDS ?? '1000',
+        AIMEAT_PORT: PORT,
+        AIMEAT_RL_GLOBAL: process.env.AIMEAT_RL_GLOBAL ?? '10000',
+        AIMEAT_RL_AUTH: process.env.AIMEAT_RL_AUTH ?? '1000',
+        AIMEAT_RL_WORK: process.env.AIMEAT_RL_WORK ?? '1000',
+        AIMEAT_RL_MEMORY: process.env.AIMEAT_RL_MEMORY ?? '1000',
+        AIMEAT_RL_BOARDS: process.env.AIMEAT_RL_BOARDS ?? '1000',
     };
 
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts'], {
@@ -102,7 +102,7 @@ function killServer(child: ChildProcess): void {
 function runTest(suitePath: string): Promise<{ output: string; exitCode: number }> {
     return new Promise((resolve) => {
         const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, MEAT_PORT: PORT, MEAT_BASE_URL: BASE_URL },
+            env: { ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE_URL },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: process.cwd(),
         });

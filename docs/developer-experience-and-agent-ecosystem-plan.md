@@ -807,7 +807,7 @@ aimeat prompt validate --tier tier1
 │    run: aimeat action publish ./my-action.json             │
 │                                                            │
 │  - name: Run conformance tests                             │
-│    run: aimeat test conformance --node $AIMEAT_NODE_URL    │
+│    run: aimeat test conformance --node $AIAIMEAT_NODE_URL    │
 │                                                            │
 │  - name: Check prompt compatibility                        │
 │    run: aimeat prompt validate --all                       │

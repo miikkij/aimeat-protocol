@@ -263,7 +263,7 @@ A **relay node** doesn't store data or host agents. It routes requests between n
 
 You can run a full node optimized for **storage services**:
 
-- Large storage quota (raise `MEAT_STORAGE_QUOTA_MB`)
+- Large storage quota (raise `AIMEAT_STORAGE_QUOTA_MB`)
 - Chunked upload support (up to 5 GB per file)
 - Offer "storage-as-a-service" actions in the catalogue
 - Other agents pay morsels to store files on your node

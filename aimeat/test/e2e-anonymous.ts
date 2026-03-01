@@ -1,6 +1,6 @@
-// E2E tests for Anonymous Node Mode (MEAT_ANONYMOUS=true)
-// Requires server running with MEAT_ANONYMOUS=true on port 40251
-// Run: cd aimeat && MEAT_ANONYMOUS=true PORT=40251 npx tsx src/index.ts
+// E2E tests for Anonymous Node Mode (AIMEAT_ANONYMOUS=true)
+// Requires server running with AIMEAT_ANONYMOUS=true on port 40251
+// Run: cd aimeat && AIMEAT_ANONYMOUS=true PORT=40251 npx tsx src/index.ts
 // Then: cd aimeat && npx tsx test/e2e-anonymous.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';

@@ -83,11 +83,11 @@ Edit the `.env` file with any text editor to change settings. The most important
 
 | Setting | What it does |
 |---------|-------------|
-| `MEAT_NODE_ID` | A unique name for your node (e.g. `"my-node-001"`) |
-| `MEAT_BASE_URL` | The public URL where your node is reachable |
+| `AIMEAT_NODE_ID` | A unique name for your node (e.g. `"my-node-001"`) |
+| `AIMEAT_BASE_URL` | The public URL where your node is reachable |
 | `DATABASE_URL` | MongoDB connection string — leave empty for in-memory storage |
-| `MEAT_ADMIN_PASSWORD` | Password for the admin panel — auto-generated if not set |
-| `MEAT_ANONYMOUS` | Set to `true` to allow anyone to use the node without registering |
+| `AIMEAT_ADMIN_PASSWORD` | Password for the admin panel — auto-generated if not set |
+| `AIMEAT_ANONYMOUS` | Set to `true` to allow anyone to use the node without registering |
 
 See [.env.example](aimeat/.env.example) for the full list with descriptions, or run `aimeat config` to see all settings.
 
@@ -126,7 +126,7 @@ Open the **Admin Setup** URL shown in the startup log in your browser. This give
 - Configure node settings
 - Back up and restore data
 
-If you set `MEAT_ADMIN_PASSWORD` in your `.env` file, the setup URL includes it automatically. If you didn't set one, a random password is printed to the console on startup — copy it from there.
+If you set `AIMEAT_ADMIN_PASSWORD` in your `.env` file, the setup URL includes it automatically. If you didn't set one, a random password is printed to the console on startup — copy it from there.
 
 ### The 30-Second Test
 
@@ -197,7 +197,7 @@ npx tsc --noEmit
 pnpm test
 
 # E2E tests — start the server first on port 40251
-MEAT_PORT=40251 pnpm dev &
+AIMEAT_PORT=40251 pnpm dev &
 
 # Run the main E2E suite (49 tests)
 npx tsx test/e2e-full.ts

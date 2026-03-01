@@ -79,13 +79,13 @@ services:
   node-a:
     build: .
     environment:
-      MEAT_NODE_ID: meat-test-node-a
-      MEAT_PORT: 40251
+      AIMEAT_NODE_ID: meat-test-node-a
+      AIMEAT_PORT: 40251
   node-b:
     build: .
     environment:
-      MEAT_NODE_ID: meat-test-node-b
-      MEAT_PORT: 3118
+      AIMEAT_NODE_ID: meat-test-node-b
+      AIMEAT_PORT: 3118
 ```
 
 The single-node E2E tests above cover the API contract; multi-node routing is a separate integration concern.

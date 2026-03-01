@@ -675,7 +675,7 @@ GET /v1/mm?otk={key}&op=config&set=tasks&access=private
 
 **Anonymous mode visibility enforcement:**
 
-When `MEAT_ANONYMOUS=true`, micro-memory `list` operations enforce visibility rules even though all anonymous requests share one identity:
+When `AIMEAT_ANONYMOUS=true`, micro-memory `list` operations enforce visibility rules even though all anonymous requests share one identity:
 
 | Visibility | Anonymous (no code) | Anonymous (with `access_code`) | Authenticated (OTK) |
 |---|---|---|---|
@@ -788,7 +788,7 @@ Authorization: Bearer <jwt>
 
 #### 5.7.4.2 Dev Mode — OTK Bypass for Local Development
 
-For home/development use, operators can enable **Dev Mode** (`MEAT_DEV_MODE=true`) which bypasses OTK validation on micro-memory endpoints. This allows basic AI integrations (e.g., simple LLMs without HTTP tooling) to write to micro-memory without managing OTKs.
+For home/development use, operators can enable **Dev Mode** (`AIMEAT_DEV_MODE=true`) which bypasses OTK validation on micro-memory endpoints. This allows basic AI integrations (e.g., simple LLMs without HTTP tooling) to write to micro-memory without managing OTKs.
 
 **Behavior when Dev Mode is enabled:**
 
@@ -800,7 +800,7 @@ For home/development use, operators can enable **Dev Mode** (`MEAT_DEV_MODE=true
 **Configuration:**
 
 ```bash
-MEAT_DEV_MODE=true   # Enable dev mode (default: false)
+AIMEAT_DEV_MODE=true   # Enable dev mode (default: false)
 ```
 
 **IMPORTANT:** Dev Mode is intended for local development and testing only. Never enable it on production or public-facing nodes. It effectively removes write authentication from micro-memory.

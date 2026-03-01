@@ -59,11 +59,11 @@ graph TB
         BUYER_NEW -->|"suora maksu<br/>0% välityspalkkio"| SELLER_NEW
         NODE1["🖥️ Node A"] -.->|federation| NODE2["🖥️ Node B"]
 
-        MEAT_COST["💰 AIMEAT kulut:<br/>— morsels (sisäinen, ilmainen)<br/>— node-operaattorin infra<br/>— ei muita kuluja"]
+        AIMEAT_COST["💰 AIMEAT kulut:<br/>— morsels (sisäinen, ilmainen)<br/>— node-operaattorin infra<br/>— ei muita kuluja"]
     end
 
     PLATFORM -.->|"AIMEAT korvaa"| NODE1
-    PLAT_COST -.->|"97% kuluista poistuu"| MEAT_COST
+    PLAT_COST -.->|"97% kuluista poistuu"| AIMEAT_COST
 
     style SELLER_OLD fill:#ef4444,color:#fff
     style BUYER_OLD fill:#ef4444,color:#fff
@@ -73,7 +73,7 @@ graph TB
     style BUYER_NEW fill:#22c55e,color:#fff
     style NODE1 fill:#3b82f6,color:#fff
     style NODE2 fill:#3b82f6,color:#fff
-    style MEAT_COST fill:#22c55e,color:#fff
+    style AIMEAT_COST fill:#22c55e,color:#fff
 ```
 
 ## Bitcoin-analogia: Sensuroimattomuus
@@ -86,8 +86,8 @@ graph TB
     end
 
     subgraph "❤️ AIMEAT (2025→)"
-        MEAT_PROP["Ominaisuudet:<br/>— hajautettu federation<br/>— kuka tahansa voi ajaa noden<br/>— sensuroimaton palveluvälitys<br/>— agentti-pseudonyymit (GAII)<br/>— globaali, rajaton"]
-        MEAT_RES["Seuraukset:<br/>— alustoja ei voi enää monopolisoida<br/>— provisioita ei voi pakottaa<br/>— ei single point of failure<br/>— sääntely kohdistuu nodeoperaattoreihin<br/>— mutta uusia nousee aina tilalle"]
+        AIMEAT_PROP["Ominaisuudet:<br/>— hajautettu federation<br/>— kuka tahansa voi ajaa noden<br/>— sensuroimaton palveluvälitys<br/>— agentti-pseudonyymit (GAII)<br/>— globaali, rajaton"]
+        AIMEAT_RES["Seuraukset:<br/>— alustoja ei voi enää monopolisoida<br/>— provisioita ei voi pakottaa<br/>— ei single point of failure<br/>— sääntely kohdistuu nodeoperaattoreihin<br/>— mutta uusia nousee aina tilalle"]
     end
 
     subgraph "🔗 Yhteinen Periaate"
@@ -95,14 +95,14 @@ graph TB
     end
 
     BTC_PROP --> BTC_RES
-    MEAT_PROP --> MEAT_RES
+    AIMEAT_PROP --> AIMEAT_RES
     BTC_RES --> CORE
-    MEAT_RES --> CORE
+    AIMEAT_RES --> CORE
 
     style BTC_PROP fill:#f97316,color:#fff
     style BTC_RES fill:#eab308,color:#000
-    style MEAT_PROP fill:#3b82f6,color:#fff
-    style MEAT_RES fill:#06b6d4,color:#fff
+    style AIMEAT_PROP fill:#3b82f6,color:#fff
+    style AIMEAT_RES fill:#06b6d4,color:#fff
     style CORE fill:#8b5cf6,color:#fff
 ```
 

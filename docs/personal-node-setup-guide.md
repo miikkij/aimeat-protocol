@@ -431,12 +431,12 @@ Operators control personal node behavior through environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MEAT_PERSONAL_NODES_ENABLED` | `true` | Enable/disable personal node support |
-| `MEAT_PERSONAL_NODE_MAX_SLOTS` | `100` | Maximum number of personal nodes this operator will host |
-| `MEAT_PERSONAL_MAILBOX_QUOTA_MB` | `50` | Mailbox storage quota per personal node (MB) |
-| `MEAT_PERSONAL_MAILBOX_RETENTION_DAYS` | `7` | How long mailbox items are kept before expiry |
-| `MEAT_PERSONAL_HEARTBEAT_MS` | `30000` | Heartbeat check interval (ms) |
-| `MEAT_PERSONAL_OFFLINE_MS` | `300000` | Time without heartbeat before marking node offline (ms) |
+| `AIMEAT_PERSONAL_NODES_ENABLED` | `true` | Enable/disable personal node support |
+| `AIMEAT_PERSONAL_NODE_MAX_SLOTS` | `100` | Maximum number of personal nodes this operator will host |
+| `AIMEAT_PERSONAL_MAILBOX_QUOTA_MB` | `50` | Mailbox storage quota per personal node (MB) |
+| `AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS` | `7` | How long mailbox items are kept before expiry |
+| `AIMEAT_PERSONAL_HEARTBEAT_MS` | `30000` | Heartbeat check interval (ms) |
+| `AIMEAT_PERSONAL_OFFLINE_MS` | `300000` | Time without heartbeat before marking node offline (ms) |
 
 ### 7.1 Operator Admin Dashboard
 
@@ -521,7 +521,7 @@ Response:
 
 ### Connection refused on WebSocket
 
-- Verify the operator has `MEAT_PERSONAL_NODES_ENABLED=true`
+- Verify the operator has `AIMEAT_PERSONAL_NODES_ENABLED=true`
 - Check that your JWT token is valid and not expired
 - Ensure the URL uses the correct protocol (`wss://` for HTTPS operators, `ws://` for local dev)
 
@@ -538,7 +538,7 @@ Response:
 
 ### "CAPACITY_FULL" error on registration
 
-- The operator has reached its `MEAT_PERSONAL_NODE_MAX_SLOTS` limit
+- The operator has reached its `AIMEAT_PERSONAL_NODE_MAX_SLOTS` limit
 - Try a different operator node or contact the operator to increase capacity
 
 ### Node shows "degraded" status
