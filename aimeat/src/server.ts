@@ -662,57 +662,68 @@ function maintenancePageHtml(nodeId: string, message: string): string {
 <title>Maintenance — ${esc(nodeId)}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#080c18;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;overflow:hidden}
+body{background:#1a1025;color:#f0e6ff;font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:100vh;padding:20px;overflow:hidden}
 
-/* ── PlayStation-style flowing wave background ── */
+/* ── Warm ambient gradient base ── */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 30% 20%,rgba(168,85,247,.12) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(236,72,153,.1) 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,rgba(139,92,246,.06) 0%,transparent 70%);z-index:0}
+
+/* ── PS-style flowing waves — warm and bright ── */
 .waves{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.wave{position:absolute;width:200%;height:200%;opacity:.035;border-radius:42%;animation:drift linear infinite}
-.wave:nth-child(1){background:linear-gradient(135deg,#6366f1,#a855f7,#06b6d4);top:-60%;left:-50%;animation-duration:25s}
-.wave:nth-child(2){background:linear-gradient(225deg,#8b5cf6,#ec4899,#3b82f6);top:-65%;left:-55%;animation-duration:30s;animation-delay:-5s;opacity:.03}
-.wave:nth-child(3){background:linear-gradient(315deg,#06b6d4,#6366f1,#f43f5e);top:-70%;left:-45%;animation-duration:35s;animation-delay:-10s;opacity:.025}
-.wave:nth-child(4){background:linear-gradient(45deg,#a855f7,#2dd4bf,#818cf8);top:-55%;left:-60%;animation-duration:40s;animation-delay:-15s;opacity:.02}
+.wave{position:absolute;width:200%;height:200%;border-radius:42%;animation:drift linear infinite}
+.wave:nth-child(1){background:linear-gradient(135deg,#c084fc,#f472b6,#fb923c);top:-60%;left:-50%;animation-duration:25s;opacity:.07}
+.wave:nth-child(2){background:linear-gradient(225deg,#a78bfa,#f9a8d4,#fdba74);top:-65%;left:-55%;animation-duration:30s;animation-delay:-5s;opacity:.06}
+.wave:nth-child(3){background:linear-gradient(315deg,#e879f9,#fb7185,#c084fc);top:-70%;left:-45%;animation-duration:35s;animation-delay:-10s;opacity:.05}
+.wave:nth-child(4){background:linear-gradient(45deg,#f0abfc,#fda4af,#d8b4fe);top:-55%;left:-60%;animation-duration:40s;animation-delay:-15s;opacity:.04}
 @keyframes drift{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
-/* ── Floating particles ── */
+/* ── Floating hearts + particles ── */
 .particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-.particle{position:absolute;border-radius:50%;opacity:0;animation:float linear infinite}
-.particle:nth-child(1){width:3px;height:3px;background:#6366f1;left:10%;animation-duration:12s;animation-delay:0s}
-.particle:nth-child(2){width:2px;height:2px;background:#a855f7;left:25%;animation-duration:15s;animation-delay:-3s}
-.particle:nth-child(3){width:4px;height:4px;background:#06b6d4;left:40%;animation-duration:10s;animation-delay:-6s}
-.particle:nth-child(4){width:2px;height:2px;background:#818cf8;left:55%;animation-duration:18s;animation-delay:-2s}
-.particle:nth-child(5){width:3px;height:3px;background:#2dd4bf;left:70%;animation-duration:14s;animation-delay:-8s}
-.particle:nth-child(6){width:2px;height:2px;background:#c084fc;left:85%;animation-duration:16s;animation-delay:-4s}
-.particle:nth-child(7){width:3px;height:3px;background:#38bdf8;left:15%;animation-duration:20s;animation-delay:-10s}
-.particle:nth-child(8){width:2px;height:2px;background:#a78bfa;left:60%;animation-duration:13s;animation-delay:-7s}
-@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.6}90%{opacity:.6}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+.particle{position:absolute;opacity:0;animation:float linear infinite}
+.particle.dot{border-radius:50%}
+.particle.heart::before{content:'\\2665';font-size:inherit;color:inherit}
+.particle:nth-child(1){font-size:14px;color:rgba(244,114,182,.5);left:8%;animation-duration:14s;animation-delay:0s}
+.particle:nth-child(2){width:3px;height:3px;background:#c084fc;left:20%;animation-duration:16s;animation-delay:-2s}
+.particle:nth-child(3){font-size:10px;color:rgba(192,132,252,.4);left:35%;animation-duration:12s;animation-delay:-5s}
+.particle:nth-child(4){width:2px;height:2px;background:#f9a8d4;left:48%;animation-duration:18s;animation-delay:-3s}
+.particle:nth-child(5){font-size:16px;color:rgba(251,113,133,.4);left:62%;animation-duration:15s;animation-delay:-7s}
+.particle:nth-child(6){width:3px;height:3px;background:#fda4af;left:75%;animation-duration:13s;animation-delay:-1s}
+.particle:nth-child(7){font-size:12px;color:rgba(216,180,254,.4);left:88%;animation-duration:17s;animation-delay:-9s}
+.particle:nth-child(8){width:2px;height:2px;background:#f0abfc;left:50%;animation-duration:20s;animation-delay:-11s}
+.particle:nth-child(9){font-size:8px;color:rgba(249,168,212,.35);left:15%;animation-duration:19s;animation-delay:-6s}
+.particle:nth-child(10){width:4px;height:4px;background:rgba(244,114,182,.3);left:42%;animation-duration:11s;animation-delay:-4s}
+@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.7}90%{opacity:.7}100%{transform:translateY(-10vh) scale(1);opacity:0}}
 
 /* ── Card ── */
-.card{position:relative;z-index:1;background:rgba(15,23,42,.75);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(99,102,241,.15);border-radius:24px;padding:56px 48px;max-width:520px;width:100%;text-align:center;box-shadow:0 0 80px rgba(99,102,241,.08),0 4px 32px rgba(0,0,0,.3);animation:cardIn .8s cubic-bezier(.16,1,.3,1)}
+.card{position:relative;z-index:1;background:rgba(30,20,45,.65);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1px solid rgba(192,132,252,.2);border-radius:28px;padding:56px 48px;max-width:520px;width:100%;text-align:center;box-shadow:0 0 100px rgba(168,85,247,.1),0 0 40px rgba(236,72,153,.06),0 4px 32px rgba(0,0,0,.2);animation:cardIn .8s cubic-bezier(.16,1,.3,1)}
 @keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 
-/* ── Glowing ring loader (uiverse-inspired) ── */
-.loader{position:relative;width:80px;height:80px;margin:0 auto 32px}
-.loader-ring{position:absolute;inset:0;border-radius:50%;border:3px solid transparent}
-.loader-ring:nth-child(1){border-top-color:#6366f1;animation:spin 1.8s cubic-bezier(.68,-.55,.27,1.55) infinite}
-.loader-ring:nth-child(2){inset:6px;border-right-color:#a855f7;animation:spin 2.2s cubic-bezier(.68,-.55,.27,1.55) infinite reverse}
-.loader-ring:nth-child(3){inset:12px;border-bottom-color:#06b6d4;animation:spin 1.5s cubic-bezier(.68,-.55,.27,1.55) infinite}
-.loader-core{position:absolute;inset:20px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.3),transparent);animation:glow 2s ease-in-out infinite alternate}
+/* ── Heart-beat loader ── */
+.loader{position:relative;width:80px;height:80px;margin:0 auto 28px}
+.heart-icon{font-size:40px;line-height:80px;animation:heartbeat 1.6s ease-in-out infinite;filter:drop-shadow(0 0 12px rgba(244,114,182,.4))}
+@keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.15)}28%{transform:scale(1)}42%{transform:scale(1.1)}56%{transform:scale(1)}}
+.loader-ring{position:absolute;inset:0;border-radius:50%;border:2px solid transparent}
+.loader-ring:nth-child(1){border-top-color:rgba(192,132,252,.5);animation:spin 3s linear infinite}
+.loader-ring:nth-child(2){inset:4px;border-right-color:rgba(244,114,182,.4);animation:spin 4s linear infinite reverse}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes glow{from{opacity:.4;transform:scale(.9)}to{opacity:.8;transform:scale(1.1)}}
 
-h1{font-size:1.5rem;font-weight:700;margin-bottom:12px;background:linear-gradient(135deg,#e2e8f0,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.02em}
-.msg{color:#94a3b8;font-size:1rem;margin-bottom:28px;line-height:1.6}
-.reason{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:14px 20px;color:#a5b4fc;font-size:.9rem;margin-bottom:28px;letter-spacing:.01em}
-.node-id{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:8px 16px;margin-bottom:20px}
-.node-id code{color:#64748b;font-family:'SF Mono',Consolas,monospace;font-size:.75rem}
-.status-dot{width:6px;height:6px;border-radius:50%;background:#eab308;animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(234,179,8,.4)}50%{opacity:.5;box-shadow:0 0 0 6px rgba(234,179,8,0)}}
-.footer{color:#475569;font-size:.7rem;margin-top:8px;letter-spacing:.03em;text-transform:uppercase}
+/* ── Brand ── */
+.brand{font-size:.85rem;font-weight:600;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px;color:rgba(216,180,254,.6)}
+h1{font-size:1.6rem;font-weight:700;margin-bottom:14px;background:linear-gradient(135deg,#f0abfc,#f9a8d4,#fda4af);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.01em}
+.msg{color:#c4b5d4;font-size:1rem;margin-bottom:28px;line-height:1.7}
+.reason{background:rgba(192,132,252,.08);border:1px solid rgba(192,132,252,.18);border-radius:12px;padding:14px 20px;color:#d8b4fe;font-size:.9rem;margin-bottom:28px;letter-spacing:.01em}
+.node-id{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 16px;margin-bottom:20px}
+.node-id code{color:#a78bfa;font-family:'SF Mono',Consolas,monospace;font-size:.75rem}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#f472b6;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(244,114,182,.5)}50%{opacity:.6;box-shadow:0 0 0 8px rgba(244,114,182,0)}}
+.footer{color:rgba(167,139,250,.4);font-size:.7rem;margin-top:8px;letter-spacing:.04em;text-transform:uppercase}
 
-/* ── Progress bar ── */
-.progress{width:100%;height:3px;background:rgba(255,255,255,.05);border-radius:2px;margin-top:24px;overflow:hidden}
-.progress-bar{height:100%;width:100%;background:linear-gradient(90deg,#6366f1,#a855f7,#06b6d4,#6366f1);background-size:300% 100%;border-radius:2px;animation:shimmer 2s linear infinite}
+/* ── Progress bar — warm gradient ── */
+.progress{width:100%;height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:24px;overflow:hidden}
+.progress-bar{height:100%;width:100%;background:linear-gradient(90deg,#c084fc,#f472b6,#fb923c,#c084fc);background-size:300% 100%;border-radius:2px;animation:shimmer 2.5s linear infinite}
 @keyframes shimmer{from{background-position:300% 0}to{background-position:0 0}}
+
+/* ── Tagline ── */
+.tagline{position:relative;z-index:1;margin-top:24px;font-size:.75rem;color:rgba(216,180,254,.3);letter-spacing:.08em}
 </style></head><body>
 
 <!-- PS-style flowing waves -->
@@ -723,25 +734,31 @@ h1{font-size:1.5rem;font-weight:700;margin-bottom:12px;background:linear-gradien
 <div class="wave"></div>
 </div>
 
-<!-- Floating particles -->
+<!-- Floating hearts + particles -->
 <div class="particles">
-<div class="particle"></div><div class="particle"></div>
-<div class="particle"></div><div class="particle"></div>
-<div class="particle"></div><div class="particle"></div>
-<div class="particle"></div><div class="particle"></div>
+<div class="particle heart"></div>
+<div class="particle dot"></div>
+<div class="particle heart"></div>
+<div class="particle dot"></div>
+<div class="particle heart"></div>
+<div class="particle dot"></div>
+<div class="particle heart"></div>
+<div class="particle dot"></div>
+<div class="particle heart"></div>
+<div class="particle dot"></div>
 </div>
 
 <div class="card">
-  <!-- Glowing ring loader -->
+  <!-- Heart-beat loader with orbiting rings -->
   <div class="loader">
     <div class="loader-ring"></div>
     <div class="loader-ring"></div>
-    <div class="loader-ring"></div>
-    <div class="loader-core"></div>
+    <div class="heart-icon">&#x2665;</div>
   </div>
 
-  <h1>Under Maintenance</h1>
-  <p class="msg">This node is temporarily offline for improvements.<br>We'll be back shortly.</p>
+  <p class="brand">AIME AT</p>
+  <h1>We'll Be Right Back</h1>
+  <p class="msg">Making things even better for you.<br>This won't take long.</p>
   ${message ? `<div class="reason">${esc(message)}</div>` : ''}
 
   <div class="node-id">
@@ -752,6 +769,8 @@ h1{font-size:1.5rem;font-weight:700;margin-bottom:12px;background:linear-gradien
   <div class="progress"><div class="progress-bar"></div></div>
   <p class="footer">Auto-refreshes every 30 seconds</p>
 </div>
+
+<p class="tagline">AI Memory Exchange &amp; Action Transfer</p>
 </body></html>`;
 }
 
