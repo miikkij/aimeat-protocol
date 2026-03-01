@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "tsx scripts/kill-port.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
-    "build": "tsc && cp -r locales dist/",
+    "build": "tsc && node -e \"const fs=require('fs');fs.cpSync('locales','dist/locales',{recursive:true})\"",
     "start": "node --env-file=.env dist/src/index.js start",
     "test": "vitest run",
     "test:watch": "vitest",
