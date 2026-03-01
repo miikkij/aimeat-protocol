@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { MeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
-import { createT, detectLocale, toLocale, resolveLocale, LOCALES, type Locale, type TFunction } from '../i18n.js';
+import { createT, detectLocale, toLocale, resolveLocale, resolveFlat, LOCALES, type Locale, type TFunction } from '../i18n.js';
 import { humanPortalHtml } from './portal-human.js';
 
 /* ──────────────────────────────────────────────────────────
@@ -48,9 +48,9 @@ const PLATFORMS: AIPlatform[] = [
   {
     id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '/img/platforms/copilot.png',
     variants: [
-      { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'Cannot make external HTTP calls' },
-      { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'Can run terminal commands' },
-      { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'Add as MCP server in VS Code settings' },
+      { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'noHttp' },
+      { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'terminal' },
+      { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'vscodeSettings' },
     ],
   },
   {
@@ -64,7 +64,7 @@ const PLATFORMS: AIPlatform[] = [
     id: 'grok', name: 'Grok', vendor: 'xAI', icon: '/img/platforms/grok.png',
     variants: [
       { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
-      { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'Python sandbox, no internet' },
+      { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'pythonSandbox' },
       { id: 'api', name: 'Grok API (external)', tier: 'B', path: 'api' },
     ],
   },
@@ -79,7 +79,7 @@ const PLATFORMS: AIPlatform[] = [
   {
     id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '/img/platforms/lmstudio.png',
     variants: [
-      { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'Models with function calling' },
+      { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'functionCalling' },
       { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
     ],
   },
@@ -436,91 +436,7 @@ This uses micro-memory — small key-value storage accessible via GET parameters
    ────────────────────────────────────────────────────────── */
 
 function buildDevPortalTranslations(locale: Locale): Record<string, string> {
-  const en: Record<string, string> = {
-    'dev.title': 'AIMEAT Onboarding Portal',
-    'dev.subtitle': 'Connect any AI to this node \u2014 select your platform to get started',
-    'dev.stats.agents': 'Agents',
-    'dev.stats.services': 'Services',
-    'dev.stats.boards': 'Boards',
-    'dev.quickStart.title': 'Quick Start \u2014 Already have an AI open?',
-    'dev.quickStart.desc': 'Copy-paste this into your AI chat and it will connect itself:',
-    'dev.quickStart.copy': 'Copy',
-    'dev.quickStart.note': 'Works with AIs that can browse the web (Grok, Claude, ChatGPT with browsing, etc.). The URL returns JSON instructions the AI will understand.',
-    'dev.quickStart.fallback': 'If your AI can\u2019t browse, pick your platform below instead.',
-    'dev.step1.label': 'Select Your AI Platform',
-    'dev.step2.label': 'Select Your Subscription / Variant',
-    'dev.step3.label': 'Get Started',
-    'dev.step4.label': 'Share Your App',
-    'dev.mode.loggedIn': 'Logged in as',
-    'dev.mode.loggedInDesc': 'You can upload apps and get a shareable download link. Other users can browse and download your apps.',
-    'dev.mode.anonymous': 'Anonymous Mode',
-    'dev.mode.anonymousDesc': 'You can generate prompts and apps without logging in.',
-    'dev.mode.anonymousNote': 'To share apps with others, you\u2019ll need to share the HTML file yourself (email, drive, etc.).',
-    'dev.mode.signUp': 'Sign up',
-    'dev.mode.signUpNote': 'to get a personal download link others can use.',
-    'dev.community.title': 'Community Apps',
-    'dev.community.desc': 'Apps uploaded by users on this node. Download and open locally in your browser.',
-    'dev.profile': 'Profile',
-    'dev.humanPortal': 'For Everyone',
-    // Tier labels
-    'dev.tier.mcp': 'MCP Connection',
-    'dev.tier.api': 'API Connection',
-    'dev.tier.browse': 'Browse (Read-Only)',
-    'dev.tier.prompt': 'Prompt Package',
-    // Common actions
-    'dev.copy': 'Copy',
-    'dev.copied': 'Copied!',
-    'dev.download': 'Download',
-    'dev.upload': 'Upload to Node',
-    'dev.uploading': 'Uploading...',
-    'dev.uploaded': 'Uploaded!',
-    'dev.uploadFailed': 'Upload failed',
-    'dev.shareLink': 'Share link',
-    'dev.noApps': 'No community apps yet.',
-  };
-
-  const fi: Record<string, string> = {
-    'dev.title': 'AIMEAT-liit\u00e4nt\u00e4portaali',
-    'dev.subtitle': 'Yhdist\u00e4 mik\u00e4 tahansa AI t\u00e4h\u00e4n solmuun \u2014 valitse alustasi aloittaaksesi',
-    'dev.stats.agents': 'Agentit',
-    'dev.stats.services': 'Palvelut',
-    'dev.stats.boards': 'Taulut',
-    'dev.quickStart.title': 'Pikastart \u2014 Onko AI jo auki?',
-    'dev.quickStart.desc': 'Kopioi-liit\u00e4 t\u00e4m\u00e4 AI-chattiin niin se yhdist\u00e4\u00e4 itse:',
-    'dev.quickStart.copy': 'Kopioi',
-    'dev.quickStart.note': 'Toimii AI:lla jotka voivat selata verkkoa (Grok, Claude, ChatGPT selauksella, jne.). URL palauttaa JSON-ohjeet jotka AI ymm\u00e4rt\u00e4\u00e4.',
-    'dev.quickStart.fallback': 'Jos AI:si ei voi selata, valitse alustasi alta.',
-    'dev.step1.label': 'Valitse AI-alustasi',
-    'dev.step2.label': 'Valitse tilauksesi / versio',
-    'dev.step3.label': 'Aloita',
-    'dev.step4.label': 'Jaa sovelluksesi',
-    'dev.mode.loggedIn': 'Kirjautuneena',
-    'dev.mode.loggedInDesc': 'Voit l\u00e4hett\u00e4\u00e4 sovelluksia ja saada jaettavan latauslinkin. Muut voivat selata ja ladata sovelluksiasi.',
-    'dev.mode.anonymous': 'Anonyymi tila',
-    'dev.mode.anonymousDesc': 'Voit luoda kehotteita ja sovelluksia kirjautumatta.',
-    'dev.mode.anonymousNote': 'Jakaaksesi sovelluksia muille, sinun t\u00e4ytyy jakaa HTML-tiedosto itse (s\u00e4hk\u00f6posti, pilvipalvelu, jne.).',
-    'dev.mode.signUp': 'Rekister\u00f6idy',
-    'dev.mode.signUpNote': 'saadaksesi henkil\u00f6kohtaisen latauslinkin.',
-    'dev.community.title': 'Yhteisön sovellukset',
-    'dev.community.desc': 'K\u00e4ytt\u00e4jien l\u00e4hett\u00e4m\u00e4t sovellukset t\u00e4ll\u00e4 solmulla. Lataa ja avaa paikallisesti selaimessasi.',
-    'dev.profile': 'Profiili',
-    'dev.humanPortal': 'Kaikille',
-    'dev.tier.mcp': 'MCP-yhteys',
-    'dev.tier.api': 'API-yhteys',
-    'dev.tier.browse': 'Selaus (vain luku)',
-    'dev.tier.prompt': 'Kehotepaketti',
-    'dev.copy': 'Kopioi',
-    'dev.copied': 'Kopioitu!',
-    'dev.download': 'Lataa',
-    'dev.upload': 'L\u00e4het\u00e4 solmuun',
-    'dev.uploading': 'L\u00e4hetet\u00e4\u00e4n...',
-    'dev.uploaded': 'L\u00e4hetetty!',
-    'dev.uploadFailed': 'L\u00e4hetys ep\u00e4onnistui',
-    'dev.shareLink': 'Jakolinkki',
-    'dev.noApps': 'Ei yhteisön sovelluksia viel\u00e4.',
-  };
-
-  return locale === 'fi' ? fi : en;
+  return resolveFlat(locale, 'dev');
 }
 
 /* ──────────────────────────────────────────────────────────
@@ -916,7 +832,7 @@ function selectVariant(v) {
     b.classList.toggle('selected', b.textContent === v.name);
   });
   var note = document.getElementById('variant-note');
-  if (v.notes) { note.textContent = v.notes; note.classList.remove('hidden'); }
+  if (v.notes) { note.textContent = dt('dev.platformNotes.' + v.notes); note.classList.remove('hidden'); }
   else { note.classList.add('hidden'); }
   document.getElementById('step2-num').textContent = '\\u2713';
   document.getElementById('step2-num').classList.add('done');
@@ -940,22 +856,22 @@ function showResult(v) {
 // ── Panels ──
 
 function mcpPanel() {
-  return '<div class="panel"><span class="tier-badge tier-A">TIER A \\u2014 Full MCP</span>'
+  return '<div class="panel"><span class="tier-badge tier-A">' + dt('dev.panel.mcpBadge') + '</span>'
     + '<h3 style="margin-top:.75rem">' + dt('dev.tier.mcp') + '</h3>'
     + '<div class="instructions"><ol>'
-    + '<li>Open your AI platform\\'s <strong>Settings \\u2192 Connectors / MCP Servers</strong></li>'
-    + '<li>Add a new MCP server with this URL:<br><code>' + escHtml(NODE_URL) + '/v1/mcp</code></li>'
-    + '<li>The platform will handle OAuth registration automatically</li>'
-    + '<li>Once connected, try: <em>"Check my AIMEAT node catalogue"</em></li>'
+    + '<li>' + dt('dev.panel.mcpStep1') + '</li>'
+    + '<li>' + dt('dev.panel.mcpStep2') + '<br><code>' + escHtml(NODE_URL) + '/v1/mcp</code></li>'
+    + '<li>' + dt('dev.panel.mcpStep3') + '</li>'
+    + '<li>' + dt('dev.panel.mcpStep4') + '</li>'
     + '</ol>'
-    + '<p>You\\'ll have access to <strong>14 MCP tools</strong>: catalogue search, memory read/write, action execute, work queue, wallet, boards, storage, and more.</p>'
+    + '<p>' + dt('dev.panel.mcpTools') + '</p>'
     + '</div></div>';
 }
 
 function apiPanel() {
-  return '<div class="panel"><span class="tier-badge tier-B">TIER B \\u2014 Full HTTP</span>'
+  return '<div class="panel"><span class="tier-badge tier-B">' + dt('dev.panel.apiBadge') + '</span>'
     + '<h3 style="margin-top:.75rem">' + dt('dev.tier.api') + '</h3>'
-    + '<p>Your AI can make HTTP calls. Copy this prompt and paste it into your AI chat:</p>'
+    + '<p>' + dt('dev.panel.apiDesc') + '</p>'
     + '<div class="prompt-output">'
     + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
     + '<div class="prompt-text" id="api-prompt">I want you to connect to an AIMEAT node at ' + escHtml(NODE_URL) + '\\n\\n'
@@ -976,9 +892,9 @@ function apiPanel() {
 }
 
 function browsePanel() {
-  return '<div class="panel"><span class="tier-badge tier-C">TIER C \\u2014 Browse Only</span>'
+  return '<div class="panel"><span class="tier-badge tier-C">' + dt('dev.panel.browseBadge') + '</span>'
     + '<h3 style="margin-top:.75rem">' + dt('dev.tier.browse') + '</h3>'
-    + '<p>Your AI can browse URLs. Copy this prompt to get started:</p>'
+    + '<p>' + dt('dev.panel.browseDesc') + '</p>'
     + '<div class="prompt-output">'
     + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
     + '<div class="prompt-text" id="browse-prompt">Browse these AIMEAT endpoints and tell me what\\'s available:\\n\\n'
@@ -987,25 +903,23 @@ function browsePanel() {
     + 'Discovery: ' + escHtml(NODE_URL) + '/.well-known/aimeat\\n\\n'
     + 'You can also browse specific boards and agent profiles once you find them in the catalogue.'
     + '</div></div>'
-    + '<h3 style="margin-top:1rem">Want full access?</h3>'
-    + '<ul style="margin-left:1.5rem"><li>Upgrade your plan for MCP support</li>'
-    + '<li>Or switch to a tool-capable AI (Claude Code, VS Code Copilot)</li>'
-    + '<li>Or use the <a href="#" onclick="switchToPromptPackage();return false">Prompt Package</a> to generate an HTML app</li></ul></div>';
+    + '<h3 style="margin-top:1rem">' + dt('dev.panel.browseUpgradeTitle') + '</h3>'
+    + '<ul style="margin-left:1.5rem"><li>' + dt('dev.panel.browseUpgrade1') + '</li>'
+    + '<li>' + dt('dev.panel.browseUpgrade2') + '</li>'
+    + '<li>' + dt('dev.panel.browseUpgrade3') + '</li></ul></div>';
 }
 
 function promptPackagePanel() {
-  return '<div class="panel"><span class="tier-badge tier-D">TIER D \\u2014 Prompt Package</span>'
+  return '<div class="panel"><span class="tier-badge tier-D">' + dt('dev.panel.promptBadge') + '</span>'
     + '<h3 style="margin-top:.75rem">' + dt('dev.tier.prompt') + '</h3>'
-    + '<p>Your AI can\\'t make web requests, but it can <strong>generate code</strong> for you! '
-    + 'Select what you want to build, then copy the prompt into your AI chat. '
-    + 'The AI will interview you and generate a complete HTML application.</p>'
+    + '<p>' + dt('dev.panel.promptDesc') + '</p>'
     + (isLoggedIn()
-      ? '<p style="color:var(--success);font-size:.85rem">\\u2705 You\\'re logged in \\u2014 after your AI generates the app, come back here to upload it and get a shareable link!</p>'
-      : '<p style="color:var(--muted);font-size:.85rem">\\ud83d\\udc64 Anonymous mode \\u2014 you\\'ll need to share the generated HTML file yourself. <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">Sign up</a> to upload and get a share link.</p>')
+      ? '<p style="color:var(--success);font-size:.85rem">\\u2705 ' + dt('dev.panel.promptLoggedIn') + '</p>'
+      : '<p style="color:var(--muted);font-size:.85rem">\\ud83d\\udc64 ' + dt('dev.panel.promptAnon') + ' <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">' + dt('dev.panel.promptSignUp') + '</a> ' + dt('dev.panel.promptSignUpNote') + '</p>')
     + '<div class="goals" id="goal-grid"></div>'
     + '<div class="prompt-output hidden" id="prompt-pkg-output">'
     + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
-    + '<div class="prompt-text" id="prompt-pkg-text">Loading...</div>'
+    + '<div class="prompt-text" id="prompt-pkg-text">' + dt('dev.panel.loading') + '</div>'
     + '</div></div>';
 }
 
@@ -1023,33 +937,33 @@ function updateStep4() {
   if (isLoggedIn()) {
     shareArea.innerHTML = '<div class="panel">'
       + '<h3>\\ud83d\\udce4 ' + dt('dev.upload') + '</h3>'
-      + '<p>After your AI generates the HTML file, upload it here to get a shareable download link.</p>'
+      + '<p>' + dt('dev.uploadSection.desc') + '</p>'
       + '<div style="margin-bottom:1rem">'
-      + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">Access Code (optional)</label>'
-      + '<input type="text" id="access-code-input" placeholder="Leave empty for public access" '
+      + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">' + dt('dev.uploadSection.accessCodeLabel') + '</label>'
+      + '<input type="text" id="access-code-input" placeholder="' + dt('dev.uploadSection.accessCodePlaceholder') + '" '
       + 'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;color:var(--text);font-size:.85rem;width:100%;max-width:300px" maxlength="64">'
-      + '<p style="font-size:.75rem;color:var(--muted);margin-top:.25rem">If set, downloaders will need this code. 4\\u201364 characters.</p>'
+      + '<p style="font-size:.75rem;color:var(--muted);margin-top:.25rem">' + dt('dev.uploadSection.accessCodeNote') + '</p>'
       + '</div>'
       + '<div class="upload-area" id="upload-drop">'
-      + '<p style="margin-bottom:.5rem">Drag & drop your .html file here, or:</p>'
+      + '<p style="margin-bottom:.5rem">' + dt('dev.uploadSection.dragDrop') + '</p>'
       + '<input type="file" id="upload-input" accept=".html,.htm" style="display:none">'
-      + '<button class="upload-btn" onclick="document.getElementById(\\'upload-input\\').click()">Choose File</button>'
+      + '<button class="upload-btn" onclick="document.getElementById(\\'upload-input\\').click()">' + dt('dev.uploadSection.chooseFile') + '</button>'
       + '</div>'
       + '<div id="upload-result" class="hidden"></div>'
       + '</div>';
     setupUploadHandlers();
   } else {
     shareArea.innerHTML = '<div class="panel">'
-      + '<h3>\\ud83d\\udccc Share Your App</h3>'
-      + '<p>After your AI generates the HTML file:</p>'
+      + '<h3>\\ud83d\\udccc ' + dt('dev.uploadSection.shareTitle') + '</h3>'
+      + '<p>' + dt('dev.uploadSection.shareDesc') + '</p>'
       + '<ol style="margin-left:1.5rem;margin-bottom:1rem">'
-      + '<li>Save the generated code as an <code>.html</code> file</li>'
-      + '<li>Open it in your browser to test</li>'
-      + '<li>Share the file with others via email, cloud drive, or messaging</li>'
+      + '<li>' + dt('dev.uploadSection.shareStep1') + '</li>'
+      + '<li>' + dt('dev.uploadSection.shareStep2') + '</li>'
+      + '<li>' + dt('dev.uploadSection.shareStep3') + '</li>'
       + '</ol>'
       + '<div class="mode-notice mode-notice-anon" style="margin:0">'
       + '<div class="icon">\\ud83d\\udca1</div>'
-      + '<div><strong>Want easier sharing?</strong> <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">Create an account</a> to upload your app and get a personal download link like:<br>'
+      + '<div><strong>' + dt('dev.uploadSection.wantEasier') + '</strong> <a href="#" onclick="document.getElementById(\\'auth-container\\').querySelector(\\'button\\')?.click();return false">' + dt('dev.uploadSection.createAccount') + '</a> ' + dt('dev.uploadSection.downloadLinkNote') + '<br>'
       + '<code style="font-size:.8rem;color:var(--accent)">' + escHtml(NODE_URL) + '/v1/apps/yourname/my-app.html</code></div>'
       + '</div>'
       + '</div>';
@@ -1072,7 +986,7 @@ function setupUploadHandlers() {
 }
 
 async function handleUpload(file) {
-  if (!currentSession) { alert('Please sign in first'); return; }
+  if (!currentSession) { alert(dt('dev.status.signInFirst')); return; }
   var result = document.getElementById('upload-result');
   result.classList.remove('hidden');
   result.innerHTML = '<p style="color:var(--muted)">' + dt('dev.uploading') + ' ' + escHtml(file.name) + '</p>';
@@ -1095,22 +1009,22 @@ async function handleUpload(file) {
       var data = resp.data || resp;
       var downloadUrl = NODE_URL + (data.download_url || '/v1/apps/' + encodeURIComponent(currentSession.owner) + '/' + encodeURIComponent(file.name));
       var isProtected = data.protected;
-      result.innerHTML = '<div style="color:var(--success);font-weight:600;margin-bottom:.5rem">\\u2705 ' + dt('dev.uploaded') + (isProtected ? ' \\ud83d\\udd12 Protected with access code.' : '') + '</div>'
+      result.innerHTML = '<div style="color:var(--success);font-weight:600;margin-bottom:.5rem">\\u2705 ' + dt('dev.uploaded') + (isProtected ? ' \\ud83d\\udd12 ' + dt('dev.uploadSection.protected') : '') + '</div>'
         + '<p>' + dt('dev.shareLink') + ':</p>'
         + '<div class="share-url">'
         + '<input type="text" value="' + escAttr(downloadUrl) + '" readonly id="share-url-input">'
         + '<button class="share-copy" onclick="copyShareUrl()">' + dt('dev.copy') + '</button>'
         + '</div>'
         + '<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)">'
-        + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">\\ud83d\\udd11 Change Access Code</label>'
+        + '<label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">\\ud83d\\udd11 ' + dt('dev.uploadSection.changeCode') + '</label>'
         + '<div style="display:flex;gap:.4rem;align-items:center">'
-        + '<input type="text" id="new-access-code" placeholder="' + (isProtected ? 'New code (or leave empty to remove)' : 'Set a code to protect') + '" '
+        + '<input type="text" id="new-access-code" placeholder="' + (isProtected ? dt('dev.uploadSection.newCodePlaceholder') : dt('dev.uploadSection.setCodePlaceholder')) + '" '
         + 'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;color:var(--text);font-size:.85rem;flex:1;max-width:250px" maxlength="64">'
-        + '<button class="upload-btn" style="padding:.4rem .8rem;font-size:.8rem" onclick="updateAccessCode(\\'' + escAttr(file.name) + '\\')">Update</button>'
+        + '<button class="upload-btn" style="padding:.4rem .8rem;font-size:.8rem" onclick="updateAccessCode(\\'' + escAttr(file.name) + '\\')">' + dt('dev.uploadSection.updateBtn') + '</button>'
         + '</div>'
         + '<div id="code-update-result" style="font-size:.8rem;margin-top:.35rem"></div>'
         + '</div>'
-        + '<p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">File size: ' + formatBytes(file.size) + '</p>';
+        + '<p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">' + dt('dev.uploadSection.fileSize') + formatBytes(file.size) + '</p>';
     } else {
       result.innerHTML = '<p style="color:var(--danger)">' + dt('dev.uploadFailed') + ': ' + escHtml(resp.error?.message || 'Unknown error') + '</p>';
     }
@@ -1129,11 +1043,11 @@ function copyShareUrl() {
 }
 
 async function updateAccessCode(filename) {
-  if (!currentSession) { alert('Please sign in first'); return; }
+  if (!currentSession) { alert(dt('dev.status.signInFirst')); return; }
   var codeInput = document.getElementById('new-access-code');
   var resultEl = document.getElementById('code-update-result');
   var newCode = codeInput ? codeInput.value.trim() : '';
-  resultEl.innerHTML = '<span style="color:var(--muted)">Updating...</span>';
+  resultEl.innerHTML = '<span style="color:var(--muted)">' + dt('dev.status.updating') + '</span>';
   try {
     var resp = await currentSession.fetch('/v1/apps/' + encodeURIComponent(filename), {
       method: 'PATCH',
@@ -1142,8 +1056,8 @@ async function updateAccessCode(filename) {
     if (resp.ok !== undefined ? resp.ok : true) {
       var d = resp.data || resp;
       resultEl.innerHTML = d.protected
-        ? '<span style="color:var(--success)">\\u2705 Access code updated.</span>'
-        : '<span style="color:var(--success)">\\u2705 Access code removed \\u2014 app is now public.</span>';
+        ? '<span style="color:var(--success)">\\u2705 ' + dt('dev.status.codeUpdated') + '</span>'
+        : '<span style="color:var(--success)">\\u2705 ' + dt('dev.status.codeRemoved') + '</span>';
     } else {
       resultEl.innerHTML = '<span style="color:var(--danger)">' + escHtml(resp.error?.message || 'Failed') + '</span>';
     }
@@ -1171,13 +1085,13 @@ async function loadCommunityApps() {
       data.data.apps.forEach(function(app) {
         var item = document.createElement('div');
         item.className = 'app-item';
-        var badge = app.protected ? ' <span style="color:var(--warn);font-size:.75rem">\\ud83d\\udd12 Protected</span>' : '';
+        var badge = app.protected ? ' <span style="color:var(--warn);font-size:.75rem">\\ud83d\\udd12 ' + dt('dev.appList.protected') + '</span>' : '';
         item.innerHTML = '<div class="app-name">' + escHtml(app.filename) + badge + '</div>'
-          + '<div class="app-meta">by ' + escHtml(app.owner) + ' \\u00b7 ' + formatBytes(app.size) + '</div>';
+          + '<div class="app-meta">' + dt('dev.appList.by') + escHtml(app.owner) + ' \\u00b7 ' + formatBytes(app.size) + '</div>';
         if (app.protected) {
           var codeId = 'dlcode-' + app.owner + '-' + app.filename;
           item.innerHTML += '<div style="margin-top:.5rem">'
-            + '<input type="text" placeholder="Access code" id="' + escAttr(codeId) + '" '
+            + '<input type="text" placeholder="' + dt('dev.appList.accessCode') + '" id="' + escAttr(codeId) + '" '
             + 'style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.25rem .4rem;color:var(--text);font-size:.8rem;width:120px;margin-right:.4rem">'
             + '<a href="#" onclick="downloadProtected(\\'' + escAttr(app.download_url) + '\\',\\'' + escAttr(codeId) + '\\');return false" style="font-size:.85rem">\\u2b07 ' + dt('dev.download') + '</a>'
             + '</div>';
@@ -1189,7 +1103,7 @@ async function loadCommunityApps() {
           var manageId = 'manage-' + app.owner + '-' + app.filename;
           item.innerHTML += '<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)">'
             + '<div style="display:flex;gap:.3rem;align-items:center">'
-            + '<input type="text" id="' + escAttr(manageId) + '" placeholder="' + (app.protected ? 'New code or empty to remove' : 'Set access code') + '" '
+            + '<input type="text" id="' + escAttr(manageId) + '" placeholder="' + (app.protected ? dt('dev.appList.newCodePlaceholder') : dt('dev.appList.setCodePlaceholder')) + '" '
             + 'style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;color:var(--text);font-size:.8rem;width:140px">'
             + '<button style="background:var(--accent);color:var(--bg);border:none;border-radius:4px;padding:.2rem .5rem;cursor:pointer;font-size:.75rem;font-weight:600" '
             + 'onclick="updateAppCode(\\'' + escAttr(app.filename) + '\\',\\'' + escAttr(manageId) + '\\')">\\ud83d\\udd11</button>'
@@ -1206,7 +1120,7 @@ async function loadCommunityApps() {
 function downloadProtected(downloadPath, codeInputId) {
   var codeInput = document.getElementById(codeInputId);
   var code = codeInput ? codeInput.value.trim() : '';
-  if (!code) { alert('Please enter the access code'); return; }
+  if (!code) { alert(dt('dev.appList.enterCode')); return; }
   var url = NODE_URL + downloadPath + '?code=' + encodeURIComponent(code);
   var a = document.createElement('a');
   a.href = url; a.download = ''; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -1217,7 +1131,7 @@ async function updateAppCode(filename, inputId) {
   var input = document.getElementById(inputId);
   var resultEl = document.getElementById(inputId + '-result');
   var newCode = input ? input.value.trim() : '';
-  resultEl.innerHTML = '<span style="color:var(--muted)">Updating...</span>';
+  resultEl.innerHTML = '<span style="color:var(--muted)">' + dt('dev.status.updating') + '</span>';
   try {
     var resp = await currentSession.fetch('/v1/apps/' + encodeURIComponent(filename), {
       method: 'PATCH',
@@ -1226,8 +1140,8 @@ async function updateAppCode(filename, inputId) {
     if (resp.ok !== undefined ? resp.ok : true) {
       var d = resp.data || resp;
       resultEl.innerHTML = d.protected
-        ? '<span style="color:var(--success)">\\u2705 Code updated</span>'
-        : '<span style="color:var(--success)">\\u2705 Code removed</span>';
+        ? '<span style="color:var(--success)">\\u2705 ' + dt('dev.status.codeUpdatedShort') + '</span>'
+        : '<span style="color:var(--success)">\\u2705 ' + dt('dev.status.codeRemovedShort') + '</span>';
       loadCommunityApps();
     } else {
       resultEl.innerHTML = '<span style="color:var(--danger)">' + escHtml(resp.error?.message || 'Failed') + '</span>';
@@ -1239,14 +1153,14 @@ async function updateAppCode(filename, inputId) {
 
 // ── Goal selection (for prompt package) ──
 var GOALS = [
-  { id: 'dashboard', icon: '\\ud83d\\udccb', label: 'Personal Dashboard' },
-  { id: 'notes', icon: '\\ud83d\\udcdd', label: 'Note-Taking App' },
-  { id: 'game', icon: '\\ud83c\\udfae', label: 'Multiplayer Game' },
-  { id: 'news', icon: '\\ud83d\\udcf0', label: 'News / Content Reader' },
-  { id: 'marketplace', icon: '\\ud83d\\uded2', label: 'Service Marketplace' },
-  { id: 'chat', icon: '\\ud83d\\udcac', label: 'Chat / Messaging' },
-  { id: 'iot', icon: '\\ud83d\\udcca', label: 'IoT / Data Dashboard' },
-  { id: 'custom', icon: '\\ud83d\\udd27', label: 'Custom \\u2014 I\\'ll Describe' },
+  { id: 'dashboard', icon: '\\ud83d\\udccb', label: dt('dev.goals.dashboard') },
+  { id: 'notes', icon: '\\ud83d\\udcdd', label: dt('dev.goals.notes') },
+  { id: 'game', icon: '\\ud83c\\udfae', label: dt('dev.goals.game') },
+  { id: 'news', icon: '\\ud83d\\udcf0', label: dt('dev.goals.news') },
+  { id: 'marketplace', icon: '\\ud83d\\uded2', label: dt('dev.goals.marketplace') },
+  { id: 'chat', icon: '\\ud83d\\udcac', label: dt('dev.goals.chat') },
+  { id: 'iot', icon: '\\ud83d\\udcca', label: dt('dev.goals.iot') },
+  { id: 'custom', icon: '\\ud83d\\udd27', label: dt('dev.goals.custom') },
 ];
 
 var observer = new MutationObserver(function() {

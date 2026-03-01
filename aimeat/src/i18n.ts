@@ -87,3 +87,44 @@ export function resolveLocale(
   if (fromCookie) return fromCookie;
   return detectLocale(acceptLang);
 }
+
+/** Extract all keys under a prefix as a flat Record for client-side embedding.
+ *  e.g. resolveFlat('fi', 'profile') → { 'profile.title': '...', 'profile.stats.agents': '...', ... }
+ *  Falls back to DEFAULT_LOCALE for missing keys. */
+export function resolveFlat(locale: Locale, prefix: string): Record<string, string> {
+  const dict = translations.get(locale);
+  const fallback = locale !== DEFAULT_LOCALE ? translations.get(DEFAULT_LOCALE) : undefined;
+  const result: Record<string, string> = {};
+
+  function navigateTo(d: Dict, pfx: string): Dict | undefined {
+    const parts = pfx.split('.');
+    let cur: string | string[] | Dict = d;
+    for (const p of parts) {
+      if (typeof cur !== 'object' || cur === null || Array.isArray(cur)) return undefined;
+      cur = (cur as Dict)[p];
+    }
+    if (typeof cur === 'object' && cur !== null && !Array.isArray(cur)) return cur as Dict;
+    return undefined;
+  }
+
+  function collect(obj: Dict, path: string, overwrite: boolean): void {
+    for (const [k, v] of Object.entries(obj)) {
+      const full = path ? `${path}.${k}` : k;
+      if (typeof v === 'string') { if (overwrite || !(full in result)) result[full] = v; }
+      else if (Array.isArray(v)) { if (overwrite || !(full in result)) result[full] = v.join(', '); }
+      else if (typeof v === 'object' && v !== null) collect(v as Dict, full, overwrite);
+    }
+  }
+
+  // Walk the primary locale
+  const sub = dict ? navigateTo(dict, prefix) : undefined;
+  if (sub) collect(sub, prefix, true);
+
+  // Fill in missing keys from fallback
+  if (fallback) {
+    const fbSub = navigateTo(fallback, prefix);
+    if (fbSub) collect(fbSub, prefix, false);
+  }
+
+  return result;
+}
