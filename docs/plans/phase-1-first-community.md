@@ -1525,6 +1525,16 @@ Phase 1 (tämä dokumentti):
 
 ---
 
+## Seuraava vaihe: Phase 2
+
+Phase 1 valmistuttua siirrytään Phase 2:een — markkinapaikka + yhteisötyökalut.
+
+→ **[Phase 2: "Markkinapaikka + yhteisötyökalut" — Kattava implementointisuunnitelma](./phase-2-marketplace-community.md)**
+
+Phase 2 rakentaa: AI-matchaus-agentin (2.1), Organismit/ryhmät (2.2), Collaborative workspaces (2.3), Advanced moderoinnin (2.4), CSM-templatekirjaston (2.5), ja yhdistää kaiken Markkinapaikka-vertikaalisliceksi (2.6).
+
+---
+
 *AIMEAT — AI Memory Exchange and Action Transfer*
 
 Overscale Solutions Oy, 2026
