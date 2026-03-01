@@ -207,9 +207,9 @@ Composio on kehittäjälähtöinen integraatioalusta AI-agenteille. Se tarjoaa:
 
 ---
 
-## 3. Ehdotus: MEAT Service Manifest (MSM)
+## 3. Ehdotus:AIMEAT Service Manifest (MSM)
 
-Yhdistämällä parhaat puolet kaikista tutkituista standardeista ehdotan **MEAT Service Manifest (MSM)** -formaattia. Tämä on YAML/JSON-dokumentti joka kuvaa ulkoisen palvelun niin, että AI-agentti voi automaattisesti:
+Yhdistämällä parhaat puolet kaikista tutkituista standardeista ehdotan**AIMEAT Service Manifest (MSM)** -formaattia. Tämä on YAML/JSON-dokumentti joka kuvaa ulkoisen palvelun niin, että AI-agentti voi automaattisesti:
 
 1. **Generoida** AIMEAT-actionin (`POST /v1/actions`)
 2. **Rakentaa** webhook-handlerin
@@ -219,7 +219,7 @@ Yhdistämällä parhaat puolet kaikista tutkituista standardeista ehdotan **MEAT
 ### 3.1 MSM-formaatti
 
 ```yaml
-# MEAT Service Manifest v1.0
+#AIMEAT Service Manifest v1.0
 msm: "1.0"
 service:
   name: "DeepL Translation"
@@ -725,7 +725,7 @@ Loppukäyttäjän kokemus kännykällä:
 
 ```
                     ┌──────────────────────────────────────┐
-                    │     MEAT Service Manifest (MSM)       │
+                    │    AIMEAT Service Manifest (MSM)       │
                     │     ─ Yksinkertainen YAML-formaatti   │
                     │     ─ AI-generoitava                  │
                     │     ─ Validoitava JSON Schemalla      │
