@@ -135,6 +135,40 @@ a:hover{text-decoration:underline;color:var(--love3)}
 .peer-dot.alive{background:var(--success)}
 .peer-dot.dead{background:var(--danger)}
 
+/* Personal Node cards */
+.pn-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.75rem;transition:border-color .2s;overflow:hidden}
+.pn-card:hover{border-color:var(--love1)}
+.pn-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;cursor:pointer;user-select:none}
+.pn-header-left{display:flex;align-items:center;gap:.75rem}
+.pn-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.pn-status-dot.online{background:var(--success);box-shadow:0 0 6px rgba(34,197,94,.4)}
+.pn-status-dot.offline{background:var(--danger)}
+.pn-status-dot.degraded{background:var(--warn)}
+.pn-status-dot.detached{background:var(--muted)}
+.pn-name{font-weight:600;font-family:monospace;font-size:.9rem}
+.pn-badges{display:flex;gap:.4rem;align-items:center}
+.pn-quick{font-size:.8rem;color:var(--muted);padding:0 1.25rem .75rem}
+.pn-arrow{color:var(--muted);font-size:.8rem;transition:transform .2s}
+.pn-arrow.open{transform:rotate(180deg)}
+.pn-details{display:none;padding:0 1.25rem 1.25rem;border-top:1px solid rgba(255,107,157,.08)}
+.pn-details.open{display:block}
+.pn-detail-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(255,107,157,.06);font-size:.85rem}
+.pn-detail-row:last-child{border-bottom:none}
+.pn-detail-label{color:var(--muted);font-size:.8rem}
+.pn-detail-value{font-family:monospace;font-size:.8rem;color:var(--text);word-break:break-all}
+.pn-agent-list{display:flex;flex-direction:column;gap:.3rem;margin:.5rem 0}
+.pn-agent-item{font-family:monospace;font-size:.8rem;color:var(--love3);padding:.2rem .5rem;background:rgba(255,107,157,.08);border-radius:4px}
+.pn-vis-toggle{display:flex;gap:2px;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.pn-vis-btn{padding:4px 12px;border:none;cursor:pointer;font-size:.75rem;font-weight:600;background:transparent;color:var(--muted);transition:all .2s}
+.pn-vis-btn.active{background:var(--love1);color:#fff}
+.pn-vis-btn:hover:not(.active){color:var(--text)}
+.pn-setup{display:none;margin-top:.75rem;background:rgba(15,10,20,.6);border:1px solid rgba(255,107,157,.1);border-radius:8px;padding:1rem;font-size:.85rem;line-height:1.7}
+.pn-setup.open{display:block}
+.pn-setup ol{margin-left:1.5rem;margin-bottom:.5rem}
+.pn-setup li{margin-bottom:.3rem;color:var(--muted)}
+.pn-detach-btn{margin-top:.75rem;padding:6px 16px;background:transparent;color:var(--danger);border:1px solid var(--danger);border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
+.pn-detach-btn:hover{background:rgba(239,68,68,.15)}
+
 /* Agent CTA */
 .agent-cta{background:linear-gradient(135deg,rgba(30,20,40,.95),rgba(50,20,50,.9));border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
 .agent-cta h3{color:var(--love1);margin-bottom:.5rem;font-size:1.05rem}
@@ -333,6 +367,7 @@ textarea.input-field{resize:vertical;min-height:60px}
     <div class="stat-card"><div class="num" id="stat-work">-</div><div class="label">${sanitize(translations['profile.stats.tasks'] || 'Tasks')}</div></div>
     <div class="stat-card"><div class="num" id="stat-apps">-</div><div class="label">${sanitize(translations['profile.stats.apps'] || 'Apps')}</div></div>
     <div class="stat-card"><div class="num" id="stat-files">-</div><div class="label">${sanitize(translations['profile.stats.files'] || 'Files')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-nodes">-</div><div class="label">${sanitize(translations['profile.stats.nodes'] || 'Nodes')}</div></div>
   </div>
 
   <!-- Tabs -->
@@ -345,6 +380,7 @@ textarea.input-field{resize:vertical;min-height:60px}
     <button class="tab" data-tab="boards">${sanitize(translations['profile.tabs.boards'] || 'Boards')}</button>
     <button class="tab" data-tab="apps">${sanitize(translations['profile.tabs.apps'] || 'Apps')}</button>
     <button class="tab" data-tab="federation">${sanitize(translations['profile.tabs.federation'] || 'Federation')}</button>
+    <button class="tab" data-tab="nodes">${sanitize(translations['profile.tabs.nodes'] || 'Nodes')}</button>
     <button class="tab" data-tab="access">${sanitize(translations['profile.tabs.access'] || 'Access')}</button>
   </div>
 
@@ -535,6 +571,49 @@ textarea.input-field{resize:vertical;min-height:60px}
     <div id="federation-area"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.federation.loading'] || 'Loading federation info...')}</span></div>
   </div>
 
+  <!-- ═══ PERSONAL NODES ═══ -->
+  <div class="tab-panel" id="panel-nodes">
+    <div class="section-title">${sanitize(translations['profile.nodes.title'] || 'Personal Nodes')}</div>
+    <div class="section-desc">${sanitize(translations['profile.nodes.desc'] || '')}</div>
+
+    <!-- Add Node button -->
+    <button class="expand-btn" id="add-node-btn" onclick="toggleAddNodeForm()" style="margin-bottom:1.25rem">${sanitize(translations['profile.nodes.addBtn'] || '+ Add Node')}</button>
+
+    <!-- Add Node form (hidden) -->
+    <div id="add-node-form" style="display:none">
+      <div class="card" style="border-color:var(--love1);margin-bottom:1.5rem">
+        <h3 style="color:var(--love1);margin-bottom:1rem;font-size:1rem">${sanitize(translations['profile.nodes.addTitle'] || 'Register a Personal Node')}</h3>
+        <div style="margin-bottom:.75rem">
+          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:.3rem">${sanitize(translations['profile.nodes.nodeIdLabel'] || 'Node ID')}</label>
+          <input id="node-id-input" type="text" placeholder="${sanitize(translations['profile.nodes.nodeIdPlaceholder'] || 'personal-my-laptop')}" style="width:100%;padding:8px 12px;background:rgba(15,10,20,.8);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:monospace;font-size:.85rem">
+        </div>
+        <div style="margin-bottom:.75rem">
+          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:.3rem">${sanitize(translations['profile.nodes.visLabel'] || 'Visibility')}</label>
+          <div style="display:flex;gap:1rem">
+            <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.85rem">
+              <input type="radio" name="node-vis" value="private" checked style="accent-color:var(--love1)"> ${sanitize(translations['profile.nodes.private'] || 'Private')}
+              <span style="font-size:.75rem;color:var(--muted)">\u2014 ${sanitize(translations['profile.nodes.privateDesc'] || 'Hidden from federation')}</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.85rem">
+              <input type="radio" name="node-vis" value="public" style="accent-color:var(--love1)"> ${sanitize(translations['profile.nodes.public'] || 'Public')}
+              <span style="font-size:.75rem;color:var(--muted)">\u2014 ${sanitize(translations['profile.nodes.publicDesc'] || 'Discoverable')}</span>
+            </label>
+          </div>
+        </div>
+        <div style="margin-bottom:1rem">
+          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:.3rem">${sanitize(translations['profile.nodes.agentGaiisLabel'] || 'Agent GAIIs')}</label>
+          <input id="node-gaiis-input" type="text" placeholder="${sanitize(translations['profile.nodes.agentGaiisPlaceholder'] || 'bot1#owner, bot2#owner')}" style="width:100%;padding:8px 12px;background:rgba(15,10,20,.8);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem">
+        </div>
+        <div style="display:flex;gap:.75rem">
+          <button onclick="registerNode()" style="padding:8px 20px;background:linear-gradient(135deg,var(--love1),var(--love2));color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem">${sanitize(translations['profile.nodes.registerBtn'] || 'Register')}</button>
+          <button onclick="toggleAddNodeForm()" style="padding:8px 20px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:.85rem">${sanitize(translations['profile.nodes.cancelBtn'] || 'Cancel')}</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="nodes-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.nodes.loading'] || 'Loading...')}</span></div>
+  </div>
+
   <!-- ═══ ACCESS ═══ -->
   <div class="tab-panel" id="panel-access">
     <div class="section-title">${sanitize(translations['profile.access.title'] || 'Access Codes & Tokens')}</div>
@@ -680,6 +759,7 @@ async function loadAll() {
   loadApps();
   loadFederation();
   loadAccess();
+  loadNodes();
 }
 
 // Helper to do authenticated fetch
@@ -1692,6 +1772,211 @@ async function loadAccess() {
     + '<div style="font-size:.75rem;color:var(--muted);margin-top:.3rem">' + t('profile.access.mcpDesc') + '</div></div>';
 
   el.innerHTML = html;
+}
+
+// ── Personal Nodes ──
+var nodesData = [];
+
+async function loadNodes() {
+  var el = document.getElementById('nodes-list');
+  try {
+    var data = await apiFetch('/v1/personal/status');
+    var nodes = [];
+    if (data && data.data && data.data.node_id) {
+      nodes.push(data.data);
+    }
+    if (nodes.length === 0 && data && data.error && data.error.code === 'NOT_FOUND') {
+      nodes = [];
+    }
+    nodesData = nodes;
+    document.getElementById('stat-nodes').textContent = nodes.length;
+
+    if (nodes.length === 0) {
+      el.innerHTML = '<div class="empty">' + t('profile.nodes.empty') + '</div>';
+      return;
+    }
+
+    var html = '';
+    nodes.forEach(function(node, idx) {
+      var statusClass = node.status || 'offline';
+      var statusLabel = t('profile.nodes.' + statusClass) || statusClass;
+      var visBadge = node.visibility === 'public'
+        ? '<span class="badge badge-success">' + t('profile.nodes.public') + '</span>'
+        : '<span class="badge badge-muted">' + t('profile.nodes.private') + '</span>';
+      var agentCount = node.agent_gaiis ? node.agent_gaiis.length : 0;
+      var agentWord = agentCount === 1 ? t('profile.nodes.agent') : t('profile.nodes.agents');
+      var mailboxCount = node.mailbox ? node.mailbox.items : 0;
+      var tunnelUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
+
+      html += '<div class="pn-card" id="pn-' + idx + '">'
+        + '<div class="pn-header" onclick="toggleNodeCard(' + idx + ')">'
+        + '<div class="pn-header-left">'
+        + '<div class="pn-status-dot ' + statusClass + '"></div>'
+        + '<span class="pn-name">' + escHtml(node.node_id) + '</span>'
+        + '</div>'
+        + '<div class="pn-badges">'
+        + visBadge
+        + ' <span class="badge badge-' + (statusClass === 'online' ? 'success' : statusClass === 'degraded' ? 'warn' : 'danger') + '">' + statusLabel + '</span>'
+        + ' <span class="pn-arrow" id="pn-arrow-' + idx + '">\\u25BC</span>'
+        + '</div></div>'
+        + '<div class="pn-quick">' + agentCount + ' ' + agentWord + ' \\u2502 ' + t('profile.nodes.mailboxItems') + ': ' + mailboxCount + ' ' + t('profile.nodes.items') + '</div>'
+        + '<div class="pn-details" id="pn-details-' + idx + '">';
+
+      // Tunnel URL
+      html += '<div class="pn-detail-row"><span class="pn-detail-label">' + t('profile.nodes.tunnelUrl') + '</span>'
+        + '<span class="pn-detail-value" style="display:flex;align-items:center;gap:.5rem"><code style="font-size:.75rem">' + escHtml(tunnelUrl) + '</code>'
+        + '<button onclick="copyTunnelUrl()" style="padding:2px 8px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--love4);cursor:pointer;font-size:.7rem">' + t('profile.nodes.copyUrl') + '</button></span></div>';
+
+      // Agents
+      html += '<div style="padding:.5rem 0"><span class="pn-detail-label">' + t('profile.nodes.agentList') + '</span>';
+      if (node.agent_gaiis && node.agent_gaiis.length > 0) {
+        html += '<div class="pn-agent-list">';
+        node.agent_gaiis.forEach(function(g) { html += '<div class="pn-agent-item">' + escHtml(g) + '</div>'; });
+        html += '</div>';
+      } else {
+        html += '<div style="font-size:.8rem;color:var(--muted);margin-top:.3rem">' + t('profile.nodes.noAgents') + '</div>';
+      }
+      html += '</div>';
+
+      // Mailbox
+      var mbUsed = node.mailbox ? node.mailbox.used_bytes : 0;
+      var mbQuota = node.mailbox ? node.mailbox.quota_bytes : 0;
+      var mbUsedMB = (mbUsed / 1024 / 1024).toFixed(1);
+      var mbQuotaMB = (mbQuota / 1024 / 1024).toFixed(0);
+      html += '<div class="pn-detail-row"><span class="pn-detail-label">' + t('profile.nodes.mailbox') + '</span>'
+        + '<span class="pn-detail-value">' + mailboxCount + ' ' + t('profile.nodes.items') + ' (' + mbUsedMB + ' ' + t('profile.nodes.mailboxOf') + ' ' + mbQuotaMB + ' MB)</span></div>';
+
+      // Last seen
+      html += '<div class="pn-detail-row"><span class="pn-detail-label">' + t('profile.nodes.lastSeen') + '</span>'
+        + '<span class="pn-detail-value">' + escHtml(node.last_seen ? timeAgo(node.last_seen) : '-') + '</span></div>';
+
+      // Visibility toggle
+      html += '<div class="pn-detail-row"><span class="pn-detail-label">' + t('profile.nodes.visibility') + '</span>'
+        + '<div class="pn-vis-toggle">'
+        + '<button class="pn-vis-btn ' + (node.visibility !== 'public' ? 'active' : '') + '" onclick="setNodeVis(\\'' + escHtml(node.node_id) + '\\',\\'private\\')">' + t('profile.nodes.private') + '</button>'
+        + '<button class="pn-vis-btn ' + (node.visibility === 'public' ? 'active' : '') + '" onclick="setNodeVis(\\'' + escHtml(node.node_id) + '\\',\\'public\\')">' + t('profile.nodes.public') + '</button>'
+        + '</div></div>';
+
+      // Setup instructions
+      html += '<div style="margin-top:.75rem"><button class="expand-btn" onclick="toggleSetup(' + idx + ')" style="font-size:.8rem;padding:6px 12px">' + t('profile.nodes.setupTitle') + ' <span style="transition:transform .2s">\\u25BC</span></button>'
+        + '<div class="pn-setup" id="pn-setup-' + idx + '">'
+        + '<ol>'
+        + '<li>' + t('profile.nodes.setupStep1') + '</li>'
+        + '<li>' + t('profile.nodes.setupStep2') + '</li>'
+        + '<li>' + t('profile.nodes.setupStep3') + '</li>'
+        + '<li>' + t('profile.nodes.setupStep4') + '</li>'
+        + '</ol>'
+        + '<a href="/docs/personal-node-setup-guide.md" target="_blank" style="color:var(--love1);font-size:.8rem">' + t('profile.nodes.setupDocs') + ' \\u2192</a>'
+        + '</div></div>';
+
+      // Detach button
+      html += '<button class="pn-detach-btn" onclick="detachNode(\\'' + escHtml(node.node_id) + '\\')">' + t('profile.nodes.detachBtn') + '</button>';
+
+      html += '</div></div>';
+    });
+
+    el.innerHTML = html;
+  } catch(e) {
+    document.getElementById('stat-nodes').textContent = '0';
+    if (e && e.message && e.message.includes('NOT_FOUND')) {
+      el.innerHTML = '<div class="empty">' + t('profile.nodes.empty') + '</div>';
+    } else {
+      el.innerHTML = '<div class="empty">' + t('profile.nodes.error') + '</div>';
+    }
+  }
+}
+
+function copyTunnelUrl() {
+  var url = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
+  copyToClipboard(url).then(function() { showToast(t('profile.nodes.copied')); });
+}
+
+function toggleNodeCard(idx) {
+  var details = document.getElementById('pn-details-' + idx);
+  var arrow = document.getElementById('pn-arrow-' + idx);
+  if (!details) return;
+  details.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open');
+}
+
+function toggleSetup(idx) {
+  var el = document.getElementById('pn-setup-' + idx);
+  if (el) el.classList.toggle('open');
+}
+
+function toggleAddNodeForm() {
+  var form = document.getElementById('add-node-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function timeAgo(iso) {
+  var ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60000) return 'just now';
+  if (ms < 3600000) return Math.floor(ms / 60000) + ' min ago';
+  if (ms < 86400000) return Math.floor(ms / 3600000) + 'h ago';
+  return Math.floor(ms / 86400000) + 'd ago';
+}
+
+async function setNodeVis(nodeId, vis) {
+  try {
+    await session.fetch('/v1/personal/anchor/' + encodeURIComponent(nodeId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visibility: vis }),
+    });
+    showToast(t('profile.nodes.visUpdated'));
+    loadNodes();
+  } catch(e) {
+    showToast(t('profile.error'), true);
+  }
+}
+
+async function registerNode() {
+  var nodeId = document.getElementById('node-id-input').value.trim();
+  if (!nodeId) { showToast(t('profile.nodes.registerFailed'), true); return; }
+  if (!nodeId.startsWith('personal-')) nodeId = 'personal-' + nodeId;
+
+  var visRadio = document.querySelector('input[name="node-vis"]:checked');
+  var visibility = visRadio ? visRadio.value : 'private';
+
+  var gaiisRaw = document.getElementById('node-gaiis-input').value.trim();
+  var agentGaiis = gaiisRaw ? gaiisRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+
+  try {
+    var resp = await session.fetch('/v1/personal/anchor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        node_id: nodeId,
+        owner_name: session.owner,
+        public_key: session.publicKey || 'placeholder',
+        agent_gaiis: agentGaiis,
+        visibility: visibility,
+      }),
+    });
+    if (resp && resp.ok !== false) {
+      showToast(t('profile.nodes.registered'));
+      toggleAddNodeForm();
+      document.getElementById('node-id-input').value = '';
+      document.getElementById('node-gaiis-input').value = '';
+      loadNodes();
+    } else {
+      showToast((resp && resp.error && resp.error.message) || t('profile.nodes.registerFailed'), true);
+    }
+  } catch(e) {
+    showToast(t('profile.nodes.registerFailed'), true);
+  }
+}
+
+async function detachNode(nodeId) {
+  if (!confirm(t('profile.nodes.detachConfirm'))) return;
+  try {
+    await session.fetch('/v1/personal/anchor/' + encodeURIComponent(nodeId), { method: 'DELETE' });
+    showToast(t('profile.nodes.detached.toast'));
+    loadNodes();
+  } catch(e) {
+    showToast(t('profile.error'), true);
+  }
 }
 
 <\/script>

@@ -7,6 +7,11 @@ export const AnchorRequestSchema = z.object({
     owner_name: z.string().min(3).max(64),
     public_key: z.string().min(10),
     agent_gaiis: z.array(z.string()).optional(),
+    visibility: z.enum(['private', 'public']).optional(),
+});
+
+export const VisibilityUpdateSchema = z.object({
+    visibility: z.enum(['private', 'public']),
 });
 
 // ── Identity ────────────────────────────────────────────────

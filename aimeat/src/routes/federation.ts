@@ -35,7 +35,8 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
 
         if (config.personalNodesEnabled) {
             const personalNodes = await storage.listPersonalNodes();
-            personalNodesList = personalNodes.map(pn => ({
+            const publicNodes = personalNodes.filter(pn => pn.visibility === 'public');
+            personalNodesList = publicNodes.map(pn => ({
                 node_id: pn.nodeId,
                 type: 'personal',
                 anchor_operator: pn.anchorNodeId,

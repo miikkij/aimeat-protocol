@@ -5,7 +5,7 @@ import type { TunnelManager } from '../services/personal-tunnel.js';
 import { MailboxService } from '../services/mailbox.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { AnchorRequestSchema, validateBody } from '../models/schemas.js';
+import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 
 export function personalRouter(config: MeatConfig, storage: Storage, tunnelManager: TunnelManager | null): Router {
@@ -20,7 +20,7 @@ export function personalRouter(config: MeatConfig, storage: Storage, tunnelManag
         return;
       }
 
-      const { node_id, owner_name, public_key, agent_gaiis } = (req as any).validated;
+      const { node_id, owner_name, public_key, agent_gaiis, visibility } = (req as any).validated;
       const ownerFromAuth = req.auth!.owner;
 
       // Verify the requesting owner matches
@@ -54,6 +54,7 @@ export function personalRouter(config: MeatConfig, storage: Storage, tunnelManag
         lastSeen: now,
         mailboxQuotaBytes: config.personalNodeMailboxQuotaMb * 1024 * 1024,
         mailboxUsedBytes: 0,
+        visibility: visibility ?? 'private',
         createdAt: now,
         updatedAt: now,
       });
@@ -67,6 +68,7 @@ export function personalRouter(config: MeatConfig, storage: Storage, tunnelManag
         tunnel_url: tunnelUrl,
         mailbox_quota_bytes: record.mailboxQuotaBytes,
         created_at: record.createdAt,
+        visibility: record.visibility,
       }, [
         {
           description: 'Connect via WebSocket tunnel',
@@ -103,6 +105,7 @@ export function personalRouter(config: MeatConfig, storage: Storage, tunnelManag
         anchor_operator: node.anchorNodeId,
         status: isConnected ? 'online' : node.status,
         agent_gaiis: node.agentGaiis,
+        visibility: node.visibility,
         last_seen: node.lastSeen,
         mailbox: {
           items: mailboxStats.count,
@@ -135,6 +138,7 @@ export function personalRouter(config: MeatConfig, storage: Storage, tunnelManag
         return {
           node_id: node.nodeId,
           owner_name: node.ownerName,
+          visibility: node.visibility,
           status: isConnected ? 'online' : node.status,
           agent_count: node.agentGaiis.length,
           last_seen: node.lastSeen,
@@ -153,6 +157,39 @@ export function personalRouter(config: MeatConfig, storage: Storage, tunnelManag
     } catch (err) {
       logger.error('Failed to list personal nodes', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list personal nodes'));
+    }
+  });
+
+  // PATCH /v1/personal/anchor/:nodeId — Update personal node settings (visibility)
+  // Note: operators can also update any personal node (consistent with DELETE pattern)
+  router.patch('/v1/personal/anchor/:nodeId', requireAuth(), requireRole('owner'), validateBody(VisibilityUpdateSchema, config.nodeId), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only update your own personal nodes'));
+        return;
+      }
+
+      const { visibility } = (req as any).validated;
+
+      const updated = await storage.updatePersonalNode(nodeId, { visibility });
+
+      res.json(success(config.nodeId, {
+        node_id: updated!.nodeId,
+        visibility: updated!.visibility,
+        updated_at: updated!.updatedAt,
+      }));
+    } catch (err) {
+      logger.error('Failed to update personal node', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update personal node'));
     }
   });
 

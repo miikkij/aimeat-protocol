@@ -213,6 +213,7 @@ export interface PersonalNodeRecord {
   lastSeen: string;             // ISO timestamp
   mailboxQuotaBytes: number;    // allocated quota
   mailboxUsedBytes: number;     // current usage
+  visibility: 'private' | 'public';  // federation directory visibility
   createdAt: string;
   updatedAt: string;
 }
