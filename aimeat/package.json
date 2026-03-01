@@ -8,7 +8,7 @@
     "aimeat": "dist/bin/aimeat.js"
   },
   "scripts": {
-    "dev": "node --env-file=.env --import tsx src/index.ts start",
+    "dev": "tsx scripts/kill-port.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
     "build": "tsc && cp -r locales dist/",
     "start": "node --env-file=.env dist/src/index.js start",
