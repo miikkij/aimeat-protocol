@@ -4,7 +4,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 interface ConfigEntry {
   envVar: string;
@@ -28,7 +28,7 @@ function maskUrl(url: string): string {
   return url.replace(/\/\/([^@]+)@/, '//*****@');
 }
 
-export function formatConfig(config: MeatConfig): string {
+export function formatConfig(config: AimeatConfig): string {
   const env = process.env;
 
   const sections: ConfigSection[] = [
@@ -39,7 +39,7 @@ export function formatConfig(config: MeatConfig): string {
           envVar: 'AIMEAT_NODE_ID',
           description: 'Unique name for this node on the network',
           value: config.nodeId,
-          defaultVal: 'meat-local-001-dev',
+          defaultVal: 'aimeat-local-001-dev',
         },
         {
           envVar: 'AIMEAT_NODE_TYPE',
@@ -223,6 +223,18 @@ export function formatConfig(config: MeatConfig): string {
       title: 'Federation',
       entries: [
         {
+          envVar: 'AIMEAT_FEDERATION_ROLE',
+          description: 'Network role: operator (genesis directory), contributor (join genesis), standalone',
+          value: config.federationRole,
+          defaultVal: 'standalone',
+        },
+        {
+          envVar: 'AIMEAT_GENESIS_URL',
+          description: 'Genesis node URL to register with (for contributor role)',
+          value: config.genesisUrl ?? '(not set)',
+          defaultVal: '(none)',
+        },
+        {
           envVar: 'AIMEAT_MAX_RELAY_HOPS',
           description: 'Maximum number of hops when relaying between nodes',
           value: String(config.maxRelayHops),
@@ -291,6 +303,17 @@ export function formatConfig(config: MeatConfig): string {
           description: 'Rate limit for board requests',
           value: String(config.rateLimits.boards.max),
           defaultVal: '60',
+        },
+      ],
+    },
+    {
+      title: 'Search Indexing',
+      entries: [
+        {
+          envVar: 'AIMEAT_INDEXNOW_KEY',
+          description: 'IndexNow key for Bing/Yandex search indexing. Run "pnpm indexnow" after setting.',
+          value: config.indexNowKey ?? '(not set)',
+          defaultVal: '(none)',
         },
       ],
     },

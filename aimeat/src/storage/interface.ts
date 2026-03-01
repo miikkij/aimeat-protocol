@@ -161,7 +161,7 @@ export interface PeeringRequestRecord {
   targetUrl?: string;
   publicKey?: string;
   message?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'auto_approved';
   createdAt: string;
   updatedAt: string;
 }

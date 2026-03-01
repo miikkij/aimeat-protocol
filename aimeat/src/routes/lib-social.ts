@@ -1,10 +1,10 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 /**
  * aimeat-social.js — Boards & social feed client library
  * Depends on AIMEAT.auth being loaded first.
  */
-export function aimeatSocialLib(config: MeatConfig): string {
+export function aimeatSocialLib(config: AimeatConfig): string {
     return `// aimeat-social.js — AIMEAT Social Library (Boards, Posts, Reactions)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first

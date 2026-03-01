@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { verify } from '../auth/keypair.js';
@@ -60,7 +60,7 @@ interface OAuthToken {
     expiresAt: number;
 }
 
-export function mcpRouter(config: MeatConfig, storage: Storage): Router {
+export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // Per-session transports

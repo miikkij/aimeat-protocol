@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import { createInterface } from 'node:readline';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
 import { logger } from './utils/logger.js';
@@ -30,6 +31,7 @@ USAGE
   aimeat validate             Validate .env configuration
   aimeat check                Alias for validate
   aimeat init                 Interactive config wizard
+  aimeat join [URL]            Join a federation network
   aimeat backup  [FILE]       Export all data to JSON
   aimeat restore <FILE>       Import data from JSON backup
 
@@ -43,10 +45,15 @@ OPTIONS
   -v, --version              Show version
 
 QUICK START
-  1. Edit the .env file in this directory to configure your node
-  2. Run "aimeat config" to see all settings
-  3. Run "aimeat validate" to check for problems
-  4. Run "aimeat start" to launch the node
+  1. Run "aimeat init" to create a config (interactive wizard)
+  2. Run "aimeat validate" to check for problems
+  3. Run "aimeat start" to launch the node
+
+MULTIPLE ENVIRONMENTS
+  aimeat init creates .env (default) or named JSON config files.
+  Use JSON configs to manage multiple environments on one machine:
+    aimeat start --config production.json
+    aimeat start --config staging.json
 `;
 
 if (values.help) {
@@ -57,6 +64,40 @@ if (values.help) {
 if (values.version) {
   console.log('aimeat v1.2.0');
   process.exit(0);
+}
+
+// Load .env into process.env if not already loaded by bin/aimeat.ts.
+// Search: CWD first, then package root (aimeat/ directory).
+// Package root: from dist/src/index.js -> go up 2 levels to aimeat/
+const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const envPath = existsSync('.env') ? '.env'
+  : existsSync(join(__pkgRoot, '.env')) ? join(__pkgRoot, '.env')
+  : null;
+
+if (envPath) {
+  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx < 0) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    let val = trimmed.slice(eqIdx + 1).trim();
+    // Handle quoted values: extract content between first pair of quotes
+    if (val.startsWith('"')) {
+      const closeIdx = val.indexOf('"', 1);
+      val = closeIdx > 0 ? val.slice(1, closeIdx) : val.slice(1);
+    } else if (val.startsWith("'")) {
+      const closeIdx = val.indexOf("'", 1);
+      val = closeIdx > 0 ? val.slice(1, closeIdx) : val.slice(1);
+    } else {
+      // Unquoted: strip inline comments
+      const hashIdx = val.indexOf('#');
+      if (hashIdx >= 0) val = val.slice(0, hashIdx).trim();
+    }
+    if (!(key in process.env)) {
+      process.env[key] = val;
+    }
+  }
 }
 
 // Load config file: explicit --config flag, or auto-detect aimeat.config.json in CWD
@@ -99,53 +140,19 @@ if (subcommand === 'config') {
   console.log(formatConfig(config));
   process.exit(0);
 } else if (subcommand === 'init') {
-  const outFile = positionals[1] ?? 'aimeat.config.json';
-  if (existsSync(outFile)) {
-    console.log(`Config file already exists: ${outFile}`);
-    process.exit(1);
-  }
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const ask = (q: string, def: string): Promise<string> =>
-    new Promise(resolve => rl.question(`${q} [${def}]: `, ans => resolve(ans.trim() || def)));
-
-  (async () => {
-    console.log('\n❤️ AIMEAT Node Configuration Wizard\n');
-    const nodeId = await ask('Node ID', config.nodeId);
-    const port = await ask('Port', String(config.port));
-    const welcomeBonus = await ask('Welcome bonus (morsels)', String(config.welcomeBonus));
-    const dailyAllowance = await ask('Daily allowance (morsels)', String(config.dailyAllowance));
-    const dailyAllowanceCap = await ask('Daily allowance cap', String(config.dailyAllowanceCap));
-    const burnRate = await ask('Burn rate (0-1)', String(config.burnRate));
-    const jwtTtlSeconds = await ask('JWT TTL (seconds)', String(config.jwtTtlSeconds));
-    const db = await ask('MongoDB URL (blank for in-memory)', config.dbUrl ?? '');
-    rl.close();
-
-    const cfg: Record<string, unknown> = {
-      nodeId,
-      port: parseInt(port, 10),
-      welcomeBonus: parseInt(welcomeBonus, 10),
-      dailyAllowance: parseInt(dailyAllowance, 10),
-      dailyAllowanceCap: parseInt(dailyAllowanceCap, 10),
-      burnRate: parseFloat(burnRate),
-      jwtTtlSeconds: parseInt(jwtTtlSeconds, 10),
-    };
-    if (db) cfg.db = db;
-
-    writeFileSync(outFile, JSON.stringify(cfg, null, 2) + '\n');
-    console.log(`\nConfig written to ${outFile}\n`);
-    console.log(`Next steps:`);
-    console.log(`  1. Review the config:   cat ${outFile}`);
-    console.log(`  2. Validate settings:   aimeat validate`);
-    console.log(`  3. Start the node:      aimeat start --config ${outFile}`);
-    console.log('');
-    process.exit(0);
-  })();
+  const { runInitWizard } = await import('./cli/init-wizard.js');
+  await runInitWizard(config);
+  process.exit(0);
 } else if (subcommand === 'validate' || subcommand === 'check') {
   const { validateEnv, formatValidationResults } = await import('./utils/env-validator.js');
   const results = validateEnv();
   console.log(formatValidationResults(results));
   const hasErrors = results.some(r => r.level === 'error');
   process.exit(hasErrors ? 1 : 0);
+} else if (subcommand === 'join') {
+  const { runFederationJoin } = await import('./cli/federation-join.js');
+  await runFederationJoin(config, positionals[1] ?? config.genesisUrl ?? undefined);
+  process.exit(0);
 } else if (subcommand === 'backup') {
   const outArg = positionals[1] ?? 'aimeat-backup.json';
   const { app } = await createServer(config);
@@ -208,13 +215,28 @@ if (subcommand === 'config') {
   }
   const { app, tunnelManager, storage } = await createServer(config);
   const server = app.listen(config.port, () => {
-    logger.info(`❤️ AIMEAT node started`, {
-      nodeId: config.nodeId,
-      port: config.port,
-      storage: config.dbUrl ? 'mongodb' : 'in-memory',
-    });
-    logger.info(`   GET ${config.baseUrl}/`);
-    logger.info(`   Protocol: AIMEAT v1.3 | License: MIT`);
+    // ── Node type banner ──
+    const bannerLabel =
+      config.federationRole === 'operator'    ? 'GENESIS-OPERATOR NODE' :
+      config.federationRole === 'contributor'  ? 'FEDERATION NODE' :
+      config.nodeType === 'personal'           ? 'PRIVATE NODE' :
+      config.devMode                           ? 'DEV NODE' :
+                                                 'STANDALONE NODE';
+    const pad = 4;
+    const inner = bannerLabel.length + pad * 2;
+    const line = '─'.repeat(inner + 2);
+    logger.info('');
+    logger.info(`   ┌${line}┐`);
+    logger.info(`   │${' '.repeat(pad)}${bannerLabel}${' '.repeat(pad)}│`);
+    logger.info(`   └${line}┘`);
+    logger.info('');
+
+    logger.info(`   ❤️  AIMEAT node started`);
+    logger.info(`   Node ID:   ${config.nodeId}`);
+    logger.info(`   Port:      ${config.port}`);
+    logger.info(`   Storage:   ${config.dbUrl ? 'mongodb' : 'in-memory'}`);
+    logger.info(`   URL:       ${config.baseUrl}/`);
+    logger.info(`   Protocol:  AIMEAT v1.3 | License: MIT`);
     if (config.devMode) {
       logger.info(`   ⚠ DEV MODE: OTK validation bypassed on micro-memory`);
     }

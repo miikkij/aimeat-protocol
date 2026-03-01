@@ -42,7 +42,7 @@ pnpm start
 
 ### Response Envelope
 
-Every response uses the MEAT envelope via `success()` / `error()` from `src/middleware/envelope.ts`:
+Every response uses the AIMEAT envelope via `success()` / `error()` from `src/middleware/envelope.ts`:
 
 ```typescript
 import { success, error } from '../middleware/envelope.js';
@@ -74,7 +74,7 @@ router.post('/v1/endpoint', requireAuth(), requireRole('agent'), async (req, res
 All routes are mounted in `src/server.ts`. New routers follow the pattern:
 
 ```typescript
-export function myRouter(config: MeatConfig, storage: Storage): Router {
+export function myRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   router.get('/v1/myendpoint', ...);
   return router;
@@ -108,7 +108,9 @@ import { foo } from '../services/foo';     // ❌
 | `src/routes/` | Express route handlers (one file per domain) |
 | `src/services/` | Business logic (morsel economy, trust scoring) |
 | `src/storage/` | Data layer abstraction + implementations |
+| `src/cli/` | CLI wizards (init wizard) |
 | `src/utils/` | GAII utilities, logger |
+| `locales/` | i18n translations (en.json, fi.json) |
 | `test/` | E2E test suite |
 
 ## Testing
@@ -133,3 +135,28 @@ The E2E test file (`test/e2e-full.ts`) runs 35 tests across 6 phases + GDPR. Tes
 - **Ed25519 sha512Sync:** Must set `ed.etc.sha512Sync` using `node:crypto` for synchronous operations
 - **MultiDiGraph:** If two nodes can have multiple edges (e.g., goal_reached + goal_not_reached), use `MultiDiGraph`, not `DiGraph`
 - **First owner is operator:** The first registered owner automatically gets the `operator` role
+
+## Naming Convention — AIMEAT Only
+
+**Never use `MEAT` as a standalone prefix.** The project has been fully renamed to `AIMEAT`:
+
+- Type names: `AimeatConfig`, `AimeatResponse` (not ~~MeatConfig~~, ~~MeatResponse~~)
+- Env vars: `AIMEAT_*` prefix (not ~~MEAT_*~~)
+- Default node ID: `aimeat-local-001-dev` (not ~~meat-local-001-dev~~)
+
+If you find any remaining `Meat`-prefixed identifiers, rename them to `Aimeat`.
+
+## Init Wizard Maintenance (`aimeat init`)
+
+The interactive setup wizard lives in `src/cli/init-wizard.ts` and uses `@clack/prompts` for the UI. When adding new config options:
+
+1. **Add the env var to `src/config.ts`** in the `AimeatConfig` interface and `loadConfig()`
+2. **Add translations** to both `locales/en.json` and `locales/fi.json` under the `"init"` section — field label, hint text, validation error message
+3. **Add the prompt** to the wizard in `src/cli/init-wizard.ts`:
+   - Decide which use cases need it (public / personal / dev / custom)
+   - Add to `askCoreSettings()` or `askEconomySettings()` or `askAllAdvancedSettings()`
+   - Add the env var key to `CONFIG_DEFAULTS` for summary comparison
+4. **Update `.env.example`** with the new variable, default, and comment
+5. **Update `src/utils/env-config.ts`** to display the setting in `aimeat config`
+6. **Update `src/utils/env-validator.ts`** if the setting needs validation rules
+7. Run `npx tsc --noEmit` and `pnpm build` to verify

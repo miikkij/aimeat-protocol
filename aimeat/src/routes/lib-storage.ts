@@ -1,10 +1,10 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 /**
  * aimeat-storage.js — File upload/download client library
  * Depends on AIMEAT.auth being loaded first.
  */
-export function aimeatStorageLib(config: MeatConfig): string {
+export function aimeatStorageLib(config: AimeatConfig): string {
     return `// aimeat-storage.js — AIMEAT Storage Library (File Upload & Download)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
 import { PeeringRequestSchema, PeeringDecisionSchema, validateBody } from '../models/schemas.js';
 import type { PeerInfo } from '../services/federation.js';
 
-export function federationRouter(config: MeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
+export function federationRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
 
     // GET /v1/federation/directory — public peer directory (Tier 0)
@@ -58,6 +58,87 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
         }, [
             { description: 'Request peering', method: 'POST', url: '/v1/federation/peer/request' },
         ]));
+    });
+
+    // POST /v1/federation/peer/introduce — unauthenticated "knock on the door" for joining nodes
+    router.post('/v1/federation/peer/introduce', async (req, res) => {
+        const { node_id, node_url, node_type, public_key, role, message } = req.body ?? {};
+
+        if (!node_id || !node_url || !public_key || !role) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id, node_url, public_key, and role are required'));
+            return;
+        }
+
+        if (role !== 'contributor' && role !== 'operator') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'role must be "contributor" or "operator"'));
+            return;
+        }
+
+        // Check if already a peer
+        if (peers.has(node_id)) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', `Node "${node_id}" is already a peer`));
+            return;
+        }
+
+        // Extension hook: pre_federation_peer
+        const hookResult = await executeHooks(config, storage, 'pre_federation_peer', { target_url: node_url, target_node_id: node_id });
+        if (!hookResult.allowed) {
+            res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Introduction denied by extension hook'));
+            return;
+        }
+
+        const id = `peer-req-${randomBytes(8).toString('hex')}`;
+        const now = new Date().toISOString();
+        const autoApprove = role === 'contributor';
+
+        await storage.createPeeringRequest({
+            id,
+            fromNodeUrl: node_url,
+            fromNodeId: node_id,
+            toNodeId: config.nodeId,
+            targetUrl: node_url,
+            publicKey: public_key,
+            message: message ?? '',
+            status: autoApprove ? 'auto_approved' : 'pending',
+            createdAt: now,
+            updatedAt: now,
+        });
+
+        // Auto-approve contributors: add to peers immediately
+        if (autoApprove) {
+            peers.set(node_id, {
+                nodeId: node_id,
+                url: node_url,
+                publicKey: public_key,
+                status: 'active',
+                addedAt: now,
+                lastSeen: now,
+            });
+        }
+
+        res.status(201).json(success(config.nodeId, {
+            request_id: id,
+            status: autoApprove ? 'auto_approved' : 'pending',
+        }, autoApprove ? [
+            { description: 'Exchange keys', method: 'POST', url: '/v1/federation/key-exchange' },
+        ] : [
+            { description: 'Check introduction status', method: 'GET', url: `/v1/federation/peer/introduce/${id}/status` },
+        ]));
+    });
+
+    // GET /v1/federation/peer/introduce/:id/status — check introduction status (no auth, request_id acts as bearer)
+    router.get('/v1/federation/peer/introduce/:id/status', async (req, res) => {
+        const id = req.params.id as string;
+        const request = await storage.getPeeringRequest(id);
+        if (!request) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Introduction request not found: ${id}`));
+            return;
+        }
+
+        res.json(success(config.nodeId, {
+            request_id: request.id,
+            status: request.status,
+        }));
     });
 
     // POST /v1/federation/peer/request — request peering (operator auth)
@@ -613,7 +694,29 @@ export function federationRouter(config: MeatConfig, storage: Storage, peers: Ma
             return;
         }
 
-        const peer = [...peers.entries()].find(([, p]) => p.nodeId === node_id);
+        let peer = [...peers.entries()].find(([, p]) => p.nodeId === node_id);
+
+        // Fallback: check approved peering requests in storage (e.g. operator approval via DB)
+        if (!peer) {
+            const requests = await storage.listPeeringRequests();
+            const approved = requests.find(r =>
+                r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'),
+            );
+            if (approved) {
+                const now = new Date().toISOString();
+                const newPeer = {
+                    nodeId: node_id,
+                    url: approved.fromNodeUrl ?? approved.targetUrl ?? '',
+                    publicKey: public_key,
+                    status: 'approved' as const,
+                    addedAt: now,
+                    lastSeen: now,
+                };
+                peers.set(node_id, newPeer);
+                peer = [node_id, newPeer];
+            }
+        }
+
         if (!peer) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Peer not found in registry'));
             return;

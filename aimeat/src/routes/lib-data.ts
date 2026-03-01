@@ -1,10 +1,10 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 /**
  * aimeat-data.js — Memory & Micro-Memory client library
  * Depends on AIMEAT.auth being loaded first.
  */
-export function aimeatDataLib(config: MeatConfig): string {
+export function aimeatDataLib(config: AimeatConfig): string {
     return `// aimeat-data.js — AIMEAT Data Library (Memory + Micro-Memory)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first

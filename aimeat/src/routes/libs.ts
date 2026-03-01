@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { aimeatDataLib } from './lib-data.js';
 import { aimeatStorageLib } from './lib-storage.js';
@@ -12,7 +12,7 @@ import { aimeatWorkLib } from './lib-work.js';
  * These are self-contained scripts that AI-generated apps include via <script> tag.
  * The app files are served from the AIMEAT node itself — zero CORS issues.
  */
-export function libsRouter(config: MeatConfig, _storage: Storage): Router {
+export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
 
   // GET /v1/libs/aimeat-auth.js — Auth helper library
@@ -147,7 +147,7 @@ window.__ready = true;
    - Login/register UI component
    ───────────────────────────────────────────────────────────────── */
 
-function aimeatAuthLib(config: MeatConfig): string {
+function aimeatAuthLib(config: AimeatConfig): string {
   return `// aimeat-auth.js — AIMEAT Auth Library
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Include: <script src="${config.baseUrl}/v1/libs/aimeat-auth.js"><\\/script>

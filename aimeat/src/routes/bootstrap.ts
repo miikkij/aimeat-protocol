@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
-export function bootstrapRouter(config: MeatConfig): Router {
+export function bootstrapRouter(config: AimeatConfig): Router {
   const router = Router();
 
   router.get('/favicon.ico', (_req, res) => {

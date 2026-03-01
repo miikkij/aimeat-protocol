@@ -1,4 +1,4 @@
-import type { MeatConfig, HookName } from '../config.js';
+import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -18,7 +18,7 @@ export interface HookResult {
  * Actions are called in sequence; if any returns failure, the flow is aborted.
  */
 export async function executeHooks(
-    config: MeatConfig,
+    config: AimeatConfig,
     storage: Storage,
     hookName: HookName,
     context: HookContext,
@@ -95,6 +95,6 @@ export async function executeHooks(
 /**
  * List all configured extension hooks.
  */
-export function listHooks(config: MeatConfig): Record<string, string[]> {
+export function listHooks(config: AimeatConfig): Record<string, string[]> {
     return { ...config.extensionHooks };
 }

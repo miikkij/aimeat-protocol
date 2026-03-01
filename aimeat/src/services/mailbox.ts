@@ -1,11 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 export class MailboxService {
   constructor(
-    private config: MeatConfig,
+    private config: AimeatConfig,
     private storage: Storage,
   ) {}
 

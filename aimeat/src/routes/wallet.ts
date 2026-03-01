@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 
-export function walletRouter(config: MeatConfig, storage: Storage): Router {
+export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/wallet — check balance (agent auth)

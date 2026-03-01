@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
@@ -9,7 +9,7 @@ import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
 import { AgentRegistrationSchema, validateBody } from '../models/schemas.js';
 
-export function agentsRouter(config: MeatConfig, storage: Storage): Router {
+export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/agents — register a new agent (requires owner JWT)

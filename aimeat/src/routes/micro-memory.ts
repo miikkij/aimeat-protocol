@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { checkOtkSession } from './auth.js';
@@ -35,7 +35,7 @@ function parseBatchPairs(query: Record<string, unknown>): { key: string; value: 
     return pairs;
 }
 
-export function microMemoryRouter(config: MeatConfig, storage: Storage): Router {
+export function microMemoryRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // GET /v1/mm/test-url-length — Probe endpoint for measuring max accepted URL length

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { createT, detectLocale, toLocale, resolveLocale, resolveFlat, LOCALES, type Locale, type TFunction } from '../i18n.js';
@@ -104,7 +104,7 @@ const PLATFORMS: AIPlatform[] = [
    Prompt Package Templates
    ────────────────────────────────────────────────────────── */
 
-function buildPromptPackage(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
+function buildPromptPackage(config: AimeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
   return `# AIMEAT Application Builder
 
 You are helping a human build a web application that connects to an AIMEAT (AI Memory Exchange and Action Transfer) node. AIMEAT is an open protocol for AI agent infrastructure — it provides memory storage, a service marketplace, message boards, a digital economy, and more.
@@ -325,7 +325,7 @@ Tell the user:
 The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB, Notifications, Drag&Drop, Clipboard, Speech, Fullscreen, Web Workers, CSS Animations, SVG, Gamepad API, Vibration, Share API. Use whatever is appropriate for the user's goal.`;
 }
 
-function buildMcpInstructions(config: MeatConfig): string {
+function buildMcpInstructions(config: AimeatConfig): string {
   return `## MCP Setup Instructions
 
 Your AI platform supports the Model Context Protocol (MCP), which provides the richest integration with AIMEAT.
@@ -356,7 +356,7 @@ After connecting, try saying: "Check my AIMEAT node catalogue" or "What services
 - All 14 MCP tools at your fingertips`;
 }
 
-function buildApiInstructions(config: MeatConfig): string {
+function buildApiInstructions(config: AimeatConfig): string {
   return `## API Integration Instructions
 
 Your AI platform can make HTTP calls. Here's how to get started:
@@ -395,7 +395,7 @@ GET ${config.baseUrl}/v1/spec — OpenAPI specification
 GET ${config.baseUrl}/v1/prompts/tier1 — Detailed operating instructions`;
 }
 
-function buildBrowseInstructions(config: MeatConfig): string {
+function buildBrowseInstructions(config: AimeatConfig): string {
   return `## Browse-Only Access
 
 Your AI can browse URLs but cannot make POST requests. Here's what you can do:
@@ -443,7 +443,7 @@ function buildDevPortalTranslations(locale: Locale): Record<string, string> {
    Portal HTML — Self-contained single page
    ────────────────────────────────────────────────────────── */
 
-function portalHtml(config: MeatConfig, nodeStats: { agents: number; actions: number; boards: number }, locale: Locale): string {
+function portalHtml(config: AimeatConfig, nodeStats: { agents: number; actions: number; boards: number }, locale: Locale): string {
   const platformsJson = JSON.stringify(PLATFORMS);
   const devPortalTranslations = buildDevPortalTranslations(locale);
   return `<!DOCTYPE html>
@@ -1312,7 +1312,7 @@ function sanitize(s: string): string {
    Router
    ────────────────────────────────────────────────────────── */
 
-export function portalRouter(config: MeatConfig, storage: Storage): Router {
+export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/portal — serve the onboarding portal HTML page

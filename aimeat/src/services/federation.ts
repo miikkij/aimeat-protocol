@@ -3,7 +3,7 @@
  * and peer health monitoring.
  */
 
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -29,7 +29,7 @@ export interface PeerInfo {
  */
 export async function resolveGaii(
     gaii: string,
-    config: MeatConfig,
+    config: AimeatConfig,
     storage: Storage,
     peers: Map<string, PeerInfo>,
 ): Promise<{ nodeId: string; nodeUrl: string; local: boolean } | null> {
@@ -89,7 +89,7 @@ export async function resolveGaii(
  * and marks unresponsive peers as degraded.
  */
 export function startHeartbeatJob(
-    config: MeatConfig,
+    config: AimeatConfig,
     peers: Map<string, PeerInfo>,
 ): ReturnType<typeof setInterval> {
     const INTERVAL_MS = 5 * 60_000;

@@ -2,7 +2,7 @@ import express from 'express';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { MeatConfig } from './config.js';
+import type { AimeatConfig } from './config.js';
 import { InMemoryStorage } from './storage/memory.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
@@ -52,7 +52,7 @@ export interface ServerResult {
   storage: Storage;
 }
 
-export async function createServer(config: MeatConfig): Promise<ServerResult> {
+export async function createServer(config: AimeatConfig): Promise<ServerResult> {
   const app = express();
 
   // Global middleware
@@ -168,6 +168,8 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
       p.startsWith('/v1/admin') ||
       p.startsWith('/v1/spec') ||
       p.startsWith('/.well-known') ||
+      p.startsWith('/v1/federation/peer/introduce') ||
+      p.startsWith('/v1/federation/directory') ||
       p.startsWith('/favicon') ||
       req.method === 'OPTIONS'
     ) { next(); return; }
@@ -268,7 +270,13 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
   };
 
   app.use('/v1/boards', requireExtended);
-  app.use('/v1/federation', requireExtended);
+  app.use('/v1/federation', (req, res, next) => {
+    // Allow unauthenticated introduce endpoints (federation join flow)
+    if (req.path.startsWith('/peer/introduce')) return next();
+    // Allow public directory and heartbeat/ping
+    if (req.path === '/directory' || req.path === '/ping' || req.path === '/heartbeat') return next();
+    return requireExtended(req, res, next);
+  });
   app.use('/v1/storage', requireExtended);
   app.use('/v1/validate', requireExtended);
 
@@ -328,7 +336,7 @@ export async function createServer(config: MeatConfig): Promise<ServerResult> {
 }
 
 // Daily allowance: credit all agents every 24 hours (or on first activity)
-function startDailyAllowanceJob(config: MeatConfig, storage: Storage): void {
+function startDailyAllowanceJob(config: AimeatConfig, storage: Storage): void {
   const creditAllAgents = async () => {
     try {
       const agents = await storage.listAgents();
@@ -354,7 +362,7 @@ function startDailyAllowanceJob(config: MeatConfig, storage: Storage): void {
 }
 
 // Work timeout: expire work items whose TTL has passed, return escrow
-function startWorkTimeoutJob(config: MeatConfig, storage: Storage): void {
+function startWorkTimeoutJob(config: AimeatConfig, storage: Storage): void {
   const expireTimedOutWork = async () => {
     try {
       const allWork = await storage.listAllWork();
@@ -445,7 +453,7 @@ function startBoardPostTtlCleanupJob(storage: Storage): void {
 }
 
 // Dispute auto-escalation and timeout (RFC 10.8)
-function startDisputeTimeoutJob(config: MeatConfig, storage: Storage): void {
+function startDisputeTimeoutJob(config: AimeatConfig, storage: Storage): void {
   const processDisputes = async () => {
     try {
       const now = Date.now();
@@ -552,7 +560,7 @@ function startMailboxCleanupJob(storage: Storage): void {
 }
 
 /** Set up the anonymous owner + agent for anonymous mode. Normal auth still works alongside. */
-async function setupAnonymousIdentity(config: MeatConfig, storage: Storage): Promise<void> {
+async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): Promise<void> {
   const ANON_OWNER = 'anonymous';
   const ANON_AGENT_NAME = 'shared';
   const ANON_GAII = `${ANON_AGENT_NAME}#${ANON_OWNER}@${config.nodeId}`;
@@ -600,7 +608,7 @@ async function setupAnonymousIdentity(config: MeatConfig, storage: Storage): Pro
   }
 }
 
-async function initializeNode(config: MeatConfig, storage: Storage): Promise<void> {
+async function initializeNode(config: AimeatConfig, storage: Storage): Promise<void> {
   try {
     let nodeKey = await storage.getNodeKey();
     if (!nodeKey) {

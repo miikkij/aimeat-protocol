@@ -35,11 +35,11 @@ export function validateEnv(): ValidationResult[] {
   // ── Node ID ──
   const nodeId = env.AIMEAT_NODE_ID;
   if (nodeId) {
-    if (nodeId === 'meat-local-001-dev') {
+    if (nodeId === 'aimeat-local-001-dev') {
       results.push({ level: 'warning', variable: 'AIMEAT_NODE_ID', message: 'Using default node ID. Set a unique ID for production.' });
     }
   } else {
-    results.push({ level: 'info', variable: 'AIMEAT_NODE_ID', message: 'Not set. Default: meat-local-001-dev' });
+    results.push({ level: 'info', variable: 'AIMEAT_NODE_ID', message: 'Not set. Default: aimeat-local-001-dev' });
   }
 
   // ── Node Type ──

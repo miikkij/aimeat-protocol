@@ -1,10 +1,10 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 /**
  * aimeat-wallet.js — Morsel economy client library
  * Depends on AIMEAT.auth being loaded first.
  */
-export function aimeatWalletLib(config: MeatConfig): string {
+export function aimeatWalletLib(config: AimeatConfig): string {
     return `// aimeat-wallet.js — AIMEAT Wallet Library (Morsel Economy)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first

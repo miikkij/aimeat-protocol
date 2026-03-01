@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 /**
  * Serves the AIMEAT-OS.md guide — a comprehensive reference for AI assistants
@@ -7,7 +7,7 @@ import type { MeatConfig } from '../config.js';
  *
  * Served dynamically so the node URL is always correct.
  */
-export function aimeatOsRouter(config: MeatConfig): Router {
+export function aimeatOsRouter(config: AimeatConfig): Router {
   const router = Router();
 
   router.get('/v1/aimeat-os.md', (_req, res) => {

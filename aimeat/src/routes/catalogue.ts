@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 
-export function catalogueRouter(config: MeatConfig, storage: Storage): Router {
+export function catalogueRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/catalogue — public action catalogue (Tier 0, no auth)

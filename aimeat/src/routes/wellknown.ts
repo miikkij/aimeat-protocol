@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 
-export function wellknownRouter(config: MeatConfig, storage: Storage): Router {
+export function wellknownRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   router.get('/.well-known/aimeat', async (_req, res) => {

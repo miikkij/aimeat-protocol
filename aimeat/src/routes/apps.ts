@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -14,7 +14,7 @@ import { success, error } from '../middleware/envelope.js';
  * These are served as file downloads, NOT as rendered pages.
  * Users download the file and open it locally in their browser.
  */
-export function appsRouter(config: MeatConfig, storage: Storage): Router {
+export function appsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // GET /v1/apps — List all publicly available apps

@@ -1,4 +1,4 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import { generateRequestId } from '../utils/tracking-code.js';
 
 export interface HintAction {
@@ -9,7 +9,7 @@ export interface HintAction {
   example_body?: Record<string, unknown>;
 }
 
-export interface MeatResponse<T = unknown> {
+export interface AimeatResponse<T = unknown> {
   ok: boolean;
   protocol: 'aimeat';
   version: 'v1';
@@ -22,7 +22,7 @@ export interface MeatResponse<T = unknown> {
   meta?: { page?: number; per_page?: number; total?: number };
 }
 
-export function success<T>(nodeId: string, data: T, hints?: HintAction[], meta?: MeatResponse['meta']): MeatResponse<T> {
+export function success<T>(nodeId: string, data: T, hints?: HintAction[], meta?: AimeatResponse['meta']): AimeatResponse<T> {
   return {
     ok: true,
     protocol: 'aimeat',
@@ -36,7 +36,7 @@ export function success<T>(nodeId: string, data: T, hints?: HintAction[], meta?:
   };
 }
 
-export function error(nodeId: string, code: string, message: string, httpStatus?: number, details?: unknown, hints?: HintAction[]): MeatResponse {
+export function error(nodeId: string, code: string, message: string, httpStatus?: number, details?: unknown, hints?: HintAction[]): AimeatResponse {
   return {
     ok: false,
     protocol: 'aimeat',

@@ -1,10 +1,10 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 
 /**
  * aimeat-work.js — Actions & work exchange client library
  * Depends on AIMEAT.auth being loaded first.
  */
-export function aimeatWorkLib(config: MeatConfig): string {
+export function aimeatWorkLib(config: AimeatConfig): string {
     return `// aimeat-work.js — AIMEAT Work Library (Actions, Catalogue & Work Exchange)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first

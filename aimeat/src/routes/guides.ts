@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import { resolveLocale, createT } from '../i18n.js';
 import type { Locale, TFunction } from '../i18n.js';
 
@@ -1294,7 +1294,7 @@ Stats: GET /v1/stats (public, no auth needed)`,
 
 /* ── Page wrapper ── */
 function renderGuidePage(
-  config: MeatConfig,
+  config: AimeatConfig,
   locale: Locale,
   guide: GuideContent,
 ): string {
@@ -1769,7 +1769,7 @@ const GUIDES: Record<string, GuideGenerator> = {
   'build-apps': guideBuildApps,
 };
 
-export function guidesRouter(config: MeatConfig): Router {
+export function guidesRouter(config: AimeatConfig): Router {
   const router = Router();
 
   router.get('/v1/guide/:slug', (req: Request, res: Response) => {

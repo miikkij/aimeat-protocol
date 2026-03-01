@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { resolveFlat, resolveLocale, type Locale } from '../i18n.js';
 
@@ -11,7 +11,7 @@ function buildProfileTranslations(locale: Locale): Record<string, string> {
   return resolveFlat(locale, 'profile');
 }
 
-function profileHtml(config: MeatConfig, locale: string, translations: Record<string, string>): string {
+function profileHtml(config: AimeatConfig, locale: string, translations: Record<string, string>): string {
   return `<!DOCTYPE html>
 <html lang="${sanitize(locale)}">
 <head>
@@ -1984,7 +1984,7 @@ async function detachNode(nodeId) {
 </html>`;
 }
 
-export function profileRouter(config: MeatConfig, _storage: Storage): Router {
+export function profileRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
 
   router.get('/v1/profile', (req, res) => {

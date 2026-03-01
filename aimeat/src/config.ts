@@ -36,8 +36,9 @@ export interface RateLimitsConfig {
 }
 
 export type NodeType = 'full' | 'relay' | 'mirror' | 'personal';
+export type FederationRole = 'operator' | 'contributor' | 'standalone';
 
-export interface MeatConfig {
+export interface AimeatConfig {
   port: number;
   baseUrl: string;
   nodeId: string;
@@ -73,6 +74,10 @@ export interface MeatConfig {
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
 
+  // Federation role
+  federationRole: FederationRole;
+  genesisUrl: string | null;
+
   // Personal Node support (operator-side)
   personalNodesEnabled: boolean;
   personalNodeMaxSlots: number;
@@ -82,7 +87,7 @@ export interface MeatConfig {
   personalNodeOfflineThresholdMs: number;
 }
 
-export function loadConfig(): MeatConfig {
+export function loadConfig(): AimeatConfig {
   const nodeType = (process.env.AIMEAT_NODE_TYPE ?? 'full') as NodeType;
   if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
@@ -93,7 +98,7 @@ export function loadConfig(): MeatConfig {
   return {
     port,
     baseUrl: process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`,
-    nodeId: process.env.AIMEAT_NODE_ID ?? 'meat-local-001-dev',
+    nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,
     adminPassword: process.env.AIMEAT_ADMIN_PASSWORD ?? null,
@@ -136,6 +141,8 @@ export function loadConfig(): MeatConfig {
       pre_board_post: [],
       pre_federation_peer: [],
     },
+    federationRole: (process.env.AIMEAT_FEDERATION_ROLE ?? 'standalone') as FederationRole,
+    genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),

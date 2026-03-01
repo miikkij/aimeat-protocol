@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Locale, TFunction } from '../i18n.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -20,7 +20,7 @@ function jesc(s: string): string {
 }
 
 export function humanPortalHtml(
-  config: MeatConfig,
+  config: AimeatConfig,
   t: TFunction,
   locale: Locale,
   stats: { agents: number; actions: number; boards: number },
@@ -2023,7 +2023,7 @@ body {
    Router — anonymous memory save endpoint
    ────────────────────────────────────────────────────────── */
 
-export function humanPortalRouter(config: MeatConfig, storage: Storage): Router {
+export function humanPortalRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   router.post('/v1/portal/try-memory', requireAuth(), async (req, res) => {

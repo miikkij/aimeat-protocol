@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -7,7 +7,7 @@ import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/s
 import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
-export function memoryRouter(config: MeatConfig, storage: Storage): Router {
+export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/memory — write a memory entry (agent auth required)

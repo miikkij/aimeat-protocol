@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import { MailboxService } from '../services/mailbox.js';
@@ -8,7 +8,7 @@ import { success, error } from '../middleware/envelope.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 
-export function personalRouter(config: MeatConfig, storage: Storage, tunnelManager: TunnelManager | null): Router {
+export function personalRouter(config: AimeatConfig, storage: Storage, tunnelManager: TunnelManager | null): Router {
   const router = Router();
   const mailboxService = new MailboxService(config, storage);
 

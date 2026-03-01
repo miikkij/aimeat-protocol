@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -9,7 +9,7 @@ import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySche
 import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
 
-export function boardsRouter(config: MeatConfig, storage: Storage): Router {
+export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   /** Notify board subscribers of a new post (fire-and-forget). */

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -85,7 +85,7 @@ function fireWebhook(url: string, payload: Record<string, unknown>, maxRetries: 
 }
 
 async function createWorkItem(
-  config: MeatConfig,
+  config: AimeatConfig,
   storage: Storage,
   requesterGaii: string,
   body: any,
@@ -221,7 +221,7 @@ async function createWorkItem(
   return { work, personalNodeTarget };
 }
 
-export function workRouter(config: MeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
+export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
 
   // POST /v1/work/request — submit a work request (spec path)

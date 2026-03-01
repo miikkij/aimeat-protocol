@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
@@ -41,7 +41,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
  * - Operators/admins are owners with role=['owner','operator'] — they manage the node
  * - GHII users are owners with role=['owner'] + a GHII profile — they use apps
  */
-export function ghiiRouter(config: MeatConfig, storage: Storage): Router {
+export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // POST /v1/ghii — Register a new human identity (no auth required)

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
 import type { z } from 'zod';
 import {
@@ -43,7 +43,7 @@ const SCHEMA_MAP: Record<string, Record<string, z.ZodType<unknown>>> = {
     '/v1/admin/roles/grant': { POST: RoleGrantSchema },
 };
 
-export function validateRouter(config: MeatConfig): Router {
+export function validateRouter(config: AimeatConfig): Router {
     const router = Router();
 
     // POST /v1/validate — validate a request body against Zod schemas

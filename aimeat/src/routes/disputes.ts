@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -44,7 +44,7 @@ async function appendAuditEntry(
     return storage.addDisputeAuditEntry(disputeId, full);
 }
 
-export function disputesRouter(config: MeatConfig, storage: Storage): Router {
+export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // POST /v1/work/:tc/dispute — Open dispute

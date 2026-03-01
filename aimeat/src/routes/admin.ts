@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -13,7 +13,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
 
 export function adminRouter(
-    config: MeatConfig,
+    config: AimeatConfig,
     storage: Storage,
     maintenanceCache?: {
         get: () => import('../storage/interface.js').MaintenanceState;
@@ -412,7 +412,7 @@ export function adminRouter(
         }
 
         // Map dot-paths to config keys with validation
-        const pathMap: Record<string, { key: keyof MeatConfig; validate: (v: unknown) => boolean }> = {
+        const pathMap: Record<string, { key: keyof AimeatConfig; validate: (v: unknown) => boolean }> = {
             'morsel_policy.welcome_bonus': { key: 'welcomeBonus', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
             'morsel_policy.daily_allowance': { key: 'dailyAllowance', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
             'morsel_policy.daily_allowance_cap': { key: 'dailyAllowanceCap', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },

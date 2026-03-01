@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -18,7 +18,7 @@ function extractKey(params: Record<string, string | string[]>): string {
     return Array.isArray(k) ? k.join('/') : k;
 }
 
-export function storageFilesRouter(config: MeatConfig, storage: Storage): Router {
+export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // Max chunked file size: 5 GB (RFC Appendix B)

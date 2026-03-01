@@ -6,7 +6,7 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  */
 
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, MicroMemoryRecord } from '../storage/interface.js';
 
 // ── Size calculators ──
@@ -64,7 +64,7 @@ export interface QuotaCheckResult {
  * `replacingBytes` is subtracted first (for updates to existing keys).
  */
 export async function checkMemoryQuota(
-    config: MeatConfig,
+    config: AimeatConfig,
     storage: Storage,
     gaii: string,
     additionalBytes: number,
@@ -103,7 +103,7 @@ export async function checkMemoryQuota(
  * Check storage file quota for an agent.
  */
 export async function checkStorageQuota(
-    config: MeatConfig,
+    config: AimeatConfig,
     storage: Storage,
     gaii: string,
     additionalBytes: number,
@@ -136,7 +136,7 @@ export async function checkStorageQuota(
  * Check micro-memory total quota (hard limit, no overage).
  */
 export async function checkMicroMemoryQuota(
-    config: MeatConfig,
+    config: AimeatConfig,
     storage: Storage,
     gaii: string,
     additionalBytes: number,

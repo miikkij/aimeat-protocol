@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -27,7 +27,7 @@ export class TunnelManager {
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    private config: MeatConfig,
+    private config: AimeatConfig,
     private storage: Storage,
   ) {}
 

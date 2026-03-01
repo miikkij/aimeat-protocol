@@ -1,4 +1,4 @@
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
 
 export interface SettlementResult {
@@ -60,7 +60,7 @@ export async function holdEscrow(
  */
 export async function settlePayment(
     storage: Storage,
-    config: MeatConfig,
+    config: AimeatConfig,
     work: WorkRecord,
     relayPath: string[] = [],
 ): Promise<SettlementResult> {
@@ -195,7 +195,7 @@ export async function returnEscrow(
  */
 export async function applyDailyAllowance(
     storage: Storage,
-    config: MeatConfig,
+    config: AimeatConfig,
     gaii: string,
 ): Promise<number> {
     const agent = await storage.getAgent(gaii);

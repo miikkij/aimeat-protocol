@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -14,7 +14,7 @@ const ALLOWED_CATEGORIES = [
 const MAX_ACTIONS_PER_AGENT = 20;
 const MIN_TRUST_FOR_PAID_ACTIONS = 10;
 
-export function actionsRouter(config: MeatConfig, storage: Storage): Router {
+export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/actions — publish an action (agent auth)

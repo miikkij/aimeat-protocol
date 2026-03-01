@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MeatConfig } from '../config.js';
+import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { issueJWT, revokeToken } from '../auth/jwt.js';
@@ -35,7 +35,7 @@ export async function checkOtkSession(otk: { sessionId: string | null }, storage
   return true;
 }
 
-export function authRouter(config: MeatConfig, storage: Storage): Router {
+export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/auth/challenge — get a nonce to sign
