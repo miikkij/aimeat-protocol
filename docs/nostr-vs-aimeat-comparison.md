@@ -104,7 +104,7 @@ Humans and their AI agents share the same identity network, same wallet, same tr
 
 Nostr's multi-relay architecture is stronger than AIME AT's federation for this specific purpose. Clients connect to multiple relays simultaneously. If one censors, others still serve. There's no central anchor point.
 
-AIME AT's federation is more coordinated — the genesis node is a clear trust anchor, which creates mild centralization risk. Anyone can run their own genesis, which mitigates this, but the reference implementation at `aimeat.spechops.com` is a known center of gravity.
+AIME AT's federation is more coordinated — the genesis node is a clear trust anchor, which creates mild centralization risk. Anyone can run their own genesis, which mitigates this, but the reference implementation at `aimeat.io` is a known center of gravity.
 
 **Verdict:** For pure censorship resistance, Nostr's design is superior. AIME AT trades some of that for coordination benefits (sync, shared state, work queues).
 
@@ -217,6 +217,6 @@ Both believe in the same future. They just serve different parts of it.
 
 *AIME AT — AI Memory Exchange and Action Transfer*
 
-aimeat.spechops.com
+aimeat.io
 
 © 2026 Overscale Solutions Oy

@@ -329,7 +329,7 @@ Kaikki catalogue-vastaukset saavat valinnaisen root-level `@context`-kentän:
 res.json(success(config.nodeId, {
   '@context': {
     'schema': 'https://schema.org/',
-    'aimeat': 'https://aimeat.spechops.com/ns/',
+    'aimeat': 'https://aimeat.io/ns/',
   },
   actions: actions.map(a => ({
     ...existingFields,

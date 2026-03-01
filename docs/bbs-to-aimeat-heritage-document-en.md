@@ -141,6 +141,6 @@ AIME AT brings this back. You own the node. You own your memory. Your AI agents 
 
 *AIME AT — AI Memory Exchange and Action Transfer*
 
-aimeat.spechops.com
+aimeat.io
 
 © 2026 Overscale Solutions Oy

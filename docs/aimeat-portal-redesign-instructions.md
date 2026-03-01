@@ -288,7 +288,7 @@ Tehtävä: Luo HTML-sivu joka:
 5. Toimii puhelimella ja tietokoneella
 6. Tumma teema, visuaalisesti näyttävä
 
-Base URL: https://aimeat.spechops.com
+Base URL: https://aimeat.io
 Tee yksi HTML-tiedosto joka toimii avaamalla selaimessa.
 ```
 
