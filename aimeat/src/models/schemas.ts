@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+// ── Semantic Ontology (Phase 0.7b) ─────────────────────────
+
+export const SemanticAnnotationSchema = z.object({
+    '@context': z.record(z.string(), z.string()).optional(),
+    '@type': z.string().optional(),
+}).passthrough();  // Allow ontology-specific fields (schema:category, qudt:unit, etc.)
+
 // ── Personal Nodes ──────────────────────────────────────────
 
 export const AnchorRequestSchema = z.object({
@@ -97,6 +104,7 @@ export const ActionPublishSchema = z.object({
     max_input_size_bytes: z.number().int().positive().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     webhook_url: z.string().url().max(2048).optional(),
+    semantic: SemanticAnnotationSchema.optional(),
 });
 
 export const ActionUpdateSchema = z.object({
@@ -109,6 +117,7 @@ export const ActionUpdateSchema = z.object({
     estimated_time_seconds: z.number().int().positive().optional(),
     max_input_size_bytes: z.number().int().positive().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
+    semantic: SemanticAnnotationSchema.optional(),
 });
 
 // ── Work Queue ──────────────────────────────────────────────
@@ -242,6 +251,48 @@ export const ChunkedUploadInitSchema = z.object({
     chunk_size: z.number().int().positive(),
     visibility: z.enum(['private', 'owner', 'public']).optional(),
     total_chunks: z.number().int().positive().optional(),
+});
+
+// ── Schema Locking (Phase 0.1) ──────────────────────────────
+
+export const SchemaSetSchema = z.object({
+    schema: z.record(z.string(), z.unknown()),
+    apply_to: z.enum(['exact', 'prefix']),
+    schema_mode: z.enum(['open', 'strict']).optional().default('open'),
+});
+
+export const SchemaListQuerySchema = z.object({
+    prefix: z.string().optional(),
+});
+
+// ── Consent Layer (Phase 0.3) ────────────────────────────────
+
+export const ConsentCreateSchema = z.object({
+    data_pattern: z.string().min(1).max(256),
+    recipient: z.string().min(1).max(256),
+    purpose: z.string().min(1).max(512),
+    scope: z.enum(['private', 'dmz', 'federation']).optional().default('federation'),
+    expires: z.string().datetime().nullable().optional().default(null),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const ConsentAuditQuerySchema = z.object({
+    days: z.coerce.number().int().positive().max(365).optional().default(30),
+    accessor_gaii: z.string().optional(),
+    consent_id: z.string().optional(),
+});
+
+// ── TOTP / 2FA (Phase 0.5) ──────────────────────────────────
+
+export const TotpVerifySchema = z.object({
+    code: z.string().min(6).max(8),
+});
+
+export const TotpDisableSchema = z.object({
+    code: z.string().min(6).max(8).optional(),
+    backup_code: z.string().min(6).max(16).optional(),
+}).refine(data => data.code || data.backup_code, {
+    message: 'Either code or backup_code is required',
 });
 
 // ── Validate ────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import type {
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
   StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord,
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, MaintenanceState,
+  SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -27,6 +28,10 @@ export class InMemoryStorage implements Storage {
   private ghiis = new Map<string, GHIIRecord>();              // key: ghii string
   private personalNodes = new Map<string, PersonalNodeRecord>(); // key: nodeId
   private mailboxItems = new Map<string, MailboxItemRecord>();   // key: id
+  private schemas = new Map<string, SchemaRecord>();
+  private consents = new Map<string, ConsentRecord>();      // key: id
+  private consentAudit: ConsentAuditEntry[] = [];
+  private csms = new Map<string, CsmRecord>();              // key: name
 
   // ── Owners ──
 
@@ -799,4 +804,229 @@ export class InMemoryStorage implements Storage {
     this.maintenanceState = state;
     return state;
   }
+
+  // ── Consent Layer ─────────────────────────────────────
+  async createConsent(record: ConsentRecord): Promise<ConsentRecord> {
+    this.consents.set(record.id, record);
+    return record;
+  }
+
+  async getConsent(id: string): Promise<ConsentRecord | null> {
+    return this.consents.get(id) ?? null;
+  }
+
+  async listConsents(ownerGaii: string, opts?: {
+    status?: 'active' | 'revoked' | 'expired';
+    recipient?: string;
+  }): Promise<ConsentRecord[]> {
+    const results: ConsentRecord[] = [];
+    for (const c of this.consents.values()) {
+      if (c.ownerGaii !== ownerGaii) continue;
+      if (opts?.status && c.status !== opts.status) continue;
+      if (opts?.recipient && c.recipient !== opts.recipient) continue;
+      results.push(c);
+    }
+    return results;
+  }
+
+  async updateConsent(id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null> {
+    const existing = this.consents.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.consents.set(id, updated);
+    return updated;
+  }
+
+  async deleteConsent(id: string): Promise<boolean> {
+    return this.consents.delete(id);
+  }
+
+  async findMatchingConsents(ownerGaii: string, memoryKey: string, accessorGaii: string): Promise<ConsentRecord[]> {
+    const now = new Date().toISOString();
+    const results: ConsentRecord[] = [];
+
+    for (const consent of this.consents.values()) {
+      if (consent.ownerGaii !== ownerGaii) continue;
+      if (consent.status !== 'active') continue;
+
+      // Check expiration
+      if (consent.expires && consent.expires < now) {
+        consent.status = 'expired';
+        continue;
+      }
+
+      // Check recipient
+      if (consent.recipient !== '*' && consent.recipient !== accessorGaii) continue;
+
+      // Check data_pattern (glob match)
+      if (!consentMatchPattern(consent.dataPattern, memoryKey)) continue;
+
+      results.push(consent);
+    }
+
+    return results;
+  }
+
+  // Consent Audit
+  async addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry> {
+    this.consentAudit.push(entry);
+    return entry;
+  }
+
+  async listConsentAudit(ownerGaii: string, opts?: {
+    days?: number;
+    consentId?: string;
+    accessorGaii?: string;
+  }): Promise<ConsentAuditEntry[]> {
+    const cutoff = opts?.days
+      ? new Date(Date.now() - opts.days * 86400000).toISOString()
+      : null;
+
+    return this.consentAudit.filter(e => {
+      if (e.ownerGaii !== ownerGaii) return false;
+      if (cutoff && e.timestamp < cutoff) return false;
+      if (opts?.consentId && e.consentId !== opts.consentId) return false;
+      if (opts?.accessorGaii && e.accessorGaii !== opts.accessorGaii) return false;
+      return true;
+    });
+  }
+
+  // ── Schema Locking ──────────────────────────────────
+  async setSchema(record: SchemaRecord): Promise<SchemaRecord> {
+    const storageKey = `${record.applyTo}:${record.keyPattern}`;
+    this.schemas.set(storageKey, record);
+    return record;
+  }
+
+  async getSchema(keyPattern: string, applyTo?: 'exact' | 'prefix'): Promise<SchemaRecord | null> {
+    if (applyTo) {
+      return this.schemas.get(`${applyTo}:${keyPattern}`) ?? null;
+    }
+    return this.schemas.get(`exact:${keyPattern}`) ?? this.schemas.get(`prefix:${keyPattern}`) ?? null;
+  }
+
+  async deleteSchema(keyPattern: string): Promise<boolean> {
+    const deleted1 = this.schemas.delete(`exact:${keyPattern}`);
+    const deleted2 = this.schemas.delete(`prefix:${keyPattern}`);
+    return deleted1 || deleted2;
+  }
+
+  async listSchemas(prefix?: string): Promise<SchemaRecord[]> {
+    const results: SchemaRecord[] = [];
+    for (const record of this.schemas.values()) {
+      if (!prefix || record.keyPattern.startsWith(prefix)) {
+        results.push(record);
+      }
+    }
+    return results;
+  }
+
+  async findApplicableSchema(memoryKey: string): Promise<SchemaRecord | null> {
+    // 1. Exact match — highest priority
+    const exact = this.schemas.get(`exact:${memoryKey}`);
+    if (exact) return exact;
+
+    // 2. Wildcard pattern match — supports profile.*.interests style
+    let bestWildcard: SchemaRecord | null = null;
+    let bestSegments = 0;
+    for (const record of this.schemas.values()) {
+      if (record.applyTo !== 'prefix') continue;
+      if (!record.keyPattern.includes('*')) continue;
+      if (matchWildcardPattern(record.keyPattern, memoryKey)) {
+        const segments = record.keyPattern.split('.').length;
+        if (segments > bestSegments) {
+          bestWildcard = record;
+          bestSegments = segments;
+        }
+      }
+    }
+    if (bestWildcard) return bestWildcard;
+
+    // 3. Simple prefix match — longest prefix wins
+    const parts = memoryKey.split('.');
+    for (let i = parts.length - 1; i >= 1; i--) {
+      const prefix = parts.slice(0, i).join('.');
+      const prefixSchema = this.schemas.get(`prefix:${prefix}`);
+      if (prefixSchema) return prefixSchema;
+    }
+
+    return null;
+  }
+
+  // ── CSM — Community Service Manifest (Phase 0.2) ──────
+
+  async createCsm(record: CsmRecord): Promise<CsmRecord> {
+    if (this.csms.has(record.name)) throw new Error('CSM_NAME_TAKEN');
+    this.csms.set(record.name, record);
+    return record;
+  }
+
+  async getCsm(name: string): Promise<CsmRecord | null> {
+    return this.csms.get(name) ?? null;
+  }
+
+  async listCsms(opts?: { serviceType?: string }): Promise<CsmRecord[]> {
+    const results: CsmRecord[] = [];
+    for (const csm of this.csms.values()) {
+      if (opts?.serviceType && csm.serviceType !== opts.serviceType) continue;
+      results.push(csm);
+    }
+    return results;
+  }
+
+  async updateCsm(name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null> {
+    const existing = this.csms.get(name);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, name: existing.name };
+    this.csms.set(name, updated);
+    return updated;
+  }
+
+  async deleteCsm(name: string): Promise<boolean> {
+    return this.csms.delete(name);
+  }
+}
+
+/**
+ * Wildcard pattern matching: supports '*' (one segment) and '**' (multiple segments)
+ * Example: 'profile.*.interests' matches 'profile.alice.interests'
+ *          'iot.**' matches 'iot.temperature.living-room'
+ */
+export function matchWildcardPattern(pattern: string, key: string): boolean {
+  const patternParts = pattern.split('.');
+  const keyParts = key.split('.');
+
+  let pi = 0, ki = 0;
+  while (pi < patternParts.length && ki < keyParts.length) {
+    if (patternParts[pi] === '**') {
+      return true;
+    }
+    if (patternParts[pi] === '*') {
+      pi++;
+      ki++;
+      continue;
+    }
+    if (patternParts[pi] !== keyParts[ki]) {
+      return false;
+    }
+    pi++;
+    ki++;
+  }
+  return pi === patternParts.length && ki === keyParts.length;
+}
+
+/**
+ * Glob pattern matching for consent data patterns.
+ * Supports '*' (one segment) and '**' (multiple segments).
+ */
+export function consentMatchPattern(pattern: string, key: string): boolean {
+  const regex = pattern
+    .split('.')
+    .map(segment => {
+      if (segment === '**') return '.*';
+      if (segment === '*') return '[^.]+';
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    })
+    .join('\\.');
+  return new RegExp(`^${regex}$`).test(key);
 }

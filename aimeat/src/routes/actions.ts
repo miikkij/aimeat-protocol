@@ -19,7 +19,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/actions — publish an action (agent auth)
   router.post('/v1/actions', requireAuth(), requireRole('agent'), validateBody(ActionPublishSchema, config.nodeId), async (req, res) => {
-    const { id, display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, webhook_url } = req.body ?? {};
+    const { id, display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, webhook_url, semantic } = req.body ?? {};
 
     // Category validation
     if (category && !ALLOWED_CATEGORIES.includes(category)) {
@@ -70,6 +70,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         maxInputSizeBytes: max_input_size_bytes,
         tags: tags ?? [],
         webhookUrl: webhook_url,
+        semantic: semantic && typeof semantic === 'object' ? semantic : undefined,
         createdAt: now,
         updatedAt: now,
       });
@@ -79,6 +80,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         provider_gaii: action.providerGaii,
         display_name: action.displayName,
         description: action.description,
+        semantic: action.semantic ?? undefined,
         created_at: action.createdAt,
       }, [
         { description: 'View in catalogue', method: 'GET', url: `/v1/catalogue/${action.id}` },
@@ -133,6 +135,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
           } : undefined,
         },
         tags: a.tags,
+        semantic: a.semantic,
       })),
       total: actions.length,
     }, [
@@ -144,7 +147,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   router.put('/v1/actions/:id', requireAuth(), requireRole('agent'), validateBody(ActionUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = req.auth!.sub;
     const id = req.params.id as string;
-    const { display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags } = req.body ?? {};
+    const { display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, semantic } = req.body ?? {};
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     if (display_name !== undefined) updates.displayName = display_name;
@@ -161,6 +164,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     if (estimated_time_seconds !== undefined) updates.estimatedTimeSeconds = estimated_time_seconds;
     if (max_input_size_bytes !== undefined) updates.maxInputSizeBytes = max_input_size_bytes;
     if (tags !== undefined) updates.tags = tags;
+    if (semantic !== undefined) updates.semantic = semantic;
 
     const updated = await storage.updateAction(id, gaii, updates as any);
     if (!updated) {
@@ -201,6 +205,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
       },
       estimated_time_seconds: action.estimatedTimeSeconds,
       tags: action.tags,
+      semantic: action.semantic,
       created_at: action.createdAt,
       updated_at: action.updatedAt,
     }));

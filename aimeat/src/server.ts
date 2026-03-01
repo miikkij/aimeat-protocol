@@ -15,6 +15,8 @@ import { wellknownRouter } from './routes/wellknown.js';
 import { authRouter } from './routes/auth.js';
 import { ownersRouter } from './routes/owners.js';
 import { agentsRouter } from './routes/agents.js';
+import { schemaRouter } from './routes/schemas.js';
+import { consentRouter } from './routes/consent.js';
 import { memoryRouter } from './routes/memory.js';
 import { actionsRouter } from './routes/actions.js';
 import { catalogueRouter } from './routes/catalogue.js';
@@ -33,7 +35,9 @@ import { mcpRouter } from './routes/mcp.js';
 import { portalRouter } from './routes/portal.js';
 import { humanPortalRouter } from './routes/portal-human.js';
 import { profileRouter } from './routes/profile.js';
+import { csmRouter } from './routes/csm.js';
 import { ghiiRouter } from './routes/ghii.js';
+import { totpRouter } from './routes/totp.js';
 import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
 import { aimeatOsRouter } from './routes/aimeat-os.js';
@@ -45,6 +49,8 @@ import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
 import { TunnelManager } from './services/personal-tunnel.js';
+import { startConsentExpiryJob } from './services/consent.js';
+import { seedProfileSchemas } from './services/profile-schemas.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -57,6 +63,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Global middleware
   app.use(express.json({ limit: '15mb' }));
+  app.use(express.text({ limit: '1mb', type: ['text/yaml', 'application/x-yaml'] }));
 
   // Serve static assets (platform icons, etc.)
   const __filename = fileURLToPath(import.meta.url);
@@ -133,6 +140,17 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Start dispute auto-escalation job
   startDisputeTimeoutJob(config, storage);
+
+  // Start consent expiry background job (every 10m) — Phase 0.3
+  if (config.consentEnabled) {
+    startConsentExpiryJob(storage);
+    logger.info('Consent expiry job scheduled (every 10m)');
+  }
+
+  // Seed standardized profile schemas — Phase 0.4
+  seedProfileSchemas(storage, `system@${config.nodeId}`)
+    .then(count => { if (count > 0) logger.info(`Seeded ${count} profile schemas`); })
+    .catch(err => logger.error('Failed to seed profile schemas', { error: err }));
 
   // Federation peer registry (shared between routes and heartbeat)
   const peers = new Map<string, PeerInfo>();
@@ -250,7 +268,10 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   app.use(ownersRouter(config, storage));
   app.use(agentsRouter(config, storage));
+  app.use(consentRouter(config, storage));  // Phase 0.3
+  app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use(memoryRouter(config, storage));
+  app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(actionsRouter(config, storage));
   app.use(catalogueRouter(config, storage));
   app.use(workRouter(config, storage, peers));
@@ -295,6 +316,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(portalRouter(config, storage));
   app.use(humanPortalRouter(config, storage));
   app.use(profileRouter(config, storage));
+  app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
   app.use(ghiiRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));

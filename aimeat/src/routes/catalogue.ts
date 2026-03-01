@@ -33,6 +33,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage): Router 
           } : undefined,
         },
         tags: a.tags,
+        semantic: a.semantic,
       })),
       total: actions.length,
     }, [
@@ -60,6 +61,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage): Router 
         category: a.category,
         pricing: { base_morsels: a.pricing.baseMorsels },
         tags: a.tags,
+        semantic: a.semantic,
       })),
       total: actions.length,
     }, undefined, { page, per_page: perPage, total: actions.length }));
@@ -81,6 +83,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage): Router 
         description: a.description,
         trust_score: a.trustScore,
         capabilities: a.capabilities,
+        semantic: a.semantic,
         last_seen: a.lastSeen,
       })),
       total: agents.length,
@@ -97,6 +100,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage): Router 
         id: b.id,
         name: b.name,
         description: b.description,
+        semantic: b.semantic,
         created_at: b.createdAt,
       })),
       total: publicBoards.length,
@@ -182,6 +186,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage): Router 
       },
       estimated_time_seconds: action.estimatedTimeSeconds,
       tags: action.tags,
+      semantic: action.semantic,
       created_at: action.createdAt,
     }));
   });

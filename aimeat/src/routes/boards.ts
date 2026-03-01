@@ -86,6 +86,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         name: b.name,
         description: b.description,
         visibility: b.visibility,
+        semantic: b.semantic,
         created_at: b.createdAt,
       })),
       total: visible.length,
@@ -227,6 +228,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         category: p.category,
         tags: p.tags,
         reactions: p.reactions,
+        semantic: p.semantic,
         ttl_expires_at: p.ttlExpiresAt,
         created_at: p.createdAt,
       })),
@@ -326,6 +328,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       tags: post.tags,
       reactions: post.reactions,
       reply_to: post.replyTo,
+      semantic: post.semantic,
       ttl_expires_at: post.ttlExpiresAt,
       created_at: post.createdAt,
     }, [

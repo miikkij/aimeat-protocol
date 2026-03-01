@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
+import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
 export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
@@ -57,6 +58,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     const quotaCheck = await checkMemoryQuota(config, storage, gaii, valueSize, existingSize);
     if (!quotaCheck.allowed) {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
+      return;
+    }
+
+    // Schema validation (Phase 0.1)
+    const validation = await validateMemoryWrite(key, value, storage);
+    if (!validation.valid) {
+      res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
+        'Value does not match the schema for this key', 422, {
+          key,
+          violations: validation.errors,
+          schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,
+        }));
       return;
     }
 
@@ -115,6 +128,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
       items: records.map(r => ({
         key: r.key,
         visibility: r.visibility,
+        zone: r.visibility === 'private' ? 'private' : r.visibility === 'public' ? 'federation' : 'dmz',
         tags: r.tags,
         version: r.version,
         created_at: r.createdAt,
@@ -175,10 +189,16 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // DMZ zone mapping (Phase 0.6)
+    const zone = record.visibility === 'private' ? 'private'
+      : record.visibility === 'public' ? 'federation'
+      : 'dmz';
+
     res.json(success(config.nodeId, {
       key: record.key,
       value: record.value,
       visibility: record.visibility,
+      zone,
       tags: record.tags,
       version: record.version,
       created_at: record.createdAt,
@@ -238,6 +258,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     const quotaCheck = await checkMemoryQuota(config, storage, gaii, newValueSize, existingSize);
     if (!quotaCheck.allowed) {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
+      return;
+    }
+
+    // Schema validation (Phase 0.1)
+    const putValidation = await validateMemoryWrite(key, value, storage);
+    if (!putValidation.valid) {
+      res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
+        'Value does not match the schema for this key', 422, {
+          key,
+          violations: putValidation.errors,
+          schema_url: `/v1/memory/${encodeURIComponent(putValidation.schemaKey!)}/schema`,
+        }));
       return;
     }
 

@@ -167,6 +167,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         age_days: trust.ageDays,
       },
       actions_published: actionsPublished,
+      semantic: agent.semantic,
       home_node: config.nodeId,
       created_at: agent.createdAt,
       last_seen: agent.lastSeen,
@@ -246,6 +247,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         public_key: agent.publicKey,
         trust_score: trust.score,
         morsel_balance: agent.morselBalance,
+        semantic: agent.semantic,
         created_at: agent.createdAt,
       },
       memory: memories.map(m => ({

@@ -62,6 +62,14 @@ tags:
     description: Operator dashboard and configuration
   - name: MCP
     description: Model Context Protocol integration (optional extension)
+  - name: Schema
+    description: Phase 0.1 — Schema locking for memory key patterns
+  - name: CSM
+    description: Phase 0.2 — Community Service Manifest registration
+  - name: Consent
+    description: Phase 0.3 — Granular consent grants and audit
+  - name: TOTP
+    description: Phase 0.5 — Time-based one-time password two-factor authentication
 
 components:
   securitySchemes:
@@ -157,6 +165,14 @@ components:
             - OTK_ALREADY_USED: One-time key already consumed
             - NAME_TAKEN: Owner/agent name already registered
             - ESCROW_FAILED: Could not hold morsels in escrow
+            - SCHEMA_VALIDATION_FAILED: Value does not match schema
+            - CONSENT_DENIED: Access denied by consent policy
+            - TOTP_REQUIRED: Two-factor authentication required
+            - TOTP_LOCKED: Account locked due to failed TOTP attempts
+            - TOTP_REPLAY: TOTP code already used
+            - TOTP_ALREADY_ENABLED: TOTP already set up
+            - CSM_NOT_FOUND: CSM service not found
+            - VALIDATION_ERROR: Request body validation failed
           example: INSUFFICIENT_MORSELS
         message:
           type: string
@@ -868,6 +884,94 @@ components:
               type: integer
             average_rating:
               type: number
+
+    # === Phase 0: Schema Locking ===
+    SchemaLockRequest:
+      type: object
+      required: [schema, apply_to]
+      properties:
+        schema:
+          type: object
+          description: JSON Schema to enforce on matching keys
+        apply_to:
+          type: string
+          enum: [exact, prefix]
+        schema_mode:
+          type: string
+          enum: [open, strict]
+          default: open
+        semantic_context:
+          $ref: '#/components/schemas/SemanticAnnotation'
+
+    # === Phase 0: Semantic Ontology ===
+    SemanticAnnotation:
+      type: object
+      description: JSON-LD compatible semantic annotation for ontology support
+      properties:
+        '@context':
+          type: object
+          additionalProperties:
+            type: string
+        '@type':
+          type: string
+      additionalProperties: true
+
+    # === Phase 0: Consent Layer ===
+    ConsentGrant:
+      type: object
+      required: [data_pattern, recipient, purpose]
+      properties:
+        data_pattern:
+          type: string
+          maxLength: 256
+        recipient:
+          type: string
+          maxLength: 256
+        purpose:
+          type: string
+          maxLength: 512
+        scope:
+          type: string
+          enum: [private, dmz, federation]
+          default: federation
+        expires:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+
+    # === Phase 0: TOTP ===
+    TotpSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+          description: TOTP secret (encrypted if encryption key configured)
+        otpauth_url:
+          type: string
+          description: OTP Auth URL for QR code generation
+        qr_code:
+          type: string
+          description: Base64 encoded QR code image (data URI)
+        backup_codes:
+          type: array
+          items:
+            type: string
+
+    # === Phase 0: CSM ===
+    CsmDefinition:
+      type: object
+      properties:
+        name:
+          type: string
+        definition:
+          type: object
+          description: Parsed CSM definition
+        json_schema_key:
+          type: string
+        service_type:
+          type: string
 
   # === Reusable Response Wrappers ===
   responses:
@@ -4072,3 +4176,723 @@ paths:
             application/json:
               schema:
                 type: object
+
+  # ====================================================================
+  # Phase 0: Foundation Endpoints
+  # ====================================================================
+
+  # --- Phase 0.1: Schema Locking ---
+
+  /v1/memory/{key}/schema:
+    put:
+      operationId: setMemorySchema
+      summary: Set schema for a memory key pattern
+      description: |
+        Lock a memory key (or key prefix) to a JSON Schema. All future writes
+        to matching keys will be validated against this schema. Requires operator role.
+      tags: [Schema]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Memory key or key prefix to lock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchemaLockRequest'
+      responses:
+        '200':
+          description: Schema set successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          apply_to:
+                            type: string
+                          schema_mode:
+                            type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Invalid JSON Schema
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR
+
+    get:
+      operationId: getMemorySchema
+      summary: Get schema for a memory key
+      description: Retrieve the JSON Schema locked to a specific memory key or prefix. No authentication required.
+      tags: [Schema]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Memory key to look up
+      responses:
+        '200':
+          description: Schema for the key
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          apply_to:
+                            type: string
+                          schema_mode:
+                            type: string
+                          schema:
+                            type: object
+                          semantic_context:
+                            $ref: '#/components/schemas/SemanticAnnotation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deleteMemorySchema
+      summary: Remove schema from a memory key
+      description: Remove the schema lock from a memory key pattern. Requires operator role.
+      tags: [Schema]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Memory key to unlock
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/schemas:
+    get:
+      operationId: listSchemas
+      summary: List all schemas
+      description: List all registered schema locks on this node. No authentication required.
+      tags: [Schema]
+      parameters:
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: List of schema locks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key:
+                              type: string
+                            apply_to:
+                              type: string
+                            schema_mode:
+                              type: string
+                            schema:
+                              type: object
+                            semantic_context:
+                              $ref: '#/components/schemas/SemanticAnnotation'
+
+  # --- Phase 0.2: CSM (Community Service Manifest) ---
+
+  /v1/csm:
+    post:
+      operationId: registerCsm
+      summary: Register a Community Service Manifest
+      description: |
+        Register a new CSM service definition. Accepts either YAML (text/yaml)
+        or JSON (application/json) request body. Requires operator role.
+      tags: [CSM]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CsmDefinition'
+          text/yaml:
+            schema:
+              type: string
+              description: YAML CSM definition
+      responses:
+        '201':
+          description: CSM registered
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CsmDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: CSM with this name already exists
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NAME_TAKEN
+        '422':
+          description: Invalid CSM definition
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR
+
+    get:
+      operationId: listCsm
+      summary: List CSM services
+      description: List all registered Community Service Manifests. No authentication required.
+      tags: [CSM]
+      parameters:
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+        - name: service_type
+          in: query
+          schema:
+            type: string
+          description: Filter by service type
+      responses:
+        '200':
+          description: List of CSM services
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CsmDefinition'
+
+  /v1/csm/{name}:
+    get:
+      operationId: getCsm
+      summary: Get a single CSM
+      description: Retrieve a Community Service Manifest by name. No authentication required.
+      tags: [CSM]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: CSM service name
+      responses:
+        '200':
+          description: CSM definition
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CsmDefinition'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deleteCsm
+      summary: Delete a CSM
+      description: Remove a Community Service Manifest by name. Requires operator role.
+      tags: [CSM]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: CSM service name
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # --- Phase 0.3: Consent Layer ---
+
+  /v1/consent:
+    post:
+      operationId: createConsent
+      summary: Create a consent grant
+      description: |
+        Grant consent for a specific data pattern to be shared with a recipient
+        for a stated purpose. Requires agent authentication.
+      tags: [Consent]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentGrant'
+      responses:
+        '201':
+          description: Consent grant created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/ConsentGrant'
+                          - type: object
+                            properties:
+                              id:
+                                type: string
+                              created_at:
+                                type: string
+                                format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Invalid consent grant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR
+
+    get:
+      operationId: listConsent
+      summary: List own consent grants
+      description: List all consent grants for the authenticated agent.
+      tags: [Consent]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+        - name: recipient
+          in: query
+          schema:
+            type: string
+          description: Filter by recipient
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [private, dmz, federation]
+          description: Filter by scope
+      responses:
+        '200':
+          description: List of consent grants
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: '#/components/schemas/ConsentGrant'
+                            - type: object
+                              properties:
+                                id:
+                                  type: string
+                                created_at:
+                                  type: string
+                                  format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/consent/{id}:
+    get:
+      operationId: getConsent
+      summary: Get a single consent grant
+      description: Retrieve a specific consent grant by ID. Requires agent authentication.
+      tags: [Consent]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Consent grant ID
+      responses:
+        '200':
+          description: Consent grant details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/ConsentGrant'
+                          - type: object
+                            properties:
+                              id:
+                                type: string
+                              created_at:
+                                type: string
+                                format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: revokeConsent
+      summary: Revoke a consent grant
+      description: Revoke a previously issued consent grant. Requires agent authentication.
+      tags: [Consent]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Consent grant ID to revoke
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/consent/audit:
+    get:
+      operationId: consentAuditLog
+      summary: View consent audit log
+      description: |
+        Retrieve the audit log of consent-related events (grants, revocations,
+        access checks) for the authenticated agent.
+      tags: [Consent]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [grant, revoke, access_check, denied]
+          description: Filter by audit event type
+      responses:
+        '200':
+          description: Consent audit log
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            action:
+                              type: string
+                              enum: [grant, revoke, access_check, denied]
+                            consent_id:
+                              type: string
+                            data_pattern:
+                              type: string
+                            recipient:
+                              type: string
+                            timestamp:
+                              type: string
+                              format: date-time
+                            details:
+                              type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # --- Phase 0.5: TOTP Two-Factor Authentication ---
+
+  /v1/ghii/totp/setup:
+    post:
+      operationId: totpSetup
+      summary: Enable TOTP two-factor authentication
+      description: |
+        Generate a TOTP secret and QR code for the authenticated owner.
+        The owner must verify the code via /v1/ghii/totp/verify to complete setup.
+      tags: [TOTP]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: TOTP setup initiated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TotpSetupResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: TOTP already enabled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: TOTP_ALREADY_ENABLED
+
+  /v1/ghii/totp/verify:
+    post:
+      operationId: totpVerify
+      summary: Verify TOTP to confirm setup
+      description: |
+        Submit a TOTP code to confirm two-factor authentication setup.
+        Must be called after /v1/ghii/totp/setup to activate 2FA.
+      tags: [TOTP]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  description: Six-digit TOTP code from authenticator app
+      responses:
+        '200':
+          description: TOTP verified and enabled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          backup_codes:
+                            type: array
+                            items:
+                              type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Invalid TOTP code
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR
+
+  /v1/ghii/totp:
+    delete:
+      operationId: totpDisable
+      summary: Disable TOTP two-factor authentication
+      description: Disable TOTP 2FA for the authenticated owner. Requires current TOTP code or backup code.
+      tags: [TOTP]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: Current TOTP code or backup code
+      responses:
+        '200':
+          $ref: '#/components/responses/MeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Invalid TOTP code
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR
+
+  /v1/ghii/totp/backup-codes:
+    post:
+      operationId: totpRegenerateBackupCodes
+      summary: Regenerate TOTP backup codes
+      description: |
+        Regenerate backup codes for TOTP 2FA. Invalidates all previously
+        issued backup codes. Requires current TOTP code for verification.
+      tags: [TOTP]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: Current TOTP code for verification
+      responses:
+        '200':
+          description: New backup codes generated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          backup_codes:
+                            type: array
+                            items:
+                              type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Invalid TOTP code
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: VALIDATION_ERROR

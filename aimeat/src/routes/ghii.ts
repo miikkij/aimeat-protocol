@@ -7,6 +7,8 @@ import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { scrypt, randomBytes, timingSafeEqual } from 'node:crypto';
+import { validateTotpCode, validateBackupCode } from '../services/totp.js';
+import type { TotpConfig } from '../services/totp.js';
 
 // Password hashing with scrypt
 async function hashPassword(password: string): Promise<string> {
@@ -123,6 +125,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
             passwordHash,
             verificationLevel: 0,
             ownerName: owner.name,
+            totpEnabled: false,
             createdAt: now,
             updatedAt: now,
         });
@@ -153,10 +156,23 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
         ]));
     });
 
+    // TOTP config for login 2FA verification (Phase 0.5)
+    const totpConfig: TotpConfig = {
+        issuer: config.totpIssuer,
+        algorithm: 'SHA1' as const,
+        digits: 6 as const,
+        period: config.totpPeriod,
+        window: config.totpWindow,
+        backupCodeCount: config.totpBackupCodeCount,
+        encryptionKey: config.totpSecretEncryptionKey
+            ? Buffer.from(config.totpSecretEncryptionKey, 'hex')
+            : undefined,
+    };
+
     // POST /v1/ghii/login — Login with username + password from any device
     // Regenerates keys, creates agent if missing, returns full session
     router.post('/v1/ghii/login', async (req, res) => {
-        const { username, password } = req.body ?? {};
+        const { username, password, totp_code, backup_code } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
@@ -185,7 +201,92 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Password verified — regenerate owner keys
+        // TOTP 2FA check (Phase 0.5) — if TOTP is enabled, require a valid code
+        if (ghiiRecord.totpEnabled && ghiiRecord.totpSecret) {
+            // Check lockout
+            if (ghiiRecord.totpLockedUntil) {
+                const lockExpires = new Date(ghiiRecord.totpLockedUntil).getTime();
+                if (Date.now() < lockExpires) {
+                    res.status(429).json(error(config.nodeId, 'TOTP_LOCKED',
+                        `Account temporarily locked due to too many failed TOTP attempts. Try again after ${ghiiRecord.totpLockedUntil}`));
+                    return;
+                }
+                // Lock expired — reset counters
+                await storage.updateGHII(ghiiRecord.ghii, {
+                    totpFailedAttempts: 0,
+                    totpLockedUntil: undefined,
+                });
+                ghiiRecord.totpFailedAttempts = 0;
+                ghiiRecord.totpLockedUntil = undefined;
+            }
+
+            let totpVerified = false;
+
+            // Try TOTP code
+            if (totp_code && typeof totp_code === 'string') {
+                // Replay protection: reject if same code was just used
+                if (ghiiRecord.totpLastUsedCode === totp_code) {
+                    res.status(401).json(error(config.nodeId, 'TOTP_REPLAY', 'This TOTP code has already been used. Wait for the next code.'));
+                    return;
+                }
+                const totpResult = validateTotpCode(ghiiRecord.totpSecret, totp_code, totpConfig);
+                if (totpResult.valid) {
+                    totpVerified = true;
+                    await storage.updateGHII(ghiiRecord.ghii, {
+                        totpLastUsedAt: new Date().toISOString(),
+                        totpLastUsedCode: totp_code,
+                        totpFailedAttempts: 0,
+                        totpLockedUntil: undefined,
+                    });
+                }
+            }
+
+            // Try backup code
+            if (!totpVerified && backup_code && typeof backup_code === 'string' && ghiiRecord.totpBackupCodes) {
+                const backupResult = validateBackupCode(backup_code, ghiiRecord.totpBackupCodes);
+                if (backupResult.valid) {
+                    totpVerified = true;
+                    // Remove used backup code
+                    const updatedCodes = [...ghiiRecord.totpBackupCodes];
+                    updatedCodes.splice(backupResult.index, 1);
+                    await storage.updateGHII(ghiiRecord.ghii, {
+                        totpBackupCodes: updatedCodes,
+                        totpFailedAttempts: 0,
+                        totpLockedUntil: undefined,
+                    });
+                }
+            }
+
+            if (!totpVerified) {
+                // If neither code was provided at all, tell the client TOTP is required
+                if (!totp_code && !backup_code) {
+                    res.status(401).json(error(config.nodeId, 'TOTP_REQUIRED',
+                        'This account has two-factor authentication enabled. Provide totp_code or backup_code.'));
+                    return;
+                }
+
+                // Increment failed attempts
+                const attempts = (ghiiRecord.totpFailedAttempts ?? 0) + 1;
+                const lockUntil = attempts >= config.totpMaxFailedAttempts
+                    ? new Date(Date.now() + config.totpLockoutSeconds * 1000).toISOString()
+                    : undefined;
+                await storage.updateGHII(ghiiRecord.ghii, {
+                    totpFailedAttempts: attempts,
+                    totpLockedUntil: lockUntil,
+                });
+
+                if (lockUntil) {
+                    res.status(429).json(error(config.nodeId, 'TOTP_LOCKED',
+                        `Too many failed TOTP attempts. Account locked until ${lockUntil}`));
+                    return;
+                }
+
+                res.status(401).json(error(config.nodeId, 'INVALID_TOTP', 'Invalid TOTP code or backup code.'));
+                return;
+            }
+        }
+
+        // Password (+ TOTP if enabled) verified — regenerate owner keys
         const ownerKeyPair = await generateKeyPair();
         await storage.updateOwner(username, { publicKey: ownerKeyPair.publicKey });
 
@@ -295,6 +396,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage): Router {
             avatar: record.avatar,
             locale: record.locale,
             verification_level: record.verificationLevel,
+            semantic: record.semantic,
             created_at: record.createdAt,
             agents: agents.map(a => ({
                 gaii: a.gaii,

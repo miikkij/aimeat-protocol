@@ -1,3 +1,10 @@
+// Phase 0.7b — Semantic annotation for records (JSON-LD-compatible)
+export interface SemanticAnnotation {
+  '@context'?: Record<string, string>;
+  '@type'?: string;
+  [key: string]: unknown;
+}
+
 export interface OwnerRecord {
   name: string;
   displayName?: string;
@@ -18,6 +25,7 @@ export interface AgentRecord {
   morselBalance: number;
   createdAt: string;
   lastSeen: string;
+  semantic?: SemanticAnnotation;  // Phase 0.7b
 }
 
 export interface MemoryRecord {
@@ -47,6 +55,7 @@ export interface ActionRecord {
   webhookUrl?: string;
   createdAt: string;
   updatedAt: string;
+  semantic?: SemanticAnnotation;  // Phase 0.7b
 }
 
 export interface WorkRecord {
@@ -83,6 +92,7 @@ export interface BoardRecord {
   ownerGaii: string;
   allowedGaiis: string[];
   createdAt: string;
+  semantic?: SemanticAnnotation;  // Phase 0.7b
 }
 
 export interface BoardPostRecord {
@@ -97,6 +107,7 @@ export interface BoardPostRecord {
   reactions: Record<string, string[]>; // emoji -> gaiis
   replyTo?: string;
   createdAt: string;
+  semantic?: SemanticAnnotation;  // Phase 0.7b
 }
 
 export interface OtkRecord {
@@ -201,6 +212,15 @@ export interface GHIIRecord {
   ownerName: string;              // links to OwnerRecord.name
   createdAt: string;
   updatedAt: string;
+  // TOTP 2FA (Phase 0.5)
+  totpSecret?: string;          // AES-256-GCM encrypted TOTP secret (Base32)
+  totpEnabled: boolean;         // Is TOTP activated (default: false)
+  totpBackupCodes?: string[];   // SHA-256 hashed backup codes
+  totpLastUsedAt?: string;      // Last used code timestamp (replay protection)
+  totpLastUsedCode?: string;    // Last used code (replay protection)
+  totpFailedAttempts?: number;  // Failed attempts (rate limiting)
+  totpLockedUntil?: string;     // Locked until (rate limiting)
+  semantic?: SemanticAnnotation;  // Phase 0.7b
 }
 
 export interface PersonalNodeRecord {
@@ -216,6 +236,7 @@ export interface PersonalNodeRecord {
   visibility: 'private' | 'public';  // federation directory visibility
   createdAt: string;
   updatedAt: string;
+  semantic?: SemanticAnnotation;  // Phase 0.7b
 }
 
 export interface MailboxItemRecord {
@@ -236,6 +257,58 @@ export interface MaintenanceState {
   message: string;
   enabledAt: string | null;
   enabledBy: string | null;
+}
+
+export interface ConsentRecord {
+  id: string;                 // UUID
+  ownerGaii: string;          // Data owner (consent grantor)
+  dataPattern: string;        // Glob-pattern: "profile.*.interests", "iot.*"
+  recipient: string;          // "*" | GAII | "organism.{id}"
+  purpose: string;            // Free-form: "discovery", "marketplace", "research"
+  scope: 'private' | 'dmz' | 'federation';  // DMZ zone
+  expires: string | null;     // ISO 8601 or null (indefinite)
+  status: 'active' | 'revoked' | 'expired';
+  grantedAt: string;          // ISO timestamp
+  revokedAt: string | null;   // ISO timestamp or null
+  metadata?: Record<string, unknown>;  // Free-form metadata
+}
+
+export interface ConsentAuditEntry {
+  id: string;                 // UUID
+  consentId: string;          // References ConsentRecord.id
+  ownerGaii: string;          // Whose data was accessed
+  accessorGaii: string;       // Who accessed the data
+  memoryKey: string;          // Which key was read
+  action: 'read' | 'list' | 'search';  // What was done
+  timestamp: string;          // ISO timestamp
+  allowed: boolean;           // Did consent allow this?
+}
+
+export interface CsmRecord {
+  name: string;                  // unique service name (e.g. "hobby-directory")
+  definition: Record<string, unknown>;  // Full CsmDefinition as JSON
+  jsonSchemaKey: string;         // schema locking key: "csm.{name}"
+  serviceType: string;           // directory | marketplace | forum | etc.
+  registeredBy: string;          // owner name who registered this CSM
+  registeredAt: string;          // ISO timestamp
+  updatedAt: string;             // ISO timestamp
+}
+
+export interface SemanticContext {
+  '@context'?: Record<string, string>;
+  '@type'?: string;
+  properties?: Record<string, unknown>;
+}
+
+export interface SchemaRecord {
+  keyPattern: string;         // memory key name or prefix
+  applyTo: 'exact' | 'prefix'; // 'exact' = this key only, 'prefix' = this and all sub-keys
+  schemaJson: Record<string, unknown>; // JSON Schema object
+  schemaMode: 'open' | 'strict';      // open = additionalProperties: true, strict = false
+  lockedBy: string;           // GAII or GHII that set the schema
+  setAt: string;              // ISO timestamp
+  updatedAt: string;          // ISO timestamp
+  semanticContext?: SemanticContext;  // Phase 0.7 — optional JSON-LD-compatible semantic type
 }
 
 export interface Storage {
@@ -382,4 +455,37 @@ export interface Storage {
   // Maintenance mode
   getMaintenanceMode(): Promise<MaintenanceState>;
   setMaintenanceMode(state: MaintenanceState): Promise<MaintenanceState>;
+
+  // Schema Locking (Phase 0.1)
+  setSchema(record: SchemaRecord): Promise<SchemaRecord>;
+  getSchema(keyPattern: string, applyTo?: 'exact' | 'prefix'): Promise<SchemaRecord | null>;
+  deleteSchema(keyPattern: string): Promise<boolean>;
+  listSchemas(prefix?: string): Promise<SchemaRecord[]>;
+  findApplicableSchema(memoryKey: string): Promise<SchemaRecord | null>;
+
+  // Consent Layer (Phase 0.3)
+  createConsent(record: ConsentRecord): Promise<ConsentRecord>;
+  getConsent(id: string): Promise<ConsentRecord | null>;
+  listConsents(ownerGaii: string, opts?: {
+    status?: 'active' | 'revoked' | 'expired';
+    recipient?: string;
+  }): Promise<ConsentRecord[]>;
+  updateConsent(id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null>;
+  deleteConsent(id: string): Promise<boolean>;
+  findMatchingConsents(ownerGaii: string, memoryKey: string, accessorGaii: string): Promise<ConsentRecord[]>;
+
+  // CSM — Community Service Manifest (Phase 0.2)
+  createCsm(record: CsmRecord): Promise<CsmRecord>;
+  getCsm(name: string): Promise<CsmRecord | null>;
+  listCsms(opts?: { serviceType?: string }): Promise<CsmRecord[]>;
+  updateCsm(name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null>;
+  deleteCsm(name: string): Promise<boolean>;
+
+  // Consent Audit (Phase 0.3)
+  addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry>;
+  listConsentAudit(ownerGaii: string, opts?: {
+    days?: number;
+    consentId?: string;
+    accessorGaii?: string;
+  }): Promise<ConsentAuditEntry[]>;
 }

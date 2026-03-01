@@ -78,6 +78,21 @@ export interface AimeatConfig {
   federationRole: FederationRole;
   genesisUrl: string | null;
 
+  // Consent Layer (Phase 0.3)
+  consentEnabled: boolean;
+  consentAuditRetentionDays: number;
+  consentMaxPerUser: number;
+
+  // TOTP / 2FA (Phase 0.5)
+  totpEnabled: boolean;
+  totpIssuer: string;
+  totpPeriod: number;
+  totpWindow: number;
+  totpBackupCodeCount: number;
+  totpSecretEncryptionKey: string | null;
+  totpMaxFailedAttempts: number;
+  totpLockoutSeconds: number;
+
   // Personal Node support (operator-side)
   personalNodesEnabled: boolean;
   personalNodeMaxSlots: number;
@@ -143,6 +158,17 @@ export function loadConfig(): AimeatConfig {
     },
     federationRole: (process.env.AIMEAT_FEDERATION_ROLE ?? 'standalone') as FederationRole,
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
+    consentEnabled: process.env.AIMEAT_CONSENT_ENABLED !== 'false',
+    consentAuditRetentionDays: parseInt(process.env.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS ?? '365', 10),
+    consentMaxPerUser: parseInt(process.env.AIMEAT_CONSENT_MAX_PER_USER ?? '100', 10),
+    totpEnabled: process.env.AIMEAT_TOTP_ENABLED !== 'false',
+    totpIssuer: process.env.AIMEAT_TOTP_ISSUER ?? 'AIMEAT',
+    totpPeriod: parseInt(process.env.AIMEAT_TOTP_PERIOD ?? '30', 10),
+    totpWindow: parseInt(process.env.AIMEAT_TOTP_WINDOW ?? '1', 10),
+    totpBackupCodeCount: parseInt(process.env.AIMEAT_TOTP_BACKUP_CODE_COUNT ?? '10', 10),
+    totpSecretEncryptionKey: process.env.AIMEAT_TOTP_ENCRYPTION_KEY ?? null,
+    totpMaxFailedAttempts: parseInt(process.env.AIMEAT_TOTP_MAX_FAILED ?? '5', 10),
+    totpLockoutSeconds: parseInt(process.env.AIMEAT_TOTP_LOCKOUT_SECONDS ?? '300', 10),
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),

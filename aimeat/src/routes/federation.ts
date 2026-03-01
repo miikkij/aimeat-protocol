@@ -611,6 +611,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     perUnit: action.pricing?.per_unit,
                 },
                 tags: [...(action.tags ?? []), `federated:${source_node}`],
+                semantic: action.semantic,
                 createdAt: action.created_at ?? now,
                 updatedAt: now,
             };
