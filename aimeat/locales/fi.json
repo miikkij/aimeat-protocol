@@ -486,7 +486,7 @@
       "label": "Valitse tilauksesi / versio"
     },
     "step3": {
-      "label": "Aloita"
+      "label": "Valitse yhdistämistapa"
     },
     "step4": {
       "label": "Jaa sovelluksesi"
@@ -512,6 +512,17 @@
       "browse": "Selaus (vain luku)",
       "prompt": "Kehotepaketti"
     },
+    "tabs": {
+      "apps": "Sovellukset",
+      "appsDesc": "Rakenna sovelluksia",
+      "mcp": "MCP",
+      "mcpDesc": "AI-liitäntä",
+      "api": "API",
+      "apiDesc": "REST-rajapinta",
+      "unavailable": "Ei saatavilla tällä tilauksella",
+      "upgradeForMcp": "MCP vaatii maksullisen tilauksen. Päivitä saadaksesi 14 AIMEAT-työkalua suoraan AI:llesi.",
+      "upgradeForApi": "Tämä tilaus ei voi tehdä HTTP-pyyntöjä. Käytä Sovellukset-välilehteä luodaksesi valmiin verkkosovelluksen."
+    },
     "copy": "Kopioi",
     "copied": "Kopioitu!",
     "download": "Lataa",
@@ -522,21 +533,21 @@
     "shareLink": "Jakolinkki",
     "noApps": "Ei yhteisön sovelluksia vielä.",
     "panel": {
-      "mcpBadge": "TASO A \u2014 Täysi MCP",
+      "mcpBadge": "\ud83d\udd0c MCP \u2014 AI-liitäntä",
       "mcpStep1": "Avaa AI-alustasi <strong>Asetukset \u2192 Yhdistimet / MCP-palvelimet</strong>",
       "mcpStep2": "Lisää uusi MCP-palvelin tällä URL:lla:",
       "mcpStep3": "Alusta hoitaa OAuth-rekisteröinnin automaattisesti",
       "mcpStep4": "Kun yhdistetty, kokeile: <em>\"Tarkista AIMEAT-solmuni hakemisto\"</em>",
       "mcpTools": "Käytössäsi on <strong>14 MCP-työkalua</strong>: hakemistohaku, muistin luku/kirjoitus, toimintojen suoritus, työjono, lompakko, taulut, tallennus ja paljon muuta.",
-      "apiBadge": "TASO B \u2014 Täysi HTTP",
+      "apiBadge": "\ud83d\udce1 API \u2014 REST-rajapinta",
       "apiDesc": "AI:si voi tehdä HTTP-kutsuja. Kopioi tämä kehote ja liitä se AI-chattiisi:",
-      "browseBadge": "TASO C \u2014 Vain selaus",
+      "browseBadge": "\ud83d\udce1 API \u2014 Vain selaus",
       "browseDesc": "AI:si voi selata URL-osoitteita. Kopioi tämä kehote aloittaaksesi:",
       "browseUpgradeTitle": "Haluatko täyden pääsyn?",
       "browseUpgrade1": "Päivitä tilauksesi MCP-tuella",
       "browseUpgrade2": "Tai vaihda työkalukykyiseen AI:hin (Claude Code, VS Code Copilot)",
       "browseUpgrade3": "Tai käytä <a href=\"#\" onclick=\"switchToPromptPackage();return false\">kehotepakettia</a> HTML-sovelluksen luomiseen",
-      "promptBadge": "TASO D \u2014 Kehotepaketti",
+      "promptBadge": "\ud83d\udda5\ufe0f Sovellukset \u2014 Sovellusrakentaja",
       "promptDesc": "AI:si ei voi tehdä verkkopyyntöjä, mutta se voi <strong>luoda koodia</strong> puolestasi! Valitse mitä haluat rakentaa, kopioi kehote AI-chattiisi. AI haastattelee sinua ja luo valmiin HTML-sovelluksen.",
       "promptLoggedIn": "Olet kirjautunut \u2014 kun AI on luonut sovelluksen, tule takaisin lähettämään se ja saat jaettavan linkin!",
       "promptAnon": "Anonyymi tila \u2014 sinun täytyy jakaa luotu HTML-tiedosto itse.",
@@ -596,8 +607,9 @@
       "noHttp": "Ei voi tehdä ulkoisia HTTP-kutsuja",
       "terminal": "Voi suorittaa terminaalikomentoja",
       "vscodeSettings": "Lisää MCP-palvelimeksi VS Code -asetuksissa",
-      "pythonSandbox": "Python-hiekkalaatikko, ei internetiä",
-      "functionCalling": "Mallit joilla on funktokutsut"
+      "pythonSandbox": "Python-hiekkalaatikko — voi tehdä HTTP-kutsuja",
+      "functionCalling": "Mallit joilla on funktokutsut",
+      "indexnow": "Voi selata Bingiin indeksoituja sivuja (IndexNow)"
     }
   },
   "init": {

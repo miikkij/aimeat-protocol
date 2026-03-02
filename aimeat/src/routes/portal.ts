@@ -22,13 +22,12 @@ interface AIPlatform {
   id: string;
   name: string;
   vendor: string;
-  icon: string;
   variants: PlatformVariant[];
 }
 
 const PLATFORMS: AIPlatform[] = [
   {
-    id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI', icon: '/img/platforms/chatgpt.png',
+    id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI',
     variants: [
       { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
       { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
@@ -38,7 +37,7 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'claude', name: 'Claude', vendor: 'Anthropic', icon: '/img/platforms/claude.png',
+    id: 'claude', name: 'Claude', vendor: 'Anthropic',
     variants: [
       { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
       { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
@@ -47,30 +46,36 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'copilot', name: 'Microsoft Copilot', vendor: 'Microsoft', icon: '/img/platforms/copilot.png',
+    id: 'githubcopilot', name: 'GitHub Copilot', vendor: 'GitHub',
     variants: [
-      { id: 'office', name: 'Microsoft 365 Copilot', tier: 'D', path: 'prompt-package', notes: 'noHttp' },
-      { id: 'vscode-chat', name: 'VS Code Copilot Chat', tier: 'B', path: 'api', notes: 'terminal' },
-      { id: 'vscode-mcp', name: 'VS Code Copilot (MCP)', tier: 'A', path: 'mcp', notes: 'vscodeSettings' },
+      { id: 'vscode-mcp', name: 'VS Code (MCP)', tier: 'A', path: 'mcp', notes: 'vscodeSettings' },
+      { id: 'vscode-chat', name: 'VS Code (Terminal)', tier: 'B', path: 'api', notes: 'terminal' },
     ],
   },
   {
-    id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek', icon: '/img/platforms/deepseek.png',
+    id: 'm365copilot', name: 'M365 Copilot', vendor: 'Microsoft',
+    variants: [
+      { id: 'appbuilder', name: 'M365 App Builder', tier: 'D', path: 'prompt-package' },
+      { id: 'browse', name: 'M365 Copilot (Bing browse)', tier: 'C', path: 'browse', notes: 'indexnow' },
+    ],
+  },
+  {
+    id: 'deepseek', name: 'DeepSeek', vendor: 'DeepSeek',
     variants: [
       { id: 'chat', name: 'DeepSeek Chat', tier: 'D', path: 'prompt-package' },
       { id: 'api', name: 'DeepSeek API (external)', tier: 'B', path: 'api' },
     ],
   },
   {
-    id: 'grok', name: 'Grok', vendor: 'xAI', icon: '/img/platforms/grok.png',
+    id: 'grok', name: 'Grok', vendor: 'xAI',
     variants: [
       { id: 'chat', name: 'Grok (x.com chat)', tier: 'C', path: 'browse' },
-      { id: 'code', name: 'Grok (code_execution)', tier: 'D', path: 'prompt-package', notes: 'pythonSandbox' },
+      { id: 'code', name: 'Grok (code_execution)', tier: 'B', path: 'api', notes: 'pythonSandbox' },
       { id: 'api', name: 'Grok API (external)', tier: 'B', path: 'api' },
     ],
   },
   {
-    id: 'gemini', name: 'Gemini', vendor: 'Google', icon: '/img/platforms/gemini.png',
+    id: 'gemini', name: 'Gemini', vendor: 'Google',
     variants: [
       { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
       { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
@@ -78,20 +83,21 @@ const PLATFORMS: AIPlatform[] = [
     ],
   },
   {
-    id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio', icon: '/img/platforms/lmstudio.png',
+    id: 'lmstudio', name: 'LM Studio', vendor: 'LM Studio',
     variants: [
       { id: 'tools', name: 'LM Studio (tool-capable model)', tier: 'B', path: 'api', notes: 'functionCalling' },
       { id: 'chat', name: 'LM Studio (chat-only model)', tier: 'D', path: 'prompt-package' },
     ],
   },
   {
-    id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw', icon: '/img/platforms/openclaw.png',
+    id: 'openclaw', name: 'OpenClaw', vendor: 'OpenClaw',
     variants: [
-      { id: 'instance', name: 'OpenClaw Instance', tier: 'B', path: 'api' },
+      { id: 'mcp', name: 'OpenClaw (MCP)', tier: 'A', path: 'mcp' },
+      { id: 'instance', name: 'OpenClaw (HTTP)', tier: 'B', path: 'api' },
     ],
   },
   {
-    id: 'other', name: 'Other / Custom', vendor: 'Various', icon: '/img/platforms/other.png',
+    id: 'other', name: 'Other / Custom', vendor: 'Various',
     variants: [
       { id: 'mcp', name: 'MCP-capable AI', tier: 'A', path: 'mcp' },
       { id: 'http', name: 'HTTP-capable AI', tier: 'B', path: 'api' },
@@ -565,6 +571,23 @@ p{margin-bottom:.75rem}
 
 /* Goal selector */
 .goals{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;margin-bottom:1rem}
+
+/* Capability tabs */
+.cap-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:2px solid var(--border)}
+.cap-tab{flex:1;padding:.75rem 1rem;text-align:center;cursor:pointer;background:transparent;border:none;color:var(--muted);font-size:.9rem;font-weight:600;transition:all .2s;border-bottom:3px solid transparent;margin-bottom:-2px;position:relative}
+.cap-tab:hover{color:var(--text);background:rgba(255,107,157,.05)}
+.cap-tab.active{color:var(--love1);border-bottom-color:var(--love1);background:rgba(255,107,157,.08)}
+.cap-tab.recommended{color:var(--success)}
+.cap-tab.recommended.active{color:var(--success);border-bottom-color:var(--success)}
+.cap-tab .tab-icon{font-size:1.2rem;display:block;margin-bottom:.15rem}
+.cap-tab .tab-label{font-size:.8rem;display:block}
+.cap-tab .tab-rec{position:absolute;top:2px;right:6px;font-size:.55rem;background:var(--success);color:#fff;padding:1px 5px;border-radius:8px;text-transform:uppercase;letter-spacing:.05em}
+.cap-tab.unavail{opacity:.45;cursor:default}
+.cap-tab.unavail:hover{background:transparent;color:var(--muted)}
+.cap-panel{display:none}
+.cap-panel.active{display:block}
+.unavail-notice{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.9rem}
+.unavail-notice .unavail-icon{font-size:2rem;margin-bottom:.5rem}
 .goal-card{background:var(--card);border:2px solid var(--border);border-radius:8px;padding:.75rem;cursor:pointer;transition:all .15s;font-size:.85rem}
 .goal-card:hover{border-color:var(--love1)}
 .goal-card.selected{border-color:var(--love1);background:var(--card2)}
@@ -843,20 +866,62 @@ function showResult(v) {
   var s3 = document.getElementById('step3');
   s3.classList.remove('hidden');
 
-  if (v.path === 'mcp') { area.innerHTML = mcpPanel(); }
-  else if (v.path === 'api') { area.innerHTML = apiPanel(); }
-  else if (v.path === 'browse') { area.innerHTML = browsePanel(); }
-  else { area.innerHTML = promptPackagePanel(); }
+  // Determine which capabilities are available for this variant
+  var hasApps = true; // Always available
+  var hasMcp = (v.path === 'mcp');
+  var hasApi = (v.path === 'api' || v.path === 'browse' || v.path === 'mcp');
 
+  // Build tabbed interface — Apps always first and selected
+  var html = '<div class="cap-tabs">';
+  html += '<button class="cap-tab active" data-tab="apps" onclick="switchTab(\\'apps\\')">'
+    + '<span class="tab-icon">\\ud83d\\udda5\\ufe0f</span>'
+    + '<span class="tab-label">' + dt('dev.tabs.apps') + '</span></button>';
+  html += '<button class="cap-tab' + (hasMcp ? '' : ' unavail') + '" data-tab="mcp" onclick="' + (hasMcp ? 'switchTab(\\'mcp\\')' : '') + '">'
+    + (hasMcp ? '<span class="tab-rec">\\u2713</span>' : '')
+    + '<span class="tab-icon">\\ud83d\\udd0c</span>'
+    + '<span class="tab-label">' + dt('dev.tabs.mcp') + '</span></button>';
+  html += '<button class="cap-tab' + (hasApi ? '' : ' unavail') + '" data-tab="api" onclick="' + (hasApi ? 'switchTab(\\'api\\')' : '') + '">'
+    + '<span class="tab-icon">\\ud83d\\udce1</span>'
+    + '<span class="tab-label">' + dt('dev.tabs.api') + '</span></button>';
+  html += '</div>';
+
+  // Apps panel (always shown first)
+  html += '<div class="cap-panel active" id="tab-apps">' + promptPackagePanel() + '</div>';
+
+  // MCP panel
+  html += '<div class="cap-panel" id="tab-mcp">';
+  if (hasMcp) { html += mcpPanel(); }
+  else { html += '<div class="unavail-notice"><div class="unavail-icon">\\ud83d\\udd12</div><p>' + dt('dev.tabs.unavailable') + '</p><p style="font-size:.8rem;margin-top:.5rem">' + dt('dev.tabs.upgradeForMcp') + '</p></div>'; }
+  html += '</div>';
+
+  // API panel
+  html += '<div class="cap-panel" id="tab-api">';
+  if (hasApi && v.path === 'browse') { html += browsePanel(); }
+  else if (hasApi) { html += apiPanel(); }
+  else { html += '<div class="unavail-notice"><div class="unavail-icon">\\ud83d\\udd12</div><p>' + dt('dev.tabs.unavailable') + '</p><p style="font-size:.8rem;margin-top:.5rem">' + dt('dev.tabs.upgradeForApi') + '</p></div>'; }
+  html += '</div>';
+
+  area.innerHTML = html;
   updateStep4();
   s3.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.cap-tab').forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
+  });
+  document.querySelectorAll('.cap-panel').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'tab-' + tabId);
+  });
+  // Update step4 visibility based on active tab
+  updateStep4();
 }
 
 // ── Panels ──
 
 function mcpPanel() {
-  return '<div class="panel"><span class="tier-badge tier-A">' + dt('dev.panel.mcpBadge') + '</span>'
-    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.mcp') + '</h3>'
+  return '<div class="panel">'
+    + '<h3>' + dt('dev.panel.mcpBadge') + '</h3>'
     + '<div class="instructions"><ol>'
     + '<li>' + dt('dev.panel.mcpStep1') + '</li>'
     + '<li>' + dt('dev.panel.mcpStep2') + '<br><code>' + escHtml(NODE_URL) + '/v1/mcp</code></li>'
@@ -868,8 +933,8 @@ function mcpPanel() {
 }
 
 function apiPanel() {
-  return '<div class="panel"><span class="tier-badge tier-B">' + dt('dev.panel.apiBadge') + '</span>'
-    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.api') + '</h3>'
+  return '<div class="panel">'
+    + '<h3>' + dt('dev.panel.apiBadge') + '</h3>'
     + '<p>' + dt('dev.panel.apiDesc') + '</p>'
     + '<div class="prompt-output">'
     + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
@@ -891,8 +956,8 @@ function apiPanel() {
 }
 
 function browsePanel() {
-  return '<div class="panel"><span class="tier-badge tier-C">' + dt('dev.panel.browseBadge') + '</span>'
-    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.browse') + '</h3>'
+  return '<div class="panel">'
+    + '<h3>' + dt('dev.panel.browseBadge') + '</h3>'
     + '<p>' + dt('dev.panel.browseDesc') + '</p>'
     + '<div class="prompt-output">'
     + '<button class="copy-btn" onclick="copyPrompt(this)">' + dt('dev.copy') + '</button>'
@@ -909,8 +974,8 @@ function browsePanel() {
 }
 
 function promptPackagePanel() {
-  return '<div class="panel"><span class="tier-badge tier-D">' + dt('dev.panel.promptBadge') + '</span>'
-    + '<h3 style="margin-top:.75rem">' + dt('dev.tier.prompt') + '</h3>'
+  return '<div class="panel">'
+    + '<h3>' + dt('dev.panel.promptBadge') + '</h3>'
     + '<p>' + dt('dev.panel.promptDesc') + '</p>'
     + (isLoggedIn()
       ? '<p style="color:var(--success);font-size:.85rem">\\u2705 ' + dt('dev.panel.promptLoggedIn') + '</p>'
@@ -928,8 +993,10 @@ function updateStep4() {
   var shareArea = document.getElementById('share-area');
   if (!selectedVariant) { step4.classList.add('hidden'); return; }
 
-  // Only show upload for prompt-package tier (the ones that generate HTML files)
-  if (selectedVariant.path !== 'prompt-package') { step4.classList.add('hidden'); return; }
+  // Show upload when Apps tab is active (apps generate HTML files)
+  var appsTab = document.getElementById('tab-apps');
+  var appsActive = appsTab && appsTab.classList.contains('active');
+  if (!appsActive) { step4.classList.add('hidden'); return; }
 
   step4.classList.remove('hidden');
 
@@ -1200,10 +1267,8 @@ async function selectGoal(goalId) {
 }
 
 function switchToPromptPackage() {
-  if (selectedPlatform && selectedVariant) {
-    selectedVariant = { ...selectedVariant, path: 'prompt-package', tier: 'D' };
-    showResult(selectedVariant);
-  }
+  // Switch to Apps tab
+  switchTab('apps');
 }
 
 // ── Copy to clipboard ──

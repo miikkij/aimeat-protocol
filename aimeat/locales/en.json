@@ -486,7 +486,7 @@
       "label": "Select Your Subscription / Variant"
     },
     "step3": {
-      "label": "Get Started"
+      "label": "Choose How to Connect"
     },
     "step4": {
       "label": "Share Your App"
@@ -512,6 +512,17 @@
       "browse": "Browse (Read-Only)",
       "prompt": "Prompt Package"
     },
+    "tabs": {
+      "apps": "Apps",
+      "appsDesc": "Build Applications",
+      "mcp": "MCP",
+      "mcpDesc": "AI Integration",
+      "api": "API",
+      "apiDesc": "REST Interface",
+      "unavailable": "Not available on this plan",
+      "upgradeForMcp": "MCP requires a paid plan. Upgrade to access 14 AIMEAT tools directly from your AI.",
+      "upgradeForApi": "This plan cannot make HTTP requests. Use Apps to generate a complete web application instead."
+    },
     "copy": "Copy",
     "copied": "Copied!",
     "download": "Download",
@@ -522,21 +533,21 @@
     "shareLink": "Share link",
     "noApps": "No community apps yet.",
     "panel": {
-      "mcpBadge": "TIER A \u2014 Full MCP",
+      "mcpBadge": "\ud83d\udd0c MCP \u2014 AI Integration",
       "mcpStep1": "Open your AI platform's <strong>Settings \u2192 Connectors / MCP Servers</strong>",
       "mcpStep2": "Add a new MCP server with this URL:",
       "mcpStep3": "The platform will handle OAuth registration automatically",
       "mcpStep4": "Once connected, try: <em>\"Check my AIMEAT node catalogue\"</em>",
       "mcpTools": "You'll have access to <strong>14 MCP tools</strong>: catalogue search, memory read/write, action execute, work queue, wallet, boards, storage, and more.",
-      "apiBadge": "TIER B \u2014 Full HTTP",
+      "apiBadge": "\ud83d\udce1 API \u2014 REST Interface",
       "apiDesc": "Your AI can make HTTP calls. Copy this prompt and paste it into your AI chat:",
-      "browseBadge": "TIER C \u2014 Browse Only",
+      "browseBadge": "\ud83d\udce1 API \u2014 Browse Only",
       "browseDesc": "Your AI can browse URLs. Copy this prompt to get started:",
       "browseUpgradeTitle": "Want full access?",
       "browseUpgrade1": "Upgrade your plan for MCP support",
       "browseUpgrade2": "Or switch to a tool-capable AI (Claude Code, VS Code Copilot)",
       "browseUpgrade3": "Or use the <a href=\"#\" onclick=\"switchToPromptPackage();return false\">Prompt Package</a> to generate an HTML app",
-      "promptBadge": "TIER D \u2014 Prompt Package",
+      "promptBadge": "\ud83d\udda5\ufe0f Apps \u2014 Application Builder",
       "promptDesc": "Your AI can't make web requests, but it can <strong>generate code</strong> for you! Select what you want to build, then copy the prompt into your AI chat. The AI will interview you and generate a complete HTML application.",
       "promptLoggedIn": "You're logged in \u2014 after your AI generates the app, come back here to upload it and get a shareable link!",
       "promptAnon": "Anonymous mode \u2014 you'll need to share the generated HTML file yourself.",
@@ -596,8 +607,9 @@
       "noHttp": "Cannot make external HTTP calls",
       "terminal": "Can run terminal commands",
       "vscodeSettings": "Add as MCP server in VS Code settings",
-      "pythonSandbox": "Python sandbox, no internet",
-      "functionCalling": "Models with function calling"
+      "pythonSandbox": "Python sandbox — can make HTTP requests",
+      "functionCalling": "Models with function calling",
+      "indexnow": "Can browse pages indexed in Bing (IndexNow)"
     }
   },
   "init": {

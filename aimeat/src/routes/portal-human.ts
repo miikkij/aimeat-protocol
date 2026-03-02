@@ -1728,7 +1728,10 @@ body {
   var askUser = 'Before building, ask me:\\n' +
     '1. What should the app be called?\\n' +
     '2. How should it look and feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
-    'Use my answers to customize the title, colors, fonts, and overall vibe.\\n\\n';
+    '3. Memory area: Should this app use its OWN private space, or a SHARED community space where I can see what others have made and add mine?\\n' +
+    '   - OWN: create a unique key like "apps.[type].[my-unique-id]" — only I see my data\\n' +
+    '   - SHARED: use the community key given below — I see others\' content and can add mine\\n' +
+    'Use my answers to customize everything.\\n\\n';
 
   var apiRef = '## Data storage API\\n' +
     'Server: ' + nodeUrl + ' (no authentication needed, anonymous mode)\\n' +
@@ -1753,9 +1756,12 @@ body {
       '1. What should the game be called?\\n' +
       '2. What type of game? (e.g. "tic-tac-toe", "connect four", "battleship", "trivia quiz", "word game")\\n' +
       '3. How should it look and feel? (e.g. "retro arcade", "cozy board game", "sleek and minimal", "fun and colorful")\\n' +
+      '4. Memory area: SHARED community lobby (default \u2014 all players see the same lobby and can join each other), or PRIVATE lobby (only people with the link)?\\n' +
       'Use my answers to customize the title, game type, colors, fonts, and overall vibe.\\n\\n' +
       'I want a multiplayer game with a lobby system as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      'NOTE: The lobby is already a shared community space by default \u2014 all players see the same lobby and can join each other\\'s games.\\n' +
+      'If user wants a PRIVATE lobby, use a unique key like "apps.games.[gametype].private.[uniqueId].lobby" instead.\\n\\n' +
       '## Data structure\\n\\n' +
       'Each game type gets its own memory area. The key format is:\\n' +
       '- Lobby: "apps.games.[gametype].lobby"\\n' +
@@ -1783,9 +1789,16 @@ body {
     notes: askUser +
       'I want a note-taking app as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      '## Shared community board (if user chooses SHARED):\\n' +
+      'Key: "apps.notes.community.board"\\n' +
+      'Read: GET ' + nodeUrl + '/v1/memory/apps.notes.community.board\\n' +
+      'Format: {"items": [{"id":"unique","author":"Name","title":"Note title","body":"Note content","created":"ISO timestamp"},...]}\\n' +
+      'To add: GET existing items, append new item to items array, POST full updated object back.\\n' +
+      'Show all community notes in a feed/list. Each note shows author name and time. Let user add their own with their name.\\n\\n' +
       'App requirements:\\n' +
       '- Create, view, edit, and delete notes\\n' +
-      '- Each note stored as: "apps.notes.[note-id]" with value: {title, body, created, updated}\\n' +
+      '- If OWN: each note stored as "apps.notes.[note-id]" with value: {title, body, created, updated}\\n' +
+      '- If SHARED: all notes stored at "apps.notes.community.board" in items array — show everyone\'s notes\\n' +
       '- Sidebar or list view showing all saved notes with titles and timestamps\\n' +
       '- Click a note to view or edit it\\n' +
       '- Search or filter notes\\n\\n' +
@@ -1794,9 +1807,16 @@ body {
     trackers: askUser +
       'I want a tracker app as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      '## Shared community dashboard (if user chooses SHARED):\\n' +
+      'Key: "apps.tracker.community.dashboard"\\n' +
+      'Read: GET ' + nodeUrl + '/v1/memory/apps.tracker.community.dashboard\\n' +
+      'Format: {"items": [{"id":"unique","author":"Name","category":"habit or expense or custom","entries":[{"date":"ISO","value":"..."}],"created":"ISO"},...]}\\n' +
+      'To add: GET existing items, append new item to items array, POST full updated object back.\\n' +
+      'Show a shared leaderboard/dashboard of everyone\'s tracked items. Let user add theirs with their name.\\n\\n' +
       'App requirements:\\n' +
       '- Track daily habits, expenses, or anything the user wants\\n' +
-      '- Each entry stored as: "apps.tracker.[date]" with value: {items: [...], date}\\n' +
+      '- If OWN: each entry stored as "apps.tracker.[date]" with value: {items: [...], date}\\n' +
+      '- If SHARED: all entries stored at "apps.tracker.community.dashboard" in items array — show everyone\'s progress\\n' +
       '- Calendar or list view of past entries\\n' +
       '- Simple charts or progress indicators\\n' +
       '- Add and remove tracked items\\n\\n' +
@@ -1805,27 +1825,49 @@ body {
     family: askUser +
       'I want a shared family tool as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      'NOTE: This category is already shared via URL hash — family members access the same data.\\n' +
+      'If user chooses SHARED, it means a PUBLIC community list visible to everyone (not just family).\\n\\n' +
+      '## Public community lists (if user chooses SHARED):\\n' +
+      'Key: "apps.family.community.lists"\\n' +
+      'Read: GET ' + nodeUrl + '/v1/memory/apps.family.community.lists\\n' +
+      'Format: {"items": [{"id":"unique","author":"Name","listName":"Shopping list","entries":[{"text":"Milk","done":false,"addedBy":"Name"}],"created":"ISO"},...]}\\n' +
+      'To add: GET existing items, append new item to items array, POST full updated object back.\\n' +
+      'Show all public lists. Let user create and contribute to shared lists with their name.\\n\\n' +
       'App requirements:\\n' +
       '- Shareable via URL so family members can access the same data (use URL hash #listId)\\n' +
       '- Auto-refresh by polling memory every 3 seconds to see others\\' changes\\n' +
       '- Add and check off items (shopping list, to-do, etc.)\\n' +
-      '- All data under shared key: "apps.family.[list-id]"\\n' +
+      '- If OWN: all data under shared key "apps.family.[list-id]"\\n' +
+      '- If SHARED: public lists at "apps.family.community.lists" — visible to all visitors\\n' +
       '- Ask for name on first visit so items show who added them\\n\\n' +
       baseReqs + baseEnd,
 
     creative: askUser +
       'I want a creative tool as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      '## Shared community gallery (if user chooses SHARED):\\n' +
+      'Key: "apps.art.community.gallery"\\n' +
+      'Read: GET ' + nodeUrl + '/v1/memory/apps.art.community.gallery\\n' +
+      'Format: {"items": [{"id":"unique","author":"Name","title":"Artwork title","data":"data:image/png;base64,...","created":"ISO timestamp"},...]}\\n' +
+      'To add: GET existing items, append new item with base64 image data to items array, POST full updated object back.\\n' +
+      'Show all community artwork in a gallery grid. Each piece shows author name, title and time. Let user save their drawing alongside others.\\n\\n' +
       'App requirements:\\n' +
       '- Drawing canvas with color picker and brush size\\n' +
-      '- Save creations to memory: "apps.art.[drawing-id]"\\n' +
-      '- Gallery view of past creations\\n' +
+      '- If OWN: save creations to "apps.art.[drawing-id]"\\n' +
+      '- If SHARED: save to "apps.art.community.gallery" items array — show everyone\'s artwork in a gallery\\n' +
+      '- Gallery view of all creations (own or community)\\n' +
       '- Clear canvas, undo, and download image\\n\\n' +
       baseReqs + baseEnd,
 
     custom: askUser +
       'I want [DESCRIBE YOUR IDEA HERE] as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      '## Shared community option (if user chooses SHARED):\\n' +
+      'Ask the user what to call the shared space (e.g. "apps.custom.community.[name]").\\n' +
+      'Use the same pattern: store data as {"items": [...]} at the shared key.\\n' +
+      'Read: GET ' + nodeUrl + '/v1/memory/apps.custom.community.[name]\\n' +
+      'To add: GET existing items, append new item to items array, POST full updated object back.\\n' +
+      'Show all community items and let user add theirs with their name.\\n\\n' +
       baseReqs + '\\n' +
       'Ask me what the app should do before building it.' + baseEnd
   };
