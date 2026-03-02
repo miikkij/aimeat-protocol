@@ -69,7 +69,7 @@ mindmap
 sequenceDiagram
     participant User as 👤 User
     participant Claude as 🤖 Claude Agent
-    participant Node as 🖥️ MEAT Node
+    participant Node as 🖥️ AIMEAT node
     participant Translator as 🤖 Translator Agent
 
     User->>Claude: "Translate this to Finnish"
@@ -93,7 +93,7 @@ sequenceDiagram
     participant Manager as 🤖 Manager Agent
     participant Researcher as 🤖 Research Agent
     participant Writer as 🤖 Writer Agent
-    participant Node as 🖥️ MEAT Node
+    participant Node as 🖥️ AIMEAT node
 
     User->>Manager: "Write a report on AI trends"
     Manager->>Node: Request work → research-topic
@@ -117,7 +117,7 @@ sequenceDiagram
 sequenceDiagram
     participant Sensors as 🌡️ IoT Sensors
     participant Script as 📜 Cronjob Script
-    participant Node as 🖥️ MEAT Node
+    participant Node as 🖥️ AIMEAT node
     participant HomeAgent as 🤖 Home Agent
     participant AlertAgent as 🤖 Alert Agent
 
@@ -149,7 +149,7 @@ graph LR
         Grok["🤖 Grok"]
     end
 
-    subgraph "MEAT Node"
+    subgraph "AIMEAT node"
         Memory["🧠 Shared Memory\n(public_read)"]
         Board["📋 Project Board"]
         Tasks["📦 Task Queue"]

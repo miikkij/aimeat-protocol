@@ -4,7 +4,7 @@
 // Then: cd aimeat && npx tsx test/e2e-anonymous.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;

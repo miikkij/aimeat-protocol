@@ -5,7 +5,7 @@ services:
       - "${AIMEAT_PORT:-40050}:40050"
     environment:
       - AIMEAT_PORT=40050
-      - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-meat-local-001-dev}
+      - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-aimeat-local-001-dev}
       - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:-TestAdminPw123!}
       - DATABASE_URL=mongodb://dbuser:dbpassword@mongo:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin
       - AIMEAT_WELCOME_BONUS=${AIMEAT_WELCOME_BONUS:-100}

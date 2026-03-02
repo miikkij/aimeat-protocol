@@ -120,7 +120,7 @@ Operaattori määrittelee bundlen esim. "morning-briefing":
   "name": "Aamukatsaus",
   "description": "Yhdistää uutiset, sään, IoT-datan ja kalenterin",
   "actions": ["world-news-digest", "weather-forecast", "home-iot-summary"],
-  "system_prompt": "You are a morning briefing assistant connected to AIMEAT node {nodeUrl}. You have access to the following data sources: ...",
+  "system_prompt": "You are a morning briefing assistant connected to aimeat node {nodeUrl}. You have access to the following data sources: ...",
   "suggested_schedule": "daily 07:00"
 }
 ```
@@ -636,7 +636,7 @@ GET /v1/prompts/admin-assistant
 Palauttaa promptin, jonka ihminen liittää haluamaansa chattiin (Claude, ChatGPT, LM Studio):
 
 ```
-"You are an AIMEAT node administrator assistant. You are connected to
+"You are an aimeat node administrator assistant. You are connected to
 node {nodeUrl} as operator '{ownerName}'.
 
 Your responsibilities:
@@ -807,7 +807,7 @@ aimeat prompt validate --tier tier1
 │    run: aimeat action publish ./my-action.json             │
 │                                                            │
 │  - name: Run conformance tests                             │
-│    run: aimeat test conformance --node $AIAIMEAT_NODE_URL    │
+│    run: aimeat test conformance --node $aimeat_NODE_URL    │
 │                                                            │
 │  - name: Check prompt compatibility                        │
 │    run: aimeat prompt validate --all                       │

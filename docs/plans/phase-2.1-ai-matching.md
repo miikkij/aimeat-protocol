@@ -184,7 +184,7 @@ export function createMatchingEngine(
       {
         "id": "match-uuid",
         "matchedProfile": {
-          "ghii": "liisa29@meat-finland-001",
+          "ghii": "liisa29@aimeat-finland-001",
           "displayName": "Liisa",
           "sharedInterests": ["lintubongaus", "luontokuvaus"],
           "distanceKm": 3.2,

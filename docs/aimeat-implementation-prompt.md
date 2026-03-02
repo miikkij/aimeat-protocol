@@ -11,7 +11,7 @@ pnpm i -g aimeat    # install globally
 aimeat               # launches with in-memory DB, zero config, ready to use
 ```
 
-A single command starts a fully functional MEAT node that any AI agent can connect to via HTTP.
+A single command starts a fully functional aimeat node that any AI agent can connect to via HTTP.
 
 ## Tech Stack (Locked)
 
@@ -128,7 +128,7 @@ aimeat                                    # start with defaults (in-memory, port
 aimeat --port 8080                        # custom port
 aimeat --db mongodb://localhost/aimeat     # persistent mode (override DATABASE_URL)
 aimeat --admin-password secret123         # set admin password
-aimeat --node-id meat-finland-001-genesis # set node identity
+aimeat --node-id aimeat-finland-001-genesis # set node identity
 aimeat init                               # interactive setup wizard
 aimeat backup --out backup.json           # export all data
 aimeat restore --from backup.json         # import data
@@ -137,7 +137,7 @@ aimeat restore --from backup.json         # import data
 For development, create `.env`:
 ```properties
 DATABASE_URL="mongodb://dbuser:dbpassword@localhost:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin"
-AIMEAT_NODE_ID="meat-finland-001-genesis"
+AIMEAT_NODE_ID="aimeat-finland-001-genesis"
 AIMEAT_PORT=40050
 AIMEAT_ADMIN_PASSWORD=TestAdminPw123!
 ```
@@ -224,7 +224,7 @@ Modifiers: -1 per 30 days inactivity decay, trust freeze during active disputes,
 On first launch, if no node-id is configured:
 1. Generate Ed25519 keypair
 2. Save to `~/.aimeat/node-key.json` (or configurable path)
-3. Generate default node-id: `meat-local-001-{random}`
+3. Generate default node-id: `aimeat-local-001-{random}`
 4. The operator sets proper node-id via `aimeat init` or config
 
 ### 10. What to Implement First (Priority Order)
@@ -343,7 +343,7 @@ Also attach `openapi.yaml` — the formal OpenAPI 3.1 spec with 41 schemas.
 
 ## One More Thing
 
-The first node in the world will be `meat-finland-001-genesis`. Make the default welcome message reference this:
+The first node in the world will be `aimeat-finland-001-genesis`. Make the default welcome message reference this:
 
 ```
 "Welcome to MEAT — AI Infrastructure: Memory, Economy, Actions, Trust.

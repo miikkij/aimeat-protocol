@@ -2,7 +2,7 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -416,14 +416,14 @@ await test('16. List tools', async () => {
     assert(status === 200, `status ${status}`);
     assert(body.result?.tools !== undefined, 'has tools');
     const toolNames = body.result.tools.map((t: any) => t.name);
-    assert(toolNames.includes('meat_memory_write'), 'has meat_memory_write');
-    assert(toolNames.includes('meat_memory_read'), 'has meat_memory_read');
-    assert(toolNames.includes('meat_catalogue_search'), 'has meat_catalogue_search');
-    assert(toolNames.includes('meat_wallet_balance'), 'has meat_wallet_balance');
-    assert(toolNames.includes('meat_agent_profile'), 'has meat_agent_profile');
-    assert(toolNames.includes('meat_board_read'), 'has meat_board_read');
-    assert(toolNames.includes('meat_storage_upload'), 'has meat_storage_upload');
-    assert(toolNames.includes('meat_storage_download'), 'has meat_storage_download');
+    assert(toolNames.includes('aimeat_memory_write'), 'has aimeat_memory_write');
+    assert(toolNames.includes('aimeat_memory_read'), 'has aimeat_memory_read');
+    assert(toolNames.includes('aimeat_catalogue_search'), 'has aimeat_catalogue_search');
+    assert(toolNames.includes('aimeat_wallet_balance'), 'has aimeat_wallet_balance');
+    assert(toolNames.includes('aimeat_agent_profile'), 'has aimeat_agent_profile');
+    assert(toolNames.includes('aimeat_board_read'), 'has aimeat_board_read');
+    assert(toolNames.includes('aimeat_storage_upload'), 'has aimeat_storage_upload');
+    assert(toolNames.includes('aimeat_storage_download'), 'has aimeat_storage_download');
     assert(body.result.tools.length === 14, `expected 14 tools, got ${body.result.tools.length}`);
 });
 
@@ -438,9 +438,9 @@ await test('17. List resources', async () => {
 // ─── Phase 5: MCP Tool Invocation ───
 console.log('\nPhase 5 — MCP Tool Invocation');
 
-await test('18. meat_memory_write', async () => {
+await test('18. aimeat_memory_write', async () => {
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_memory_write',
+        name: 'aimeat_memory_write',
         arguments: { key: 'mcp-test-key', value: { greeting: 'hello from MCP' }, visibility: 'private' },
     }, 10);
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -450,9 +450,9 @@ await test('18. meat_memory_write', async () => {
     assert(result.key === 'mcp-test-key', `key: ${result.key}`);
 });
 
-await test('19. meat_memory_read', async () => {
+await test('19. aimeat_memory_read', async () => {
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_memory_read',
+        name: 'aimeat_memory_read',
         arguments: { key: 'mcp-test-key' },
     }, 11);
     assert(status === 200, `status ${status}`);
@@ -461,9 +461,9 @@ await test('19. meat_memory_read', async () => {
     assert(result.value?.greeting === 'hello from MCP', `value: ${JSON.stringify(result.value)}`);
 });
 
-await test('20. meat_memory_list', async () => {
+await test('20. aimeat_memory_list', async () => {
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_memory_list',
+        name: 'aimeat_memory_list',
         arguments: {},
     }, 12);
     assert(status === 200, `status ${status}`);
@@ -473,9 +473,9 @@ await test('20. meat_memory_list', async () => {
     assert(found !== undefined, 'contains mcp-test-key');
 });
 
-await test('21. meat_catalogue_search', async () => {
+await test('21. aimeat_catalogue_search', async () => {
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_catalogue_search',
+        name: 'aimeat_catalogue_search',
         arguments: {},
     }, 13);
     assert(status === 200, `status ${status}`);
@@ -483,9 +483,9 @@ await test('21. meat_catalogue_search', async () => {
     assert(Array.isArray(result), 'is array');
 });
 
-await test('22. meat_wallet_balance', async () => {
+await test('22. aimeat_wallet_balance', async () => {
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_wallet_balance',
+        name: 'aimeat_wallet_balance',
         arguments: {},
     }, 14);
     assert(status === 200, `status ${status}`);
@@ -495,9 +495,9 @@ await test('22. meat_wallet_balance', async () => {
     assert(typeof result.available === 'number', `available: ${result.available}`);
 });
 
-await test('23. meat_agent_profile', async () => {
+await test('23. aimeat_agent_profile', async () => {
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_agent_profile',
+        name: 'aimeat_agent_profile',
         arguments: { gaii: agentGaii },
     }, 15);
     assert(status === 200, `status ${status}`);
@@ -506,7 +506,7 @@ await test('23. meat_agent_profile', async () => {
     assert(typeof result.gaii === 'string', 'has gaii in profile');
 });
 
-await test('24. meat_board_read', async () => {
+await test('24. aimeat_board_read', async () => {
     // Create a board first via REST so we can read it
     await json('/v1/boards', {
         method: 'POST',
@@ -515,7 +515,7 @@ await test('24. meat_board_read', async () => {
     });
 
     const { status, body } = await mcpRpc('tools/call', {
-        name: 'meat_board_read',
+        name: 'aimeat_board_read',
         arguments: { board_id: 'mcp-test-board' },
     }, 16);
     assert(status === 200, `status ${status}`);
@@ -528,7 +528,7 @@ console.log('\nPhase 6 — MCP Resource Read');
 
 await test('25. Read memory resource', async () => {
     const { status, body } = await mcpRpc('resources/read', {
-        uri: 'meat://memory/mcp-test-key',
+        uri: 'aimeat://memory/mcp-test-key',
     }, 20);
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.result?.contents?.[0] !== undefined, 'has contents');
@@ -539,7 +539,7 @@ await test('25. Read memory resource', async () => {
 
 await test('26. Read wallet resource', async () => {
     const { status, body } = await mcpRpc('resources/read', {
-        uri: `meat://wallet/${encodeURIComponent(agentGaii)}`,
+        uri: `aimeat://wallet/${encodeURIComponent(agentGaii)}`,
     }, 21);
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.result?.contents?.[0] !== undefined, 'has contents');
@@ -549,7 +549,7 @@ await test('26. Read wallet resource', async () => {
 
 await test('27. Read non-existent memory resource', async () => {
     const { status, body } = await mcpRpc('resources/read', {
-        uri: 'meat://memory/nonexistent-key-xyz',
+        uri: 'aimeat://memory/nonexistent-key-xyz',
     }, 22);
     assert(status === 200, `status ${status}`);
     assert(body.result?.contents?.[0]?.text === 'Not found', `text: ${body.result?.contents?.[0]?.text}`);
@@ -590,7 +590,7 @@ await test('28. SSE stream opens with valid session', async () => {
 await test('29. Subscribe to memory resource (or graceful error)', async () => {
     // resources/subscribe may not be implemented — verify no crash
     const { status, body } = await mcpRpc('resources/subscribe', {
-        uri: 'meat://memory/mcp-test-key',
+        uri: 'aimeat://memory/mcp-test-key',
     }, 30);
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     // Either success (no error) or method not found — both are acceptable

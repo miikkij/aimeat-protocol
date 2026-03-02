@@ -47,7 +47,7 @@ service:
   type: "directory"          # Palvelutyyppi (ks. alla)
   description: "Löydä harrastuksia ja samanhenkisiä läheltäsi"
   version: "1.0"
-  author: "app#alice@meat-local-001"  # GAII palvelun tekijästä
+  author: "app#alice@aimeat-local-001"  # GAII palvelun tekijästä
 
 # Tuetut palvelutyypit:
 # directory    — hakemisto (henkilöt, yritykset, harrastukset)

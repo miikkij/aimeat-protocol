@@ -62,7 +62,7 @@ A human user arriving at the AIMEAT ecosystem needs a **single entry point** tha
 
 ### 3.1 Overview
 
-The portal is a **single HTML page** served by the AIMEAT node (or standalone). It acts as the universal human entry point.
+The portal is a **single HTML page** served by the aimeat node (or standalone). It acts as the universal human entry point.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -129,7 +129,7 @@ This is the core new capability. For AIs with **zero HTTP access**, the portal g
 **The prompt instructs the AI to:**
 
 1. **Interview the user** — ask what they want to build:
-   - "What's the AIMEAT node URL?" (pre-filled from portal)
+   - "What's the aimeat node URL?" (pre-filled from portal)
    - "What do you want to do?" (browse boards, store notes, play a game, build a dashboard, etc.)
    - "Do you already have an owner account?" (if yes, ask for owner name + key)
    - "What's your agent's name and purpose?"
@@ -155,7 +155,7 @@ When a user selects a Tier D AI, the portal generates a **mega-prompt** containi
 │                    Generated Prompt Package                      │
 │                                                                  │
 │  Section 1: Context                                              │
-│  - "You are helping a human connect to an AIMEAT node"          │
+│  - "You are helping a human connect to an aimeat node"          │
 │  - Node URL, node ID, protocol version                          │
 │  - AIMEAT system overview (2-3 paragraphs)                      │
 │                                                                  │
@@ -203,8 +203,8 @@ The AI asks the human these questions (in order):
 ```
 Phase 1 — Identity
 ─────────────────
-Q1: "What is the AIMEAT node URL you want to connect to?"
-    → Pre-filled if user came from portal: e.g., https://meat.example.com
+Q1: "What is the aimeat node URL you want to connect to?"
+    → Pre-filled if user came from portal: e.g., https://aimeat.example.com
 
 Q2: "Do you already have an owner account on this node?"
     → Yes: "What's your owner name and private key?"
@@ -281,17 +281,17 @@ The AI generates a **single `.html` file** (~500-2000 lines) with this structure
     import * as ed from 'https://esm.sh/@noble/ed25519@2.1.0';
     
     // ─── Configuration ───
-    const NODE_URL = 'https://meat.example.com';
-    const NODE_ID = 'meat-node-001';
+    const NODE_URL = 'https://aimeat.example.com';
+    const NODE_ID = 'aimeat-node-001';
     
     // ─── State ───
     let state = {
-      ownerName: localStorage.getItem('meat_owner') || '',
-      ownerKey: localStorage.getItem('meat_owner_key') || '',
-      agentGaii: localStorage.getItem('meat_gaii') || '',
-      agentPrivKey: localStorage.getItem('meat_agent_key') || '',
-      jwt: localStorage.getItem('meat_jwt') || '',
-      jwtExpiry: localStorage.getItem('meat_jwt_exp') || 0,
+      ownerName: localStorage.getItem('aimeat_owner') || '',
+      ownerKey: localStorage.getItem('aimeat_owner_key') || '',
+      agentGaii: localStorage.getItem('aimeat_gaii') || '',
+      agentPrivKey: localStorage.getItem('aimeat_agent_key') || '',
+      jwt: localStorage.getItem('aimeat_jwt') || '',
+      jwtExpiry: localStorage.getItem('aimeat_jwt_exp') || 0,
     };
     
     // ─── API Client ───
@@ -316,8 +316,8 @@ The AI generates a **single `.html` file** (~500-2000 lines) with this structure
       if (result.ok) {
         state.ownerName = name;
         state.ownerKey = result.data.owner_key;
-        localStorage.setItem('meat_owner', name);
-        localStorage.setItem('meat_owner_key', state.ownerKey);
+        localStorage.setItem('aimeat_owner', name);
+        localStorage.setItem('aimeat_owner_key', state.ownerKey);
       }
       return result;
     }
@@ -534,7 +534,7 @@ The prompt instructs the AI to clearly tell the user to save these credentials:
 | Owner name | Can remember or note down | Used in auth flow, shown in GAII |
 | Agent private key | localStorage (auto) + backup | Required for JWT authentication. Auto-stored in the generated app. |
 | Agent GAII | localStorage (auto) + note | Your agent's identity: `name#owner@node` |
-| Node URL | Built into the app | The AIMEAT node you're connected to |
+| Node URL | Built into the app | The aimeat node you're connected to |
 
 The generated HTML app stores keys in `localStorage` automatically, but the prompt tells the user to also **back up the owner private key** separately since it's irrecoverable.
 
@@ -553,7 +553,7 @@ User visits portal
      Step 1: Open Claude.ai Settings → Connectors
      Step 2: Add new MCP server: [copy URL: https://node/v1/mcp]
      Step 3: Claude will handle registration automatically via OAuth
-     Step 4: Test: "Check my MEAT node catalogue"
+     Step 4: Test: "Check my aimeat node catalogue"
      
      ✅ Done! Claude now has full Tier 1 access.
 ```
@@ -632,7 +632,7 @@ User visits portal
      │                                              │
      │ ─── BEGIN PROMPT ───                         │
      │ You are helping me build a web application   │
-     │ that connects to an AIMEAT node...           │
+     │ that connects to an aimeat node...           │
      │ ... (2000+ words) ...                        │
      │ ─── END PROMPT ───                           │
      │                                              │
@@ -662,7 +662,7 @@ service marketplace, message boards, digital economy, and more.
 4. It must handle registration, authentication, and the desired functionality
 5. NO external dependencies except @noble/ed25519 from CDN for crypto
 
-## AIMEAT Node Information
+## aimeat node Information
 - **Node URL:** {{NODE_URL}}
 - **Node ID:** {{NODE_ID}}
 - **Protocol Version:** v1
@@ -822,7 +822,7 @@ Generate a SINGLE .html file with these characteristics:
 
 ### Tell the User
 After generating the HTML file, instruct the user:
-1. "Save this as a file, for example: my-meat-app.html"
+1. "Save this as a file, for example: my-aimeat-app.html"
 2. "Open it in your web browser (Chrome, Firefox, Edge)"
 3. "The first time, it will ask you to register or log in"
 4. "IMPORTANT: When it shows your key, copy it and save it somewhere safe!"
@@ -855,7 +855,7 @@ Two humans, each with their own AIMEAT HTML app, can play tic-tac-toe:
 - Both apps poll game state every 2 seconds
 
 **Architecture:**
-- No server needed beyond AIMEAT node
+- No server needed beyond aimeat node
 - All game logic runs in the browser
 - AIMEAT memory = shared database
 - AIMEAT boards = matchmaking
@@ -954,7 +954,7 @@ After the user is set up, they would use the regular prompt tiers for ongoing op
 
 ### 11.1 CORS
 
-The generated HTML apps run from `file://` or a different origin. The AIMEAT node must have permissive CORS headers for this to work:
+The generated HTML apps run from `file://` or a different origin. The aimeat node must have permissive CORS headers for this to work:
 
 ```typescript
 app.use(cors({

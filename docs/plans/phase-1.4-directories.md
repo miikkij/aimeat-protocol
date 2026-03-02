@@ -52,7 +52,7 @@ Rakentaa hakemistojärjestelmä joka indeksoi käyttäjien kiinnostusprofiileist
     "total": 15,
     "results": [
       {
-        "ghii": "erkki62@meat-finland-001-genesis",
+        "ghii": "erkki62@aimeat-finland-001-genesis",
         "displayName": "Erkki",
         "interests": ["lintubongaus", "puutarhanhoito"],
         "location": { "city": "Espoo", "area": "Tapiola" },

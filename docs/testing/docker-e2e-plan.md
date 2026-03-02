@@ -36,7 +36,7 @@ services:
       - "${E2E_PORT:-3200}:3200"
     environment:
       AIMEAT_PORT: 3200
-      AIMEAT_NODE_ID: meat-e2e-001-test
+      AIMEAT_NODE_ID: aimeat-e2e-001-test
       AIMEAT_ADMIN_PASSWORD: e2e-test-password
       AIMEAT_WELCOME_BONUS: 100
       AIMEAT_DAILY_ALLOWANCE: 50
@@ -81,7 +81,7 @@ docker compose -f "$COMPOSE_FILE" -p "$PROJECT" up -d --build --wait
 
 echo "🧪 Running tests: $TEST_FILE"
 E2E_BASE="http://localhost:3200" \
-E2E_NODE_ID="meat-e2e-001-test" \
+E2E_NODE_ID="aimeat-e2e-001-test" \
 npx tsx "$TEST_FILE"
 
 echo "✅ Tests complete"
@@ -93,7 +93,7 @@ All E2E test files read the base URL and node ID from environment variables:
 
 ```typescript
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 ```
 
 This allows the same test files to run against:
@@ -125,13 +125,13 @@ services:
     ports: ["3200:3200"]
     environment:
       AIMEAT_PORT: 3200
-      AIMEAT_NODE_ID: meat-e2e-node-a
+      AIMEAT_NODE_ID: aimeat-e2e-node-a
   node-b:
     build: ../..
     ports: ["3201:3201"]
     environment:
       AIMEAT_PORT: 3201
-      AIMEAT_NODE_ID: meat-e2e-node-b
+      AIMEAT_NODE_ID: aimeat-e2e-node-b
 ```
 
 ## Migration Plan

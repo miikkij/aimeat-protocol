@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.e2e.yml"
 PROJECT="aimeat-e2e"
 E2E_PORT="${E2E_PORT:-3200}"
-E2E_NODE_ID="meat-e2e-001-test"
+E2E_NODE_ID="aimeat-e2e-001-test"
 E2E_BASE="http://localhost:${E2E_PORT}"
 
 cleanup() {

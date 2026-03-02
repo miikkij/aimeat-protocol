@@ -125,8 +125,8 @@ Add a "Nodes" stat card showing total personal node count.
 │ │ Tunnel URL: wss://op.../tunnel        [Copy]   │ │
 │ │                                                │ │
 │ │ Agents:                                        │ │
-│ │   bot1#jouni@meat-fi-001                       │ │
-│ │   bot2#jouni@meat-fi-001                       │ │
+│ │   bot1#jouni@aimeat-fi-001                       │ │
+│ │   bot2#jouni@aimeat-fi-001                       │ │
 │ │                                                │ │
 │ │ Mailbox: 0 items (0 / 50 MB)                   │ │
 │ │ Last seen: 2 minutes ago                       │ │

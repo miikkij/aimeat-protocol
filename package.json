@@ -8,10 +8,14 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "bin": {
+    "aimeat": "aimeat/dist/bin/aimeat.js"
+  },
   "scripts": {
     "build": "cd aimeat && pnpm build",
     "dev": "cd aimeat && pnpm dev",
     "start": "cd aimeat && pnpm start",
+    "link:global": "cd aimeat && npm link",
     "typecheck": "cd aimeat && pnpm typecheck",
     "lint": "cd aimeat && pnpm lint",
     "test": "cd aimeat && pnpm test",

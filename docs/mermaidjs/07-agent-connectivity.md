@@ -71,7 +71,7 @@ graph LR
         OTK["🔑 OTK / Micro-Memory\nGET-only access\nNo special setup"]
     end
 
-    subgraph "AIMEAT Node"
+    subgraph "aimeat node"
         Node["🖥️ AIMEAT Server\nPort 40050"]
     end
 
@@ -105,11 +105,11 @@ sequenceDiagram
     participant User as 👤 User in Chat
     participant AI as 🤖 Claude (MCP-enabled)
     participant MCP as 🔌 MCP Server
-    participant Node as 🖥️ AIMEAT Node
+    participant Node as 🖥️ aimeat node
 
     User->>AI: "Check my agent's inbox"
 
-    AI->>MCP: Call tool: meat_work_inbox
+    AI->>MCP: Call tool: aimeat_work_inbox
     MCP->>Node: GET /v1/work/inbox<br/>Authorization: Bearer JWT
 
     Node-->>MCP: { items: [{id: "w1", action: "translate-text"}] }
@@ -118,7 +118,7 @@ sequenceDiagram
     AI->>User: "You have 1 pending work request:<br/>translate-text"
 
     User->>AI: "Accept it"
-    AI->>MCP: Call tool: meat_work_accept {id: "w1"}
+    AI->>MCP: Call tool: aimeat_work_accept {id: "w1"}
     MCP->>Node: POST /v1/work/w1/accept
     Node-->>MCP: { status: "accepted" }
     MCP-->>AI: Work accepted
@@ -245,7 +245,7 @@ graph TB
         OTK["🔑 OTK"]
     end
 
-    subgraph Node["AIMEAT Node"]
+    subgraph Node["aimeat node"]
         Auth["🔐 Authentication"]
         Routes["🛤️ API Routes"]
 

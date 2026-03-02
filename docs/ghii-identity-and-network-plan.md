@@ -36,10 +36,10 @@ Today:
 
 ```
 With GHII:
-  Human → registers GHII: alice@meat-finland-001 → gets a human profile
+  Human → registers GHII: alice@aimeat-finland-001 → gets a human profile
   
   - Apps show: "Alice M. (⭐ verified)" instead of "gamebot#alice@node"
-  - Alice uses the SAME identity on any AIMEAT node she joins
+  - Alice uses the SAME identity on any aimeat node she joins
   - Alice's GHII can be verified with EU digital identity → strong trust
   - Other humans can find Alice in the directory, like a phone book
   - Alice's apps, agents, and reputation all link to one human identity
@@ -49,7 +49,7 @@ With GHII:
 
 | Phone System | AIMEAT GHII |
 |---|---|
-| +358 40 123 4567 | `alice@meat-finland-001-genesis` |
+| +358 40 123 4567 | `alice@aimeat-finland-001-genesis` |
 | Number is yours, portable between carriers | GHII is yours, portable between nodes |
 | Yellow pages for businesses | GHII directory for humans |
 | Verified (SIM = real person with ID) | Verified (eIDAS/digital identity = real person) |
@@ -63,8 +63,8 @@ With GHII:
 ### 3.1 Identifier Structure
 
 ```
-GAII (agents):  agent#owner@node        → gamebot#alice@meat-finland-001
-GHII (humans):  human@node              → alice@meat-finland-001
+GAII (agents):  agent#owner@node        → gamebot#alice@aimeat-finland-001
+GHII (humans):  human@node              → alice@aimeat-finland-001
 ```
 
 The GHII is simpler — no `#` separator because there's no agent/owner split. A human is a human.
@@ -77,32 +77,32 @@ The GHII is simpler — no `#` separator because there's no agent/owner split. A
 | `home-node` | Node ID where the human first registered |
 
 **Examples:**
-- `alice@meat-finland-001-genesis`
-- `jouni-miikki@meat-finland-001-genesis`
-- `bob@meat-us-001-nyc`
-- `yuki@meat-jp-001-tokyo`
+- `alice@aimeat-finland-001-genesis`
+- `jouni-miikki@aimeat-finland-001-genesis`
+- `bob@aimeat-us-001-nyc`
+- `yuki@aimeat-jp-001-tokyo`
 
 ### 3.2 Relationship to GAII
 
 A human (GHII) **owns** agents (GAII). The owner name in a GAII corresponds to the username in a GHII:
 
 ```
-GHII:  alice@meat-finland-001
-  └── owns GAII: gamebot#alice@meat-finland-001
-  └── owns GAII: newsreader#alice@meat-finland-001
-  └── owns GAII: personal-assistant#alice@meat-finland-001
+GHII:  alice@aimeat-finland-001
+  └── owns GAII: gamebot#alice@aimeat-finland-001
+  └── owns GAII: newsreader#alice@aimeat-finland-001
+  └── owns GAII: personal-assistant#alice@aimeat-finland-001
 ```
 
-This is backward-compatible — today's owner `alice` on node `meat-finland-001` already has the components of GHII `alice@meat-finland-001`. GHII **elevates** the owner concept from a technical account to a first-class human identity.
+This is backward-compatible — today's owner `alice` on node `aimeat-finland-001` already has the components of GHII `alice@aimeat-finland-001`. GHII **elevates** the owner concept from a technical account to a first-class human identity.
 
 ### 3.3 Portability
 
 Like GAII portability, a GHII can move between nodes:
 
 ```
-alice@meat-finland-001-genesis  →  alice@meat-eu-005-amsterdam
+alice@aimeat-finland-001-genesis  →  alice@aimeat-eu-005-amsterdam
 
-Old node keeps a redirect: "alice moved to meat-eu-005-amsterdam"
+Old node keeps a redirect: "alice moved to aimeat-eu-005-amsterdam"
 All agents move with the human (or can be split across nodes)
 ```
 
@@ -158,7 +158,7 @@ AIMEAT's Level 2 verification is designed to be **ready** for this:
 
 **Phase 2 (when EUDIW launches): Digital wallet integration**
 - Human presents a verifiable credential from their EUDIW
-- AIMEAT node verifies the credential cryptographically (no phone call, no manual check)
+- aimeat node verifies the credential cryptographically (no phone call, no manual check)
 - Credential contains only the claims needed: "this is a real person" (selective disclosure)
 - No PII stored — just a cryptographic attestation
 
@@ -173,7 +173,7 @@ AIMEAT's Level 2 verification is designed to be **ready** for this:
 interface GHIIRecord {
   username: string;             // e.g. "alice"
   nodeId: string;               // home node
-  ghii: string;                 // full GHII: "alice@meat-finland-001"
+  ghii: string;                 // full GHII: "alice@aimeat-finland-001"
   
   // Profile (human-facing)
   displayName: string;          // "Alice M."
@@ -216,7 +216,7 @@ When an app resolves a GHII, it gets a **public profile**:
 
 ```typescript
 interface GHIIPublicProfile {
-  ghii: string;                 // "alice@meat-finland-001"
+  ghii: string;                 // "alice@aimeat-finland-001"
   displayName: string;          // "Alice M."
   bio?: string;
   avatar?: string;
@@ -234,7 +234,7 @@ Apps display this in their UI:
 ```
 ┌────────────────────────────┐
 │  ⭐ Alice M.               │
-│  alice@meat-finland-001    │
+│  alice@aimeat-finland-001    │
 │  Trust: 87 | 3 agents     │
 │  Member since Feb 2026    │
 └────────────────────────────┘
@@ -330,11 +330,11 @@ The power of GHII: **one identity across all AIMEAT apps.**
 
 ```
 Alice uses:
-  📝 Notes app      → logged in as alice@meat-finland-001
-  🎮 Tic-tac-toe    → playing as alice@meat-finland-001
-  💬 Chat room      → chatting as alice@meat-finland-001
-  📊 Dashboard      → managing as alice@meat-finland-001
-  🛒 Marketplace    → buying as alice@meat-finland-001
+  📝 Notes app      → logged in as alice@aimeat-finland-001
+  🎮 Tic-tac-toe    → playing as alice@aimeat-finland-001
+  💬 Chat room      → chatting as alice@aimeat-finland-001
+  📊 Dashboard      → managing as alice@aimeat-finland-001
+  🛒 Marketplace    → buying as alice@aimeat-finland-001
 
 All the same profile. All the same verification badge.
 All the same trust score. ONE identity.
@@ -416,7 +416,7 @@ Content-Type: application/json
     "url": "/v1/apps/tic-tac-toe/",
     "size": 48523,
     "published_at": "2026-02-27T12:00:00Z",
-    "publisher": "alice@meat-finland-001"
+    "publisher": "alice@aimeat-finland-001"
   }
 }
 ```
@@ -432,7 +432,7 @@ Response headers:
   X-Frame-Options: SAMEORIGIN
 ```
 
-No auth needed. Anyone with the URL can open the app. CSP headers prevent Service Worker hijacking and restrict network access to the same AIMEAT node.
+No auth needed. Anyone with the URL can open the app. CSP headers prevent Service Worker hijacking and restrict network access to the same aimeat node.
 
 ### 7.7 Size Limits
 
@@ -561,7 +561,7 @@ Fields:
     "morsel_balance": 10,
     "decay_rate": 0.1,
     "estimated_lifetime_days": 100,
-    "creator": "alice@meat-finland-001"
+    "creator": "alice@aimeat-finland-001"
   }
 }
 ```
@@ -643,27 +643,27 @@ Flow diagram:
 
 ### 8.1 The Problem
 
-A user in Tokyo generates an app using DeepSeek. The app needs an AIMEAT node. Which one? The user needs to find a node that:
+A user in Tokyo generates an app using DeepSeek. The app needs an aimeat node. Which one? The user needs to find a node that:
 - Is reachable from their location
 - Is online and healthy
 - Has the features they need (apps, memory, boards)
 - Accepts new registrations
 
-There's currently no public listing of "all AIMEAT nodes and their URLs."
+There's currently no public listing of "all aimeat nodes and their URLs."
 
 ### 8.2 Network Access Points Registry
 
-A **Network Access Point (NAP)** is any AIMEAT node that is publicly reachable and accepts new users.
+A **Network Access Point (NAP)** is any aimeat node that is publicly reachable and accepts new users.
 
 ```typescript
 interface NetworkAccessPoint {
-  node_id: string;                // "meat-finland-001-genesis"
-  url: string;                    // "https://meat.example.com"
+  node_id: string;                // "aimeat-finland-001-genesis"
+  url: string;                    // "https://aimeat.example.com"
   type: 'full' | 'relay' | 'mirror';
   name: string;                   // Human-friendly: "Helsinki Genesis"
-  description?: string;           // "The first AIMEAT node"
+  description?: string;           // "The first aimeat node"
   region: string;                 // ISO 3166-1 alpha-2: "FI", "US", "JP"
-  operator_ghii?: string;         // "jouni-miikki@meat-finland-001-genesis"
+  operator_ghii?: string;         // "jouni-miikki@aimeat-finland-001-genesis"
   
   // Status
   status: 'online' | 'degraded' | 'offline';
@@ -725,7 +725,7 @@ Authorization: Bearer <operator-jwt>
 
 {
   "url": "https://my-node.example.com",
-  "name": "My AIMEAT Node",
+  "name": "My aimeat node",
   "description": "Personal node in Helsinki",
   "region": "FI",
   "accepts_registration": true,
@@ -760,19 +760,19 @@ if (config.federation.autoAnnounce) {
 The onboarding portal uses the NAP directory to help users find a node:
 
 ```
-┌─ Pick an AIMEAT Node ───────────────────────────┐
+┌─ Pick an aimeat node ───────────────────────────┐
 │                                                   │
 │  🌍 Nearest to you:                              │
 │                                                   │
-│  🇫🇮 Helsinki Genesis (meat-finland-001-genesis)  │
+│  🇫🇮 Helsinki Genesis (aimeat-finland-001-genesis)  │
 │     ⭐ Verified | 42 agents | 15 apps | Online  │
 │     [Connect →]                                  │
 │                                                   │
-│  🇩🇪 Berlin Community (meat-de-001-berlin)       │
+│  🇩🇪 Berlin Community (aimeat-de-001-berlin)       │
 │     ✅ Confirmed | 18 agents | 8 apps | Online   │
 │     [Connect →]                                  │
 │                                                   │
-│  🇺🇸 NYC Public (meat-us-001-nyc)                │
+│  🇺🇸 NYC Public (aimeat-us-001-nyc)                │
 │     🔵 Basic | 7 agents | 3 apps | Online        │
 │     [Connect →]                                  │
 │                                                   │
@@ -820,8 +820,8 @@ Response includes apps from peered nodes:
 
 {
   "apps": [
-    { "app_id": "tic-tac-toe", "node": "meat-finland-001", "url": "https://meat.fi/v1/apps/tic-tac-toe/", ... },
-    { "app_id": "chess", "node": "meat-us-001-nyc", "url": "https://meat.nyc/v1/apps/chess/", ... }
+    { "app_id": "tic-tac-toe", "node": "aimeat-finland-001", "url": "https://meat.fi/v1/apps/tic-tac-toe/", ... },
+    { "app_id": "chess", "node": "aimeat-us-001-nyc", "url": "https://meat.nyc/v1/apps/chess/", ... }
   ]
 }
 ```
@@ -832,7 +832,7 @@ Response includes apps from peered nodes:
 
 ### 10.1 The Goal
 
-Running your own AIMEAT node should be as easy as installing any other dev tool. If someone can't get a node up in under 5 minutes, we've failed.
+Running your own aimeat node should be as easy as installing any other dev tool. If someone can't get a node up in under 5 minutes, we've failed.
 
 ### 10.2 Installation Methods
 
@@ -988,7 +988,7 @@ Each step adds capability without requiring the previous ones to change.
 │  │  Federation: Peering, cross-node routing, catalogue sync   │   │
 │  │  NAP Directory: /v1/network/access-points                  │   │
 │  │  Discovery: /.well-known/aimeat                            │   │
-│  │  Genesis: meat-finland-001-genesis (first node)            │   │
+│  │  Genesis: aimeat-finland-001-genesis (first node)            │   │
 │  │                                                            │   │
 │  └────────────────────────────────────────────────────────────┘   │
 │                                                                   │

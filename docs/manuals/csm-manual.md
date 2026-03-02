@@ -1044,7 +1044,7 @@ A CSM file is just a `.yaml` file. You can share it the same way you share any d
 
 - **Forking and customizing.** Copy a CSM, change the `service.name`, adjust the categories or fields, and you have a new service. The video directory CSM becomes a podcast library by swapping `video_url` for `audio_url` and adjusting the `allowed_formats`.
 
-- **Community libraries.** Collections of CSM files can be published and shared. An AIMEAT node operator might maintain a gallery of CSMs that community members can browse and activate with a single prompt to their AI assistant.
+- **Community libraries.** Collections of CSM files can be published and shared. An aimeat node operator might maintain a gallery of CSMs that community members can browse and activate with a single prompt to their AI assistant.
 
 For details on operating a node, managing multiple services, and federation configuration, see the [Service Owner Manual](./service-owner-manual.md). To package a CSM together with external API integrations as a plugin, see the [Service Owner Manual](./service-owner-manual.md) section on YAML plugins.
 

@@ -3,7 +3,7 @@
 // Requires: server running on :40251
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -55,9 +55,9 @@ const agentName = 'fedagent';
 
 let peeringRequestId = '';
 let peeringRequestId2 = '';
-const fakePeerNodeId = `meat-fake-peer-${Date.now()}`;
+const fakePeerNodeId = `aimeat-fake-peer-${Date.now()}`;
 const fakePeerUrl = 'http://localhost:9999'; // non-existent, that's fine for API tests
-const directPeerNodeId = `meat-direct-peer-${Date.now()}`;
+const directPeerNodeId = `aimeat-direct-peer-${Date.now()}`;
 const directPeerUrl = 'http://localhost:9998';
 
 console.log('\n=== T-1: Federation E2E Tests ===\n');
@@ -193,7 +193,7 @@ await test('7. Submit + reject a second request', async () => {
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
             target_url: 'http://localhost:8888',
-            target_node_id: 'meat-reject-test',
+            target_node_id: 'aimeat-reject-test',
             message: 'This will be rejected',
         }),
     });
@@ -377,7 +377,7 @@ await test('14b. Catalogue sync (update existing)', async () => {
 console.log('\nPhase 4 — De-peering');
 
 // First, add a second peer for emergency de-peering test
-const emergencyPeerId = `meat-emergency-peer-${Date.now()}`;
+const emergencyPeerId = `aimeat-emergency-peer-${Date.now()}`;
 await test('Setup: register peer for emergency de-peer', async () => {
     const { status } = await json('/v1/federation/peers', {
         method: 'POST',
@@ -446,7 +446,7 @@ await test('18. Trust advisory (warning)', async () => {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
-            target_node: 'meat-bad-node-001',
+            target_node: 'aimeat-bad-node-001',
             advisory_type: 'warning',
             reason: 'E2E test warning advisory',
         }),
@@ -454,13 +454,13 @@ await test('18. Trust advisory (warning)', async () => {
     assert(status === 201, `status ${status}`);
     assert(body.ok === true, 'ok');
     assert(body.data.advisory_type === 'warning', `type: ${body.data.advisory_type}`);
-    assert(body.data.target_node === 'meat-bad-node-001', 'target matches');
+    assert(body.data.target_node === 'aimeat-bad-node-001', 'target matches');
     assert(typeof body.data.id === 'string', 'has advisory id');
 });
 
 await test('18b. Trust advisory (ban — auto de-peers)', async () => {
     // Register a peer, then ban it
-    const banPeerId = `meat-ban-peer-${Date.now()}`;
+    const banPeerId = `aimeat-ban-peer-${Date.now()}`;
     await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -492,7 +492,7 @@ console.log('\nPhase 6 — Key Exchange');
 
 await test('18c. Key exchange with known peer', async () => {
     // Re-register the direct peer (it was de-peered in phase 4)
-    const kxPeerId = `meat-kx-peer-${Date.now()}`;
+    const kxPeerId = `aimeat-kx-peer-${Date.now()}`;
     await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -610,7 +610,7 @@ await test('26. Replicate missing fields', async () => {
 
 await test('27. Peer registration duplicate', async () => {
     // Register a new peer
-    const dupId = `meat-dup-peer-${Date.now()}`;
+    const dupId = `aimeat-dup-peer-${Date.now()}`;
     const { status: s1 } = await json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },

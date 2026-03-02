@@ -35,7 +35,7 @@ Rakentaa desktop-sovellus (Tauri) joka asentaa ja hallinnoi AIMEAT personal node
 │                 └─────────────────┘ │
 │                       ↕             │
 │              ┌────────────────┐     │
-│              │ AIMEAT Node    │     │
+│              │ aimeat node    │     │
 │              │ (child process)│     │
 │              │ port 40050     │     │
 │              └────────────────┘     │

@@ -135,7 +135,7 @@ async function createWorkItem(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-MEAT-Origin-Node': config.nodeId,
+          'X-AIMEAT-Origin-Node': config.nodeId,
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(30_000),

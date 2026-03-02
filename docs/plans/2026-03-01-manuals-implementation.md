@@ -194,7 +194,7 @@ git commit -m "docs: write MSM manual — external API integration guide"
 
 **Sections to write (in order):**
 
-1. **What is a Service Owner?** — You run an AIMEAT node. You want it to serve your community — add services, connect APIs, maybe add custom logic. Three levels of extension: YAML (no code), JavaScript sandbox (custom logic), Webhook (external process). Pick your depth.
+1. **What is a Service Owner?** — You run an aimeat node. You want it to serve your community — add services, connect APIs, maybe add custom logic. Three levels of extension: YAML (no code), JavaScript sandbox (custom logic), Webhook (external process). Pick your depth.
 
 2. **Level 1: YAML Plugins (no code)** — The simplest extension:
    - `.plugin.yaml` concept: bundles CSM templates + MSM integrations + config overrides
@@ -203,7 +203,7 @@ git commit -m "docs: write MSM manual — external API integration guide"
      plugin: "1.0"
      name: "Espoon Kirpputori"
      description: "Local flea market for Espoo neighborhoods"
-     author: "jouni@meat-finland-001-genesis"
+     author: "jouni@aimeat-finland-001-genesis"
      version: "1.0.0"
      includes:
        csm: ["marketplace.csm.yaml"]

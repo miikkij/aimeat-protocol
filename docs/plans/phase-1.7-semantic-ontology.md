@@ -72,7 +72,7 @@ Sisäinen tekninen record, ei jaeta federaatiossa eikä katalogissa.
     "@context": { "schema": "https://schema.org/" },
     "@type": "schema:Message",
     "schema:about": "community-discovery-match",
-    "schema:sender": "match-agent@meat-finland-001"
+    "schema:sender": "match-agent@aimeat-finland-001"
   }
 }
 ```

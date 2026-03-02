@@ -108,7 +108,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // MCP resource subscription notifications
-    emitResourceUpdated(gaii, `meat://memory/${encodeURIComponent(key)}`);
+    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
     if (!existing) emitResourceListChanged(gaii);
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
@@ -238,7 +238,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    emitResourceUpdated(gaii, `meat://memory/${encodeURIComponent(key)}`);
+    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
     emitResourceListChanged(gaii);
 
     res.json(success(config.nodeId, {
@@ -308,7 +308,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
       await chargeOverage(storage, gaii, quotaCheck.overageMorsels, 'memory_overage');
     }
 
-    emitResourceUpdated(gaii, `meat://memory/${encodeURIComponent(key)}`);
+    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
 
     res.json(success(config.nodeId, {
       key: record.key,

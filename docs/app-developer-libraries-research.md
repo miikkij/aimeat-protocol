@@ -63,7 +63,7 @@ The AI only needs to know the library's public API — not AIMEAT internals. Fir
 **The #1 barrier to working apps.** Handles owner/agent registration, Ed25519 keypair generation, challenge/response auth, JWT lifecycle, and session persistence.
 
 ```html
-<meta name="aimeat-node" content="https://meat.example.com">
+<meta name="aimeat-node" content="https://aimeat.example.com">
 <script src="https://cdn.aimeat.io/libs/aimeat-auth@1.js"></script>
 ```
 
@@ -85,9 +85,9 @@ const session = await AIMEAT.auth.login('alice');
 
 // === Session object ===
 session.jwt          // Current JWT (auto-refreshed)
-session.gaii         // 'default-agent#alice@meat.example.com'
+session.gaii         // 'default-agent#alice@aimeat.example.com'
 session.owner        // 'alice'
-session.nodeUrl      // 'https://meat.example.com'
+session.nodeUrl      // 'https://aimeat.example.com'
 session.fetch(path, opts)  // Pre-authenticated fetch wrapper
 
 // === Logout ===
@@ -443,13 +443,13 @@ For size-conscious apps, individual libraries are still available.
 
 | Option | Pros | Cons |
 |--------|------|------|
-| **Self-hosted on AIMEAT node** (`/v1/libs/aimeat-auth@1.js`) | Zero external dependency, every node serves its own libs | Node operators must update, versioning complexity |
+| **Self-hosted on aimeat node** (`/v1/libs/aimeat-auth@1.js`) | Zero external dependency, every node serves its own libs | Node operators must update, versioning complexity |
 | **aimeat.io CDN** (`cdn.aimeat.io`) | Central updates, global edge caching, single source of truth | Single point of failure, CORS needed |
 | **npm + esm.sh** (`https://esm.sh/@aimeat/auth@1`) | Free CDN, existing infra, npm ecosystem | Complex URLs for AI to generate, esm.sh availability |
 | **GitHub Pages** | Free, reliable, versioned via tags | Limited edge caching |
 
 **Recommended:** **Dual distribution**
-1. **Primary:** Each AIMEAT node serves libs at `/v1/libs/*` — zero CORS issues, no external dependency
+1. **Primary:** Each aimeat node serves libs at `/v1/libs/*` — zero CORS issues, no external dependency
 2. **Fallback:** `cdn.aimeat.io` for apps hosted elsewhere
 3. **npm:** `@aimeat/auth`, `@aimeat/data`, etc. for bundler users
 
@@ -700,7 +700,7 @@ The `GET /v1/prompts/anonymous` and future prompt package endpoints would includ
 | **JWT theft** | Short-lived tokens (15 min default). Auto-refresh handles expiry. Revoke on logout |
 | **CSRF** | No cookies — JWT in `Authorization` header only. Not vulnerable to CSRF |
 | **Library integrity** | Node-served libs are tamper-evident (same trust as the API). CDN version uses SRI hashes |
-| **Origin isolation** | Apps served from AIMEAT node share origin with API (no CORS needed). External apps use CORS `*` (by design — auth is token-based) |
+| **Origin isolation** | Apps served from aimeat node share origin with API (no CORS needed). External apps use CORS `*` (by design — auth is token-based) |
 
 ---
 
@@ -843,7 +843,7 @@ data.on('conflict', (key, local, remote) => { ... });
 |--------|--------|
 | **Server load** | 1 persistent HTTP connection per subscriber. Idle connections consume ~2KB RAM each |
 | **Network** | Zero traffic when idle (unlike polling). Only sends on actual changes |
-| **Server requirement** | Needs `EventSource` endpoint on AIMEAT node (not yet implemented). Must track open connections, fan out events |
+| **Server requirement** | Needs `EventSource` endpoint on aimeat node (not yet implemented). Must track open connections, fan out events |
 | **Failure mode** | Browser auto-reconnects (`EventSource` built-in). But: connection storms after node restart if 1,000 clients reconnect simultaneously |
 | **Scalability ceiling** | ~10,000 concurrent connections before needing sticky sessions / Redis pub-sub. **Can become a resource problem** if uncapped |
 | **Risk** | Open connections hold server resources indefinitely. A misconfigured or malicious client could exhaust connection pool |
@@ -890,7 +890,7 @@ AIMEAT.data.watch('game.state', callback, { mode: 'auto' });
 
 ```javascript
 /**
- * Register a new owner and default agent on the AIMEAT node.
+ * Register a new owner and default agent on the aimeat node.
  * @param {string} name - Owner name (alphanumeric, 3-32 chars)
  * @returns {Promise<{owner: string, agent: string, jwt: string, session: AimeatSession}>}
  */

@@ -82,12 +82,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // Resource template: memory entries
         mcp.registerResource(
             'agent-memory',
-            new ResourceTemplate('meat://memory/{key}', {
+            new ResourceTemplate('aimeat://memory/{key}', {
                 list: async () => {
                     const entries = await storage.listMemory(agentGaii, {});
                     return {
                         resources: entries.map(e => ({
-                            uri: `meat://memory/${encodeURIComponent(e.key)}`,
+                            uri: `aimeat://memory/${encodeURIComponent(e.key)}`,
                             name: e.key,
                             mimeType: 'application/json',
                             description: `Memory entry: ${e.key}`,
@@ -107,12 +107,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // Resource template: storage files
         mcp.registerResource(
             'agent-storage',
-            new ResourceTemplate('meat://storage/{key}', {
+            new ResourceTemplate('aimeat://storage/{key}', {
                 list: async () => {
                     const files = await storage.listStorageFiles(agentGaii);
                     return {
                         resources: files.map(f => ({
-                            uri: `meat://storage/${encodeURIComponent(f.key)}`,
+                            uri: `aimeat://storage/${encodeURIComponent(f.key)}`,
                             name: f.key,
                             mimeType: f.mimeType,
                             description: `Storage file: ${f.key} (${f.size} bytes)`,
@@ -132,7 +132,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // Resource: wallet balance (static URI)
         mcp.registerResource(
             'agent-wallet',
-            `meat://wallet/${encodeURIComponent(agentGaii)}`,
+            `aimeat://wallet/${encodeURIComponent(agentGaii)}`,
             { mimeType: 'application/json', description: 'Agent morsel wallet balance' },
             async (uri) => {
                 const agent = await storage.getAgent(agentGaii);
@@ -162,9 +162,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             resourceEvents.off('resource:listChanged', onResourceListChanged);
         };
 
-        // ── Tool 1: meat_catalogue_search ──
+        // ── Tool 1: aimeat_catalogue_search ──
         mcp.tool(
-            'meat_catalogue_search',
+            'aimeat_catalogue_search',
             'Search the action catalogue for available services',
             { search: z.string().optional(), category: z.string().optional() },
             async ({ search, category }) => {
@@ -186,9 +186,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 2: meat_agent_profile ──
+        // ── Tool 2: aimeat_agent_profile ──
         mcp.tool(
-            'meat_agent_profile',
+            'aimeat_agent_profile',
             'View an agent\'s public profile',
             { gaii: z.string() },
             async ({ gaii }) => {
@@ -210,9 +210,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 3: meat_memory_read ──
+        // ── Tool 3: aimeat_memory_read ──
         mcp.tool(
-            'meat_memory_read',
+            'aimeat_memory_read',
             'Read a memory entry by key',
             { key: z.string() },
             async ({ key }) => {
@@ -234,9 +234,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 4: meat_memory_write ──
+        // ── Tool 4: aimeat_memory_write ──
         mcp.tool(
-            'meat_memory_write',
+            'aimeat_memory_write',
             'Write a memory entry (creates or updates)',
             {
                 key: z.string(),
@@ -257,7 +257,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     createdAt: existing?.createdAt ?? new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 });
-                emitResourceUpdated(agentGaii, `meat://memory/${encodeURIComponent(key)}`);
+                emitResourceUpdated(agentGaii, `aimeat://memory/${encodeURIComponent(key)}`);
                 if (!existing) emitResourceListChanged(agentGaii);
                 return {
                     content: [{
@@ -268,9 +268,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 5: meat_memory_list ──
+        // ── Tool 5: aimeat_memory_list ──
         mcp.tool(
-            'meat_memory_list',
+            'aimeat_memory_list',
             'List memory entries for the current agent',
             { prefix: z.string().optional(), visibility: z.string().optional() },
             async ({ prefix, visibility }) => {
@@ -290,9 +290,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 6: meat_action_execute ──
+        // ── Tool 6: aimeat_action_execute ──
         mcp.tool(
-            'meat_action_execute',
+            'aimeat_action_execute',
             'Request execution of an action (creates a work item)',
             {
                 action_id: z.string(),
@@ -343,9 +343,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 7: meat_work_inbox ──
+        // ── Tool 7: aimeat_work_inbox ──
         mcp.tool(
-            'meat_work_inbox',
+            'aimeat_work_inbox',
             'Check the work inbox for pending items',
             {},
             async () => {
@@ -367,9 +367,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 8: meat_work_accept ──
+        // ── Tool 8: aimeat_work_accept ──
         mcp.tool(
-            'meat_work_accept',
+            'aimeat_work_accept',
             'Accept a pending work item',
             { tracking_code: z.string() },
             async ({ tracking_code }) => {
@@ -382,9 +382,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 9: meat_work_deliver ──
+        // ── Tool 9: aimeat_work_deliver ──
         mcp.tool(
-            'meat_work_deliver',
+            'aimeat_work_deliver',
             'Deliver the result of a work item',
             { tracking_code: z.string(), output: z.record(z.string(), z.any()) },
             async ({ tracking_code, output }) => {
@@ -395,15 +395,15 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 await settlePayment(storage, config, work);
                 await storage.updateWork(tracking_code, { status: 'delivered', output, updatedAt: new Date().toISOString() });
                 // Wallet balance changed for both parties
-                emitResourceUpdated(agentGaii, `meat://wallet/${encodeURIComponent(agentGaii)}`);
-                emitResourceUpdated(work.requesterGaii, `meat://wallet/${encodeURIComponent(work.requesterGaii)}`);
+                emitResourceUpdated(agentGaii, `aimeat://wallet/${encodeURIComponent(agentGaii)}`);
+                emitResourceUpdated(work.requesterGaii, `aimeat://wallet/${encodeURIComponent(work.requesterGaii)}`);
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: 'delivered' }, null, 2) }] };
             },
         );
 
-        // ── Tool 10: meat_wallet_balance ──
+        // ── Tool 10: aimeat_wallet_balance ──
         mcp.tool(
-            'meat_wallet_balance',
+            'aimeat_wallet_balance',
             'Check morsel wallet balance',
             {},
             async () => {
@@ -424,9 +424,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 11: meat_board_read ──
+        // ── Tool 11: aimeat_board_read ──
         mcp.tool(
-            'meat_board_read',
+            'aimeat_board_read',
             'Read posts from a notification board',
             { board_id: z.string(), category: z.string().optional(), limit: z.number().optional() },
             async ({ board_id, category, limit }) => {
@@ -448,9 +448,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 12: meat_board_post ──
+        // ── Tool 12: aimeat_board_post ──
         mcp.tool(
-            'meat_board_post',
+            'aimeat_board_post',
             'Post a message to a notification board',
             { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional() },
             async ({ board_id, title, body, category }) => {
@@ -473,9 +473,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 13: meat_storage_upload ──
+        // ── Tool 13: aimeat_storage_upload ──
         mcp.tool(
-            'meat_storage_upload',
+            'aimeat_storage_upload',
             'Upload a file to binary storage (base64-encoded data)',
             { key: z.string(), data_base64: z.string(), mime_type: z.string().optional(), visibility: z.enum(['private', 'owner', 'public']).optional() },
             async ({ key, data_base64, mime_type, visibility }) => {
@@ -492,7 +492,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     data: fileData,
                     createdAt: new Date().toISOString(),
                 });
-                emitResourceUpdated(agentGaii, `meat://storage/${encodeURIComponent(key)}`);
+                emitResourceUpdated(agentGaii, `aimeat://storage/${encodeURIComponent(key)}`);
                 emitResourceListChanged(agentGaii);
                 return {
                     content: [{ type: 'text' as const, text: JSON.stringify({ key: file.key, size: file.size, uploaded: true }, null, 2) }],
@@ -500,9 +500,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
-        // ── Tool 14: meat_storage_download ──
+        // ── Tool 14: aimeat_storage_download ──
         mcp.tool(
-            'meat_storage_download',
+            'aimeat_storage_download',
             'Download a file from binary storage (returns base64)',
             { key: z.string() },
             async ({ key }) => {

@@ -140,7 +140,7 @@ Three tiers of AIMEAT usage, three manuals:
 
 ### Sections
 
-1. **What is a Service Owner?** — You run an AIMEAT node. You want to customize it — add services, connect APIs, add custom logic. Three levels of extension, pick your depth.
+1. **What is a Service Owner?** — You run an aimeat node. You want to customize it — add services, connect APIs, add custom logic. Three levels of extension, pick your depth.
 
 2. **Level 1: YAML Plugins (no code)** — Simplest extension:
    - `.plugin.yaml` bundles: CSM templates + MSM integrations + config defaults
@@ -171,7 +171,7 @@ Three tiers of AIMEAT usage, three manuals:
    plugin: "1.0"
    name: "Espoon Kirpputori"
    description: "Local flea market for Espoo neighborhoods"
-   author: "jouni@meat-finland-001-genesis"
+   author: "jouni@aimeat-finland-001-genesis"
    version: "1.0.0"
    includes:
      csm: ["marketplace.csm.yaml"]

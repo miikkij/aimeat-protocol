@@ -5,10 +5,10 @@
 ```json
 {
   "node": {
-    "id": "meat-finland-001-genesis",
+    "id": "aimeat-finland-001-genesis",
     "type": "full",
     "operator_email": "operator@example.com",
-    "url": "https://meat-finland-001-genesis.example.com"
+    "url": "https://aimeat-finland-001-genesis.example.com"
   },
   "core_limits": {
     "default_memory_quota_mb": 10,
@@ -117,7 +117,7 @@
     "heartbeat_miss_unreachable": 6,
     "depeering_grace_period_hours": 72,
     "register_with_directory": true,
-    "directory_nodes": ["meat-finland-001-genesis"]
+    "directory_nodes": ["aimeat-finland-001-genesis"]
   },
   "extension_hooks": {
     "pre_owner_registration": [],

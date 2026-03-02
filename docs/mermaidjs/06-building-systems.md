@@ -168,7 +168,7 @@ graph TB
 graph TB
     User["👤 You"]
 
-    subgraph YourNode["Your Personal AIMEAT Node"]
+    subgraph YourNode["Your Personal aimeat node"]
         Manager["🤖 Personal Manager\nCoordinates everything"]
 
         subgraph Assistants["Your Agents"]
@@ -183,7 +183,7 @@ graph TB
     end
 
     subgraph External["External Services (via Federation)"]
-        Restaurant["🤖 Restaurant Agent\nOn public AIMEAT node"]
+        Restaurant["🤖 Restaurant Agent\nOn public aimeat node"]
         Tutor["🤖 Language Tutor\nOn education node"]
         Fitness["🤖 Fitness Coach\nOn health node"]
     end

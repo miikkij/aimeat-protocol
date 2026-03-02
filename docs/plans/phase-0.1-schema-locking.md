@@ -305,7 +305,7 @@ export function schemaRouter(config: MeatConfig, storage: Storage): Router
     "key": "iot.temperature.living-room",
     "apply_to": "exact",
     "schema_mode": "open",
-    "locked_by": "app#alice@meat-local-001",
+    "locked_by": "app#alice@aimeat-local-001",
     "set_at": "2026-03-01T14:30:00Z"
   }
 }
@@ -348,7 +348,7 @@ export function schemaRouter(config: MeatConfig, storage: Storage): Router
     "schema": { ... },
     "apply_to": "exact",
     "schema_mode": "open",
-    "locked_by": "app#alice@meat-local-001",
+    "locked_by": "app#alice@aimeat-local-001",
     "set_at": "2026-03-01T14:30:00Z"
   }
 }
@@ -423,7 +423,7 @@ export function schemaRouter(config: MeatConfig, storage: Storage): Router
         "key": "iot.temperature",
         "apply_to": "prefix",
         "schema_mode": "strict",
-        "locked_by": "app#alice@meat-local-001",
+        "locked_by": "app#alice@aimeat-local-001",
         "set_at": "2026-03-01T14:30:00Z"
       }
     ],

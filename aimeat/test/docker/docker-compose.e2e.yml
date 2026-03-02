@@ -7,7 +7,7 @@ services:
       - "${E2E_PORT:-3200}:3200"
     environment:
       AIMEAT_PORT: "3200"
-      AIMEAT_NODE_ID: "meat-e2e-001-test"
+      AIMEAT_NODE_ID: "aimeat-e2e-001-test"
       AIMEAT_ADMIN_PASSWORD: "e2e-test-password"
       AIMEAT_WELCOME_BONUS: "100"
       AIMEAT_DAILY_ALLOWANCE: "50"

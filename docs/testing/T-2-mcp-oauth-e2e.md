@@ -58,13 +58,13 @@ Test the full MCP lifecycle: OAuth 2.1 dynamic client registration → authoriza
 
 | # | Test | Tool | Assert |
 |---|------|------|--------|
-| 18 | `meat_memory_write` | Write key via MCP | `{ written: true }` |
-| 19 | `meat_memory_read` | Read back | Value matches |
-| 20 | `meat_memory_list` | List entries | Contains written key |
-| 21 | `meat_catalogue_search` | Search actions | Returns array |
-| 22 | `meat_wallet_balance` | Check balance | Returns `{ balance, in_escrow, available }` |
-| 23 | `meat_agent_profile` | Get agent | Returns agent info |
-| 24 | `meat_board_read` | Read board | Returns posts array |
+| 18 | `aimeat_memory_write` | Write key via MCP | `{ written: true }` |
+| 19 | `aimeat_memory_read` | Read back | Value matches |
+| 20 | `aimeat_memory_list` | List entries | Contains written key |
+| 21 | `aimeat_catalogue_search` | Search actions | Returns array |
+| 22 | `aimeat_wallet_balance` | Check balance | Returns `{ balance, in_escrow, available }` |
+| 23 | `aimeat_agent_profile` | Get agent | Returns agent info |
+| 24 | `aimeat_board_read` | Read board | Returns posts array |
 
 ### Phase 6 — MCP Resource Read
 

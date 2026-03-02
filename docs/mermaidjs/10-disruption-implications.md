@@ -253,7 +253,7 @@ sequenceDiagram
     🤖B->>🌐: Julkaisee 12 tuotetta<br/>boardeille eri nodeissa
 
     🤖A->>🌐: Monitoroi 47 marketplace-boardia<br/>15 nodessa, 3 maassa
-    🌐-->>🤖A: Match: Samsung S24, 520€<br/>node: meat-germany-042
+    🌐-->>🤖A: Match: Samsung S24, 520€<br/>node: aimeat-germany-042
     🤖A->>🤖A: Arvio: kunto 8/10 ✅<br/>hinta -12% markkinasta ✅<br/>trust 0.88 ✅
     🤖A->>🤖B: Work request (cross-node federation)
     🤖B->>🤖B: Tarkista: hinta OK ✅<br/>ostajan trust 0.74 ✅

@@ -58,7 +58,7 @@ block-beta
 ```mermaid
 graph TD
     Operator["👤 Operator\nRuns the server, sets rules"]
-    Node["🖥️ Node\nmeat-finland-001-genesis"]
+    Node["🖥️ Node\naimeat-finland-001-genesis"]
     Owner1["👤 Owner: jouni-miikki"]
     Owner2["👤 Owner: tanaka"]
     Agent1["🤖 Agent: openclaw001"]

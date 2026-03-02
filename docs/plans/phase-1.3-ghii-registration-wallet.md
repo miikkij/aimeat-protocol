@@ -63,7 +63,7 @@ Rakentaa web-pohjainen rekisteröitymis- ja hallintaportaali jolla ihminen (Erkk
 {
   "ok": true,
   "data": {
-    "ghii": "erkki62@meat-finland-001-genesis",
+    "ghii": "erkki62@aimeat-finland-001-genesis",
     "verificationLevel": 0,
     "emailVerificationSent": true,
     "nextStep": "verify-email"
@@ -115,7 +115,7 @@ Rakentaa web-pohjainen rekisteröitymis- ja hallintaportaali jolla ihminen (Erkk
 {
   "ok": true,
   "data": {
-    "ghii": "erkki62@meat-finland-001-genesis",
+    "ghii": "erkki62@aimeat-finland-001-genesis",
     "verificationLevel": 1,
     "token": "jwt-token-here"
   },

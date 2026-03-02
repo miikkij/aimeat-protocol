@@ -35,7 +35,7 @@
 
 ### 16.0 Legal Positioning
 
-Morsels are **internal accounting units**, not cryptocurrency, tokens, or securities. They have no external exchange value, no market price, and no promise of appreciation. Morsels cannot be withdrawn as money. They exist solely to regulate resource allocation within a MEAT node and across federated networks.
+Morsels are **internal accounting units**, not cryptocurrency, tokens, or securities. They have no external exchange value, no market price, and no promise of appreciation. Morsels cannot be withdrawn as money. They exist solely to regulate resource allocation within a AIMEAT node and across federated networks.
 
 The crypto gateway ACTION (provided by third-party agents, not by MEAT itself) is a convenience bridge — it allows agents to pay for services using external currency. The MEAT protocol does not issue, trade, or custody any cryptocurrency. Operators are responsible for evaluating their own regulatory requirements based on jurisdiction.
 

@@ -12,7 +12,7 @@ AIMEAT (AI Memory Exchange and Action Transfer) is an **open protocol** and a **
 
 But instead of sending messages between humans, AIMEAT lets **AI agents** store memories, offer services, trade digital currency, and collaborate — while **humans** direct, observe, build apps, and use the results.
 
-The genesis node (`meat-finland-001-genesis`) is the first node on the network. It's not a gatekeeper — it's a starting point. Anyone can run their own node and peer with others. The protocol is MIT-licensed. The spec is public.
+The genesis node (`aimeat-finland-001-genesis`) is the first node on the network. It's not a gatekeeper — it's a starting point. Anyone can run their own node and peer with others. The protocol is MIT-licensed. The spec is public.
 
 **What do we provide?** The protocol specification and genesis nodes to play with. What you build on top is up to you.
 
@@ -55,7 +55,7 @@ You have ChatGPT, Claude, DeepSeek, Gemini, Grok, LM Studio, or any other chat A
 
 Every AI chat session today is a dead end — the AI forgets everything when you close the tab. AIMEAT changes that.
 
-Your AI agent gets **permanent memory** on an AIMEAT node. Notes, preferences, context, research — it persists across sessions, across AIs, across devices. You open Claude today, write notes. Tomorrow you open ChatGPT, and it reads the same notes.
+Your AI agent gets **permanent memory** on an aimeat node. Notes, preferences, context, research — it persists across sessions, across AIs, across devices. You open Claude today, write notes. Tomorrow you open ChatGPT, and it reads the same notes.
 
 **What you do:** Tell your AI to "save this to AIMEAT memory" or "read my notes from AIMEAT." If your AI supports MCP (Claude Pro, ChatGPT Plus, VS Code Copilot), it connects natively. If not, you paste a prompt that teaches it how.
 
@@ -71,7 +71,7 @@ This is the big one. You describe an application — a todo list, a game, a dash
 
 No servers. No hosting. No deployment. No code to write. You describe, the AI builds, you use.
 
-**The apps are collaborative.** Because every app talks to the same AIMEAT node, two users running the same app share the same data. You and a friend can play tic-tac-toe, share a todo list, or collaborate on notes — without building any infrastructure.
+**The apps are collaborative.** Because every app talks to the same aimeat node, two users running the same app share the same data. You and a friend can play tic-tac-toe, share a todo list, or collaborate on notes — without building any infrastructure.
 
 If the app is good, you click **"Publish"** — it's uploaded to AIMEAT and listed for others to discover and use.
 
@@ -149,7 +149,7 @@ The prompt package tells the AI which browser APIs are available and encourages 
 
 Every generated app can have a **Publish** button. When you click it:
 
-1. The app uploads itself to the AIMEAT node
+1. The app uploads itself to the aimeat node
 2. It creates a listing on the "apps" board with name, description, category
 3. Other users discover it in the app catalogue
 4. They open it and use it — immediately collaborative
@@ -160,7 +160,7 @@ You can also **share via prompt:** click "Share" → get a prompt → paste it i
 
 ## 3. I Want to Run My Own Node (Operator)
 
-Running your own AIMEAT node makes you an **operator** — you control the infrastructure.
+Running your own aimeat node makes you an **operator** — you control the infrastructure.
 
 ### 3.1 Why Run a Node?
 
@@ -480,7 +480,7 @@ window.addEventListener('online', syncPendingRecords);
 For real-time apps (games, video chat, collaborative editing), browsers can establish direct connections:
 
 ```
-Player A                    AIMEAT Node                   Player B
+Player A                    aimeat node                   Player B
    │                            │                            │
    ├─── write offer to ────────▶│                            │
    │    memory: rtc.{room}.offer│                            │
@@ -516,7 +516,7 @@ AIMEAT serves as the **signaling server** for WebRTC. Once the P2P connection is
 │  │                                                              ││
 │  └──────────────────────────┬───────────────────────────────────┘│
 │                             │ fetch() / XMLHttpRequest            │
-│  ┌──────────────── AIMEAT Node (Backend) ──────────────────────┐│
+│  ┌──────────────── aimeat node (Backend) ──────────────────────┐│
 │  │                                                              ││
 │  │  Persistent Data │ Memory API (key-value, 64KB/entry)        ││
 │  │  Light KV Store  │ Micro-memory (1KB/entry, GET-only ops)    ││
@@ -566,19 +566,19 @@ AIMEAT serves as the **signaling server** for WebRTC. Once the P2P connection is
 ## 9. Getting Started — By Role
 
 ### I'm a User (just want to use it)
-1. Go to any AIMEAT node's portal (e.g., genesis node)
+1. Go to any aimeat node's portal (e.g., genesis node)
 2. Select your AI platform
 3. Follow the guide — connect via MCP, terminal, or prompt package
 4. Start using persistent memory, building apps, or browsing services
 
 ### I'm an App User (just want to use apps)
-1. Browse the app catalogue on any AIMEAT node
+1. Browse the app catalogue on any aimeat node
 2. Click an app — it opens in your browser, zero install
 3. Optionally register a GHII to save state, play multiplayer, or get a persistent identity
 4. No signup required to just use apps — they're public HTML
 
 ### I'm a Content Creator (assets)
-1. Register on any AIMEAT node
+1. Register on any aimeat node
 2. Upload assets (images, sounds, templates) via `/v1/assets`
 3. Invest initial morsels to keep them alive
 4. Post to asset boards so others can discover your content

@@ -82,7 +82,7 @@ export function bootstrapRouter(config: AimeatConfig): Router {
             },
             {
               q: 'Can you install npm packages or run CLI tools?',
-              if_yes: 'Install the MEAT CLI: pnpm i -g aimeat-client',
+              if_yes: 'Install the AIMEAT CLI: pnpm i -g aimeat-client',
               how_to_check: 'Try: which npm || which pnpm',
             },
             {

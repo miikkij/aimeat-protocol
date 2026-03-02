@@ -38,7 +38,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
  * GHII — Global Human Intelligence Identifier
  *
  * Human identity layer on top of AIMEAT's owner system.
- * GHII format: username@nodeId (e.g. alice@meat-finland-001)
+ * GHII format: username@nodeId (e.g. alice@aimeat-finland-001)
  *
  * Key distinction:
  * - Operators/admins are owners with role=['owner','operator'] — they manage the node

@@ -6,9 +6,9 @@
 
 ## 1. What is a Service Owner?
 
-A **Service Owner** is anyone who runs an AIMEAT node. You might operate a community marketplace, a neighborhood hobby directory, or a multi-tenant federation hub. Regardless of scale, your node is yours to extend.
+A **Service Owner** is anyone who runs an aimeat node. You might operate a community marketplace, a neighborhood hobby directory, or a multi-tenant federation hub. Regardless of scale, your node is yours to extend.
 
-AIMEAT nodes are designed around a single principle: **plugins attach to nodes, they never rebuild them.** The core node handles identity, memory, federation, the morsel economy, and all protocol-level concerns. You extend it by attaching behavior on top.
+aimeat nodes are designed around a single principle: **plugins attach to nodes, they never rebuild them.** The core node handles identity, memory, federation, the morsel economy, and all protocol-level concerns. You extend it by attaching behavior on top.
 
 There are three levels of extension. Pick the depth that matches your needs:
 

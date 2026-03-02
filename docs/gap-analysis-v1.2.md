@@ -77,7 +77,7 @@ The reference implementation covers **~95% of the RFC v1.2 specification**. All 
 | Peer heartbeat with degraded/offline detection | ✅ | 3 failures → degraded, 10 → offline |
 | Federation directory (public) | ✅ | Tier 0 access |
 | GAII resolution (cache → local → hint → broadcast) | ✅ | 5-minute cache TTL |
-| Work request forwarding to remote nodes | ✅ | Proxy with `X-MEAT-Origin-Node` header |
+| Work request forwarding to remote nodes | ✅ | Proxy with `X-aimeat-Origin-Node` header |
 | Trust advisory (warn, suspend, ban) | ✅ | Auto-de-peer on ban |
 | Memory replication between peers | ✅ | Prefix: `replica:{source_node}:` |
 | Catalogue sync between peers | ✅ | Prefix: `{source_node}:` |

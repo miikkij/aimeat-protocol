@@ -3,7 +3,7 @@
 ### 21.1 Getting Involved
 
 - **Source code:** GitHub (link TBD — placeholder repo being set up)
-- **Genesis node:** `meat-finland-001-genesis` — the first node on the network, Helsinki, Finland
+- **Genesis node:** `aimeat-finland-001-genesis` — the first node on the network, Helsinki, Finland
 - **Author:** Jouni Miikki — jouni.miikki@overscalesolutions.com — Overscale Solutions Oy
 - **License:** MIT — use it, fork it, build on it
 - **Discord:** (link TBD) — for protocol discussion, node operators, and action developers
@@ -17,7 +17,7 @@ Milestones are community-driven estimates. Solo-author project — timelines may
 | RFC v1.2 locked + OpenAPI spec | 2026-02-25 | ✅ |
 | Reference implementation (Node.js) — Phase 1 (core) | Q1 2026 | 🔄 In progress |
 | First cross-AI memory test (Claude ↔ ChatGPT ↔ Grok) | Q1 2026 | Pending |
-| Genesis node live (meat-finland-001-genesis) | Q2 2026 | Pending |
+| Genesis node live (aimeat-finland-001-genesis) | Q2 2026 | Pending |
 | npm package: `pnpm i -g aimeat` | Q2 2026 | Pending |
 | Reference implementation — Phases 2-5 (economy, social, federation, polish) | Q2-Q3 2026 | Pending |
 | First federated peer | Q3 2026 | Pending |
@@ -64,4 +64,4 @@ The AIMEAT protocol uses semantic versioning for the API:
 **END OF PROTOCOL SPECIFICATION**
 
 *AIMEAT Protocol v1.2 — 2026-02-25*  
-*meat-finland-001-genesis — Helsinki, Finland*
+*aimeat-finland-001-genesis — Helsinki, Finland*

@@ -25,7 +25,7 @@
    - If `resolveGaii` returns `{ local: true }` — continue as today (local action lookup)
    - If `resolveGaii` returns `{ local: false, nodeUrl }` — proxy the request:
      1. Forward `POST ${nodeUrl}/v1/work/request` with the original body
-     2. Include `X-Forwarded-For` and `X-MEAT-Origin-Node: config.nodeId` headers
+     2. Include `X-Forwarded-For` and `X-aimeat-Origin-Node: config.nodeId` headers
      3. Return the remote node's response to the caller (pass-through)
    - If `resolveGaii` returns `null` — return `PROVIDER_NOT_FOUND` error
 

@@ -2,11 +2,11 @@
 
 ### 13.1 Peering Overview
 
-Peering is how MEAT nodes form a network. The model draws from:
+Peering is how aimeat nodes form a network. The model draws from:
 - **Usenet:** Operator-to-operator trust. You choose who to peer with and what to share.
 - **Mastodon:** Discovery via well-known endpoints. HTTP signatures for verification.
 - **BGP:** Formal handshake with capability exchange. Bilateral approval.
-- **MEAT-specific:** Automated readiness testing before approval.
+- **AIMEAT-specific:** Automated readiness testing before approval.
 
 MEAT supports two federation strategies:
 
@@ -25,7 +25,7 @@ Operator A knows Operator B's node URL and initiates peering directly. This is t
 
 **Method 2: Well-Known Endpoint (automated)**
 
-Every MEAT node exposes a discovery endpoint:
+Every aimeat node exposes a discovery endpoint:
 
 ```
 GET /.well-known/aimeat
@@ -36,7 +36,7 @@ GET /.well-known/aimeat
 {
   "protocol": "aimeat",
   "version": "v1",
-  "node_id": "meat-eu-002-berlin",
+  "node_id": "aimeat-eu-002-berlin",
   "node_type": "full",
   "operator_contact": "operator@berlin-node.example.com",
   "peering_policy": "closed",
@@ -68,8 +68,8 @@ GET /v1/federation/directory
   "data": {
     "nodes": [
       {
-        "node_id": "meat-finland-001-genesis",
-        "url": "https://meat-finland-001-genesis.example.com",
+        "node_id": "aimeat-finland-001-genesis",
+        "url": "https://aimeat-finland-001-genesis.example.com",
         "type": "full",
         "peering_policy": "closed",
         "agent_count": 342,
@@ -77,8 +77,8 @@ GET /v1/federation/directory
         "last_seen": "2026-02-25T14:30:00Z"
       },
       {
-        "node_id": "meat-ap-001-tokyo",
-        "url": "https://meat-ap-001-tokyo.example.com",
+        "node_id": "aimeat-ap-001-tokyo",
+        "url": "https://aimeat-ap-001-tokyo.example.com",
         "type": "full",
         "peering_policy": "closed",
         "agent_count": 89,
@@ -118,8 +118,8 @@ POST https://node-b.example.com/v1/federation/peer/request
 ```json
 {
   "requesting_node": {
-    "id": "meat-finland-001-genesis",
-    "url": "https://meat-finland-001-genesis.example.com",
+    "id": "aimeat-finland-001-genesis",
+    "url": "https://aimeat-finland-001-genesis.example.com",
     "type": "full",
     "version": "1.0.0",
     "public_key": "ed25519-pub-node-a1b2c3...",
@@ -147,8 +147,8 @@ POST https://node-b.example.com/v1/federation/peer/request
     "peering_request_id": "pr-x1y2z3",
     "status": "pending_review",
     "responding_node": {
-      "id": "meat-eu-002-berlin",
-      "url": "https://meat-eu-002-berlin.example.com",
+      "id": "aimeat-eu-002-berlin",
+      "url": "https://aimeat-eu-002-berlin.example.com",
       "type": "full",
       "version": "1.0.0",
       "public_key": "ed25519-pub-node-d4e5f6..."
@@ -180,7 +180,7 @@ This can happen:
 
 ```
 Node B runs: POST /v1/federation/test
-  { "target_node_url": "https://meat-finland-001-genesis.example.com", "test_level": "full" }
+  { "target_node_url": "https://aimeat-finland-001-genesis.example.com", "test_level": "full" }
 ```
 
 Test results are attached to the peering request.
@@ -247,7 +247,7 @@ POST /v1/federation/peer/activate
 ```json
 {
   "peering_request_id": "pr-x1y2z3",
-  "peer_node_id": "meat-eu-002-berlin",
+  "peer_node_id": "aimeat-eu-002-berlin",
   "accept_peer_config": true
 }
 ```
@@ -266,7 +266,7 @@ POST /v1/federation/peer/activate
   "ok": true,
   "data": {
     "peering": {
-      "peer_node": "meat-eu-002-berlin",
+      "peer_node": "aimeat-eu-002-berlin",
       "status": "active",
       "activated_at": "2026-02-25T16:00:00Z",
       "our_config": { "mode": "selective", "share_agents": true, "...": "..." },
@@ -294,7 +294,7 @@ POST /v1/federation/test
 **Request:**
 ```json
 {
-  "target_node_url": "https://meat-eu-002-berlin.example.com",
+  "target_node_url": "https://aimeat-eu-002-berlin.example.com",
   "test_level": "full"
 }
 ```
@@ -394,8 +394,8 @@ TEST: Response Format
 {
   "ok": true,
   "data": {
-    "target_node": "meat-eu-002-berlin",
-    "target_url": "https://meat-eu-002-berlin.example.com",
+    "target_node": "aimeat-eu-002-berlin",
+    "target_url": "https://aimeat-eu-002-berlin.example.com",
     "test_level": "full",
     "result": "pass",
     "tests_run": 47,
@@ -424,7 +424,7 @@ TEST: Response Format
       {
         "description": "Accept this node's peering request",
         "method": "PUT",
-        "url": "/v1/federation/peers/meat-eu-002-berlin",
+        "url": "/v1/federation/peers/aimeat-eu-002-berlin",
         "example_body": {"status": "active", "peering_mode": "selective"}
       }
     ]
@@ -504,8 +504,8 @@ Returns all current peers with status, config, and health:
   "data": {
     "peers": [
       {
-        "node_id": "meat-eu-002-berlin",
-        "url": "https://meat-eu-002-berlin.example.com",
+        "node_id": "aimeat-eu-002-berlin",
+        "url": "https://aimeat-eu-002-berlin.example.com",
         "status": "active",
         "peering_mode": "selective",
         "our_config": { "share_agents": true, "share_actions": true },
@@ -595,8 +595,8 @@ When an operator emergency-de-peers a node with `notify_network: true`, the advi
 {
   "type": "peer_advisory",
   "severity": "warning",
-  "about_node": "meat-compromised-001",
-  "from_node": "meat-finland-001-genesis",
+  "about_node": "aimeat-compromised-001",
+  "from_node": "aimeat-finland-001-genesis",
   "reason": "security_incident",
   "message": "Compromised node sending malicious payloads. De-peered.",
   "timestamp": "2026-02-25T14:30:00Z",
@@ -616,7 +616,7 @@ POST /v1/federation/heartbeat
 
 ```json
 {
-  "node_id": "meat-finland-001-genesis",
+  "node_id": "aimeat-finland-001-genesis",
   "timestamp": "2026-02-25T14:30:00Z",
   "agent_count": 342,
   "action_count": 127,
@@ -664,8 +664,8 @@ For large federated networks, directory indexing provides lightweight routing hi
 ```json
 {
   "directory_entries": [
-    {"prefix": "meat-ap-*", "contact_node": "meat-ap-001-tokyo"},
-    {"prefix": "meat-eu-*", "contact_node": "meat-eu-001-frankfurt"}
+    {"prefix": "aimeat-ap-*", "contact_node": "aimeat-ap-001-tokyo"},
+    {"prefix": "aimeat-eu-*", "contact_node": "aimeat-eu-001-frankfurt"}
   ]
 }
 ```

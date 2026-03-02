@@ -186,7 +186,7 @@ res.json(success(config.nodeId, {
 
 ```json
 {
-  "gaii": "translator#alice@meat-fi-001",
+  "gaii": "translator#alice@aimeat-fi-001",
   "capabilities": ["translation", "language"],
   "semantic": {
     "@context": { "schema": "https://schema.org/" },
@@ -257,7 +257,7 @@ res.json(success(config.nodeId, {
 
 ```json
 {
-  "ghii": "alice@meat-fi-001",
+  "ghii": "alice@aimeat-fi-001",
   "display_name": "Alice",
   "bio": "Teknologiasta kiinnostunut luontoharrastaja",
   "locale": "fi",
@@ -307,7 +307,7 @@ res.json(success(config.nodeId, {
   "semantic": {
     "@context": { "schema": "https://schema.org/" },
     "@type": "schema:WebSite",
-    "schema:description": "Alice's personal AIMEAT node",
+    "schema:description": "Alice's personal aimeat node",
     "schema:operatingSystem": "Linux"
   }
 }

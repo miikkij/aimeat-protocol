@@ -11,18 +11,18 @@ import {
 
 describe('buildGAII', () => {
     it('constructs agent#owner@node format', () => {
-        expect(buildGAII('my-agent', 'my-owner', 'meat-us-001-dev')).toBe('my-agent#my-owner@meat-us-001-dev');
+        expect(buildGAII('my-agent', 'my-owner', 'aimeat-us-001-dev')).toBe('my-agent#my-owner@aimeat-us-001-dev');
     });
 });
 
 describe('parseGAII', () => {
     it('parses a valid GAII string', () => {
-        const result = parseGAII('my-agent#my-owner@meat-us-001-dev');
+        const result = parseGAII('my-agent#my-owner@aimeat-us-001-dev');
         expect(result).toEqual({
             agent: 'my-agent',
             owner: 'my-owner',
-            node: 'meat-us-001-dev',
-            full: 'my-agent#my-owner@meat-us-001-dev',
+            node: 'aimeat-us-001-dev',
+            full: 'my-agent#my-owner@aimeat-us-001-dev',
         });
     });
 
@@ -34,12 +34,12 @@ describe('parseGAII', () => {
     });
 
     it('rejects names that are too short', () => {
-        expect(parseGAII('a#my-owner@meat-us-001-dev')).toBeNull();
-        expect(parseGAII('my-agent#b@meat-us-001-dev')).toBeNull();
+        expect(parseGAII('a#my-owner@aimeat-us-001-dev')).toBeNull();
+        expect(parseGAII('my-agent#b@aimeat-us-001-dev')).toBeNull();
     });
 
     it('rejects uppercase characters', () => {
-        expect(parseGAII('My-Agent#my-owner@meat-us-001-dev')).toBeNull();
+        expect(parseGAII('My-Agent#my-owner@aimeat-us-001-dev')).toBeNull();
     });
 
     it('rejects invalid node format', () => {
@@ -49,7 +49,7 @@ describe('parseGAII', () => {
 
 describe('isValidGAII', () => {
     it('returns true for valid GAII', () => {
-        expect(isValidGAII('agent01#owner01@meat-us-001-dev')).toBe(true);
+        expect(isValidGAII('agent01#owner01@aimeat-us-001-dev')).toBe(true);
     });
 
     it('returns false for invalid GAII', () => {
@@ -101,13 +101,13 @@ describe('validateOwnerName', () => {
 
 describe('validateNodeId', () => {
     it('accepts valid node IDs', () => {
-        expect(validateNodeId('meat-us-001-dev')).toBeNull();
-        expect(validateNodeId('meat-eu-042-production')).toBeNull();
+        expect(validateNodeId('aimeat-us-001-dev')).toBeNull();
+        expect(validateNodeId('aimeat-eu-042-production')).toBeNull();
     });
 
     it('rejects invalid node IDs', () => {
         expect(validateNodeId('not-a-node')).not.toBeNull();
-        expect(validateNodeId('meat-US-001-dev')).not.toBeNull();
+        expect(validateNodeId('aimeat-US-001-dev')).not.toBeNull();
         expect(validateNodeId('')).not.toBeNull();
     });
 });

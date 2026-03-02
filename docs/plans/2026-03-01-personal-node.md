@@ -285,9 +285,9 @@ if (tunnelManager) {
   "ok": true,
   "data": {
     "node_id": "personal-jouni-001",
-    "anchor_operator": "meat-finland-001-genesis",
+    "anchor_operator": "aimeat-finland-001-genesis",
     "status": "offline",
-    "tunnel_url": "wss://meat-finland-001-genesis.example.com/v1/personal/tunnel",
+    "tunnel_url": "wss://aimeat-finland-001-genesis.example.com/v1/personal/tunnel",
     "mailbox_quota_bytes": 52428800
   },
   "hints": {
@@ -380,7 +380,7 @@ Add to the directory response an optional `personal_nodes` array:
     {
       "node_id": "personal-jouni-001",
       "type": "personal",
-      "anchor_operator": "meat-finland-001-genesis",
+      "anchor_operator": "aimeat-finland-001-genesis",
       "status": "online",
       "last_seen": "2026-02-28T14:30:00Z",
       "agent_count": 3,

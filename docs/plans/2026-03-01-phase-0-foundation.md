@@ -361,7 +361,7 @@ export function schemaRouter(config: MeatConfig, storage: Storage): Router
     "key": "iot.temperature.living-room",
     "apply_to": "exact",
     "schema_mode": "open",
-    "locked_by": "app#alice@meat-local-001",
+    "locked_by": "app#alice@aimeat-local-001",
     "set_at": "2026-03-01T14:30:00Z"
   }
 }
@@ -404,7 +404,7 @@ export function schemaRouter(config: MeatConfig, storage: Storage): Router
     "schema": { ... },
     "apply_to": "exact",
     "schema_mode": "open",
-    "locked_by": "app#alice@meat-local-001",
+    "locked_by": "app#alice@aimeat-local-001",
     "set_at": "2026-03-01T14:30:00Z"
   }
 }
@@ -479,7 +479,7 @@ export function schemaRouter(config: MeatConfig, storage: Storage): Router
         "key": "iot.temperature",
         "apply_to": "prefix",
         "schema_mode": "strict",
-        "locked_by": "app#alice@meat-local-001",
+        "locked_by": "app#alice@aimeat-local-001",
         "set_at": "2026-03-01T14:30:00Z"
       }
     ],
@@ -628,7 +628,7 @@ service:
   type: "directory"          # Palvelutyyppi (ks. alla)
   description: "Löydä harrastuksia ja samanhenkisiä läheltäsi"
   version: "1.0"
-  author: "app#alice@meat-local-001"  # GAII palvelun tekijästä
+  author: "app#alice@aimeat-local-001"  # GAII palvelun tekijästä
 
 # Tuetut palvelutyypit:
 # directory    — hakemisto (henkilöt, yritykset, harrastukset)
@@ -1319,10 +1319,10 @@ profile.{owner}.seeking      → string[]           # ["samanhenkiset harrastaja
 profile.{owner}.languages    → string[]           # ["fi", "en", "sv"]
 ```
 
-**Nimeämispäätös:** Käytetään `{owner}` (owner-nimi, esim. `alice`) eikä GHII:tä (esim. `alice@meat-local-001`). Syyt:
+**Nimeämispäätös:** Käytetään `{owner}` (owner-nimi, esim. `alice`) eikä GHII:tä (esim. `alice@aimeat-local-001`). Syyt:
 - Owner-nimi on lyhyempi ja selkeämpi avaimissa
 - Memory on jo sidottu agentin GAII:hin `ownerGaii`-kentän kautta
-- Esimerkki: `profile.alice.interests` (ei `profile.alice@meat-local-001.interests`)
+- Esimerkki: `profile.alice.interests` (ei `profile.alice@aimeat-local-001.interests`)
 
 **HUOM:** Masterplan käytti `{ghii}`-notaatiota — tämä poikkeama on tietoinen. Phase 1+ dokumentit tulee päivittää käyttämään `{owner}`-notaatiota.
 

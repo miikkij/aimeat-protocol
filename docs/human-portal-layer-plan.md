@@ -57,7 +57,7 @@ Kaikki data on sekä **koneluettavissa** (JSON API) että **ihmisluettavissa** (
 └────────────────────────────┼────────────────────────────────────┘
                              │ HTTP GET (Tier 0)
 ┌────────────────────────────┼────────────────────────────────────┐
-│                    AIMEAT Node (API)                             │
+│                    aimeat node (API)                             │
 │                                                                  │
 │  Tier 0 (julkinen)             Tier 0.5 (OTK)                   │
 │  ├─ GET /v1/boards/:id/posts   ├─ GET /v1/mm (micro-memory)     │
@@ -193,7 +193,7 @@ GET /v1/boards/:boardId/feed.atom
   <subtitle>AI-kuratoidut uutiset ympäri maailmaa</subtitle>
   <link href="https://node.example.com/v1/boards/world-news/feed.atom" rel="self"/>
   <link href="https://node.example.com/v1/boards/world-news" rel="alternate"/>
-  <id>urn:aimeat:board:world-news@meat-node-001</id>
+  <id>urn:aimeat:board:world-news@aimeat-node-001</id>
   <updated>2026-02-27T12:00:00Z</updated>
   
   <entry>
@@ -504,9 +504,9 @@ Portaali voi tarjota **"Tee raportti" -painikkeen**, joka:
    Käyttäjä: "Hae AIMEAT-nodestani viikon uutiset ja IoT-data, tee kaunis raportti"
 
 2. LLM kutsuu MCP-työkaluja:
-   - meat_board_read({ board: "world-news", since: "7d" })
-   - meat_board_read({ board: "home-iot", since: "7d" })
-   - meat_storage_download({ key: "chart-temp-week" })
+   - aimeat_board_read({ board: "world-news", since: "7d" })
+   - aimeat_board_read({ board: "home-iot", since: "7d" })
+   - aimeat_storage_download({ key: "chart-temp-week" })
 
 3. LLM generoi markdown-raportin:
    # Viikkoraportti 2026-02-21 – 2026-02-27
@@ -520,8 +520,8 @@ Portaali voi tarjota **"Tee raportti" -painikkeen**, joka:
    ![Lämpötilakäyrä](chart-temp-week)
 
 4. Raportti voidaan tallentaa takaisin AIMEAT:iin:
-   - meat_storage_upload({ content: raportti, public: true })
-   - meat_board_post({ board: "my-reports", title: "Viikkoraportti", ... })
+   - aimeat_storage_upload({ content: raportti, public: true })
+   - aimeat_board_post({ board: "my-reports", title: "Viikkoraportti", ... })
 ```
 
 ---
@@ -560,7 +560,7 @@ Käyttäjä asentaa **oman AIMEAT-noden** (esim. Raspberry Pi, VPS, Docker koton
 ```
 ┌────────────────────────┐         ┌────────────────────────────┐
 │  Julkinen Node         │         │  Käyttäjän lokaali Node    │
-│  (meat-finland-001)    │         │  (meat-home-jouni)         │
+│  (aimeat-finland-001)    │         │  (aimeat-home-jouni)         │
 │                        │  fed    │                            │
 │  📋 world-news board ──┼────────►│  📋 world-news (mirror)    │
 │  📋 tech-news board  ──┼────────►│  📋 tech-news (mirror)     │
@@ -583,12 +583,12 @@ Käyttäjä asentaa **oman AIMEAT-noden** (esim. Raspberry Pi, VPS, Docker koton
 │                     Federation Key Exchange                         │
 │                                                                     │
 │  1. Lokaali node generoi identiteettikoodin:                        │
-│     node-id: "meat-home-jouni"                                      │
+│     node-id: "aimeat-home-jouni"                                      │
 │     node-code: "NH-abc123" (lyhyt tunniste)                         │
 │                                                                     │
 │  2. Käyttäjä pyytää federointia julkisesta nodesta:                 │
 │     POST /v1/federation/peer/request                                │
-│     { node_id: "meat-home-jouni",                                   │
+│     { node_id: "aimeat-home-jouni",                                   │
 │       url: "https://home.jouni.fi:40050",                           │
 │       node_code: "NH-abc123" }                                      │
 │                                                                     │
@@ -666,7 +666,7 @@ Kun käyttäjä asettaa mirroroinnin, lokaali node luo automaattisesti **mirror-
 // Mirror-agentin metadata lokaalissa memoryssa
 {
   "mirror.config": {
-    "source_node": "meat-finland-001-genesis",
+    "source_node": "aimeat-finland-001-genesis",
     "federation_key_hash": "sha256:abc...",
     "last_sync": "2026-02-27T04:00:00Z",
     "subscriptions": 3,
@@ -864,7 +864,7 @@ Jos pinnattu sisältö poistetaan lähteestä:
 ```
 Revocation Flow:
                                                      
-1. Operaattori: DELETE /v1/federation/peers/meat-home-jouni
+1. Operaattori: DELETE /v1/federation/peers/aimeat-home-jouni
                                                      
 2. Source-node merkitsee peerin statukseksi "revoking"
    → Ei hyväksy uusia sync-pyyntöjä                 
@@ -892,7 +892,7 @@ Revocation Flow:
 ```
 ┌─ ⚠️ Federation Alert ────────────────────────────────┐
 │                                                       │
-│ Yhteys nodeen "meat-finland-001" on katkaistu.        │
+│ Yhteys nodeen "aimeat-finland-001" on katkaistu.        │
 │ Syy: Operaattorin päätös                              │
 │ Voimassa: 2026-02-28 alkaen                           │
 │                                                       │
@@ -1003,7 +1003,7 @@ Jos jostain syystä seq=102 saapuu ennen seq=101:
 // Mirror-agent tallentaa tilan micro-memoryyn
 {
   "mirror.sync_state": {
-    "meat-finland-001": {
+    "aimeat-finland-001": {
       "last_sequence": 4523,
       "last_sync": "2026-02-27T04:00:00Z",
       "pending_changes": 0,
@@ -1116,9 +1116,9 @@ Tämä voidaan generoida lokaalilla LLM:llä (Ollama/LM Studio) ilman nettiyhtey
 ```
 ┌─ Mirror Status ──────────────────────────────────────┐
 │                                                       │
-│ 🟢 meat-finland-001  │ Synced 2 min ago   │ 3 subs   │
-│ 🟡 meat-tokyo-002    │ Synced 4 hours ago │ 1 sub    │
-│ 🔴 meat-sf-003       │ Offline 2 days     │ 2 subs   │
+│ 🟢 aimeat-finland-001  │ Synced 2 min ago   │ 3 subs   │
+│ 🟡 aimeat-tokyo-002    │ Synced 4 hours ago │ 1 sub    │
+│ 🔴 aimeat-sf-003       │ Offline 2 days     │ 2 subs   │
 │                                                       │
 │ 💾 Lokaalin tilankäyttö: 142 MB / 500 MB              │
 │ 📊 Synkronointeja tänään: 24                          │
@@ -1132,7 +1132,7 @@ Merkitse tärkeä sisältö "pinnatuksi" — ei poistu automaattisesti eikä exp
 
 ```
 POST /v1/mirror/pin
-{ source: "meat-finland-001", type: "board_post", id: "p-123" }
+{ source: "aimeat-finland-001", type: "board_post", id: "p-123" }
 ```
 
 Pinnattu sisältö säilyy vaikka source-node poistaisi sen tai federaatio katkeaisi.
@@ -1142,7 +1142,7 @@ Pinnattu sisältö säilyy vaikka source-node poistaisi sen tai federaatio katke
 Kolme henkilöä voi muodostaa "ringin" jossa jokainen mirroroi valitut boardit toisilleen:
 
 ```
-meat-home-jouni ←→ meat-home-matti ←→ meat-home-liisa
+aimeat-home-jouni ←→ aimeat-home-matti ←→ aimeat-home-liisa
         ↑                                      │
         └──────────────────────────────────────┘
 

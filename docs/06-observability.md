@@ -14,7 +14,7 @@ GET /v1/admin/dashboard
   "ok": true,
   "data": {
     "node": {
-      "id": "meat-finland-001-genesis",
+      "id": "aimeat-finland-001-genesis",
       "type": "full",
       "uptime_seconds": 86400,
       "version": "1.0.0"

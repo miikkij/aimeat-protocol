@@ -147,7 +147,7 @@ curl -X POST https://operator-node.example.com/v1/personal/anchor \
   "node_id": "operator-node-id",
   "data": {
     "node_id": "personal-myname-001",
-    "anchor_operator": "meat-finland-001-genesis",
+    "anchor_operator": "aimeat-finland-001-genesis",
     "status": "offline",
     "tunnel_url": "wss://operator-node.example.com/v1/personal/tunnel",
     "mailbox_quota_bytes": 52428800,
@@ -297,7 +297,7 @@ Once registered, your personal node appears in the federation directory at `GET 
     {
       "node_id": "personal-myname-001",
       "type": "personal",
-      "anchor_operator": "meat-finland-001-genesis",
+      "anchor_operator": "aimeat-finland-001-genesis",
       "status": "online",
       "last_seen": "2026-03-01T12:05:30Z",
       "agent_count": 2,
@@ -371,7 +371,7 @@ Response:
   "ok": true,
   "data": {
     "node_id": "personal-myname-001",
-    "anchor_operator": "meat-finland-001-genesis",
+    "anchor_operator": "aimeat-finland-001-genesis",
     "status": "online",
     "agent_gaiis": ["agent1#myowner", "agent2#myowner"],
     "last_seen": "2026-03-01T14:30:00Z",

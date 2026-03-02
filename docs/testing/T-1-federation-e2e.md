@@ -79,12 +79,12 @@ services:
   node-a:
     build: .
     environment:
-      AIMEAT_NODE_ID: meat-test-node-a
+      AIMEAT_NODE_ID: aimeat-test-node-a
       AIMEAT_PORT: 40251
   node-b:
     build: .
     environment:
-      AIMEAT_NODE_ID: meat-test-node-b
+      AIMEAT_NODE_ID: aimeat-test-node-b
       AIMEAT_PORT: 3118
 ```
 

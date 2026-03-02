@@ -10,7 +10,7 @@ ed.etc.sha512Sync = (...m: Uint8Array[]) =>
     new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'meat-local-001-dev';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;

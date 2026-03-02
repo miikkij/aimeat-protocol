@@ -238,7 +238,7 @@ export function createMatchingEngine(
       {
         "id": "match-uuid",
         "matchedProfile": {
-          "ghii": "liisa29@meat-finland-001",
+          "ghii": "liisa29@aimeat-finland-001",
           "displayName": "Liisa",
           "sharedInterests": ["lintubongaus", "luontokuvaus"],
           "distanceKm": 3.2,
@@ -1270,7 +1270,7 @@ Yksittäinen ilmoitus.
     "totalCost": 53,
     "breakdown": { "price": 50, "transactionFee": 3 },
     "status": "pending_delivery",
-    "sellerGhii": "liisa29@meat-finland-001"
+    "sellerGhii": "liisa29@aimeat-finland-001"
   }
 }
 ```

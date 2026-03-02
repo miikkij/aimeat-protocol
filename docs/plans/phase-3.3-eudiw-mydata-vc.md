@@ -100,7 +100,7 @@ pnpm add @sd-jwt/core @sd-jwt/types
 {
   "ok": true,
   "data": {
-    "ghii": "erkki62@meat-finland-001-genesis",
+    "ghii": "erkki62@aimeat-finland-001-genesis",
     "verificationLevel": 3,
     "verificationMethod": "eudiw",
     "verifiedAttributes": ["name", "date_of_birth", "nationality"],
@@ -142,10 +142,10 @@ AIMEAT voi myös **myöntää** Verifiable Credentials GHII-profiileille:
     "https://aimeat.spechops.com/ns/credentials/v1"
   ],
   "type": ["VerifiableCredential", "AIMEATIdentityCredential"],
-  "issuer": "did:web:meat-finland-001-genesis.aimeat.example",
+  "issuer": "did:web:aimeat-finland-001-genesis.aimeat.example",
   "issuanceDate": "2026-03-15T10:00:00Z",
   "credentialSubject": {
-    "id": "did:aimeat:erkki62@meat-finland-001-genesis",
+    "id": "did:aimeat:erkki62@aimeat-finland-001-genesis",
     "type": "AIMEATUser",
     "verificationLevel": 3,
     "memberSince": "2026-03-01",
@@ -169,8 +169,8 @@ MyData consent receipt -malli integroituu Phase 0.3 Consent Layeriin:
   "consentReceiptID": "consent-001",
   "publicKey": "...",
   "language": "fi",
-  "piiPrincipalId": "erkki62@meat-finland-001-genesis",
-  "piiControllers": [{ "piiController": "meat-finland-001-genesis", "onBehalf": false }],
+  "piiPrincipalId": "erkki62@aimeat-finland-001-genesis",
+  "piiControllers": [{ "piiController": "aimeat-finland-001-genesis", "onBehalf": false }],
   "services": [
     {
       "service": "AIMEAT Discovery",

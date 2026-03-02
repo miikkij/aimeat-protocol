@@ -85,7 +85,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
         }
 
-        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(key)}`);
+        emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
         emitResourceListChanged(gaii);
 
         res.status(201).json(success(config.nodeId, {
@@ -276,7 +276,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Clean up chunked upload
         await storage.deleteChunkedUpload(uploadId);
 
-        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(upload.key)}`);
+        emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(upload.key)}`);
         emitResourceListChanged(gaii);
 
         res.status(201).json(success(config.nodeId, {
@@ -400,7 +400,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        emitResourceUpdated(gaii, `meat://storage/${encodeURIComponent(key)}`);
+        emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
         emitResourceListChanged(gaii);
 
         res.json(success(config.nodeId, { deleted: true, key }));

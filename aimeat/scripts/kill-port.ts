@@ -1,12 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * Kill any processes listening on the MEAT server port before starting dev.
+ * Kill any processes listening on the AIMEAT server port before starting dev.
  * Works on Windows (netstat) and Linux/macOS (lsof).
  */
 import { execSync } from 'node:child_process';
 import { platform } from 'node:os';
 
-const port = process.env.MEAT_PORT ?? '40050';
+const port = process.env.AIMEAT_PORT ?? '40050';
 
 function killOnWindows(port: string): void {
     try {

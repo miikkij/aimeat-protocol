@@ -23,10 +23,10 @@ profile.{owner}.seeking      → string[]           # ["samanhenkiset harrastaja
 profile.{owner}.languages    → string[]           # ["fi", "en", "sv"]
 ```
 
-**Nimeämispäätös:** Käytetään `{owner}` (owner-nimi, esim. `alice`) eikä GHII:tä (esim. `alice@meat-local-001`). Syyt:
+**Nimeämispäätös:** Käytetään `{owner}` (owner-nimi, esim. `alice`) eikä GHII:tä (esim. `alice@aimeat-local-001`). Syyt:
 - Owner-nimi on lyhyempi ja selkeämpi avaimissa
 - Memory on jo sidottu agentin GAII:hin `ownerGaii`-kentän kautta
-- Esimerkki: `profile.alice.interests` (ei `profile.alice@meat-local-001.interests`)
+- Esimerkki: `profile.alice.interests` (ei `profile.alice@aimeat-local-001.interests`)
 
 **HUOM:** Masterplan käytti `{ghii}`-notaatiota — tämä poikkeama on tietoinen. Phase 1+ dokumentit tulee päivittää käyttämään `{owner}`-notaatiota.
 

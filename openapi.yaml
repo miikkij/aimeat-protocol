@@ -26,7 +26,7 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://meat-finland-001-genesis.overscalesolutions.com
+  - url: https://aimeat-finland-001-genesis.overscalesolutions.com
     description: Genesis node (Helsinki, Finland)
   - url: http://localhost:40050
     description: Local development
@@ -137,7 +137,7 @@ components:
       enum: [dispute_opened, counter_dispute, message, re_delivery, accept_redelivery, withdraw_dispute, accept_fault, partial_offer, partial_accepted, partial_rejected, escalated, operator_ruled, timeout_resolved]
 
     # === Core Envelope ===
-    MeatEnvelope:
+    AimeatEnvelope:
       type: object
       required: [ok, protocol, version, node, timestamp, request_id]
       properties:
@@ -152,7 +152,7 @@ components:
           example: v1
         node:
           type: string
-          example: meat-finland-001-genesis
+          example: aimeat-finland-001-genesis
         timestamp:
           type: string
           format: date-time
@@ -244,7 +244,7 @@ components:
     GAII:
       type: string
       pattern: '^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]#[a-z0-9][a-z0-9-]{0,38}[a-z0-9]@[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$'
-      example: openclaw001#jouni-miikki@meat-finland-001-genesis
+      example: openclaw001#jouni-miikki@aimeat-finland-001-genesis
 
     OwnerRegistration:
       type: object
@@ -680,7 +680,7 @@ components:
         target_node_url:
           type: string
           format: uri
-          example: https://meat-eu-001-berlin.example.com
+          example: https://aimeat-eu-001-berlin.example.com
         message:
           type: string
           example: Requesting peering for cross-node action discovery
@@ -723,7 +723,7 @@ components:
           const: trust_advisory
         target_node:
           type: string
-          example: meat-bad-actor-node
+          example: aimeat-bad-actor-node
         severity:
           type: string
           enum: [warning, critical, revoked]
@@ -747,7 +747,7 @@ components:
               format: date-time
         issuer_node:
           type: string
-          example: meat-finland-001-genesis
+          example: aimeat-finland-001-genesis
         timestamp:
           type: string
           format: date-time
@@ -805,7 +805,7 @@ components:
       properties:
         node_id:
           type: string
-          example: meat-finland-001-genesis
+          example: aimeat-finland-001-genesis
         timestamp:
           type: string
           format: date-time
@@ -1634,7 +1634,7 @@ components:
         issuer:
           type: string
           description: DID or URL of the issuer
-          example: did:web:meat-finland-001-genesis.overscalesolutions.com
+          example: did:web:aimeat-finland-001-genesis.overscalesolutions.com
         issuanceDate:
           type: string
           format: date-time
@@ -1760,12 +1760,12 @@ components:
         genesisNodeId:
           type: string
           description: Node ID of the genesis peer
-          example: meat-usa-001-genesis
+          example: aimeat-usa-001-genesis
         genesisUrl:
           type: string
           format: uri
           description: Base URL of the genesis peer
-          example: https://meat-usa-001-genesis.example.com
+          example: https://aimeat-usa-001-genesis.example.com
         publicKey:
           type: string
           description: Ed25519 public key (base64url)
@@ -1845,20 +1845,20 @@ components:
 
   # === Reusable Response Wrappers ===
   responses:
-    MeatSuccess:
-      description: Successful MEAT response
+    AimeatSuccess:
+      description: Successful AIMEAT response
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/MeatEnvelope'
+            $ref: '#/components/schemas/AimeatEnvelope'
 
-    MeatError:
-      description: Error response wrapped in MEAT envelope
+    AimeatError:
+      description: Error response wrapped in AIMEAT envelope
       content:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   ok:
@@ -1870,7 +1870,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1885,7 +1885,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1900,7 +1900,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1915,7 +1915,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1945,7 +1945,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1962,7 +1962,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1984,7 +1984,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -1999,7 +1999,7 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: '#/components/schemas/MeatEnvelope'
+              - $ref: '#/components/schemas/AimeatEnvelope'
               - type: object
                 properties:
                   error:
@@ -2056,7 +2056,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2124,7 +2124,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2165,7 +2165,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2207,7 +2207,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2255,7 +2255,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2285,7 +2285,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -2298,7 +2298,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/prompts/{tier}:
     get:
@@ -2315,7 +2315,7 @@ paths:
             enum: ['0', '0.5', '1', '2']
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Micro-Memory (Tier 0.5) ────────────────────────────────
   /v1/mm:
@@ -2324,7 +2324,7 @@ paths:
       summary: Micro-memory operations
       description: >
         GET-based write/read operations using one-time keys. Supports op=add, del, mod, list, config, batch.
-        In anonymous mode (MEAT_ANONYMOUS=true), requests without OTK are accepted but visibility
+        In anonymous mode (AIMEAT_ANONYMOUS=true), requests without OTK are accepted but visibility
         rules are enforced: private sets are hidden, shared_read/shared_write require access_code.
       tags: [Micro-Memory]
       security:
@@ -2363,7 +2363,7 @@ paths:
           description: Access code for shared_read/shared_write sets. Required for anonymous access to shared sets.
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/mm/{gaii}/{set}:
     get:
@@ -2390,7 +2390,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2411,7 +2411,7 @@ paths:
               $ref: '#/components/schemas/OwnerRegistration'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '409':
           description: Owner name already taken
 
@@ -2431,7 +2431,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -2451,7 +2451,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -2478,7 +2478,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2518,7 +2518,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2552,7 +2552,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2570,7 +2570,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Agent Portability ──────────────────────────────────────
   /v1/agents/{gaii}/export:
@@ -2597,7 +2597,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2778,7 +2778,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2836,7 +2836,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2896,7 +2896,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2939,7 +2939,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -2973,7 +2973,7 @@ paths:
           description: Comma-separated tag filter
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/memory/{key}:
     get:
@@ -2997,7 +2997,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3032,7 +3032,7 @@ paths:
                       description: Expected current version (optimistic lock)
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '409':
           description: Version conflict (optimistic lock failure)
 
@@ -3050,7 +3050,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/memory/search:
     get:
@@ -3075,7 +3075,7 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
@@ -3102,7 +3102,7 @@ paths:
                   enum: [private, owner, public]
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '413':
           description: Storage quota exceeded
 
@@ -3114,7 +3114,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/storage/{key}:
     get:
@@ -3171,7 +3171,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Actions ────────────────────────────────────────────────
   /v1/actions:
@@ -3189,7 +3189,7 @@ paths:
               $ref: '#/components/schemas/ActionPublish'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     get:
       operationId: discoverActions
@@ -3210,7 +3210,7 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/actions/{gaii}/{id}:
     get:
@@ -3235,7 +3235,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3262,7 +3262,7 @@ paths:
               $ref: '#/components/schemas/ActionPublish'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     delete:
       operationId: unpublishAction
@@ -3278,7 +3278,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Work Queue ─────────────────────────────────────────────
   /v1/work/request:
@@ -3304,7 +3304,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3334,7 +3334,7 @@ paths:
                     $ref: '#/components/schemas/WorkRequest'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/inbox:
     get:
@@ -3353,7 +3353,7 @@ paths:
         - $ref: '#/components/parameters/Pagination'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}:
     get:
@@ -3371,7 +3371,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3388,7 +3388,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/reject:
     post:
@@ -3410,7 +3410,7 @@ paths:
                   type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/deliver:
     post:
@@ -3429,7 +3429,7 @@ paths:
               $ref: '#/components/schemas/WorkDelivery'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/rate:
     post:
@@ -3448,7 +3448,7 @@ paths:
               $ref: '#/components/schemas/WorkRating'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/owners/{owner}@{node}/trust:
     get:
@@ -3473,7 +3473,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3497,7 +3497,7 @@ paths:
               $ref: '#/components/schemas/DisputeOpen'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     get:
       operationId: viewDispute
@@ -3514,7 +3514,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3537,7 +3537,7 @@ paths:
               $ref: '#/components/schemas/WorkDelivery'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/accept-fault:
     post:
@@ -3551,7 +3551,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/counter-dispute:
     post:
@@ -3574,7 +3574,7 @@ paths:
                   type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/offer-partial:
     post:
@@ -3593,7 +3593,7 @@ paths:
               $ref: '#/components/schemas/PartialOffer'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/accept-redelivery:
     post:
@@ -3606,7 +3606,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/accept-partial:
     post:
@@ -3619,7 +3619,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/reject-partial:
     post:
@@ -3632,7 +3632,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/withdraw-dispute:
     post:
@@ -3645,7 +3645,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/escalate:
     post:
@@ -3658,7 +3658,7 @@ paths:
         - $ref: '#/components/parameters/TrackingCode'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/disputes/{id}/rule:
     post:
@@ -3681,7 +3681,7 @@ paths:
               $ref: '#/components/schemas/OperatorRuling'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/disputes/{id}/audit-log:
     get:
@@ -3704,7 +3704,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3730,7 +3730,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3753,7 +3753,7 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/wallet/history:
     get:
@@ -3771,7 +3771,7 @@ paths:
             default: 50
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/wallet/request:
     post:
@@ -3793,7 +3793,7 @@ paths:
                   type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Notification Boards ────────────────────────────────────
   /v1/boards:
@@ -3811,7 +3811,7 @@ paths:
               $ref: '#/components/schemas/BoardCreate'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     get:
       operationId: listBoards
@@ -3822,7 +3822,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/boards/{id}/posts:
     get:
@@ -3839,7 +3839,7 @@ paths:
         - $ref: '#/components/parameters/Pagination'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     post:
       operationId: postToBoard
@@ -3862,7 +3862,7 @@ paths:
               $ref: '#/components/schemas/BoardPost'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/boards/{id}/posts/{post_id}:
     get:
@@ -3882,7 +3882,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/boards/{id}/posts/{pid}/react:
     post:
@@ -3913,7 +3913,7 @@ paths:
                   example: useful
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/boards/{id}/posts/{pid}/replies:
     post:
@@ -3945,7 +3945,7 @@ paths:
                   type: string
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Catalogue & Discovery ──────────────────────────────────
   /v1/catalogue:
@@ -3964,7 +3964,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -3985,7 +3985,7 @@ paths:
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/catalogue/agents:
     get:
@@ -3996,7 +3996,7 @@ paths:
         - $ref: '#/components/parameters/Pagination'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/catalogue/boards:
     get:
@@ -4005,7 +4005,7 @@ paths:
       tags: [Catalogue]
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/catalogue/hash:
     get:
@@ -4020,7 +4020,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4039,7 +4039,7 @@ paths:
       tags: [Catalogue]
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /.well-known/aimeat:
     get:
@@ -4049,7 +4049,7 @@ paths:
       tags: [Catalogue]
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
@@ -4067,7 +4067,7 @@ paths:
               $ref: '#/components/schemas/PeeringRequest'
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/federation/peer/request/{id}/status:
     get:
@@ -4084,7 +4084,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/federation/test:
     post:
@@ -4105,7 +4105,7 @@ paths:
                   format: uri
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/peering/requests:
     get:
@@ -4116,7 +4116,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/peering/requests/{id}:
     put:
@@ -4139,7 +4139,7 @@ paths:
               $ref: '#/components/schemas/PeeringDecision'
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/federation/peer/activate:
     post:
@@ -4159,7 +4159,7 @@ paths:
                   type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/federation/heartbeat:
     post:
@@ -4180,7 +4180,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4200,7 +4200,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4219,7 +4219,7 @@ paths:
       tags: [Catalogue]
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/federation/peers/{id}:
     put:
@@ -4241,7 +4241,7 @@ paths:
               type: object
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     delete:
       operationId: depeer
@@ -4264,7 +4264,7 @@ paths:
           description: Emergency de-peering (immediate, no grace period)
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Federation Internal (node-to-node) ─────────────────────
   /v1/federation/ping:
@@ -4291,7 +4291,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4345,7 +4345,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4429,7 +4429,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4485,7 +4485,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4543,7 +4543,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4583,7 +4583,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4598,7 +4598,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     put:
       operationId: updateConfig
@@ -4619,7 +4619,7 @@ paths:
               description: Full node configuration (see Appendix B)
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/roles/grant:
     post:
@@ -4643,7 +4643,7 @@ paths:
                   enum: [operator]
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Additional Implemented Endpoints ───────────────────────
 
@@ -4655,7 +4655,7 @@ paths:
       tags: [Bootstrap]
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/auth/otk:
     post:
@@ -4684,7 +4684,7 @@ paths:
                   default: 60
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/otk/{key}:
     get:
@@ -4709,7 +4709,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -4757,7 +4757,7 @@ paths:
                   type: integer
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/storage/upload/{id}/{chunk}:
     put:
@@ -4786,7 +4786,7 @@ paths:
               format: binary
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/storage/upload/{id}/complete:
     post:
@@ -4804,7 +4804,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/storage/upload/{id}:
     delete:
@@ -4821,7 +4821,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── Admin Extensions ───────────────────────────────────────
 
@@ -4834,7 +4834,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/stats:
     get:
@@ -4845,7 +4845,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/backup:
     get:
@@ -4857,7 +4857,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/restore:
     post:
@@ -4874,7 +4874,7 @@ paths:
               type: object
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/hooks:
     get:
@@ -4885,7 +4885,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/admin/hooks/{hookName}:
     put:
@@ -4914,7 +4914,7 @@ paths:
                     type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
     delete:
       operationId: clearHook
@@ -4930,7 +4930,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   # ── MCP (Model Context Protocol) ───────────────────────────
 
@@ -4970,7 +4970,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/mcp/register:
     post:
@@ -4993,7 +4993,7 @@ paths:
                     type: string
       responses:
         '201':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/mcp/authorize:
     get:
@@ -5043,7 +5043,7 @@ paths:
                   type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/mcp/token/revoke:
     post:
@@ -5061,7 +5061,7 @@ paths:
                   type: string
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
 
   /.well-known/oauth-authorization-server:
     get:
@@ -5113,7 +5113,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5135,7 +5135,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5163,7 +5163,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5198,7 +5198,7 @@ paths:
           description: Memory key to unlock
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5222,7 +5222,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5270,7 +5270,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5285,7 +5285,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5299,7 +5299,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5328,7 +5328,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5356,7 +5356,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5380,7 +5380,7 @@ paths:
           description: CSM service name
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5413,7 +5413,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5434,7 +5434,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5471,7 +5471,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5511,7 +5511,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5545,7 +5545,7 @@ paths:
           description: Consent grant ID to revoke
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -5577,7 +5577,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5623,7 +5623,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5636,7 +5636,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5674,7 +5674,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5694,7 +5694,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5724,7 +5724,7 @@ paths:
                   description: Current TOTP code or backup code
       responses:
         '200':
-          $ref: '#/components/responses/MeatSuccess'
+          $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
@@ -5733,7 +5733,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5770,7 +5770,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5788,7 +5788,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5823,7 +5823,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5836,7 +5836,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5852,7 +5852,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5882,7 +5882,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5904,7 +5904,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5918,7 +5918,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -5951,7 +5951,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -5986,7 +5986,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6003,7 +6003,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -6084,7 +6084,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6108,7 +6108,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6141,7 +6141,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6156,7 +6156,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -6198,7 +6198,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6245,7 +6245,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6291,7 +6291,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6438,7 +6438,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6475,7 +6475,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6541,7 +6541,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6618,7 +6618,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6674,7 +6674,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6709,7 +6709,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6771,7 +6771,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6808,7 +6808,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6859,7 +6859,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6881,7 +6881,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -6914,7 +6914,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -6961,7 +6961,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7008,7 +7008,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7073,7 +7073,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7135,7 +7135,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7175,7 +7175,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7233,7 +7233,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7277,7 +7277,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7331,7 +7331,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7410,7 +7410,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7474,7 +7474,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7509,7 +7509,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7570,7 +7570,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7609,7 +7609,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7649,7 +7649,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7666,7 +7666,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -7709,7 +7709,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7764,7 +7764,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7807,7 +7807,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7848,7 +7848,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7906,7 +7906,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7934,7 +7934,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7965,7 +7965,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -7982,7 +7982,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       error:
@@ -8007,7 +8007,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8044,7 +8044,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8083,7 +8083,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8145,7 +8145,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8191,7 +8191,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8253,7 +8253,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8319,7 +8319,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8354,7 +8354,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8400,7 +8400,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8452,12 +8452,12 @@ paths:
                 genesisNodeId:
                   type: string
                   description: Node ID of the target genesis node
-                  example: meat-usa-001-genesis
+                  example: aimeat-usa-001-genesis
                 genesisUrl:
                   type: string
                   format: uri
                   description: Base URL of the target genesis node
-                  example: https://meat-usa-001-genesis.example.com
+                  example: https://aimeat-usa-001-genesis.example.com
                 publicKey:
                   type: string
                   description: Ed25519 public key for federation auth (base64url)
@@ -8468,7 +8468,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8506,7 +8506,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8546,7 +8546,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8584,7 +8584,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8617,7 +8617,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -8675,7 +8675,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/MeatEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:

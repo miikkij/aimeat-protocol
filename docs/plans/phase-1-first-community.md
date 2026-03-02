@@ -453,7 +453,7 @@ Rakentaa web-pohjainen rekisteröitymis- ja hallintaportaali jolla ihminen (Erkk
 {
   "ok": true,
   "data": {
-    "ghii": "erkki62@meat-finland-001-genesis",
+    "ghii": "erkki62@aimeat-finland-001-genesis",
     "verificationLevel": 0,
     "emailVerificationSent": true,
     "nextStep": "verify-email"
@@ -505,7 +505,7 @@ Rakentaa web-pohjainen rekisteröitymis- ja hallintaportaali jolla ihminen (Erkk
 {
   "ok": true,
   "data": {
-    "ghii": "erkki62@meat-finland-001-genesis",
+    "ghii": "erkki62@aimeat-finland-001-genesis",
     "verificationLevel": 1,
     "token": "jwt-token-here"
   },
@@ -684,7 +684,7 @@ Rakentaa hakemistojärjestelmä joka indeksoi käyttäjien kiinnostusprofiileist
     "total": 15,
     "results": [
       {
-        "ghii": "erkki62@meat-finland-001-genesis",
+        "ghii": "erkki62@aimeat-finland-001-genesis",
         "displayName": "Erkki",
         "interests": ["lintubongaus", "puutarhanhoito"],
         "location": { "city": "Espoo", "area": "Tapiola" },
@@ -1255,7 +1255,7 @@ Sisäinen tekninen record, ei jaeta federaatiossa eikä katalogissa.
     "@context": { "schema": "https://schema.org/" },
     "@type": "schema:Message",
     "schema:about": "community-discovery-match",
-    "schema:sender": "match-agent@meat-finland-001"
+    "schema:sender": "match-agent@aimeat-finland-001"
   }
 }
 ```

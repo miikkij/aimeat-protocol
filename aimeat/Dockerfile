@@ -24,7 +24,7 @@ COPY --from=build /app/dist ./dist
 COPY package.json ./
 
 ENV NODE_ENV=production
-ENV MEAT_PORT=40050
+ENV AIMEAT_PORT=40050
 EXPOSE 40050
 
 USER node
