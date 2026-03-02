@@ -641,7 +641,7 @@ function startMailboxCleanupJob(storage: Storage): void {
   logger.info('Mailbox cleanup job scheduled (every 10m)');
 }
 
-/** Set up the anonymous owner + agent for anonymous mode. Normal auth still works alongside. */
+/** Set up the anonymous owner + agent + GHII for anonymous mode. Normal auth still works alongside. */
 async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): Promise<void> {
   const ANON_OWNER = 'anonymous';
   const ANON_AGENT_NAME = 'shared';
@@ -680,6 +680,27 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
         lastSeen: new Date().toISOString(),
       });
       logger.info('Anonymous agent created', { gaii: ANON_GAII });
+    }
+
+    // Create anonymous GHII if doesn't exist — system identity for anonymous chat sessions
+    const ANON_GHII = `${ANON_OWNER}@${config.nodeId}`;
+    const existingGhii = await storage.getGHII(ANON_GHII);
+    if (!existingGhii) {
+      const now = new Date().toISOString();
+      await storage.createGHII({
+        username: ANON_OWNER,
+        nodeId: config.nodeId,
+        ghii: ANON_GHII,
+        displayName: 'Anonymous',
+        verificationLevel: 0,
+        ownerName: ANON_OWNER,
+        totpEnabled: false,
+        trustScore: 50,
+        morselBalance: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      logger.info('Anonymous GHII created', { ghii: ANON_GHII });
     }
 
     // Enable the anonymous auth fallback in middleware
