@@ -340,6 +340,29 @@ export function formatConfig(config: AimeatConfig): string {
         },
       ],
     },
+    {
+      title: 'Cookie Consent',
+      entries: [
+        {
+          envVar: 'AIMEAT_COOKIE_CONSENT_ENABLED',
+          description: 'Enable cookie consent banner for portal pages',
+          value: String(config.cookieConsentEnabled),
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_COOKIE_CONSENT_CATEGORIES',
+          description: 'Consent categories (comma-separated)',
+          value: config.cookieConsentCategories.join(','),
+          defaultVal: 'necessary',
+        },
+        {
+          envVar: 'AIMEAT_COOKIE_CONSENT_POLICY_URL',
+          description: 'Privacy policy URL',
+          value: config.cookieConsentPolicyUrl ?? '(not set)',
+          defaultVal: '(not set)',
+        },
+      ],
+    },
   ];
 
   const lines: string[] = [];
