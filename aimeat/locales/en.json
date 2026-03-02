@@ -688,7 +688,14 @@
     "nextStep3": "Start the node:        aimeat start",
     "nextStepJson": "Start with config:     aimeat start --config {{file}}",
     "done": "Done! Your node is ready.",
-    "joinNow": "Join the federation network now?"
+    "joinNow": "Join the federation network now?",
+    "cookieConsent": "Enable cookie consent banner?",
+    "cookieConsentHint": "GDPR/ePrivacy cookie banner for portal pages (for service builders)",
+    "cookieConsentCategories": "Cookie categories (comma-separated)",
+    "cookieConsentCategoriesHint": "e.g. necessary,analytics,marketing",
+    "cookieConsentPolicyUrl": "Privacy policy URL",
+    "cookieConsentPolicyUrlHint": "Link shown in the cookie banner (recommended for GDPR)",
+    "cookieConsentPolicyUrlInvalid": "Must start with http:// or https://"
   },
   "join": {
     "title": "Join AIMEAT Federation",

@@ -535,8 +535,6 @@ p{margin-bottom:.75rem}
 .platform-card{background:var(--card);border:2px solid transparent;border-radius:var(--radius);padding:1rem;text-align:center;cursor:pointer;transition:all .15s}
 .platform-card:hover{border-color:var(--love1);transform:translateY(-2px);box-shadow:0 4px 20px rgba(255,107,157,.15)}
 .platform-card.selected{border-color:var(--love1);background:var(--card2);box-shadow:0 0 20px rgba(255,107,157,.2)}
-.platform-card .icon{margin-bottom:.4rem;display:flex;justify-content:center;align-items:center;height:56px}
-.platform-card .icon img{max-width:56px;max-height:56px;object-fit:contain;filter:drop-shadow(0 2px 6px rgba(0,0,0,.3))}
 .platform-card .name{font-weight:600;font-size:.9rem}
 .platform-card .vendor{color:var(--muted);font-size:.75rem}
 
@@ -790,7 +788,7 @@ const grid = document.getElementById('platform-grid');
 PLATFORMS.forEach(function(p) {
   const card = document.createElement('div');
   card.className = 'platform-card';
-  card.innerHTML = '<div class="icon"><img src="' + escHtml(p.icon) + '" alt="' + escHtml(p.name) + '"></div><div class="name">' + escHtml(p.name) + '</div><div class="vendor">' + escHtml(p.vendor) + '</div>';
+  card.innerHTML = '<div class="name">' + escHtml(p.name) + '</div><div class="vendor">' + escHtml(p.vendor) + '</div>';
   card.addEventListener('click', function() { selectPlatform(p); });
   grid.appendChild(card);
 });
