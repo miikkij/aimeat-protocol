@@ -688,7 +688,14 @@
     "nextStep3": "Käynnistä solmu:       aimeat start",
     "nextStepJson": "Käynnistä configilla:  aimeat start --config {{file}}",
     "done": "Valmis! Solmusi on käyttövalmis.",
-    "joinNow": "Liitytäänkö federaatioverkkoon nyt?"
+    "joinNow": "Liitytäänkö federaatioverkkoon nyt?",
+    "cookieConsent": "Ota evästebanneri käyttöön?",
+    "cookieConsentHint": "GDPR/ePrivacy-evästebanneri portaalisivuille (palveluntarjoajille)",
+    "cookieConsentCategories": "Evästekategoriat (pilkuilla erotettuna)",
+    "cookieConsentCategoriesHint": "esim. necessary,analytics,marketing",
+    "cookieConsentPolicyUrl": "Tietosuojaselosteen URL",
+    "cookieConsentPolicyUrlHint": "Linkki joka näytetään evästebannerissa (suositeltava GDPR:n vuoksi)",
+    "cookieConsentPolicyUrlInvalid": "Pitää alkaa http:// tai https://"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",

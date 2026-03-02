@@ -90,6 +90,9 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_FEDERATION_ROLE: 'standalone',
   AIMEAT_GENESIS_URL: '',
   AIMEAT_INDEXNOW_KEY: '',
+  AIMEAT_COOKIE_CONSENT_ENABLED: 'false',
+  AIMEAT_COOKIE_CONSENT_CATEGORIES: 'necessary',
+  AIMEAT_COOKIE_CONSENT_POLICY_URL: '',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -520,6 +523,51 @@ async function askCoreSettings(
       t,
     );
     if (indexNow) settings.AIMEAT_INDEXNOW_KEY = indexNow;
+  }
+
+  // Cookie consent banner — ask for public and custom (service builders)
+  if (useCase === 'public' || useCase === 'custom') {
+    const ccDefault = env.AIMEAT_COOKIE_CONSENT_ENABLED === 'true';
+    const ccEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.cookieConsent'),
+        initialValue: ccDefault,
+      }),
+      t,
+    );
+    if (ccEnabled) {
+      settings.AIMEAT_COOKIE_CONSENT_ENABLED = 'true';
+
+      // Categories
+      const catDefault = env.AIMEAT_COOKIE_CONSENT_CATEGORIES || 'necessary,analytics,marketing';
+      const categories = checkCancel(
+        await p.text({
+          message: t('init.cookieConsentCategories'),
+          placeholder: catDefault,
+          defaultValue: catDefault,
+        }),
+        t,
+      );
+      if (categories && categories !== 'necessary') {
+        settings.AIMEAT_COOKIE_CONSENT_CATEGORIES = categories;
+      }
+
+      // Privacy policy URL
+      const policyDefault = env.AIMEAT_COOKIE_CONSENT_POLICY_URL || '';
+      const policyUrl = checkCancel(
+        await p.text({
+          message: t('init.cookieConsentPolicyUrl'),
+          placeholder: policyDefault || 'https://example.com/privacy',
+          ...(policyDefault ? { defaultValue: policyDefault } : {}),
+          validate: val => {
+            if (!val) return undefined; // optional
+            return validateUrl(val, t);
+          },
+        }),
+        t,
+      );
+      if (policyUrl) settings.AIMEAT_COOKIE_CONSENT_POLICY_URL = policyUrl;
+    }
   }
 
   return settings;
