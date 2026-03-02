@@ -23,7 +23,7 @@ export function humanPortalHtml(
   config: AimeatConfig,
   t: TFunction,
   locale: Locale,
-  stats: { agents: number; actions: number; boards: number },
+  stats: { agents: number; chatSessions: number; actions: number; boards: number },
 ): string {
   const otherLocale = locale === 'fi' ? 'en' : 'fi';
   const otherLocaleLabel = locale === 'fi' ? 'EN' : 'FI';

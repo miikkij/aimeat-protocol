@@ -469,6 +469,7 @@
     "subtitle": "Connect any AI to this node \u2014 select your platform to get started",
     "stats": {
       "agents": "Agents",
+      "chatSessions": "Chat Sessions",
       "services": "Services",
       "boards": "Boards"
     },

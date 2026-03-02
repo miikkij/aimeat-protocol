@@ -469,6 +469,7 @@
     "subtitle": "Yhdistä mikä tahansa AI tähän solmuun \u2014 valitse alustasi aloittaaksesi",
     "stats": {
       "agents": "Agentit",
+      "chatSessions": "Keskustelusessiot",
       "services": "Palvelut",
       "boards": "Taulut"
     },

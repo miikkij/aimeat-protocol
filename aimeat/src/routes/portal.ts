@@ -111,7 +111,7 @@ const PLATFORMS: AIPlatform[] = [
    Prompt Package Templates
    ────────────────────────────────────────────────────────── */
 
-function buildPromptPackage(config: AimeatConfig, nodeStats: { agents: number; actions: number; boards: number }): string {
+function buildPromptPackage(config: AimeatConfig, nodeStats: { agents: number; chatSessions: number; actions: number; boards: number }): string {
   return `# AIMEAT Application Builder
 
 You are helping a human build a web application that connects to an AIMEAT (AI Memory Exchange and Action Transfer) node. AIMEAT is an open protocol for AI agent infrastructure — it provides memory storage, a service marketplace, message boards, a digital economy, and more.
@@ -130,6 +130,7 @@ You are helping a human build a web application that connects to an AIMEAT (AI M
 - **Available Actions:** ${nodeStats.actions} services in catalogue
 - **Active Boards:** ${nodeStats.boards} discussion boards
 - **Registered Agents:** ${nodeStats.agents}
+- **Chat Sessions:** ${nodeStats.chatSessions}
 
 ---
 
@@ -450,7 +451,7 @@ function buildDevPortalTranslations(locale: Locale): Record<string, string> {
    Portal HTML — Self-contained single page
    ────────────────────────────────────────────────────────── */
 
-function portalHtml(config: AimeatConfig, nodeStats: { agents: number; actions: number; boards: number }, locale: Locale): string {
+function portalHtml(config: AimeatConfig, nodeStats: { agents: number; chatSessions: number; actions: number; boards: number }, locale: Locale): string {
   const platformsJson = JSON.stringify(PLATFORMS);
   const devPortalTranslations = buildDevPortalTranslations(locale);
   return `<!DOCTYPE html>
@@ -673,6 +674,7 @@ p{margin-bottom:.75rem}
 
   <div class="stats">
     <div class="stat"><div class="num">${nodeStats.agents}</div><div class="label">${devPortalTranslations['dev.stats.agents']}</div></div>
+    <div class="stat"><div class="num">${nodeStats.chatSessions}</div><div class="label">${devPortalTranslations['dev.stats.chatSessions']}</div></div>
     <div class="stat"><div class="num">${nodeStats.actions}</div><div class="label">${devPortalTranslations['dev.stats.services']}</div></div>
     <div class="stat"><div class="num">${nodeStats.boards}</div><div class="label">${devPortalTranslations['dev.stats.boards']}</div></div>
   </div>
@@ -1397,12 +1399,13 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
     const t = createT(locale);
 
-    const [agents, actions, boards] = await Promise.all([
+    const [agents, chatSessions, actions, boards] = await Promise.all([
       storage.listAgents(),
+      storage.listChatInstances(),
       storage.listActions(),
       storage.listBoards(),
     ]);
-    const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
+    const stats = { agents: agents.length, chatSessions: chatSessions.length, actions: actions.length, boards: boards.length };
 
     if (viewParam === 'dev') {
       // Existing developer portal
@@ -1440,12 +1443,13 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const [agents, actions, boards] = await Promise.all([
+    const [agents, chatSessions, actions, boards] = await Promise.all([
       storage.listAgents(),
+      storage.listChatInstances(),
       storage.listActions(),
       storage.listBoards(),
     ]);
-    const stats = { agents: agents.length, actions: actions.length, boards: boards.length };
+    const stats = { agents: agents.length, chatSessions: chatSessions.length, actions: actions.length, boards: boards.length };
 
     const path = variant?.path ?? 'prompt-package';
     let prompt: string;
