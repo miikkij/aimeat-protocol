@@ -1001,6 +1001,139 @@ await test('Initial OTK — admin setup endpoint', async () => {
     assert(typeof body.grace_ms === 'number', 'has grace_ms');
 });
 
+// ─── Phase 8: Chat Instance CRUD ───
+console.log('Phase 8 — Chat Instance CRUD');
+
+// Chat instances require a GHII profile. The test owner (created via POST /v1/owners)
+// does not have one, so we create a dedicated GHII user for chat instance tests.
+const chatOwnerName = `chatowner${Date.now()}`;
+let chatOwnerToken = '';
+let chatOwnerPrivKey = '';
+let chatInstanceId = '';
+
+await test('Setup — create GHII user for chat instances', async () => {
+    const { status, body } = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: chatOwnerName,
+            display_name: 'Chat Test User',
+            password: 'testpass1234',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.ghii?.ghii === `${chatOwnerName}@${NODE_ID}`, 'ghii matches');
+    chatOwnerPrivKey = body.data.private_key;
+    assert(typeof chatOwnerPrivKey === 'string' && chatOwnerPrivKey.length > 0, 'got private key');
+
+    // Authenticate to get a JWT token
+    const timestamp = new Date().toISOString();
+    const message = chatOwnerName + NODE_ID + timestamp;
+    const signature = await signMsg(chatOwnerPrivKey, message);
+
+    const { body: tokenBody } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: chatOwnerName, timestamp, signature }),
+    });
+    assert(tokenBody.ok === true, `token ok: ${JSON.stringify(tokenBody.error)}`);
+    chatOwnerToken = tokenBody.data?.token;
+    assert(typeof chatOwnerToken === 'string', 'got chat owner token');
+});
+
+await test('POST /v1/chat-instances — create chat instance', async () => {
+    const { status, body } = await json('/v1/chat-instances', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+        body: JSON.stringify({ platform: 'claude', app_name: 'e2e-test-app' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.chat_instance?.platform === 'claude', 'platform matches');
+    assert(body.data?.chat_instance?.app_name === 'e2e-test-app', 'app_name matches');
+    assert(body.data?.chat_instance?.ghii === `${chatOwnerName}@${NODE_ID}`, 'ghii matches');
+    chatInstanceId = body.data.chat_instance.id;
+    assert(typeof chatInstanceId === 'string' && chatInstanceId.length > 0, 'got chat instance id');
+});
+
+await test('GET /v1/chat-instances — list chat instances', async () => {
+    const { body } = await json('/v1/chat-instances', {
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+    assert(Array.isArray(body.data?.chat_instances), 'has chat_instances array');
+    assert(body.data.chat_instances.length > 0, 'has at least one instance');
+    assert(typeof body.data.total === 'number', 'has total');
+
+    // Test platform filter
+    const { body: filteredBody } = await json('/v1/chat-instances?platform=claude', {
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(filteredBody.ok === true, 'filtered ok');
+    assert(filteredBody.data.chat_instances.every((ci: any) => ci.platform === 'claude'), 'all instances are claude');
+
+    // Non-matching filter returns empty
+    const { body: emptyBody } = await json('/v1/chat-instances?platform=nonexistent', {
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(emptyBody.ok === true, 'empty filter ok');
+    assert(emptyBody.data.chat_instances.length === 0, 'no instances for nonexistent platform');
+});
+
+await test('GET /v1/chat-instances/:id — get chat instance details', async () => {
+    const { body } = await json(`/v1/chat-instances/${encodeURIComponent(chatInstanceId)}`, {
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+    assert(body.data?.chat_instance?.id === chatInstanceId, 'id matches');
+    assert(body.data?.chat_instance?.platform === 'claude', 'platform matches');
+    assert(body.data?.chat_instance?.app_name === 'e2e-test-app', 'app_name matches');
+    // Economy data should be present since GHII exists
+    assert(body.data?.economy !== null, 'has economy data');
+    assert(typeof body.data?.economy?.trust_score === 'number', 'has trust_score');
+});
+
+await test('PUT /v1/chat-instances/:id — update lastSeen', async () => {
+    // Get original lastSeen
+    const { body: beforeBody } = await json(`/v1/chat-instances/${encodeURIComponent(chatInstanceId)}`, {
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    const originalLastSeen = beforeBody.data?.chat_instance?.last_seen;
+
+    // Small delay to ensure timestamp differs
+    await new Promise(r => setTimeout(r, 50));
+
+    const { body } = await json(`/v1/chat-instances/${encodeURIComponent(chatInstanceId)}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+    assert(body.data?.chat_instance?.id === chatInstanceId, 'id matches');
+    assert(typeof body.data?.chat_instance?.last_seen === 'string', 'has last_seen');
+    assert(body.data.chat_instance.last_seen !== originalLastSeen, 'lastSeen was updated');
+});
+
+await test('DELETE /v1/chat-instances/:id — end chat session', async () => {
+    const { body } = await json(`/v1/chat-instances/${encodeURIComponent(chatInstanceId)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+    assert(body.data?.deleted === true, 'deleted');
+    assert(body.data?.id === chatInstanceId, 'id matches');
+
+    // Verify it's gone
+    const { status } = await json(`/v1/chat-instances/${encodeURIComponent(chatInstanceId)}`, {
+        headers: { Authorization: `Bearer ${chatOwnerToken}` },
+    });
+    assert(status === 404, `expected 404 after delete, got ${status}`);
+});
+
+// Clean up: delete the GHII test owner
+await json(`/v1/owners/${chatOwnerName}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${chatOwnerToken}` },
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 
