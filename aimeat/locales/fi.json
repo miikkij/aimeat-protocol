@@ -736,5 +736,28 @@
     "resumeYes": "Kyllä, tarkista tila",
     "resumeNo": "Ei, aloita alusta",
     "alreadyPeer": "Tämä solmu on jo kohteen vertainen"
+  },
+  "cookieConsent": {
+    "title": "Evästeasetukset",
+    "description": "Tämä sivusto käyttää evästeitä käyttökokemuksen parantamiseksi. Voit valita, mitkä kategoriat sallit.",
+    "acceptAll": "Hyväksy kaikki",
+    "rejectAll": "Hylkää kaikki",
+    "settings": "Asetukset",
+    "save": "Tallenna asetukset",
+    "categories": {
+      "necessary": {
+        "title": "Välttämättömät",
+        "description": "Sivuston toiminnan kannalta välttämättömät evästeet. Näitä ei voi poistaa käytöstä."
+      },
+      "analytics": {
+        "title": "Analytiikka",
+        "description": "Evästeet, jotka auttavat meitä ymmärtämään, miten käytät sivustoa."
+      },
+      "marketing": {
+        "title": "Markkinointi",
+        "description": "Evästeet, joita käytetään olennaisten mainosten näyttämiseen."
+      }
+    },
+    "policyLink": "Tietosuojaseloste"
   }
 }

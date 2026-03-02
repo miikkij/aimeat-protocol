@@ -736,5 +736,28 @@
     "resumeYes": "Yes, check status",
     "resumeNo": "No, start fresh",
     "alreadyPeer": "This node is already a peer of the target"
+  },
+  "cookieConsent": {
+    "title": "Cookie Settings",
+    "description": "This site uses cookies to improve your experience. You can choose which categories to allow.",
+    "acceptAll": "Accept all",
+    "rejectAll": "Reject all",
+    "settings": "Settings",
+    "save": "Save settings",
+    "categories": {
+      "necessary": {
+        "title": "Necessary",
+        "description": "Essential cookies required for the site to function. Cannot be disabled."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Cookies that help us understand how you use the site so we can improve it."
+      },
+      "marketing": {
+        "title": "Marketing",
+        "description": "Cookies used to deliver relevant ads and track campaign effectiveness."
+      }
+    },
+    "policyLink": "Privacy Policy"
   }
 }
