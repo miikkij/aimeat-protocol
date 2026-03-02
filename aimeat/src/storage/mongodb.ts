@@ -26,6 +26,7 @@ import type {
     PeeringRequestRecord,
     ChunkedUploadRecord,
     GHIIRecord,
+    ChatInstanceRecord,
     PersonalNodeRecord,
     MailboxItemRecord,
     SchemaRecord,
@@ -1085,6 +1086,38 @@ export class MongoStorage implements Storage {
 
     async deleteGHII(ghii: string): Promise<boolean> {
         return this.ghiis.delete(ghii);
+    }
+
+    // ── Chat Instances (in-memory fallback until Prisma schema is updated) ──
+
+    private chatInstances = new Map<string, ChatInstanceRecord>();
+
+    async createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord> {
+        this.chatInstances.set(record.id, record);
+        return record;
+    }
+
+    async getChatInstance(id: string): Promise<ChatInstanceRecord | null> {
+        return this.chatInstances.get(id) ?? null;
+    }
+
+    async listChatInstances(opts?: { ownerName?: string; platform?: string; ghii?: string }): Promise<ChatInstanceRecord[]> {
+        let results = [...this.chatInstances.values()];
+        if (opts?.ownerName) results = results.filter(r => r.ownerName === opts.ownerName);
+        if (opts?.platform) results = results.filter(r => r.platform === opts.platform);
+        if (opts?.ghii) results = results.filter(r => r.ghii === opts.ghii);
+        return results;
+    }
+
+    async updateChatInstance(id: string, updates: Partial<ChatInstanceRecord>): Promise<ChatInstanceRecord | null> {
+        const record = this.chatInstances.get(id);
+        if (!record) return null;
+        Object.assign(record, updates);
+        return record;
+    }
+
+    async deleteChatInstance(id: string): Promise<boolean> {
+        return this.chatInstances.delete(id);
     }
 
     // ── Personal Nodes ──
