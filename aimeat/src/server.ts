@@ -57,6 +57,7 @@ import { createVcIssuerService } from './services/vc-issuer.js';
 import { createMyDataReceiptService } from './services/mydata-receipt.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
+import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
@@ -95,6 +96,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   if (existsSync(pwaStaticDir)) {
     app.use(express.static(pwaStaticDir, { maxAge: '1d' }));
   }
+
+  // Cookie consent banner injection (opt-in for service builders)
+  app.use(cookieConsentMiddleware(config));
 
   // CORS for Tier 0 endpoints
   app.use((_req, res, next) => {
