@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { createT, detectLocale, toLocale, resolveLocale, resolveFlat, LOCALES, type Locale, type TFunction } from '../i18n.js';
 import { humanPortalHtml } from './portal-human.js';
+import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 
 /* ──────────────────────────────────────────────────────────
    Platform Registry — known AI platforms and their capabilities
@@ -1314,6 +1315,15 @@ function sanitize(s: string): string {
 
 export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // Cookie consent standalone JS snippet — for manual integration by service builders
+  router.get('/v1/portal/cookie-consent.js', (_req, res) => {
+    if (!config.cookieConsentEnabled) {
+      res.status(404).type('text/plain').send('Cookie consent is not enabled on this node.');
+      return;
+    }
+    res.type('application/javascript').send(buildStandaloneSnippetJs(config));
+  });
 
   // GET /v1/portal — serve the onboarding portal HTML page
   // Default: human-facing portal. ?view=dev shows the developer portal.
