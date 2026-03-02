@@ -217,6 +217,7 @@ export function adminRouter(
         const agents = await storage.listAgents();
         const actions = await storage.listActions();
         const boards = await storage.listBoards();
+        const chatInstances = await storage.listChatInstances({});
         const allWork = await storage.listAllWork();
         const allDisputes = await storage.listAllDisputes();
 
@@ -354,6 +355,7 @@ export function adminRouter(
                 active_agents_24h: activeAgents,
                 actions: actions.length,
                 boards: boards.length,
+                chat_instances: chatInstances.length,
             },
             economy: {
                 total_morsels_in_circulation: totalMorsels,
@@ -912,6 +914,7 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">${t('dashboard.agents')}</span><span class="count" id="cntAgents">0</span></button>
   <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">${t('dashboard.actions')}</span><span class="count" id="cntActions">0</span></button>
   <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">${t('dashboard.boards')}</span><span class="count" id="cntBoards">0</span></button>
+  <button class="nav-item" onclick="nav('chatInstances')"><span class="icon">&#x1F4AC;</span><span class="label">${t('dashboard.chatInstances')}</span><span class="count" id="cntChatInstances">0</span></button>
   <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.work')}</span><span class="count" id="cntWork">0</span></button>
   <div class="nav-sep"></div>
   <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
@@ -1001,6 +1004,7 @@ var __t=${JSON.stringify({
         failedToLoad: t('dashboard.failedToLoad'),
         registeredOwners: t('dashboard.registeredOwners'), registeredAgents: t('dashboard.registeredAgents'),
         publishedActions: t('dashboard.publishedActions'), activeBoards: t('dashboard.activeBoards'),
+        chatInstances: t('dashboard.chatInstances'), activeChatSessions: t('dashboard.activeChatSessions'), noChatInstances: t('dashboard.noChatInstances'),
     })};
 
 async function api(path,opts){
@@ -1063,9 +1067,9 @@ function nav(page){
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
   var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','work','','economy','federation','hooks','maintenance','config'];
+  var pages=['overview','owners','agents','actions','boards','chatInstances','work','','economy','federation','hooks','maintenance','config'];
   for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config};
+  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config};
   document.getElementById('pageTitle').innerHTML=titles[page]||page;
   render();
 }
@@ -1088,18 +1092,21 @@ async function loadAll(){
       document.getElementById('cntAgents').textContent=D.dash.counts.agents;
       document.getElementById('cntActions').textContent=D.dash.counts.actions;
       document.getElementById('cntBoards').textContent=D.dash.counts.boards;
+      document.getElementById('cntChatInstances').textContent=D.dash.counts.chat_instances||0;
     }
     // Load maintenance, work, owners, federation, hooks in parallel
     var extras=await Promise.allSettled([
       api('/v1/admin/maintenance'),
       api('/v1/admin/work'),
       api('/v1/admin/federation'),
-      api('/v1/admin/hooks')
+      api('/v1/admin/hooks'),
+      api('/v1/chat-instances')
     ]);
     D.maintenance=extras[0].status==='fulfilled'?extras[0].value.data:null;
     D.workItems=extras[1].status==='fulfilled'?(extras[1].value.data.work||[]):[];
     D.federation=extras[2].status==='fulfilled'?(extras[2].value.data.peers||[]):[];
-    D.hooks=extras[3].status==='fulfilled'?(extras[3].value.data.extension_hooks||{}):{};;
+    D.hooks=extras[3].status==='fulfilled'?(extras[3].value.data.extension_hooks||{}):{};
+    D.chatInstances=extras[4].status==='fulfilled'?(extras[4].value.data.chat_instances||[]):[];
     // Load owners
     try{
       var ownerNames=D.agents&&D.agents.agents?[...new Set(D.agents.agents.map(function(a){return a.owner}))]:[];
@@ -1129,6 +1136,7 @@ function render(){
     case 'agents':app.innerHTML=renderAgents();break;
     case 'actions':app.innerHTML=renderActions();break;
     case 'boards':app.innerHTML=renderBoards();break;
+    case 'chatInstances':app.innerHTML=renderChatInstances();break;
     case 'work':app.innerHTML=renderWork();break;
     case 'economy':app.innerHTML=renderEconomy();break;
     case 'federation':app.innerHTML=renderFederation();break;
@@ -1160,6 +1168,7 @@ function renderOverview(){
   o+=sc(__t.registeredAgents,c.agents,'('+c.active_agents_24h+' '+__t.active24h+')','var(--purple)');
   o+=sc(__t.publishedActions,c.actions,'','var(--cyan)');
   o+=sc(__t.activeBoards,c.boards,'','var(--green)');
+  o+=sc(__t.activeChatSessions,c.chat_instances||0,'','var(--cyan)');
   o+='</div>';
   o+='<div class="grid grid-2">';
   o+='<div class="card"><h2>'+__t.economyToday+'</h2>';
@@ -1537,6 +1546,27 @@ async function loadBoardPosts(boardId,btn){
     el.innerHTML=o;
     btn.textContent=__t.refresh+' Posts';btn.disabled=false;
   }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent=__t.loadPosts;btn.disabled=false},2000)}
+}
+
+function renderChatInstances(){
+  var list=D.chatInstances||[];
+  if(!list.length)return '<div class="empty">'+__t.noChatInstances+'</div>';
+  var o='<div class="grid grid-4" style="margin-bottom:20px">';
+  o+=sc(__t.activeChatSessions,list.length,'','var(--cyan)');
+  var platforms={};list.forEach(function(c){platforms[c.platform]=(platforms[c.platform]||0)+1});
+  var topPlatform=Object.keys(platforms).sort(function(a,b){return platforms[b]-platforms[a]})[0]||'-';
+  o+=sc('Top Platform',topPlatform,'','var(--purple)');
+  o+='</div>';
+  o+='<div class="card"><table><thead><tr><th>ID</th><th>'+__t.name+'</th><th>Platform</th><th>Owner</th><th>'+__t.lastSeen+'</th></tr></thead><tbody>';
+  list.forEach(function(c){
+    o+='<tr><td class="mono" title="'+esc(c.id)+'">'+esc(c.id.length>40?c.id.substring(0,40)+'...':c.id)+'</td>';
+    o+='<td>'+esc(c.app_name)+'</td>';
+    o+='<td>'+esc(c.platform)+'</td>';
+    o+='<td>'+esc(c.ghii||'')+'</td>';
+    o+='<td>'+dt(c.last_seen)+'</td></tr>';
+  });
+  o+='</tbody></table></div>';
+  return o;
 }
 
 loadAll();
