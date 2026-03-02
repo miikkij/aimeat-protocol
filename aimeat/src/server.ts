@@ -37,6 +37,7 @@ import { humanPortalRouter } from './routes/portal-human.js';
 import { profileRouter } from './routes/profile.js';
 import { csmRouter } from './routes/csm.js';
 import { ghiiRouter } from './routes/ghii.js';
+import { chatInstancesRouter } from './routes/chat-instances.js';
 import { totpRouter } from './routes/totp.js';
 import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
@@ -378,6 +379,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
   app.use(ghiiRouter(config, storage, emailService));
+  app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));
   app.use(aimeatOsRouter(config));
