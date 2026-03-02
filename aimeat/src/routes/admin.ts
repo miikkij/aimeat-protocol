@@ -6,11 +6,22 @@ import { success, error } from '../middleware/envelope.js';
 import { listHooks } from '../services/hooks.js';
 import type { HookName } from '../config.js';
 import { RoleGrantSchema, validateBody } from '../models/schemas.js';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
-import { validateOwnerName } from '../utils/gaii.js';
+import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
+
+// Password hashing with scrypt (shared with GHII)
+async function hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(16);
+    return new Promise((resolve, reject) => {
+        scrypt(password, salt, 64, (err, derivedKey) => {
+            if (err) reject(err);
+            else resolve(salt.toString('hex') + ':' + derivedKey.toString('hex'));
+        });
+    });
+}
 
 export function adminRouter(
     config: AimeatConfig,
@@ -47,7 +58,7 @@ export function adminRouter(
             return;
         }
 
-        const { name, display_name } = req.body ?? {};
+        const { name, display_name, password } = req.body ?? {};
         if (!name || typeof name !== 'string') {
             res.status(400).json({ ok: false, error: 'name is required' });
             return;
@@ -79,7 +90,30 @@ export function adminRouter(
             createdAt: new Date().toISOString(),
         });
 
-        res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey });
+        // Create GHII profile if password provided (human-friendly login)
+        let hasPassword = false;
+        if (password && typeof password === 'string' && password.length >= 4) {
+            const passwordHash = await hashPassword(password);
+            const ghii = `${name}@${config.nodeId}`;
+            const now = new Date().toISOString();
+            try {
+                await storage.createGHII({
+                    username: name,
+                    nodeId: config.nodeId,
+                    ghii,
+                    displayName: display_name ?? name,
+                    passwordHash,
+                    verificationLevel: 0,
+                    ownerName: name,
+                    totpEnabled: false,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+                hasPassword = true;
+            } catch { /* GHII record may already exist */ }
+        }
+
+        res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey, has_password: hasPassword });
     });
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
@@ -366,9 +400,47 @@ export function adminRouter(
         ]));
     });
 
-    // GET /v1/admin/ui — graphical admin dashboard (operator only, serves HTML)
-    router.get('/v1/admin/ui', requireAuth(), requireRole('operator'), (_req, res) => {
+    // GET /v1/admin/ui — graphical admin dashboard
+    // Serves HTML always; auth is checked client-side via API calls.
+    // If token is invalid/missing, the dashboard shows a login form.
+    router.get('/v1/admin/ui', (_req, res) => {
         res.type('text/html').send(ADMIN_DASHBOARD_HTML);
+    });
+
+    // GET /v1/admin/work — list all work items (operator only)
+    router.get('/v1/admin/work', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const allWork = await storage.listAllWork();
+        res.json(success(config.nodeId, {
+            work: allWork.map(w => ({
+                tracking_code: w.trackingCode,
+                status: w.status,
+                action_id: w.actionId,
+                provider_gaii: w.providerGaii,
+                requester_gaii: w.requesterGaii,
+                cost: w.cost,
+                created_at: w.createdAt,
+                updated_at: w.updatedAt,
+                ttl_expires_at: w.ttlExpiresAt,
+            })),
+            total: allWork.length,
+        }));
+    });
+
+    // GET /v1/admin/federation — federation info (operator only)
+    router.get('/v1/admin/federation', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const peers = await storage.listPeeringRequests();
+        res.json(success(config.nodeId, {
+            peers: peers.map(p => ({
+                id: p.id,
+                from_node_url: p.fromNodeUrl,
+                from_node_id: p.fromNodeId,
+                target_url: p.targetUrl,
+                status: p.status,
+                message: p.message,
+                created_at: p.createdAt,
+            })),
+            total: peers.length,
+        }));
     });
 
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
@@ -827,7 +899,7 @@ tr:hover td{background:#ffffff06}
 <body>
 <div class="layout">
 <nav class="sidebar">
-  <h1>&#x1F969; AIMEAT</h1>
+  <h1>&#x2764;&#xFE0F; AIMEAT</h1>
   <div class="node-id" id="sideNodeId"></div>
   <button class="nav-item active" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">Overview</span></button>
   <button class="nav-item" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">Owners</span><span class="count" id="cntOwners">0</span></button>
@@ -837,6 +909,8 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">Work</span><span class="count" id="cntWork">0</span></button>
   <div class="nav-sep"></div>
   <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">Economy</span></button>
+  <button class="nav-item" onclick="nav('federation')"><span class="icon">&#x1F310;</span><span class="label">Federation</span><span class="count" id="cntPeers">0</span></button>
+  <button class="nav-item" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">Hooks</span></button>
   <button class="nav-item" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">Maintenance</span></button>
   <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">Config</span></button>
 </nav>
@@ -845,31 +919,91 @@ tr:hover td{background:#ffffff06}
     <div id="pageTitle" class="page-title"><span class="icon">&#x1F4CA;</span> Overview</div>
     <div class="topbar-right">
       <button class="refresh" id="btnRefresh" onclick="loadAll()">Refresh</button>
+      <button class="refresh" style="background:var(--border);color:var(--muted)" onclick="localStorage.removeItem('aimeat_token');TOKEN='';showLoginForm()">Logout</button>
       <span id="lastUpdate"></span>
     </div>
   </div>
   <div id="app"><div class="loading">Loading&#8230;</div></div>
+  <!-- Login form (shown when no valid token) -->
+  <div id="loginForm" class="hidden" style="max-width:420px;margin:60px auto">
+    <div class="card" style="border-radius:10px;text-align:center">
+      <h2 style="font-size:1.2rem;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:4px">&#x2764;&#xFE0F; AIMEAT Dashboard</h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px">Login to access the admin dashboard</p>
+      <div id="dashLoginPw">
+        <input type="text" id="dashUser" placeholder="Username" autocomplete="username" style="margin-bottom:8px"/>
+        <input type="password" id="dashPass" placeholder="Password" autocomplete="current-password" style="margin-bottom:4px"/>
+        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" id="btnDashLogin" onclick="dashLogin()">Login</button>
+        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginPw').classList.add('hidden');document.getElementById('dashLoginKey').classList.remove('hidden')" style="color:var(--cyan)">Advanced: Login with private key</a></p>
+      </div>
+      <div id="dashLoginKey" class="hidden">
+        <input type="text" id="dashKeyOwner" placeholder="Owner name" autocomplete="off" style="margin-bottom:8px"/>
+        <textarea id="dashKeyPk" placeholder="Private key" rows="3" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;resize:vertical;font-family:monospace;margin-bottom:4px"></textarea>
+        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" onclick="dashKeyLogin()">Login with Key</button>
+        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginKey').classList.add('hidden');document.getElementById('dashLoginPw').classList.remove('hidden')" style="color:var(--cyan)">Back to password login</a></p>
+      </div>
+      <div id="dashLoginErr" class="hidden" style="margin-top:10px;padding:8px;border-radius:6px;background:#dc262618;border:1px solid #dc262655;color:var(--red);font-size:.85rem"></div>
+    </div>
+  </div>
 </div>
 </div>
 <script>
-const TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('aimeat_token')||'';
+let TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('aimeat_token')||'';
 if(TOKEN)localStorage.setItem('aimeat_token',TOKEN);
 
 let D={};// cached data
 let currentPage='overview';
 
-async function api(path){
-  const h={};
+async function api(path,opts){
+  const h=opts&&opts.headers?Object.assign({},opts.headers):{};
   if(TOKEN)h['Authorization']='Bearer '+TOKEN;
-  const r=await fetch(path,{headers:h});
+  if(opts&&opts.body)h['Content-Type']='application/json';
+  const r=await fetch(path,{method:(opts&&opts.method)||'GET',headers:h,body:opts&&opts.body?JSON.stringify(opts.body):undefined});
+  if(r.status===401){showLoginForm();throw new Error('Unauthorized');}
   if(!r.ok)throw new Error(r.status+' '+r.statusText);
   return r.json();
 }
 
+function showLoginForm(){
+  document.querySelector('.layout').style.display='none';
+  document.getElementById('loginForm').classList.remove('hidden');
+}
+function hideLoginForm(){
+  document.querySelector('.layout').style.display='flex';
+  document.getElementById('loginForm').classList.add('hidden');
+}
+
+async function dashLogin(){
+  var user=document.getElementById('dashUser').value.trim();
+  var pass=document.getElementById('dashPass').value;
+  if(!user||!pass){document.getElementById('dashLoginErr').textContent='Username and password required';document.getElementById('dashLoginErr').classList.remove('hidden');return;}
+  document.getElementById('btnDashLogin').disabled=true;document.getElementById('btnDashLogin').textContent='Signing in...';
+  try{
+    var r=await fetch('/v1/ghii/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
+    var j=await r.json();
+    if(!r.ok||!j.data||!j.data.token){document.getElementById('dashLoginErr').textContent=j.error||j.message||'Login failed';document.getElementById('dashLoginErr').classList.remove('hidden');document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent='Login';return;}
+    TOKEN=j.data.token;localStorage.setItem('aimeat_token',TOKEN);
+    hideLoginForm();loadAll();
+  }catch(e){document.getElementById('dashLoginErr').textContent='Network error: '+e.message;document.getElementById('dashLoginErr').classList.remove('hidden');}
+  document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent='Login';
+}
+
+async function dashKeyLogin(){
+  var owner=document.getElementById('dashKeyOwner').value.trim();
+  var pk=document.getElementById('dashKeyPk').value.trim();
+  if(!owner||!pk)return;
+  try{
+    var r=await fetch('/v1/admin/setup/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:owner,private_key:pk})});
+    var j=await r.json();
+    if(!j.ok||!j.token){document.getElementById('dashLoginErr').textContent=j.error||'Login failed';document.getElementById('dashLoginErr').classList.remove('hidden');return;}
+    TOKEN=j.token;localStorage.setItem('aimeat_token',TOKEN);
+    hideLoginForm();loadAll();
+  }catch(e){document.getElementById('dashLoginErr').textContent='Error: '+e.message;document.getElementById('dashLoginErr').classList.remove('hidden');}
+}
+
 function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML}
 function badge(z){return '<span class="badge badge-'+z+'">'+z+'</span>'}
-function num(n){return typeof n==='number'?n.toLocaleString():String(n??'—')}
-function dt(s){return s?new Date(s).toLocaleString():'—'}
+function num(n){return typeof n==='number'?n.toLocaleString():String(n??'\\u2014')}
+function dt(s){return s?new Date(s).toLocaleString():'\\u2014'}
 function sc(l,v,sub,col){return '<div class="card"><h2>'+l+'</h2><div class="stat" style="color:'+col+'">'+num(v)+'</div>'+(sub?'<div class="stat-label">'+sub+'</div>':'')+'</div>'}
 function er(l,v){return '<div class="econ-row"><span class="econ-label">'+l+'</span><span class="econ-val">'+v+'</span></div>'}
 function hRow(l,obj){return '<div class="health-row"><span class="health-metric">'+l+'</span><span>'+badge(obj.zone)+' <span class="health-value">'+obj.value+'</span></span></div>'}
@@ -879,14 +1013,15 @@ function nav(page){
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
   var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','work','','economy','maintenance','config'];
+  var pages=['overview','owners','agents','actions','boards','work','','economy','federation','hooks','maintenance','config'];
   for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'&#x1F4CA; Overview',owners:'&#x1F464; Owners',agents:'&#x1F916; Agents',actions:'&#x26A1; Actions',boards:'&#x1F4CB; Boards',work:'&#x1F4E6; Work Contracts',economy:'&#x1FA99; Economy',maintenance:'&#x1F6A7; Maintenance',config:'&#x2699; Configuration'};
+  var titles={overview:'\\u{1F4CA} Overview',owners:'\\u{1F464} Owners',agents:'\\u{1F916} Agents',actions:'\\u26A1 Actions',boards:'\\u{1F4CB} Boards',work:'\\u{1F4E6} Work Contracts',economy:'\\u{1FA99} Economy',federation:'\\u{1F310} Federation',hooks:'\\u{1F517} Extension Hooks',maintenance:'\\u{1F6A7} Maintenance',config:'\\u2699 Configuration'};
   document.getElementById('pageTitle').innerHTML=titles[page]||page;
   render();
 }
 
 async function loadAll(){
+  if(!TOKEN){showLoginForm();return;}
   var btn=document.getElementById('btnRefresh');
   btn.disabled=true;btn.textContent='Loading...';
   try{
@@ -904,10 +1039,17 @@ async function loadAll(){
       document.getElementById('cntActions').textContent=D.dash.counts.actions;
       document.getElementById('cntBoards').textContent=D.dash.counts.boards;
     }
-    // Load maintenance state
-    try{var mt=await api('/v1/admin/maintenance');D.maintenance=mt.data;}catch(e){D.maintenance=null;}
-    // Try work listing (may fail if no agent auth)
-    try{var w=await api('/v1/admin/backup');D.workItems=extractWork(w.data);}catch(e){D.workItems=[];}
+    // Load maintenance, work, owners, federation, hooks in parallel
+    var extras=await Promise.allSettled([
+      api('/v1/admin/maintenance'),
+      api('/v1/admin/work'),
+      api('/v1/admin/federation'),
+      api('/v1/admin/hooks')
+    ]);
+    D.maintenance=extras[0].status==='fulfilled'?extras[0].value.data:null;
+    D.workItems=extras[1].status==='fulfilled'?(extras[1].value.data.work||[]):[];
+    D.federation=extras[2].status==='fulfilled'?(extras[2].value.data.peers||[]):[];
+    D.hooks=extras[3].status==='fulfilled'?(extras[3].value.data.extension_hooks||{}):{};;
     // Load owners
     try{
       var ownerNames=D.agents&&D.agents.agents?[...new Set(D.agents.agents.map(function(a){return a.owner}))]:[];
@@ -916,26 +1058,21 @@ async function loadAll(){
         try{var o=await api('/v1/owners/'+encodeURIComponent(ownerNames[i]));D.owners.push(o.data);}catch(e){}
       }
     }catch(e){D.owners=[];}
-    if(D.workItems)document.getElementById('cntWork').textContent=D.workItems.length;
+    document.getElementById('cntWork').textContent=D.workItems.length;
+    document.getElementById('cntPeers').textContent=D.federation.length;
     document.getElementById('sideNodeId').textContent=D.dash?D.dash.node_id:'';
     document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString();
     render();
   }catch(e){
+    if(e.message==='Unauthorized')return;
     document.getElementById('app').innerHTML='<div class="error-box"><strong>Failed to load</strong><br/>'+esc(e.message)+'</div>';
   }
   btn.disabled=false;btn.textContent='Refresh';
 }
 
-function extractWork(backup){
-  if(!backup||!backup.agent_data)return[];
-  var items=[];
-  // Work items are in the backup as transactions or via agent_data
-  return items;
-}
-
 function render(){
   var app=document.getElementById('app');
-  if(!D.dash){app.innerHTML='<div class="loading">Loading&#8230;</div>';return;}
+  if(!D.dash){app.innerHTML='<div class="loading">Loading\\u2026</div>';return;}
   switch(currentPage){
     case 'overview':app.innerHTML=renderOverview();break;
     case 'owners':app.innerHTML=renderOwners();break;
@@ -944,6 +1081,8 @@ function render(){
     case 'boards':app.innerHTML=renderBoards();break;
     case 'work':app.innerHTML=renderWork();break;
     case 'economy':app.innerHTML=renderEconomy();break;
+    case 'federation':app.innerHTML=renderFederation();break;
+    case 'hooks':app.innerHTML=renderHooks();break;
     case 'maintenance':app.innerHTML=renderMaintenance();break;
     case 'config':app.innerHTML=renderConfig();break;
     default:app.innerHTML='<div class="empty">Unknown page</div>';
@@ -998,17 +1137,29 @@ function renderOverview(){
 function renderOwners(){
   var owners=D.owners||[];
   if(owners.length===0)return '<div class="empty">No owners found</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>Name</th><th>Display Name</th><th>Agents</th><th>Created</th></tr></thead><tbody>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>Name</th><th>Display Name</th><th>Roles</th><th>Agents</th><th>Created</th><th></th></tr></thead><tbody>';
   for(var i=0;i<owners.length;i++){
     var ow=owners[i];
     var agCount=ow.agents?ow.agents.length:0;
-    var agNames=ow.agents?ow.agents.map(function(a){return esc(a.gaii)}).join(', '):'—';
-    o+='<tr><td><strong>'+esc(ow.name)+'</strong></td><td>'+esc(ow.display_name||'—')+'</td>';
-    o+='<td><span title="'+esc(agNames)+'">'+agCount+'</span></td>';
-    o+='<td style="color:var(--muted)">'+dt(ow.created_at)+'</td></tr>';
+    var roles=ow.roles||[];
+    var roleBadges=roles.map(function(r){return badge(r)}).join(' ');
+    var isOp=roles.indexOf('operator')>=0;
+    o+='<tr><td><strong>'+esc(ow.name)+'</strong></td><td>'+esc(ow.display_name||'\\u2014')+'</td>';
+    o+='<td>'+roleBadges+'</td>';
+    o+='<td>'+agCount+'</td>';
+    o+='<td style="color:var(--muted)">'+dt(ow.created_at)+'</td>';
+    o+='<td>'+(isOp?'':'<button class="expand-btn" onclick="grantOperator(\\''+esc(ow.name)+'\\')">Grant Operator</button>')+'</td></tr>';
   }
   o+='</tbody></table></div></div>';
   return o;
+}
+
+async function grantOperator(name){
+  if(!confirm('Grant operator role to "'+name+'"?'))return;
+  try{
+    await api('/v1/admin/roles/grant',{method:'POST',body:{owner:name,role:'operator'}});
+    loadAll();
+  }catch(e){alert('Failed: '+e.message)}
 }
 
 /* ── AGENTS ── */
@@ -1069,12 +1220,22 @@ function renderBoards(){
 
 /* ── WORK ── */
 function renderWork(){
-  return '<div class="card"><p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Work contracts are agent-scoped. Use the agent details view to see individual work items, or browse via the API.</p>'
-    +'<div style="font-size:.85rem">'
-    +er('API: List by provider','GET /v1/work/inbox')
-    +er('API: Work status','GET /v1/work/:tracking_code')
-    +er('API: Request work','POST /v1/work')
-    +'</div></div>';
+  var items=D.workItems||[];
+  if(items.length===0)return '<div class="empty">No work contracts found</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>Tracking Code</th><th>Status</th><th>Action</th><th>Requester</th><th>Provider</th><th>Cost</th><th>Created</th></tr></thead><tbody>';
+  for(var i=0;i<items.length;i++){
+    var w=items[i];
+    var cost=w.cost?(w.cost.total||w.cost.base_price||0):0;
+    o+='<tr><td class="mono" style="font-size:.75rem">'+esc(w.tracking_code)+'</td>';
+    o+='<td>'+badge(w.status)+'</td>';
+    o+='<td>'+esc(w.action_id||'\\u2014')+'</td>';
+    o+='<td class="mono" style="font-size:.75rem">'+esc(w.requester_gaii)+'</td>';
+    o+='<td class="mono" style="font-size:.75rem">'+esc(w.provider_gaii)+'</td>';
+    o+='<td>'+num(cost)+'</td>';
+    o+='<td style="color:var(--muted)">'+dt(w.created_at)+'</td></tr>';
+  }
+  o+='</tbody></table></div></div>';
+  return o;
 }
 
 /* ── ECONOMY ── */
@@ -1102,7 +1263,26 @@ function renderEconomy(){
   o+=er('Burn Rate',e.burn_rate);
   o+=er('Max Operator Mint/Day',num(e.max_operator_mint_per_day)+' morsels');
   o+='</div>';
+  // Mint form
+  o+='<div class="card" style="margin-top:16px"><h2>Mint Morsels</h2>';
+  o+='<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Issue morsels to an agent (daily cap: '+num(e.max_operator_mint_per_day)+')</p>';
+  o+='<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">';
+  o+='<div style="flex:2;min-width:200px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">Agent GAII</label><input type="text" id="mintGaii" placeholder="agent#owner@node" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
+  o+='<div style="flex:1;min-width:100px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">Amount</label><input type="number" id="mintAmount" placeholder="100" min="1" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
+  o+='<button class="refresh" style="height:38px;white-space:nowrap" onclick="doMint()">Mint</button>';
+  o+='</div><div id="mintResult" style="margin-top:8px;font-size:.85rem"></div></div>';
   return o;
+}
+
+async function doMint(){
+  var gaii=document.getElementById('mintGaii').value.trim();
+  var amount=parseInt(document.getElementById('mintAmount').value);
+  if(!gaii||!amount||amount<1){document.getElementById('mintResult').innerHTML='<span style="color:var(--red)">GAII and positive amount required</span>';return;}
+  try{
+    var r=await api('/v1/admin/mint',{method:'POST',body:{gaii:gaii,amount:amount}});
+    document.getElementById('mintResult').innerHTML='<span style="color:var(--green)">Minted '+num(r.data.minted)+' morsels. New balance: '+num(r.data.new_balance)+'</span>';
+    loadAll();
+  }catch(e){document.getElementById('mintResult').innerHTML='<span style="color:var(--red)">'+esc(e.message)+'</span>';}
 }
 
 /* ── MAINTENANCE ── */
@@ -1131,18 +1311,107 @@ function renderMaintenance(){
   o+='</div>';
   o+='<p style="color:var(--muted);font-size:.75rem;margin-top:12px">When maintenance mode is on, all non-essential endpoints return 503. Operators, health checks, and admin routes remain accessible.</p>';
   o+='</div>';
+  // Backup/Restore
+  o+='<div class="card" style="margin-top:16px"><h2>Backup &amp; Restore</h2>';
+  o+='<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  o+='<button class="refresh" style="flex:1;min-width:140px" onclick="doBackup()">Download Backup</button>';
+  o+='<button class="refresh" style="flex:1;min-width:140px;background:var(--purple)" onclick="document.getElementById(\\'restoreFile\\').click()">Restore from File</button>';
+  o+='<input type="file" id="restoreFile" accept=".json" style="display:none" onchange="doRestore(this)"/>';
+  o+='</div>';
+  o+='<div id="backupResult" style="margin-top:8px;font-size:.85rem"></div>';
+  o+='<p style="color:var(--muted);font-size:.72rem;margin-top:8px">Backup exports all owners, agents, actions, boards, memories and transactions as JSON.</p>';
+  o+='</div>';
   return o;
+}
+
+async function doBackup(){
+  try{
+    var r=await api('/v1/admin/backup');
+    var blob=new Blob([JSON.stringify(r.data,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='aimeat-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    document.getElementById('backupResult').innerHTML='<span style="color:var(--green)">Backup downloaded</span>';
+  }catch(e){document.getElementById('backupResult').innerHTML='<span style="color:var(--red)">'+esc(e.message)+'</span>';}
+}
+
+async function doRestore(input){
+  if(!input.files||!input.files[0])return;
+  if(!confirm('Restore from backup? This will import data into the current node.'))return;
+  var reader=new FileReader();
+  reader.onload=async function(){
+    try{
+      var data=JSON.parse(reader.result);
+      await api('/v1/admin/restore',{method:'POST',body:data});
+      document.getElementById('backupResult').innerHTML='<span style="color:var(--green)">Data restored successfully</span>';
+      loadAll();
+    }catch(e){document.getElementById('backupResult').innerHTML='<span style="color:var(--red)">'+esc(e.message)+'</span>';}
+  };
+  reader.readAsText(input.files[0]);
+  input.value='';
 }
 
 async function toggleMaintenance(on){
   try{
     var msg=document.getElementById('maintMsg')?document.getElementById('maintMsg').value:'';
-    var h={'Content-Type':'application/json'};
-    if(TOKEN)h['Authorization']='Bearer '+TOKEN;
-    var r=await fetch('/v1/admin/maintenance',{method:'POST',headers:h,body:JSON.stringify({enabled:on,message:msg})});
-    var data=await r.json();
-    if(data.ok!==false)D.maintenance=data.data;
+    var r=await api('/v1/admin/maintenance',{method:'POST',body:{enabled:on,message:msg}});
+    D.maintenance=r.data;
     render();
+  }catch(e){alert('Failed: '+e.message)}
+}
+
+/* ── FEDERATION ── */
+function renderFederation(){
+  var peers=D.federation||[];
+  var o='<div class="card"><h2>Peering Requests</h2>';
+  if(peers.length===0){
+    o+='<div class="empty">No federation peers</div>';
+  }else{
+    o+='<div class="scrollable"><table><thead><tr><th>From Node</th><th>URL</th><th>Status</th><th>Message</th><th>Created</th></tr></thead><tbody>';
+    for(var i=0;i<peers.length;i++){
+      var p=peers[i];
+      o+='<tr><td class="mono" style="font-size:.8rem">'+esc(p.from_node_id||p.id)+'</td>';
+      o+='<td class="mono" style="font-size:.75rem">'+esc(p.from_node_url||p.target_url||'\\u2014')+'</td>';
+      o+='<td>'+badge(p.status)+'</td>';
+      o+='<td style="color:var(--muted);font-size:.8rem">'+esc(p.message||'\\u2014')+'</td>';
+      o+='<td style="color:var(--muted)">'+dt(p.created_at)+'</td></tr>';
+    }
+    o+='</tbody></table></div>';
+  }
+  o+='</div>';
+  o+='<div class="card" style="margin-top:16px"><h2>Federation Info</h2>';
+  o+=er('Node ID',esc(D.dash.node_id));
+  o+=er('Max Relay Hops',D.dash.config.max_relay_hops||3);
+  o+='<p style="color:var(--muted);font-size:.8rem;margin-top:12px">To peer with another node, use POST /v1/federation/peer with the remote node URL.</p>';
+  o+='</div>';
+  return o;
+}
+
+/* ── HOOKS ── */
+function renderHooks(){
+  var hooks=D.hooks||{};
+  var hookNames=Object.keys(hooks);
+  var o='<div class="card"><h2>Extension Hooks</h2>';
+  o+='<p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">Hooks let you trigger actions at key lifecycle events.</p>';
+  o+='<div class="scrollable"><table><thead><tr><th>Hook</th><th>Bound Actions</th><th></th></tr></thead><tbody>';
+  for(var i=0;i<hookNames.length;i++){
+    var name=hookNames[i];
+    var actions=hooks[name]||[];
+    o+='<tr><td class="mono" style="font-size:.8rem">'+esc(name)+'</td>';
+    o+='<td>'+(actions.length>0?actions.map(function(a){return '<span class="tag">'+esc(a)+'</span>'}).join(' '):'<span style="color:var(--muted)">none</span>')+'</td>';
+    o+='<td>';
+    if(actions.length>0)o+='<button class="expand-btn" onclick="clearHook(\\''+esc(name)+'\\')">Clear</button>';
+    o+='</td></tr>';
+  }
+  o+='</tbody></table></div></div>';
+  return o;
+}
+
+async function clearHook(name){
+  if(!confirm('Clear all actions from hook "'+name+'"?'))return;
+  try{
+    await api('/v1/admin/hooks/'+encodeURIComponent(name),{method:'DELETE'});
+    loadAll();
   }catch(e){alert('Failed: '+e.message)}
 }
 
@@ -1240,7 +1509,7 @@ button:hover{background:#2563eb}
 .hint{color:#64748b;font-size:.75rem;margin-top:16px}
 </style></head><body>
 <div class="box">
-<h1>&#x1F969; AIMEAT Admin</h1>
+<h1>&#x2764;&#xFE0F; AIMEAT Admin</h1>
 <p class="sub">Enter the admin password to continue</p>
 <form onsubmit="go(event)">
 <input type="password" id="pw" placeholder="Admin password" autofocus/>
@@ -1302,7 +1571,7 @@ a:hover{text-decoration:underline}
 .success-panel h3{color:var(--green);font-size:1.1rem;margin-bottom:8px}
 </style></head><body>
 <div class="container">
-<h1>&#x1F969; AIMEAT</h1>
+<h1>&#x2764;&#xFE0F; AIMEAT</h1>
 <p class="sub">Node: <strong>{{NODE_ID}}</strong></p>
 
 <div class="tabs">
@@ -1313,12 +1582,30 @@ a:hover{text-decoration:underline}
 <!-- ═══ LOGIN TAB ═══ -->
 <div class="tab-panel active" id="panel-login">
 <div class="card">
-  <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Sign in with your owner name and private key.</p>
-  <label>Owner Name</label>
-  <input type="text" id="loginOwner" placeholder="e.g. myname" autocomplete="off" autofocus/>
-  <label>Private Key</label>
-  <textarea id="loginKey" placeholder="Paste your private key here" rows="3"></textarea>
-  <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
+  <!-- Password Login (default for humans) -->
+  <div id="loginPasswordMode">
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Sign in with your username and password.</p>
+    <label>Username</label>
+    <input type="text" id="loginUser" placeholder="e.g. myname" autocomplete="username" autofocus/>
+    <label>Password</label>
+    <input type="password" id="loginPass" placeholder="Your password" autocomplete="current-password"/>
+    <button class="btn-primary" id="btnPwLogin" onclick="doPasswordLogin()">Login</button>
+    <p style="color:var(--muted);font-size:.75rem;margin-top:12px;text-align:center">
+      <a href="#" onclick="toggleLoginMode(event)">Advanced: Login with private key</a>
+    </p>
+  </div>
+  <!-- Key Login (advanced, for developers/agents) -->
+  <div id="loginKeyMode" class="hidden">
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Sign in with your owner name and private key.</p>
+    <label>Owner Name</label>
+    <input type="text" id="loginOwner" placeholder="e.g. myname" autocomplete="off"/>
+    <label>Private Key</label>
+    <textarea id="loginKey" placeholder="Paste your private key here" rows="3"></textarea>
+    <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
+    <p style="color:var(--muted);font-size:.75rem;margin-top:12px;text-align:center">
+      <a href="#" onclick="toggleLoginMode(event)">Back to password login</a>
+    </p>
+  </div>
   <div id="loginResult" class="hidden"></div>
   <div id="loginSuccess" class="hidden">
     <div class="success-panel">
@@ -1342,6 +1629,9 @@ a:hover{text-decoration:underline}
   <input type="text" id="regOwner" placeholder="e.g. myname" autocomplete="off"/>
   <label>Display Name (optional)</label>
   <input type="text" id="regDisplay" placeholder="e.g. Node Operator"/>
+  <label>Password <span style="color:var(--cyan);font-size:.7rem">(recommended)</span></label>
+  <input type="password" id="regPassword" placeholder="Set a login password" autocomplete="new-password"/>
+  <p style="color:var(--muted);font-size:.72rem;margin-top:2px">With a password you can login from any device without keys.</p>
   <button class="btn-primary" id="btnRegister" onclick="doRegister()">Create Account</button>
   <div id="regResult" class="hidden"></div>
   <div id="regKeys" class="hidden">
@@ -1381,16 +1671,57 @@ function switchTab(name){
   document.getElementById('panel-'+name).classList.add('active');
 }
 
+function toggleLoginMode(e){
+  e.preventDefault();
+  document.getElementById('loginPasswordMode').classList.toggle('hidden');
+  document.getElementById('loginKeyMode').classList.toggle('hidden');
+}
+
 async function api(method,path,body){
   const h={'Content-Type':'application/json','X-Admin-Password':PW};
   const r=await fetch(path+'?pw='+encodeURIComponent(PW),{method,headers:h,body:body?JSON.stringify(body):undefined});
   return r.json();
 }
 
+async function apiNoAdmin(method,path,body){
+  const h={'Content-Type':'application/json'};
+  const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+  return r.json();
+}
+
 function show(id,html,cls){const el=document.getElementById(id);el.className='result '+(cls||'');el.innerHTML=html;el.classList.remove('hidden');}
 function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML;}
 
-/* ── LOGIN ── */
+function showLoginSuccess(token,roles,dashUrl){
+  document.getElementById('loginResult').classList.add('hidden');
+  document.getElementById('loginRoles').textContent='Roles: '+(Array.isArray(roles)?roles.join(', '):roles);
+  document.getElementById('loginDashLink').href=dashUrl||('/v1/admin/ui?token='+token);
+  document.getElementById('loginJwtBox').textContent=token;
+  document.getElementById('loginSuccess').classList.remove('hidden');
+}
+
+/* \u2500\u2500 PASSWORD LOGIN \u2500\u2500 */
+async function doPasswordLogin(){
+  const user=document.getElementById('loginUser').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  if(!user||!pass){show('loginResult','Username and password are required','result-err');return;}
+  document.getElementById('btnPwLogin').disabled=true;
+  document.getElementById('btnPwLogin').textContent='Signing in...';
+  document.getElementById('loginSuccess').classList.add('hidden');
+  try{
+    const r=await apiNoAdmin('POST','/v1/ghii/login',{username:user,password:pass});
+    if(r.error_code||!r.data){
+      show('loginResult',esc(r.error||(r.data&&r.data.error)||'Login failed'),'result-err');
+      document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';return;
+    }
+    var d=r.data;
+    showLoginSuccess(d.token,['owner','operator'],'/v1/admin/ui?token='+d.token);
+    document.getElementById('btnPwLogin').textContent='Login';
+    document.getElementById('btnPwLogin').disabled=false;
+  }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';}
+}
+
+/* \u2500\u2500 KEY LOGIN \u2500\u2500 */
 async function doLogin(){
   const owner=document.getElementById('loginOwner').value.trim();
   const key=document.getElementById('loginKey').value.trim();
@@ -1401,28 +1732,29 @@ async function doLogin(){
   try{
     const r=await api('POST','/v1/admin/setup/token',{owner:owner,private_key:key});
     if(!r.ok){show('loginResult',esc(r.error),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';return;}
-    document.getElementById('loginResult').classList.add('hidden');
-    document.getElementById('loginRoles').textContent='Roles: '+r.roles.join(', ');
-    document.getElementById('loginDashLink').href=r.dashboard_url;
-    document.getElementById('loginJwtBox').textContent=r.token;
-    document.getElementById('loginSuccess').classList.remove('hidden');
+    showLoginSuccess(r.token,r.roles,r.dashboard_url);
     document.getElementById('btnLogin').textContent='Login';
     document.getElementById('btnLogin').disabled=false;
   }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';}
 }
 
-/* ── REGISTER ── */
+/* \u2500\u2500 REGISTER \u2500\u2500 */
 async function doRegister(){
   const name=document.getElementById('regOwner').value.trim();
   const dname=document.getElementById('regDisplay').value.trim();
+  const password=document.getElementById('regPassword').value;
   if(!name){show('regResult','Owner name is required','result-err');return;}
   document.getElementById('btnRegister').disabled=true;
   try{
-    const r=await api('POST','/v1/admin/setup/register',{name:name,display_name:dname||undefined});
+    const body={name:name,display_name:dname||undefined};
+    if(password&&password.length>=4)body.password=password;
+    const r=await api('POST','/v1/admin/setup/register',body);
     if(!r.ok){show('regResult',esc(r.error),'result-err');document.getElementById('btnRegister').disabled=false;return;}
     regOwner=r.owner.name;regKey=r.private_key;
     var roles=r.owner.roles.join(', ');
-    show('regResult','<strong>Account created!</strong> Roles: '+roles,'result-ok');
+    var msg='<strong>Account created!</strong> Roles: '+roles;
+    if(r.has_password)msg+='<br/><span style="color:var(--cyan)">Password login enabled \u2014 you can login with your username and password.</span>';
+    show('regResult',msg,'result-ok');
     document.getElementById('regPrivateKey').textContent=r.private_key;
     document.getElementById('regPublicKey').textContent=r.public_key;
     document.getElementById('regKeys').classList.remove('hidden');

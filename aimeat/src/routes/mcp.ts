@@ -522,6 +522,120 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             },
         );
 
+        // ── Admin Tools (operator-only) ──
+        // These tools are registered for all sessions but check operator role at runtime.
+        // This avoids needing to know roles at session creation time.
+
+        async function isOperator(): Promise<boolean> {
+            const parsed = parseGAII(agentGaii);
+            if (!parsed) return false;
+            const owner = await storage.getOwner(parsed.owner);
+            return !!owner && owner.roles.includes('operator');
+        }
+
+        // ── Tool 15: aimeat_admin_stats ──
+        mcp.tool(
+            'aimeat_admin_stats',
+            'Get node statistics and health metrics (operator only)',
+            {},
+            async () => {
+                if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
+                const agents = await storage.listAgents();
+                const actions = await storage.listActions();
+                const boards = await storage.listBoards();
+                const allWork = await storage.listAllWork();
+                let totalMorsels = 0;
+                let activeAgents = 0;
+                const now = Date.now();
+                for (const a of agents) {
+                    totalMorsels += a.morselBalance;
+                    if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) activeAgents++;
+                }
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            node_id: config.nodeId,
+                            uptime_seconds: Math.floor(process.uptime()),
+                            counts: { agents: agents.length, active_agents_24h: activeAgents, actions: actions.length, boards: boards.length, work_items: allWork.length },
+                            economy: { total_morsels_in_circulation: totalMorsels },
+                        }, null, 2),
+                    }],
+                };
+            },
+        );
+
+        // ── Tool 16: aimeat_admin_agents ──
+        mcp.tool(
+            'aimeat_admin_agents',
+            'List all agents with details (operator only)',
+            { limit: z.number().optional() },
+            async ({ limit }) => {
+                if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
+                const agents = await storage.listAgents();
+                const result = (limit ? agents.slice(0, limit) : agents).map(a => ({
+                    gaii: a.gaii, owner: a.owner, display_name: a.displayName,
+                    trust_score: a.trustScore, morsel_balance: a.morselBalance,
+                    last_seen: a.lastSeen, created_at: a.createdAt,
+                }));
+                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+            },
+        );
+
+        // ── Tool 17: aimeat_admin_config ──
+        mcp.tool(
+            'aimeat_admin_config',
+            'View current node configuration (operator only)',
+            {},
+            async () => {
+                if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            node_id: config.nodeId, port: config.port,
+                            storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
+                            jwt_ttl_seconds: config.jwtTtlSeconds,
+                            welcome_bonus: config.welcomeBonus, daily_allowance: config.dailyAllowance,
+                            burn_rate: config.burnRate, max_operator_mint_per_day: config.maxOperatorMintPerDay,
+                        }, null, 2),
+                    }],
+                };
+            },
+        );
+
+        // ── Tool 18: aimeat_admin_mint ──
+        mcp.tool(
+            'aimeat_admin_mint',
+            'Mint morsels for an agent (operator only, daily cap enforced)',
+            { gaii: z.string(), amount: z.number().int().positive() },
+            async ({ gaii, amount }) => {
+                if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
+                const agent = await storage.getAgent(gaii);
+                if (!agent) return { content: [{ type: 'text' as const, text: `Agent not found: ${gaii}` }], isError: true };
+
+                const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+                const allTx = await storage.listAllTransactions();
+                const mintedToday = allTx
+                    .filter(tx => tx.type === 'mint' && new Date(tx.timestamp) >= dayStart)
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+                if (mintedToday + amount > config.maxOperatorMintPerDay) {
+                    return { content: [{ type: 'text' as const, text: `Daily mint cap (${config.maxOperatorMintPerDay}) would be exceeded. Already minted ${mintedToday} today.` }], isError: true };
+                }
+
+                await storage.updateAgent(gaii, { morselBalance: agent.morselBalance + amount });
+                const { randomBytes: rb } = await import('node:crypto');
+                await storage.addTransaction({
+                    id: `tx-${Date.now()}-${rb(4).toString('hex')}`,
+                    gaii, type: 'mint', amount,
+                    counterpartyGaii: agentGaii,
+                    timestamp: new Date().toISOString(),
+                });
+                emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: agent.morselBalance + amount }, null, 2) }] };
+            },
+        );
+
         return mcp;
     }
 
