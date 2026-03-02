@@ -133,6 +133,21 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'info', variable: 'AIMEAT_BURN_RATE', message: 'Not set. Default: 0.10' });
   }
 
+  // ── Cookie Consent ──
+  const ccEnabled = env.AIMEAT_COOKIE_CONSENT_ENABLED;
+  if (ccEnabled === 'true') {
+    const ccCategories = env.AIMEAT_COOKIE_CONSENT_CATEGORIES;
+    if (ccCategories) {
+      const cats = ccCategories.split(',').map(s => s.trim());
+      if (!cats.includes('necessary')) {
+        results.push({ level: 'warning', variable: 'AIMEAT_COOKIE_CONSENT_CATEGORIES', message: '"necessary" category is recommended. It will be added automatically.' });
+      }
+    }
+    if (!env.AIMEAT_COOKIE_CONSENT_POLICY_URL) {
+      results.push({ level: 'warning', variable: 'AIMEAT_COOKIE_CONSENT_POLICY_URL', message: 'Cookie consent enabled but no privacy policy URL set. Recommended for GDPR compliance.' });
+    }
+  }
+
   return results;
 }
 
