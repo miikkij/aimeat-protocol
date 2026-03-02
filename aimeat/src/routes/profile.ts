@@ -361,6 +361,7 @@ textarea.input-field{resize:vertical;min-height:60px}
   <!-- Stats bar -->
   <div class="stats-bar" id="stats-bar">
     <div class="stat-card"><div class="num" id="stat-agents">-</div><div class="label">${sanitize(translations['profile.stats.agents'] || 'Agents')}</div></div>
+    <div class="stat-card"><div class="num" id="stat-chatsessions">-</div><div class="label">${sanitize(translations['profile.stats.chatSessions'] || 'Chat Sessions')}</div></div>
     <div class="stat-card"><div class="num" id="stat-balance">-</div><div class="label">${sanitize(translations['profile.stats.morsels'] || 'Morsels')}</div></div>
     <div class="stat-card"><div class="num" id="stat-memory">-</div><div class="label">${sanitize(translations['profile.stats.memories'] || 'Memories')}</div></div>
     <div class="stat-card"><div class="num" id="stat-actions">-</div><div class="label">${sanitize(translations['profile.stats.services'] || 'Services')}</div></div>
@@ -373,6 +374,7 @@ textarea.input-field{resize:vertical;min-height:60px}
   <!-- Tabs -->
   <div class="tabs" id="tabs">
     <button class="tab active" data-tab="agents">${sanitize(translations['profile.tabs.agents'] || 'Agents')}</button>
+    <button class="tab" data-tab="chatsessions">${sanitize(translations['profile.tabs.chatSessions'] || 'Chat Sessions')}</button>
     <button class="tab" data-tab="wallet">${sanitize(translations['profile.tabs.wallet'] || 'Wallet')}</button>
     <button class="tab" data-tab="memory">${sanitize(translations['profile.tabs.memory'] || 'Memory')}</button>
     <button class="tab" data-tab="work">${sanitize(translations['profile.tabs.work'] || 'Work')}</button>
@@ -416,6 +418,13 @@ textarea.input-field{resize:vertical;min-height:60px}
     </div>
 
     <div id="agents-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.agents.loadingAgents'] || 'Loading agents...')}</span></div>
+  </div>
+
+  <!-- ═══ CHAT SESSIONS ═══ -->
+  <div class="tab-panel" id="panel-chatsessions">
+    <div class="section-title">${sanitize(translations['profile.chatSessions.title'] || 'Chat Sessions')}</div>
+    <div class="section-desc">${sanitize(translations['profile.chatSessions.desc'] || '')}</div>
+    <div id="chatsessions-list"><span class="spinner"></span><span class="loading-text">${sanitize(translations['profile.chatSessions.loading'] || 'Loading chat sessions...')}</span></div>
   </div>
 
   <!-- ═══ WALLET ═══ -->
@@ -755,6 +764,7 @@ async function loadAll() {
 
   // Load everything in parallel
   loadAgents();
+  loadChatSessions();
   loadWallet();
   loadMemory();
   loadFiles();
@@ -807,6 +817,32 @@ async function loadAgents() {
     });
     el.innerHTML = html;
   } catch(e) { el.innerHTML = '<div class="empty">' + t('profile.agents.loadError') + '</div>'; }
+}
+
+// ── Chat Sessions ──
+async function loadChatSessions() {
+  var el = document.getElementById('chatsessions-list');
+  try {
+    var csData = await apiFetch('/v1/chat-instances');
+    var csList = (csData && csData.data && csData.data.chat_instances) ? csData.data.chat_instances : [];
+    document.getElementById('stat-chatsessions').textContent = csList.length;
+    var csHtml = '';
+    if (csList.length === 0) {
+      csHtml = '<div class="empty">' + t('profile.chatSessions.empty') + '</div>';
+    } else {
+      csList.forEach(function(c) {
+        csHtml += '<div class="card">';
+        csHtml += '<div class="card-header"><div><span class="card-title">' + escHtml(c.platform) + '</span>';
+        csHtml += '<div class="card-subtitle">' + escHtml(c.app_name) + '</div></div>';
+        csHtml += '<span class="badge badge-info">' + (c.is_anonymous ? t('profile.chatSessions.anonymous') : escHtml(c.platform)) + '</span></div>';
+        csHtml += '<div style="font-size:.8rem;color:var(--muted);margin-top:.4rem">' + t('profile.chatSessions.lastSeen') + ': ' + new Date(c.last_seen).toLocaleString() + '</div>';
+        csHtml += '</div>';
+      });
+    }
+    el.innerHTML = csHtml;
+  } catch(e) {
+    el.innerHTML = '<div class="empty">' + t('profile.chatSessions.error') + '</div>';
+  }
 }
 
 // ── Wallet ──
