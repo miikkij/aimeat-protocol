@@ -1479,6 +1479,30 @@ body {
 (function() {
   'use strict';
 
+  /* ── Modal i18n strings ── */
+  var __modalI18n = {
+    title: '${jesc(t('modal.title'))}',
+    descNew: '${jesc(t('modal.descNew'))}',
+    descReturning: '${jesc(t('modal.descReturning'))}',
+    usernamePlaceholder: '${jesc(t('modal.usernamePlaceholder'))}',
+    passwordPlaceholder: '${jesc(t('modal.passwordPlaceholder'))}',
+    displayNamePlaceholder: '${jesc(t('modal.displayNamePlaceholder'))}',
+    signInBtn: '${jesc(t('modal.signInBtn'))}',
+    cancelBtn: '${jesc(t('modal.cancelBtn'))}',
+    working: '${jesc(t('modal.working'))}',
+    errUserShort: '${jesc(t('modal.errUserShort'))}',
+    errPassShort: '${jesc(t('modal.errPassShort'))}',
+    errWrongPass: '${jesc(t('modal.errWrongPass'))}',
+    loggedIn: '${jesc(t('modal.loggedIn'))}',
+    logoutBtn: '${jesc(t('modal.logoutBtn'))}',
+    whyTitle: '${jesc(t('modal.whyTitle'))}',
+    whyGhii: '${jesc(t('modal.whyGhii'))}',
+    whyPrivacy: '${jesc(t('modal.whyPrivacy'))}',
+    whyControl: '${jesc(t('modal.whyControl'))}',
+    whyAgents: '${jesc(t('modal.whyAgents'))}',
+    whyMorsels: '${jesc(t('modal.whyMorsels'))}'
+  };
+
   /* ── Clipboard helper (fallback for HTTP) ── */
   function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1857,6 +1881,7 @@ body {
       document.body.appendChild(tmp);
       AIMEAT.auth.mountLoginButton('#aimeat-return-auth', {
         nodeUrl: '${jesc(config.baseUrl)}',
+        i18n: __modalI18n,
         onLogin: function(session) {
           tmp.remove();
           window.location.href = '/v1/profile?tab=apps';
@@ -1914,6 +1939,7 @@ body {
       document.body.appendChild(tmp);
       AIMEAT.auth.mountLoginButton('#aimeat-service-auth', {
         nodeUrl: '${jesc(config.baseUrl)}',
+        i18n: __modalI18n,
         onLogin: function(session) {
           tmp.remove();
           showServiceForm(mode);

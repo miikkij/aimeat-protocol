@@ -8,7 +8,7 @@ function sanitize(s: string): string {
 }
 
 function buildProfileTranslations(locale: Locale): Record<string, string> {
-  return resolveFlat(locale, 'profile');
+  return { ...resolveFlat(locale, 'profile'), ...resolveFlat(locale, 'modal') };
 }
 
 function profileHtml(config: AimeatConfig, locale: string, translations: Record<string, string>): string {
@@ -664,6 +664,11 @@ console.log('[AIMEAT Profile] Stored session:', storedRaw ? 'exists (' + storedR
 var auth = window.AIMEAT && window.AIMEAT.auth;
 if (auth) {
   auth.mountLoginButton('#auth-container', {
+    i18n: (function() {
+      var m = {};
+      for (var k in T) { if (k.indexOf('modal.') === 0) m[k.slice(6)] = T[k]; }
+      return m;
+    })(),
     onLogin: function(s) { console.log('[AIMEAT Profile] onLogin callback', s); session = s; showProfile(); },
     onLogout: function() { console.log('[AIMEAT Profile] onLogout callback'); session = null; hideProfile(); },
   });

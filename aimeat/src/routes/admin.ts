@@ -11,6 +11,7 @@ import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
+import { createT, resolveLocale, type Locale } from '../i18n.js';
 
 // Password hashing with scrypt (shared with GHII)
 async function hashPassword(password: string): Promise<string> {
@@ -403,8 +404,11 @@ export function adminRouter(
     // GET /v1/admin/ui — graphical admin dashboard
     // Serves HTML always; auth is checked client-side via API calls.
     // If token is invalid/missing, the dashboard shows a login form.
-    router.get('/v1/admin/ui', (_req, res) => {
-        res.type('text/html').send(ADMIN_DASHBOARD_HTML);
+    router.get('/v1/admin/ui', (req, res) => {
+        const langParam = req.query.lang as string | undefined;
+        const locale = resolveLocale(langParam, req.headers.cookie, req.headers['accept-language']);
+        if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
+        res.type('text/html').send(buildDashboardHtml(locale));
     });
 
     // GET /v1/admin/work — list all work items (operator only)
@@ -814,13 +818,15 @@ export function adminRouter(
 }
 
 // ── Admin Dashboard HTML ──
-const ADMIN_DASHBOARD_HTML = `<!DOCTYPE html>
-<html lang="en">
+function buildDashboardHtml(locale: Locale): string {
+    const t = createT(locale);
+    return `<!DOCTYPE html>
+<html lang="${locale}">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<title>AIMEAT Admin Dashboard</title>
+<title>${t('dashboard.title')}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
@@ -901,45 +907,48 @@ tr:hover td{background:#ffffff06}
 <nav class="sidebar">
   <h1>&#x2764;&#xFE0F; AIMEAT</h1>
   <div class="node-id" id="sideNodeId"></div>
-  <button class="nav-item active" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">Overview</span></button>
-  <button class="nav-item" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">Owners</span><span class="count" id="cntOwners">0</span></button>
-  <button class="nav-item" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">Agents</span><span class="count" id="cntAgents">0</span></button>
-  <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">Actions</span><span class="count" id="cntActions">0</span></button>
-  <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">Boards</span><span class="count" id="cntBoards">0</span></button>
-  <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">Work</span><span class="count" id="cntWork">0</span></button>
+  <button class="nav-item active" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">${t('dashboard.overview')}</span></button>
+  <button class="nav-item" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">${t('dashboard.owners')}</span><span class="count" id="cntOwners">0</span></button>
+  <button class="nav-item" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">${t('dashboard.agents')}</span><span class="count" id="cntAgents">0</span></button>
+  <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">${t('dashboard.actions')}</span><span class="count" id="cntActions">0</span></button>
+  <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">${t('dashboard.boards')}</span><span class="count" id="cntBoards">0</span></button>
+  <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.work')}</span><span class="count" id="cntWork">0</span></button>
   <div class="nav-sep"></div>
-  <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">Economy</span></button>
-  <button class="nav-item" onclick="nav('federation')"><span class="icon">&#x1F310;</span><span class="label">Federation</span><span class="count" id="cntPeers">0</span></button>
-  <button class="nav-item" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">Hooks</span></button>
-  <button class="nav-item" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">Maintenance</span></button>
-  <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">Config</span></button>
+  <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
+  <button class="nav-item" onclick="nav('federation')"><span class="icon">&#x1F310;</span><span class="label">${t('dashboard.federation')}</span><span class="count" id="cntPeers">0</span></button>
+  <button class="nav-item" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">${t('dashboard.hooks')}</span></button>
+  <button class="nav-item" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">${t('dashboard.maintenance')}</span></button>
+  <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">${t('dashboard.config')}</span></button>
 </nav>
 <div class="main">
   <div class="topbar">
-    <div id="pageTitle" class="page-title"><span class="icon">&#x1F4CA;</span> Overview</div>
+    <div id="pageTitle" class="page-title"><span class="icon">&#x1F4CA;</span> ${t('dashboard.overview')}</div>
     <div class="topbar-right">
-      <button class="refresh" id="btnRefresh" onclick="loadAll()">Refresh</button>
-      <button class="refresh" style="background:var(--border);color:var(--muted)" onclick="localStorage.removeItem('aimeat_token');TOKEN='';showLoginForm()">Logout</button>
+      <span style="font-size:.75rem;color:var(--muted);margin-right:4px">${t('dashboard.language')}:</span>
+      <a href="?lang=en" style="color:${'en' === locale ? 'var(--cyan)' : 'var(--muted)'};text-decoration:none;font-size:.8rem;font-weight:${'en' === locale ? '700' : '400'};margin-right:4px">EN</a>
+      <a href="?lang=fi" style="color:${'fi' === locale ? 'var(--cyan)' : 'var(--muted)'};text-decoration:none;font-size:.8rem;font-weight:${'fi' === locale ? '700' : '400'};margin-right:12px">FI</a>
+      <button class="refresh" id="btnRefresh" onclick="loadAll()">${t('dashboard.refresh')}</button>
+      <button class="refresh" style="background:var(--border);color:var(--muted)" onclick="localStorage.removeItem('aimeat_token');TOKEN='';showLoginForm()">${t('dashboard.logout')}</button>
       <span id="lastUpdate"></span>
     </div>
   </div>
-  <div id="app"><div class="loading">Loading&#8230;</div></div>
+  <div id="app"><div class="loading">${t('dashboard.loading')}</div></div>
   <!-- Login form (shown when no valid token) -->
   <div id="loginForm" class="hidden" style="max-width:420px;margin:60px auto">
     <div class="card" style="border-radius:10px;text-align:center">
-      <h2 style="font-size:1.2rem;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:4px">&#x2764;&#xFE0F; AIMEAT Dashboard</h2>
-      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px">Login to access the admin dashboard</p>
+      <h2 style="font-size:1.2rem;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:4px">${t('dashboard.loginTitle')}</h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px">${t('dashboard.loginDesc')}</p>
       <div id="dashLoginPw">
-        <input type="text" id="dashUser" placeholder="Username" autocomplete="username" style="margin-bottom:8px"/>
-        <input type="password" id="dashPass" placeholder="Password" autocomplete="current-password" style="margin-bottom:4px"/>
-        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" id="btnDashLogin" onclick="dashLogin()">Login</button>
-        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginPw').classList.add('hidden');document.getElementById('dashLoginKey').classList.remove('hidden')" style="color:var(--cyan)">Advanced: Login with private key</a></p>
+        <input type="text" id="dashUser" placeholder="${t('dashboard.username')}" autocomplete="username" style="margin-bottom:8px"/>
+        <input type="password" id="dashPass" placeholder="${t('dashboard.password')}" autocomplete="current-password" style="margin-bottom:4px"/>
+        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" id="btnDashLogin" onclick="dashLogin()">${t('dashboard.login')}</button>
+        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginPw').classList.add('hidden');document.getElementById('dashLoginKey').classList.remove('hidden')" style="color:var(--cyan)">${t('dashboard.advancedKeyLogin')}</a></p>
       </div>
       <div id="dashLoginKey" class="hidden">
-        <input type="text" id="dashKeyOwner" placeholder="Owner name" autocomplete="off" style="margin-bottom:8px"/>
-        <textarea id="dashKeyPk" placeholder="Private key" rows="3" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;resize:vertical;font-family:monospace;margin-bottom:4px"></textarea>
-        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" onclick="dashKeyLogin()">Login with Key</button>
-        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginKey').classList.add('hidden');document.getElementById('dashLoginPw').classList.remove('hidden')" style="color:var(--cyan)">Back to password login</a></p>
+        <input type="text" id="dashKeyOwner" placeholder="${t('dashboard.ownerName')}" autocomplete="off" style="margin-bottom:8px"/>
+        <textarea id="dashKeyPk" placeholder="${t('dashboard.privateKey')}" rows="3" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;resize:vertical;font-family:monospace;margin-bottom:4px"></textarea>
+        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" onclick="dashKeyLogin()">${t('dashboard.loginWithKey')}</button>
+        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginKey').classList.add('hidden');document.getElementById('dashLoginPw').classList.remove('hidden')" style="color:var(--cyan)">${t('dashboard.backToPassword')}</a></p>
       </div>
       <div id="dashLoginErr" class="hidden" style="margin-top:10px;padding:8px;border-radius:6px;background:#dc262618;border:1px solid #dc262655;color:var(--red);font-size:.85rem"></div>
     </div>
@@ -952,6 +961,47 @@ if(TOKEN)localStorage.setItem('aimeat_token',TOKEN);
 
 let D={};// cached data
 let currentPage='overview';
+var __t=${JSON.stringify({
+        overview: t('dashboard.overview'), owners: t('dashboard.owners'), agents: t('dashboard.agents'),
+        actions: t('dashboard.actions'), boards: t('dashboard.boards'), work: t('dashboard.work'),
+        economy: t('dashboard.economy'), federation: t('dashboard.federation'), hooks: t('dashboard.hooks'),
+        maintenance: t('dashboard.maintenance'), config: t('dashboard.config'), refresh: t('dashboard.refresh'),
+        logout: t('dashboard.logout'), loading: t('dashboard.loading'), login: t('dashboard.login'),
+        signingIn: t('dashboard.signingIn'), loginFailed: t('dashboard.loginFailed'),
+        usernamePasswordRequired: t('dashboard.usernamePasswordRequired'),
+        nodeHealth: t('dashboard.nodeHealth'), economyToday: t('dashboard.economyToday'),
+        quickConfig: t('dashboard.quickConfig'), noOwnersFound: t('dashboard.noOwnersFound'),
+        noAgentsRegistered: t('dashboard.noAgentsRegistered'), noActionsPublished: t('dashboard.noActionsPublished'),
+        noBoardsCreated: t('dashboard.noBoardsCreated'), noWorkContracts: t('dashboard.noWorkContracts'),
+        noFederationPeers: t('dashboard.noFederationPeers'),
+        name: t('dashboard.name'), displayName: t('dashboard.displayName'), roles: t('dashboard.roles'),
+        created: t('dashboard.created'), trust: t('dashboard.trust'), morsels: t('dashboard.totalMorsels'),
+        lastSeen: t('dashboard.lastSeen'), details: t('dashboard.details'), hide: t('dashboard.hide'),
+        grantOperator: t('dashboard.grantOperator'), gaii: t('dashboard.gaii'), amount: t('dashboard.amount'),
+        morselSupply: t('dashboard.morselSupply'), todayActivity: t('dashboard.todayActivity'),
+        morselPolicy: t('dashboard.morselPolicy'), mintMorsels: t('dashboard.mintMorsels'), mint: t('dashboard.mint'),
+        maintenanceMode: t('dashboard.maintenanceMode'), operational: t('dashboard.operational'),
+        maintenanceOn: t('dashboard.maintenanceOn'), backupRestore: t('dashboard.backupRestore'),
+        downloadBackup: t('dashboard.downloadBackup'), restoreFromFile: t('dashboard.restoreFromFile'),
+        extensionHooks: t('dashboard.extensionHooks'), nodeSettings: t('dashboard.nodeSettings'),
+        configApi: t('dashboard.configApi'), peeringRequests: t('dashboard.peeringRequests'),
+        federationInfo: t('dashboard.federationInfo'), trackingCode: t('dashboard.trackingCode'),
+        status: t('dashboard.status'), action: t('dashboard.action'), requester: t('dashboard.requester'),
+        provider: t('dashboard.provider'), cost: t('dashboard.cost'), id: t('dashboard.id'),
+        category: t('dashboard.category'), tags: t('dashboard.tags'), baseCost: t('dashboard.baseCost'),
+        fromNode: t('dashboard.fromNode'), url: t('dashboard.url'), message: t('dashboard.message'),
+        loadPosts: t('dashboard.loadPosts'), clear: t('dashboard.clear'),
+        uptime: t('dashboard.uptime'), storage: t('dashboard.storage'),
+        active24h: t('dashboard.active24h'), inCirculation: t('dashboard.inCirculation'),
+        transactionsToday: t('dashboard.transactionsToday'), morselsMovedToday: t('dashboard.morselsMovedToday'),
+        burnedToday: t('dashboard.burnedToday'), port: t('dashboard.port'), jwtTtl: t('dashboard.jwtTtl'),
+        keyedBrowse: t('dashboard.keyedBrowse'), welcomeBonus: t('dashboard.welcomeBonus'),
+        enabled: t('dashboard.enabled'), disabled: t('dashboard.disabled'),
+        warnings: t('dashboard.warnings'), noData: t('dashboard.noData'),
+        failedToLoad: t('dashboard.failedToLoad'),
+        registeredOwners: t('dashboard.registeredOwners'), registeredAgents: t('dashboard.registeredAgents'),
+        publishedActions: t('dashboard.publishedActions'), activeBoards: t('dashboard.activeBoards'),
+    })};
 
 async function api(path,opts){
   const h=opts&&opts.headers?Object.assign({},opts.headers):{};
@@ -975,16 +1025,16 @@ function hideLoginForm(){
 async function dashLogin(){
   var user=document.getElementById('dashUser').value.trim();
   var pass=document.getElementById('dashPass').value;
-  if(!user||!pass){document.getElementById('dashLoginErr').textContent='Username and password required';document.getElementById('dashLoginErr').classList.remove('hidden');return;}
-  document.getElementById('btnDashLogin').disabled=true;document.getElementById('btnDashLogin').textContent='Signing in...';
+  if(!user||!pass){document.getElementById('dashLoginErr').textContent=__t.usernamePasswordRequired;document.getElementById('dashLoginErr').classList.remove('hidden');return;}
+  document.getElementById('btnDashLogin').disabled=true;document.getElementById('btnDashLogin').textContent=__t.signingIn;
   try{
     var r=await fetch('/v1/ghii/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
     var j=await r.json();
-    if(!r.ok||!j.data||!j.data.token){document.getElementById('dashLoginErr').textContent=j.error||j.message||'Login failed';document.getElementById('dashLoginErr').classList.remove('hidden');document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent='Login';return;}
+    if(!r.ok||!j.data||!j.data.token){document.getElementById('dashLoginErr').textContent=j.error||j.message||__t.loginFailed;document.getElementById('dashLoginErr').classList.remove('hidden');document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent=__t.login;return;}
     TOKEN=j.data.token;localStorage.setItem('aimeat_token',TOKEN);
     hideLoginForm();loadAll();
   }catch(e){document.getElementById('dashLoginErr').textContent='Network error: '+e.message;document.getElementById('dashLoginErr').classList.remove('hidden');}
-  document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent='Login';
+  document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent=__t.login;
 }
 
 async function dashKeyLogin(){
@@ -994,7 +1044,7 @@ async function dashKeyLogin(){
   try{
     var r=await fetch('/v1/admin/setup/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:owner,private_key:pk})});
     var j=await r.json();
-    if(!j.ok||!j.token){document.getElementById('dashLoginErr').textContent=j.error||'Login failed';document.getElementById('dashLoginErr').classList.remove('hidden');return;}
+    if(!j.ok||!j.token){document.getElementById('dashLoginErr').textContent=j.error||__t.loginFailed;document.getElementById('dashLoginErr').classList.remove('hidden');return;}
     TOKEN=j.token;localStorage.setItem('aimeat_token',TOKEN);
     hideLoginForm();loadAll();
   }catch(e){document.getElementById('dashLoginErr').textContent='Error: '+e.message;document.getElementById('dashLoginErr').classList.remove('hidden');}
@@ -1015,7 +1065,7 @@ function nav(page){
   var btns=document.querySelectorAll('.nav-item');
   var pages=['overview','owners','agents','actions','boards','work','','economy','federation','hooks','maintenance','config'];
   for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'\\u{1F4CA} Overview',owners:'\\u{1F464} Owners',agents:'\\u{1F916} Agents',actions:'\\u26A1 Actions',boards:'\\u{1F4CB} Boards',work:'\\u{1F4E6} Work Contracts',economy:'\\u{1FA99} Economy',federation:'\\u{1F310} Federation',hooks:'\\u{1F517} Extension Hooks',maintenance:'\\u{1F6A7} Maintenance',config:'\\u2699 Configuration'};
+  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config};
   document.getElementById('pageTitle').innerHTML=titles[page]||page;
   render();
 }
@@ -1023,7 +1073,7 @@ function nav(page){
 async function loadAll(){
   if(!TOKEN){showLoginForm();return;}
   var btn=document.getElementById('btnRefresh');
-  btn.disabled=true;btn.textContent='Loading...';
+  btn.disabled=true;btn.textContent=__t.loading;
   try{
     var [dash,agents,actions,boards]=await Promise.all([
       api('/v1/admin/dashboard'),
@@ -1065,14 +1115,14 @@ async function loadAll(){
     render();
   }catch(e){
     if(e.message==='Unauthorized')return;
-    document.getElementById('app').innerHTML='<div class="error-box"><strong>Failed to load</strong><br/>'+esc(e.message)+'</div>';
+    document.getElementById('app').innerHTML='<div class="error-box"><strong>'+__t.failedToLoad+'</strong><br/>'+esc(e.message)+'</div>';
   }
-  btn.disabled=false;btn.textContent='Refresh';
+  btn.disabled=false;btn.textContent=__t.refresh;
 }
 
 function render(){
   var app=document.getElementById('app');
-  if(!D.dash){app.innerHTML='<div class="loading">Loading\\u2026</div>';return;}
+  if(!D.dash){app.innerHTML='<div class="loading">'+__t.loading+'</div>';return;}
   switch(currentPage){
     case 'overview':app.innerHTML=renderOverview();break;
     case 'owners':app.innerHTML=renderOwners();break;
@@ -1096,8 +1146,8 @@ function renderOverview(){
   var o='';
   o+='<div class="card" style="border-left:4px solid var(--'+hColor+');margin-bottom:20px">';
   o+='<div style="display:flex;justify-content:space-between;align-items:center">';
-  o+='<div><h2>Node Health</h2><div class="stat" style="color:var(--'+hColor+')">'+h.status.toUpperCase()+'</div>';
-  o+='<div class="stat-label">Uptime: '+fmtUp(d.uptime_seconds)+' &middot; Storage: '+esc(d.storage_type)+'</div></div>';
+  o+='<div><h2>'+__t.nodeHealth+'</h2><div class="stat" style="color:var(--'+hColor+')">'+h.status.toUpperCase()+'</div>';
+  o+='<div class="stat-label">'+__t.uptime+': '+fmtUp(d.uptime_seconds)+' &middot; '+__t.storage+': '+esc(d.storage_type)+'</div></div>';
   o+='<div>'+badge(h.status)+'</div></div>';
   o+='<div style="margin-top:14px">';
   o+=hRow('Burn/Mint Ratio',h.burn_mint_ratio);
@@ -1106,26 +1156,26 @@ function renderOverview(){
   o+=hRow('Dispute Rate (30d)',h.dispute_rate_30d);
   o+='</div></div>';
   o+='<div class="grid grid-4">';
-  o+=sc('Owners',c.owners,'','var(--blue)');
-  o+=sc('Agents',c.agents,'('+c.active_agents_24h+' active 24h)','var(--purple)');
-  o+=sc('Actions',c.actions,'','var(--cyan)');
-  o+=sc('Boards',c.boards,'','var(--green)');
+  o+=sc(__t.registeredOwners,c.owners,'','var(--blue)');
+  o+=sc(__t.registeredAgents,c.agents,'('+c.active_agents_24h+' '+__t.active24h+')','var(--purple)');
+  o+=sc(__t.publishedActions,c.actions,'','var(--cyan)');
+  o+=sc(__t.activeBoards,c.boards,'','var(--green)');
   o+='</div>';
   o+='<div class="grid grid-2">';
-  o+='<div class="card"><h2>Economy Today</h2>';
-  o+=er('Transactions',num(e.transactions_today));
-  o+=er('Morsels Moved',num(e.morsels_transacted_today));
-  o+=er('In Circulation',num(e.total_morsels_in_circulation));
-  o+=er('Burned Today',num(e.burned_today));
+  o+='<div class="card"><h2>'+__t.economyToday+'</h2>';
+  o+=er(__t.transactionsToday,num(e.transactions_today));
+  o+=er(__t.morselsMovedToday,num(e.morsels_transacted_today));
+  o+=er(__t.inCirculation,num(e.total_morsels_in_circulation));
+  o+=er(__t.burnedToday,num(e.burned_today));
   o+='</div>';
-  o+='<div class="card"><h2>Quick Config</h2>';
-  o+=er('Port',d.config.port);
-  o+=er('JWT TTL',d.config.jwt_ttl_seconds+'s');
-  o+=er('Keyed Browse',d.config.keyed_browse_enabled?'Enabled':'Disabled');
-  o+=er('Welcome Bonus',num(e.welcome_bonus));
+  o+='<div class="card"><h2>'+__t.quickConfig+'</h2>';
+  o+=er(__t.port,d.config.port);
+  o+=er(__t.jwtTtl,d.config.jwt_ttl_seconds+'s');
+  o+=er(__t.keyedBrowse,d.config.keyed_browse_enabled?__t.enabled:__t.disabled);
+  o+=er(__t.welcomeBonus,num(e.welcome_bonus));
   o+='</div></div>';
   if(w.length>0){
-    o+='<div class="card" style="border-left:3px solid var(--yellow);margin-bottom:20px"><h2>Warnings ('+w.length+')</h2>';
+    o+='<div class="card" style="border-left:3px solid var(--yellow);margin-bottom:20px"><h2>'+__t.warnings+' ('+w.length+')</h2>';
     o+='<table><thead><tr><th>Metric</th><th>Value</th><th>Zone</th><th>Threshold</th></tr></thead><tbody>';
     for(var i=0;i<w.length;i++){var x=w[i];o+='<tr><td>'+esc(x.metric)+'</td><td>'+x.value+'</td><td>'+badge(x.zone)+'</td><td style="color:var(--muted)">'+esc(x.threshold)+'</td></tr>';}
     o+='</tbody></table></div>';
@@ -1136,8 +1186,8 @@ function renderOverview(){
 /* ── OWNERS ── */
 function renderOwners(){
   var owners=D.owners||[];
-  if(owners.length===0)return '<div class="empty">No owners found</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>Name</th><th>Display Name</th><th>Roles</th><th>Agents</th><th>Created</th><th></th></tr></thead><tbody>';
+  if(owners.length===0)return '<div class="empty">'+__t.noOwnersFound+'</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.name+'</th><th>'+__t.displayName+'</th><th>'+__t.roles+'</th><th>'+__t.agents+'</th><th>'+__t.created+'</th><th></th></tr></thead><tbody>';
   for(var i=0;i<owners.length;i++){
     var ow=owners[i];
     var agCount=ow.agents?ow.agents.length:0;
@@ -1148,7 +1198,7 @@ function renderOwners(){
     o+='<td>'+roleBadges+'</td>';
     o+='<td>'+agCount+'</td>';
     o+='<td style="color:var(--muted)">'+dt(ow.created_at)+'</td>';
-    o+='<td>'+(isOp?'':'<button class="expand-btn" onclick="grantOperator(\\''+esc(ow.name)+'\\')">Grant Operator</button>')+'</td></tr>';
+    o+='<td>'+(isOp?'':'<button class="expand-btn" onclick="grantOperator(\\''+esc(ow.name)+'\\')">'+__t.grantOperator+'</button>')+'</td></tr>';
   }
   o+='</tbody></table></div></div>';
   return o;
@@ -1165,8 +1215,8 @@ async function grantOperator(name){
 /* ── AGENTS ── */
 function renderAgents(){
   var ag=D.agents;
-  if(!ag||!ag.agents||ag.agents.length===0)return '<div class="empty">No agents registered</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>GAII</th><th>Owner</th><th>Display Name</th><th>Trust</th><th>Morsels</th><th>Last Seen</th><th></th></tr></thead><tbody>';
+  if(!ag||!ag.agents||ag.agents.length===0)return '<div class="empty">'+__t.noAgentsRegistered+'</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.gaii+'</th><th>'+__t.owners+'</th><th>'+__t.displayName+'</th><th>'+__t.trust+'</th><th>'+__t.morsels+'</th><th>'+__t.lastSeen+'</th><th></th></tr></thead><tbody>';
   for(var i=0;i<ag.agents.length;i++){
     var a=ag.agents[i];
     var trust=typeof a.trust_score==='number'?a.trust_score.toFixed(1):'—';
@@ -1174,7 +1224,7 @@ function renderAgents(){
     o+='<tr><td class="mono">'+esc(a.gaii)+'</td><td>'+esc(a.owner)+'</td><td>'+esc(a.display_name||'—')+'</td>';
     o+='<td style="color:'+tColor+'">'+trust+'</td><td>'+num(a.morsel_balance)+'</td>';
     o+='<td style="color:var(--muted)">'+dt(a.last_seen)+'</td>';
-    o+='<td><button class="expand-btn" onclick="loadAgentDetail(\\''+esc(a.gaii)+'\\',this)">Details</button></td></tr>';
+    o+='<td><button class="expand-btn" onclick="loadAgentDetail(\\''+esc(a.gaii)+'\\',this)">'+__t.details+'</button></td></tr>';
     o+='<tr class="agent-detail" id="ad-'+i+'" style="display:none"><td colspan="7"></td></tr>';
   }
   o+='</tbody></table></div></div>';
@@ -1184,8 +1234,8 @@ function renderAgents(){
 /* ── ACTIONS ── */
 function renderActions(){
   var ac=D.actions;
-  if(!ac||!ac.actions||ac.actions.length===0)return '<div class="empty">No actions published</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>ID</th><th>Name</th><th>Provider</th><th>Category</th><th>Base Cost</th><th>Tags</th></tr></thead><tbody>';
+  if(!ac||!ac.actions||ac.actions.length===0)return '<div class="empty">'+__t.noActionsPublished+'</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.id+'</th><th>'+__t.name+'</th><th>'+__t.provider+'</th><th>'+__t.category+'</th><th>'+__t.baseCost+'</th><th>'+__t.tags+'</th></tr></thead><tbody>';
   for(var i=0;i<ac.actions.length;i++){
     var a=ac.actions[i];
     var tags=(a.tags||[]).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join(' ');
@@ -1202,7 +1252,7 @@ function renderActions(){
 /* ── BOARDS ── */
 function renderBoards(){
   var bo=D.boards;
-  if(!bo||!bo.boards||bo.boards.length===0)return '<div class="empty">No boards created</div>';
+  if(!bo||!bo.boards||bo.boards.length===0)return '<div class="empty">'+__t.noBoardsCreated+'</div>';
   var o='';
   for(var i=0;i<bo.boards.length;i++){
     var b=bo.boards[i];
@@ -1211,7 +1261,7 @@ function renderBoards(){
     o+='<div><h2>'+esc(b.name||b.id)+'</h2><p style="color:var(--muted);font-size:.8rem;margin-bottom:8px">'+esc(b.description||'No description')+'</p></div>';
     o+='<div>'+badge(b.visibility||'public')+'</div></div>';
     o+='<div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">ID: <span class="mono">'+esc(b.id)+'</span> &middot; Created: '+dt(b.created_at)+'</div>';
-    o+='<button class="expand-btn" onclick="loadBoardPosts(\\''+esc(b.id)+'\\',this)">Load Posts</button>';
+    o+='<button class="expand-btn" onclick="loadBoardPosts(\\''+esc(b.id)+'\\',this)">'+__t.loadPosts+'</button>';
     o+='<div id="bp-'+esc(b.id)+'" style="margin-top:8px"></div>';
     o+='</div>';
   }
@@ -1221,8 +1271,8 @@ function renderBoards(){
 /* ── WORK ── */
 function renderWork(){
   var items=D.workItems||[];
-  if(items.length===0)return '<div class="empty">No work contracts found</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>Tracking Code</th><th>Status</th><th>Action</th><th>Requester</th><th>Provider</th><th>Cost</th><th>Created</th></tr></thead><tbody>';
+  if(items.length===0)return '<div class="empty">'+__t.noWorkContracts+'</div>';
+  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.trackingCode+'</th><th>'+__t.status+'</th><th>'+__t.action+'</th><th>'+__t.requester+'</th><th>'+__t.provider+'</th><th>'+__t.cost+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
   for(var i=0;i<items.length;i++){
     var w=items[i];
     var cost=w.cost?(w.cost.total||w.cost.base_price||0):0;
@@ -1242,21 +1292,21 @@ function renderWork(){
 function renderEconomy(){
   var e=D.dash.economy;
   var o='<div class="grid grid-2">';
-  o+='<div class="card"><h2>Morsel Supply</h2>';
-  o+=er('In Circulation',num(e.total_morsels_in_circulation));
+  o+='<div class="card"><h2>'+__t.morselSupply+'</h2>';
+  o+=er(__t.inCirculation,num(e.total_morsels_in_circulation));
   o+=er('Total Minted (all time)',num(e.total_minted_all_time));
   o+=er('Total Burned (all time)',num(e.total_burned_all_time));
   o+=er('Inflation Rate (30d)',e.inflation_rate_30d_percent+'%');
   o+=er('Burn/Mint Ratio',e.burn_mint_ratio);
   o+='</div>';
-  o+='<div class="card"><h2>Today\\'s Activity</h2>';
-  o+=er('Transactions',num(e.transactions_today));
-  o+=er('Morsels Moved',num(e.morsels_transacted_today));
+  o+='<div class="card"><h2>'+__t.todayActivity+'</h2>';
+  o+=er(__t.transactionsToday,num(e.transactions_today));
+  o+=er(__t.morselsMovedToday,num(e.morsels_transacted_today));
   o+=er('Network Fees',num(e.network_fees_today));
   o+=er('Burned',num(e.burned_today));
   o+=er('Daily Allowances Issued',num(e.daily_allowances_issued_today));
   o+='</div></div>';
-  o+='<div class="card"><h2>Morsel Policy</h2>';
+  o+='<div class="card"><h2>'+__t.morselPolicy+'</h2>';
   o+=er('Welcome Bonus',num(e.welcome_bonus)+' morsels');
   o+=er('Daily Allowance',num(e.daily_allowance)+' morsels');
   o+=er('Allowance Cap',num(e.daily_allowance_cap)+' morsels');
@@ -1264,12 +1314,12 @@ function renderEconomy(){
   o+=er('Max Operator Mint/Day',num(e.max_operator_mint_per_day)+' morsels');
   o+='</div>';
   // Mint form
-  o+='<div class="card" style="margin-top:16px"><h2>Mint Morsels</h2>';
+  o+='<div class="card" style="margin-top:16px"><h2>'+__t.mintMorsels+'</h2>';
   o+='<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Issue morsels to an agent (daily cap: '+num(e.max_operator_mint_per_day)+')</p>';
   o+='<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">';
-  o+='<div style="flex:2;min-width:200px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">Agent GAII</label><input type="text" id="mintGaii" placeholder="agent#owner@node" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
-  o+='<div style="flex:1;min-width:100px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">Amount</label><input type="number" id="mintAmount" placeholder="100" min="1" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
-  o+='<button class="refresh" style="height:38px;white-space:nowrap" onclick="doMint()">Mint</button>';
+  o+='<div style="flex:2;min-width:200px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">'+__t.gaii+'</label><input type="text" id="mintGaii" placeholder="agent#owner@node" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
+  o+='<div style="flex:1;min-width:100px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">'+__t.amount+'</label><input type="number" id="mintAmount" placeholder="100" min="1" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
+  o+='<button class="refresh" style="height:38px;white-space:nowrap" onclick="doMint()">'+__t.mint+'</button>';
   o+='</div><div id="mintResult" style="margin-top:8px;font-size:.85rem"></div></div>';
   return o;
 }
@@ -1289,9 +1339,9 @@ async function doMint(){
 function renderMaintenance(){
   var m=D.maintenance||{enabled:false,message:'',enabledAt:null,enabledBy:null};
   var color=m.enabled?'red':'green';
-  var status=m.enabled?'MAINTENANCE ON':'OPERATIONAL';
+  var status=m.enabled?__t.maintenanceOn:__t.operational;
   var o='<div class="card" style="border-left:4px solid var(--'+color+')">';
-  o+='<h2>Maintenance Mode</h2>';
+  o+='<h2>'+__t.maintenanceMode+'</h2>';
   o+='<div class="stat" style="color:var(--'+color+');margin-bottom:12px">'+status+'</div>';
   if(m.enabled){
     o+='<div style="margin-bottom:12px">';
@@ -1312,10 +1362,10 @@ function renderMaintenance(){
   o+='<p style="color:var(--muted);font-size:.75rem;margin-top:12px">When maintenance mode is on, all non-essential endpoints return 503. Operators, health checks, and admin routes remain accessible.</p>';
   o+='</div>';
   // Backup/Restore
-  o+='<div class="card" style="margin-top:16px"><h2>Backup &amp; Restore</h2>';
+  o+='<div class="card" style="margin-top:16px"><h2>'+__t.backupRestore+'</h2>';
   o+='<div style="display:flex;gap:12px;flex-wrap:wrap">';
-  o+='<button class="refresh" style="flex:1;min-width:140px" onclick="doBackup()">Download Backup</button>';
-  o+='<button class="refresh" style="flex:1;min-width:140px;background:var(--purple)" onclick="document.getElementById(\\'restoreFile\\').click()">Restore from File</button>';
+  o+='<button class="refresh" style="flex:1;min-width:140px" onclick="doBackup()">'+__t.downloadBackup+'</button>';
+  o+='<button class="refresh" style="flex:1;min-width:140px;background:var(--purple)" onclick="document.getElementById(\\'restoreFile\\').click()">'+__t.restoreFromFile+'</button>';
   o+='<input type="file" id="restoreFile" accept=".json" style="display:none" onchange="doRestore(this)"/>';
   o+='</div>';
   o+='<div id="backupResult" style="margin-top:8px;font-size:.85rem"></div>';
@@ -1363,11 +1413,11 @@ async function toggleMaintenance(on){
 /* ── FEDERATION ── */
 function renderFederation(){
   var peers=D.federation||[];
-  var o='<div class="card"><h2>Peering Requests</h2>';
+  var o='<div class="card"><h2>'+__t.peeringRequests+'</h2>';
   if(peers.length===0){
-    o+='<div class="empty">No federation peers</div>';
+    o+='<div class="empty">'+__t.noFederationPeers+'</div>';
   }else{
-    o+='<div class="scrollable"><table><thead><tr><th>From Node</th><th>URL</th><th>Status</th><th>Message</th><th>Created</th></tr></thead><tbody>';
+    o+='<div class="scrollable"><table><thead><tr><th>'+__t.fromNode+'</th><th>'+__t.url+'</th><th>'+__t.status+'</th><th>'+__t.message+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
     for(var i=0;i<peers.length;i++){
       var p=peers[i];
       o+='<tr><td class="mono" style="font-size:.8rem">'+esc(p.from_node_id||p.id)+'</td>';
@@ -1379,7 +1429,7 @@ function renderFederation(){
     o+='</tbody></table></div>';
   }
   o+='</div>';
-  o+='<div class="card" style="margin-top:16px"><h2>Federation Info</h2>';
+  o+='<div class="card" style="margin-top:16px"><h2>'+__t.federationInfo+'</h2>';
   o+=er('Node ID',esc(D.dash.node_id));
   o+=er('Max Relay Hops',D.dash.config.max_relay_hops||3);
   o+='<p style="color:var(--muted);font-size:.8rem;margin-top:12px">To peer with another node, use POST /v1/federation/peer with the remote node URL.</p>';
@@ -1391,7 +1441,7 @@ function renderFederation(){
 function renderHooks(){
   var hooks=D.hooks||{};
   var hookNames=Object.keys(hooks);
-  var o='<div class="card"><h2>Extension Hooks</h2>';
+  var o='<div class="card"><h2>'+__t.extensionHooks+'</h2>';
   o+='<p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">Hooks let you trigger actions at key lifecycle events.</p>';
   o+='<div class="scrollable"><table><thead><tr><th>Hook</th><th>Bound Actions</th><th></th></tr></thead><tbody>';
   for(var i=0;i<hookNames.length;i++){
@@ -1400,7 +1450,7 @@ function renderHooks(){
     o+='<tr><td class="mono" style="font-size:.8rem">'+esc(name)+'</td>';
     o+='<td>'+(actions.length>0?actions.map(function(a){return '<span class="tag">'+esc(a)+'</span>'}).join(' '):'<span style="color:var(--muted)">none</span>')+'</td>';
     o+='<td>';
-    if(actions.length>0)o+='<button class="expand-btn" onclick="clearHook(\\''+esc(name)+'\\')">Clear</button>';
+    if(actions.length>0)o+='<button class="expand-btn" onclick="clearHook(\\''+esc(name)+'\\')">'+__t.clear+'</button>';
     o+='</td></tr>';
   }
   o+='</tbody></table></div></div>';
@@ -1418,15 +1468,15 @@ async function clearHook(name){
 /* ── CONFIG ── */
 function renderConfig(){
   var d=D.dash;
-  var o='<div class="card"><h2>Node Settings</h2>';
+  var o='<div class="card"><h2>'+__t.nodeSettings+'</h2>';
   o+=er('Node ID',esc(d.node_id));
-  o+=er('Storage',esc(d.storage_type));
-  o+=er('Port',d.config.port);
-  o+=er('JWT TTL',d.config.jwt_ttl_seconds+'s');
-  o+=er('Keyed Browse',d.config.keyed_browse_enabled?'Enabled':'Disabled');
-  o+=er('Uptime',fmtUp(d.uptime_seconds));
+  o+=er(__t.storage,esc(d.storage_type));
+  o+=er(__t.port,d.config.port);
+  o+=er(__t.jwtTtl,d.config.jwt_ttl_seconds+'s');
+  o+=er(__t.keyedBrowse,d.config.keyed_browse_enabled?__t.enabled:__t.disabled);
+  o+=er(__t.uptime,fmtUp(d.uptime_seconds));
   o+='</div>';
-  o+='<div class="card" style="margin-top:16px"><h2>Config API</h2>';
+  o+='<div class="card" style="margin-top:16px"><h2>'+__t.configApi+'</h2>';
   o+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:8px">Use the API to view and update runtime config:</p>';
   o+='<div style="font-size:.85rem">';
   o+=er('View full config','GET /v1/admin/config');
@@ -1463,9 +1513,9 @@ async function loadAgentDetail(gaii,btn){
     o+='</div>';
     row.querySelector('td').innerHTML=o;
     row.style.display='';
-    btn.textContent='Hide';btn.disabled=false;
-    btn.onclick=function(){row.style.display=row.style.display?'':'none';btn.textContent=row.style.display?'Details':'Hide'};
-  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent='Details';btn.disabled=false},2000)}
+    btn.textContent=__t.hide;btn.disabled=false;
+    btn.onclick=function(){row.style.display=row.style.display?'':'none';btn.textContent=row.style.display?__t.details:__t.hide};
+  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent=__t.details;btn.disabled=false},2000)}
 }
 
 async function loadBoardPosts(boardId,btn){
@@ -1474,7 +1524,7 @@ async function loadBoardPosts(boardId,btn){
     var r=await api('/v1/boards/'+encodeURIComponent(boardId)+'/posts?limit=50');
     var posts=r.data.posts||[];
     var el=document.getElementById('bp-'+boardId);
-    if(posts.length===0){el.innerHTML='<div class="empty">No posts</div>';btn.textContent='Load Posts';btn.disabled=false;return;}
+    if(posts.length===0){el.innerHTML='<div class="empty">'+__t.noData+'</div>';btn.textContent=__t.loadPosts;btn.disabled=false;return;}
     var o='<table><thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Created</th></tr></thead><tbody>';
     for(var i=0;i<posts.length;i++){
       var p=posts[i];
@@ -1485,14 +1535,15 @@ async function loadBoardPosts(boardId,btn){
     }
     o+='</tbody></table>';
     el.innerHTML=o;
-    btn.textContent='Refresh Posts';btn.disabled=false;
-  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent='Load Posts';btn.disabled=false},2000)}
+    btn.textContent=__t.refresh+' Posts';btn.disabled=false;
+  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent=__t.loadPosts;btn.disabled=false},2000)}
 }
 
 loadAll();
 </script>
 </body>
 </html>`;
+}
 
 // ── Admin Login Page HTML ──
 const ADMIN_LOGIN_HTML = `<!DOCTYPE html>

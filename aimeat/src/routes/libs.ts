@@ -482,6 +482,8 @@ const auth = {
     const container = document.querySelector(selector);
     if (!container) { console.error('AIMEAT: Container not found:', selector); return; }
 
+    const i = opts.i18n || {};
+
     function render() {
       const stored = load('session');
       if (stored) {
@@ -495,7 +497,7 @@ const auth = {
           + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
           + 'background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);'
           + 'box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span>'
-          + 'logged in</span>'
+          + escHtml(i.loggedIn || 'logged in') + '</span>'
           + '<span style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;'
           + 'text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);'
           + '-webkit-text-stroke:.2px rgba(120,85,20,.3)">'
@@ -505,7 +507,7 @@ const auth = {
           + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
           + 'border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;'
           + 'box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);'
-          + 'text-shadow:0 1px 1px rgba(0,0,0,.4)">Logout</button>'
+          + 'text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || 'Logout') + '</button>'
           + '</div>';
         document.getElementById('aimeat-logout-btn').addEventListener('click', () => {
           auth.logout();
@@ -513,8 +515,9 @@ const auth = {
           if (opts.onLogout) opts.onLogout();
         });
       } else {
-        container.innerHTML = '<button id="aimeat-login-btn" style="padding:8px 16px;background:#38bdf8;color:#0f172a;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:system-ui;font-size:14px">'
-          + (opts.buttonText || '\\u2764\\ufe0f Sign In') + '</button>';
+        container.innerHTML = '<style>.aimeat-sign-btn{padding:10px 20px;background:linear-gradient(135deg,#e8457a,#c44569);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-family:system-ui;font-size:14px;letter-spacing:.3px;box-shadow:0 2px 8px rgba(196,69,105,.3);transition:transform .15s,box-shadow .15s}.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(196,69,105,.4)}</style>'
+          + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
+          + (opts.buttonText || i.signInBtn || '\\u2764\\ufe0f Sign In') + '</button>';
         document.getElementById('aimeat-login-btn').addEventListener('click', () => showLoginModal(opts, render));
       }
     }
@@ -525,25 +528,37 @@ const auth = {
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function showLoginModal(opts, renderBtn) {
+  const i = opts.i18n || {};
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
 
   const modal = document.createElement('div');
   modal.id = 'aimeat-modal';
-  modal.innerHTML = '<div style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:system-ui">'
-    + '<div style="background:#1e293b;border:1px solid #475569;border-radius:16px;padding:24px;max-width:360px;width:90%;color:#e2e8f0">'
-    + '<h3 style="margin:0 0 16px;font-size:18px">\\u2764\\ufe0f AIMEAT Sign In</h3>'
+  modal.innerHTML = '<style>.aimeat-inp:focus{border-color:#c44569 !important}.aimeat-go{flex:1;padding:10px;background:linear-gradient(135deg,#e8457a,#c44569);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;letter-spacing:.3px;box-shadow:0 2px 8px rgba(196,69,105,.3);transition:transform .15s,box-shadow .15s}.aimeat-go:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(196,69,105,.4)}</style>'
+    + '<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:system-ui">'
+    + '<div style="background:#1e293b;border:1px solid #334155;border-radius:14px;padding:24px;max-width:400px;width:90%;color:#e2e8f0;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)">'
+    + '<h3 style="margin:0 0 16px;font-size:18px;color:#f0e6f6">' + escHtml(i.title || '\\u2764\\ufe0f AIMEAT Sign In') + '</h3>'
     + '<div id="aimeat-modal-body">'
-    + '<p style="margin:0 0 12px;font-size:13px;color:#94a3b8">New? Pick a username and password to create an account.<br>Returning? Enter your username and password to sign in.</p>'
-    + '<input id="aimeat-username" placeholder="Username" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:8px;box-sizing:border-box">'
-    + '<input id="aimeat-password" type="password" placeholder="Password (min 4 chars)" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:8px;box-sizing:border-box">'
-    + '<input id="aimeat-displayname" placeholder="Display Name (optional, for new accounts)" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:12px;box-sizing:border-box">'
+    + '<p style="margin:0 0 4px;font-size:13px;color:#94a3b8">' + escHtml(i.descNew || 'New? Pick a username and password to create an account.') + '</p>'
+    + '<p style="margin:0 0 12px;font-size:13px;color:#94a3b8">' + escHtml(i.descReturning || 'Already have an account? Enter your username and password.') + '</p>'
+    + '<input id="aimeat-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:8px;box-sizing:border-box;transition:border-color .2s">'
+    + '<input id="aimeat-password" type="password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password (min 4 chars)') + '" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:8px;box-sizing:border-box;transition:border-color .2s">'
+    + '<input id="aimeat-displayname" class="aimeat-inp" placeholder="' + escHtml(i.displayNamePlaceholder || 'Display Name (optional, for new accounts)') + '" style="width:100%;padding:8px 12px;background:#0f172a;border:1px solid #475569;border-radius:8px;color:#e2e8f0;font-size:14px;margin-bottom:12px;box-sizing:border-box;transition:border-color .2s">'
     + '<div style="display:flex;gap:8px">'
-    + '<button id="aimeat-go-btn" style="flex:1;padding:8px;background:#38bdf8;color:#0f172a;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px">Sign In</button>'
-    + '<button id="aimeat-cancel-btn" style="padding:8px 12px;background:#334155;color:#e2e8f0;border:none;border-radius:8px;cursor:pointer;font-size:14px">Cancel</button>'
+    + '<button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i.signInBtn || 'Sign In') + '</button>'
+    + '<button id="aimeat-cancel-btn" style="padding:8px 12px;background:#334155;color:#e2e8f0;border:none;border-radius:8px;cursor:pointer;font-size:14px">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
     + '</div>'
     + '<p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #334155">'
+    + '<p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#e2e8f0">' + escHtml(i.whyTitle || '\\u2728 What do you get?') + '</p>'
+    + '<ul style="margin:0;padding:0 0 0 18px;font-size:12px;color:#94a3b8;line-height:1.8;list-style:none">'
+    + '<li>\\u2764\\ufe0f ' + escHtml(i.whyGhii || 'A free GHII (Global Human Intelligence Identifier), your personal AI identity') + '</li>'
+    + '<li>\\ud83d\\udd12 ' + escHtml(i.whyPrivacy || 'Your own private memory space, protected by your password') + '</li>'
+    + '<li>\\ud83d\\udee1 ' + escHtml(i.whyControl || 'Full control: only you can access your data, no need to share with anyone') + '</li>'
+    + '<li>\\ud83e\\udd16 ' + escHtml(i.whyAgents || 'Connect AI agents that remember you and work on your behalf') + '</li>'
+    + '<li>\\ud83d\\udc96 ' + escHtml(i.whyMorsels || '100 free heart morsels to start! E.g. memory request ~ 1, board post ~ 2. You get 50 more every day') + '</li>'
+    + '</ul></div>'
     + '</div></div></div>';
   document.body.appendChild(modal);
 
@@ -557,19 +572,19 @@ function showLoginModal(opts, renderBtn) {
     const errEl = document.getElementById('aimeat-error');
 
     if (!username || username.length < 3) {
-      errEl.textContent = 'Username must be at least 3 characters';
+      errEl.textContent = i.errUserShort || 'Username must be at least 3 characters';
       errEl.style.display = 'block';
       return;
     }
 
     if (!password || password.length < 4) {
-      errEl.textContent = 'Password must be at least 4 characters';
+      errEl.textContent = i.errPassShort || 'Password must be at least 4 characters';
       errEl.style.display = 'block';
       return;
     }
 
     const btn = document.getElementById('aimeat-go-btn');
-    btn.textContent = 'Working...';
+    btn.textContent = i.working || 'Working...';
     btn.disabled = true;
 
     try {
@@ -588,16 +603,16 @@ function showLoginModal(opts, renderBtn) {
           if (opts.onLogin) opts.onLogin(session);
         } catch(e2) {
           errEl.textContent = e2.message.includes('Invalid username or password')
-            ? 'Wrong password for that username.'
+            ? (i.errWrongPass || 'Wrong password for that username.')
             : e2.message;
           errEl.style.display = 'block';
-          btn.textContent = 'Sign In';
+          btn.textContent = i.signInBtn || 'Sign In';
           btn.disabled = false;
         }
       } else {
         errEl.textContent = e.message;
         errEl.style.display = 'block';
-        btn.textContent = 'Sign In';
+        btn.textContent = i.signInBtn || 'Sign In';
         btn.disabled = false;
       }
     }
