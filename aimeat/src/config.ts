@@ -147,6 +147,11 @@ export interface AimeatConfig {
   crossFederationEnabled: boolean;
   maxGenesisPeers: number;
   genesisSyncIntervalHours: number;
+
+  // Cookie Consent (optional, for service builders)
+  cookieConsentEnabled: boolean;
+  cookieConsentCategories: string[];
+  cookieConsentPolicyUrl: string | null;
 }
 
 export function loadConfig(): AimeatConfig {
@@ -255,6 +260,9 @@ export function loadConfig(): AimeatConfig {
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),
+    cookieConsentEnabled: process.env.AIMEAT_COOKIE_CONSENT_ENABLED === 'true',
+    cookieConsentCategories: (process.env.AIMEAT_COOKIE_CONSENT_CATEGORIES ?? 'necessary').split(',').map(s => s.trim()).filter(Boolean),
+    cookieConsentPolicyUrl: process.env.AIMEAT_COOKIE_CONSENT_POLICY_URL ?? null,
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },
