@@ -304,7 +304,105 @@ describe('cookieConsentMiddleware', () => {
     expect(result).not.toContain('Privacy Policy');
     expect(result).not.toContain('footer');
   });
+
+  it('passes HTML through unchanged when there is no </body> tag', () => {
+    const config = makeConfig({ cookieConsentEnabled: true });
+    const middleware = cookieConsentMiddleware(config);
+
+    const req = {} as Request;
+    const headers = new Map<string, string | number | readonly string[]>();
+    let capturedBody: unknown;
+    const res = {
+      getHeader: (name: string) => headers.get(name.toLowerCase()),
+      send: vi.fn(function (this: Response, body?: unknown) {
+        capturedBody = body;
+        return this;
+      }),
+    } as unknown as Response;
+    const next = vi.fn() as unknown as NextFunction;
+
+    middleware(req, res, next);
+    headers.set('content-type', 'text/html');
+    const htmlWithoutBody = '<html><head><title>No body tag</title></head></html>';
+    res.send(htmlWithoutBody);
+
+    // Body should pass through without any injection
+    expect(capturedBody).toBe(htmlWithoutBody);
+    expect(capturedBody).not.toContain('CookieConsent');
+    expect(capturedBody).not.toContain('cookieconsent.css');
+  });
+
+  it('handles empty string body gracefully', () => {
+    const config = makeConfig({ cookieConsentEnabled: true });
+    const middleware = cookieConsentMiddleware(config);
+
+    const req = {} as Request;
+    const headers = new Map<string, string | number | readonly string[]>();
+    let capturedBody: unknown;
+    const res = {
+      getHeader: (name: string) => headers.get(name.toLowerCase()),
+      send: vi.fn(function (this: Response, body?: unknown) {
+        capturedBody = body;
+        return this;
+      }),
+    } as unknown as Response;
+    const next = vi.fn() as unknown as NextFunction;
+
+    middleware(req, res, next);
+    headers.set('content-type', 'text/html');
+    res.send('');
+
+    // Empty body should pass through unchanged
+    expect(capturedBody).toBe('');
+  });
+
+  it('passes non-string body through unchanged (e.g. Buffer)', () => {
+    const config = makeConfig({ cookieConsentEnabled: true });
+    const middleware = cookieConsentMiddleware(config);
+
+    const req = {} as Request;
+    const headers = new Map<string, string | number | readonly string[]>();
+    let capturedBody: unknown;
+    const res = {
+      getHeader: (name: string) => headers.get(name.toLowerCase()),
+      send: vi.fn(function (this: Response, body?: unknown) {
+        capturedBody = body;
+        return this;
+      }),
+    } as unknown as Response;
+    const next = vi.fn() as unknown as NextFunction;
+
+    middleware(req, res, next);
+    headers.set('content-type', 'text/html');
+    const buf = Buffer.from('<html><body></body></html>');
+    res.send(buf);
+
+    // Non-string body should pass through without modification
+    expect(capturedBody).toBe(buf);
+  });
 });
+
+/**
+ * Extract the JSON config object from a CookieConsent.run(...) call inside a JS string.
+ * Uses a balanced-brace counter since the config is a JSON object.
+ */
+function extractRunConfig(js: string): Record<string, unknown> {
+  const marker = 'CookieConsent.run(';
+  const start = js.indexOf(marker);
+  if (start === -1) throw new Error('CookieConsent.run( not found');
+  const jsonStart = start + marker.length;
+  let depth = 0;
+  let jsonEnd = -1;
+  for (let i = jsonStart; i < js.length; i++) {
+    if (js[i] === '{') depth++;
+    else if (js[i] === '}') {
+      depth--;
+      if (depth === 0) { jsonEnd = i + 1; break; }
+    }
+  }
+  if (jsonEnd === -1) throw new Error('Unbalanced braces in CookieConsent.run()');
+  return JSON.parse(js.slice(jsonStart, jsonEnd));
+}
 
 describe('buildStandaloneSnippetJs', () => {
   it('returns a JS IIFE containing CookieConsent.run', () => {
@@ -321,5 +419,37 @@ describe('buildStandaloneSnippetJs', () => {
     expect(js).toContain('cookieconsent.css');
     expect(js).toContain('cookieconsent.umd.js');
     expect(js).toContain('"analytics"');
+  });
+
+  it('always includes necessary category as enabled + readOnly even if not in config categories', () => {
+    const config = makeConfig({
+      cookieConsentEnabled: true,
+      cookieConsentCategories: ['analytics', 'marketing'],
+    });
+    const js = buildStandaloneSnippetJs(config);
+
+    const runConfig = extractRunConfig(js) as { categories: Record<string, unknown> };
+
+    // necessary must always be present with enabled: true, readOnly: true
+    expect(runConfig.categories.necessary).toEqual({ enabled: true, readOnly: true });
+    // Other categories should also be present
+    expect(runConfig.categories.analytics).toBeDefined();
+    expect(runConfig.categories.marketing).toBeDefined();
+  });
+
+  it('does not duplicate necessary when it is explicitly included in config categories', () => {
+    const config = makeConfig({
+      cookieConsentEnabled: true,
+      cookieConsentCategories: ['necessary', 'analytics'],
+    });
+    const js = buildStandaloneSnippetJs(config);
+
+    const runConfig = extractRunConfig(js) as { categories: Record<string, unknown> };
+
+    // necessary must still be enabled + readOnly
+    expect(runConfig.categories.necessary).toEqual({ enabled: true, readOnly: true });
+    // Should have exactly 2 categories
+    expect(Object.keys(runConfig.categories)).toHaveLength(2);
+    expect(runConfig.categories.analytics).toBeDefined();
   });
 });
