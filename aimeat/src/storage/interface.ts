@@ -233,6 +233,21 @@ export interface GHIIRecord {
   verificationIssuer?: string;
   verificationCredentialHash?: string;
   ftnVerified?: boolean;
+  // Economy (documented in GHII plan, now implemented)
+  trustScore?: number;              // Aggregate trust score (0-100)
+  morselBalance?: number;           // Morsel wallet balance
+}
+
+export interface ChatInstanceRecord {
+  id: string;              // Full identifier: "claude-myapp#jouni@node" or "anon-claude-1709337600#anonymous@node"
+  platform: string;        // "claude" | "chatgpt" | "grok" | "copilot" | "gemini" | ...
+  appName: string;         // App name or "anon-<timestamp>" for anonymous
+  ownerName: string;       // "anonymous" or username
+  ghii: string;            // Always set: "anonymous@node" or "username@node"
+  nodeId: string;          // Node where this instance operates
+  isAnonymous: boolean;    // true = anonymous session
+  createdAt: string;       // ISO timestamp — session start
+  lastSeen: string;        // ISO timestamp — last activity
 }
 
 export interface PersonalNodeRecord {
@@ -658,6 +673,13 @@ export interface Storage {
   getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null>;
   listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]>;
   deleteGHII(ghii: string): Promise<boolean>;
+
+  // Chat Instances
+  createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord>;
+  getChatInstance(id: string): Promise<ChatInstanceRecord | null>;
+  listChatInstances(opts?: { ownerName?: string; platform?: string; ghii?: string }): Promise<ChatInstanceRecord[]>;
+  updateChatInstance(id: string, updates: Partial<ChatInstanceRecord>): Promise<ChatInstanceRecord | null>;
+  deleteChatInstance(id: string): Promise<boolean>;
 
   // Personal Nodes
   createPersonalNode(node: PersonalNodeRecord): Promise<PersonalNodeRecord>;
