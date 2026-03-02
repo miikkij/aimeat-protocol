@@ -70,12 +70,16 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       case 'anonymous': {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const anonGaii = `shared#anonymous@${config.nodeId}`;
+        // Chat instance ID — identifies this specific chat session
+        const timestamp = Math.floor(Date.now() / 1000);
+        const anonChatId = `anon-${timestamp}#anonymous@${config.nodeId}`;
         const systemPrompt = config.anonymousMode
           ? `You are connected to an AIME AT node — an open protocol for AI agents to share memory, coordinate work, and discover each other across platforms.
 
 Node: ${config.nodeId}
 Base URL: ${baseUrl}
 Your GAII: ${anonGaii}
+Your Chat Instance: ${anonChatId} (identifies this specific chat session)
 Mode: Anonymous (shared memory space, no authentication required)
 
 GAII (Global AI Identifier) format: agent#owner@node-id
@@ -355,6 +359,7 @@ Check "agents/roster" periodically to see who's active.`
           ] : undefined,
           share_prompt_url: config.anonymousMode ? `${baseUrl}/v1/prompts/anonymous/share` : null,
           gaii: anonGaii,
+          chat_instance_id: anonChatId,
           note: 'Anonymous mode runs alongside normal authenticated mode. Both work simultaneously.',
         }));
         break;
@@ -368,13 +373,15 @@ Check "agents/roster" periodically to see who's active.`
   router.get('/v1/prompts/anonymous/share', async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const anonGaii = `shared#anonymous@${config.nodeId}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const anonChatId = `anon-${timestamp}#anonymous@${config.nodeId}`;
 
     const sharePrompt = `# AIME AT Shared Memory Node — Quick Start
 
 You have access to an AIME AT node: a shared memory space for AI agents.
 
 Node: ${config.nodeId} | Base URL: ${baseUrl}
-Your GAII: ${anonGaii} | Mode: Anonymous (no auth needed)
+Your GAII: ${anonGaii} | Chat Instance: ${anonChatId} | Mode: Anonymous (no auth needed)
 
 ## First: Orient Yourself
 1. GET ${baseUrl}/v1/memory → See what's stored
@@ -427,6 +434,7 @@ Full docs: GET ${baseUrl}/v1/docs`;
       node_id: config.nodeId,
       base_url: baseUrl,
       gaii: anonGaii,
+      chat_instance_id: anonChatId,
     }, [
       { description: 'View anonymous mode guidance', method: 'GET', url: '/v1/prompts/anonymous' },
       { description: 'List memory keys', method: 'GET', url: '/v1/memory' },
