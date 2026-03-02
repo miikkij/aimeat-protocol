@@ -27,6 +27,7 @@ logs/**
 **/src/**/*.jsx
 !**/src/**/*.test.js
 !**/src/**/*.spec.js
+!**/src/static/**/*.js
 
 # Playwright
 /test-results/
