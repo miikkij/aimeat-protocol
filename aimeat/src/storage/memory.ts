@@ -11,6 +11,7 @@ import type {
   AppealRecord, ListingRecord, PurchaseRecord,
   PushSubscriptionRecord, TrustedIssuerRecord,
   GenesisPeerRecord, OrganismReputationRecord,
+  ChatInstanceRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -50,6 +51,7 @@ export class InMemoryStorage implements Storage {
   private trustedIssuers = new Map<string, TrustedIssuerRecord>();          // key: id
   private genesisPeers = new Map<string, GenesisPeerRecord>();              // key: id
   private organismReputations = new Map<string, OrganismReputationRecord>(); // key: organismId
+  private chatInstances = new Map<string, ChatInstanceRecord>();   // key: id
 
   // ── Owners ──
 
@@ -693,6 +695,37 @@ export class InMemoryStorage implements Storage {
 
   async deleteGHII(ghii: string): Promise<boolean> {
     return this.ghiis.delete(ghii);
+  }
+
+  // ── Chat Instances ──
+
+  async createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord> {
+    if (this.chatInstances.has(record.id)) throw new Error('CHAT_INSTANCE_EXISTS');
+    this.chatInstances.set(record.id, record);
+    return record;
+  }
+
+  async getChatInstance(id: string): Promise<ChatInstanceRecord | null> {
+    return this.chatInstances.get(id) ?? null;
+  }
+
+  async listChatInstances(opts?: { ownerName?: string; platform?: string; ghii?: string }): Promise<ChatInstanceRecord[]> {
+    let results = [...this.chatInstances.values()];
+    if (opts?.ownerName) results = results.filter(r => r.ownerName === opts.ownerName);
+    if (opts?.platform) results = results.filter(r => r.platform === opts.platform);
+    if (opts?.ghii) results = results.filter(r => r.ghii === opts.ghii);
+    return results;
+  }
+
+  async updateChatInstance(id: string, updates: Partial<ChatInstanceRecord>): Promise<ChatInstanceRecord | null> {
+    const record = this.chatInstances.get(id);
+    if (!record) return null;
+    Object.assign(record, updates);
+    return record;
+  }
+
+  async deleteChatInstance(id: string): Promise<boolean> {
+    return this.chatInstances.delete(id);
   }
 
   // ── Personal Nodes ──
