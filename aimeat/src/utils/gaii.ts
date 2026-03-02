@@ -51,3 +51,75 @@ export function validateNodeId(nodeId: string): string | null {
 export function isValidGAII(gaii: string): boolean {
   return GAII_RE.test(gaii);
 }
+
+// Chat Instance ID format: platform-appname#owner@node
+// Same syntax as GAII but semantically different — represents a human-operated AI session
+// Examples:
+//   Logged in:  claude-myapp#jouni@aimeat-finland-001-genesis
+//   Anonymous:  chatgpt-anon-1709337600#anonymous@aimeat-finland-001-genesis
+
+export interface ParsedChatInstanceId {
+  platform: string;
+  appName: string;
+  ownerName: string;
+  nodeId: string;
+  full: string;
+  isAnonymous: boolean;
+}
+
+export function buildChatInstanceId(platform: string, appName: string, owner: string, node: string): string {
+  return `${platform}-${appName}#${owner}@${node}`;
+}
+
+export function parseChatInstanceId(id: string): ParsedChatInstanceId | null {
+  // Format: platform-appname#owner@node
+  const hashIdx = id.indexOf('#');
+  if (hashIdx < 0) return null;
+
+  const beforeHash = id.substring(0, hashIdx);
+  const afterHash = id.substring(hashIdx + 1);
+
+  const atIdx = afterHash.indexOf('@');
+  if (atIdx < 0) return null;
+
+  const ownerName = afterHash.substring(0, atIdx);
+  const nodeId = afterHash.substring(atIdx + 1);
+
+  if (!NODE_RE.test(nodeId)) return null;
+  if (!OWNER_RE.test(ownerName)) return null;
+
+  // Split beforeHash into platform and appName
+  // The appName is the last hyphen-separated segment
+  // EXCEPT for anonymous: "chatgpt-anon-1709337600" → platform=chatgpt, appName=anon-1709337600
+  const firstHyphen = beforeHash.indexOf('-');
+  if (firstHyphen < 0) return null;
+
+  const lastHyphen = beforeHash.lastIndexOf('-');
+  const afterLastHyphen = beforeHash.substring(lastHyphen + 1);
+  const beforeLastHyphen = beforeHash.substring(0, lastHyphen);
+
+  let platform: string;
+  let appName: string;
+
+  if (/^\d+$/.test(afterLastHyphen) && beforeLastHyphen.endsWith('-anon')) {
+    // Anonymous: "chatgpt-anon-1709337600" → platform=chatgpt, appName=anon-1709337600
+    const anonIdx = beforeLastHyphen.lastIndexOf('-anon');
+    platform = beforeLastHyphen.substring(0, anonIdx);
+    appName = beforeLastHyphen.substring(anonIdx + 1) + '-' + afterLastHyphen;
+  } else {
+    // Normal: last hyphen separates platform from appName
+    platform = beforeLastHyphen;
+    appName = afterLastHyphen;
+  }
+
+  if (!platform || !appName) return null;
+
+  return {
+    platform,
+    appName,
+    ownerName,
+    nodeId,
+    full: id,
+    isAnonymous: ownerName === 'anonymous',
+  };
+}
