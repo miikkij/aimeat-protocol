@@ -141,10 +141,12 @@
       "tasks": "Tasks",
       "apps": "Apps",
       "files": "Files",
-      "nodes": "Nodes"
+      "nodes": "Nodes",
+      "chatSessions": "Chat Sessions"
     },
     "tabs": {
       "agents": "Agents",
+      "chatSessions": "Chat Sessions",
       "wallet": "Wallet",
       "memory": "Memory",
       "work": "Work",
@@ -171,6 +173,19 @@
       "lastSeen": "Last seen",
       "loadingPrompt": "Loading prompt...",
       "loadingAgents": "Loading agents..."
+    },
+    "chatSessions": {
+      "title": "Chat Sessions",
+      "desc": "Chat sessions represent AI tools you use directly \u2014 like Claude, ChatGPT, Grok, or Copilot. Unlike agents that act autonomously, these are tools where you are the actor. Each session inherits your trust score and morsel balance.",
+      "empty": "No active chat sessions.",
+      "loading": "Loading chat sessions...",
+      "error": "Could not load chat sessions.",
+      "platform": "Platform",
+      "appName": "App Name",
+      "lastSeen": "Last Seen",
+      "delete": "End Session",
+      "anonymous": "Anonymous",
+      "economy": "Economy"
     },
     "wallet": {
       "title": "Wallet",
@@ -835,6 +850,9 @@
     "registeredAgents": "Registered Agents",
     "publishedActions": "Published Actions",
     "activeBoards": "Active Boards",
+    "chatInstances": "Chat Instances",
+    "activeChatSessions": "Active Chat Sessions",
+    "noChatInstances": "No chat instances",
     "totalMorsels": "Total Morsels",
     "grantOperator": "Grant Operator",
     "mint": "Mint",

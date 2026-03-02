@@ -141,10 +141,12 @@
       "tasks": "Tehtävät",
       "apps": "Sovellukset",
       "files": "Tiedostot",
-      "nodes": "Solmut"
+      "nodes": "Solmut",
+      "chatSessions": "Keskustelusessiot"
     },
     "tabs": {
       "agents": "Agentit",
+      "chatSessions": "Keskustelusessiot",
       "wallet": "Lompakko",
       "memory": "Muisti",
       "work": "Työt",
@@ -171,6 +173,19 @@
       "lastSeen": "Nähty viimeksi",
       "loadingPrompt": "Ladataan kehotetta...",
       "loadingAgents": "Ladataan agentteja..."
+    },
+    "chatSessions": {
+      "title": "Keskustelusessiot",
+      "desc": "Keskustelusessiot edustavat AI-työkaluja joita käytät suoraan \u2014 kuten Claude, ChatGPT, Grok tai Copilot. Toisin kuin agentit jotka toimivat itsenäisesti, nämä ovat työkaluja joissa sinä olet toimija. Jokaisella sessiolla on luottamuspisteesi ja murusaldosi.",
+      "empty": "Ei aktiivisia keskustelusessioita.",
+      "loading": "Ladataan keskustelusessioita...",
+      "error": "Keskustelusessioiden lataus epäonnistui.",
+      "platform": "Alusta",
+      "appName": "Sovellus",
+      "lastSeen": "Nähty viimeksi",
+      "delete": "Lopeta sessio",
+      "anonymous": "Anonyymi",
+      "economy": "Talous"
     },
     "wallet": {
       "title": "Lompakko",
@@ -835,6 +850,9 @@
     "registeredAgents": "Rekisteröidyt agentit",
     "publishedActions": "Julkaistut toiminnot",
     "activeBoards": "Aktiiviset taulut",
+    "chatInstances": "Chat-instanssit",
+    "activeChatSessions": "Aktiiviset chat-sessiot",
+    "noChatInstances": "Ei chat-instansseja",
     "totalMorsels": "Muruset yhteensä",
     "grantOperator": "Myönnä operaattori",
     "mint": "Lyö",
