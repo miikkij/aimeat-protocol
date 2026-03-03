@@ -38,6 +38,7 @@ export interface MemoryRecord {
   version: number;
   createdAt: string;
   updatedAt: string;
+  flagCount?: number;   // Phase 1.5 — moderation flag counter
 }
 
 export interface ActionRecord {
@@ -604,9 +605,10 @@ export interface Storage {
   // Memory
   setMemory(record: MemoryRecord): Promise<MemoryRecord>;
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
-  listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[] }): Promise<MemoryRecord[]>;
+  listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): Promise<MemoryRecord[]>;
   deleteMemory(ownerGaii: string, key: string): Promise<boolean>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
+  incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;
 
   // Actions
   createAction(action: ActionRecord): Promise<ActionRecord>;
@@ -686,7 +688,7 @@ export interface Storage {
   updatePeeringRequest(id: string, updates: Partial<PeeringRequestRecord>): Promise<PeeringRequestRecord | null>;
 
   // Memory search
-  searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string }): Promise<MemoryRecord[]>;
+  searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number }): Promise<MemoryRecord[]>;
 
   // Action update
   updateAction(id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null>;

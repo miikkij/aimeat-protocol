@@ -178,6 +178,7 @@ export class MongoStorage implements Storage {
                 tags: record.tags,
                 ttlHours: record.ttlHours,
                 version: record.version,
+                flagCount: record.flagCount ?? 0,
                 createdAt: new Date(record.createdAt),
                 updatedAt: new Date(record.updatedAt),
             },
@@ -187,6 +188,7 @@ export class MongoStorage implements Storage {
                 tags: record.tags,
                 ttlHours: record.ttlHours,
                 version: record.version,
+                flagCount: record.flagCount ?? 0,
                 updatedAt: new Date(record.updatedAt),
             },
         });
@@ -210,7 +212,7 @@ export class MongoStorage implements Storage {
         return this.toMemoryRecord(row);
     }
 
-    async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[] }): Promise<MemoryRecord[]> {
+    async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): Promise<MemoryRecord[]> {
         this.ensureReady();
         const where: any = { ownerGaii };
         if (opts?.prefix) where.key = { startsWith: opts.prefix };
@@ -223,7 +225,11 @@ export class MongoStorage implements Storage {
                 if (!r.ttlHours) return true;
                 return Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000;
             })
-            .map((r: any) => this.toMemoryRecord(r));
+            .map((r: any) => this.toMemoryRecord(r))
+            .filter((r: MemoryRecord) => {
+                if (opts?.maxFlags !== undefined && (r.flagCount ?? 0) > opts.maxFlags) return false;
+                return true;
+            });
     }
 
     async deleteMemory(ownerGaii: string, key: string): Promise<boolean> {
@@ -240,7 +246,16 @@ export class MongoStorage implements Storage {
         return result.count;
     }
 
-    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string }): Promise<MemoryRecord[]> {
+    async incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void> {
+        this.ensureReady();
+        const record = await this.getMemory(ownerGaii, key);
+        if (record) {
+            record.flagCount = (record.flagCount ?? 0) + 1;
+            await this.setMemory(record);
+        }
+    }
+
+    async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number }): Promise<MemoryRecord[]> {
         this.ensureReady();
         // MongoDB text search — search keys and string values
         const where: any = { ownerGaii };
@@ -260,7 +275,11 @@ export class MongoStorage implements Storage {
                 if (!r.ttlHours) return true;
                 return Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000;
             })
-            .map((r: any) => this.toMemoryRecord(r));
+            .map((r: any) => this.toMemoryRecord(r))
+            .filter((r: MemoryRecord) => {
+                if (opts?.maxFlags !== undefined && (r.flagCount ?? 0) > opts.maxFlags) return false;
+                return true;
+            });
     }
 
     // ── Actions ─────────────────────────────────────────────────
@@ -1006,7 +1025,7 @@ export class MongoStorage implements Storage {
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined };
     }
 
     private toActionRecord(row: any): ActionRecord {

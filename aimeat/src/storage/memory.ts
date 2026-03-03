@@ -145,7 +145,7 @@ export class InMemoryStorage implements Storage {
     return record;
   }
 
-  async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[] }): Promise<MemoryRecord[]> {
+  async listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number }): Promise<MemoryRecord[]> {
     const prefix = `${ownerGaii}::`;
     const results: MemoryRecord[] = [];
     for (const [k, v] of this.memory) {
@@ -157,6 +157,7 @@ export class InMemoryStorage implements Storage {
         const hasTags = opts.tags.every(t => v.tags.includes(t));
         if (!hasTags) continue;
       }
+      if (opts?.maxFlags !== undefined && (v.flagCount ?? 0) > opts.maxFlags) continue;
       results.push(v);
     }
     return results;
@@ -173,6 +174,14 @@ export class InMemoryStorage implements Storage {
       if (k.startsWith(prefix)) { this.memory.delete(k); count++; }
     }
     return count;
+  }
+
+  async incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void> {
+    const record = await this.getMemory(ownerGaii, key);
+    if (record) {
+      record.flagCount = (record.flagCount ?? 0) + 1;
+      await this.setMemory(record);
+    }
   }
 
   // ── Actions ──
@@ -589,7 +598,7 @@ export class InMemoryStorage implements Storage {
 
   // ── Memory Search ──
 
-  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string }): Promise<MemoryRecord[]> {
+  async searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number }): Promise<MemoryRecord[]> {
     const q = query.toLowerCase();
     const results: MemoryRecord[] = [];
     const prefix = `${ownerGaii}::`;
@@ -597,6 +606,7 @@ export class InMemoryStorage implements Storage {
       if (!k.startsWith(prefix)) continue;
       if (this.isMemoryExpired(v)) { this.memory.delete(k); continue; }
       if (opts?.visibility && v.visibility !== opts.visibility) continue;
+      if (opts?.maxFlags !== undefined && (v.flagCount ?? 0) > opts.maxFlags) continue;
       const valStr = typeof v.value === 'string' ? v.value : JSON.stringify(v.value);
       if (v.key.toLowerCase().includes(q) || valStr.toLowerCase().includes(q) || v.tags.some(t => t.toLowerCase().includes(q))) {
         results.push(v);
