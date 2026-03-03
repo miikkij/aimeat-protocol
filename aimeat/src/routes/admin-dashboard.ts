@@ -136,6 +136,11 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
     isPublic: t('dashboard.isPublic'), isPrivate: t('dashboard.isPrivate'),
     visibility: t('dashboard.visibility'), maxPeers: t('dashboard.maxPeers'),
     createdBy: t('dashboard.createdBy'), realtimeDisabled: t('dashboard.realtimeDisabled'),
+    navNode: t('dashboard.navNode'), navIdentity: t('dashboard.navIdentity'),
+    navData: t('dashboard.navData'), navInfrastructure: t('dashboard.navInfrastructure'),
+    navServices: t('dashboard.navServices'), navIntegrations: t('dashboard.navIntegrations'),
+    navFederation: t('dashboard.navFederation'),
+    csmManagement: t('dashboard.csmManagement'), msmManagement: t('dashboard.msmManagement'),
   };
 }
 
@@ -223,6 +228,7 @@ tr:hover td{background:#ffffff06}
 .scrollable{max-height:600px;overflow-y:auto}
 @media(max-width:768px){.sidebar{display:none}.main{padding:12px}}
 .hidden{display:none}
+.nav-group-label{font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:8px 16px 2px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -230,30 +236,37 @@ tr:hover td{background:#ffffff06}
 <nav class="sidebar">
   <h1>&#x2764;&#xFE0F; AIMEAT</h1>
   <div class="node-id" id="sideNodeId"></div>
-  <button class="nav-item active" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">${t('dashboard.overview')}</span></button>
-  <button class="nav-item" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">${t('dashboard.owners')}</span><span class="count" id="cntOwners">0</span></button>
-  <button class="nav-item" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">${t('dashboard.agents')}</span><span class="count" id="cntAgents">0</span></button>
-  <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">${t('dashboard.actions')}</span><span class="count" id="cntActions">0</span></button>
-  <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">${t('dashboard.boards')}</span><span class="count" id="cntBoards">0</span></button>
-  <button class="nav-item" onclick="nav('chatInstances')"><span class="icon">&#x1F4AC;</span><span class="label">${t('dashboard.chatInstances')}</span><span class="count" id="cntChatInstances">0</span></button>
-  <button class="nav-item" onclick="nav('realtime')"><span class="icon">&#x1F4E1;</span><span class="label">${t('dashboard.realtime')}</span><span class="count" id="cntRooms">0</span></button>
-  <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.work')}</span><span class="count" id="cntWork">0</span></button>
-  <div class="nav-sep"></div>
-  <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
-  <button class="nav-item" onclick="nav('federation')"><span class="icon">&#x1F310;</span><span class="label">${t('dashboard.federation')}</span><span class="count" id="cntPeers">0</span></button>
-  <button class="nav-item" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">${t('dashboard.hooks')}</span></button>
-  <button class="nav-item" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">${t('dashboard.maintenance')}</span></button>
-  <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">${t('dashboard.config')}</span></button>
-  <div class="nav-sep"></div>
-  <button class="nav-item" onclick="nav('ghii')"><span class="icon">&#x1F511;</span><span class="label">${t('dashboard.ghii')}</span><span class="count" id="cntGhii">0</span></button>
-  <button class="nav-item" onclick="nav('email')"><span class="icon">&#x2709;</span><span class="label">${t('dashboard.email')}</span></button>
-  <button class="nav-item" onclick="nav('directory')"><span class="icon">&#x1F4D6;</span><span class="label">${t('dashboard.directory')}</span></button>
-  <button class="nav-item" onclick="nav('matching')"><span class="icon">&#x1F91D;</span><span class="label">${t('dashboard.matching')}</span></button>
-  <button class="nav-item" onclick="nav('marketplace')"><span class="icon">&#x1F6D2;</span><span class="label">${t('dashboard.marketplace')}</span></button>
-  <button class="nav-item" onclick="nav('push')"><span class="icon">&#x1F514;</span><span class="label">${t('dashboard.push')}</span></button>
-  <button class="nav-item" onclick="nav('csm')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.csm')}</span></button>
-  <button class="nav-item" onclick="nav('msm')"><span class="icon">&#x1F50C;</span><span class="label">${t('dashboard.msmLabel')}</span><span class="count" id="cntMsm">0</span></button>
-  <button class="nav-item" onclick="nav('genesis')"><span class="icon">&#x1F30D;</span><span class="label">${t('dashboard.genesis')}</span><span class="count" id="cntGenesis">0</span></button>
+  <div class="nav-group-label" id="navNode">${t('dashboard.navNode')}</div>
+  <button class="nav-item active" data-page="overview" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">${t('dashboard.overview')}</span></button>
+  <button class="nav-item" data-page="economy" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
+  <button class="nav-item" data-page="config" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">${t('dashboard.config')}</span></button>
+  <button class="nav-item" data-page="maintenance" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">${t('dashboard.maintenance')}</span></button>
+  <button class="nav-item" data-page="hooks" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">${t('dashboard.hooks')}</span></button>
+  <div class="nav-group-label" id="navIdentity">${t('dashboard.navIdentity')}</div>
+  <button class="nav-item" data-page="owners" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">${t('dashboard.owners')}</span><span class="count" id="cntOwners">0</span></button>
+  <button class="nav-item" data-page="agents" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">${t('dashboard.agents')}</span><span class="count" id="cntAgents">0</span></button>
+  <button class="nav-item" data-page="ghii" onclick="nav('ghii')"><span class="icon">&#x1F511;</span><span class="label">${t('dashboard.ghii')}</span><span class="count" id="cntGhii">0</span></button>
+  <div class="nav-group-label" id="navData">${t('dashboard.navData')}</div>
+  <button class="nav-item" data-page="actions" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">${t('dashboard.actions')}</span><span class="count" id="cntActions">0</span></button>
+  <button class="nav-item" data-page="boards" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">${t('dashboard.boards')}</span><span class="count" id="cntBoards">0</span></button>
+  <button class="nav-item" data-page="chatInstances" onclick="nav('chatInstances')"><span class="icon">&#x1F4AC;</span><span class="label">${t('dashboard.chatInstances')}</span><span class="count" id="cntChatInstances">0</span></button>
+  <button class="nav-item" data-page="realtime" onclick="nav('realtime')"><span class="icon">&#x1F4E1;</span><span class="label">${t('dashboard.realtime')}</span><span class="count" id="cntRooms">0</span></button>
+  <button class="nav-item" data-page="work" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.work')}</span><span class="count" id="cntWork">0</span></button>
+  <div class="nav-group-label" id="navInfrastructure">${t('dashboard.navInfrastructure')}</div>
+  <button class="nav-item" data-page="email" onclick="nav('email')"><span class="icon">&#x2709;</span><span class="label">${t('dashboard.email')}</span></button>
+  <button class="nav-item" data-page="push" onclick="nav('push')"><span class="icon">&#x1F514;</span><span class="label">${t('dashboard.push')}</span></button>
+  <div class="nav-group-label" id="navServices">${t('dashboard.navServices')}</div>
+  <button class="nav-item" data-page="directory" onclick="nav('directory')"><span class="icon">&#x1F4D6;</span><span class="label">${t('dashboard.directory')}</span></button>
+  <button class="nav-item" data-page="matching" onclick="nav('matching')"><span class="icon">&#x1F91D;</span><span class="label">${t('dashboard.matching')}</span></button>
+  <button class="nav-item" data-page="marketplace" onclick="nav('marketplace')"><span class="icon">&#x1F6D2;</span><span class="label">${t('dashboard.marketplace')}</span></button>
+  <div id="dynamicServices"></div>
+  <button class="nav-item" data-page="csm" onclick="nav('csm')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.csmManagement')}</span></button>
+  <div class="nav-group-label" id="navIntegrations">${t('dashboard.navIntegrations')}</div>
+  <div id="dynamicIntegrations"></div>
+  <button class="nav-item" data-page="msm" onclick="nav('msm')"><span class="icon">&#x1F50C;</span><span class="label">${t('dashboard.msmManagement')}</span><span class="count" id="cntMsm">0</span></button>
+  <div class="nav-group-label" id="navFederation">${t('dashboard.navFederation')}</div>
+  <button class="nav-item" data-page="federation" onclick="nav('federation')"><span class="icon">&#x1F310;</span><span class="label">${t('dashboard.federation')}</span><span class="count" id="cntPeers">0</span></button>
+  <button class="nav-item" data-page="genesis" onclick="nav('genesis')"><span class="icon">&#x1F30D;</span><span class="label">${t('dashboard.genesis')}</span><span class="count" id="cntGenesis">0</span></button>
 </nav>
 <div class="main">
   <div class="topbar">
@@ -334,11 +347,27 @@ async function switchLang(lang){
   }
 }
 function updateSidebarLabels(){
-  var btns=document.querySelectorAll('.nav-item');
-  var keys=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghiiLabel','emailLabel','directoryLabel','matchingLabel','marketplaceLabel','pushLabel','csmLabel','msmLabel','genesisLabel'];
-  for(var i=0;i<btns.length&&i<keys.length;i++){
-    var lbl=btns[i].querySelector('.label');
-    if(lbl&&__t[keys[i]])lbl.textContent=__t[keys[i]];
+  var map={
+    overview:__t.overview,economy:__t.economy,config:__t.config,
+    maintenance:__t.maintenance,hooks:__t.extensionHooks,
+    owners:__t.owners,agents:__t.agents,ghii:__t.ghiiLabel,
+    actions:__t.actions,boards:__t.boards,chatInstances:__t.chatInstances,
+    realtime:__t.realtime,work:__t.work,
+    email:__t.emailLabel,push:__t.pushLabel,
+    directory:__t.directoryLabel,matching:__t.matchingLabel,marketplace:__t.marketplaceLabel,
+    csm:__t.csmManagement,msm:__t.msmManagement,
+    federation:__t.federation,genesis:__t.genesisLabel
+  };
+  for(var page in map){
+    var btn=document.querySelector('[data-page="'+page+'"]');
+    if(btn){var lbl=btn.querySelector('.label');if(lbl&&map[page])lbl.textContent=map[page];}
+  }
+  var grpMap={navNode:__t.navNode,navIdentity:__t.navIdentity,navData:__t.navData,
+    navInfrastructure:__t.navInfrastructure,navServices:__t.navServices,
+    navIntegrations:__t.navIntegrations,navFederation:__t.navFederation};
+  for(var grp in grpMap){
+    var el=document.getElementById(grp);
+    if(el&&grpMap[grp])el.textContent=grpMap[grp];
   }
 }
 function updateLangIndicator(lang){
@@ -404,12 +433,33 @@ function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.
 function nav(page){
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
-  var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghii','email','directory','matching','marketplace','push','csm','msm','genesis'];
-  for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config,ghii:'\\u{1F511} '+__t.ghiiLabel,email:'\\u2709 '+__t.emailLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,push:'\\u{1F514} '+__t.pushLabel,csm:'\\u{1F4E6} '+__t.csmLabel,msm:'\\u{1F50C} '+__t.msmLabel,genesis:'\\u{1F30D} '+__t.genesisLabel};
-  document.getElementById('pageTitle').innerHTML=titles[page]||page;
+  var baseP=page.indexOf(':')>0?page.split(':')[0]:page;
+  var btn=document.querySelector('[data-page="'+baseP+'"]');
+  if(btn)btn.classList.add('active');
+  var titles={overview:'\\u{1F4CA} '+__t.overview,economy:'\\u{1FA99} '+__t.economy,config:'\\u2699 '+__t.config,maintenance:'\\u{1F6A7} '+__t.maintenance,hooks:'\\u{1F517} '+__t.extensionHooks,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,ghii:'\\u{1F511} '+__t.ghiiLabel,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,email:'\\u2709 '+__t.emailLabel,push:'\\u{1F514} '+__t.pushLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,csm:'\\u{1F4E6} '+__t.csmManagement,msm:'\\u{1F50C} '+__t.msmManagement,federation:'\\u{1F310} '+__t.federation,genesis:'\\u{1F30D} '+__t.genesisLabel};
+  document.getElementById('pageTitle').innerHTML=titles[baseP]||page;
   render();
+}
+
+function renderDynamicNav(){
+  var svcEl=document.getElementById('dynamicServices');
+  if(svcEl&&D.csmTemplates&&D.csmTemplates.templates){
+    var h='';
+    for(var i=0;i<D.csmTemplates.templates.length;i++){
+      var c=D.csmTemplates.templates[i];
+      h+='<button class="nav-item" onclick="nav(\\'csmDetail:'+esc(c.name)+'\\')"><span class="icon">&#x1F4E6;</span><span class="label">'+esc(c.name)+'</span></button>';
+    }
+    svcEl.innerHTML=h;
+  }
+  var intEl=document.getElementById('dynamicIntegrations');
+  if(intEl&&D.msmIntegrations&&D.msmIntegrations.integrations){
+    var h2='';
+    for(var j=0;j<D.msmIntegrations.integrations.length;j++){
+      var m=D.msmIntegrations.integrations[j];
+      h2+='<button class="nav-item" onclick="nav(\\'msmDetail:'+esc(m.name)+'\\')"><span class="icon">&#x1F50C;</span><span class="label">'+esc(m.name)+'</span></button>';
+    }
+    intEl.innerHTML=h2;
+  }
 }
 
 async function loadAll(){
@@ -485,6 +535,7 @@ async function loadAll(){
     if(D.msmIntegrations)document.getElementById('cntMsm').textContent=D.msmIntegrations.total||0;
     document.getElementById('sideNodeId').textContent=D.dash?D.dash.node_id:'';
     document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString();
+    renderDynamicNav();
     render();
   }catch(e){
     if(e.message==='Unauthorized')return;

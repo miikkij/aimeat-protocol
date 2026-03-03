@@ -1166,7 +1166,17 @@
     "visibility": "Visibility",
     "maxPeers": "Max Peers",
     "createdBy": "Created By",
-    "realtimeDisabled": "Realtime is disabled on this node"
+    "realtimeDisabled": "Realtime is disabled on this node",
+
+    "navNode": "Node",
+    "navIdentity": "Identity",
+    "navData": "Data",
+    "navInfrastructure": "Infrastructure",
+    "navServices": "Services",
+    "navIntegrations": "Integrations",
+    "navFederation": "Federation",
+    "csmManagement": "CSM Management",
+    "msmManagement": "MSM Management"
   },
   "launcher": {
     "title": "My Apps",

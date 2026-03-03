@@ -1166,7 +1166,17 @@
     "visibility": "Näkyvyys",
     "maxPeers": "Maks. vertaiset",
     "createdBy": "Luoja",
-    "realtimeDisabled": "Reaaliaikatoiminto on poistettu käytöstä tässä solmussa"
+    "realtimeDisabled": "Reaaliaikatoiminto on poistettu käytöstä tässä solmussa",
+
+    "navNode": "Solmu",
+    "navIdentity": "Identiteetti",
+    "navData": "Data",
+    "navInfrastructure": "Infrastruktuuri",
+    "navServices": "Palvelut",
+    "navIntegrations": "Integraatiot",
+    "navFederation": "Federaatio",
+    "csmManagement": "CSM-hallinta",
+    "msmManagement": "MSM-hallinta"
   },
   "launcher": {
     "title": "Omat Sovellukset",
