@@ -160,10 +160,24 @@ AIMEAT's architecture is: **CSM defines data shape + rules → Generic APIs hand
 | Wallet | Morsel economy |
 | CSM/MSM | Service manifest registration |
 
-### Legacy SSR files (scheduled for removal)
+### SSR Removal — COMPLETED (2026-03-03)
 
-These files violate the architecture rule and are being removed/refactored:
-`portal-hobbies.ts`, `portal-marketplace.ts`, `portal-human.ts`, `portal.ts`, `profile.ts`, `guides.ts`, `aimeat-os.ts`, `admin-dashboard.ts`, `personal.ts`
+6 SSR backend files (~9,000 lines) were removed and replaced with static HTML files in `aimeat/public/`:
+
+| Deleted backend file | Replaced by | Lines removed |
+|---------------------|-------------|---------------|
+| `portal-hobbies.ts` | `public/hobbies.html` | 1,153 |
+| `portal-marketplace.ts` | `public/marketplace.html` | 910 |
+| `portal-human.ts` | `public/human.html` | 2,546 |
+| `profile.ts` | `public/profile.html` | 2,048 |
+| `guides.ts` | `public/guides.html` | 1,793 |
+| `aimeat-os.ts` | `public/aimeat-os.html` | 551 |
+
+**Remaining exceptions (kept intentionally):**
+- `admin-dashboard.ts` — operator tooling (will migrate to SPA later)
+- `portal.ts` — landing page entry point (redirects to static HTML)
+- `personal.ts` — pure JSON API, NOT SSR
+- `portal-api.ts` — pure JSON API (extracted from portal-human.ts)
 
 ## Common Pitfalls
 
