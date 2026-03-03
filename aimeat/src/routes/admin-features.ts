@@ -211,6 +211,25 @@ export function adminFeaturesRouter(
         }));
     }));
 
+    // ── MSM Integrations ────────────────────────────────────
+
+    router.get('/v1/admin/msm', ...auth, handle(async (_req, res) => {
+        const msms = await storage.listMsms();
+        res.json(success(config.nodeId, {
+            integrations: msms.map(m => ({
+                name: m.name,
+                category: m.category,
+                auth_type: m.authType,
+                actions_count: m.actionsCount,
+                registered_by: m.registeredBy,
+                registered_at: m.registeredAt,
+                updated_at: m.updatedAt,
+                federate: m.federate ?? false,
+            })),
+            total: msms.length,
+        }));
+    }));
+
     // ── Genesis Peers (Cross-Federation) ────────────────────
 
     router.get('/v1/admin/genesis-peers', ...auth, handle(async (_req, res) => {

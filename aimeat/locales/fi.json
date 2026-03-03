@@ -971,6 +971,7 @@
     "marketplace": "Kauppapaikka",
     "push": "Push-ilmoitukset",
     "csm": "CSM-palvelut",
+    "msm": "Integraatiot",
     "genesis": "Genesis-vertaiset",
 
     "healthBurnMintRatio": "Poltto/lyönti-suhde",
@@ -1101,6 +1102,13 @@
     "registered": "Rekisteröity",
     "updated": "Päivitetty",
     "csmNotAvailable": "CSM-tiedot eivät saatavilla",
+
+    "msmLabel": "Integraatiot",
+    "msmExplain": "Ulkoiset API-integraatiot (MSM — Machine Service Manifest)",
+    "msmCategory": "Kategoria",
+    "msmAuthType": "Todennus",
+    "msmActions": "Toiminnot",
+    "noMsmIntegrations": "Ei rekisteröityjä MSM-integraatioita",
 
     "totalPeers": "Vertaiset yhteensä",
     "active": "Aktiivinen",

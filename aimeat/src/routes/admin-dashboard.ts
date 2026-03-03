@@ -117,7 +117,10 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
     ghiiLabel: t('dashboard.ghii'), emailLabel: t('dashboard.email'),
     directoryLabel: t('dashboard.directory'), matchingLabel: t('dashboard.matching'),
     marketplaceLabel: t('dashboard.marketplace'), pushLabel: t('dashboard.push'),
-    csmLabel: t('dashboard.csm'), genesisLabel: t('dashboard.genesis'),
+    csmLabel: t('dashboard.csm'), msmLabel: t('dashboard.msmLabel'), genesisLabel: t('dashboard.genesis'),
+    msmExplain: t('dashboard.msmExplain'), msmCategory: t('dashboard.msmCategory'),
+    msmAuthType: t('dashboard.msmAuthType'), msmActions: t('dashboard.msmActions'),
+    noMsmIntegrations: t('dashboard.noMsmIntegrations'),
     language: t('dashboard.language'),
     realtime: t('dashboard.realtime'), activeRooms: t('dashboard.activeRooms'),
     connectedPeers: t('dashboard.connectedPeers'), messagesIn: t('dashboard.messagesIn'),
@@ -249,6 +252,7 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item" onclick="nav('marketplace')"><span class="icon">&#x1F6D2;</span><span class="label">${t('dashboard.marketplace')}</span></button>
   <button class="nav-item" onclick="nav('push')"><span class="icon">&#x1F514;</span><span class="label">${t('dashboard.push')}</span></button>
   <button class="nav-item" onclick="nav('csm')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.csm')}</span></button>
+  <button class="nav-item" onclick="nav('msm')"><span class="icon">&#x1F50C;</span><span class="label">${t('dashboard.msmLabel')}</span><span class="count" id="cntMsm">0</span></button>
   <button class="nav-item" onclick="nav('genesis')"><span class="icon">&#x1F30D;</span><span class="label">${t('dashboard.genesis')}</span><span class="count" id="cntGenesis">0</span></button>
 </nav>
 <div class="main">
@@ -331,7 +335,7 @@ async function switchLang(lang){
 }
 function updateSidebarLabels(){
   var btns=document.querySelectorAll('.nav-item');
-  var keys=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghiiLabel','emailLabel','directoryLabel','matchingLabel','marketplaceLabel','pushLabel','csmLabel','genesisLabel'];
+  var keys=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghiiLabel','emailLabel','directoryLabel','matchingLabel','marketplaceLabel','pushLabel','csmLabel','msmLabel','genesisLabel'];
   for(var i=0;i<btns.length&&i<keys.length;i++){
     var lbl=btns[i].querySelector('.label');
     if(lbl&&__t[keys[i]])lbl.textContent=__t[keys[i]];
@@ -401,9 +405,9 @@ function nav(page){
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
   var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghii','email','directory','matching','marketplace','push','csm','genesis'];
+  var pages=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghii','email','directory','matching','marketplace','push','csm','msm','genesis'];
   for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config,ghii:'\\u{1F511} '+__t.ghiiLabel,email:'\\u2709 '+__t.emailLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,push:'\\u{1F514} '+__t.pushLabel,csm:'\\u{1F4E6} '+__t.csmLabel,genesis:'\\u{1F30D} '+__t.genesisLabel};
+  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config,ghii:'\\u{1F511} '+__t.ghiiLabel,email:'\\u2709 '+__t.emailLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,push:'\\u{1F514} '+__t.pushLabel,csm:'\\u{1F4E6} '+__t.csmLabel,msm:'\\u{1F50C} '+__t.msmLabel,genesis:'\\u{1F30D} '+__t.genesisLabel};
   document.getElementById('pageTitle').innerHTML=titles[page]||page;
   render();
 }
@@ -451,6 +455,7 @@ async function loadAll(){
       api('/v1/admin/marketplace'),
       api('/v1/admin/push'),
       api('/v1/admin/csm'),
+      api('/v1/admin/msm'),
       api('/v1/admin/genesis-peers'),
       api('/v1/admin/config')
     ]);
@@ -461,8 +466,9 @@ async function loadAll(){
     D.marketplaceStats=features[4].status==='fulfilled'?features[4].value.data:null;
     D.pushStats=features[5].status==='fulfilled'?features[5].value.data:null;
     D.csmTemplates=features[6].status==='fulfilled'?features[6].value.data:null;
-    D.genesisPeers=features[7].status==='fulfilled'?features[7].value.data:null;
-    D.configSchema=features[8].status==='fulfilled'?features[8].value.data:null;
+    D.msmIntegrations=features[7].status==='fulfilled'?features[7].value.data:null;
+    D.genesisPeers=features[8].status==='fulfilled'?features[8].value.data:null;
+    D.configSchema=features[9].status==='fulfilled'?features[9].value.data:null;
     // Load owners
     try{
       var ownerNames=D.agents&&D.agents.agents?[...new Set(D.agents.agents.map(function(a){return a.owner}))]:[];
@@ -476,6 +482,7 @@ async function loadAll(){
     if(D.realtime&&D.realtime.stats)document.getElementById('cntRooms').textContent=D.realtime.stats.rooms;
     if(D.ghiiUsers)document.getElementById('cntGhii').textContent=D.ghiiUsers.length;
     if(D.genesisPeers&&D.genesisPeers.peers)document.getElementById('cntGenesis').textContent=D.genesisPeers.peers.length;
+    if(D.msmIntegrations)document.getElementById('cntMsm').textContent=D.msmIntegrations.total||0;
     document.getElementById('sideNodeId').textContent=D.dash?D.dash.node_id:'';
     document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString();
     render();
@@ -510,6 +517,7 @@ function render(){
     case 'marketplace':app.innerHTML=renderMarketplace();break;
     case 'push':app.innerHTML=renderPush();break;
     case 'csm':app.innerHTML=renderCsm();break;
+    case 'msm':app.innerHTML=renderMsm();break;
     case 'genesis':app.innerHTML=renderGenesis();break;
     default:app.innerHTML=emptyState('Unknown page');
   }
@@ -1175,6 +1183,25 @@ function renderCsm(){
   var rows=[];for(var i=0;i<templates.length;i++){var c=templates[i];rows.push([{text:'<code>'+esc(c.name)+'</code>',html:true},c.service_type||'-',c.registered_by,{text:c.federate?badge('healthy'):badge('critical'),html:true},{text:dt(c.registered_at),html:true},{text:dt(c.updated_at),html:true}]);}
   o+=dataTable([__t.name,__t.serviceType,__t.registeredBy,__t.federate,__t.registered,__t.updated],rows);
   return o;
+}
+
+/* ── MSM INTEGRATIONS ── */
+function renderMsm(){
+  var d=D.msmIntegrations;
+  if(!d||!d.integrations||d.integrations.length===0)return emptyState(__t.noMsmIntegrations);
+  return dataTable(
+    [__t.name,__t.msmCategory,__t.msmAuthType,__t.msmActions,__t.author,__t.registered,__t.updated],
+    d.integrations.map(function(m){return [
+      {text:m.name,mono:true},
+      m.category,
+      m.auth_type,
+      String(m.actions_count),
+      m.registered_by,
+      dt(m.registered_at),
+      dt(m.updated_at)
+    ]}),
+    {card:true,scroll:true}
+  );
 }
 
 /* ── GENESIS PEERS ── */

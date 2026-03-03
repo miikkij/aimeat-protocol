@@ -971,6 +971,7 @@
     "marketplace": "Marketplace",
     "push": "Push",
     "csm": "CSM Services",
+    "msm": "Integrations",
     "genesis": "Genesis Peers",
 
     "healthBurnMintRatio": "Burn/Mint Ratio",
@@ -1101,6 +1102,13 @@
     "registered": "Registered",
     "updated": "Updated",
     "csmNotAvailable": "CSM data not available",
+
+    "msmLabel": "Integrations",
+    "msmExplain": "External API integrations (MSM — Machine Service Manifest)",
+    "msmCategory": "Category",
+    "msmAuthType": "Auth",
+    "msmActions": "Actions",
+    "noMsmIntegrations": "No MSM integrations registered",
 
     "totalPeers": "Total Peers",
     "active": "Active",
