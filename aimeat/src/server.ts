@@ -73,6 +73,7 @@ import { RealtimeManager } from './services/realtime-manager.js';
 import { startMatchNotificationJob } from './services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from './services/matching.js';
 import { adminFeaturesRouter } from './routes/admin-features.js';
+import { setupRouter } from './routes/setup.js';
 import { createGenesisPeeringService } from './services/genesis-peering.js';
 import { initStats } from './services/stats.js';
 import { statsMiddleware } from './middleware/stats.js';
@@ -320,7 +321,39 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     next();
   };
 
+  // First-run detection: redirect to wizard if no owners exist
+  let hasOwners: boolean | null = null;
+  const invalidateHasOwnersCache = () => { hasOwners = true; };
+  app.use(async (req, res, next) => {
+    // Skip for API routes, static assets, and wizard page
+    if (req.path.startsWith('/v1/') || req.path.includes('.') || req.path === '/wizard.html') {
+      next();
+      return;
+    }
+    // Cache the check
+    if (hasOwners === null) {
+      const owners = await storage.listOwners();
+      hasOwners = owners.length > 0;
+    }
+    if (!hasOwners) {
+      // Serve wizard inline (resolvePublicFile pattern)
+      const wizardCandidates = [
+        join(__dirname, '..', 'public', 'wizard.html'),
+        join(__dirname, '..', '..', 'public', 'wizard.html'),
+      ];
+      const wizardPath = wizardCandidates.find(p => existsSync(p));
+      if (wizardPath) {
+        res.type('text/html').send(readFileSync(wizardPath, 'utf-8'));
+      } else {
+        res.redirect(302, '/v1/setup/status');
+      }
+      return;
+    }
+    next();
+  });
+
   // Mount routes
+  app.use(setupRouter(config, storage, invalidateHasOwnersCache));
   app.use(bootstrapRouter(config));
   app.use(statsRouter(config, storage, stats));
   app.use(wellknownRouter(config, storage));
