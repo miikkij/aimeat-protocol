@@ -1134,6 +1134,153 @@ await json(`/v1/owners/${chatOwnerName}`, {
     headers: { Authorization: `Bearer ${chatOwnerToken}` },
 });
 
+// ─── Node Portal (Site) ───
+console.log('Node Portal (Site)');
+
+await test('GET /v1/site — portal metadata', async () => {
+    const { status, body } = await json('/v1/site');
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.node_id === 'string', 'has node_id');
+    assert(Array.isArray(body.data?.tag_types), 'has tag_types');
+});
+
+await test('GET /v1/site/prompt — AI prompt (no auth)', async () => {
+    const { status, body } = await json('/v1/site/prompt');
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.prompt === 'string', 'has prompt string');
+    assert(body.data.prompt.length > 0, 'prompt not empty');
+});
+
+await test('GET /v1/site/template — no template yet', async () => {
+    const { status, body } = await json('/v1/site/template', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+    assert(body.ok === false, 'not ok');
+});
+
+await test('POST /v1/site/template — upload template', async () => {
+    const template = '<html><body><h1>{{config:nodeName}}</h1><p>Hello from {{kv:region}}</p></body></html>';
+    const { status, body } = await json('/v1/site/template', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ template }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.stored === true, 'stored');
+    assert(typeof body.data?.size_bytes === 'number', 'has size_bytes');
+    assert(Array.isArray(body.data?.tags_found), 'has tags_found');
+});
+
+await test('POST /v1/site/template — reject missing body', async () => {
+    const { status, body } = await json('/v1/site/template', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({}),
+    });
+    assert(status === 422, `expected 422, got ${status}`);
+    assert(body.ok === false, 'not ok');
+});
+
+await test('GET /v1/site/template — download uploaded template', async () => {
+    const { status, body } = await json('/v1/site/template', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.template === 'string', 'has template');
+    assert(body.data.template.includes('{{config:nodeName}}'), 'template has config tag');
+    assert(typeof body.data?.size_bytes === 'number', 'has size_bytes');
+    assert(Array.isArray(body.data?.tags_found), 'has tags_found');
+});
+
+await test('GET / — serves resolved custom template', async () => {
+    const res = await fetch(`${BASE}/`);
+    const ct = res.headers.get('content-type') ?? '';
+    assert(ct.includes('text/html'), `expected HTML, got ${ct}`);
+    const html = await res.text();
+    assert(html.includes('<h1>'), 'has heading');
+    // Tags should be resolved — nodeName should NOT appear as {{config:nodeName}}
+    assert(!html.includes('{{config:nodeName}}'), 'config tag should be resolved');
+});
+
+await test('POST /v1/site/import — import bundle', async () => {
+    const bundle = {
+        template: '<html><body><h1>Imported</h1><p>{{memory:portal/welcome}}</p></body></html>',
+        memory: { 'portal/welcome': 'Welcome to the imported portal!' },
+        kv: { greeting: 'Hello World' },
+    };
+    const { status, body } = await json('/v1/site/import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify(bundle),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.template_stored === true, 'template stored');
+    assert(body.data?.memory_keys_written === 1, 'memory keys written');
+    assert(typeof body.data?.changelog_entry_id === 'string', 'has changelog entry id');
+});
+
+await test('POST /v1/site/import — reject invalid memory keys', async () => {
+    const { status, body } = await json('/v1/site/import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ memory: { 'invalid/key': 'value' } }),
+    });
+    assert(status === 422, `expected 422, got ${status}`);
+    assert(body.ok === false, 'not ok');
+});
+
+await test('GET /v1/site/changelog — view changes', async () => {
+    const { status, body } = await json('/v1/site/changelog', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data), 'data is array');
+    assert(body.data.length > 0, 'has changelog entries');
+    assert(typeof body.data[0].action === 'string', 'entry has action');
+});
+
+await test('POST /v1/site/cache-invalidate — clear cache', async () => {
+    const { status, body } = await json('/v1/site/cache-invalidate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.cache_cleared === true, 'cache cleared');
+});
+
+await test('DELETE /v1/site/template — revert to default', async () => {
+    const { status, body } = await json('/v1/site/template', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.deleted === true, 'deleted');
+    assert(body.data?.reverted_to === 'default', 'reverted to default');
+});
+
+await test('GET / — serves default portal after delete', async () => {
+    const res = await fetch(`${BASE}/`);
+    const ct = res.headers.get('content-type') ?? '';
+    assert(ct.includes('text/html'), `expected HTML, got ${ct}`);
+    const html = await res.text();
+    // Should no longer contain our custom template content
+    assert(!html.includes('Imported'), 'custom content should be gone');
+});
+
+await test('GET /v1/site/template — 401 without auth', async () => {
+    const { status } = await json('/v1/site/template');
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 

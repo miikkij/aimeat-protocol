@@ -249,6 +249,14 @@ model RealtimeRoom {
   lastActivityAt DateTime @default(now())
 }
 
+model SiteChangeLog {
+  id        String   @id @map("_id")
+  action    String
+  summary   String
+  changedBy String
+  changedAt DateTime @default(now())
+}
+
 model Ghii {
   id                         String   @id @default(auto()) @map("_id") @db.ObjectId
   username                   String

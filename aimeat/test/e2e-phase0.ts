@@ -325,6 +325,95 @@ await test('GET /v1/consent/audit \u2192 200, audit trail endpoint works', async
 });
 
 // ═══════════════════════════════════════════════════════════════
+// Phase 0.5 — TOTP Two-Factor Authentication
+// ═══════════════════════════════════════════════════════════════
+console.log('\nPhase 0.5 — TOTP');
+
+// TOTP requires a GHII identity, register one for testing
+const ghiiUser = `ghiitotp_${Date.now()}`;
+
+await test('POST /v1/ghii → register GHII identity for TOTP tests', async () => {
+    const { status, body } = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: ghiiUser,
+            display_name: 'TOTP Test User',
+            password: 'testpassword',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+});
+
+// Get a token for the GHII user
+let ghiiToken = '';
+await test('POST /v1/ghii/login → get GHII user token', async () => {
+    const { status, body } = await json('/v1/ghii/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: ghiiUser, password: 'testpassword' }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    ghiiToken = body.data?.token;
+    assert(typeof ghiiToken === 'string', 'got token');
+});
+
+function ghiiAuthed(opts: RequestInit = {}): RequestInit {
+    return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${ghiiToken}` } };
+}
+
+await test('POST /v1/ghii/totp/setup → returns secret and QR data', async () => {
+    const { status, body } = await json('/v1/ghii/totp/setup', ghiiAuthed({
+        method: 'POST',
+    }));
+    // If TOTP is disabled on the test node, 503 is acceptable
+    if (status === 503) {
+        console.log('    (TOTP disabled on test node — skipping)');
+        return;
+    }
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.totp_secret === 'string', 'has totp_secret');
+    assert(typeof body.data?.totp_uri === 'string', 'has totp_uri');
+    assert(Array.isArray(body.data?.backup_codes), 'has backup_codes');
+});
+
+await test('POST /v1/ghii/totp/verify → rejects invalid code', async () => {
+    const { status, body } = await json('/v1/ghii/totp/verify', ghiiAuthed({
+        method: 'POST',
+        body: JSON.stringify({ code: '000000' }),
+    }));
+    // 503 if TOTP disabled, 400 if bad code or not setup
+    if (status === 503) {
+        console.log('    (TOTP disabled on test node — skipping)');
+        return;
+    }
+    assert(status === 400 || status === 401, `expected 400 or 401, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+});
+
+await test('DELETE /v1/ghii/totp → handles no TOTP enabled', async () => {
+    const { status, body } = await json('/v1/ghii/totp', ghiiAuthed({
+        method: 'DELETE',
+        body: JSON.stringify({ code: '000000' }),
+    }));
+    // 503 if TOTP disabled, 400 if not enabled
+    if (status === 503) {
+        console.log('    (TOTP disabled on test node — skipping)');
+        return;
+    }
+    assert(status === 400 || status === 200, `expected 400 or 200, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// Clean up GHII test user
+await test('Delete GHII test user', async () => {
+    const { body } = await json(`/v1/owners/${ghiiUser}`, ghiiAuthed({
+        method: 'DELETE',
+    }));
+    assert(body.ok === true, `delete: ${JSON.stringify(body.error)}`);
+});
+
+// ═══════════════════════════════════════════════════════════════
 // MSM Integration (via API)
 // ═══════════════════════════════════════════════════════════════
 console.log('\nMSM Integration');

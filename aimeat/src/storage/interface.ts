@@ -576,6 +576,15 @@ export interface RealtimeRoomRecord {
   lastActivityAt: string;
 }
 
+// Node Portal (Site)
+export interface SiteChangeLogEntry {
+  id: string;
+  action: 'template_upload' | 'template_delete' | 'import' | 'cache_invalidate';
+  summary: string;
+  changedBy: string;
+  changedAt: string;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -868,4 +877,8 @@ export interface Storage {
   listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]>;
   updateRealtimeRoom(id: string, updates: Partial<RealtimeRoomRecord>): Promise<RealtimeRoomRecord | null>;
   deleteRealtimeRoom(id: string): Promise<boolean>;
+
+  // Node Portal (Site)
+  addSiteChangeLog(entry: SiteChangeLogEntry): Promise<SiteChangeLogEntry>;
+  listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]>;
 }

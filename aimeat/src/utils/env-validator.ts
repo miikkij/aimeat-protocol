@@ -99,6 +99,8 @@ export function validateEnv(): ValidationResult[] {
     { key: 'AIMEAT_MAX_RELAY_HOPS', name: 'Max Relay Hops', defaultVal: '3', min: 1, max: 10 },
     { key: 'AIMEAT_MEMORY_QUOTA_MB', name: 'Memory Quota MB', defaultVal: '10', min: 1 },
     { key: 'AIMEAT_STORAGE_QUOTA_MB', name: 'Storage Quota MB', defaultVal: '100', min: 1 },
+    { key: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB', name: 'Site Max Template Size KB', defaultVal: '512', min: 1 },
+    { key: 'AIMEAT_SITE_CACHE_TTL_SECONDS', name: 'Site Cache TTL Seconds', defaultVal: '60', min: 0 },
   ];
 
   for (const field of numericFields) {

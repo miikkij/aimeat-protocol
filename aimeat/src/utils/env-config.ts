@@ -395,6 +395,29 @@ export function formatConfig(config: AimeatConfig): string {
       ],
     },
     {
+      title: 'Node Portal (Site)',
+      entries: [
+        {
+          envVar: 'AIMEAT_SITE_ENABLED',
+          description: 'Enable custom HTML template portal at GET /',
+          value: String(config.siteEnabled),
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB',
+          description: 'Maximum template HTML size (KB)',
+          value: String(config.siteMaxTemplateSizeKb),
+          defaultVal: '512',
+        },
+        {
+          envVar: 'AIMEAT_SITE_CACHE_TTL_SECONDS',
+          description: 'Resolved template cache TTL (seconds, 0 = no cache)',
+          value: String(config.siteCacheTtlSeconds),
+          defaultVal: '60',
+        },
+      ],
+    },
+    {
       title: 'Cookie Consent',
       entries: [
         {

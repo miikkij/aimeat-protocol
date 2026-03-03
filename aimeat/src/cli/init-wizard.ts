@@ -102,6 +102,9 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_COOKIE_CONSENT_ENABLED: 'false',
   AIMEAT_COOKIE_CONSENT_CATEGORIES: 'necessary',
   AIMEAT_COOKIE_CONSENT_POLICY_URL: '',
+  AIMEAT_SITE_ENABLED: 'true',
+  AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB: '512',
+  AIMEAT_SITE_CACHE_TTL_SECONDS: '60',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -273,6 +276,14 @@ function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_INDEXNOW_KEY', comment: 'Hex key for IndexNow. Generate: openssl rand -hex 16. After setting, run: pnpm indexnow' },
       ],
     },
+    {
+      title: 'Node Portal (Site)',
+      vars: [
+        { key: 'AIMEAT_SITE_ENABLED', comment: 'Enable custom HTML template portal at GET /' },
+        { key: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB', comment: 'Max template size in KB' },
+        { key: 'AIMEAT_SITE_CACHE_TTL_SECONDS', comment: 'Resolved template cache TTL (0 = no cache)' },
+      ],
+    },
   ];
 
   for (const section of sections) {
@@ -332,6 +343,9 @@ function generateJsonContent(settings: Record<string, string>): string {
     AIMEAT_FEDERATION_ROLE: 'federationRole',
     AIMEAT_GENESIS_URL: 'genesisUrl',
     AIMEAT_INDEXNOW_KEY: 'indexNowKey',
+    AIMEAT_SITE_ENABLED: 'siteEnabled',
+    AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB: 'siteMaxTemplateSizeKb',
+    AIMEAT_SITE_CACHE_TTL_SECONDS: 'siteCacheTtlSeconds',
   };
 
   const cfg: Record<string, unknown> = {};
@@ -594,6 +608,43 @@ async function askCoreSettings(
         t,
       );
       if (policyUrl) settings.AIMEAT_COOKIE_CONSENT_POLICY_URL = policyUrl;
+    }
+  }
+
+  // Node Portal (Site) — ask for public and custom
+  if (useCase === 'public' || useCase === 'custom') {
+    const siteDefault = env.AIMEAT_SITE_ENABLED !== 'false';
+    const siteEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.siteEnabled'),
+        initialValue: siteDefault,
+      }),
+      t,
+    );
+    if (!siteEnabled) {
+      settings.AIMEAT_SITE_ENABLED = 'false';
+    } else {
+      const tmplSizeDefault = env.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB || '512';
+      const tmplSize = checkCancel(
+        await p.text({
+          message: t('init.siteMaxTemplateSizeKb'),
+          defaultValue: tmplSizeDefault,
+          validate: val => validatePositiveNum(val, t),
+        }),
+        t,
+      );
+      if (tmplSize !== '512') settings.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB = tmplSize;
+
+      const cacheTtlDefault = env.AIMEAT_SITE_CACHE_TTL_SECONDS || '60';
+      const cacheTtl = checkCancel(
+        await p.text({
+          message: t('init.siteCacheTtlSeconds'),
+          defaultValue: cacheTtlDefault,
+          validate: val => validatePositiveNum(val, t),
+        }),
+        t,
+      );
+      if (cacheTtl !== '60') settings.AIMEAT_SITE_CACHE_TTL_SECONDS = cacheTtl;
     }
   }
 

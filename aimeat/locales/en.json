@@ -761,7 +761,13 @@
     "cookieConsentCategoriesHint": "e.g. necessary,analytics,marketing",
     "cookieConsentPolicyUrl": "Privacy policy URL",
     "cookieConsentPolicyUrlHint": "Link shown in the cookie banner (recommended for GDPR)",
-    "cookieConsentPolicyUrlInvalid": "Must start with http:// or https://"
+    "cookieConsentPolicyUrlInvalid": "Must start with http:// or https://",
+    "siteEnabled": "Enable Node Portal (custom HTML template)?",
+    "siteEnabledHint": "Serve a custom HTML template at GET / with dynamic {{type:key}} tags",
+    "siteMaxTemplateSizeKb": "Max template size (KB)",
+    "siteMaxTemplateSizeKbHint": "Maximum allowed size for the HTML template upload",
+    "siteCacheTtlSeconds": "Template cache TTL (seconds)",
+    "siteCacheTtlSecondsHint": "How long to cache the resolved template (0 = no cache)"
   },
   "join": {
     "title": "Join AIMEAT Federation",

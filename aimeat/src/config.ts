@@ -175,6 +175,12 @@ export interface AimeatConfig {
   turnServer: string | null;
   turnUsername: string | null;
   turnCredential: string | null;
+
+  // Node Portal (Site)
+  siteEnabled: boolean;
+  siteMaxTemplateSizeKb: number;
+  siteCacheTtlSeconds: number;
+  siteKv: Record<string, string>;
 }
 
 export function loadConfig(): AimeatConfig {
@@ -307,6 +313,14 @@ export function loadConfig(): AimeatConfig {
     turnServer: process.env.AIMEAT_TURN_SERVER ?? null,
     turnUsername: process.env.AIMEAT_TURN_USERNAME ?? null,
     turnCredential: process.env.AIMEAT_TURN_CREDENTIAL ?? null,
+    siteEnabled: process.env.AIMEAT_SITE_ENABLED !== 'false',
+    siteMaxTemplateSizeKb: parseInt(process.env.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB ?? '512', 10),
+    siteCacheTtlSeconds: parseInt(process.env.AIMEAT_SITE_CACHE_TTL_SECONDS ?? '60', 10),
+    siteKv: Object.fromEntries(
+      Object.entries(process.env)
+        .filter(([k]) => k.startsWith('AIMEAT_SITE_KV_'))
+        .map(([k, v]) => [k.replace('AIMEAT_SITE_KV_', '').toLowerCase(), v ?? ''])
+    ),
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },

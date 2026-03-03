@@ -69,6 +69,7 @@ import { seedProfileSchemas } from './services/profile-schemas.js';
 import { createEmailService } from './services/email.js';
 import { DirectoryService } from './services/directory.js';
 import { portalHobbiesRouter } from './routes/portal-hobbies.js';
+import { siteRouter } from './routes/site.js';
 import { realtimeRouter } from './routes/realtime.js';
 import { RealtimeManager } from './services/realtime-manager.js';
 import { startMatchNotificationJob } from './services/match-notification.js';
@@ -371,6 +372,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
   app.use(mcpRouter(config, storage));
+  app.use(siteRouter(config, storage));    // Node Portal — GET / + /v1/site/*
   app.use(portalRouter(config, storage));
   app.use(humanPortalRouter(config, storage));
   app.use(portalHobbiesRouter(config, storage, directoryService));

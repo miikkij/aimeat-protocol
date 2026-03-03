@@ -37,6 +37,7 @@ import type {
     EmailVerificationRecord,
     PushSubscriptionRecord,
     TrustedIssuerRecord,
+    SiteChangeLogEntry,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -1519,6 +1520,8 @@ export class MongoStorage implements Storage {
     }
 
     // ── MSM — Machine Service Manifest (in-memory fallback) ──
+    // TODO: Migrate to MongoDB collection ('msm') when persistence is needed.
+    // Current in-memory implementation means MSM data does not survive restarts.
 
     private msms = new Map<string, MsmRecord>();
 
@@ -2137,6 +2140,38 @@ export class MongoStorage implements Storage {
         } catch {
             return false;
         }
+    }
+
+    // ── Node Portal (Site) ──
+
+    async addSiteChangeLog(entry: SiteChangeLogEntry): Promise<SiteChangeLogEntry> {
+        this.ensureReady();
+        await this.prisma.siteChangeLog.create({
+            data: {
+                id: entry.id,
+                action: entry.action,
+                summary: entry.summary,
+                changedBy: entry.changedBy,
+                changedAt: new Date(entry.changedAt),
+            },
+        });
+        return entry;
+    }
+
+    async listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]> {
+        this.ensureReady();
+        const rows = await this.prisma.siteChangeLog.findMany({
+            orderBy: { changedAt: 'desc' },
+            take: limit,
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
+        return rows.map((r: any) => ({
+            id: r.id,
+            action: r.action,
+            summary: r.summary,
+            changedBy: r.changedBy,
+            changedAt: r.changedAt instanceof Date ? r.changedAt.toISOString() : r.changedAt,
+        }));
     }
 }
 

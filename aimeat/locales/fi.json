@@ -761,7 +761,13 @@
     "cookieConsentCategoriesHint": "esim. necessary,analytics,marketing",
     "cookieConsentPolicyUrl": "Tietosuojaselosteen URL",
     "cookieConsentPolicyUrlHint": "Linkki joka näytetään evästebannerissa (suositeltava GDPR:n vuoksi)",
-    "cookieConsentPolicyUrlInvalid": "Pitää alkaa http:// tai https://"
+    "cookieConsentPolicyUrlInvalid": "Pitää alkaa http:// tai https://",
+    "siteEnabled": "Ota solmuportaali käyttöön (HTML-sivupohja)?",
+    "siteEnabledHint": "Tarjoile mukautettu HTML-sivupohja osoitteessa GET / dynaamisilla {{type:key}} -tageilla",
+    "siteMaxTemplateSizeKb": "Sivupohjan enimmäiskoko (Kt)",
+    "siteMaxTemplateSizeKbHint": "Suurin sallittu koko HTML-sivupohjan lataukselle",
+    "siteCacheTtlSeconds": "Sivupohjan välimuistin elinaika (sekuntia)",
+    "siteCacheTtlSecondsHint": "Kuinka kauan resolvattua sivupohjaa säilytetään välimuistissa (0 = ei välimuistia)"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",

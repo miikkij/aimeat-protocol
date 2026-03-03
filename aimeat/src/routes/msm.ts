@@ -121,16 +121,26 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Store MSM record
     const now = new Date().toISOString();
-    const record = await storage.createMsm({
-      name: definition.service.name,
-      definition: definition as unknown as Record<string, unknown>,
-      category: definition.service.category,
-      authType: definition.auth.type,
-      actionsCount: definition.actions.length,
-      registeredBy: ownerName,
-      registeredAt: now,
-      updatedAt: now,
-    });
+    let record: import('../storage/interface.js').MsmRecord;
+    try {
+      record = await storage.createMsm({
+        name: definition.service.name,
+        definition: definition as unknown as Record<string, unknown>,
+        category: definition.service.category,
+        authType: definition.auth.type,
+        actionsCount: definition.actions.length,
+        registeredBy: ownerName,
+        registeredAt: now,
+        updatedAt: now,
+      });
+    } catch (err) {
+      if (String(err).includes('MSM_NAME_TAKEN')) {
+        res.status(409).json(error(config.nodeId, 'MSM_NAME_TAKEN',
+          `MSM integration "${definition.service.name}" is already registered`));
+        return;
+      }
+      throw err;
+    }
 
     res.status(201).json(success(config.nodeId, {
       integration: {
@@ -200,12 +210,20 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/msm/:name — Get a single MSM integration
+  // Note: unauthenticated — strip auth env var names from definition to avoid leaking infrastructure config
   router.get('/v1/msm/:name', async (req, res) => {
     const name = req.params.name as string;
     const msm = await storage.getMsm(name);
     if (!msm) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `MSM integration "${name}" not found`));
       return;
+    }
+
+    // Strip sensitive auth config (env var names) from the public definition
+    const safeDef = { ...msm.definition } as Record<string, unknown>;
+    if (safeDef.auth && typeof safeDef.auth === 'object') {
+      const { env_var, env_var_secret, ...safeAuth } = safeDef.auth as Record<string, unknown>;
+      safeDef.auth = safeAuth;
     }
 
     res.json(success(config.nodeId, {
@@ -217,7 +235,7 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
         registered_by: msm.registeredBy,
         registered_at: msm.registeredAt,
         updated_at: msm.updatedAt,
-        definition: msm.definition,
+        definition: safeDef,
       },
     }, [
       { description: 'Delete this MSM integration', method: 'DELETE', url: `/v1/msm/${encodeURIComponent(msm.name)}` },

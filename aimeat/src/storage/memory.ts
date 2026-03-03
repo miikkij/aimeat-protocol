@@ -11,7 +11,7 @@ import type {
   AppealRecord, ListingRecord, PurchaseRecord,
   PushSubscriptionRecord, TrustedIssuerRecord,
   GenesisPeerRecord, OrganismReputationRecord,
-  ChatInstanceRecord, RealtimeRoomRecord,
+  ChatInstanceRecord, RealtimeRoomRecord, SiteChangeLogEntry,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -54,6 +54,7 @@ export class InMemoryStorage implements Storage {
   private organismReputations = new Map<string, OrganismReputationRecord>(); // key: organismId
   private chatInstances = new Map<string, ChatInstanceRecord>();   // key: id
   private realtimeRooms = new Map<string, RealtimeRoomRecord>();   // key: id
+  private siteChangeLog: SiteChangeLogEntry[] = [];
 
   // ── Owners ──
 
@@ -1577,6 +1578,24 @@ export class InMemoryStorage implements Storage {
   }
   async deleteRealtimeRoom(id: string): Promise<boolean> {
     return this.realtimeRooms.delete(id);
+  }
+
+  // ── Node Portal (Site) ──
+
+  async addSiteChangeLog(entry: SiteChangeLogEntry): Promise<SiteChangeLogEntry> {
+    this.siteChangeLog.unshift(entry);
+    // Keep at most 200 entries
+    if (this.siteChangeLog.length > 200) this.siteChangeLog.length = 200;
+    return entry;
+  }
+
+  async listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]> {
+    let entries = this.siteChangeLog;
+    if (cursor) {
+      const idx = entries.findIndex(e => e.id === cursor);
+      if (idx >= 0) entries = entries.slice(idx + 1);
+    }
+    return entries.slice(0, limit);
   }
 }
 

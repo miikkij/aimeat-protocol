@@ -78,6 +78,8 @@ tags:
     description: Phase 1.5 — Content quality flagging and moderation
   - name: Hobby-Portal
     description: Phase 1.6 — HTML hobby directory portal for humans
+  - name: Site
+    description: Node Portal — custom HTML template with dynamic tag resolution
   - name: Matching
     description: Phase 2.1 — AI-powered profile matching
   - name: Organisms
@@ -8680,5 +8682,309 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OrganismReputationRecord'
+
+  # ── Node Portal (Site) ─────────────────────────────────────
+
+  /v1/site:
+    get:
+      operationId: getSiteMetadata
+      summary: Portal metadata
+      description: |
+        Returns metadata about the node portal: whether a custom template is
+        active, the template engine tag types, and node identity.
+        No authentication required (Tier 0).
+      tags: [Site]
+      responses:
+        '200':
+          description: Portal metadata
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          custom_template:
+                            type: boolean
+                          tag_types:
+                            type: array
+                            items:
+                              type: string
+                          node_id:
+                            type: string
+                          node_name:
+                            type: string
+
+  /v1/site/template:
+    get:
+      operationId: getSiteTemplate
+      summary: Download current template
+      description: |
+        Download the current custom HTML template.
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current template content
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          template:
+                            type: string
+                          size_bytes:
+                            type: integer
+                          updated_at:
+                            type: string
+                            format: date-time
+                          tags_found:
+                            type: array
+                            items:
+                              type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      operationId: uploadSiteTemplate
+      summary: Upload new template
+      description: |
+        Upload a custom HTML template with `{{type:key}}` dynamic tags.
+        Supported tag types: `config`, `memory`, `storage`, `kv`.
+        Validates HTML safety (blocks raw `<script>` injections via memory tags).
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [template]
+              properties:
+                template:
+                  type: string
+                  description: HTML template content with optional {{type:key}} tags
+      responses:
+        '200':
+          description: Template uploaded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stored:
+                            type: boolean
+                          size_bytes:
+                            type: integer
+                          tags_found:
+                            type: array
+                            items:
+                              type: string
+                          unresolvable_tags:
+                            type: array
+                            items:
+                              type: string
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      operationId: deleteSiteTemplate
+      summary: Revert to default portal
+      description: |
+        Delete the custom template and revert to the built-in default portal.
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Template deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                          reverted_to:
+                            type: string
+
+  /v1/site/import:
+    post:
+      operationId: importSiteBundle
+      summary: Import portal bundle
+      description: |
+        Import a complete portal bundle containing template HTML,
+        memory keys (under `portal/*` namespace), and KV pairs.
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                template:
+                  type: string
+                  description: HTML template content
+                memory:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Memory key-value pairs (keys must start with portal/)
+                kv:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: KV pairs for {{kv:key}} tag resolution
+      responses:
+        '200':
+          description: Bundle imported
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          template_stored:
+                            type: boolean
+                          memory_keys_written:
+                            type: integer
+                          kv_pairs_updated:
+                            type: integer
+                          changelog_entry_id:
+                            type: string
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/site/changelog:
+    get:
+      operationId: getSiteChangelog
+      summary: View change log
+      description: |
+        List site change log entries (template uploads, deletions, imports, cache invalidations).
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Change log entries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            action:
+                              type: string
+                            summary:
+                              type: string
+                            changed_by:
+                              type: string
+                            changed_at:
+                              type: string
+                              format: date-time
+
+  /v1/site/cache-invalidate:
+    post:
+      operationId: invalidateSiteCache
+      summary: Force cache refresh
+      description: |
+        Clear the resolved template cache so the next request re-resolves all tags.
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Cache cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cache_cleared:
+                            type: boolean
+
+  /v1/site/prompt:
+    get:
+      operationId: getSitePrompt
+      summary: AI navigation prompt
+      description: |
+        Returns a text prompt that AI agents can use to understand
+        how to navigate and interact with this node. Useful for
+        AI-driven site editing workflows.
+        No authentication required (Tier 0).
+      tags: [Site]
+      responses:
+        '200':
+          description: AI prompt text
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt:
+                            type: string
         '404':
           $ref: '#/components/responses/NotFound'
