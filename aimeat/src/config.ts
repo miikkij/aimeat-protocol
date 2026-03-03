@@ -181,6 +181,10 @@ export interface AimeatConfig {
   siteMaxTemplateSizeKb: number;
   siteCacheTtlSeconds: number;
   siteKv: Record<string, string>;
+
+  // Statistics
+  statsEnabled: boolean;
+  statsAccess: 'public' | 'authenticated' | 'operator';
 }
 
 export function loadConfig(): AimeatConfig {
@@ -321,6 +325,8 @@ export function loadConfig(): AimeatConfig {
         .filter(([k]) => k.startsWith('AIMEAT_SITE_KV_'))
         .map(([k, v]) => [k.replace('AIMEAT_SITE_KV_', '').toLowerCase(), v ?? ''])
     ),
+    statsEnabled: process.env.AIMEAT_STATS_ENABLED !== 'false',
+    statsAccess: (process.env.AIMEAT_STATS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'public',
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },

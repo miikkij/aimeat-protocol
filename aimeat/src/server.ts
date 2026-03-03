@@ -76,6 +76,9 @@ import { startMatchNotificationJob } from './services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from './services/matching.js';
 import { adminFeaturesRouter } from './routes/admin-features.js';
 import { createGenesisPeeringService } from './services/genesis-peering.js';
+import { initStats } from './services/stats.js';
+import { statsMiddleware } from './middleware/stats.js';
+import { statsRouter } from './routes/stats.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -117,6 +120,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // Cookie consent banner injection (opt-in for service builders)
   app.use(cookieConsentMiddleware(config));
 
+  // Statistics collector
+  const stats = initStats();
+
   // CORS for Tier 0 endpoints
   app.use((_req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -128,6 +134,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     }
     next();
   });
+
+  // Stats middleware — counts requests, methods, and status codes
+  app.use(statsMiddleware(stats));
 
   // Rate limiting — global (with role multipliers)
   // optionalAuth() must run first so req.auth is available for per-identity rate limiting
@@ -294,6 +303,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Mount routes
   app.use(bootstrapRouter(config));
+  app.use(statsRouter(config, storage, stats));
   app.use(wellknownRouter(config, storage));
 
   // IndexNow key verification file (serves /{key}.txt for Bing/Yandex)
