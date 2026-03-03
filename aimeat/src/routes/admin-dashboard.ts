@@ -141,6 +141,37 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
     navServices: t('dashboard.navServices'), navIntegrations: t('dashboard.navIntegrations'),
     navFederation: t('dashboard.navFederation'),
     csmManagement: t('dashboard.csmManagement'), msmManagement: t('dashboard.msmManagement'),
+    portal: t('dashboard.portal'), portalTemplate: t('dashboard.portalTemplate'),
+    portalPreview: t('dashboard.portalPreview'), portalMemoryKeys: t('dashboard.portalMemoryKeys'),
+    portalKvPairs: t('dashboard.portalKvPairs'), portalChangelog: t('dashboard.portalChangelog'),
+    portalUpload: t('dashboard.portalUpload'), portalDownload: t('dashboard.portalDownload'),
+    portalResetDefault: t('dashboard.portalResetDefault'), portalImport: t('dashboard.portalImport'),
+    portalClearCache: t('dashboard.portalClearCache'), portalNoTemplate: t('dashboard.portalNoTemplate'),
+    portalNoMemoryKeys: t('dashboard.portalNoMemoryKeys'), portalNoChanges: t('dashboard.portalNoChanges'),
+    portalSaveTemplate: t('dashboard.portalSaveTemplate'), portalAiChat: t('dashboard.portalAiChat'),
+    portalAiPlaceholder: t('dashboard.portalAiPlaceholder'), portalAiSend: t('dashboard.portalAiSend'),
+    portalAiImport: t('dashboard.portalAiImport'), portalAiExplain: t('dashboard.portalAiExplain'),
+    portalTagHelp: t('dashboard.portalTagHelp'),
+    stats: t('dashboard.stats'),
+    statsNotAvailable: t('dashboard.statsNotAvailable'),
+    requestsTotal: t('dashboard.requestsTotal'),
+    memoryOps: t('dashboard.memoryOps'),
+    consentOps: t('dashboard.consentOps'),
+    schemaOps: t('dashboard.schemaOps'),
+    dailyActivity: t('dashboard.dailyActivity'),
+    weeklyComparison: t('dashboard.weeklyComparison'),
+    monthlyTrend: t('dashboard.monthlyTrend'),
+    statsExplain: t('dashboard.statsExplain'),
+    writes: t('dashboard.writes'),
+    reads: t('dashboard.reads'),
+    grants: t('dashboard.grants'),
+    revocations: t('dashboard.revocations'),
+    validations: t('dashboard.validations'),
+    failures: t('dashboard.failures'),
+    thisWeek: t('dashboard.thisWeek'),
+    lastWeek: t('dashboard.lastWeek'),
+    twoWeeksAgo: t('dashboard.twoWeeksAgo'),
+    threeWeeksAgo: t('dashboard.threeWeeksAgo'),
   };
 }
 
@@ -242,6 +273,8 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item" data-page="config" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">${t('dashboard.config')}</span></button>
   <button class="nav-item" data-page="maintenance" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">${t('dashboard.maintenance')}</span></button>
   <button class="nav-item" data-page="hooks" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">${t('dashboard.hooks')}</span></button>
+  <button class="nav-item" data-page="portal" onclick="nav('portal')"><span class="icon">&#x1F310;</span><span class="label">${t('dashboard.portal')}</span></button>
+  <button class="nav-item" data-page="stats" onclick="nav('stats')"><span class="icon">&#x1F4C8;</span><span class="label">${t('dashboard.stats')}</span></button>
   <div class="nav-group-label" id="navIdentity">${t('dashboard.navIdentity')}</div>
   <button class="nav-item" data-page="owners" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">${t('dashboard.owners')}</span><span class="count" id="cntOwners">0</span></button>
   <button class="nav-item" data-page="agents" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">${t('dashboard.agents')}</span><span class="count" id="cntAgents">0</span></button>
@@ -356,7 +389,8 @@ function updateSidebarLabels(){
     email:__t.emailLabel,push:__t.pushLabel,
     directory:__t.directoryLabel,matching:__t.matchingLabel,marketplace:__t.marketplaceLabel,
     csm:__t.csmManagement,msm:__t.msmManagement,
-    federation:__t.federation,genesis:__t.genesisLabel
+    federation:__t.federation,genesis:__t.genesisLabel,
+    portal:__t.portal
   };
   for(var page in map){
     var btn=document.querySelector('[data-page="'+page+'"]');
@@ -436,7 +470,7 @@ function nav(page){
   var baseP=page.indexOf(':')>0?page.split(':')[0]:page;
   var btn=document.querySelector('[data-page="'+baseP+'"]');
   if(btn)btn.classList.add('active');
-  var titles={overview:'\\u{1F4CA} '+__t.overview,economy:'\\u{1FA99} '+__t.economy,config:'\\u2699 '+__t.config,maintenance:'\\u{1F6A7} '+__t.maintenance,hooks:'\\u{1F517} '+__t.extensionHooks,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,ghii:'\\u{1F511} '+__t.ghiiLabel,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,email:'\\u2709 '+__t.emailLabel,push:'\\u{1F514} '+__t.pushLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,csm:'\\u{1F4E6} '+__t.csmManagement,msm:'\\u{1F50C} '+__t.msmManagement,federation:'\\u{1F310} '+__t.federation,genesis:'\\u{1F30D} '+__t.genesisLabel};
+  var titles={overview:'\\u{1F4CA} '+__t.overview,economy:'\\u{1FA99} '+__t.economy,config:'\\u2699 '+__t.config,maintenance:'\\u{1F6A7} '+__t.maintenance,hooks:'\\u{1F517} '+__t.extensionHooks,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,ghii:'\\u{1F511} '+__t.ghiiLabel,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,email:'\\u2709 '+__t.emailLabel,push:'\\u{1F514} '+__t.pushLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,csm:'\\u{1F4E6} '+__t.csmManagement,msm:'\\u{1F50C} '+__t.msmManagement,federation:'\\u{1F310} '+__t.federation,genesis:'\\u{1F30D} '+__t.genesisLabel,portal:'\\u{1F310} '+__t.portal,stats:'\\u{1F4C8} '+__t.stats};
   var namepart=page.indexOf(':')>0?page.split(':').slice(1).join(':'):'';
   document.getElementById('pageTitle').innerHTML=titles[baseP]||(baseP==='csmDetail'?'\\u{1F4E6} '+namepart:baseP==='msmDetail'?'\\u{1F50C} '+namepart:page);
   render();
@@ -520,6 +554,17 @@ async function loadAll(){
     D.msmIntegrations=features[7].status==='fulfilled'?features[7].value.data:null;
     D.genesisPeers=features[8].status==='fulfilled'?features[8].value.data:null;
     D.configSchema=features[9].status==='fulfilled'?features[9].value.data:null;
+    // Load portal data
+    try{
+      var [portalMeta,portalTemplate,portalChangelog]=await Promise.all([
+        api('/v1/site').catch(function(){return {data:null}}),
+        api('/v1/site/template').catch(function(){return {data:null}}),
+        api('/v1/site/changelog').catch(function(){return {data:null}})
+      ]);
+      D.portal={meta:portalMeta.data,template:portalTemplate.data,changelog:portalChangelog.data};
+    }catch(e){D.portal=null;}
+    // Load stats
+    try{var sr=await api('/v1/stats');if(sr.data)D.stats=sr.data;}catch(e){D.stats=null;}
     // Load owners
     try{
       var ownerNames=D.agents&&D.agents.agents?[...new Set(D.agents.agents.map(function(a){return a.owner}))]:[];
@@ -571,6 +616,8 @@ function render(){
     case 'csm':app.innerHTML=renderCsm();break;
     case 'msm':app.innerHTML=renderMsm();break;
     case 'genesis':app.innerHTML=renderGenesis();break;
+    case 'portal':app.innerHTML=renderPortal();break;
+    case 'stats':renderStats();break;
     default:
       if(currentPage.startsWith('csmDetail:')){app.innerHTML=renderCsmDetail(currentPage.split(':').slice(1).join(':'));}
       else if(currentPage.startsWith('msmDetail:')){app.innerHTML=renderMsmDetail(currentPage.split(':').slice(1).join(':'));}
@@ -1324,6 +1371,251 @@ function renderMsmDetail(name){
   o+='</div>';
   o+='<div style="margin-top:12px">'+actionBtn('\\u2190 '+__t.msmManagement,'nav(\\'msm\\')')+'</div>';
   return o;
+}
+
+/* ── PORTAL ── */
+function renderPortal(){
+  var p=D.portal||{};
+  var meta=p.meta||{};
+  var tmpl=p.template||{};
+  var changes=(p.changelog&&p.changelog.entries)||[];
+  var hasTemplate=meta.has_custom_template||false;
+  var o='';
+  // Preview iframe
+  o+='<div class="card"><h3>'+__t.portalPreview+'</h3>';
+  o+='<iframe id="portalPreviewFrame" src="/" style="width:100%;height:400px;border:1px solid var(--border);border-radius:8px;background:#fff" sandbox="allow-same-origin"></iframe>';
+  o+='<div style="margin-top:8px;display:flex;gap:8px">';
+  o+=actionBtn('\u{1F504} '+__t.refresh,'document.getElementById(\'portalPreviewFrame\').src=\'/?\'+(+new Date())');
+  o+=actionBtn('\u{1F6AB} '+__t.portalClearCache,'clearPortalCache()');
+  o+='</div></div>';
+  // Template editor
+  o+='<div class="card"><h3>'+__t.portalTemplate+'</h3>';
+  o+='<div style="margin-bottom:8px;color:var(--muted);font-size:.85rem">'+__t.portalTagHelp+'</div>';
+  o+='<textarea id="portalEditor" rows="20" style="width:100%;font-family:monospace;font-size:13px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--fg);resize:vertical">'+(tmpl.template?esc(tmpl.template):'')+'</textarea>';
+  o+='<div style="margin-top:8px;display:flex;gap:8px">';
+  o+=actionBtn('\u{1F4BE} '+__t.portalSaveTemplate,'savePortalTemplate()');
+  o+=actionBtn('\u{1F4E5} '+__t.portalDownload,'downloadPortalTemplate()');
+  o+=actionBtn('\u{1F504} '+__t.portalResetDefault,'resetPortalTemplate()');
+  o+='</div></div>';
+  // Memory keys
+  o+='<div class="card"><h3>'+__t.portalMemoryKeys+'</h3>';
+  o+='<div id="portalMemoryList"><div style="color:var(--muted)">'+__t.loading+'...</div></div>';
+  o+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center">';
+  o+='<input id="newMemKey" placeholder="portal/key" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg)">';
+  o+='<input id="newMemVal" placeholder="value" style="flex:2;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--fg)">';
+  o+=actionBtn('+ '+__t.portalUpload,'addPortalMemory()');
+  o+='</div></div>';
+  // KV pairs (read-only, from env)
+  o+='<div class="card"><h3>'+__t.portalKvPairs+'</h3>';
+  var kv=meta.kv||{};
+  var kvKeys=Object.keys(kv);
+  if(kvKeys.length===0)o+='<div style="color:var(--muted)">No KV pairs configured (set AIMEAT_SITE_KV_* env vars)</div>';
+  else{
+    o+='<table class="data-table"><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>';
+    for(var i=0;i<kvKeys.length;i++)o+='<tr><td><code>'+esc(kvKeys[i])+'</code></td><td>'+esc(kv[kvKeys[i]])+'</td></tr>';
+    o+='</tbody></table>';
+  }
+  o+='</div>';
+  // AI Chat panel
+  o+='<div class="card"><h3>'+__t.portalAiChat+'</h3>';
+  o+='<p style="color:var(--muted);font-size:.85rem">'+__t.portalAiExplain+'</p>';
+  o+='<div style="display:flex;gap:8px;margin-top:8px">';
+  o+=actionBtn('\u{1F4CB} '+__t.portalDownload+' AI Prompt','copyAiPrompt()');
+  o+='</div></div>';
+  // Changelog
+  o+='<div class="card"><h3>'+__t.portalChangelog+'</h3>';
+  if(changes.length===0)o+='<div style="color:var(--muted)">'+__t.portalNoChanges+'</div>';
+  else{
+    o+='<table class="data-table"><thead><tr><th>'+__t.action+'</th><th>'+__t.by+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
+    for(var i=0;i<Math.min(changes.length,20);i++){
+      var c=changes[i];
+      o+='<tr><td>'+badge(c.action)+'</td><td class="mono" style="font-size:.75rem">'+esc(c.changed_by||c.changedBy||'-')+'</td><td style="color:var(--muted)">'+dt(c.changed_at||c.changedAt)+'</td></tr>';
+    }
+    o+='</tbody></table>';
+  }
+  o+='</div>';
+  // Async load memory keys
+  setTimeout(loadPortalMemoryKeys,100);
+  return o;
+}
+async function loadPortalMemoryKeys(){
+  var el=document.getElementById('portalMemoryList');
+  if(!el)return;
+  try{
+    var res=await api('/v1/site/memory-keys');
+    var keys=res.data&&res.data.keys?res.data.keys:[];
+    if(keys.length===0){el.innerHTML='<div style="color:var(--muted)">'+__t.portalNoMemoryKeys+'</div>';return;}
+    var o='<table class="data-table"><thead><tr><th>Key</th><th>Value</th><th></th></tr></thead><tbody>';
+    for(var i=0;i<keys.length;i++){
+      var k=keys[i];
+      o+='<tr><td><code>'+esc(k.key)+'</code></td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">'+esc(String(k.value||''))+'</td>';
+      o+='<td>'+actionBtn('\u274C','deletePortalMemory(\''+esc(k.key).replace(/'/g,'\\\'')+'\')')+'</td></tr>';
+    }
+    el.innerHTML=o+'</tbody></table>';
+  }catch(e){el.innerHTML='<div style="color:var(--muted)">'+esc(e.message)+'</div>';}
+}
+async function savePortalTemplate(){
+  var editor=document.getElementById('portalEditor');
+  if(!editor)return;
+  try{
+    await api('/v1/site/template',{method:'POST',body:JSON.stringify({template:editor.value})});
+    loadAll();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+function downloadPortalTemplate(){
+  var editor=document.getElementById('portalEditor');
+  if(!editor||!editor.value)return;
+  var blob=new Blob([editor.value],{type:'text/html'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='portal-template.html';
+  a.click();
+}
+async function resetPortalTemplate(){
+  if(!confirm(__t.portalResetDefault+'?'))return;
+  try{
+    await api('/v1/site/template',{method:'DELETE'});
+    loadAll();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+async function clearPortalCache(){
+  try{
+    await api('/v1/site/cache-invalidate',{method:'POST'});
+    document.getElementById('portalPreviewFrame').src='/?'+Date.now();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+async function addPortalMemory(){
+  var key=document.getElementById('newMemKey').value.trim();
+  var val=document.getElementById('newMemVal').value;
+  if(!key)return;
+  try{
+    await api('/v1/memory',{method:'POST',body:JSON.stringify({key:key,value:val,visibility:'private'})});
+    document.getElementById('newMemKey').value='';
+    document.getElementById('newMemVal').value='';
+    loadPortalMemoryKeys();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+async function deletePortalMemory(key){
+  if(!confirm('Delete '+key+'?'))return;
+  try{
+    await api('/v1/memory/'+encodeURIComponent(key),{method:'DELETE'});
+    loadPortalMemoryKeys();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+async function copyAiPrompt(){
+  try{
+    var res=await api('/v1/site/prompt');
+    var prompt=res.data&&res.data.prompt?res.data.prompt:'No prompt available';
+    await navigator.clipboard.writeText(prompt);
+    alert('AI prompt copied to clipboard!');
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+
+/* ── STATS ── */
+var _chartJsLoaded=false;
+function loadChartJs(){
+  return new Promise(function(r){
+    if(_chartJsLoaded||window.Chart)return(_chartJsLoaded=true,r());
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+    s.onload=function(){_chartJsLoaded=true;r()};
+    document.head.appendChild(s);
+  });
+}
+
+function renderStats(){
+  var app=document.getElementById('app');
+  var sd=D.stats;
+  if(!sd){app.innerHTML='<div class="empty">'+__t.statsNotAvailable+'</div>';return;}
+
+  var h='<p style="color:var(--muted);font-size:.8rem;margin-bottom:16px">'+__t.statsExplain+'</p>';
+
+  h+='<div class="grid grid-4">';
+  h+='<div class="card"><h2>'+__t.requestsTotal+'</h2><div class="stat">'+num(sd.requests_total)+'</div></div>';
+  h+='<div class="card"><h2>'+__t.memoryOps+'</h2><div class="stat">'+num((sd.memory_reads||0)+(sd.memory_writes||0))+'</div><div class="stat-label">'+__t.reads+': '+num(sd.memory_reads)+' / '+__t.writes+': '+num(sd.memory_writes)+'</div></div>';
+  h+='<div class="card"><h2>'+__t.consentOps+'</h2><div class="stat">'+num((sd.consent_grants||0)+(sd.consent_revocations||0))+'</div><div class="stat-label">'+__t.grants+': '+num(sd.consent_grants)+' / '+__t.revocations+': '+num(sd.consent_revocations)+'</div></div>';
+  h+='<div class="card"><h2>'+__t.schemaOps+'</h2><div class="stat">'+num(sd.schema_validations)+'</div><div class="stat-label">'+__t.failures+': '+num(sd.schema_validation_failures)+'</div></div>';
+  h+='</div>';
+
+  h+='<div class="grid grid-4" style="margin-bottom:20px">';
+  h+='<div class="card"><h2>'+__t.uptime+'</h2><div class="stat">'+fmtUp(sd.uptime_seconds||0)+'</div></div>';
+  h+='<div class="card"><h2>'+__t.registeredOwners+'</h2><div class="stat">'+num(sd.active_owners)+'</div></div>';
+  h+='<div class="card"><h2>'+__t.registeredAgents+'</h2><div class="stat">'+num(sd.active_agents)+'</div></div>';
+  h+='</div>';
+
+  h+='<div class="grid grid-2">';
+  h+='<div class="card"><h2>'+__t.dailyActivity+'</h2><canvas id="chartDaily" height="200"></canvas></div>';
+  h+='<div class="card"><h2>'+__t.weeklyComparison+'</h2><canvas id="chartWeekly" height="200"></canvas></div>';
+  h+='</div>';
+  h+='<div class="card" style="margin-top:16px"><h2>'+__t.monthlyTrend+'</h2><canvas id="chartMonthly" height="160"></canvas></div>';
+
+  app.innerHTML=h;
+  renderStatsCharts(sd);
+}
+
+async function renderStatsCharts(sd){
+  await loadChartJs();
+  if(!window.Chart)return;
+  var daily=sd.daily_history||{};
+  var days=Object.keys(daily).sort().slice(-30);
+
+  var dc=document.getElementById('chartDaily');
+  if(dc){
+    new Chart(dc,{type:'bar',data:{
+      labels:days.map(function(d){return d.slice(5)}),
+      datasets:[
+        {label:__t.requestsTotal,data:days.map(function(d){return (daily[d]||{}).requests_total||0}),backgroundColor:'#3b82f688'},
+        {label:__t.writes,data:days.map(function(d){return (daily[d]||{}).memory_writes||0}),backgroundColor:'#22c55e88'},
+        {label:__t.reads,data:days.map(function(d){return (daily[d]||{}).memory_reads||0}),backgroundColor:'#06b6d488'}
+      ]
+    },options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#94a3b8',maxRotation:45},grid:{color:'#334155'}},y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}}}});
+  }
+
+  var wc=document.getElementById('chartWeekly');
+  if(wc&&days.length>0){
+    var weekLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    var now=new Date();
+    var getWeekData=function(weeksAgo){
+      var data=new Array(7).fill(0);
+      for(var i=0;i<7;i++){
+        var d=new Date(now);d.setDate(d.getDate()-d.getDay()+1+i-weeksAgo*7);
+        var key=d.toISOString().split('T')[0];
+        data[i]=(daily[key]||{}).requests_total||0;
+      }
+      return data;
+    };
+    new Chart(wc,{type:'line',data:{
+      labels:weekLabels,
+      datasets:[
+        {label:__t.thisWeek,data:getWeekData(0),borderColor:'#3b82f6',backgroundColor:'#3b82f622',fill:true,tension:.3},
+        {label:__t.lastWeek,data:getWeekData(1),borderColor:'#22c55e',backgroundColor:'#22c55e22',fill:true,tension:.3},
+        {label:__t.twoWeeksAgo,data:getWeekData(2),borderColor:'#a855f7',borderDash:[5,5],fill:false,tension:.3},
+        {label:__t.threeWeeksAgo,data:getWeekData(3),borderColor:'#94a3b8',borderDash:[5,5],fill:false,tension:.3}
+      ]
+    },options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}},y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}}}});
+  }
+
+  var mc=document.getElementById('chartMonthly');
+  if(mc&&days.length>0){
+    var months={};
+    for(var k=0;k<Object.keys(daily).length;k++){
+      var dd=Object.keys(daily)[k];
+      var m=dd.slice(0,7);
+      if(!months[m])months[m]={requests:0,writes:0,reads:0};
+      months[m].requests+=(daily[dd].requests_total||0);
+      months[m].writes+=(daily[dd].memory_writes||0);
+      months[m].reads+=(daily[dd].memory_reads||0);
+    }
+    var mKeys=Object.keys(months).sort().slice(-6);
+    new Chart(mc,{type:'bar',data:{
+      labels:mKeys,
+      datasets:[
+        {label:__t.requestsTotal,data:mKeys.map(function(m){return months[m].requests}),backgroundColor:'#3b82f688'},
+        {label:__t.writes,data:mKeys.map(function(m){return months[m].writes}),backgroundColor:'#22c55e88'},
+        {label:__t.reads,data:mKeys.map(function(m){return months[m].reads}),backgroundColor:'#06b6d488'}
+      ]
+    },options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}},y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}}}});
+  }
 }
 
 loadAll();
