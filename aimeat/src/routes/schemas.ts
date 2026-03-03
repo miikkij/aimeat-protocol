@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateSchemaItself, removeFromCache } from '../services/schema-validator.js';
+import { SchemaSetSchema } from '../models/schemas.js';
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -17,12 +18,15 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     const key = decodeURIComponent(req.params.key as string);
-    const { schema, apply_to, schema_mode, semantic_context } = req.body ?? {};
-
-    if (!schema || !apply_to) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'schema and apply_to are required'));
+    const parsed = SchemaSetSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid request body', 400, {
+        violations: parsed.error.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
+      }));
       return;
     }
+    const { schema, apply_to, schema_mode } = parsed.data;
+    const semantic_context = (req.body as Record<string, unknown>)?.semantic_context;
 
     const schemaError = validateSchemaItself(schema);
     if (schemaError) {
@@ -30,7 +34,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const mode = schema_mode ?? 'open';
+    const mode = schema_mode;
     const now = new Date().toISOString();
 
     const existing = await storage.getSchema(key, apply_to);
