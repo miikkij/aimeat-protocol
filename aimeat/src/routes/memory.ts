@@ -9,6 +9,7 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import type { StatsCollector } from '../services/stats.js';
+import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
@@ -338,14 +339,56 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory/:gaii/:key — public memory read (no auth for public entries)
-  // This allows Tier 0 access to public memory
+  // This allows Tier 0 access to public memory, with consent checking for non-public data
   router.get('/v1/memory/:gaii/:key', async (req, res) => {
     const gaii = decodeURIComponent(req.params.gaii as string);
     const key = decodeURIComponent(req.params.key as string);
 
     const record = await storage.getMemory(gaii, key);
-    if (!record || record.visibility !== 'public') {
+    if (!record) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
+      return;
+    }
+
+    // Public data — always allow
+    if (record.visibility === 'public') {
+      stats?.increment('memory_reads');
+
+      // Audit if consent layer is enabled
+      if (config.consentEnabled) {
+        const accessorGaii = req.auth?.sub ?? 'anonymous';
+        await auditDataAccess(storage, null, record.ownerGaii, accessorGaii, key, 'read', true);
+      }
+
+      res.json(success(config.nodeId, {
+        key: record.key,
+        value: record.value,
+        visibility: record.visibility,
+        zone: visibilityToZone(record.visibility),
+        tags: record.tags,
+        version: record.version,
+        owner_gaii: record.ownerGaii,
+        created_at: record.createdAt,
+        updated_at: record.updatedAt,
+      }));
+      return;
+    }
+
+    // Non-public data: if consent is not enabled, fall back to old behavior (404)
+    if (!config.consentEnabled) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
+      return;
+    }
+
+    // Non-public data with consent enabled: check consent
+    const accessorGaii = req.auth?.sub ?? 'anonymous';
+    const consentResult = await checkConsentForRead(storage, key, record.ownerGaii, accessorGaii, record.visibility);
+
+    // Audit the access attempt
+    await auditDataAccess(storage, consentResult.consentId ?? null, record.ownerGaii, accessorGaii, key, 'read', consentResult.allowed);
+
+    if (!consentResult.allowed) {
+      res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `Access denied: ${consentResult.reason}`));
       return;
     }
 
