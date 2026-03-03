@@ -315,21 +315,37 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 64px 24px;
+      padding: 72px 24px;
       text-align: center;
       color: var(--text-dim);
     }
 
     .empty-state .empty-icon {
-      font-size: 3rem;
-      margin-bottom: 16px;
-      opacity: .5;
+      font-size: 4rem;
+      margin-bottom: 20px;
+      opacity: .6;
+      filter: drop-shadow(0 4px 12px rgba(168, 85, 247, .15));
+    }
+
+    .empty-state h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
     }
 
     .empty-state p {
-      font-size: .95rem;
+      font-size: .9rem;
       line-height: 1.6;
-      max-width: 320px;
+      max-width: 340px;
+      margin-bottom: 6px;
+    }
+
+    .empty-state .empty-formats {
+      font-size: .78rem;
+      color: var(--text-dim);
+      opacity: .7;
+      margin-top: 4px;
     }
 
     /* ── Footer ─────────────────────────────────────── */
@@ -352,9 +368,10 @@
 
     .footer-brand {
       font-size: .7rem;
-      color: rgba(216, 180, 254, .25);
+      color: var(--text-dim);
       letter-spacing: .1em;
       text-transform: uppercase;
+      opacity: .6;
     }
 
     /* ── Modal Overlay ──────────────────────────────── */
@@ -1855,14 +1872,17 @@
           grid.innerHTML =
             '<div class="empty-state">' +
               '<div class="empty-icon">\u{1F680}</div>' +
-              '<p>No apps yet. Tap <strong>+</strong> to add your first app from a URL or local file.</p>' +
+              '<h3>No apps yet</h3>' +
+              '<p>Add your first app using the <strong>+</strong> button above</p>' +
+              '<span class="empty-formats">Supports: HTML files, URLs, ZIP packages, AIMEAT imports</span>' +
             '</div>';
         } else {
           // Filters active but no matches
           grid.innerHTML =
             '<div class="empty-state">' +
               '<div class="empty-icon">\u{1F50D}</div>' +
-              '<p>No apps match the current filter.</p>' +
+              '<h3>No matches</h3>' +
+              '<p>No apps match the current filter. Try a different search term or tag.</p>' +
             '</div>';
         }
       } else {
@@ -2448,8 +2468,9 @@
       hideContextMenu();
     });
 
-    // ── Escape key to close modals ──────────────────
+    // ── Keyboard shortcuts ──────────────────────────
     document.addEventListener('keydown', function (e) {
+      // Escape — close modals / overlays
       if (e.key === 'Escape') {
         if (!document.getElementById('context-menu').hidden) {
           hideContextMenu();
@@ -2460,6 +2481,18 @@
         } else if (!document.getElementById('modal-overlay').hidden) {
           closeModal();
         }
+        return;
+      }
+      // Ctrl+N / Cmd+N — open Add App modal
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        showModal();
+        return;
+      }
+      // Ctrl+F / Cmd+F — focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('search-input').focus();
       }
     });
   });
