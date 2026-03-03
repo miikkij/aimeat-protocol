@@ -1,9 +1,26 @@
 import { Router } from 'express';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { resolveLocale, resolveFlat, type Locale } from '../i18n.js';
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
+
+const __dirname_portal = dirname(fileURLToPath(import.meta.url));
+
+/** Resolve a file from public/ directory (works from both src/ and dist/). */
+function resolvePublicFile(filename: string): string | null {
+  const candidates = [
+    join(__dirname_portal, '..', '..', 'public', filename),      // dev: src/routes/../../public
+    join(__dirname_portal, '..', '..', '..', 'public', filename), // dist: dist/src/routes/../../../public
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
 
 /* ──────────────────────────────────────────────────────────
    Platform Registry — known AI platforms and their capabilities
@@ -1421,9 +1438,13 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       const stats = { agents: agents.length, chatSessions: chatSessions.length, actions: actions.length, boards: boards.length };
       res.type('text/html').send(portalHtml(config, stats, locale));
     } else {
-      // Human-facing portal — served as static HTML from public/human.html
-      const langSuffix = langParam ? `?lang=${encodeURIComponent(langParam)}` : '';
-      res.redirect(302, `/human.html${langSuffix}`);
+      // Human-facing portal — serve static HTML inline (no redirect, preserves URL)
+      const htmlPath = resolvePublicFile('human.html');
+      if (htmlPath) {
+        res.type('text/html').send(readFileSync(htmlPath, 'utf-8'));
+      } else {
+        res.redirect(302, '/human.html');
+      }
     }
   });
 
@@ -1513,6 +1534,28 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Visit the portal', method: 'GET', url: '/v1/portal' },
     ]));
   });
+
+  // ── Backward-compatible routes for SSR-removed pages ──
+  // Serve static HTML inline at old URLs so bookmarks/links don't break.
+
+  const staticRedirects: Record<string, string> = {
+    '/v1/profile': 'profile.html',
+    '/v1/guides': 'guides.html',
+    '/v1/aimeat-os': 'aimeat-os.html',
+    '/v1/hobbies': 'hobbies.html',
+    '/v1/marketplace': 'marketplace.html',
+  };
+
+  for (const [path, file] of Object.entries(staticRedirects)) {
+    router.get(path, (_req, res) => {
+      const htmlPath = resolvePublicFile(file);
+      if (htmlPath) {
+        res.type('text/html').send(readFileSync(htmlPath, 'utf-8'));
+      } else {
+        res.redirect(302, `/${file}`);
+      }
+    });
+  }
 
   return router;
 }
