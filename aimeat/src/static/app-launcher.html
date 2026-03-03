@@ -486,7 +486,10 @@
   const DB_VERSION = 1;
   const STORE_NAME = 'apps';
 
+  let dbInstance = null;
+
   function openDB() {
+    if (dbInstance) return Promise.resolve(dbInstance);
     return new Promise(function (resolve, reject) {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -501,7 +504,8 @@
       };
 
       request.onsuccess = function (event) {
-        resolve(event.target.result);
+        dbInstance = event.target.result;
+        resolve(dbInstance);
       };
 
       request.onerror = function (event) {
@@ -531,15 +535,10 @@
     return openDB().then(function (db) {
       return new Promise(function (resolve, reject) {
         const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.put(app);
-
-        request.onsuccess = function () {
-          resolve(request.result);
-        };
-        request.onerror = function () {
-          reject(request.error);
-        };
+        tx.objectStore(STORE_NAME).put(app);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
       });
     });
   }
@@ -548,15 +547,10 @@
     return openDB().then(function (db) {
       return new Promise(function (resolve, reject) {
         const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.delete(id);
-
-        request.onsuccess = function () {
-          resolve();
-        };
-        request.onerror = function () {
-          reject(request.error);
-        };
+        tx.objectStore(STORE_NAME).delete(id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
       });
     });
   }
