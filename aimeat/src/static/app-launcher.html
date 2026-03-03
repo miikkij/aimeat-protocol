@@ -307,6 +307,31 @@
       opacity: 1;
     }
 
+    /* ── Card Menu Button ─────────────────────────────── */
+
+    .card-menu-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      background: var(--surface-glass, rgba(22, 33, 62, 0.8));
+      border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+      color: var(--text);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 2;
+    }
+    .app-card:hover .card-menu-btn,
+    .card-menu-btn:focus { opacity: 1; }
+    .card-menu-btn:hover { background: var(--accent); }
+
     /* ── Empty State ────────────────────────────────── */
 
     .empty-state {
@@ -798,6 +823,42 @@
       background: rgba(255, 255, 255, .95);
     }
 
+    /* ── Source Modal ──────────────────────────────── */
+
+    #source-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #source-overlay[hidden] {
+      display: none;
+    }
+
+    .source-modal { max-width: 800px; width: 95vw; }
+    #source-code {
+      width: 100%;
+      min-height: 400px;
+      max-height: 60vh;
+      background: #0d1117;
+      color: #c9d1d9;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: vertical;
+      tab-size: 2;
+    }
+
     [data-theme="light"] #iframe-view .iframe-toolbar {
       background: rgba(245, 245, 245, .95);
     }
@@ -959,6 +1020,7 @@
     <input type="text" id="search-input" placeholder="Search apps..." autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
       <button class="icon-btn" id="add-btn" title="Add app">+</button>
+      <button class="icon-btn" id="homepage-btn" title="Generate Homepage">&#x1F3E0;</button>
       <button class="icon-btn" id="settings-btn" title="Settings">&#x2699;</button>
     </div>
   </header>
@@ -1058,6 +1120,7 @@
     <button data-action="edit">&#x270F;&#xFE0F; Edit</button>
     <button data-action="favorite">&#x2B50; Toggle favorite</button>
     <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
+    <button data-action="view-source">&#x1F441; View Source</button>
     <hr>
     <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
   </div>
@@ -1114,6 +1177,19 @@
       <div class="modal-actions" style="margin-top:24px">
         <button type="button" class="modal-btn secondary" id="settings-cancel-btn">Cancel</button>
         <button type="button" class="modal-btn primary" id="settings-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Source Modal -->
+  <div id="source-overlay" hidden>
+    <div class="modal source-modal">
+      <h2 id="source-title">View Source</h2>
+      <textarea id="source-code" readonly></textarea>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="copy-source-btn">Copy Source</button>
+        <button class="modal-btn primary" id="copy-prompt-btn">Copy with AI Prompt</button>
+        <button class="modal-btn secondary" onclick="document.getElementById('source-overlay').hidden = true">Close</button>
       </div>
     </div>
   </div>
@@ -1893,6 +1969,7 @@
           var iconDisplay = app.icon || '\u{1F4DD}';
           html +=
             '<div class="app-card" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" style="animation-delay:' + (i * 0.04) + 's">' +
+              '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
               '<div class="app-source">' + sourceLabel(app.source) + '</div>' +

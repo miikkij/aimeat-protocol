@@ -52,9 +52,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
 
     const existing = await storage.getMemory(gaii, key);
 
-    // Quota enforcement: max 1000 keys per agent, max 64KB per value
-    const MAX_KEYS_PER_AGENT = 1000;
-    const MAX_VALUE_SIZE = 65536; // 64KB
+    // Quota enforcement: configurable per-agent key limit and per-value size limit
+    const MAX_KEYS_PER_AGENT = config.memoryMaxKeysPerAgent;
+    const MAX_VALUE_SIZE = config.memoryMaxValueSizeKb * 1024;
 
     const valueSize = Buffer.byteLength(JSON.stringify(value), 'utf8');
     if (valueSize > MAX_VALUE_SIZE) {

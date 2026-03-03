@@ -156,9 +156,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         const data = Buffer.from(content, 'base64');
-        const MAX_APP_SIZE = 5 * 1024 * 1024; // 5MB limit for app files
+        const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
         if (data.length > MAX_APP_SIZE) {
-            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `App file exceeds 5MB limit (${data.length} bytes)`));
+            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `App file exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)`));
             return;
         }
 

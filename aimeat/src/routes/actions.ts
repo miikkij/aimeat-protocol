@@ -11,9 +11,6 @@ const ALLOWED_CATEGORIES = [
   'data', 'image', 'audio', 'video', 'search', 'utility', 'other',
 ] as const;
 
-const MAX_ACTIONS_PER_AGENT = 20;
-const MIN_TRUST_FOR_PAID_ACTIONS = 10;
-
 export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -33,18 +30,18 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     // Min trust enforcement for paid actions
     if (pricing.base_morsels > 0) {
       const trust = await calculateTrustScore(gaii, storage);
-      if (trust.score < MIN_TRUST_FOR_PAID_ACTIONS) {
+      if (trust.score < config.minTrustForPaidActions) {
         res.status(403).json(error(config.nodeId, 'TRUST_TOO_LOW',
-          `Trust score ${trust.score} is below minimum ${MIN_TRUST_FOR_PAID_ACTIONS} for paid actions`));
+          `Trust score ${trust.score} is below minimum ${config.minTrustForPaidActions} for paid actions`));
         return;
       }
     }
 
     // Action limit per agent
     const existingActions = await storage.listActionsByProvider(gaii);
-    if (existingActions.length >= MAX_ACTIONS_PER_AGENT) {
+    if (existingActions.length >= config.maxActionsPerAgent) {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-        `Maximum ${MAX_ACTIONS_PER_AGENT} actions per agent. Delete unused actions first.`));
+        `Maximum ${config.maxActionsPerAgent} actions per agent. Delete unused actions first.`));
       return;
     }
 

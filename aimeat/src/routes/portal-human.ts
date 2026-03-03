@@ -1855,17 +1855,28 @@ body {
     creative: askUser +
       'I want a creative tool as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      '## File storage API (for images)\\n' +
+      'Use the storage API to save images — it supports much larger files than memory.\\n' +
+      'Upload image: POST ' + nodeUrl + '/v1/storage\\n' +
+      'Content-Type: application/json\\n' +
+      'Body: {"key": "apps/art/[unique-id].png", "data": "<base64-encoded-image>", "mime_type": "image/png", "visibility": "public"}\\n' +
+      'Response: { ok: true, data: { key: "apps/art/[unique-id].png", size: 12345, ... } }\\n' +
+      'Public image URL (for <img> tags): ' + nodeUrl + '/v1/pub/shared%23anonymous@' + nodeUrl.replace(/^https?:\\/\\//, '').replace(':', '%3A') + '/apps/art/[unique-id].png\\n' +
+      'IMPORTANT: To convert canvas to base64 for upload, use canvas.toDataURL("image/png").split(",")[1] to get the raw base64 WITHOUT the data:image/png;base64, prefix.\\n\\n' +
       '## Shared community gallery (if user chooses SHARED):\\n' +
+      'Store the gallery INDEX (metadata only, no image data) in memory:\\n' +
       'Key: "apps.art.community.gallery"\\n' +
       'Read: GET ' + nodeUrl + '/v1/memory/apps.art.community.gallery\\n' +
-      'Format: {"items": [{"id":"unique","author":"Name","title":"Artwork title","data":"data:image/png;base64,...","created":"ISO timestamp"},...]}\\n' +
-      'To add: GET existing items, append new item with base64 image data to items array, POST full updated object back.\\n' +
+      'Format: {"items": [{"id":"unique","author":"Name","title":"Artwork title","storageKey":"apps/art/[id].png","created":"ISO timestamp"},...]}\\n' +
+      'To add: First upload image to storage, then GET existing gallery items, append new item with storageKey (NOT base64 data), POST gallery back to memory.\\n' +
+      'Display images using the public URL: <img src="' + nodeUrl + '/v1/pub/shared%23anonymous@' + nodeUrl.replace(/^https?:\\/\\//, '').replace(':', '%3A') + '/[storageKey]">\\n' +
       'Show all community artwork in a gallery grid. Each piece shows author name, title and time. Let user save their drawing alongside others.\\n\\n' +
       'App requirements:\\n' +
       '- Drawing canvas with color picker and brush size\\n' +
-      '- If OWN: save creations to "apps.art.[drawing-id]"\\n' +
-      '- If SHARED: save to "apps.art.community.gallery" items array — show everyone\'s artwork in a gallery\\n' +
-      '- Gallery view of all creations (own or community)\\n' +
+      '- Upload images to storage API (not memory) — storage supports large files\\n' +
+      '- If OWN: upload to storage with key "apps/art/[drawing-id].png", store metadata in memory at "apps.art.[drawing-id]"\\n' +
+      '- If SHARED: upload to storage, then add metadata (with storageKey) to "apps.art.community.gallery" items array\\n' +
+      '- Gallery view: load metadata from memory, display images via public storage URL\\n' +
       '- Clear canvas, undo, and download image\\n\\n' +
       baseReqs + baseEnd,
 

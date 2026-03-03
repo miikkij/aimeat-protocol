@@ -85,7 +85,16 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_BOARD_POST_BASE_COST: '5',
   AIMEAT_BOARD_POST_COST_PER_KB: '2',
   AIMEAT_MEMORY_QUOTA_MB: '10',
+  AIMEAT_MEMORY_MAX_VALUE_SIZE_KB: '1024',
+  AIMEAT_MEMORY_MAX_KEYS: '1000',
   AIMEAT_STORAGE_QUOTA_MB: '100',
+  AIMEAT_STORAGE_MAX_FILE_SIZE_MB: '10',
+  AIMEAT_MICRO_MEMORY_MAX_SETS: '50',
+  AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET: '100',
+  AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE: '16384',
+  AIMEAT_MAX_ACTIONS_PER_AGENT: '20',
+  AIMEAT_APP_MAX_SIZE_MB: '5',
+  AIMEAT_AGENT_PORTING_FEE: '50',
   AIMEAT_MAX_RELAY_HOPS: '3',
   AIMEAT_FEDERATION_ROLE: 'standalone',
   AIMEAT_GENESIS_URL: '',
@@ -238,7 +247,16 @@ function generateEnvContent(settings: Record<string, string>): string {
       title: 'Quotas',
       vars: [
         { key: 'AIMEAT_MEMORY_QUOTA_MB' },
+        { key: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', comment: 'Max size of a single memory value (KB)' },
+        { key: 'AIMEAT_MEMORY_MAX_KEYS', comment: 'Max memory keys per agent' },
         { key: 'AIMEAT_STORAGE_QUOTA_MB' },
+        { key: 'AIMEAT_STORAGE_MAX_FILE_SIZE_MB', comment: 'Max single file upload size (MB)' },
+        { key: 'AIMEAT_MICRO_MEMORY_MAX_SETS', comment: 'Max micro-memory sets per agent' },
+        { key: 'AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET', comment: 'Max keys per micro-memory set' },
+        { key: 'AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE', comment: 'Max micro-memory value size (bytes)' },
+        { key: 'AIMEAT_MAX_ACTIONS_PER_AGENT', comment: 'Max action definitions per agent' },
+        { key: 'AIMEAT_APP_MAX_SIZE_MB', comment: 'Max app file size (MB)' },
+        { key: 'AIMEAT_AGENT_PORTING_FEE', comment: 'Morsels charged for agent porting' },
       ],
     },
     {
@@ -300,7 +318,16 @@ function generateJsonContent(settings: Record<string, string>): string {
     AIMEAT_EXTENDED_FEATURES: 'extendedFeaturesEnabled',
     AIMEAT_KEYED_BROWSE: 'keyedBrowseEnabled',
     AIMEAT_MEMORY_QUOTA_MB: 'memoryQuotaMb',
+    AIMEAT_MEMORY_MAX_VALUE_SIZE_KB: 'memoryMaxValueSizeKb',
+    AIMEAT_MEMORY_MAX_KEYS: 'memoryMaxKeysPerAgent',
     AIMEAT_STORAGE_QUOTA_MB: 'storageQuotaMb',
+    AIMEAT_STORAGE_MAX_FILE_SIZE_MB: 'storageMaxFileSizeMb',
+    AIMEAT_MICRO_MEMORY_MAX_SETS: 'microMemoryMaxSetsPerAgent',
+    AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET: 'microMemoryMaxKeysPerSet',
+    AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE: 'microMemoryMaxValueSizeBytes',
+    AIMEAT_MAX_ACTIONS_PER_AGENT: 'maxActionsPerAgent',
+    AIMEAT_APP_MAX_SIZE_MB: 'appMaxSizeMb',
+    AIMEAT_AGENT_PORTING_FEE: 'agentPortingFeeMorsels',
     AIMEAT_MAX_RELAY_HOPS: 'maxRelayHops',
     AIMEAT_FEDERATION_ROLE: 'federationRole',
     AIMEAT_GENESIS_URL: 'genesisUrl',
@@ -678,6 +705,26 @@ async function askAllAdvancedSettings(
   );
   if (memQuota !== '10') settings.AIMEAT_MEMORY_QUOTA_MB = memQuota;
 
+  const memValueSize = checkCancel(
+    await p.text({
+      message: t('init.memoryMaxValueSizeKb'),
+      defaultValue: String(cfg.memoryMaxValueSizeKb),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (memValueSize !== '1024') settings.AIMEAT_MEMORY_MAX_VALUE_SIZE_KB = memValueSize;
+
+  const memKeys = checkCancel(
+    await p.text({
+      message: t('init.memoryMaxKeys'),
+      defaultValue: String(cfg.memoryMaxKeysPerAgent),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (memKeys !== '1000') settings.AIMEAT_MEMORY_MAX_KEYS = memKeys;
+
   const storQuota = checkCancel(
     await p.text({
       message: t('init.storageQuota'),
@@ -687,6 +734,76 @@ async function askAllAdvancedSettings(
     t,
   );
   if (storQuota !== '100') settings.AIMEAT_STORAGE_QUOTA_MB = storQuota;
+
+  const storFileSize = checkCancel(
+    await p.text({
+      message: t('init.storageMaxFileSize'),
+      defaultValue: String(cfg.storageMaxFileSizeMb),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (storFileSize !== '10') settings.AIMEAT_STORAGE_MAX_FILE_SIZE_MB = storFileSize;
+
+  const mmSets = checkCancel(
+    await p.text({
+      message: t('init.microMemoryMaxSets'),
+      defaultValue: String(cfg.microMemoryMaxSetsPerAgent),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (mmSets !== '50') settings.AIMEAT_MICRO_MEMORY_MAX_SETS = mmSets;
+
+  const mmKeys = checkCancel(
+    await p.text({
+      message: t('init.microMemoryMaxKeysPerSet'),
+      defaultValue: String(cfg.microMemoryMaxKeysPerSet),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (mmKeys !== '100') settings.AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET = mmKeys;
+
+  const mmValueSize = checkCancel(
+    await p.text({
+      message: t('init.microMemoryMaxValueSize'),
+      defaultValue: String(cfg.microMemoryMaxValueSizeBytes),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (mmValueSize !== '16384') settings.AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE = mmValueSize;
+
+  const maxActions = checkCancel(
+    await p.text({
+      message: t('init.maxActionsPerAgent'),
+      defaultValue: String(cfg.maxActionsPerAgent),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (maxActions !== '20') settings.AIMEAT_MAX_ACTIONS_PER_AGENT = maxActions;
+
+  const appSize = checkCancel(
+    await p.text({
+      message: t('init.appMaxSize'),
+      defaultValue: String(cfg.appMaxSizeMb),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (appSize !== '5') settings.AIMEAT_APP_MAX_SIZE_MB = appSize;
+
+  const portingFee = checkCancel(
+    await p.text({
+      message: t('init.agentPortingFee'),
+      defaultValue: String(cfg.agentPortingFeeMorsels),
+      validate: val => validatePositiveNum(val, t),
+    }),
+    t,
+  );
+  if (portingFee !== '50') settings.AIMEAT_AGENT_PORTING_FEE = portingFee;
 
   const relayHops = checkCancel(
     await p.text({

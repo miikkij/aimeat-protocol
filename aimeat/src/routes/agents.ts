@@ -430,8 +430,8 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Porting fee: 50 morsels
-    const PORTING_FEE = 50;
+    // Porting fee (configurable)
+    const PORTING_FEE = config.agentPortingFeeMorsels;
     if (agent.morselBalance < PORTING_FEE) {
       res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
         `Porting requires ${PORTING_FEE} morsels, you have ${agent.morselBalance}`));

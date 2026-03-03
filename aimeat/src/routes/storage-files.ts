@@ -21,8 +21,8 @@ function extractKey(params: Record<string, string | string[]>): string {
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
-    // Max chunked file size: 5 GB (RFC Appendix B)
-    const MAX_CHUNKED_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+    // Max chunked file size (configurable, default 5 GB)
+    const MAX_CHUNKED_FILE_SIZE = config.storageMaxChunkedFileSizeGb * 1024 * 1024 * 1024;
 
     // POST /v1/storage — upload file (agent auth)
     router.post('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
@@ -57,9 +57,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             mimeType = contentType || 'application/octet-stream';
         }
 
-        // 10MB per-file limit
-        if (fileData.length > 10 * 1024 * 1024) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', 'File size exceeds 10MB limit'));
+        // Per-file size limit (configurable)
+        if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
+            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `File size exceeds ${config.storageMaxFileSizeMb}MB limit`));
             return;
         }
 

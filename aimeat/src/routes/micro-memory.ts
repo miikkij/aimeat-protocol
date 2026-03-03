@@ -6,10 +6,7 @@ import { checkOtkSession } from './auth.js';
 import { checkMicroMemoryQuota } from '../services/quota.js';
 
 const VALID_VISIBILITY = ['private', 'public_read', 'shared_read', 'shared_write', 'public_write'] as const;
-const MAX_SETS_PER_AGENT = 50;
-const MAX_KEYS_PER_SET = 100;
-const MAX_VALUE_SIZE = 1024; // 1KB
-const MAX_BATCH_PAIRS = 100; // Max key-value pairs in a batch GET
+const MAX_BATCH_PAIRS = 100; // Max key-value pairs to scan in batch GET query params
 
 /** Resolve value from query — supports plain `value` and base64-encoded `value64` */
 function resolveValue(req: { query: Record<string, unknown> }): string | undefined {
@@ -193,16 +190,16 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set, key, and value (or value64) are required for add'));
                     return;
                 }
-                if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_SIZE) {
-                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
+                if (Buffer.byteLength(value, 'utf8') > config.microMemoryMaxValueSizeBytes) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${config.microMemoryMaxValueSizeBytes} byte limit`));
                     return;
                 }
                 let record = await storage.getMicroMemory(gaii, set);
                 if (!record) {
                     // Check set limit
                     const sets = await storage.listMicroMemorySets(gaii);
-                    if (sets.length >= MAX_SETS_PER_AGENT) {
-                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_SETS_PER_AGENT} sets per agent`));
+                    if (sets.length >= config.microMemoryMaxSetsPerAgent) {
+                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${config.microMemoryMaxSetsPerAgent} sets per agent`));
                         return;
                     }
                     // If access_code is provided on first add, auto-set visibility to shared_read
@@ -215,8 +212,8 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     record.visibility = 'shared_read';
                     record.accessCode = upgradeCode;
                 }
-                if (Object.keys(record.entries).length >= MAX_KEYS_PER_SET && !(key in record.entries)) {
-                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_KEYS_PER_SET} keys per set`));
+                if (Object.keys(record.entries).length >= config.microMemoryMaxKeysPerSet && !(key in record.entries)) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${config.microMemoryMaxKeysPerSet} keys per set`));
                     return;
                 }
                 // M-5: Total micro-memory quota check (§5.7.4, default 500KB)
@@ -249,8 +246,8 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'set, key, and value (or value64) are required for mod'));
                     return;
                 }
-                if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_SIZE) {
-                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
+                if (Buffer.byteLength(value, 'utf8') > config.microMemoryMaxValueSizeBytes) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${config.microMemoryMaxValueSizeBytes} byte limit`));
                     return;
                 }
                 const record2 = await storage.getMicroMemory(gaii, set);
@@ -355,24 +352,24 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                 }
                 // Validate individual value sizes
                 for (const pair of pairs) {
-                    if (Buffer.byteLength(pair.value, 'utf8') > MAX_VALUE_SIZE) {
-                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value for key "${pair.key}" exceeds ${MAX_VALUE_SIZE} byte limit`));
+                    if (Buffer.byteLength(pair.value, 'utf8') > config.microMemoryMaxValueSizeBytes) {
+                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value for key "${pair.key}" exceeds ${config.microMemoryMaxValueSizeBytes} byte limit`));
                         return;
                     }
                 }
                 let batchRecord = await storage.getMicroMemory(gaii, set);
                 if (!batchRecord) {
                     const sets = await storage.listMicroMemorySets(gaii);
-                    if (sets.length >= MAX_SETS_PER_AGENT) {
-                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${MAX_SETS_PER_AGENT} sets per agent`));
+                    if (sets.length >= config.microMemoryMaxSetsPerAgent) {
+                        res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${config.microMemoryMaxSetsPerAgent} sets per agent`));
                         return;
                     }
                     batchRecord = { gaii, set, entries: {}, visibility: 'private', updatedAt: new Date().toISOString() };
                 }
                 // Check key count limit
                 const newKeyCount = pairs.filter(p => !(p.key in batchRecord!.entries)).length;
-                if (Object.keys(batchRecord.entries).length + newKeyCount > MAX_KEYS_PER_SET) {
-                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Would exceed ${MAX_KEYS_PER_SET} keys per set`));
+                if (Object.keys(batchRecord.entries).length + newKeyCount > config.microMemoryMaxKeysPerSet) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Would exceed ${config.microMemoryMaxKeysPerSet} keys per set`));
                     return;
                 }
                 // Calculate total quota delta
@@ -449,8 +446,8 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and value (or value64) required'));
                     return;
                 }
-                if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_SIZE) {
-                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${MAX_VALUE_SIZE} byte limit`));
+                if (Buffer.byteLength(value, 'utf8') > config.microMemoryMaxValueSizeBytes) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${config.microMemoryMaxValueSizeBytes} byte limit`));
                     return;
                 }
                 // M-5: Total micro-memory quota check for public/shared writes

@@ -58,8 +58,19 @@ export interface AimeatConfig {
   depeeringGracePeriodHours: number;
   keyCacheRefreshMinutes: number;
   memoryQuotaMb: number;
+  memoryMaxValueSizeKb: number;
+  memoryMaxKeysPerAgent: number;
   storageQuotaMb: number;
+  storageMaxFileSizeMb: number;
+  storageMaxChunkedFileSizeGb: number;
   microMemoryQuotaKb: number;
+  microMemoryMaxSetsPerAgent: number;
+  microMemoryMaxKeysPerSet: number;
+  microMemoryMaxValueSizeBytes: number;
+  maxActionsPerAgent: number;
+  minTrustForPaidActions: number;
+  appMaxSizeMb: number;
+  agentPortingFeeMorsels: number;
   memoryOverageMorselsPerMbMonth: number;
   storageOverageMorselsPerGbMonth: number;
   maxOperatorMintPerDay: number;
@@ -182,8 +193,19 @@ export function loadConfig(): AimeatConfig {
     depeeringGracePeriodHours: parseInt(process.env.AIMEAT_DEPEERING_GRACE_HOURS ?? '72', 10),
     keyCacheRefreshMinutes: parseInt(process.env.AIMEAT_KEY_CACHE_REFRESH_MINUTES ?? '5', 10),
     memoryQuotaMb: parseInt(process.env.AIMEAT_MEMORY_QUOTA_MB ?? '10', 10),
+    memoryMaxValueSizeKb: parseInt(process.env.AIMEAT_MEMORY_MAX_VALUE_SIZE_KB ?? '1024', 10),
+    memoryMaxKeysPerAgent: parseInt(process.env.AIMEAT_MEMORY_MAX_KEYS ?? '1000', 10),
     storageQuotaMb: parseInt(process.env.AIMEAT_STORAGE_QUOTA_MB ?? '100', 10),
+    storageMaxFileSizeMb: parseInt(process.env.AIMEAT_STORAGE_MAX_FILE_SIZE_MB ?? '10', 10),
+    storageMaxChunkedFileSizeGb: parseInt(process.env.AIMEAT_STORAGE_MAX_CHUNKED_FILE_SIZE_GB ?? '5', 10),
     microMemoryQuotaKb: parseInt(process.env.AIMEAT_MICRO_MEMORY_QUOTA_KB ?? '500', 10),
+    microMemoryMaxSetsPerAgent: parseInt(process.env.AIMEAT_MICRO_MEMORY_MAX_SETS ?? '50', 10),
+    microMemoryMaxKeysPerSet: parseInt(process.env.AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET ?? '100', 10),
+    microMemoryMaxValueSizeBytes: parseInt(process.env.AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE ?? '16384', 10),
+    maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
+    minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),
+    appMaxSizeMb: parseInt(process.env.AIMEAT_APP_MAX_SIZE_MB ?? '5', 10),
+    agentPortingFeeMorsels: parseInt(process.env.AIMEAT_AGENT_PORTING_FEE ?? '50', 10),
     memoryOverageMorselsPerMbMonth: parseInt(process.env.AIMEAT_MEMORY_OVERAGE_MORSELS ?? '10', 10),
     storageOverageMorselsPerGbMonth: parseInt(process.env.AIMEAT_STORAGE_OVERAGE_MORSELS ?? '100', 10),
     maxOperatorMintPerDay: parseInt(process.env.AIMEAT_MAX_OPERATOR_MINT_PER_DAY ?? '10000', 10),
