@@ -92,14 +92,23 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // Serve static assets (platform icons, etc.)
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const publicDir = join(__dirname, '..', 'public');
-  if (existsSync(publicDir)) {
+  // Try multiple paths: relative to src/ (dev via tsx) and relative to dist/ (compiled)
+  const publicCandidates = [
+    join(__dirname, '..', 'public'),      // dev: src/../public
+    join(__dirname, '..', '..', 'public'), // dist: dist/src/../../public
+  ];
+  const publicDir = publicCandidates.find(p => existsSync(p));
+  if (publicDir) {
     app.use(express.static(publicDir, { maxAge: '7d' }));
   }
 
   // PWA static files (manifest.json, sw.js, offline.html, icons)
-  const pwaStaticDir = join(__dirname, '..', 'src', 'static');
-  if (existsSync(pwaStaticDir)) {
+  const pwaCandidates = [
+    join(__dirname, '..', 'src', 'static'),      // dev
+    join(__dirname, '..', '..', 'src', 'static'), // dist
+  ];
+  const pwaStaticDir = pwaCandidates.find(p => existsSync(p));
+  if (pwaStaticDir) {
     app.use(express.static(pwaStaticDir, { maxAge: '1d' }));
   }
 

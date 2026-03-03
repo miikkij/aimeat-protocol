@@ -13,6 +13,16 @@ export function enableAnonymousAuth(gaii: string, owner: string): void {
   _anonymousOwner = owner;
 }
 
+/** Check if anonymous mode is enabled */
+export function isAnonymousMode(): boolean {
+  return _anonymousMode;
+}
+
+/** Get anonymous credentials (gaii + owner) — only valid when isAnonymousMode() is true */
+export function getAnonymousCredentials(): { gaii: string; owner: string } {
+  return { gaii: _anonymousGaii, owner: _anonymousOwner };
+}
+
 // Extend Express Request with auth info
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace

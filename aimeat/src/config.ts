@@ -170,6 +170,7 @@ export interface AimeatConfig {
   realtimeMaxPeersPerRoom: number;
   realtimeRoomIdleTimeoutMs: number;
   realtimeMaxMessageSizeBytes: number;
+  realtimeRateLimitPerSecond: number;
   stunServers: string[];
   turnServer: string | null;
   turnUsername: string | null;
@@ -301,6 +302,7 @@ export function loadConfig(): AimeatConfig {
     realtimeMaxPeersPerRoom: parseInt(process.env.AIMEAT_REALTIME_MAX_PEERS_PER_ROOM ?? '20', 10),
     realtimeRoomIdleTimeoutMs: parseInt(process.env.AIMEAT_REALTIME_ROOM_IDLE_TIMEOUT_MS ?? '3600000', 10),
     realtimeMaxMessageSizeBytes: parseInt(process.env.AIMEAT_REALTIME_MAX_MESSAGE_SIZE ?? '16384', 10),
+    realtimeRateLimitPerSecond: parseInt(process.env.AIMEAT_REALTIME_RATE_LIMIT ?? '50', 10),
     stunServers: (process.env.AIMEAT_STUN_SERVERS ?? 'stun:stun.l.google.com:19302').split(',').map(s => s.trim()).filter(Boolean),
     turnServer: process.env.AIMEAT_TURN_SERVER ?? null,
     turnUsername: process.env.AIMEAT_TURN_USERNAME ?? null,

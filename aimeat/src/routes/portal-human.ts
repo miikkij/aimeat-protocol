@@ -8,6 +8,36 @@ import { success, error } from '../middleware/envelope.js';
 /* ──────────────────────────────────────────────────────────
    Human-facing portal page — "try it now" experience
    Finnish-first, mobile-first, no jargon
+   ──────────────────────────────────────────────────────────
+
+   ⚠️  ESCAPING RULES — DO NOT REMOVE THIS COMMENT  ⚠️
+
+   This file builds JS code inside HTML template literals.
+   There are TWO levels of escaping at play:
+
+   Level 1: TypeScript template literal (backticks)
+     - \' is consumed by TS → outputs just '
+     - \n is consumed by TS → outputs a real newline
+
+   Level 2: Browser JS string (single quotes in rendered HTML)
+     - The rendered JS uses '...' strings that the browser parses
+
+   CORRECT patterns inside template literal JS strings:
+     \\n   → renders as \n  (JS newline escape in browser)   ✅
+     \\\\'  → renders as \'  (escaped quote in browser)       ✅
+     <scr' + 'ipt>  → avoids closing the HTML script block   ✅
+     <\\/script>      → avoids closing the HTML script block  ✅
+
+   WRONG patterns (will cause SyntaxError in browser):
+     \n   → renders as real newline → breaks JS string        ❌
+     \\'   → renders as ' → terminates JS string prematurely  ❌
+     </script> → closes the HTML script block early           ❌
+
+   When adding text with apostrophes (e.g. "everyone's",
+   "who's", "others' content"), always use \\\\' so the
+   rendered output contains \' which the browser treats
+   as an escaped quote inside the JS string.
+
    ────────────────────────────────────────────────────────── */
 
 function esc(s: string): string {
@@ -1354,6 +1384,11 @@ body {
               <div class="cat-name">${esc(t('cards.apps.categories.creative'))}</div>
               <div class="cat-desc">${esc(t('cards.apps.categories.creativeDesc'))}</div>
             </div>
+            <div class="cat-card" data-category="band" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F3B5}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.band'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.bandDesc'))}</div>
+            </div>
             <div class="cat-card" data-category="realtime" onclick="event.stopPropagation()">
               <div class="cat-icon">\u{1F4E1}</div>
               <div class="cat-name">${esc(t('cards.apps.categories.realtime'))}</div>
@@ -1736,7 +1771,7 @@ body {
     '2. How should it look and feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
     '3. Memory area: Should this app use its OWN private space, or a SHARED community space where I can see what others have made and add mine?\\n' +
     '   - OWN: create a unique key like "apps.[type].[my-unique-id]" — only I see my data\\n' +
-    '   - SHARED: use the community key given below — I see others\' content and can add mine\\n' +
+    '   - SHARED: use the community key given below — I see others\\' content and can add mine\\n' +
     'Use my answers to customize everything.\\n\\n';
 
   var apiRef = '## Data storage API\\n' +
@@ -1755,34 +1790,34 @@ body {
     '- Clean, modern UI\\n' +
     '- Works immediately when opened in a browser\\n';
 
-  var realtimeRef = '## Realtime P2P API (optional — for live multiplayer)\n' +
-    'Your app can create real-time rooms where multiple users interact live (no polling needed).\n' +
-    'Client library: <script src="' + nodeUrl + '/lib/realtime.js"></script>\n\n' +
-    'Quick start:\n' +
-    '  const rt = new AimeatRealtime("' + nodeUrl + '", token);\n' +
-    '  // token comes from: POST ' + nodeUrl + '/v1/auth/anonymous → response.data.token\n' +
-    '  const room = await rt.createRoom({ app_type: "[TYPE]", name: "My Room" });\n' +
-    '  rt.connect(room.id, playerName);\n' +
-    '  rt.on("joined", (msg) => console.log("My peer ID:", msg.peerId, "Peers:", msg.peers));\n' +
-    '  rt.on("peer-joined", (msg) => console.log("New peer:", msg.nick));\n' +
-    '  rt.on("peer-left", (msg) => console.log("Peer left:", msg.peerId));\n' +
-    '  rt.on("broadcast", (msg) => console.log("From", msg.from, ":", msg.payload));\n' +
-    '  rt.broadcast({ action: "move", x: 10, y: 20 }); // send to all peers\n' +
-    '  rt.presence({ status: "ready", cursor: {x:100, y:200} }); // share state\n' +
-    '  rt.on("peer-presence", (msg) => console.log(msg.peerId, "state:", msg.state));\n\n' +
-    'Room lifecycle:\n' +
-    '  - Create: rt.createRoom({ app_type, name, max_peers, is_public, tags })\n' +
-    '  - List: rt.listRooms({ app_type }) → rooms array\n' +
-    '  - Connect: rt.connect(roomId, nickname)\n' +
-    '  - Disconnect: rt.disconnect()\n' +
-    '  - Broadcast (to all): rt.broadcast(payload)\n' +
-    '  - Signal (to one peer): rt.signal(peerId, payload) — for WebRTC handshake\n' +
-    '  - Presence (share state): rt.presence({ key: value })\n' +
-    '  - Leave: rt.leave()\n\n' +
-    'Events: joined, peer-joined, peer-left, peer-presence, broadcast, signal, error, open, close\n' +
-    'IMPORTANT: Get an anonymous auth token FIRST, then pass it to AimeatRealtime constructor:\n' +
-    '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\n' +
-    '  const { data: { token } } = await authRes.json();\n\n';
+  var realtimeRef = '## Realtime P2P API (optional \\u2014 for live multiplayer)\\n' +
+    'Your app can create real-time rooms where multiple users interact live (no polling needed).\\n' +
+    'Client library: <scr' + 'ipt src="' + nodeUrl + '/lib/realtime.js"><\\/scr' + 'ipt>\\n\\n' +
+    'Quick start:\\n' +
+    '  const rt = new AimeatRealtime("' + nodeUrl + '", token);\\n' +
+    '  // token comes from: POST ' + nodeUrl + '/v1/auth/anonymous \\u2192 response.data.token\\n' +
+    '  const room = await rt.createRoom({ app_type: "[TYPE]", name: "My Room" });\\n' +
+    '  rt.connect(room.id, playerName);\\n' +
+    '  rt.on("joined", (msg) => console.log("My peer ID:", msg.peerId, "Peers:", msg.peers));\\n' +
+    '  rt.on("peer-joined", (msg) => console.log("New peer:", msg.nick));\\n' +
+    '  rt.on("peer-left", (msg) => console.log("Peer left:", msg.peerId));\\n' +
+    '  rt.on("broadcast", (msg) => console.log("From", msg.from, ":", msg.payload));\\n' +
+    '  rt.broadcast({ action: "move", x: 10, y: 20 }); // send to all peers\\n' +
+    '  rt.presence({ status: "ready", cursor: {x:100, y:200} }); // share state\\n' +
+    '  rt.on("peer-presence", (msg) => console.log(msg.peerId, "state:", msg.state));\\n\\n' +
+    'Room lifecycle:\\n' +
+    '  - Create: rt.createRoom({ app_type, name, max_peers, is_public, tags })\\n' +
+    '  - List: rt.listRooms({ app_type }) \\u2192 rooms array\\n' +
+    '  - Connect: rt.connect(roomId, nickname)\\n' +
+    '  - Disconnect: rt.disconnect()\\n' +
+    '  - Broadcast (to all): rt.broadcast(payload)\\n' +
+    '  - Signal (to one peer): rt.signal(peerId, payload) \\u2014 for WebRTC handshake\\n' +
+    '  - Presence (share state): rt.presence({ key: value })\\n' +
+    '  - Leave: rt.leave()\\n\\n' +
+    'Events: joined, peer-joined, peer-left, peer-presence, broadcast, signal, error, open, close\\n' +
+    'IMPORTANT: Get an anonymous auth token FIRST, then pass it to AimeatRealtime constructor:\\n' +
+    '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\\n' +
+    '  const { data: { token } } = await authRes.json();\\n\\n';
 
   var baseEnd = '\\nMake the HTML a downloadable file. This is a live API — the URLs work right now.' +
     '\\n\\n## If Something Doesn\\'t Work\\n' +
@@ -1846,7 +1881,7 @@ body {
       'App requirements:\\n' +
       '- Create, view, edit, and delete notes\\n' +
       '- If OWN: each note stored as "apps.notes.[note-id]" with value: {title, body, created, updated}\\n' +
-      '- If SHARED: all notes stored at "apps.notes.community.board" in items array — show everyone\'s notes\\n' +
+      '- If SHARED: all notes stored at "apps.notes.community.board" in items array — show everyone\\'s notes\\n' +
       '- Sidebar or list view showing all saved notes with titles and timestamps\\n' +
       '- Click a note to view or edit it\\n' +
       '- Search or filter notes\\n\\n' +
@@ -1860,11 +1895,11 @@ body {
       'Read: GET ' + nodeUrl + '/v1/memory/apps.tracker.community.dashboard\\n' +
       'Format: {"items": [{"id":"unique","author":"Name","category":"habit or expense or custom","entries":[{"date":"ISO","value":"..."}],"created":"ISO"},...]}\\n' +
       'To add: GET existing items, append new item to items array, POST full updated object back.\\n' +
-      'Show a shared leaderboard/dashboard of everyone\'s tracked items. Let user add theirs with their name.\\n\\n' +
+      'Show a shared leaderboard/dashboard of everyone\\'s tracked items. Let user add theirs with their name.\\n\\n' +
       'App requirements:\\n' +
       '- Track daily habits, expenses, or anything the user wants\\n' +
       '- If OWN: each entry stored as "apps.tracker.[date]" with value: {items: [...], date}\\n' +
-      '- If SHARED: all entries stored at "apps.tracker.community.dashboard" in items array — show everyone\'s progress\\n' +
+      '- If SHARED: all entries stored at "apps.tracker.community.dashboard" in items array — show everyone\\'s progress\\n' +
       '- Calendar or list view of past entries\\n' +
       '- Simple charts or progress indicators\\n' +
       '- Add and remove tracked items\\n\\n' +
@@ -1930,6 +1965,49 @@ body {
       baseReqs + '\\n' +
       'Ask me what the app should do before building it.' + baseEnd,
 
+    band: 'Before building, ask me:\\n' +
+      '1. What should the jam session be called?\\n' +
+      '2. What instruments should be available? (e.g. "drums, guitar, bass, synth, piano")\\n' +
+      '3. How should it look and feel? (e.g. "dark neon studio", "cozy wooden stage", "retro arcade")\\n' +
+      '4. How many musicians at once? (2\\u201320)\\n' +
+      'Use my answers to customize everything.\\n\\n' +
+      'I want a real-time jam session app where multiple people can play music together simultaneously.\\n\\n' +
+      apiRef +
+      realtimeRef +
+      '## How it should work\\n' +
+      '1. On first visit, ask for a musician name (save to localStorage)\\n' +
+      '2. Show a "Stage Finder": list of active rooms via rt.listRooms({ app_type: "band" })\\n' +
+      '3. "Create Session" and "Join" buttons\\n' +
+      '4. Once connected, show a virtual instrument panel (touchable keyboard/pads/strings)\\n' +
+      '5. Each player picks an instrument. Broadcast note events in real-time\\n' +
+      '6. Use Web Audio API to synthesize sounds locally\\n' +
+      '7. Show all connected musicians with their instrument choice (via presence)\\n' +
+      '8. Broadcast format: { instrument: "guitar", note: "C4", velocity: 0.7, duration: 0.5 }\\n' +
+      '9. Each peer renders incoming notes to audio locally (Web Audio API)\\n' +
+      '10. Show "Now Playing" indicator when peers play notes\\n' +
+      '11. "Leave Session" button to disconnect\\n\\n' +
+      '## Architecture Notes\\n' +
+      '- Audio does NOT travel through the server \\u2014 each client synthesizes sound locally from note events\\n' +
+      '- Note events (instrument, note, velocity) are tiny JSON messages via WebSocket broadcast\\n' +
+      '- This keeps latency minimal (only a few ms for the JSON message vs. streaming raw audio)\\n' +
+      '- For full audio streaming (e.g. real microphone input), use WebRTC P2P audio channels\\n\\n' +
+      '## Instruments\\n' +
+      'Implement at least 3 instruments using Web Audio API:\\n' +
+      '- Drums: Grid of pads (kick, snare, hi-hat, tom) that trigger percussion sounds via OscillatorNode/noise\\n' +
+      '- Synth/Keys: Chromatic keyboard (1-2 octaves) with OscillatorNode (sine/square/sawtooth)\\n' +
+      '- Bass: Simple bass synth with lower octave notes\\n\\n' +
+      'Each instrument should produce short, recognizable sounds even with basic oscillators.\\n\\n' +
+      '## Auth setup\\n' +
+      'The app must first get an anonymous auth token:\\n' +
+      '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\\n' +
+      '  const { data: { token } } = await authRes.json();\\n' +
+      'Then create the realtime client: new AimeatRealtime("' + nodeUrl + '", token)\\n\\n' +
+      baseReqs +
+      '- Include <scr' + 'ipt src="' + nodeUrl + '/lib/realtime.js"><\\/scr' + 'ipt> for the realtime client library\\n' +
+      '- Use WebSocket-based realtime API (NOT polling) for all live interactions\\n' +
+      '- Mobile-friendly \\u2014 pads/keys work on touch screens\\n' +
+      '- Dark, studio-like UI\\n' + baseEnd,
+
     realtime: 'Before building, ask me:\\n' +
       '1. What should the app be called?\\n' +
       '2. What type of real-time experience? (e.g. "collaborative whiteboard", "live chat room", "multiplayer game", "jam session", "shared timer")\\n' +
@@ -1946,7 +2024,7 @@ body {
       '4. "Join" button on each room — connects to that room\\n' +
       '5. Once connected, show the live experience with peer list sidebar\\n' +
       '6. All interactions broadcast instantly to all peers (NO polling)\\n' +
-      '7. Show who\'s online and their status via presence\\n' +
+      '7. Show who\\'s online and their status via presence\\n' +
       '8. Handle peer join/leave gracefully with notifications\\n' +
       '9. "Leave Room" button to disconnect and return to room browser\\n\\n' +
       '## Auth setup\\n' +
@@ -1955,7 +2033,7 @@ body {
       '  const { data: { token } } = await authRes.json();\\n' +
       'Then create the realtime client: new AimeatRealtime("' + nodeUrl + '", token)\\n\\n' +
       baseReqs +
-      '- Include <script src="' + nodeUrl + '/lib/realtime.js"></script> for the realtime client library\\n' +
+      '- Include <scr' + 'ipt src="' + nodeUrl + '/lib/realtime.js"><\\/scr' + 'ipt> for the realtime client library\\n' +
       '- Use WebSocket-based realtime API (NOT polling) for all live interactions\\n' +
       '- Show connection status indicator (connected / disconnected / reconnecting)\\n' + baseEnd
   };

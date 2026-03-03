@@ -65,7 +65,7 @@ class AimeatRealtime {
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error?.message || 'Failed to list rooms');
-    return json.data;
+    return json.data.rooms ?? json.data;
   }
 
   async getRoom(roomId) {

@@ -76,7 +76,6 @@ export class RealtimeManager {
   private wsToPerr = new Map<WebSocket, string>(); // ws → peerId
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private static readonly RATE_LIMIT_WINDOW_MS = 1000;
-  private static readonly RATE_LIMIT_MAX_MSGS = 10; // 10 messages per second per peer
 
   // ── Metrics counters ──
   private metricsMessagesIn = 0;
@@ -394,7 +393,7 @@ export class RealtimeManager {
     const recent = timestamps.filter(t => t > cutoff);
     recent.push(now);
     room.peerMsgTimestamps.set(peerId, recent);
-    return recent.length > RealtimeManager.RATE_LIMIT_MAX_MSGS;
+    return recent.length > this.config.realtimeRateLimitPerSecond;
   }
 
   // ── Discovery ──

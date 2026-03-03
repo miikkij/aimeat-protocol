@@ -3,7 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { issueJWT, revokeToken } from '../auth/jwt.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseGAII } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
@@ -37,6 +37,31 @@ export async function checkOtkSession(otk: { sessionId: string | null }, storage
 
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // POST /v1/auth/anonymous — get a JWT for anonymous access (when anonymous mode is enabled)
+  router.post('/v1/auth/anonymous', async (req, res) => {
+    if (!isAnonymousMode()) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous mode is not enabled on this node'));
+      return;
+    }
+
+    const { gaii, owner } = getAnonymousCredentials();
+    const token = await issueJWT({
+      sub: gaii,
+      owner,
+      node: config.nodeId,
+      roles: ['agent'],
+    }, 86400); // 24 hours
+
+    res.json(success(config.nodeId, {
+      token,
+      gaii,
+      expires_in: 86400,
+    }, [
+      { description: 'Store data', method: 'POST', url: '/v1/memory' },
+      { description: 'Create realtime room', method: 'POST', url: '/v1/realtime/rooms' },
+    ]));
+  });
 
   // GET /v1/auth/challenge — get a nonce to sign
   router.get('/v1/auth/challenge', (req, res) => {

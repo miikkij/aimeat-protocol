@@ -323,6 +323,7 @@ if (subcommand === 'config') {
   if (tunnelManager || realtimeManager) {
     const { WebSocketServer } = await import('ws');
     const { verifyJWT } = await import('./auth/jwt.js');
+    const { isAnonymousMode } = await import('./auth/middleware.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
 
@@ -388,6 +389,19 @@ if (subcommand === 'config') {
           : tokenParam;
 
         if (!token) {
+          // Allow anonymous mode without token for realtime WS
+          if (isAnonymousMode()) {
+            const room = realtimeManager.getRoom(roomId);
+            if (!room) {
+              socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+              socket.destroy();
+              return;
+            }
+            realtimeWss.handleUpgrade(request, socket, head, (ws) => {
+              realtimeManager.handleUpgrade(ws, roomId, nick);
+            });
+            return;
+          }
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
