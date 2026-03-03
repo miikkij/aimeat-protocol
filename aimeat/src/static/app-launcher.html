@@ -296,7 +296,7 @@
     .app-card .fav-star {
       position: absolute;
       top: 8px;
-      right: 10px;
+      left: 10px;
       font-size: .85rem;
       opacity: 0;
       transition: opacity var(--transition);
@@ -2035,8 +2035,8 @@
   var contextAppId = null;
 
   function showContextMenu(event, id) {
-    event.preventDefault();
-    event.stopPropagation();
+    if (event.preventDefault) event.preventDefault();
+    if (event.stopPropagation) event.stopPropagation();
     contextAppId = id;
 
     var menu = document.getElementById('context-menu');
@@ -2620,9 +2620,11 @@
 
     // ── Keyboard shortcuts ──────────────────────────
     document.addEventListener('keydown', function (e) {
-      // Escape — close modals / overlays
+      // Escape — close modals / overlays (source-overlay first in cascade)
       if (e.key === 'Escape') {
-        if (!document.getElementById('context-menu').hidden) {
+        if (!document.getElementById('source-overlay').hidden) {
+          document.getElementById('source-overlay').hidden = true;
+        } else if (!document.getElementById('context-menu').hidden) {
           hideContextMenu();
         } else if (!document.getElementById('aimeat-import-overlay').hidden) {
           document.getElementById('aimeat-import-overlay').hidden = true;
@@ -2645,6 +2647,83 @@
         document.getElementById('search-input').focus();
       }
     });
+
+    // ── Long-press for touch devices ─────────────────
+    document.getElementById('app-grid').addEventListener('touchstart', function(e) {
+      var card = e.target.closest('.app-card');
+      if (!card) return;
+      var appId = card.getAttribute('data-id');
+      card._longPressTimer = setTimeout(function() {
+        e.preventDefault();
+        window._launcher.showContextMenu(e.touches[0], appId);
+      }, 500);
+    }, { passive: false });
+
+    document.getElementById('app-grid').addEventListener('touchend', function(e) {
+      var card = e.target.closest('.app-card');
+      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
+    });
+
+    document.getElementById('app-grid').addEventListener('touchmove', function(e) {
+      var card = e.target.closest('.app-card');
+      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
+    });
+
+    // ── Copy Source button ───────────────────────────
+    document.getElementById('copy-source-btn').addEventListener('click', function() {
+      var code = document.getElementById('source-code').value;
+      var btn = this;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function() {
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.textContent = 'Copy Source'; }, 1500);
+        });
+      } else {
+        // Fallback: select text in textarea
+        var ta = document.getElementById('source-code');
+        ta.select();
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy Source'; }, 1500);
+      }
+    });
+
+    // ── Copy with AI Prompt button ───────────────────
+    document.getElementById('copy-prompt-btn').addEventListener('click', function() {
+      var code = document.getElementById('source-code').value;
+      var appName = document.getElementById('source-overlay').dataset.appName;
+      var prompt = 'Here is an HTML app called "' + appName + '".\n' +
+        'Make the following change: [DESCRIBE YOUR CHANGE HERE]\n\n' +
+        'Return the complete updated HTML file.\n\n' +
+        '--- Source Code ---\n' + code;
+      var btn = this;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(prompt).then(function() {
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.textContent = 'Copy with AI Prompt'; }, 1500);
+        });
+      } else {
+        // Fallback: temporarily set textarea value and copy
+        var ta = document.getElementById('source-code');
+        var orig = ta.value;
+        ta.value = prompt;
+        ta.select();
+        document.execCommand('copy');
+        ta.value = orig;
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy with AI Prompt'; }, 1500);
+      }
+    });
+
+    // ── Click source overlay background to close ─────
+    document.getElementById('source-overlay').addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
+    // ── Homepage button ──────────────────────────────
+    document.getElementById('homepage-btn').addEventListener('click', generateHomepagePrompt);
   });
 
 })();
