@@ -34,7 +34,7 @@ import { storageFilesRouter } from './routes/storage-files.js';
 import { validateRouter } from './routes/validate.js';
 import { mcpRouter } from './routes/mcp.js';
 import { portalRouter } from './routes/portal.js';
-import { humanPortalRouter } from './routes/portal-human.js';
+import { portalApiRouter } from './routes/portal-api.js';
 import { profileRouter } from './routes/profile.js';
 import { csmRouter } from './routes/csm.js';
 import { msmRouter } from './routes/msm.js';
@@ -401,7 +401,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     startSiteSyncJob(config, storage, siteService);
   }
   app.use(portalRouter(config, storage));
-  app.use(humanPortalRouter(config, storage));
+  app.use(portalApiRouter(config, storage));
   app.use(portalHobbiesRouter(config, storage, directoryService));
   app.use(portalMarketplaceRouter(config, storage));
   app.use(profileRouter(config, storage));
