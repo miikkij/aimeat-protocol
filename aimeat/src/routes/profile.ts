@@ -1797,11 +1797,11 @@ async function loadAccess() {
   var ownerKey = localStorage.getItem('aimeat_owner_key');
   if (ownerKey) {
     html += '<h3 style="color:var(--love1);margin:1.5rem 0 .75rem">\\u{1F5DD}\\u{FE0F} ' + t('profile.access.ownerKey') + '</h3>';
-    html += '<div class="card" style="border-color:var(--warn)">'
+    html += '<div class="card" style="border-color:var(--warn);cursor:pointer" onclick="copyToClipboard(localStorage.getItem(\'aimeat_owner_key\')).then(function(){showToast(\'' + t('profile.access.keyCopied').replace(/'/g, "\\'") + '\')})">'
       + '<div style="display:flex;justify-content:space-between;align-items:center">'
       + '<div style="font-family:monospace;font-size:.75rem;word-break:break-all;color:var(--muted);filter:blur(4px);transition:filter .2s" '
       + 'onmouseenter="this.style.filter=\\'none\\'" onmouseleave="this.style.filter=\\'blur(4px)\\'">'
-      + escHtml(ownerKey.substring(0, 20)) + '...'
+      + escHtml(ownerKey)
       + '</div><span class="badge badge-warn">' + t('profile.access.hoverReveal') + '</span></div>'
       + '<div style="font-size:.75rem;color:var(--warn);margin-top:.5rem">\\u26A0 ' + t('profile.access.keepSafe') + '</div>'
       + '</div>';

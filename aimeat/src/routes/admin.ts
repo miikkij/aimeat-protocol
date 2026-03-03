@@ -12,6 +12,7 @@ import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
 import { createT, resolveLocale, type Locale } from '../i18n.js';
+import { buildDashboardHtml, buildDashboardTranslations } from './admin-dashboard.js';
 
 // Password hashing with scrypt (shared with GHII)
 async function hashPassword(password: string): Promise<string> {
@@ -413,6 +414,13 @@ export function adminRouter(
         res.type('text/html').send(buildDashboardHtml(locale));
     });
 
+    // GET /v1/admin/translations — return dashboard translations as JSON for SPA language switching
+    router.get('/v1/admin/translations', (req, res) => {
+        const lang = resolveLocale(req.query.lang as string | undefined, req.headers.cookie, req.headers['accept-language']);
+        const t = createT(lang);
+        res.json({ ok: true, locale: lang, translations: buildDashboardTranslations(t) });
+    });
+
     // GET /v1/admin/work — list all work items (operator only)
     router.get('/v1/admin/work', requireAuth(), requireRole('operator'), async (_req, res) => {
         const allWork = await storage.listAllWork();
@@ -473,6 +481,63 @@ export function adminRouter(
             'quota.micro_memory_kb': { value: config.microMemoryQuotaKb, type: 'integer', description: 'Micro-memory quota per agent in KB', range: '1-10000', mutable: true, path: 'quota.micro_memory_kb' },
             'federation.max_relay_hops': { value: config.maxRelayHops, type: 'integer', description: 'Max relay hops for federated requests', range: '1-10', mutable: true, path: 'federation.max_relay_hops' },
             'rate_limits': { value: config.rateLimits, type: 'object', description: 'Rate limiting configuration per endpoint category', mutable: true, path: 'rate_limits' },
+
+            // Email (Phase 1.1)
+            'email.enabled': { value: config.emailEnabled, type: 'boolean', description: 'Email service enabled (requires SMTP host)', mutable: true, path: 'email.enabled' },
+            'email.confirmation_required': { value: config.emailConfirmationRequired, type: 'boolean', description: 'Require email confirmation for registration', mutable: true, path: 'email.confirmation_required' },
+            'email.smtp_host': { value: config.smtpHost, type: 'string', description: 'SMTP server hostname', mutable: true, path: 'email.smtp_host' },
+            'email.smtp_port': { value: config.smtpPort, type: 'integer', description: 'SMTP server port', range: '1-65535', mutable: true, path: 'email.smtp_port' },
+            'email.smtp_from': { value: config.smtpFrom, type: 'string', description: 'SMTP From address', mutable: true, path: 'email.smtp_from' },
+            'email.smtp_user_configured': { value: !!config.smtpUser, type: 'boolean', description: 'Whether SMTP user is configured (read-only secret)', mutable: false, path: 'email.smtp_user_configured' },
+            'email.smtp_pass_configured': { value: !!config.smtpPass, type: 'boolean', description: 'Whether SMTP password is configured (read-only secret)', mutable: false, path: 'email.smtp_pass_configured' },
+
+            // Consent (Phase 0.3)
+            'consent.enabled': { value: config.consentEnabled, type: 'boolean', description: 'Consent layer enabled', mutable: true, path: 'consent.enabled' },
+            'consent.audit_retention_days': { value: config.consentAuditRetentionDays, type: 'integer', description: 'Consent audit log retention in days', range: '1-3650', mutable: true, path: 'consent.audit_retention_days' },
+            'consent.max_per_user': { value: config.consentMaxPerUser, type: 'integer', description: 'Max consent records per user', range: '1-10000', mutable: true, path: 'consent.max_per_user' },
+
+            // TOTP (Phase 0.5)
+            'totp.enabled': { value: config.totpEnabled, type: 'boolean', description: 'TOTP two-factor authentication enabled', mutable: true, path: 'totp.enabled' },
+            'totp.period': { value: config.totpPeriod, type: 'integer', description: 'TOTP code rotation period in seconds', range: '15-120', mutable: true, path: 'totp.period' },
+            'totp.window': { value: config.totpWindow, type: 'integer', description: 'TOTP validation window (codes before/after)', range: '0-5', mutable: true, path: 'totp.window' },
+            'totp.max_failed_attempts': { value: config.totpMaxFailedAttempts, type: 'integer', description: 'Max failed TOTP attempts before lockout', range: '1-20', mutable: true, path: 'totp.max_failed_attempts' },
+            'totp.lockout_seconds': { value: config.totpLockoutSeconds, type: 'integer', description: 'TOTP lockout duration in seconds', range: '30-3600', mutable: true, path: 'totp.lockout_seconds' },
+            'totp.encryption_key_configured': { value: !!config.totpSecretEncryptionKey, type: 'boolean', description: 'Whether TOTP encryption key is configured (read-only secret)', mutable: false, path: 'totp.encryption_key_configured' },
+
+            // Matching (Phase 2.1)
+            'matching.enabled': { value: config.matchingEnabled, type: 'boolean', description: 'AI matching engine enabled', mutable: true, path: 'matching.enabled' },
+            'matching.interval_hours': { value: config.matchIntervalHours, type: 'integer', description: 'Hours between matching rounds', range: '1-168', mutable: true, path: 'matching.interval_hours' },
+            'matching.threshold': { value: config.matchThreshold, type: 'float', description: 'Minimum match score threshold', range: '0.0-1.0', mutable: true, path: 'matching.threshold' },
+            'matching.max_suggestions': { value: config.matchMaxSuggestions, type: 'integer', description: 'Max match suggestions per user', range: '1-50', mutable: true, path: 'matching.max_suggestions' },
+            'matching.max_distance_km': { value: config.matchMaxDistanceKm, type: 'integer', description: 'Max geographic distance for matches in km', range: '1-50000', mutable: true, path: 'matching.max_distance_km' },
+            'matching.cooldown_days': { value: config.matchCooldownDays, type: 'integer', description: 'Days before re-matching same pair', range: '1-365', mutable: true, path: 'matching.cooldown_days' },
+
+            // Marketplace (Phase 2.6)
+            'marketplace.enabled': { value: config.marketplaceEnabled, type: 'boolean', description: 'Marketplace feature enabled', mutable: true, path: 'marketplace.enabled' },
+            'marketplace.listing_fee': { value: config.marketplaceListingFeeMorsels, type: 'integer', description: 'Morsel fee for creating a listing', range: '0-10000', mutable: true, path: 'marketplace.listing_fee' },
+            'marketplace.tx_fee_percent': { value: config.marketplaceTransactionFeePercent, type: 'integer', description: 'Transaction fee percentage', range: '0-50', mutable: true, path: 'marketplace.tx_fee_percent' },
+            'marketplace.escrow_enabled': { value: config.marketplaceEscrowEnabled, type: 'boolean', description: 'Escrow for marketplace transactions', mutable: true, path: 'marketplace.escrow_enabled' },
+
+            // Push Notifications (Phase 3.1)
+            'push.enabled': { value: config.pushEnabled, type: 'boolean', description: 'Web push notifications enabled', mutable: true, path: 'push.enabled' },
+            'push.vapid_configured': { value: !!config.vapidPublicKey && !!config.vapidPrivateKey, type: 'boolean', description: 'Whether VAPID keys are configured (read-only secret)', mutable: false, path: 'push.vapid_configured' },
+
+            // EUDIW / Identity (Phase 3.3)
+            'eudiw.enabled': { value: config.eudiwEnabled, type: 'boolean', description: 'EUDIW identity verification enabled', mutable: true, path: 'eudiw.enabled' },
+            'eudiw.ftn_enabled': { value: config.ftnEnabled, type: 'boolean', description: 'Finnish Trust Network enabled', mutable: true, path: 'eudiw.ftn_enabled' },
+
+            // Cross-Federation (Phase 3.4)
+            'cross_federation.enabled': { value: config.crossFederationEnabled, type: 'boolean', description: 'Cross-federation peering enabled', mutable: true, path: 'cross_federation.enabled' },
+            'cross_federation.max_genesis_peers': { value: config.maxGenesisPeers, type: 'integer', description: 'Max genesis peers for cross-federation', range: '1-100', mutable: true, path: 'cross_federation.max_genesis_peers' },
+            'cross_federation.sync_interval_hours': { value: config.genesisSyncIntervalHours, type: 'integer', description: 'Hours between genesis sync rounds', range: '1-168', mutable: true, path: 'cross_federation.sync_interval_hours' },
+
+            // Personal Nodes
+            'personal_nodes.enabled': { value: config.personalNodesEnabled, type: 'boolean', description: 'Personal node hosting enabled', mutable: true, path: 'personal_nodes.enabled' },
+            'personal_nodes.max_slots': { value: config.personalNodeMaxSlots, type: 'integer', description: 'Max personal node slots', range: '1-10000', mutable: true, path: 'personal_nodes.max_slots' },
+
+            // Match Notifications (Phase 1.6)
+            'match_notifications.enabled': { value: config.matchNotificationEnabled, type: 'boolean', description: 'Match notification emails enabled', mutable: true, path: 'match_notifications.enabled' },
+            'match_notifications.interval_hours': { value: config.matchNotificationIntervalHours, type: 'integer', description: 'Hours between match notification batches', range: '1-168', mutable: true, path: 'match_notifications.interval_hours' },
         };
 
         res.json(success(config.nodeId, { schema }));
@@ -508,6 +573,59 @@ export function adminRouter(
             'quota.micro_memory_kb': { key: 'microMemoryQuotaKb', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
             'federation.max_relay_hops': { key: 'maxRelayHops', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
             'rate_limits': { key: 'rateLimits', validate: v => typeof v === 'object' && v !== null },
+
+            // Email (Phase 1.1)
+            'email.enabled': { key: 'emailEnabled', validate: v => typeof v === 'boolean' },
+            'email.confirmation_required': { key: 'emailConfirmationRequired', validate: v => typeof v === 'boolean' },
+            'email.smtp_host': { key: 'smtpHost', validate: v => v === null || typeof v === 'string' },
+            'email.smtp_port': { key: 'smtpPort', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 65535 },
+            'email.smtp_from': { key: 'smtpFrom', validate: v => typeof v === 'string' && (v as string).length > 0 },
+
+            // Consent (Phase 0.3)
+            'consent.enabled': { key: 'consentEnabled', validate: v => typeof v === 'boolean' },
+            'consent.audit_retention_days': { key: 'consentAuditRetentionDays', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650 },
+            'consent.max_per_user': { key: 'consentMaxPerUser', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000 },
+
+            // TOTP (Phase 0.5)
+            'totp.enabled': { key: 'totpEnabled', validate: v => typeof v === 'boolean' },
+            'totp.period': { key: 'totpPeriod', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 15 && (v as number) <= 120 },
+            'totp.window': { key: 'totpWindow', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5 },
+            'totp.max_failed_attempts': { key: 'totpMaxFailedAttempts', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20 },
+            'totp.lockout_seconds': { key: 'totpLockoutSeconds', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 30 && (v as number) <= 3600 },
+
+            // Matching (Phase 2.1)
+            'matching.enabled': { key: 'matchingEnabled', validate: v => typeof v === 'boolean' },
+            'matching.interval_hours': { key: 'matchIntervalHours', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168 },
+            'matching.threshold': { key: 'matchThreshold', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1 },
+            'matching.max_suggestions': { key: 'matchMaxSuggestions', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50 },
+            'matching.max_distance_km': { key: 'matchMaxDistanceKm', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50000 },
+            'matching.cooldown_days': { key: 'matchCooldownDays', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 365 },
+
+            // Marketplace (Phase 2.6)
+            'marketplace.enabled': { key: 'marketplaceEnabled', validate: v => typeof v === 'boolean' },
+            'marketplace.listing_fee': { key: 'marketplaceListingFeeMorsels', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000 },
+            'marketplace.tx_fee_percent': { key: 'marketplaceTransactionFeePercent', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50 },
+            'marketplace.escrow_enabled': { key: 'marketplaceEscrowEnabled', validate: v => typeof v === 'boolean' },
+
+            // Push Notifications (Phase 3.1)
+            'push.enabled': { key: 'pushEnabled', validate: v => typeof v === 'boolean' },
+
+            // EUDIW / Identity (Phase 3.3)
+            'eudiw.enabled': { key: 'eudiwEnabled', validate: v => typeof v === 'boolean' },
+            'eudiw.ftn_enabled': { key: 'ftnEnabled', validate: v => typeof v === 'boolean' },
+
+            // Cross-Federation (Phase 3.4)
+            'cross_federation.enabled': { key: 'crossFederationEnabled', validate: v => typeof v === 'boolean' },
+            'cross_federation.max_genesis_peers': { key: 'maxGenesisPeers', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100 },
+            'cross_federation.sync_interval_hours': { key: 'genesisSyncIntervalHours', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168 },
+
+            // Personal Nodes
+            'personal_nodes.enabled': { key: 'personalNodesEnabled', validate: v => typeof v === 'boolean' },
+            'personal_nodes.max_slots': { key: 'personalNodeMaxSlots', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000 },
+
+            // Match Notifications (Phase 1.6)
+            'match_notifications.enabled': { key: 'matchNotificationEnabled', validate: v => typeof v === 'boolean' },
+            'match_notifications.interval_hours': { key: 'matchNotificationIntervalHours', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168 },
         };
 
         const applied: { path: string; old_value: unknown; new_value: unknown }[] = [];
@@ -819,761 +937,6 @@ export function adminRouter(
     return router;
 }
 
-// ── Admin Dashboard HTML ──
-function buildDashboardHtml(locale: Locale): string {
-    const t = createT(locale);
-    return `<!DOCTYPE html>
-<html lang="${locale}">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<title>${t('dashboard.title')}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;
---green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;
---cyan:#06b6d4;--font:system-ui,-apple-system,sans-serif}
-body{background:var(--bg);color:var(--text);font-family:var(--font);padding:0;min-height:100vh}
-h1{font-size:1.4rem;font-weight:700;margin-bottom:0}
-.layout{display:flex;min-height:100vh}
-/* Sidebar */
-.sidebar{width:220px;background:#0c1222;border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
-.sidebar h1{padding:0 16px;margin-bottom:16px;font-size:1.1rem}
-.sidebar .node-id{padding:0 16px;color:var(--muted);font-size:.7rem;margin-bottom:16px;word-break:break-all}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:var(--muted);font-size:.85rem;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit;transition:all .1s}
-.nav-item:hover{background:#1e293b;color:var(--text)}
-.nav-item.active{background:#1e293b;color:var(--cyan);border-left:3px solid var(--cyan);padding-left:13px}
-.nav-item .icon{font-size:1rem;width:20px;text-align:center}
-.nav-item .label{flex:1}
-.nav-item .count{background:var(--border);color:var(--muted);font-size:.7rem;padding:2px 7px;border-radius:10px}
-.nav-sep{height:1px;background:var(--border);margin:8px 16px}
-/* Main */
-.main{flex:1;padding:20px 28px;overflow-y:auto}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
-.topbar-right{display:flex;align-items:center;gap:12px}
-.refresh{background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600}
-.refresh:hover{opacity:.85}
-.refresh:disabled{opacity:.5;cursor:not-allowed}
-#lastUpdate{color:var(--muted);font-size:.7rem}
-/* Cards */
-.grid{display:grid;gap:16px;margin-bottom:20px}
-.grid-4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-.grid-2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
-.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
-.card h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px}
-.stat{font-size:1.8rem;font-weight:700;line-height:1.1}
-.stat-label{color:var(--muted);font-size:.75rem;margin-top:2px}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600;text-transform:uppercase}
-.badge-healthy{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
-.badge-watch{background:#ca8a0422;color:var(--yellow);border:1px solid #ca8a0455}
-.badge-danger{background:#dc262622;color:var(--red);border:1px solid #dc262655}
-.badge-info{background:#3b82f622;color:var(--blue);border:1px solid #3b82f655}
-.badge-private{background:#a855f722;color:var(--purple);border:1px solid #a855f755}
-.badge-public{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
-.badge-pending{background:#ca8a0422;color:var(--yellow);border:1px solid #ca8a0455}
-.badge-accepted,.badge-in_progress{background:#3b82f622;color:var(--blue);border:1px solid #3b82f655}
-.badge-delivered,.badge-settled{background:#16a34a22;color:var(--green);border:1px solid #16a34a55}
-.badge-cancelled,.badge-expired,.badge-disputed{background:#dc262622;color:var(--red);border:1px solid #dc262655}
-.health-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
-.health-row:last-child{border-bottom:none}
-.health-metric{font-size:.85rem}
-.health-value{font-family:'SF Mono',Consolas,monospace;font-size:.85rem;color:var(--cyan)}
-table{width:100%;border-collapse:collapse;font-size:.82rem}
-th{text-align:left;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
-td{padding:8px 10px;border-bottom:1px solid var(--border)}
-tr:hover td{background:#ffffff06}
-.econ-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
-.econ-row:last-child{border-bottom:none}
-.econ-label{color:var(--muted);font-size:.85rem}
-.econ-val{font-family:'SF Mono',Consolas,monospace;font-size:.85rem;color:var(--text)}
-.mono{font-family:'SF Mono',Consolas,monospace;font-size:.78rem}
-.loading{text-align:center;padding:40px;color:var(--muted)}
-.error-box{background:#dc262622;border:1px solid var(--red);border-radius:8px;padding:16px;color:var(--red);margin:20px 0}
-.empty{color:var(--muted);text-align:center;padding:24px;font-size:.85rem}
-.detail-row{padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem}
-.detail-row:last-child{border-bottom:none}
-.detail-label{color:var(--muted);min-width:140px;display:inline-block}
-.expand-btn{background:none;border:1px solid var(--border);color:var(--cyan);padding:3px 10px;border-radius:4px;cursor:pointer;font-size:.75rem;font-family:inherit}
-.expand-btn:hover{background:var(--border)}
-.sub-panel{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:8px;font-size:.8rem}
-.page-title{font-size:1.1rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.page-title .icon{font-size:1.2rem}
-.tag{display:inline-block;background:var(--border);color:var(--muted);padding:1px 6px;border-radius:4px;font-size:.7rem;margin:1px}
-.scrollable{max-height:600px;overflow-y:auto}
-@media(max-width:768px){.sidebar{display:none}.main{padding:12px}}
-</style>
-</head>
-<body>
-<div class="layout">
-<nav class="sidebar">
-  <h1>&#x2764;&#xFE0F; AIMEAT</h1>
-  <div class="node-id" id="sideNodeId"></div>
-  <button class="nav-item active" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">${t('dashboard.overview')}</span></button>
-  <button class="nav-item" onclick="nav('owners')"><span class="icon">&#x1F464;</span><span class="label">${t('dashboard.owners')}</span><span class="count" id="cntOwners">0</span></button>
-  <button class="nav-item" onclick="nav('agents')"><span class="icon">&#x1F916;</span><span class="label">${t('dashboard.agents')}</span><span class="count" id="cntAgents">0</span></button>
-  <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">${t('dashboard.actions')}</span><span class="count" id="cntActions">0</span></button>
-  <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">${t('dashboard.boards')}</span><span class="count" id="cntBoards">0</span></button>
-  <button class="nav-item" onclick="nav('chatInstances')"><span class="icon">&#x1F4AC;</span><span class="label">${t('dashboard.chatInstances')}</span><span class="count" id="cntChatInstances">0</span></button>
-  <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.work')}</span><span class="count" id="cntWork">0</span></button>
-  <div class="nav-sep"></div>
-  <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
-  <button class="nav-item" onclick="nav('federation')"><span class="icon">&#x1F310;</span><span class="label">${t('dashboard.federation')}</span><span class="count" id="cntPeers">0</span></button>
-  <button class="nav-item" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">${t('dashboard.hooks')}</span></button>
-  <button class="nav-item" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">${t('dashboard.maintenance')}</span></button>
-  <button class="nav-item" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">${t('dashboard.config')}</span></button>
-</nav>
-<div class="main">
-  <div class="topbar">
-    <div id="pageTitle" class="page-title"><span class="icon">&#x1F4CA;</span> ${t('dashboard.overview')}</div>
-    <div class="topbar-right">
-      <span style="font-size:.75rem;color:var(--muted);margin-right:4px">${t('dashboard.language')}:</span>
-      <a href="?lang=en" style="color:${'en' === locale ? 'var(--cyan)' : 'var(--muted)'};text-decoration:none;font-size:.8rem;font-weight:${'en' === locale ? '700' : '400'};margin-right:4px">EN</a>
-      <a href="?lang=fi" style="color:${'fi' === locale ? 'var(--cyan)' : 'var(--muted)'};text-decoration:none;font-size:.8rem;font-weight:${'fi' === locale ? '700' : '400'};margin-right:12px">FI</a>
-      <button class="refresh" id="btnRefresh" onclick="loadAll()">${t('dashboard.refresh')}</button>
-      <button class="refresh" style="background:var(--border);color:var(--muted)" onclick="localStorage.removeItem('aimeat_token');TOKEN='';showLoginForm()">${t('dashboard.logout')}</button>
-      <span id="lastUpdate"></span>
-    </div>
-  </div>
-  <div id="app"><div class="loading">${t('dashboard.loading')}</div></div>
-  <!-- Login form (shown when no valid token) -->
-  <div id="loginForm" class="hidden" style="max-width:420px;margin:60px auto">
-    <div class="card" style="border-radius:10px;text-align:center">
-      <h2 style="font-size:1.2rem;color:var(--text);text-transform:none;letter-spacing:0;margin-bottom:4px">${t('dashboard.loginTitle')}</h2>
-      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px">${t('dashboard.loginDesc')}</p>
-      <div id="dashLoginPw">
-        <input type="text" id="dashUser" placeholder="${t('dashboard.username')}" autocomplete="username" style="margin-bottom:8px"/>
-        <input type="password" id="dashPass" placeholder="${t('dashboard.password')}" autocomplete="current-password" style="margin-bottom:4px"/>
-        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" id="btnDashLogin" onclick="dashLogin()">${t('dashboard.login')}</button>
-        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginPw').classList.add('hidden');document.getElementById('dashLoginKey').classList.remove('hidden')" style="color:var(--cyan)">${t('dashboard.advancedKeyLogin')}</a></p>
-      </div>
-      <div id="dashLoginKey" class="hidden">
-        <input type="text" id="dashKeyOwner" placeholder="${t('dashboard.ownerName')}" autocomplete="off" style="margin-bottom:8px"/>
-        <textarea id="dashKeyPk" placeholder="${t('dashboard.privateKey')}" rows="3" style="width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;resize:vertical;font-family:monospace;margin-bottom:4px"></textarea>
-        <button class="refresh" style="width:100%;padding:10px;font-size:.9rem;margin-top:8px" onclick="dashKeyLogin()">${t('dashboard.loginWithKey')}</button>
-        <p style="color:var(--muted);font-size:.72rem;margin-top:10px"><a href="#" onclick="event.preventDefault();document.getElementById('dashLoginKey').classList.add('hidden');document.getElementById('dashLoginPw').classList.remove('hidden')" style="color:var(--cyan)">${t('dashboard.backToPassword')}</a></p>
-      </div>
-      <div id="dashLoginErr" class="hidden" style="margin-top:10px;padding:8px;border-radius:6px;background:#dc262618;border:1px solid #dc262655;color:var(--red);font-size:.85rem"></div>
-    </div>
-  </div>
-</div>
-</div>
-<script>
-let TOKEN=new URLSearchParams(location.search).get('token')||localStorage.getItem('aimeat_token')||'';
-if(TOKEN)localStorage.setItem('aimeat_token',TOKEN);
-
-let D={};// cached data
-let currentPage='overview';
-var __t=${JSON.stringify({
-        overview: t('dashboard.overview'), owners: t('dashboard.owners'), agents: t('dashboard.agents'),
-        actions: t('dashboard.actions'), boards: t('dashboard.boards'), work: t('dashboard.work'),
-        economy: t('dashboard.economy'), federation: t('dashboard.federation'), hooks: t('dashboard.hooks'),
-        maintenance: t('dashboard.maintenance'), config: t('dashboard.config'), refresh: t('dashboard.refresh'),
-        logout: t('dashboard.logout'), loading: t('dashboard.loading'), login: t('dashboard.login'),
-        signingIn: t('dashboard.signingIn'), loginFailed: t('dashboard.loginFailed'),
-        usernamePasswordRequired: t('dashboard.usernamePasswordRequired'),
-        nodeHealth: t('dashboard.nodeHealth'), economyToday: t('dashboard.economyToday'),
-        quickConfig: t('dashboard.quickConfig'), noOwnersFound: t('dashboard.noOwnersFound'),
-        noAgentsRegistered: t('dashboard.noAgentsRegistered'), noActionsPublished: t('dashboard.noActionsPublished'),
-        noBoardsCreated: t('dashboard.noBoardsCreated'), noWorkContracts: t('dashboard.noWorkContracts'),
-        noFederationPeers: t('dashboard.noFederationPeers'),
-        name: t('dashboard.name'), displayName: t('dashboard.displayName'), roles: t('dashboard.roles'),
-        created: t('dashboard.created'), trust: t('dashboard.trust'), morsels: t('dashboard.totalMorsels'),
-        lastSeen: t('dashboard.lastSeen'), details: t('dashboard.details'), hide: t('dashboard.hide'),
-        grantOperator: t('dashboard.grantOperator'), gaii: t('dashboard.gaii'), amount: t('dashboard.amount'),
-        morselSupply: t('dashboard.morselSupply'), todayActivity: t('dashboard.todayActivity'),
-        morselPolicy: t('dashboard.morselPolicy'), mintMorsels: t('dashboard.mintMorsels'), mint: t('dashboard.mint'),
-        maintenanceMode: t('dashboard.maintenanceMode'), operational: t('dashboard.operational'),
-        maintenanceOn: t('dashboard.maintenanceOn'), backupRestore: t('dashboard.backupRestore'),
-        downloadBackup: t('dashboard.downloadBackup'), restoreFromFile: t('dashboard.restoreFromFile'),
-        extensionHooks: t('dashboard.extensionHooks'), nodeSettings: t('dashboard.nodeSettings'),
-        configApi: t('dashboard.configApi'), peeringRequests: t('dashboard.peeringRequests'),
-        federationInfo: t('dashboard.federationInfo'), trackingCode: t('dashboard.trackingCode'),
-        status: t('dashboard.status'), action: t('dashboard.action'), requester: t('dashboard.requester'),
-        provider: t('dashboard.provider'), cost: t('dashboard.cost'), id: t('dashboard.id'),
-        category: t('dashboard.category'), tags: t('dashboard.tags'), baseCost: t('dashboard.baseCost'),
-        fromNode: t('dashboard.fromNode'), url: t('dashboard.url'), message: t('dashboard.message'),
-        loadPosts: t('dashboard.loadPosts'), clear: t('dashboard.clear'),
-        uptime: t('dashboard.uptime'), storage: t('dashboard.storage'),
-        active24h: t('dashboard.active24h'), inCirculation: t('dashboard.inCirculation'),
-        transactionsToday: t('dashboard.transactionsToday'), morselsMovedToday: t('dashboard.morselsMovedToday'),
-        burnedToday: t('dashboard.burnedToday'), port: t('dashboard.port'), jwtTtl: t('dashboard.jwtTtl'),
-        keyedBrowse: t('dashboard.keyedBrowse'), welcomeBonus: t('dashboard.welcomeBonus'),
-        enabled: t('dashboard.enabled'), disabled: t('dashboard.disabled'),
-        warnings: t('dashboard.warnings'), noData: t('dashboard.noData'),
-        failedToLoad: t('dashboard.failedToLoad'),
-        registeredOwners: t('dashboard.registeredOwners'), registeredAgents: t('dashboard.registeredAgents'),
-        publishedActions: t('dashboard.publishedActions'), activeBoards: t('dashboard.activeBoards'),
-        chatInstances: t('dashboard.chatInstances'), activeChatSessions: t('dashboard.activeChatSessions'), noChatInstances: t('dashboard.noChatInstances'),
-    })};
-
-async function api(path,opts){
-  const h=opts&&opts.headers?Object.assign({},opts.headers):{};
-  if(TOKEN)h['Authorization']='Bearer '+TOKEN;
-  if(opts&&opts.body)h['Content-Type']='application/json';
-  const r=await fetch(path,{method:(opts&&opts.method)||'GET',headers:h,body:opts&&opts.body?JSON.stringify(opts.body):undefined});
-  if(r.status===401){showLoginForm();throw new Error('Unauthorized');}
-  if(!r.ok)throw new Error(r.status+' '+r.statusText);
-  return r.json();
-}
-
-function showLoginForm(){
-  document.querySelector('.layout').style.display='none';
-  document.getElementById('loginForm').classList.remove('hidden');
-}
-function hideLoginForm(){
-  document.querySelector('.layout').style.display='flex';
-  document.getElementById('loginForm').classList.add('hidden');
-}
-
-async function dashLogin(){
-  var user=document.getElementById('dashUser').value.trim();
-  var pass=document.getElementById('dashPass').value;
-  if(!user||!pass){document.getElementById('dashLoginErr').textContent=__t.usernamePasswordRequired;document.getElementById('dashLoginErr').classList.remove('hidden');return;}
-  document.getElementById('btnDashLogin').disabled=true;document.getElementById('btnDashLogin').textContent=__t.signingIn;
-  try{
-    var r=await fetch('/v1/ghii/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user,password:pass})});
-    var j=await r.json();
-    if(!r.ok||!j.data||!j.data.token){document.getElementById('dashLoginErr').textContent=j.error||j.message||__t.loginFailed;document.getElementById('dashLoginErr').classList.remove('hidden');document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent=__t.login;return;}
-    TOKEN=j.data.token;localStorage.setItem('aimeat_token',TOKEN);
-    hideLoginForm();loadAll();
-  }catch(e){document.getElementById('dashLoginErr').textContent='Network error: '+e.message;document.getElementById('dashLoginErr').classList.remove('hidden');}
-  document.getElementById('btnDashLogin').disabled=false;document.getElementById('btnDashLogin').textContent=__t.login;
-}
-
-async function dashKeyLogin(){
-  var owner=document.getElementById('dashKeyOwner').value.trim();
-  var pk=document.getElementById('dashKeyPk').value.trim();
-  if(!owner||!pk)return;
-  try{
-    var r=await fetch('/v1/admin/setup/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({owner:owner,private_key:pk})});
-    var j=await r.json();
-    if(!j.ok||!j.token){document.getElementById('dashLoginErr').textContent=j.error||__t.loginFailed;document.getElementById('dashLoginErr').classList.remove('hidden');return;}
-    TOKEN=j.token;localStorage.setItem('aimeat_token',TOKEN);
-    hideLoginForm();loadAll();
-  }catch(e){document.getElementById('dashLoginErr').textContent='Error: '+e.message;document.getElementById('dashLoginErr').classList.remove('hidden');}
-}
-
-function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML}
-function badge(z){return '<span class="badge badge-'+z+'">'+z+'</span>'}
-function num(n){return typeof n==='number'?n.toLocaleString():String(n??'\\u2014')}
-function dt(s){return s?new Date(s).toLocaleString():'\\u2014'}
-function sc(l,v,sub,col){return '<div class="card"><h2>'+l+'</h2><div class="stat" style="color:'+col+'">'+num(v)+'</div>'+(sub?'<div class="stat-label">'+sub+'</div>':'')+'</div>'}
-function er(l,v){return '<div class="econ-row"><span class="econ-label">'+l+'</span><span class="econ-val">'+v+'</span></div>'}
-function hRow(l,obj){return '<div class="health-row"><span class="health-metric">'+l+'</span><span>'+badge(obj.zone)+' <span class="health-value">'+obj.value+'</span></span></div>'}
-function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m':'<1m')}
-
-function nav(page){
-  currentPage=page;
-  document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
-  var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','chatInstances','work','','economy','federation','hooks','maintenance','config'];
-  for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config};
-  document.getElementById('pageTitle').innerHTML=titles[page]||page;
-  render();
-}
-
-async function loadAll(){
-  if(!TOKEN){showLoginForm();return;}
-  var btn=document.getElementById('btnRefresh');
-  btn.disabled=true;btn.textContent=__t.loading;
-  try{
-    var [dash,agents,actions,boards]=await Promise.all([
-      api('/v1/admin/dashboard'),
-      api('/v1/admin/agents'),
-      api('/v1/actions'),
-      api('/v1/boards')
-    ]);
-    D.dash=dash.data;D.agents=agents.data;D.actions=actions.data;D.boards=boards.data;
-    // Update sidebar counts
-    if(D.dash&&D.dash.counts){
-      document.getElementById('cntOwners').textContent=D.dash.counts.owners;
-      document.getElementById('cntAgents').textContent=D.dash.counts.agents;
-      document.getElementById('cntActions').textContent=D.dash.counts.actions;
-      document.getElementById('cntBoards').textContent=D.dash.counts.boards;
-      document.getElementById('cntChatInstances').textContent=D.dash.counts.chat_instances||0;
-    }
-    // Load maintenance, work, owners, federation, hooks in parallel
-    var extras=await Promise.allSettled([
-      api('/v1/admin/maintenance'),
-      api('/v1/admin/work'),
-      api('/v1/admin/federation'),
-      api('/v1/admin/hooks'),
-      api('/v1/chat-instances')
-    ]);
-    D.maintenance=extras[0].status==='fulfilled'?extras[0].value.data:null;
-    D.workItems=extras[1].status==='fulfilled'?(extras[1].value.data.work||[]):[];
-    D.federation=extras[2].status==='fulfilled'?(extras[2].value.data.peers||[]):[];
-    D.hooks=extras[3].status==='fulfilled'?(extras[3].value.data.extension_hooks||{}):{};
-    D.chatInstances=extras[4].status==='fulfilled'?(extras[4].value.data.chat_instances||[]):[];
-    // Load owners
-    try{
-      var ownerNames=D.agents&&D.agents.agents?[...new Set(D.agents.agents.map(function(a){return a.owner}))]:[];
-      D.owners=[];
-      for(var i=0;i<ownerNames.length;i++){
-        try{var o=await api('/v1/owners/'+encodeURIComponent(ownerNames[i]));D.owners.push(o.data);}catch(e){}
-      }
-    }catch(e){D.owners=[];}
-    document.getElementById('cntWork').textContent=D.workItems.length;
-    document.getElementById('cntPeers').textContent=D.federation.length;
-    document.getElementById('sideNodeId').textContent=D.dash?D.dash.node_id:'';
-    document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString();
-    render();
-  }catch(e){
-    if(e.message==='Unauthorized')return;
-    document.getElementById('app').innerHTML='<div class="error-box"><strong>'+__t.failedToLoad+'</strong><br/>'+esc(e.message)+'</div>';
-  }
-  btn.disabled=false;btn.textContent=__t.refresh;
-}
-
-function render(){
-  var app=document.getElementById('app');
-  if(!D.dash){app.innerHTML='<div class="loading">'+__t.loading+'</div>';return;}
-  switch(currentPage){
-    case 'overview':app.innerHTML=renderOverview();break;
-    case 'owners':app.innerHTML=renderOwners();break;
-    case 'agents':app.innerHTML=renderAgents();break;
-    case 'actions':app.innerHTML=renderActions();break;
-    case 'boards':app.innerHTML=renderBoards();break;
-    case 'chatInstances':app.innerHTML=renderChatInstances();break;
-    case 'work':app.innerHTML=renderWork();break;
-    case 'economy':app.innerHTML=renderEconomy();break;
-    case 'federation':app.innerHTML=renderFederation();break;
-    case 'hooks':app.innerHTML=renderHooks();break;
-    case 'maintenance':app.innerHTML=renderMaintenance();break;
-    case 'config':app.innerHTML=renderConfig();break;
-    default:app.innerHTML='<div class="empty">Unknown page</div>';
-  }
-}
-
-/* ── OVERVIEW ── */
-function renderOverview(){
-  var d=D.dash,h=d.health,c=d.counts,e=d.economy,w=d.warnings||[];
-  var hColor=h.status==='healthy'?'green':h.status==='watch'?'yellow':'red';
-  var o='';
-  o+='<div class="card" style="border-left:4px solid var(--'+hColor+');margin-bottom:20px">';
-  o+='<div style="display:flex;justify-content:space-between;align-items:center">';
-  o+='<div><h2>'+__t.nodeHealth+'</h2><div class="stat" style="color:var(--'+hColor+')">'+h.status.toUpperCase()+'</div>';
-  o+='<div class="stat-label">'+__t.uptime+': '+fmtUp(d.uptime_seconds)+' &middot; '+__t.storage+': '+esc(d.storage_type)+'</div></div>';
-  o+='<div>'+badge(h.status)+'</div></div>';
-  o+='<div style="margin-top:14px">';
-  o+=hRow('Burn/Mint Ratio',h.burn_mint_ratio);
-  o+=hRow('Agent Churn (30d)',h.agent_churn_rate_30d);
-  o+=hRow('Work Expiry (30d)',h.work_expiry_rate_30d);
-  o+=hRow('Dispute Rate (30d)',h.dispute_rate_30d);
-  o+='</div></div>';
-  o+='<div class="grid grid-4">';
-  o+=sc(__t.registeredOwners,c.owners,'','var(--blue)');
-  o+=sc(__t.registeredAgents,c.agents,'('+c.active_agents_24h+' '+__t.active24h+')','var(--purple)');
-  o+=sc(__t.publishedActions,c.actions,'','var(--cyan)');
-  o+=sc(__t.activeBoards,c.boards,'','var(--green)');
-  o+=sc(__t.activeChatSessions,c.chat_instances||0,'','var(--cyan)');
-  o+='</div>';
-  o+='<div class="grid grid-2">';
-  o+='<div class="card"><h2>'+__t.economyToday+'</h2>';
-  o+=er(__t.transactionsToday,num(e.transactions_today));
-  o+=er(__t.morselsMovedToday,num(e.morsels_transacted_today));
-  o+=er(__t.inCirculation,num(e.total_morsels_in_circulation));
-  o+=er(__t.burnedToday,num(e.burned_today));
-  o+='</div>';
-  o+='<div class="card"><h2>'+__t.quickConfig+'</h2>';
-  o+=er(__t.port,d.config.port);
-  o+=er(__t.jwtTtl,d.config.jwt_ttl_seconds+'s');
-  o+=er(__t.keyedBrowse,d.config.keyed_browse_enabled?__t.enabled:__t.disabled);
-  o+=er(__t.welcomeBonus,num(e.welcome_bonus));
-  o+='</div></div>';
-  if(w.length>0){
-    o+='<div class="card" style="border-left:3px solid var(--yellow);margin-bottom:20px"><h2>'+__t.warnings+' ('+w.length+')</h2>';
-    o+='<table><thead><tr><th>Metric</th><th>Value</th><th>Zone</th><th>Threshold</th></tr></thead><tbody>';
-    for(var i=0;i<w.length;i++){var x=w[i];o+='<tr><td>'+esc(x.metric)+'</td><td>'+x.value+'</td><td>'+badge(x.zone)+'</td><td style="color:var(--muted)">'+esc(x.threshold)+'</td></tr>';}
-    o+='</tbody></table></div>';
-  }
-  return o;
-}
-
-/* ── OWNERS ── */
-function renderOwners(){
-  var owners=D.owners||[];
-  if(owners.length===0)return '<div class="empty">'+__t.noOwnersFound+'</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.name+'</th><th>'+__t.displayName+'</th><th>'+__t.roles+'</th><th>'+__t.agents+'</th><th>'+__t.created+'</th><th></th></tr></thead><tbody>';
-  for(var i=0;i<owners.length;i++){
-    var ow=owners[i];
-    var agCount=ow.agents?ow.agents.length:0;
-    var roles=ow.roles||[];
-    var roleBadges=roles.map(function(r){return badge(r)}).join(' ');
-    var isOp=roles.indexOf('operator')>=0;
-    o+='<tr><td><strong>'+esc(ow.name)+'</strong></td><td>'+esc(ow.display_name||'\\u2014')+'</td>';
-    o+='<td>'+roleBadges+'</td>';
-    o+='<td>'+agCount+'</td>';
-    o+='<td style="color:var(--muted)">'+dt(ow.created_at)+'</td>';
-    o+='<td>'+(isOp?'':'<button class="expand-btn" onclick="grantOperator(\\''+esc(ow.name)+'\\')">'+__t.grantOperator+'</button>')+'</td></tr>';
-  }
-  o+='</tbody></table></div></div>';
-  return o;
-}
-
-async function grantOperator(name){
-  if(!confirm('Grant operator role to "'+name+'"?'))return;
-  try{
-    await api('/v1/admin/roles/grant',{method:'POST',body:{owner:name,role:'operator'}});
-    loadAll();
-  }catch(e){alert('Failed: '+e.message)}
-}
-
-/* ── AGENTS ── */
-function renderAgents(){
-  var ag=D.agents;
-  if(!ag||!ag.agents||ag.agents.length===0)return '<div class="empty">'+__t.noAgentsRegistered+'</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.gaii+'</th><th>'+__t.owners+'</th><th>'+__t.displayName+'</th><th>'+__t.trust+'</th><th>'+__t.morsels+'</th><th>'+__t.lastSeen+'</th><th></th></tr></thead><tbody>';
-  for(var i=0;i<ag.agents.length;i++){
-    var a=ag.agents[i];
-    var trust=typeof a.trust_score==='number'?a.trust_score.toFixed(1):'—';
-    var tColor=a.trust_score>=70?'var(--green)':a.trust_score>=30?'var(--yellow)':'var(--red)';
-    o+='<tr><td class="mono">'+esc(a.gaii)+'</td><td>'+esc(a.owner)+'</td><td>'+esc(a.display_name||'—')+'</td>';
-    o+='<td style="color:'+tColor+'">'+trust+'</td><td>'+num(a.morsel_balance)+'</td>';
-    o+='<td style="color:var(--muted)">'+dt(a.last_seen)+'</td>';
-    o+='<td><button class="expand-btn" onclick="loadAgentDetail(\\''+esc(a.gaii)+'\\',this)">'+__t.details+'</button></td></tr>';
-    o+='<tr class="agent-detail" id="ad-'+i+'" style="display:none"><td colspan="7"></td></tr>';
-  }
-  o+='</tbody></table></div></div>';
-  return o;
-}
-
-/* ── ACTIONS ── */
-function renderActions(){
-  var ac=D.actions;
-  if(!ac||!ac.actions||ac.actions.length===0)return '<div class="empty">'+__t.noActionsPublished+'</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.id+'</th><th>'+__t.name+'</th><th>'+__t.provider+'</th><th>'+__t.category+'</th><th>'+__t.baseCost+'</th><th>'+__t.tags+'</th></tr></thead><tbody>';
-  for(var i=0;i<ac.actions.length;i++){
-    var a=ac.actions[i];
-    var tags=(a.tags||[]).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join(' ');
-    var price=a.pricing?num(a.pricing.base_morsels)+' morsels':'—';
-    o+='<tr><td class="mono">'+esc(a.id)+'</td><td><strong>'+esc(a.display_name||a.id)+'</strong><br/><span style="color:var(--muted);font-size:.75rem">'+esc(a.description||'')+'</span></td>';
-    o+='<td class="mono" style="font-size:.75rem">'+esc(a.provider_gaii)+'</td>';
-    o+='<td>'+badge(a.category||'general')+'</td><td>'+price+'</td>';
-    o+='<td>'+tags+'</td></tr>';
-  }
-  o+='</tbody></table></div></div>';
-  return o;
-}
-
-/* ── BOARDS ── */
-function renderBoards(){
-  var bo=D.boards;
-  if(!bo||!bo.boards||bo.boards.length===0)return '<div class="empty">'+__t.noBoardsCreated+'</div>';
-  var o='';
-  for(var i=0;i<bo.boards.length;i++){
-    var b=bo.boards[i];
-    o+='<div class="card" style="margin-bottom:16px">';
-    o+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
-    o+='<div><h2>'+esc(b.name||b.id)+'</h2><p style="color:var(--muted);font-size:.8rem;margin-bottom:8px">'+esc(b.description||'No description')+'</p></div>';
-    o+='<div>'+badge(b.visibility||'public')+'</div></div>';
-    o+='<div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">ID: <span class="mono">'+esc(b.id)+'</span> &middot; Created: '+dt(b.created_at)+'</div>';
-    o+='<button class="expand-btn" onclick="loadBoardPosts(\\''+esc(b.id)+'\\',this)">'+__t.loadPosts+'</button>';
-    o+='<div id="bp-'+esc(b.id)+'" style="margin-top:8px"></div>';
-    o+='</div>';
-  }
-  return o;
-}
-
-/* ── WORK ── */
-function renderWork(){
-  var items=D.workItems||[];
-  if(items.length===0)return '<div class="empty">'+__t.noWorkContracts+'</div>';
-  var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.trackingCode+'</th><th>'+__t.status+'</th><th>'+__t.action+'</th><th>'+__t.requester+'</th><th>'+__t.provider+'</th><th>'+__t.cost+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
-  for(var i=0;i<items.length;i++){
-    var w=items[i];
-    var cost=w.cost?(w.cost.total||w.cost.base_price||0):0;
-    o+='<tr><td class="mono" style="font-size:.75rem">'+esc(w.tracking_code)+'</td>';
-    o+='<td>'+badge(w.status)+'</td>';
-    o+='<td>'+esc(w.action_id||'\\u2014')+'</td>';
-    o+='<td class="mono" style="font-size:.75rem">'+esc(w.requester_gaii)+'</td>';
-    o+='<td class="mono" style="font-size:.75rem">'+esc(w.provider_gaii)+'</td>';
-    o+='<td>'+num(cost)+'</td>';
-    o+='<td style="color:var(--muted)">'+dt(w.created_at)+'</td></tr>';
-  }
-  o+='</tbody></table></div></div>';
-  return o;
-}
-
-/* ── ECONOMY ── */
-function renderEconomy(){
-  var e=D.dash.economy;
-  var o='<div class="grid grid-2">';
-  o+='<div class="card"><h2>'+__t.morselSupply+'</h2>';
-  o+=er(__t.inCirculation,num(e.total_morsels_in_circulation));
-  o+=er('Total Minted (all time)',num(e.total_minted_all_time));
-  o+=er('Total Burned (all time)',num(e.total_burned_all_time));
-  o+=er('Inflation Rate (30d)',e.inflation_rate_30d_percent+'%');
-  o+=er('Burn/Mint Ratio',e.burn_mint_ratio);
-  o+='</div>';
-  o+='<div class="card"><h2>'+__t.todayActivity+'</h2>';
-  o+=er(__t.transactionsToday,num(e.transactions_today));
-  o+=er(__t.morselsMovedToday,num(e.morsels_transacted_today));
-  o+=er('Network Fees',num(e.network_fees_today));
-  o+=er('Burned',num(e.burned_today));
-  o+=er('Daily Allowances Issued',num(e.daily_allowances_issued_today));
-  o+='</div></div>';
-  o+='<div class="card"><h2>'+__t.morselPolicy+'</h2>';
-  o+=er('Welcome Bonus',num(e.welcome_bonus)+' morsels');
-  o+=er('Daily Allowance',num(e.daily_allowance)+' morsels');
-  o+=er('Allowance Cap',num(e.daily_allowance_cap)+' morsels');
-  o+=er('Burn Rate',e.burn_rate);
-  o+=er('Max Operator Mint/Day',num(e.max_operator_mint_per_day)+' morsels');
-  o+='</div>';
-  // Mint form
-  o+='<div class="card" style="margin-top:16px"><h2>'+__t.mintMorsels+'</h2>';
-  o+='<p style="color:var(--muted);font-size:.8rem;margin-bottom:10px">Issue morsels to an agent (daily cap: '+num(e.max_operator_mint_per_day)+')</p>';
-  o+='<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">';
-  o+='<div style="flex:2;min-width:200px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">'+__t.gaii+'</label><input type="text" id="mintGaii" placeholder="agent#owner@node" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
-  o+='<div style="flex:1;min-width:100px"><label style="color:var(--muted);font-size:.75rem;margin-bottom:2px;display:block">'+__t.amount+'</label><input type="number" id="mintAmount" placeholder="100" min="1" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem"/></div>';
-  o+='<button class="refresh" style="height:38px;white-space:nowrap" onclick="doMint()">'+__t.mint+'</button>';
-  o+='</div><div id="mintResult" style="margin-top:8px;font-size:.85rem"></div></div>';
-  return o;
-}
-
-async function doMint(){
-  var gaii=document.getElementById('mintGaii').value.trim();
-  var amount=parseInt(document.getElementById('mintAmount').value);
-  if(!gaii||!amount||amount<1){document.getElementById('mintResult').innerHTML='<span style="color:var(--red)">GAII and positive amount required</span>';return;}
-  try{
-    var r=await api('/v1/admin/mint',{method:'POST',body:{gaii:gaii,amount:amount}});
-    document.getElementById('mintResult').innerHTML='<span style="color:var(--green)">Minted '+num(r.data.minted)+' morsels. New balance: '+num(r.data.new_balance)+'</span>';
-    loadAll();
-  }catch(e){document.getElementById('mintResult').innerHTML='<span style="color:var(--red)">'+esc(e.message)+'</span>';}
-}
-
-/* ── MAINTENANCE ── */
-function renderMaintenance(){
-  var m=D.maintenance||{enabled:false,message:'',enabledAt:null,enabledBy:null};
-  var color=m.enabled?'red':'green';
-  var status=m.enabled?__t.maintenanceOn:__t.operational;
-  var o='<div class="card" style="border-left:4px solid var(--'+color+')">';
-  o+='<h2>'+__t.maintenanceMode+'</h2>';
-  o+='<div class="stat" style="color:var(--'+color+');margin-bottom:12px">'+status+'</div>';
-  if(m.enabled){
-    o+='<div style="margin-bottom:12px">';
-    if(m.message)o+=er('Message',esc(m.message));
-    if(m.enabledAt)o+=er('Since',dt(m.enabledAt));
-    if(m.enabledBy)o+=er('By',esc(m.enabledBy));
-    o+='</div>';
-  }
-  o+='<div style="margin-top:16px">';
-  o+='<label style="display:block;color:var(--muted);font-size:.8rem;margin-bottom:4px">Custom Message (optional)</label>';
-  o+='<input type="text" id="maintMsg" value="'+esc(m.message||'')+'" placeholder="e.g. Upgrading to v1.3" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem;margin-bottom:12px"/>';
-  if(m.enabled){
-    o+='<button class="refresh" style="background:var(--green);width:100%" onclick="toggleMaintenance(false)">Disable Maintenance Mode</button>';
-  }else{
-    o+='<button class="refresh" style="background:var(--red);width:100%" onclick="toggleMaintenance(true)">Enable Maintenance Mode</button>';
-  }
-  o+='</div>';
-  o+='<p style="color:var(--muted);font-size:.75rem;margin-top:12px">When maintenance mode is on, all non-essential endpoints return 503. Operators, health checks, and admin routes remain accessible.</p>';
-  o+='</div>';
-  // Backup/Restore
-  o+='<div class="card" style="margin-top:16px"><h2>'+__t.backupRestore+'</h2>';
-  o+='<div style="display:flex;gap:12px;flex-wrap:wrap">';
-  o+='<button class="refresh" style="flex:1;min-width:140px" onclick="doBackup()">'+__t.downloadBackup+'</button>';
-  o+='<button class="refresh" style="flex:1;min-width:140px;background:var(--purple)" onclick="document.getElementById(\\'restoreFile\\').click()">'+__t.restoreFromFile+'</button>';
-  o+='<input type="file" id="restoreFile" accept=".json" style="display:none" onchange="doRestore(this)"/>';
-  o+='</div>';
-  o+='<div id="backupResult" style="margin-top:8px;font-size:.85rem"></div>';
-  o+='<p style="color:var(--muted);font-size:.72rem;margin-top:8px">Backup exports all owners, agents, actions, boards, memories and transactions as JSON.</p>';
-  o+='</div>';
-  return o;
-}
-
-async function doBackup(){
-  try{
-    var r=await api('/v1/admin/backup');
-    var blob=new Blob([JSON.stringify(r.data,null,2)],{type:'application/json'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');a.href=url;a.download='aimeat-backup-'+new Date().toISOString().slice(0,10)+'.json';
-    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    document.getElementById('backupResult').innerHTML='<span style="color:var(--green)">Backup downloaded</span>';
-  }catch(e){document.getElementById('backupResult').innerHTML='<span style="color:var(--red)">'+esc(e.message)+'</span>';}
-}
-
-async function doRestore(input){
-  if(!input.files||!input.files[0])return;
-  if(!confirm('Restore from backup? This will import data into the current node.'))return;
-  var reader=new FileReader();
-  reader.onload=async function(){
-    try{
-      var data=JSON.parse(reader.result);
-      await api('/v1/admin/restore',{method:'POST',body:data});
-      document.getElementById('backupResult').innerHTML='<span style="color:var(--green)">Data restored successfully</span>';
-      loadAll();
-    }catch(e){document.getElementById('backupResult').innerHTML='<span style="color:var(--red)">'+esc(e.message)+'</span>';}
-  };
-  reader.readAsText(input.files[0]);
-  input.value='';
-}
-
-async function toggleMaintenance(on){
-  try{
-    var msg=document.getElementById('maintMsg')?document.getElementById('maintMsg').value:'';
-    var r=await api('/v1/admin/maintenance',{method:'POST',body:{enabled:on,message:msg}});
-    D.maintenance=r.data;
-    render();
-  }catch(e){alert('Failed: '+e.message)}
-}
-
-/* ── FEDERATION ── */
-function renderFederation(){
-  var peers=D.federation||[];
-  var o='<div class="card"><h2>'+__t.peeringRequests+'</h2>';
-  if(peers.length===0){
-    o+='<div class="empty">'+__t.noFederationPeers+'</div>';
-  }else{
-    o+='<div class="scrollable"><table><thead><tr><th>'+__t.fromNode+'</th><th>'+__t.url+'</th><th>'+__t.status+'</th><th>'+__t.message+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
-    for(var i=0;i<peers.length;i++){
-      var p=peers[i];
-      o+='<tr><td class="mono" style="font-size:.8rem">'+esc(p.from_node_id||p.id)+'</td>';
-      o+='<td class="mono" style="font-size:.75rem">'+esc(p.from_node_url||p.target_url||'\\u2014')+'</td>';
-      o+='<td>'+badge(p.status)+'</td>';
-      o+='<td style="color:var(--muted);font-size:.8rem">'+esc(p.message||'\\u2014')+'</td>';
-      o+='<td style="color:var(--muted)">'+dt(p.created_at)+'</td></tr>';
-    }
-    o+='</tbody></table></div>';
-  }
-  o+='</div>';
-  o+='<div class="card" style="margin-top:16px"><h2>'+__t.federationInfo+'</h2>';
-  o+=er('Node ID',esc(D.dash.node_id));
-  o+=er('Max Relay Hops',D.dash.config.max_relay_hops||3);
-  o+='<p style="color:var(--muted);font-size:.8rem;margin-top:12px">To peer with another node, use POST /v1/federation/peer with the remote node URL.</p>';
-  o+='</div>';
-  return o;
-}
-
-/* ── HOOKS ── */
-function renderHooks(){
-  var hooks=D.hooks||{};
-  var hookNames=Object.keys(hooks);
-  var o='<div class="card"><h2>'+__t.extensionHooks+'</h2>';
-  o+='<p style="color:var(--muted);font-size:.8rem;margin-bottom:12px">Hooks let you trigger actions at key lifecycle events.</p>';
-  o+='<div class="scrollable"><table><thead><tr><th>Hook</th><th>Bound Actions</th><th></th></tr></thead><tbody>';
-  for(var i=0;i<hookNames.length;i++){
-    var name=hookNames[i];
-    var actions=hooks[name]||[];
-    o+='<tr><td class="mono" style="font-size:.8rem">'+esc(name)+'</td>';
-    o+='<td>'+(actions.length>0?actions.map(function(a){return '<span class="tag">'+esc(a)+'</span>'}).join(' '):'<span style="color:var(--muted)">none</span>')+'</td>';
-    o+='<td>';
-    if(actions.length>0)o+='<button class="expand-btn" onclick="clearHook(\\''+esc(name)+'\\')">'+__t.clear+'</button>';
-    o+='</td></tr>';
-  }
-  o+='</tbody></table></div></div>';
-  return o;
-}
-
-async function clearHook(name){
-  if(!confirm('Clear all actions from hook "'+name+'"?'))return;
-  try{
-    await api('/v1/admin/hooks/'+encodeURIComponent(name),{method:'DELETE'});
-    loadAll();
-  }catch(e){alert('Failed: '+e.message)}
-}
-
-/* ── CONFIG ── */
-function renderConfig(){
-  var d=D.dash;
-  var o='<div class="card"><h2>'+__t.nodeSettings+'</h2>';
-  o+=er('Node ID',esc(d.node_id));
-  o+=er(__t.storage,esc(d.storage_type));
-  o+=er(__t.port,d.config.port);
-  o+=er(__t.jwtTtl,d.config.jwt_ttl_seconds+'s');
-  o+=er(__t.keyedBrowse,d.config.keyed_browse_enabled?__t.enabled:__t.disabled);
-  o+=er(__t.uptime,fmtUp(d.uptime_seconds));
-  o+='</div>';
-  o+='<div class="card" style="margin-top:16px"><h2>'+__t.configApi+'</h2>';
-  o+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:8px">Use the API to view and update runtime config:</p>';
-  o+='<div style="font-size:.85rem">';
-  o+=er('View full config','GET /v1/admin/config');
-  o+=er('Update config','PUT /v1/admin/config');
-  o+=er('Backup all data','GET /v1/admin/backup');
-  o+=er('Restore data','POST /v1/admin/restore');
-  o+='</div></div>';
-  return o;
-}
-
-/* ── Detail loaders ── */
-async function loadAgentDetail(gaii,btn){
-  btn.textContent='Loading...';btn.disabled=true;
-  try{
-    var r=await api('/v1/agents/'+encodeURIComponent(gaii));
-    var a=r.data;
-    var row=btn.closest('tr').nextElementSibling;
-    var o='<div class="sub-panel">';
-    o+='<strong>'+esc(a.display_name||a.gaii)+'</strong>';
-    if(a.description)o+='<p style="color:var(--muted);font-size:.8rem;margin:4px 0">'+esc(a.description)+'</p>';
-    if(a.capabilities&&a.capabilities.length){
-      o+='<div style="margin:6px 0">Capabilities: '+a.capabilities.map(function(c){return '<span class="tag">'+esc(c)+'</span>'}).join(' ')+'</div>';
-    }
-    if(a.trust){
-      o+='<div style="margin-top:8px"><strong style="font-size:.8rem;color:var(--muted)">TRUST DETAILS</strong></div>';
-      o+=er('Score',a.trust.score);
-      o+=er('Deliveries',a.trust.total_deliveries+' ('+a.trust.successful_deliveries+' ok)');
-      o+=er('Success Rate',(a.trust.success_rate*100).toFixed(1)+'%');
-      o+=er('Avg Delivery Time',a.trust.avg_delivery_time_seconds+'s');
-      o+=er('Ratings','+'+a.trust.positive_ratings+' / -'+a.trust.negative_ratings);
-      o+=er('Age',a.trust.age_days+' days');
-    }
-    o+='<div style="margin-top:8px;font-size:.75rem;color:var(--muted)">Created: '+dt(a.created_at)+' &middot; Home: '+esc(a.home_node)+'</div>';
-    o+='</div>';
-    row.querySelector('td').innerHTML=o;
-    row.style.display='';
-    btn.textContent=__t.hide;btn.disabled=false;
-    btn.onclick=function(){row.style.display=row.style.display?'':'none';btn.textContent=row.style.display?__t.details:__t.hide};
-  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent=__t.details;btn.disabled=false},2000)}
-}
-
-async function loadBoardPosts(boardId,btn){
-  btn.textContent='Loading...';btn.disabled=true;
-  try{
-    var r=await api('/v1/boards/'+encodeURIComponent(boardId)+'/posts?limit=50');
-    var posts=r.data.posts||[];
-    var el=document.getElementById('bp-'+boardId);
-    if(posts.length===0){el.innerHTML='<div class="empty">'+__t.noData+'</div>';btn.textContent=__t.loadPosts;btn.disabled=false;return;}
-    var o='<table><thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Created</th></tr></thead><tbody>';
-    for(var i=0;i<posts.length;i++){
-      var p=posts[i];
-      o+='<tr><td><strong>'+esc(p.title||'(untitled)')+'</strong><br/><span style="color:var(--muted);font-size:.75rem">'+esc((p.body||'').substring(0,120))+'</span></td>';
-      o+='<td class="mono" style="font-size:.75rem">'+esc(p.author_gaii)+'</td>';
-      o+='<td>'+badge(p.category||'general')+'</td>';
-      o+='<td style="color:var(--muted)">'+dt(p.created_at)+'</td></tr>';
-    }
-    o+='</tbody></table>';
-    el.innerHTML=o;
-    btn.textContent=__t.refresh+' Posts';btn.disabled=false;
-  }catch(e){btn.textContent='Error';setTimeout(function(){btn.textContent=__t.loadPosts;btn.disabled=false},2000)}
-}
-
-function renderChatInstances(){
-  var list=D.chatInstances||[];
-  if(!list.length)return '<div class="empty">'+__t.noChatInstances+'</div>';
-  var o='<div class="grid grid-4" style="margin-bottom:20px">';
-  o+=sc(__t.activeChatSessions,list.length,'','var(--cyan)');
-  var platforms={};list.forEach(function(c){platforms[c.platform]=(platforms[c.platform]||0)+1});
-  var topPlatform=Object.keys(platforms).sort(function(a,b){return platforms[b]-platforms[a]})[0]||'-';
-  o+=sc('Top Platform',topPlatform,'','var(--purple)');
-  o+='</div>';
-  o+='<div class="card"><table><thead><tr><th>ID</th><th>'+__t.name+'</th><th>Platform</th><th>Owner</th><th>'+__t.lastSeen+'</th></tr></thead><tbody>';
-  list.forEach(function(c){
-    o+='<tr><td class="mono" title="'+esc(c.id)+'">'+esc(c.id.length>40?c.id.substring(0,40)+'...':c.id)+'</td>';
-    o+='<td>'+esc(c.app_name)+'</td>';
-    o+='<td>'+esc(c.platform)+'</td>';
-    o+='<td>'+esc(c.ghii||'')+'</td>';
-    o+='<td>'+dt(c.last_seen)+'</td></tr>';
-  });
-  o+='</tbody></table></div>';
-  return o;
-}
-
-loadAll();
-</script>
-</body>
-</html>`;
-}
 
 // ── Admin Login Page HTML ──
 const ADMIN_LOGIN_HTML = `<!DOCTYPE html>
@@ -1792,7 +1155,7 @@ async function doPasswordLogin(){
   try{
     const r=await apiNoAdmin('POST','/v1/ghii/login',{username:user,password:pass});
     if(r.error_code||!r.data){
-      show('loginResult',esc(r.error||(r.data&&r.data.error)||'Login failed'),'result-err');
+      show('loginResult',esc((r.error&&r.error.message)||r.error||(r.data&&r.data.error)||'Login failed'),'result-err');
       document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';return;
     }
     var d=r.data;
@@ -1812,7 +1175,7 @@ async function doLogin(){
   document.getElementById('loginSuccess').classList.add('hidden');
   try{
     const r=await api('POST','/v1/admin/setup/token',{owner:owner,private_key:key});
-    if(!r.ok){show('loginResult',esc(r.error),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';return;}
+    if(!r.ok){show('loginResult',esc((r.error&&r.error.message)||r.error||'Login failed'),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';return;}
     showLoginSuccess(r.token,r.roles,r.dashboard_url);
     document.getElementById('btnLogin').textContent='Login';
     document.getElementById('btnLogin').disabled=false;
@@ -1830,7 +1193,7 @@ async function doRegister(){
     const body={name:name,display_name:dname||undefined};
     if(password&&password.length>=4)body.password=password;
     const r=await api('POST','/v1/admin/setup/register',body);
-    if(!r.ok){show('regResult',esc(r.error),'result-err');document.getElementById('btnRegister').disabled=false;return;}
+    if(!r.ok){show('regResult',esc((r.error&&r.error.message)||r.error||'Registration failed'),'result-err');document.getElementById('btnRegister').disabled=false;return;}
     regOwner=r.owner.name;regKey=r.private_key;
     var roles=r.owner.roles.join(', ');
     var msg='<strong>Account created!</strong> Roles: '+roles;
@@ -1848,7 +1211,7 @@ async function doRegToken(){
   document.getElementById('btnRegToken').textContent='Signing in...';
   try{
     const r=await api('POST','/v1/admin/setup/token',{owner:regOwner,private_key:regKey});
-    if(!r.ok){show('regTokenResult',esc(r.error),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';return;}
+    if(!r.ok){show('regTokenResult',esc((r.error&&r.error.message)||r.error||'Token request failed'),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';return;}
     document.getElementById('regTokenResult').classList.add('hidden');
     document.getElementById('regRoles').textContent='Roles: '+r.roles.join(', ');
     document.getElementById('regDashLink').href=r.dashboard_url;

@@ -70,6 +70,8 @@ import { DirectoryService } from './services/directory.js';
 import { portalHobbiesRouter } from './routes/portal-hobbies.js';
 import { startMatchNotificationJob } from './services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from './services/matching.js';
+import { adminFeaturesRouter } from './routes/admin-features.js';
+import { createGenesisPeeringService } from './services/genesis-peering.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -376,6 +378,18 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // AI Matching — Phase 2.1
   const matchingEngine = createMatchingEngine(config, storage, directoryService, emailService);
   startMatchingScheduler(config, matchingEngine);
+
+  // Genesis peering service — Phase 3.4
+  const genesisPeeringService = createGenesisPeeringService(config, storage);
+
+  // Admin features — Phase 1-3 dashboard endpoints
+  app.use(adminFeaturesRouter(config, storage, {
+    emailService,
+    directoryService,
+    matchingEngine,
+    pushService,
+    genesisPeeringService,
+  }));
 
   app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
   app.use(ghiiRouter(config, storage, emailService));
