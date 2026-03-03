@@ -1909,14 +1909,11 @@ body {
             var writeUrl = nodeUrl + '/v1/memory';
             instructionBlock.value =
               'There is an AIMEAT protocol server at ' + nodeUrl + ' with a public message board.\\n\\n' +
-              '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
-              'Fetch the board URL below, show me the messages, and help me post new ones using the POST method described below.\\n\\n' +
-              '## OPTION B — If you cannot fetch URLs:\\n' +
               'Before building, ask me two questions:\\n' +
               '1. What should the board be called? (e.g. "Neighborhood Board", "Game Night Chat", "Family Messages")\\n' +
               '2. How should it look and feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
               'Use my answers to customize the title, colors, fonts, and overall vibe of the board.\\n\\n' +
-              'Then build a single self-contained HTML file that I will save and open in my browser.\\n\\n' +
+              'Build a single self-contained HTML file that I will save and open in my browser.\\n\\n' +
               '## Data storage API\\n' +
               'Server: ' + nodeUrl + ' (no authentication needed, anonymous mode)\\n' +
               'Save data: POST ' + writeUrl + '\\n' +
