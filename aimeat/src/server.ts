@@ -102,6 +102,27 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   ];
   const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
+    // Block direct access to portal HTML files — they are served via /v1/ routes instead
+    const portalHtmlFiles = new Set(['/human.html', '/profile.html', '/guides.html', '/aimeat-os.html', '/hobbies.html', '/marketplace.html', '/wizard.html']);
+    app.use((req, res, next) => {
+      if (portalHtmlFiles.has(req.path)) {
+        // Redirect to the canonical /v1/ URL
+        const routeMap: Record<string, string> = {
+          '/human.html': '/v1/portal',
+          '/profile.html': '/v1/profile',
+          '/guides.html': '/v1/guides',
+          '/aimeat-os.html': '/v1/aimeat-os',
+          '/hobbies.html': '/v1/hobbies',
+          '/marketplace.html': '/v1/marketplace',
+          '/wizard.html': '/v1/setup/wizard',
+        };
+        const canonical = routeMap[req.path] || '/v1/portal';
+        const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+        res.redirect(301, canonical + qs);
+        return;
+      }
+      next();
+    });
     app.use(express.static(publicDir, { maxAge: '7d' }));
   }
 
