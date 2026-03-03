@@ -329,6 +329,19 @@ Tell the user:
 4. "After that, the app will remember your login automatically"
 5. "You can also upload this app to the node: POST /v1/apps with the file"
 
+### If Something Doesn't Work
+After giving the user the download link or HTML file, always add this message at the end:
+"If the app doesn't work as expected or you see errors, don't worry — tell me what happened and we'll fix it together!
+
+Here's how to check for errors:
+1. Open the app in your browser
+2. Press F12 (or right-click → Inspect) to open Developer Tools
+3. Click the 'Console' tab
+4. If you see red error messages, copy them and paste them here
+5. I'll analyze the errors and give you a fixed version
+
+Even if there are no console errors — just describe what's wrong (e.g. 'the button doesn't do anything', 'I see a blank page', 'the data doesn't save') and I'll investigate."
+
 ### Browser APIs Available
 The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB, Notifications, Drag&Drop, Clipboard, Speech, Fullscreen, Web Workers, CSS Animations, SVG, Gamepad API, Vibration, Share API. Use whatever is appropriate for the user's goal.`;
 }

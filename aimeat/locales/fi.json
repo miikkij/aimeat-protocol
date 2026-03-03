@@ -66,7 +66,9 @@
       "returnStep3": "Muut voivat käyttää ja arvioida sitä",
       "returnBtnAnon": "Rekisteröidy ja lisää sovellus",
       "returnBtnAuth": "Lisää uusi sovellus",
-      "returnMotivation": "Saitko sovelluksen valmiiksi? Muut voivat käyttää sitä ja ansaitset sydänmurusia."
+      "returnMotivation": "Saitko sovelluksen valmiiksi? Muut voivat käyttää sitä ja ansaitset sydänmurusia.",
+      "troubleshootingTitle": "Jos jokin ei toimi",
+      "troubleshootingBody": "Jos sovellus ei toimi odotetusti tai näet virheitä, ei hätää — kerro minulle mitä tapahtui, niin selvitetään asia yhdessä!\n\nNäin tarkistat virheet:\n1. Avaa sovellus selaimessa\n2. Paina F12 (tai oikea klikkaus → Tutki elementtiä) avataksesi kehittäjätyökalut\n3. Klikkaa 'Console' / 'Konsoli' -välilehteä\n4. Jos näet punaisia virheilmoituksia, kopioi ne ja liitä ne tänne\n5. Analysoin virheet ja annan sinulle korjatun version\n\nVaikka et näkisi konsolivirheitä — kuvaile vain mikä menee pieleen niin tutkin asian."
     },
     "services": {
       "title": "Palvelut",

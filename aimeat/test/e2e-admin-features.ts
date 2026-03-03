@@ -1,0 +1,404 @@
+// E2E tests for admin-features endpoints
+// Run: cd aimeat && pnpm exec tsx test/e2e-admin-features.ts
+
+const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+
+let passed = 0;
+let failed = 0;
+
+async function test(name: string, fn: () => Promise<void>) {
+    try {
+        await fn();
+        passed++;
+        console.log(`  \u2705 ${name}`);
+    } catch (err: any) {
+        failed++;
+        console.error(`  \u274C ${name}: ${err.message}`);
+    }
+}
+
+function assert(cond: boolean, msg: string) {
+    if (!cond) throw new Error(msg);
+}
+
+async function json(path: string, opts: RequestInit = {}) {
+    const res = await fetch(`${BASE}${path}`, {
+        ...opts,
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+    });
+    const ct = res.headers.get('content-type') ?? '';
+    const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
+    return { status: res.status, body, headers: res.headers };
+}
+
+// Helper: sign a message with a base64 private key
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
+ed.etc.sha512Sync = (...m: Uint8Array[]) =>
+    new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+
+async function signMsg(privateKeyB64: string, message: string): Promise<string> {
+    const privKey = Buffer.from(privateKeyB64, 'base64');
+    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
+    return Buffer.from(sig).toString('base64');
+}
+
+// ─── State ───
+let ownerToken = '';
+let ownerPrivKey = '';
+const ownerName = `testadmin${Date.now()}`;
+
+let nonOpToken = '';
+let nonOpPrivKey = '';
+const nonOpName = `testnonop${Date.now()}`;
+
+function authed(opts: RequestInit = {}): RequestInit {
+    return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${ownerToken}` } };
+}
+
+// ─── Setup ───
+console.log('\n=== AIMEAT Admin Features E2E Test ===\n');
+console.log('Setup \u2014 registering test operator');
+
+await test('Register test owner (auto-operator)', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    ownerPrivKey = body.data.private_key;
+    assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got private key');
+});
+
+await test('Get operator token', async () => {
+    const timestamp = new Date().toISOString();
+    const message = ownerName + NODE_ID + timestamp;
+    const signature = await signMsg(ownerPrivKey, message);
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
+    });
+    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
+    ownerToken = body.data?.token;
+    assert(typeof ownerToken === 'string', 'got token');
+});
+
+await test('Register non-operator owner', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: nonOpName, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    nonOpPrivKey = body.data.private_key;
+    assert(typeof nonOpPrivKey === 'string' && nonOpPrivKey.length > 0, 'got private key');
+});
+
+await test('Get non-operator token', async () => {
+    const timestamp = new Date().toISOString();
+    const message = nonOpName + NODE_ID + timestamp;
+    const signature = await signMsg(nonOpPrivKey, message);
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: nonOpName, timestamp, signature }),
+    });
+    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
+    nonOpToken = body.data?.token;
+    assert(typeof nonOpToken === 'string', 'got non-op token');
+});
+
+// ─── Auth Guards ───
+console.log('\nAuth Guards');
+
+await test('GET /v1/admin/ghii without token \u2192 401', async () => {
+    const { status } = await json('/v1/admin/ghii');
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('GET /v1/admin/ghii with non-operator token \u2192 403', async () => {
+    const { status } = await json('/v1/admin/ghii', {
+        headers: { Authorization: `Bearer ${nonOpToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+// ─── GHII ───
+console.log('\nGHII');
+
+await test('GET /v1/admin/ghii \u2192 200, has ghii_users array', async () => {
+    const { status, body } = await json('/v1/admin/ghii', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.ghii_users), 'ghii_users is an array');
+    assert(typeof body.data?.total === 'number', 'has total');
+});
+
+await test('PUT /v1/admin/ghii/nonexistent \u2192 404', async () => {
+    const { status, body } = await json('/v1/admin/ghii/nonexistent%40nowhere', authed({
+        method: 'PUT',
+        body: JSON.stringify({ verificationLevel: 1 }),
+    }));
+    assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('PUT /v1/admin/ghii with invalid level \u2192 400', async () => {
+    const { status, body } = await json('/v1/admin/ghii/nonexistent%40nowhere', authed({
+        method: 'PUT',
+        body: JSON.stringify({ verificationLevel: 99 }),
+    }));
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('DELETE /v1/admin/ghii/nonexistent \u2192 404', async () => {
+    const { status } = await json('/v1/admin/ghii/nonexistent%40nowhere', authed({
+        method: 'DELETE',
+    }));
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+// ─── Email ───
+console.log('\nEmail');
+
+await test('GET /v1/admin/email/status \u2192 200, has enabled field', async () => {
+    const { status, body } = await json('/v1/admin/email/status', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.enabled === 'boolean', 'has enabled field');
+    assert('smtp_host' in body.data, 'has smtp_host field');
+    assert(typeof body.data?.smtp_port === 'number', 'has smtp_port field');
+    assert(typeof body.data?.confirmation_required === 'boolean', 'has confirmation_required');
+});
+
+await test('POST /v1/admin/email/test \u2192 400 (SMTP not configured)', async () => {
+    const { status, body } = await json('/v1/admin/email/test', authed({
+        method: 'POST',
+        body: JSON.stringify({ to: 'test@example.com' }),
+    }));
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+});
+
+// ─── Directory ───
+console.log('\nDirectory');
+
+await test('GET /v1/admin/directory/stats \u2192 200, has totalPeople', async () => {
+    const { status, body } = await json('/v1/admin/directory/stats', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.totalPeople === 'number', 'has totalPeople field');
+});
+
+await test('POST /v1/admin/directory/rebuild \u2192 200, has rebuilt field', async () => {
+    const { status, body } = await json('/v1/admin/directory/rebuild', authed({
+        method: 'POST',
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.rebuilt === true, 'rebuilt is true');
+    assert(typeof body.data?.stats === 'object', 'has stats');
+});
+
+// ─── Matching ───
+console.log('\nMatching');
+
+await test('GET /v1/admin/matching \u2192 200, has enabled field', async () => {
+    const { status, body } = await json('/v1/admin/matching', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.enabled === 'boolean', 'has enabled field');
+    assert(typeof body.data?.interval_hours === 'number', 'has interval_hours');
+    assert(typeof body.data?.threshold === 'number', 'has threshold');
+    assert(typeof body.data?.max_suggestions === 'number', 'has max_suggestions');
+});
+
+await test('POST /v1/admin/matching/run \u2192 200, returns result', async () => {
+    const { status, body } = await json('/v1/admin/matching/run', authed({
+        method: 'POST',
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data !== undefined, 'has data');
+});
+
+// ─── Marketplace ───
+console.log('\nMarketplace');
+
+await test('GET /v1/admin/marketplace \u2192 200, has enabled and stats', async () => {
+    const { status, body } = await json('/v1/admin/marketplace', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.enabled === 'boolean', 'has enabled field');
+    assert(typeof body.data?.listing_fee === 'number', 'has listing_fee');
+    assert(typeof body.data?.tx_fee_percent === 'number', 'has tx_fee_percent');
+    assert(typeof body.data?.stats === 'object', 'has stats');
+    assert(typeof body.data?.stats?.total === 'number', 'stats has total');
+});
+
+// ─── Push ───
+console.log('\nPush');
+
+await test('GET /v1/admin/push \u2192 200, has enabled field', async () => {
+    const { status, body } = await json('/v1/admin/push', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.enabled === 'boolean', 'has enabled field');
+    assert(typeof body.data?.vapid_configured === 'boolean', 'has vapid_configured');
+    assert(typeof body.data?.total_subscriptions === 'number', 'has total_subscriptions');
+    assert(Array.isArray(body.data?.subscriptions), 'has subscriptions array');
+});
+
+// ─── CSM ───
+console.log('\nCSM');
+
+await test('GET /v1/admin/csm \u2192 200, has templates array', async () => {
+    const { status, body } = await json('/v1/admin/csm', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.templates), 'has templates array');
+    assert(typeof body.data?.total === 'number', 'has total');
+});
+
+// ─── Genesis Peers ───
+console.log('\nGenesis Peers');
+
+await test('GET /v1/admin/genesis-peers \u2192 200, has peers array', async () => {
+    const { status, body } = await json('/v1/admin/genesis-peers', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.peers), 'has peers array');
+    assert(typeof body.data?.total === 'number', 'has total');
+    assert(typeof body.data?.network_stats === 'object', 'has network_stats');
+});
+
+await test('POST /v1/admin/genesis-peers/nonexistent/approve \u2192 404', async () => {
+    const { status } = await json('/v1/admin/genesis-peers/nonexistent/approve', authed({
+        method: 'POST',
+    }));
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('POST /v1/admin/genesis-peers/nonexistent/suspend \u2192 404', async () => {
+    const { status } = await json('/v1/admin/genesis-peers/nonexistent/suspend', authed({
+        method: 'POST',
+    }));
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('DELETE /v1/admin/genesis-peers/nonexistent \u2192 404', async () => {
+    const { status } = await json('/v1/admin/genesis-peers/nonexistent', authed({
+        method: 'DELETE',
+    }));
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+// ─── Config Expansion ───
+console.log('\nConfig');
+
+await test('GET /v1/admin/config \u2192 200, schema has expected paths', async () => {
+    const { status, body } = await json('/v1/admin/config', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.schema === 'object', 'has schema');
+
+    // Check for expected config paths
+    const schema = body.data.schema;
+    assert('email.enabled' in schema, 'schema has email.enabled');
+    assert('matching.enabled' in schema, 'schema has matching.enabled');
+    assert('marketplace.enabled' in schema, 'schema has marketplace.enabled');
+    assert('push.enabled' in schema, 'schema has push.enabled');
+    assert('morsel_policy.welcome_bonus' in schema, 'schema has morsel_policy.welcome_bonus');
+    assert('auth.jwt_ttl_seconds' in schema, 'schema has auth.jwt_ttl_seconds');
+
+    // Verify schema entry structure
+    const entry = schema['email.enabled'];
+    assert(typeof entry.value !== 'undefined', 'entry has value');
+    assert(typeof entry.type === 'string', 'entry has type');
+    assert(typeof entry.description === 'string', 'entry has description');
+    assert(typeof entry.mutable === 'boolean', 'entry has mutable');
+    assert(typeof entry.path === 'string', 'entry has path');
+});
+
+await test('PUT /v1/admin/config \u2192 update a boolean config', async () => {
+    // Read current value
+    const { body: getBody } = await json('/v1/admin/config', authed());
+    const currentVal = getBody.data.schema['features.keyed_browse_enabled'].value;
+
+    // Toggle value
+    const newVal = !currentVal;
+    const { status, body } = await json('/v1/admin/config', authed({
+        method: 'PUT',
+        body: JSON.stringify({ changes: [{ path: 'features.keyed_browse_enabled', value: newVal }] }),
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.applied), 'has applied array');
+    assert(body.data.applied.length === 1, 'one change applied');
+    assert(body.data.applied[0].path === 'features.keyed_browse_enabled', 'correct path');
+    assert(body.data.applied[0].new_value === newVal, 'new value matches');
+    assert(body.data.applied[0].old_value === currentVal, 'old value matches');
+
+    // Restore original value
+    await json('/v1/admin/config', authed({
+        method: 'PUT',
+        body: JSON.stringify({ changes: [{ path: 'features.keyed_browse_enabled', value: currentVal }] }),
+    }));
+});
+
+await test('PUT /v1/admin/config \u2192 reject invalid path', async () => {
+    const { status, body } = await json('/v1/admin/config', authed({
+        method: 'PUT',
+        body: JSON.stringify({ changes: [{ path: 'nonexistent.invalid.path', value: true }] }),
+    }));
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+});
+
+// ─── Translations ───
+console.log('\nTranslations');
+
+await test('GET /v1/admin/translations?lang=en \u2192 200, has overview key', async () => {
+    const { status, body } = await json('/v1/admin/translations?lang=en');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.locale === 'en', `locale is en, got ${body.locale}`);
+    assert(typeof body.translations === 'object', 'has translations');
+    assert(typeof body.translations.overview === 'string', 'has overview key');
+    assert(typeof body.translations.mintMorsels === 'string', 'has mintMorsels key');
+});
+
+await test('GET /v1/admin/translations?lang=fi \u2192 200, mintMorsels contains Luo', async () => {
+    const { status, body } = await json('/v1/admin/translations?lang=fi');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.locale === 'fi', `locale is fi, got ${body.locale}`);
+    assert(typeof body.translations === 'object', 'has translations');
+    assert(
+        typeof body.translations.mintMorsels === 'string' && body.translations.mintMorsels.includes('Luo'),
+        `mintMorsels should contain 'Luo', got '${body.translations.mintMorsels}'`,
+    );
+});
+
+// ─── Cleanup ───
+console.log('\nCleanup');
+
+await test('Delete test operator (cascade)', async () => {
+    const { body } = await json(`/v1/owners/${ownerName}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.ok === true, `delete operator: ${JSON.stringify(body.error)}`);
+    assert(body.data?.deleted === true, 'confirmed deleted');
+});
+
+await test('Delete non-operator test owner (cascade)', async () => {
+    const { body } = await json(`/v1/owners/${nonOpName}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${nonOpToken}` },
+    });
+    assert(body.ok === true, `delete non-op: ${JSON.stringify(body.error)}`);
+    assert(body.data?.deleted === true, 'confirmed deleted');
+});
+
+// ─── Summary ───
+console.log(`\n--- Results: ${passed} passed, ${failed} failed ---\n`);
+if (failed > 0) process.exit(1);

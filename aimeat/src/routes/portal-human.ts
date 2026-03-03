@@ -1749,7 +1749,17 @@ body {
     '- Clean, modern UI\\n' +
     '- Works immediately when opened in a browser\\n';
 
-  var baseEnd = '\\nMake the HTML a downloadable file. This is a live API — the URLs work right now.';
+  var baseEnd = '\\nMake the HTML a downloadable file. This is a live API — the URLs work right now.' +
+    '\\n\\n## If Something Doesn\\'t Work\\n' +
+    'After giving the user the download link or HTML file, always add this message at the end:\\n' +
+    '"If the app doesn\\'t work as expected or you see errors, don\\'t worry — tell me what happened and we\\'ll fix it together!\\n\\n' +
+    'Here\\'s how to check for errors:\\n' +
+    '1. Open the app in your browser\\n' +
+    '2. Press F12 (or right-click → Inspect) to open Developer Tools\\n' +
+    '3. Click the \\'Console\\' tab\\n' +
+    '4. If you see red error messages, copy them and paste them here\\n' +
+    '5. I\\'ll analyze the errors and give you a fixed version\\n\\n' +
+    'Even if there are no console errors — just describe what\\'s wrong (e.g. \\'the button doesn\\'t do anything\\', \\'I see a blank page\\', \\'the data doesn\\'t save\\') and I\\'ll investigate."';
 
   var prompts = {
     games: 'Before building, ask me:\\n' +

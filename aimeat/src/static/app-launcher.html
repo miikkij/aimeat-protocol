@@ -658,6 +658,62 @@
       width: 100%;
     }
 
+    /* ── Context Menu ──────────────────────────────── */
+
+    #context-menu {
+      position: fixed;
+      z-index: 700;
+      background: rgba(22, 33, 62, .95);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 6px 0;
+      min-width: 180px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, .4),
+        0 0 48px rgba(168, 85, 247, .06);
+      animation: cardIn .2s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    #context-menu[hidden] {
+      display: none;
+    }
+
+    #context-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: .84rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition);
+      text-align: left;
+    }
+
+    #context-menu button:hover {
+      background: rgba(192, 132, 252, .1);
+    }
+
+    #context-menu button.danger {
+      color: var(--accent);
+    }
+
+    #context-menu button.danger:hover {
+      background: rgba(233, 69, 96, .12);
+    }
+
+    #context-menu hr {
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      margin: 4px 0;
+    }
+
     /* ── Responsive ─────────────────────────────────── */
 
     @media (max-width: 480px) {
@@ -780,7 +836,15 @@
       <span class="iframe-title" id="iframe-title"></span>
       <button class="icon-btn" onclick="window._launcher.openExternal()" title="Open in new tab">&#x2197;</button>
     </div>
-    <iframe id="app-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
+  </div>
+
+  <div id="context-menu" hidden>
+    <button data-action="edit">&#x270F;&#xFE0F; Edit</button>
+    <button data-action="favorite">&#x2B50; Toggle favorite</button>
+    <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
+    <hr>
+    <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
   </div>
 
 <script>
@@ -1140,10 +1204,56 @@
     renderApps();
   }
 
-  // ── Launch App (placeholder) ──────────────────────
+  // ── Launch App ──────────────────────────────────
 
   function launchApp(id, mode) {
-    console.log('launch', id, mode);
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === id) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    app.lastOpenedAt = new Date().toISOString();
+    saveApp(app).then(function () {
+      if (mode === 'tab') {
+        launchInTab(app);
+      } else if (mode === 'iframe') {
+        launchInIframe(app);
+      }
+    });
+  }
+
+  function launchInTab(app) {
+    if (app.source === 'url' && app.url) {
+      window.open(app.url, '_blank');
+    } else if (app.blob) {
+      var html = decodeURIComponent(escape(atob(app.blob)));
+      var blob = new Blob([html], { type: 'text/html' });
+      var blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    }
+  }
+
+  function launchInIframe(app) {
+    var view = document.getElementById('iframe-view');
+    var iframe = document.getElementById('app-iframe');
+    var title = document.getElementById('iframe-title');
+
+    title.textContent = app.name || 'App';
+    iframe.dataset.appId = app.id;
+
+    if (app.source === 'url' && app.url) {
+      iframe.removeAttribute('srcdoc');
+      iframe.src = app.url;
+      currentIframeUrl = app.url;
+    } else if (app.blob) {
+      var html = decodeURIComponent(escape(atob(app.blob)));
+      iframe.removeAttribute('src');
+      iframe.srcdoc = html;
+      currentIframeUrl = '';
+    }
+
+    view.hidden = false;
   }
 
   // ── Rendering ─────────────────────────────────────
@@ -1253,13 +1363,24 @@
     var view = document.getElementById('iframe-view');
     var iframe = document.getElementById('app-iframe');
     view.hidden = true;
-    iframe.src = 'about:blank';
+    iframe.removeAttribute('src');
+    iframe.removeAttribute('srcdoc');
+    delete iframe.dataset.appId;
     currentIframeUrl = '';
   }
 
   function openExternal() {
+    var iframe = document.getElementById('app-iframe');
+    var appId = iframe.dataset.appId;
     if (currentIframeUrl) {
       window.open(currentIframeUrl, '_blank');
+    } else if (appId) {
+      // Blob app — find it and launch in tab
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === appId) { app = allApps[i]; break; }
+      }
+      if (app) launchInTab(app);
     }
   }
 

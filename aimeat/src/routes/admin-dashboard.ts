@@ -376,6 +376,10 @@ function dt(s){return s?new Date(s).toLocaleString():'\\u2014'}
 function sc(l,v,sub,col){return '<div class="card"><h2>'+l+'</h2><div class="stat" style="color:'+col+'">'+num(v)+'</div>'+(sub?'<div class="stat-label">'+sub+'</div>':'')+'</div>'}
 function er(l,v){return '<div class="econ-row"><span class="econ-label">'+l+'</span><span class="econ-val">'+v+'</span></div>'}
 function hRow(l,obj){return '<div class="health-row"><span class="health-metric">'+l+'</span><span>'+badge(obj.zone)+' <span class="health-value">'+obj.value+'</span></span></div>'}
+function statsGrid(items){var o='<div class="grid grid-4">';for(var i=0;i<items.length;i++){o+=sc(items[i].label,items[i].value,items[i].sub||'',items[i].color||'var(--cyan)');}return o+'</div>';}
+function dataTable(headers,rows,opts){var o='';if(opts&&opts.card)o+='<div class="card">';if(opts&&opts.scroll)o+='<div class="scrollable">';o+='<table><thead><tr>';for(var i=0;i<headers.length;i++)o+='<th>'+headers[i]+'</th>';o+='</tr></thead><tbody>';for(var r=0;r<rows.length;r++){o+='<tr>';for(var c=0;c<rows[r].length;c++){var cell=rows[r][c];if(typeof cell==='object'&&cell!==null){var cls=cell.mono?'class="mono"':'';var ttl=cell.title?' title="'+esc(cell.title)+'"':'';o+='<td '+cls+ttl+'>'+(cell.html?cell.text:esc(cell.text))+'</td>';}else{o+='<td>'+esc(cell)+'</td>';}}o+='</tr>';}o+='</tbody></table>';if(opts&&opts.scroll)o+='</div>';if(opts&&opts.card)o+='</div>';return o;}
+function emptyState(msg){return '<div class="empty">'+esc(msg)+'</div>';}
+function actionBtn(label,onclick){return '<button class="action-btn" onclick="'+onclick+'">'+esc(label)+'</button>';}
 function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m':'<1m')}
 
 function nav(page){
@@ -488,7 +492,7 @@ function render(){
     case 'push':app.innerHTML=renderPush();break;
     case 'csm':app.innerHTML=renderCsm();break;
     case 'genesis':app.innerHTML=renderGenesis();break;
-    default:app.innerHTML='<div class="empty">Unknown page</div>';
+    default:app.innerHTML=emptyState('Unknown page');
   }
 }
 
@@ -508,13 +512,7 @@ function renderOverview(){
   o+=hRow(__t.healthWorkExpiry,h.work_expiry_rate_30d);
   o+=hRow(__t.healthDisputeRate,h.dispute_rate_30d);
   o+='</div></div>';
-  o+='<div class="grid grid-4">';
-  o+=sc(__t.registeredOwners,c.owners,'','var(--blue)');
-  o+=sc(__t.registeredAgents,c.agents,'('+c.active_agents_24h+' '+__t.active24h+')','var(--purple)');
-  o+=sc(__t.publishedActions,c.actions,'','var(--cyan)');
-  o+=sc(__t.activeBoards,c.boards,'','var(--green)');
-  o+=sc(__t.activeChatSessions,c.chat_instances||0,'','var(--cyan)');
-  o+='</div>';
+  o+=statsGrid([{label:__t.registeredOwners,value:c.owners,color:'var(--blue)'},{label:__t.registeredAgents,value:c.agents,sub:'('+c.active_agents_24h+' '+__t.active24h+')',color:'var(--purple)'},{label:__t.publishedActions,value:c.actions,color:'var(--cyan)'},{label:__t.activeBoards,value:c.boards,color:'var(--green)'},{label:__t.activeChatSessions,value:c.chat_instances||0,color:'var(--cyan)'}]);
   o+='<div class="grid grid-2">';
   o+='<div class="card"><h2>'+__t.economyToday+'</h2>';
   o+=er(__t.transactionsToday,num(e.transactions_today));
@@ -540,7 +538,7 @@ function renderOverview(){
 /* ── OWNERS ── */
 function renderOwners(){
   var owners=D.owners||[];
-  if(owners.length===0)return '<div class="empty">'+__t.noOwnersFound+'</div>';
+  if(owners.length===0)return emptyState(__t.noOwnersFound);
   var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.name+'</th><th>'+__t.displayName+'</th><th>'+__t.roles+'</th><th>'+__t.agents+'</th><th>'+__t.created+'</th><th></th></tr></thead><tbody>';
   for(var i=0;i<owners.length;i++){
     var ow=owners[i];
@@ -569,7 +567,7 @@ async function grantOperator(name){
 /* ── AGENTS ── */
 function renderAgents(){
   var ag=D.agents;
-  if(!ag||!ag.agents||ag.agents.length===0)return '<div class="empty">'+__t.noAgentsRegistered+'</div>';
+  if(!ag||!ag.agents||ag.agents.length===0)return emptyState(__t.noAgentsRegistered);
   var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.gaii+'</th><th>'+__t.owners+'</th><th>'+__t.displayName+'</th><th>'+__t.trust+'</th><th>'+__t.morsels+'</th><th>'+__t.lastSeen+'</th><th></th></tr></thead><tbody>';
   for(var i=0;i<ag.agents.length;i++){
     var a=ag.agents[i];
@@ -588,7 +586,7 @@ function renderAgents(){
 /* ── ACTIONS ── */
 function renderActions(){
   var ac=D.actions;
-  if(!ac||!ac.actions||ac.actions.length===0)return '<div class="empty">'+__t.noActionsPublished+'</div>';
+  if(!ac||!ac.actions||ac.actions.length===0)return emptyState(__t.noActionsPublished);
   var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.id+'</th><th>'+__t.name+'</th><th>'+__t.provider+'</th><th>'+__t.category+'</th><th>'+__t.baseCost+'</th><th>'+__t.tags+'</th></tr></thead><tbody>';
   for(var i=0;i<ac.actions.length;i++){
     var a=ac.actions[i];
@@ -606,7 +604,7 @@ function renderActions(){
 /* ── BOARDS ── */
 function renderBoards(){
   var bo=D.boards;
-  if(!bo||!bo.boards||bo.boards.length===0)return '<div class="empty">'+__t.noBoardsCreated+'</div>';
+  if(!bo||!bo.boards||bo.boards.length===0)return emptyState(__t.noBoardsCreated);
   var o='';
   for(var i=0;i<bo.boards.length;i++){
     var b=bo.boards[i];
@@ -625,7 +623,7 @@ function renderBoards(){
 /* ── WORK ── */
 function renderWork(){
   var items=D.workItems||[];
-  if(items.length===0)return '<div class="empty">'+__t.noWorkContracts+'</div>';
+  if(items.length===0)return emptyState(__t.noWorkContracts);
   var o='<div class="card"><div class="scrollable"><table><thead><tr><th>'+__t.trackingCode+'</th><th>'+__t.status+'</th><th>'+__t.action+'</th><th>'+__t.requester+'</th><th>'+__t.provider+'</th><th>'+__t.cost+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
   for(var i=0;i<items.length;i++){
     var w=items[i];
@@ -769,7 +767,7 @@ function renderFederation(){
   var peers=D.federation||[];
   var o='<div class="card"><h2>'+__t.peeringRequests+'</h2>';
   if(peers.length===0){
-    o+='<div class="empty">'+__t.noFederationPeers+'</div>';
+    o+=emptyState(__t.noFederationPeers);
   }else{
     o+='<div class="scrollable"><table><thead><tr><th>'+__t.fromNode+'</th><th>'+__t.url+'</th><th>'+__t.status+'</th><th>'+__t.message+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
     for(var i=0;i<peers.length;i++){
@@ -822,7 +820,7 @@ async function clearHook(name){
 /* ── CONFIG EDITOR ── */
 function renderConfig(){
   var s=D.configSchema;
-  if(!s||!s.schema)return '<div class="empty">'+__t.configNotAvailable+'</div>';
+  if(!s||!s.schema)return emptyState(__t.configNotAvailable);
   var schema=s.schema;
   var groups={};
   for(var path in schema){
@@ -932,7 +930,7 @@ async function loadBoardPosts(boardId,btn){
     var r=await api('/v1/boards/'+encodeURIComponent(boardId)+'/posts?limit=50');
     var posts=r.data.posts||[];
     var el=document.getElementById('bp-'+boardId);
-    if(posts.length===0){el.innerHTML='<div class="empty">'+__t.noData+'</div>';btn.textContent=__t.loadPosts;btn.disabled=false;return;}
+    if(posts.length===0){el.innerHTML=emptyState(__t.noData);btn.textContent=__t.loadPosts;btn.disabled=false;return;}
     var o='<table><thead><tr><th>'+__t.titleLabel+'</th><th>'+__t.author+'</th><th>'+__t.category+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
     for(var i=0;i<posts.length;i++){
       var p=posts[i];
@@ -949,13 +947,10 @@ async function loadBoardPosts(boardId,btn){
 
 function renderChatInstances(){
   var list=D.chatInstances||[];
-  if(!list.length)return '<div class="empty">'+__t.noChatInstances+'</div>';
-  var o='<div class="grid grid-4" style="margin-bottom:20px">';
-  o+=sc(__t.activeChatSessions,list.length,'','var(--cyan)');
+  if(!list.length)return emptyState(__t.noChatInstances);
   var platforms={};list.forEach(function(c){platforms[c.platform]=(platforms[c.platform]||0)+1});
   var topPlatform=Object.keys(platforms).sort(function(a,b){return platforms[b]-platforms[a]})[0]||'-';
-  o+=sc(__t.topPlatform,topPlatform,'','var(--purple)');
-  o+='</div>';
+  var o=statsGrid([{label:__t.activeChatSessions,value:list.length,color:'var(--cyan)'},{label:__t.topPlatform,value:topPlatform,color:'var(--purple)'}]);
   o+='<div class="card"><table><thead><tr><th>'+__t.id+'</th><th>'+__t.name+'</th><th>'+__t.platform+'</th><th>'+__t.owner+'</th><th>'+__t.lastSeen+'</th></tr></thead><tbody>';
   list.forEach(function(c){
     o+='<tr><td class="mono" title="'+esc(c.id)+'">'+esc(c.id.length>40?c.id.substring(0,40)+'...':c.id)+'</td>';
@@ -971,8 +966,8 @@ function renderChatInstances(){
 /* ── GHII USERS ── */
 function renderGhii(){
   var users=D.ghiiUsers||[];
-  var o='<div class="stats-grid">'+sc(__t.totalGhiiUsers,users.length,'','var(--cyan)')+sc(__t.totpEnabled,users.filter(function(u){return u.totp_enabled}).length,'','var(--green)')+sc(__t.verifiedL2,users.filter(function(u){return u.verification_level===2}).length,'','var(--purple)')+'</div>';
-  if(!users.length)return o+'<div class="empty">'+__t.noGhiiUsers+'</div>';
+  var o=statsGrid([{label:__t.totalGhiiUsers,value:users.length,color:'var(--cyan)'},{label:__t.totpEnabled,value:users.filter(function(u){return u.totp_enabled}).length,color:'var(--green)'},{label:__t.verifiedL2,value:users.filter(function(u){return u.verification_level===2}).length,color:'var(--purple)'}]);
+  if(!users.length)return o+emptyState(__t.noGhiiUsers);
   o+='<table class="data-table"><thead><tr><th>GHII</th><th>'+__t.displayName+'</th><th>'+__t.verification+'</th><th>'+__t.totp+'</th><th>'+__t.created+'</th><th>'+__t.actions+'</th></tr></thead><tbody>';
   for(var i=0;i<users.length;i++){
     var u=users[i];
@@ -993,8 +988,8 @@ async function deleteGhii(ghii){
 /* ── EMAIL ── */
 function renderEmail(){
   var s=D.emailStatus;
-  if(!s)return '<div class="empty">'+__t.emailNotAvailable+'</div>';
-  var o='<div class="stats-grid">'+sc(__t.status,s.enabled?__t.enabled:__t.disabled,'',s.enabled?'var(--green)':'var(--red)')+sc(__t.smtpHost,s.smtp_host||__t.notConfigured,'','var(--cyan)')+sc(__t.smtpPort,s.smtp_port,'','var(--blue)')+sc(__t.confirmationRequired,s.confirmation_required?__t.yesLabel:__t.noLabel,'','var(--yellow)')+'</div>';
+  if(!s)return emptyState(__t.emailNotAvailable);
+  var o=statsGrid([{label:__t.status,value:s.enabled?__t.enabled:__t.disabled,color:s.enabled?'var(--green)':'var(--red)'},{label:__t.smtpHost,value:s.smtp_host||__t.notConfigured,color:'var(--cyan)'},{label:__t.smtpPort,value:s.smtp_port,color:'var(--blue)'},{label:__t.confirmationRequired,value:s.confirmation_required?__t.yesLabel:__t.noLabel,color:'var(--yellow)'}]);
   o+='<div class="card" style="margin-top:16px"><h3>'+__t.smtpConfig+'</h3><div class="health-row"><span class="health-metric">'+__t.fromAddress+'</span><span>'+esc(s.smtp_from||'-')+'</span></div><div class="health-row"><span class="health-metric">'+__t.secureTls+'</span><span>'+(s.smtp_secure?__t.yesLabel:__t.noLabel)+'</span></div><div class="health-row"><span class="health-metric">'+__t.smtpUser+'</span><span>'+(s.smtp_user_configured?badge('healthy')+' '+__t.configured:badge('critical')+' '+__t.notSet)+'</span></div><div class="health-row"><span class="health-metric">'+__t.smtpPassword+'</span><span>'+(s.smtp_pass_configured?badge('healthy')+' '+__t.configured:badge('critical')+' '+__t.notSet)+'</span></div></div>';
   o+='<div class="card" style="margin-top:16px"><h3>'+__t.sendTestEmail+'</h3><div style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="email" id="testEmailTo" placeholder="recipient@example.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;flex:1"><button class="action-btn" onclick="sendTestEmail()">'+__t.sendTest+'</button></div><div id="testEmailResult" style="margin-top:8px"></div></div>';
   return o;
@@ -1008,9 +1003,9 @@ async function sendTestEmail(){
 /* ── DIRECTORY ── */
 function renderDirectory(){
   var s=D.directoryStats;
-  if(!s)return '<div class="empty">'+__t.directoryNotAvailable+'</div>';
-  var o='<div class="stats-grid">'+sc(__t.totalIndexed,s.total_indexed||0,'','var(--cyan)')+sc(__t.totalInterests,s.total_interests||0,'','var(--blue)')+sc(__t.totalCities,s.total_cities||0,'','var(--purple)')+'</div>';
-  o+='<div class="card" style="margin-top:16px"><h3>'+__t.directoryIndex+'</h3><button class="action-btn" onclick="rebuildDirectory()">'+__t.rebuildIndex+'</button><div id="dirResult" style="margin-top:8px"></div></div>';
+  if(!s)return emptyState(__t.directoryNotAvailable);
+  var o=statsGrid([{label:__t.totalIndexed,value:s.totalPeople||0,color:'var(--cyan)'},{label:__t.totalInterests,value:(s.topInterests||[]).length,color:'var(--blue)'},{label:__t.totalCities,value:(s.topCities||[]).length,color:'var(--purple)'}]);
+  o+='<div class="card" style="margin-top:16px"><h3>'+esc(__t.directoryIndex)+'</h3>'+actionBtn(__t.rebuildIndex,'rebuildDirectory()')+'<div id="dirResult" style="margin-top:8px"></div></div>';
   return o;
 }
 async function rebuildDirectory(){
@@ -1020,10 +1015,10 @@ async function rebuildDirectory(){
 /* ── MATCHING ── */
 function renderMatching(){
   var s=D.matchingStats;
-  if(!s)return '<div class="empty">'+__t.matchingNotAvailable+'</div>';
-  var o='<div class="stats-grid">'+sc(__t.status,s.enabled?__t.enabled:__t.disabled,'',s.enabled?'var(--green)':'var(--red)')+sc(__t.interval,s.interval_hours+'h','','var(--blue)')+sc(__t.threshold,s.threshold,'','var(--cyan)')+sc(__t.maxSuggestions,s.max_suggestions,'','var(--purple)')+'</div>';
-  o+='<div class="stats-grid">'+sc(__t.maxDistance,s.max_distance_km+' km','','var(--blue)')+sc(__t.cooldown,s.cooldown_days+' '+__t.daysUnit,'','var(--yellow)')+'</div>';
-  o+='<div class="card" style="margin-top:16px"><h3>'+__t.runMatchingRound+'</h3><button class="action-btn" onclick="runMatching()">'+__t.triggerMatching+'</button><div id="matchResult" style="margin-top:8px"></div></div>';
+  if(!s)return emptyState(__t.matchingNotAvailable);
+  var o=statsGrid([{label:__t.status,value:s.enabled?__t.enabled:__t.disabled,color:s.enabled?'var(--green)':'var(--red)'},{label:__t.interval,value:s.interval_hours+'h',color:'var(--blue)'},{label:__t.threshold,value:s.threshold,color:'var(--cyan)'},{label:__t.maxSuggestions,value:s.max_suggestions,color:'var(--purple)'}]);
+  o+=statsGrid([{label:__t.maxDistance,value:s.max_distance_km+' km',color:'var(--blue)'},{label:__t.cooldown,value:s.cooldown_days+' '+__t.daysUnit,color:'var(--yellow)'}]);
+  o+='<div class="card" style="margin-top:16px"><h3>'+esc(__t.runMatchingRound)+'</h3>'+actionBtn(__t.triggerMatching,'runMatching()')+'<div id="matchResult" style="margin-top:8px"></div></div>';
   return o;
 }
 async function runMatching(){
@@ -1033,13 +1028,12 @@ async function runMatching(){
 /* ── MARKETPLACE ── */
 function renderMarketplace(){
   var s=D.marketplaceStats;
-  if(!s)return '<div class="empty">'+__t.marketplaceNotAvailable+'</div>';
+  if(!s)return emptyState(__t.marketplaceNotAvailable);
   var st=s.stats||{};
-  var o='<div class="stats-grid">'+sc(__t.status,s.enabled?__t.enabled:__t.disabled,'',s.enabled?'var(--green)':'var(--red)')+sc(__t.totalListings,st.total||0,'','var(--cyan)')+sc(__t.listingFee,s.listing_fee+' '+__t.morselUnit,'','var(--blue)')+sc(__t.txFee,s.tx_fee_percent+'%','','var(--yellow)')+'</div>';
+  var o=statsGrid([{label:__t.status,value:s.enabled?__t.enabled:__t.disabled,color:s.enabled?'var(--green)':'var(--red)'},{label:__t.totalListings,value:st.total||0,color:'var(--cyan)'},{label:__t.listingFee,value:s.listing_fee+' '+__t.morselUnit,color:'var(--blue)'},{label:__t.txFee,value:s.tx_fee_percent+'%',color:'var(--yellow)'}]);
   if(st.by_status){
-    o+='<div class="stats-grid">';
-    for(var k in st.by_status){o+=sc(k,st.by_status[k],'','var(--purple)');}
-    o+='</div>';
+    var statusItems=[];for(var k in st.by_status){statusItems.push({label:k,value:st.by_status[k],color:'var(--purple)'});}
+    o+=statsGrid(statusItems);
   }
   if(st.recent_listings&&st.recent_listings.length){
     o+='<h3 style="margin-top:16px">'+__t.recentListings+'</h3><table class="data-table"><thead><tr><th>'+__t.titleLabel+'</th><th>'+__t.category+'</th><th>'+__t.price+'</th><th>'+__t.status+'</th><th>'+__t.seller+'</th><th>'+__t.created+'</th></tr></thead><tbody>';
@@ -1055,15 +1049,11 @@ function renderMarketplace(){
 /* ── PUSH ── */
 function renderPush(){
   var s=D.pushStats;
-  if(!s)return '<div class="empty">'+__t.pushNotAvailable+'</div>';
-  var o='<div class="stats-grid">'+sc(__t.status,s.enabled?__t.enabled:__t.disabled,'',s.enabled?'var(--green)':'var(--red)')+sc(__t.vapidKeys,s.vapid_configured?__t.configured:__t.missing,'',s.vapid_configured?'var(--green)':'var(--red)')+sc(__t.totalSubscriptions,s.total_subscriptions||0,'','var(--cyan)')+'</div>';
+  if(!s)return emptyState(__t.pushNotAvailable);
+  var o=statsGrid([{label:__t.status,value:s.enabled?__t.enabled:__t.disabled,color:s.enabled?'var(--green)':'var(--red)'},{label:__t.vapidKeys,value:s.vapid_configured?__t.configured:__t.missing,color:s.vapid_configured?'var(--green)':'var(--red)'},{label:__t.totalSubscriptions,value:s.total_subscriptions||0,color:'var(--cyan)'}]);
   if(s.subscriptions&&s.subscriptions.length){
-    o+='<table class="data-table"><thead><tr><th>'+__t.owner+'</th><th>'+__t.created+'</th><th>'+__t.lastUsed+'</th></tr></thead><tbody>';
-    for(var i=0;i<s.subscriptions.length;i++){
-      var sub=s.subscriptions[i];
-      o+='<tr><td>'+esc(sub.owner_name)+'</td><td>'+dt(sub.created_at)+'</td><td>'+dt(sub.last_used_at)+'</td></tr>';
-    }
-    o+='</tbody></table>';
+    var rows=[];for(var i=0;i<s.subscriptions.length;i++){var sub=s.subscriptions[i];rows.push([sub.owner_name,{text:dt(sub.created_at),html:true},{text:dt(sub.last_used_at),html:true}]);}
+    o+=dataTable([__t.owner,__t.created,__t.lastUsed],rows);
   }
   return o;
 }
@@ -1071,28 +1061,24 @@ function renderPush(){
 /* ── CSM TEMPLATES ── */
 function renderCsm(){
   var s=D.csmTemplates;
-  if(!s)return '<div class="empty">'+__t.csmNotAvailable+'</div>';
+  if(!s)return emptyState(__t.csmNotAvailable);
   var templates=s.templates||[];
-  var o='<div class="stats-grid">'+sc(__t.totalTemplates,s.total||0,'','var(--cyan)')+'</div>';
-  if(!templates.length)return o+'<div class="empty">'+__t.noCsmTemplates+'</div>';
-  o+='<table class="data-table"><thead><tr><th>'+__t.name+'</th><th>'+__t.serviceType+'</th><th>'+__t.registeredBy+'</th><th>'+__t.federate+'</th><th>'+__t.registered+'</th><th>'+__t.updated+'</th></tr></thead><tbody>';
-  for(var i=0;i<templates.length;i++){
-    var c=templates[i];
-    o+='<tr><td><code>'+esc(c.name)+'</code></td><td>'+esc(c.service_type||'-')+'</td><td>'+esc(c.registered_by)+'</td><td>'+(c.federate?badge('healthy'):badge('critical'))+'</td><td>'+dt(c.registered_at)+'</td><td>'+dt(c.updated_at)+'</td></tr>';
-  }
-  o+='</tbody></table>';
+  var o=statsGrid([{label:__t.totalTemplates,value:s.total||0,color:'var(--cyan)'}]);
+  if(!templates.length)return o+emptyState(__t.noCsmTemplates);
+  var rows=[];for(var i=0;i<templates.length;i++){var c=templates[i];rows.push([{text:'<code>'+esc(c.name)+'</code>',html:true},c.service_type||'-',c.registered_by,{text:c.federate?badge('healthy'):badge('critical'),html:true},{text:dt(c.registered_at),html:true},{text:dt(c.updated_at),html:true}]);}
+  o+=dataTable([__t.name,__t.serviceType,__t.registeredBy,__t.federate,__t.registered,__t.updated],rows);
   return o;
 }
 
 /* ── GENESIS PEERS ── */
 function renderGenesis(){
   var s=D.genesisPeers;
-  if(!s)return '<div class="empty">'+__t.genesisNotAvailable+'</div>';
+  if(!s)return emptyState(__t.genesisNotAvailable);
   var peers=s.peers||[];
   var ns=s.network_stats||{};
-  var o='<div class="stats-grid">'+sc(__t.totalPeers,s.total||0,'','var(--cyan)')+sc(__t.active,peers.filter(function(p){return p.status==='active'}).length,'','var(--green)')+sc(__t.pending,peers.filter(function(p){return p.status==='pending'}).length,'','var(--yellow)')+sc(__t.suspended,peers.filter(function(p){return p.status==='suspended'}).length,'','var(--red)')+'</div>';
-  if(ns.total_federated_users)o+='<div class="stats-grid">'+sc(__t.federatedUsers,ns.total_federated_users,'','var(--blue)')+sc(__t.federatedListings,ns.total_federated_listings||0,'','var(--purple)')+'</div>';
-  if(!peers.length)return o+'<div class="empty">'+__t.noGenesisPeers+'</div>';
+  var o=statsGrid([{label:__t.totalPeers,value:s.total||0,color:'var(--cyan)'},{label:__t.active,value:peers.filter(function(p){return p.status==='active'}).length,color:'var(--green)'},{label:__t.pending,value:peers.filter(function(p){return p.status==='pending'}).length,color:'var(--yellow)'},{label:__t.suspended,value:peers.filter(function(p){return p.status==='suspended'}).length,color:'var(--red)'}]);
+  if(ns.total_federated_users)o+=statsGrid([{label:__t.federatedUsers,value:ns.total_federated_users,color:'var(--blue)'},{label:__t.federatedListings,value:ns.total_federated_listings||0,color:'var(--purple)'}]);
+  if(!peers.length)return o+emptyState(__t.noGenesisPeers);
   o+='<table class="data-table"><thead><tr><th>'+__t.nodeSettings+'</th><th>'+__t.url+'</th><th>'+__t.status+'</th><th>'+__t.lastSync+'</th><th>'+__t.actions+'</th></tr></thead><tbody>';
   for(var i=0;i<peers.length;i++){
     var p=peers[i];
