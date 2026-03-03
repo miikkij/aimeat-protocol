@@ -36,6 +36,7 @@ import { portalRouter } from './routes/portal.js';
 import { humanPortalRouter } from './routes/portal-human.js';
 import { profileRouter } from './routes/profile.js';
 import { csmRouter } from './routes/csm.js';
+import { msmRouter } from './routes/msm.js';
 import { ghiiRouter } from './routes/ghii.js';
 import { chatInstancesRouter } from './routes/chat-instances.js';
 import { totpRouter } from './routes/totp.js';
@@ -323,6 +324,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use(memoryRouter(config, storage));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
+  app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
   app.use(catalogueRouter(config, storage, directoryService, () => realtimeManager?.getStats() ?? null));
   app.use(workRouter(config, storage, peers));
