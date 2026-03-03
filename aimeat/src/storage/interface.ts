@@ -322,6 +322,19 @@ export interface CsmRecord {
   federate?: boolean;            // Phase 3.4 — auto-distribute to federation peers
 }
 
+// MSM — Machine Service Manifest (external API integrations)
+export interface MsmRecord {
+  name: string;                    // unique service name
+  definition: Record<string, unknown>;  // Full MsmDefinition as JSON
+  category: string;                // data | utility | image | communication | analytics | analysis
+  authType: string;                // bearer | query_param | oauth2 | api_key | none
+  actionsCount: number;            // number of actions defined
+  registeredBy: string;            // owner name
+  registeredAt: string;            // ISO timestamp
+  updatedAt: string;               // ISO timestamp
+  federate?: boolean;              // share across federation
+}
+
 export interface SemanticContext {
   '@context'?: Record<string, string>;
   '@type'?: string;
@@ -740,6 +753,13 @@ export interface Storage {
   listCsms(opts?: { serviceType?: string }): Promise<CsmRecord[]>;
   updateCsm(name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null>;
   deleteCsm(name: string): Promise<boolean>;
+
+  // MSM — Machine Service Manifest
+  createMsm(record: MsmRecord): Promise<MsmRecord>;
+  getMsm(name: string): Promise<MsmRecord | null>;
+  listMsms(opts?: { category?: string }): Promise<MsmRecord[]>;
+  updateMsm(name: string, updates: Partial<MsmRecord>): Promise<MsmRecord | null>;
+  deleteMsm(name: string): Promise<boolean>;
 
   // Consent Audit (Phase 0.3)
   addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry>;

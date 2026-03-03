@@ -33,6 +33,7 @@ import type {
     ConsentRecord,
     ConsentAuditEntry,
     CsmRecord,
+    MsmRecord,
     EmailVerificationRecord,
     PushSubscriptionRecord,
     TrustedIssuerRecord,
@@ -1515,6 +1516,38 @@ export class MongoStorage implements Storage {
 
     async deleteCsm(name: string): Promise<boolean> {
         return this.csms.delete(name);
+    }
+
+    // ── MSM — Machine Service Manifest (in-memory fallback) ──
+
+    private msms = new Map<string, MsmRecord>();
+
+    async createMsm(record: MsmRecord): Promise<MsmRecord> {
+        if (this.msms.has(record.name)) throw new Error('MSM_NAME_TAKEN');
+        this.msms.set(record.name, record);
+        return record;
+    }
+
+    async getMsm(name: string): Promise<MsmRecord | null> {
+        return this.msms.get(name) ?? null;
+    }
+
+    async listMsms(opts?: { category?: string }): Promise<MsmRecord[]> {
+        let results = [...this.msms.values()];
+        if (opts?.category) results = results.filter(m => m.category === opts.category);
+        return results;
+    }
+
+    async updateMsm(name: string, updates: Partial<MsmRecord>): Promise<MsmRecord | null> {
+        const existing = this.msms.get(name);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, name: existing.name, updatedAt: new Date().toISOString() };
+        this.msms.set(name, updated);
+        return updated;
+    }
+
+    async deleteMsm(name: string): Promise<boolean> {
+        return this.msms.delete(name);
     }
 
     // ── Email Verification (in-memory fallback until Prisma schema is updated) ──

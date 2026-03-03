@@ -5,7 +5,7 @@ import type {
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
   StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord,
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, MaintenanceState,
-  SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord,
+  SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord, MsmRecord,
   EmailVerificationRecord, FlagRecord, FlagSummary, MatchRecord,
   OrganismRecord, OrganismMembershipRecord, JoinRequestRecord,
   AppealRecord, ListingRecord, PurchaseRecord,
@@ -38,6 +38,7 @@ export class InMemoryStorage implements Storage {
   private consents = new Map<string, ConsentRecord>();      // key: id
   private consentAudit: ConsentAuditEntry[] = [];
   private csms = new Map<string, CsmRecord>();              // key: name
+  private msms = new Map<string, MsmRecord>();              // key: name
   private emailVerifications = new Map<string, EmailVerificationRecord>(); // key: id
   private flags = new Map<string, FlagRecord>();                          // key: id
   private matches = new Map<string, MatchRecord>();                        // key: id
@@ -1043,6 +1044,36 @@ export class InMemoryStorage implements Storage {
 
   async deleteCsm(name: string): Promise<boolean> {
     return this.csms.delete(name);
+  }
+
+  // ── MSM — Machine Service Manifest ──────────────────────
+
+  async createMsm(record: MsmRecord): Promise<MsmRecord> {
+    if (this.msms.has(record.name)) throw new Error('MSM_NAME_TAKEN');
+    this.msms.set(record.name, record);
+    return record;
+  }
+
+  async getMsm(name: string): Promise<MsmRecord | null> {
+    return this.msms.get(name) ?? null;
+  }
+
+  async listMsms(opts?: { category?: string }): Promise<MsmRecord[]> {
+    let results = [...this.msms.values()];
+    if (opts?.category) results = results.filter(m => m.category === opts.category);
+    return results;
+  }
+
+  async updateMsm(name: string, updates: Partial<MsmRecord>): Promise<MsmRecord | null> {
+    const existing = this.msms.get(name);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, name: existing.name, updatedAt: new Date().toISOString() };
+    this.msms.set(name, updated);
+    return updated;
+  }
+
+  async deleteMsm(name: string): Promise<boolean> {
+    return this.msms.delete(name);
   }
 
   // ── Email Verification (Phase 1.1) ──────────────────────
