@@ -147,8 +147,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const visibility = req.query.visibility as string | undefined;
     const tagsParam = req.query.tags as string | undefined;
     const tags = tagsParam ? tagsParam.split(',') : undefined;
+    const maxFlagsParam = req.query.max_flags as string | undefined;
+    const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
 
-    const records = await storage.listMemory(gaii, { prefix, visibility, tags });
+    const records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
 
     // Calculate total size for quota reporting
     let totalBytes = 0;
@@ -163,6 +165,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         zone: visibilityToZone(r.visibility),
         tags: r.tags,
         version: r.version,
+        flagCount: r.flagCount ?? 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
       })),
@@ -193,7 +196,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     const visibility = req.query.visibility as string | undefined;
-    const results = await storage.searchMemory(gaii, q, { visibility });
+    const maxFlagsParam = req.query.max_flags as string | undefined;
+    const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
+    const results = await storage.searchMemory(gaii, q, { visibility, maxFlags });
 
     res.json(success(config.nodeId, {
       results: results.map(r => ({
@@ -203,6 +208,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         zone: visibilityToZone(r.visibility),
         tags: r.tags,
         version: r.version,
+        flagCount: r.flagCount ?? 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
       })),

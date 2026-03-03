@@ -63,6 +63,19 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             createdAt: now,
         });
 
+        // Increment flagCount on the associated memory record
+        if (targetType === 'memory') {
+            try {
+                if (targetId.includes('::')) {
+                    const [ownerGaii, ...keyParts] = targetId.split('::');
+                    const key = keyParts.join('::');
+                    await storage.incrementMemoryFlagCount(ownerGaii, key);
+                }
+            } catch {
+                // Flag creation still succeeds even if memory increment fails
+            }
+        }
+
         // Phase 2.4 — Auto-hide: check flag count against threshold
         const AUTO_HIDE_THRESHOLD = 5;
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
