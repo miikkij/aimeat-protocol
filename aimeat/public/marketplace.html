@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="aimeat-node" content="">
+<title>Tori — AIME AT</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>
+// ── Embedded translations (en + fi) ──
+var TRANSLATIONS = {
+  en: {
+    "mkt.brand": "AIME AT Tori",
+    "mkt.nav.search": "Search",
+    "mkt.nav.sell": "Sell",
+    "mkt.nav.myListings": "My listings",
+    "mkt.nav.myPurchases": "Purchases",
+    "mkt.nav.portal": "Portal",
+    "mkt.home.title": "Tori",
+    "mkt.home.subtitle": "AIMEAT marketplace — buy and sell with morsel currency",
+    "mkt.home.listings": "Listings",
+    "mkt.home.categories": "Categories",
+    "mkt.home.categoriesHeading": "Categories",
+    "mkt.home.recentHeading": "Recent listings",
+    "mkt.home.emptyText": "No listings yet. Be the first seller!",
+    "mkt.home.browseBtn": "Browse listings",
+    "mkt.home.sellBtn": "Create listing",
+    "mkt.home.announcements": "announcements",
+    "mkt.search.title": "Search listings",
+    "mkt.search.subtitle": "Filter and browse marketplace offerings",
+    "mkt.search.keyword": "Keyword",
+    "mkt.search.keywordPlaceholder": "Search...",
+    "mkt.search.category": "Category",
+    "mkt.search.categoryAll": "All",
+    "mkt.search.city": "City",
+    "mkt.search.cityPlaceholder": "e.g. Espoo",
+    "mkt.search.price": "Price (morsels)",
+    "mkt.search.minPlaceholder": "Min",
+    "mkt.search.maxPlaceholder": "Max",
+    "mkt.search.btn": "Search",
+    "mkt.search.clearBtn": "Clear",
+    "mkt.search.noResults": "No results. Try different search criteria.",
+    "mkt.search.prev": "Previous",
+    "mkt.search.next": "Next",
+    "mkt.search.page": "Page",
+    "mkt.search.error": "Search could not be performed.",
+    "mkt.detail.backToMarket": "Back to marketplace",
+    "mkt.detail.seller": "Seller",
+    "mkt.detail.condition": "Condition",
+    "mkt.detail.availability": "Availability",
+    "mkt.detail.created": "Created",
+    "mkt.detail.totalPrice": "Total price including service fee",
+    "mkt.detail.price": "Price",
+    "mkt.detail.serviceFee": "service fee",
+    "mkt.detail.purchaseHint": "Purchasing requires authentication.",
+    "mkt.detail.purchaseBtn": "Purchase",
+    "mkt.detail.ownListing": "This is your listing. Manage via API.",
+    "mkt.detail.purchases": "Purchases",
+    "mkt.detail.buyer": "Buyer",
+    "mkt.detail.notFound": "Listing not found.",
+    "mkt.detail.backBtn": "Back",
+    "mkt.detail.loadError": "Could not load listing.",
+    "mkt.detail.purchaseSuccess": "Purchase successful!",
+    "mkt.detail.purchaseFailed": "Purchase failed",
+    "mkt.sell.title": "Create listing",
+    "mkt.sell.listingFee": "Listing fee",
+    "mkt.sell.formNote": "Fill in the details and submit to create a listing.",
+    "mkt.sell.titleLabel": "Title *",
+    "mkt.sell.titlePlaceholder": "Product or service name",
+    "mkt.sell.descLabel": "Description *",
+    "mkt.sell.descPlaceholder": "Describe the product or service...",
+    "mkt.sell.categoryLabel": "Category *",
+    "mkt.sell.priceLabel": "Price (morsels) *",
+    "mkt.sell.conditionLabel": "Condition",
+    "mkt.sell.conditionNone": "-",
+    "mkt.sell.conditionNew": "New",
+    "mkt.sell.conditionUsed": "Used",
+    "mkt.sell.conditionDigital": "Digital",
+    "mkt.sell.availLabel": "Availability",
+    "mkt.sell.availNone": "-",
+    "mkt.sell.availImmediate": "Immediate",
+    "mkt.sell.availOnRequest": "On request",
+    "mkt.sell.availScheduled": "Scheduled",
+    "mkt.sell.cityLabel": "City",
+    "mkt.sell.cityPlaceholder": "e.g. Helsinki",
+    "mkt.sell.areaLabel": "Area",
+    "mkt.sell.areaPlaceholder": "e.g. Kallio",
+    "mkt.sell.tagsLabel": "Tags (comma separated)",
+    "mkt.sell.tagsPlaceholder": "e.g. coding, web, react",
+    "mkt.sell.submitBtn": "Create listing",
+    "mkt.sell.sending": "Sending...",
+    "mkt.sell.success": "Listing created! ID:",
+    "mkt.sell.unknownError": "Unknown error",
+    "mkt.sell.networkError": "Network connection failed",
+    "mkt.sell.authRequired": "Sign in to create a listing.",
+    "mkt.sell.authBtn": "Sign in",
+    "mkt.myListings.title": "My listings",
+    "mkt.myListings.subtitle": "Manage your sale listings",
+    "mkt.myListings.newBtn": "+ New listing",
+    "mkt.myListings.empty": "No listings yet. Create your first!",
+    "mkt.myListings.authRequired": "Sign in to view your listings.",
+    "mkt.myListings.error": "Could not load page.",
+    "mkt.myPurchases.title": "My purchases",
+    "mkt.myPurchases.subtitle": "Purchase history and reviews",
+    "mkt.myPurchases.empty": "No purchases yet.",
+    "mkt.myPurchases.seller": "Seller",
+    "mkt.myPurchases.code": "Code",
+    "mkt.myPurchases.rateHint": "Rate: POST /v1/marketplace/purchases/",
+    "mkt.myPurchases.authRequired": "Sign in to view your purchases.",
+    "mkt.myPurchases.error": "Could not load page.",
+    "mkt.myPurchases.unknown": "Unknown",
+    "mkt.status.active": "Active",
+    "mkt.status.sold": "Sold",
+    "mkt.status.expired": "Expired",
+    "mkt.status.hidden": "Hidden",
+    "mkt.status.delisted": "Delisted",
+    "mkt.status.pending_delivery": "Pending delivery",
+    "mkt.status.delivered": "Delivered",
+    "mkt.status.disputed": "Disputed",
+    "mkt.status.completed": "Completed",
+    "mkt.status.cancelled": "Cancelled",
+    "mkt.cat.palvelut": "Services",
+    "mkt.cat.tuotteet": "Products",
+    "mkt.cat.data": "Data",
+    "mkt.cat.osaaminen": "Skills",
+    "mkt.cat.muu": "Other",
+    "mkt.lang.switch": "FI"
+  },
+  fi: {
+    "mkt.brand": "AIME AT Tori",
+    "mkt.nav.search": "Haku",
+    "mkt.nav.sell": "Myy",
+    "mkt.nav.myListings": "Omat",
+    "mkt.nav.myPurchases": "Ostokset",
+    "mkt.nav.portal": "Portaali",
+    "mkt.home.title": "Tori",
+    "mkt.home.subtitle": "AIMEAT-markkinapaikka \u2014 osta ja myy morsel-valuutalla",
+    "mkt.home.listings": "Ilmoitusta",
+    "mkt.home.categories": "Kategoriaa",
+    "mkt.home.categoriesHeading": "Kategoriat",
+    "mkt.home.recentHeading": "Uusimmat ilmoitukset",
+    "mkt.home.emptyText": "Ei viela ilmoituksia. Ole ensimmainen myyjae!",
+    "mkt.home.browseBtn": "Selaa ilmoituksia",
+    "mkt.home.sellBtn": "Luo ilmoitus",
+    "mkt.home.announcements": "ilmoitusta",
+    "mkt.search.title": "Hae ilmoituksia",
+    "mkt.search.subtitle": "Suodata ja selaa markkinapaikan tarjontaa",
+    "mkt.search.keyword": "Hakusana",
+    "mkt.search.keywordPlaceholder": "Etsi...",
+    "mkt.search.category": "Kategoria",
+    "mkt.search.categoryAll": "Kaikki",
+    "mkt.search.city": "Kaupunki",
+    "mkt.search.cityPlaceholder": "esim. Espoo",
+    "mkt.search.price": "Hinta (morsels)",
+    "mkt.search.minPlaceholder": "Min",
+    "mkt.search.maxPlaceholder": "Max",
+    "mkt.search.btn": "Hae",
+    "mkt.search.clearBtn": "Tyhjenna",
+    "mkt.search.noResults": "Ei tuloksia. Kokeile eri hakuehtoja.",
+    "mkt.search.prev": "Edellinen",
+    "mkt.search.next": "Seuraava",
+    "mkt.search.page": "Sivu",
+    "mkt.search.error": "Hakua ei voitu suorittaa.",
+    "mkt.detail.backToMarket": "Takaisin torille",
+    "mkt.detail.seller": "Myyjae",
+    "mkt.detail.condition": "Kunto",
+    "mkt.detail.availability": "Saatavuus",
+    "mkt.detail.created": "Luotu",
+    "mkt.detail.totalPrice": "Kokonaishinta sisaltaen palvelumaksun",
+    "mkt.detail.price": "Hinta",
+    "mkt.detail.serviceFee": "palvelumaksu",
+    "mkt.detail.purchaseHint": "Ostaminen vaatii kirjautumisen.",
+    "mkt.detail.purchaseBtn": "Osta",
+    "mkt.detail.ownListing": "Tama on oma ilmoituksesi. Hallinnoi API:n kautta.",
+    "mkt.detail.purchases": "Ostokset",
+    "mkt.detail.buyer": "Ostaja",
+    "mkt.detail.notFound": "Ilmoitusta ei loydy.",
+    "mkt.detail.backBtn": "Takaisin",
+    "mkt.detail.loadError": "Ilmoitusta ei voitu ladata.",
+    "mkt.detail.purchaseSuccess": "Osto onnistui!",
+    "mkt.detail.purchaseFailed": "Osto epaonnistui",
+    "mkt.sell.title": "Luo ilmoitus",
+    "mkt.sell.listingFee": "Listaamismaksu",
+    "mkt.sell.formNote": "Tayta tiedot ja lahetae ilmoitus.",
+    "mkt.sell.titleLabel": "Otsikko *",
+    "mkt.sell.titlePlaceholder": "Tuotteen tai palvelun nimi",
+    "mkt.sell.descLabel": "Kuvaus *",
+    "mkt.sell.descPlaceholder": "Kuvaile tuote tai palvelu...",
+    "mkt.sell.categoryLabel": "Kategoria *",
+    "mkt.sell.priceLabel": "Hinta (morsels) *",
+    "mkt.sell.conditionLabel": "Kunto",
+    "mkt.sell.conditionNone": "-",
+    "mkt.sell.conditionNew": "Uusi",
+    "mkt.sell.conditionUsed": "Kaytetty",
+    "mkt.sell.conditionDigital": "Digitaalinen",
+    "mkt.sell.availLabel": "Saatavuus",
+    "mkt.sell.availNone": "-",
+    "mkt.sell.availImmediate": "Heti",
+    "mkt.sell.availOnRequest": "Pyydettaessa",
+    "mkt.sell.availScheduled": "Aikataulutettu",
+    "mkt.sell.cityLabel": "Kaupunki",
+    "mkt.sell.cityPlaceholder": "esim. Helsinki",
+    "mkt.sell.areaLabel": "Alue",
+    "mkt.sell.areaPlaceholder": "esim. Kallio",
+    "mkt.sell.tagsLabel": "Tagit (pilkuilla erotetut)",
+    "mkt.sell.tagsPlaceholder": "esim. koodaus, web, react",
+    "mkt.sell.submitBtn": "Luo ilmoitus",
+    "mkt.sell.sending": "Lahetetaan...",
+    "mkt.sell.success": "Ilmoitus luotu! ID:",
+    "mkt.sell.unknownError": "Tuntematon virhe",
+    "mkt.sell.networkError": "Verkkoyhteys epaonnistui",
+    "mkt.sell.authRequired": "Kirjaudu sisaan luodaksesi ilmoituksen.",
+    "mkt.sell.authBtn": "Kirjaudu",
+    "mkt.myListings.title": "Omat ilmoitukset",
+    "mkt.myListings.subtitle": "Hallinnoi myynti-ilmoituksiasi",
+    "mkt.myListings.newBtn": "+ Uusi ilmoitus",
+    "mkt.myListings.empty": "Ei viela ilmoituksia. Luo ensimmainen!",
+    "mkt.myListings.authRequired": "Kirjaudu sisaan nahdaksesi omat ilmoituksesi.",
+    "mkt.myListings.error": "Sivua ei voitu ladata.",
+    "mkt.myPurchases.title": "Omat ostokset",
+    "mkt.myPurchases.subtitle": "Ostoshistoria ja arvostelut",
+    "mkt.myPurchases.empty": "Ei viela ostoksia.",
+    "mkt.myPurchases.seller": "Myyjae",
+    "mkt.myPurchases.code": "Koodi",
+    "mkt.myPurchases.rateHint": "Arvostele: POST /v1/marketplace/purchases/",
+    "mkt.myPurchases.authRequired": "Kirjaudu sisaan nahdaksesi ostoksesi.",
+    "mkt.myPurchases.error": "Sivua ei voitu ladata.",
+    "mkt.myPurchases.unknown": "Tuntematon",
+    "mkt.status.active": "Aktiivinen",
+    "mkt.status.sold": "Myyty",
+    "mkt.status.expired": "Vanhentunut",
+    "mkt.status.hidden": "Piilotettu",
+    "mkt.status.delisted": "Poistettu",
+    "mkt.status.pending_delivery": "Odottaa toimitusta",
+    "mkt.status.delivered": "Toimitettu",
+    "mkt.status.disputed": "Riitautettu",
+    "mkt.status.completed": "Valmis",
+    "mkt.status.cancelled": "Peruttu",
+    "mkt.cat.palvelut": "Palvelut",
+    "mkt.cat.tuotteet": "Tuotteet",
+    "mkt.cat.data": "Data",
+    "mkt.cat.osaaminen": "Osaaminen",
+    "mkt.cat.muu": "Muu",
+    "mkt.lang.switch": "EN"
+  }
+};
+
+// ── Language detection ──
+var currentLang = (function() {
+  var params = new URLSearchParams(window.location.search);
+  var langParam = params.get('lang');
+  var cookieMatch = document.cookie.match(/(?:^|;\s*)aimeat-lang=(en|fi)(?:;|$)/);
+  var stored = localStorage.getItem('aimeat-lang');
+  var navLang = (navigator.language || '').split('-')[0].toLowerCase();
+  return langParam === 'en' || langParam === 'fi' ? langParam
+    : stored === 'en' || stored === 'fi' ? stored
+    : cookieMatch ? cookieMatch[1]
+    : navLang === 'fi' ? 'fi' : 'fi';
+})();
+
+function t(key) {
+  return (TRANSLATIONS[currentLang] || TRANSLATIONS.fi)[key] || key;
+}
+
+function switchLang() {
+  var newLang = currentLang === 'fi' ? 'en' : 'fi';
+  localStorage.setItem('aimeat-lang', newLang);
+  document.cookie = 'aimeat-lang=' + newLang + ';path=/;max-age=31536000;SameSite=Lax';
+  var url = new URL(window.location.href);
+  url.searchParams.set('lang', newLang);
+  window.location.href = url.toString();
+}
+</script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a1a;
+  --bg-grad-top: #12082a;
+  --bg-grad-mid: #0a0a1a;
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --card-bg-hover: rgba(255, 255, 255, 0.07);
+  --card-border: rgba(255, 105, 180, 0.15);
+  --card-border-hover: rgba(255, 105, 180, 0.4);
+  --card-glow: rgba(255, 105, 180, 0.08);
+  --accent: #ff69b4;
+  --accent-bright: #ff8ecf;
+  --accent-deep: #c44569;
+  --accent-glow: rgba(255, 105, 180, 0.3);
+  --text: #e0e0e0;
+  --text-bright: #ffffff;
+  --text-dim: #888;
+  --text-muted: #6b6b8a;
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --success-border: rgba(34, 197, 94, 0.3);
+  --warning: #eab308;
+  --warning-bg: rgba(234, 179, 8, 0.1);
+  --warning-border: rgba(234, 179, 8, 0.3);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bg-canvas {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, var(--bg-grad-top) 0%, var(--bg-grad-mid) 60%, var(--bg) 100%);
+}
+
+.container {
+  position: relative; z-index: 1;
+  max-width: 900px; margin: 0 auto;
+  padding: 24px 16px 80px;
+}
+
+/* ── Navigation ── */
+.nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; margin-bottom: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.nav-brand { color: var(--accent); font-weight: 700; font-size: 1rem; text-decoration: none; letter-spacing: 0.05em; cursor: pointer; }
+.nav-brand:hover { color: var(--accent-bright); }
+.nav-links { display: flex; gap: 16px; align-items: center; }
+.nav-links a { color: var(--text-dim); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; cursor: pointer; }
+.nav-links a:hover { color: var(--accent); }
+
+/* ── Page title ── */
+.page-title {
+  font-size: 1.8rem; font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 8px;
+}
+.page-subtitle { color: var(--text-dim); font-size: 1rem; margin-bottom: 32px; }
+
+/* ── Cards ── */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+  background: var(--card-bg-hover);
+  border-color: var(--card-border-hover);
+  box-shadow: 0 0 20px var(--card-glow);
+}
+.card-clickable { text-decoration: none; display: block; cursor: pointer; }
+.card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 8px; }
+.card-meta { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 8px; }
+.card-desc { color: var(--text); font-size: 0.9rem; line-height: 1.6; margin-bottom: 12px; }
+
+/* ── Tags ── */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tag {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255, 105, 180, 0.12);
+  border: 1px solid rgba(255, 105, 180, 0.25);
+  border-radius: 20px;
+  font-size: 0.8rem; color: var(--accent-bright);
+  white-space: nowrap;
+}
+
+/* ── Price badge ── */
+.price-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px;
+  background: rgba(255, 105, 180, 0.15);
+  border: 1px solid rgba(255, 105, 180, 0.3);
+  border-radius: 20px;
+  font-size: 0.9rem; font-weight: 600;
+  color: var(--accent-bright);
+}
+
+/* ── Status badge ── */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.status-active { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success); }
+.status-sold { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; }
+.status-pending { background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); }
+.status-delivered { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success); }
+.status-completed { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; }
+.status-delisted { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 24px;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  text-decoration: none;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: #fff;
+}
+.btn-primary:hover { opacity: 0.9; box-shadow: 0 0 16px var(--accent-glow); }
+.btn-secondary {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text);
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--accent); color: var(--accent); }
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+.btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+.btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+/* ── Forms ── */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+.form-input, .form-textarea, .form-select {
+  width: 100%; padding: 10px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  color: var(--text); font-size: 0.9rem;
+  font-family: var(--font);
+  transition: border-color 0.2s;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  outline: none; border-color: var(--accent);
+}
+.form-textarea { min-height: 80px; resize: vertical; }
+.form-select { appearance: auto; }
+.form-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Pagination ── */
+.pagination { display: flex; gap: 8px; justify-content: center; margin-top: 24px; }
+.pagination a {
+  padding: 8px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  color: var(--text); text-decoration: none; font-size: 0.85rem;
+  cursor: pointer;
+}
+.pagination a:hover { border-color: var(--accent); color: var(--accent); }
+.pagination .active { border-color: var(--accent); color: var(--accent); background: rgba(255,105,180,0.1); }
+
+/* ── Categories grid ── */
+.categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 32px; }
+.category-card {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius);
+  padding: 20px; text-align: center; text-decoration: none;
+  transition: all 0.2s; cursor: pointer;
+}
+.category-card:hover { background: var(--card-bg-hover); border-color: var(--card-border-hover); box-shadow: 0 0 16px var(--card-glow); }
+.category-icon { font-size: 2rem; margin-bottom: 8px; }
+.category-name { font-size: 0.95rem; font-weight: 600; color: var(--text-bright); }
+.category-count { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Stats grid ── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
+.stat-card {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-sm);
+  padding: 16px; text-align: center;
+}
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+.stat-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+/* ── Stars rating ── */
+.stars { color: #eab308; font-size: 1.1rem; letter-spacing: 2px; }
+
+/* ── Empty state ── */
+.empty-state { text-align: center; padding: 48px 16px; }
+.empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+.empty-text { color: var(--text-dim); font-size: 1rem; }
+
+/* ── Alert / message ── */
+.alert {
+  padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.9rem;
+}
+.alert-success { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success); }
+.alert-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; }
+.alert-info { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text-dim); }
+
+/* ── Card layout for listing ── */
+.listing-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.listing-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .page-title { font-size: 1.4rem; }
+  .container { padding: 16px 12px 60px; }
+  .categories-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="bg-canvas"></div>
+<div class="container">
+  <nav class="nav">
+    <a class="nav-brand" onclick="navigate('home')"></a>
+    <div class="nav-links">
+      <a onclick="navigate('search')"></a>
+      <a onclick="navigate('sell')"></a>
+      <a onclick="navigate('my-listings')"></a>
+      <a onclick="navigate('my-purchases')"></a>
+      <a href="/v1/portal/human" id="nav-portal"></a>
+      <a onclick="switchLang()" style="cursor:pointer; font-weight:600; color:var(--accent);"></a>
+    </div>
+  </nav>
+  <div id="app"></div>
+</div>
+
+<script>
+// ── Constants ──
+var NODE_URL = window.location.origin;
+var CATEGORIES = [
+  { key: 'palvelut', icon: '\uD83D\uDEE0\uFE0F' },
+  { key: 'tuotteet', icon: '\uD83D\uDCE6' },
+  { key: 'data',     icon: '\uD83D\uDCCA' },
+  { key: 'osaaminen',icon: '\uD83C\uDF93' },
+  { key: 'muu',      icon: '\uD83D\uDD39' }
+];
+
+var STATUS_CLASSES = {
+  active: 'status-active',
+  sold: 'status-sold',
+  pending_delivery: 'status-pending',
+  delivered: 'status-delivered',
+  completed: 'status-completed',
+  delisted: 'status-delisted'
+};
+
+// ── Auth helpers ──
+function getAuthHeaders() {
+  var token = localStorage.getItem('aimeat-token');
+  if (!token) return null;
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+}
+
+function getAuthInfo() {
+  return {
+    token: localStorage.getItem('aimeat-token'),
+    gaii: localStorage.getItem('aimeat-gaii'),
+    owner: localStorage.getItem('aimeat-owner')
+  };
+}
+
+function isAuthenticated() {
+  return !!localStorage.getItem('aimeat-token');
+}
+
+// ── HTML escape ──
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Status helpers ──
+function statusLabel(status) {
+  return t('mkt.status.' + status) || status;
+}
+
+function statusClass(status) {
+  return STATUS_CLASSES[status] || '';
+}
+
+function starsHtml(score) {
+  var html = '<span class="stars">';
+  for (var i = 1; i <= 5; i++) {
+    html += i <= score ? '\u2605' : '\u2606';
+  }
+  html += '</span>';
+  return html;
+}
+
+function catLabel(catKey) {
+  var cat = CATEGORIES.find(function(c) { return c.key === catKey; });
+  return cat ? { name: t('mkt.cat.' + catKey), icon: cat.icon } : { name: catKey, icon: '' };
+}
+
+// ── Navigation ──
+var currentView = 'home';
+var currentParams = {};
+
+function navigate(view, params) {
+  currentView = view || 'home';
+  currentParams = params || {};
+
+  // Update URL hash
+  var hash = '#' + currentView;
+  if (currentParams.id) hash += '/' + currentParams.id;
+  if (window.location.hash !== hash) {
+    history.pushState(null, '', hash);
+  }
+
+  renderCurrentView();
+}
+
+function parseHash() {
+  var hash = window.location.hash.replace(/^#/, '');
+  if (!hash) return { view: 'home', params: {} };
+
+  var parts = hash.split('/');
+  var view = parts[0] || 'home';
+  var params = {};
+  if (parts[1]) params.id = parts[1];
+  return { view: view, params: params };
+}
+
+window.addEventListener('popstate', function() {
+  var parsed = parseHash();
+  currentView = parsed.view;
+  currentParams = parsed.params;
+  renderCurrentView();
+});
+
+// ── Render dispatcher ──
+function renderCurrentView() {
+  var app = document.getElementById('app');
+  switch (currentView) {
+    case 'home': renderHome(app); break;
+    case 'search': renderSearch(app); break;
+    case 'listing': renderListing(app); break;
+    case 'sell': renderSell(app); break;
+    case 'my-listings': renderMyListings(app); break;
+    case 'my-purchases': renderMyPurchases(app); break;
+    default: renderHome(app); break;
+  }
+}
+
+// ── Render: Home ──
+function renderHome(app) {
+  app.innerHTML = '<div class="alert alert-info">' + t('mkt.sell.sending').replace('...', '...') + '</div>';
+
+  fetch(NODE_URL + '/v1/marketplace/listings?per_page=50&page=1')
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json.ok) throw new Error(json.error ? json.error.message : 'Failed');
+
+      var listings = json.data.listings || [];
+      var total = json.data.total || listings.length;
+
+      // Category counts
+      var categoryCounts = {};
+      listings.forEach(function(l) {
+        categoryCounts[l.category] = (categoryCounts[l.category] || 0) + 1;
+      });
+
+      var categoryCards = CATEGORIES.map(function(cat) {
+        var count = categoryCounts[cat.key] || 0;
+        return '<a class="category-card" onclick="navigate(\'search\', {category:\'' + cat.key + '\'})">' +
+          '<div class="category-icon">' + cat.icon + '</div>' +
+          '<div class="category-name">' + esc(t('mkt.cat.' + cat.key)) + '</div>' +
+          (count > 0 ? '<div class="category-count">' + count + ' ' + t('mkt.home.announcements') + '</div>' : '') +
+          '</a>';
+      }).join('');
+
+      // Recent listings (latest 6)
+      var recent = listings.slice(0, 6);
+      var recentCards = recent.map(function(l) {
+        var cl = catLabel(l.category);
+        var tagsHtml = (l.tags || []).slice(0, 3).map(function(tg) {
+          return '<span class="tag">' + esc(tg) + '</span>';
+        }).join('');
+        return '<a class="card card-clickable" onclick="navigate(\'listing\', {id:\'' + esc(l.id) + '\'})">' +
+          '<div class="listing-header"><div>' +
+          '<div class="card-title">' + esc(l.title) + '</div>' +
+          '<div class="card-meta">' + cl.icon + ' ' + esc(cl.name) +
+            (l.location && l.location.city ? ' &middot; ' + esc(l.location.city) : '') + '</div>' +
+          '</div>' +
+          '<div class="price-badge">' + l.priceMorsels + ' morsels</div>' +
+          '</div>' +
+          (tagsHtml ? '<div class="tags">' + tagsHtml + '</div>' : '') +
+          '</a>';
+      }).join('');
+
+      var uniqueCats = Object.keys(categoryCounts).length;
+
+      var html = '<h1 class="page-title">' + t('mkt.home.title') + '</h1>' +
+        '<p class="page-subtitle">' + t('mkt.home.subtitle') + '</p>' +
+        '<div class="stats-grid">' +
+          '<div class="stat-card"><div class="stat-value">' + total + '</div><div class="stat-label">' + t('mkt.home.listings') + '</div></div>' +
+          '<div class="stat-card"><div class="stat-value">' + uniqueCats + '</div><div class="stat-label">' + t('mkt.home.categories') + '</div></div>' +
+        '</div>' +
+        '<h2 style="font-size:1.1rem; color:var(--text-bright); margin-bottom:16px;">' + t('mkt.home.categoriesHeading') + '</h2>' +
+        '<div class="categories-grid">' + categoryCards + '</div>';
+
+      if (recent.length > 0) {
+        html += '<h2 style="font-size:1.1rem; color:var(--text-bright); margin-bottom:16px;">' + t('mkt.home.recentHeading') + '</h2>' + recentCards;
+      } else {
+        html += '<div class="empty-state"><div class="empty-icon">&#x1F6D2;</div><div class="empty-text">' + t('mkt.home.emptyText') + '</div></div>';
+      }
+
+      html += '<div style="text-align:center; margin-top:32px;">' +
+        '<a onclick="navigate(\'search\')" class="btn btn-primary" style="margin-right:8px;">' + t('mkt.home.browseBtn') + '</a>' +
+        '<a onclick="navigate(\'sell\')" class="btn btn-secondary">' + t('mkt.home.sellBtn') + '</a>' +
+        '</div>';
+
+      app.innerHTML = html;
+    })
+    .catch(function() {
+      app.innerHTML = '<div class="alert alert-error">' + t('mkt.myListings.error') + '</div>';
+    });
+}
+
+// ── Render: Search ──
+var searchState = { q: '', category: '', city: '', minPrice: '', maxPrice: '', page: 1 };
+
+function renderSearch(app) {
+  // Inherit params from navigation
+  if (currentParams.category) {
+    searchState.category = currentParams.category;
+  }
+
+  var categoryOptions = '<option value="">' + t('mkt.search.categoryAll') + '</option>';
+  CATEGORIES.forEach(function(cat) {
+    var selected = searchState.category === cat.key ? ' selected' : '';
+    categoryOptions += '<option value="' + cat.key + '"' + selected + '>' + cat.icon + ' ' + esc(t('mkt.cat.' + cat.key)) + '</option>';
+  });
+
+  var html = '<h1 class="page-title">' + t('mkt.search.title') + '</h1>' +
+    '<p class="page-subtitle">' + t('mkt.search.subtitle') + '</p>' +
+    '<div class="card" style="margin-bottom:24px;">' +
+      '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.search.keyword') + '</label>' +
+          '<input type="text" id="search-q" class="form-input" placeholder="' + t('mkt.search.keywordPlaceholder') + '" value="' + esc(searchState.q) + '"></div>' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.search.category') + '</label>' +
+          '<select id="search-category" class="form-select">' + categoryOptions + '</select></div>' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.search.city') + '</label>' +
+          '<input type="text" id="search-city" class="form-input" placeholder="' + t('mkt.search.cityPlaceholder') + '" value="' + esc(searchState.city) + '"></div>' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.search.price') + '</label>' +
+          '<div style="display:flex; gap:8px;">' +
+            '<input type="number" id="search-min-price" class="form-input" placeholder="' + t('mkt.search.minPlaceholder') + '" value="' + esc(searchState.minPrice) + '" min="0">' +
+            '<input type="number" id="search-max-price" class="form-input" placeholder="' + t('mkt.search.maxPlaceholder') + '" value="' + esc(searchState.maxPrice) + '" min="0">' +
+          '</div></div>' +
+      '</div>' +
+      '<div style="margin-top:12px;">' +
+        '<button onclick="doSearch(1)" class="btn btn-primary btn-sm">' + t('mkt.search.btn') + '</button>' +
+        '<button onclick="clearSearch()" class="btn btn-secondary btn-sm" style="margin-left:8px;">' + t('mkt.search.clearBtn') + '</button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="search-results"></div>';
+
+  app.innerHTML = html;
+
+  // Auto-search if category was passed or if there are existing search params
+  doSearch(searchState.page);
+}
+
+function doSearch(page) {
+  searchState.q = (document.getElementById('search-q') || {}).value || '';
+  searchState.category = (document.getElementById('search-category') || {}).value || '';
+  searchState.city = (document.getElementById('search-city') || {}).value || '';
+  searchState.minPrice = (document.getElementById('search-min-price') || {}).value || '';
+  searchState.maxPrice = (document.getElementById('search-max-price') || {}).value || '';
+  searchState.page = page || 1;
+
+  var perPage = 20;
+  var url = NODE_URL + '/v1/marketplace/listings?page=' + searchState.page + '&per_page=' + perPage;
+  if (searchState.category) url += '&category=' + encodeURIComponent(searchState.category);
+  if (searchState.city) url += '&city=' + encodeURIComponent(searchState.city);
+  if (searchState.minPrice) url += '&min_price=' + encodeURIComponent(searchState.minPrice);
+  if (searchState.maxPrice) url += '&max_price=' + encodeURIComponent(searchState.maxPrice);
+
+  var el = document.getElementById('search-results');
+  el.innerHTML = '<div class="alert alert-info">...</div>';
+
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json.ok) throw new Error(json.error ? json.error.message : 'Failed');
+
+      var listings = json.data.listings || [];
+      var total = json.data.total || 0;
+
+      // Client-side text search filter
+      if (searchState.q) {
+        var lower = searchState.q.toLowerCase();
+        listings = listings.filter(function(l) {
+          return l.title.toLowerCase().indexOf(lower) >= 0 ||
+            l.description.toLowerCase().indexOf(lower) >= 0 ||
+            (l.tags || []).some(function(tg) { return tg.toLowerCase().indexOf(lower) >= 0; });
+        });
+      }
+
+      if (listings.length === 0) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F50D;</div><div class="empty-text">' + t('mkt.search.noResults') + '</div></div>';
+        return;
+      }
+
+      var cards = listings.map(function(l) {
+        var cl = catLabel(l.category);
+        var tagsHtml = (l.tags || []).slice(0, 4).map(function(tg) {
+          return '<span class="tag">' + esc(tg) + '</span>';
+        }).join('');
+        var desc = l.description.length > 120 ? l.description.slice(0, 120) + '...' : l.description;
+        return '<a class="card card-clickable" onclick="navigate(\'listing\', {id:\'' + esc(l.id) + '\'})">' +
+          '<div class="listing-header"><div>' +
+          '<div class="card-title">' + esc(l.title) + '</div>' +
+          '<div class="card-meta">' + cl.icon + ' ' + esc(cl.name) +
+            (l.location && l.location.city ? ' &middot; ' + esc(l.location.city) : '') +
+            ' &middot; ' + esc(l.sellerGhii) + '</div>' +
+          '</div>' +
+          '<div class="price-badge">' + l.priceMorsels + ' morsels</div>' +
+          '</div>' +
+          '<div class="card-desc">' + esc(desc) + '</div>' +
+          (tagsHtml ? '<div class="tags">' + tagsHtml + '</div>' : '') +
+          '</a>';
+      }).join('');
+
+      // Pagination
+      var paginationHtml = '';
+      if (total > perPage) {
+        paginationHtml = '<div class="pagination">';
+        if (searchState.page > 1) {
+          paginationHtml += '<a onclick="doSearch(' + (searchState.page - 1) + ')">&laquo; ' + t('mkt.search.prev') + '</a>';
+        }
+        paginationHtml += '<a class="active">' + t('mkt.search.page') + ' ' + searchState.page + '</a>';
+        if (listings.length >= perPage) {
+          paginationHtml += '<a onclick="doSearch(' + (searchState.page + 1) + ')">' + t('mkt.search.next') + ' &raquo;</a>';
+        }
+        paginationHtml += '</div>';
+      }
+
+      el.innerHTML = cards + paginationHtml;
+    })
+    .catch(function() {
+      el.innerHTML = '<div class="alert alert-error">' + t('mkt.search.error') + '</div>';
+    });
+}
+
+function clearSearch() {
+  searchState = { q: '', category: '', city: '', minPrice: '', maxPrice: '', page: 1 };
+  currentParams = {};
+  renderSearch(document.getElementById('app'));
+}
+
+// ── Render: Listing Detail ──
+function renderListing(app) {
+  var id = currentParams.id;
+  if (!id) {
+    app.innerHTML = '<div class="alert alert-error">' + t('mkt.detail.notFound') + '</div>';
+    return;
+  }
+
+  app.innerHTML = '<div class="alert alert-info">...</div>';
+
+  fetch(NODE_URL + '/v1/marketplace/listings/' + encodeURIComponent(id))
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json.ok) {
+        app.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x2753;</div><div class="empty-text">' + t('mkt.detail.notFound') + '</div></div>' +
+          '<div style="text-align:center;"><a onclick="navigate(\'home\')" class="btn btn-secondary">' + t('mkt.detail.backBtn') + '</a></div>';
+        return;
+      }
+
+      var listing = json.data.listing;
+      var cl = catLabel(listing.category);
+      var tagsHtml = (listing.tags || []).map(function(tg) {
+        return '<span class="tag">' + esc(tg) + '</span>';
+      }).join('');
+
+      // Check if viewer is the seller
+      var info = getAuthInfo();
+      var isOwner = info.owner && info.owner === listing.ownerName;
+
+      // Fee calculation (default 5% if not known)
+      var feePercent = 5;
+      var fee = Math.ceil(listing.priceMorsels * feePercent / 100);
+      var totalCost = listing.priceMorsels + fee;
+
+      var html = '<div style="margin-bottom:16px;">' +
+        '<a onclick="navigate(\'home\')" style="color:var(--text-dim); text-decoration:none; font-size:0.85rem; cursor:pointer;">&laquo; ' + t('mkt.detail.backToMarket') + '</a>' +
+        '</div>' +
+        '<div class="card">' +
+          '<div class="listing-header"><div>' +
+            '<div class="card-title" style="font-size:1.4rem;">' + esc(listing.title) + '</div>' +
+            '<div class="card-meta">' + cl.icon + ' ' + esc(cl.name) +
+              (listing.location && listing.location.city ? ' &middot; ' + esc(listing.location.city) : '') +
+              (listing.location && listing.location.area ? ', ' + esc(listing.location.area) : '') +
+              ' &middot; ' + t('mkt.detail.seller') + ': ' + esc(listing.sellerGhii) + '</div>' +
+          '</div><div>' +
+            '<div class="price-badge" style="font-size:1.1rem;">' + listing.priceMorsels + ' morsels</div>' +
+            '<div style="margin-top:8px;"><span class="status-badge ' + statusClass(listing.status) + '">' + statusLabel(listing.status) + '</span></div>' +
+          '</div></div>' +
+          '<div class="card-desc" style="margin-top:16px; white-space:pre-line;">' + esc(listing.description) + '</div>' +
+          (tagsHtml ? '<div class="tags" style="margin-top:12px;">' + tagsHtml + '</div>' : '') +
+          '<div style="margin-top:16px; font-size:0.85rem; color:var(--text-dim);">' +
+            (listing.condition ? t('mkt.detail.condition') + ': ' + esc(listing.condition) + ' &middot; ' : '') +
+            (listing.availability ? t('mkt.detail.availability') + ': ' + esc(listing.availability) + ' &middot; ' : '') +
+            t('mkt.detail.created') + ': ' + esc(listing.createdAt.slice(0, 10)) +
+          '</div>';
+
+      // Purchase section (only for active listings not owned by viewer)
+      if (listing.status === 'active' && !isOwner) {
+        html += '<div class="listing-actions">' +
+          '<div class="card" style="padding:16px; background:rgba(255,105,180,0.05); border-color:rgba(255,105,180,0.2); flex:1;">' +
+            '<div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:8px;">' + t('mkt.detail.totalPrice') + ' (' + feePercent + '%)</div>' +
+            '<div style="font-size:1.2rem; font-weight:700; color:var(--accent-bright);">' + totalCost + ' morsels</div>' +
+            '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">' + t('mkt.detail.price') + ': ' + listing.priceMorsels + ' + ' + t('mkt.detail.serviceFee') + ': ' + fee + '</div>' +
+          '</div></div>';
+
+        if (isAuthenticated()) {
+          html += '<div style="margin-top:16px; text-align:center;">' +
+            '<button onclick="purchaseListing(\'' + esc(listing.id) + '\')" class="btn btn-primary">' + t('mkt.detail.purchaseBtn') + '</button>' +
+            '</div>';
+        } else {
+          html += '<div style="margin-top:16px; text-align:center;">' +
+            '<p style="font-size:0.85rem; color:var(--text-dim); margin-bottom:8px;">' + t('mkt.detail.purchaseHint') + '</p>' +
+            '</div>';
+        }
+      }
+
+      if (isOwner) {
+        html += '<div class="listing-actions">' +
+          '<p style="font-size:0.85rem; color:var(--text-dim);">' + t('mkt.detail.ownListing') + '</p>' +
+          '</div>';
+      }
+
+      html += '</div>';
+      html += '<div id="purchase-result"></div>';
+
+      app.innerHTML = html;
+    })
+    .catch(function() {
+      app.innerHTML = '<div class="alert alert-error">' + t('mkt.detail.loadError') + '</div>';
+    });
+}
+
+function purchaseListing(listingId) {
+  var headers = getAuthHeaders();
+  if (!headers) return;
+
+  var resultEl = document.getElementById('purchase-result');
+  resultEl.innerHTML = '<div class="alert alert-info">...</div>';
+
+  fetch(NODE_URL + '/v1/marketplace/listings/' + encodeURIComponent(listingId) + '/purchase', {
+    method: 'POST',
+    headers: headers
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.ok) {
+        resultEl.innerHTML = '<div class="alert alert-success">' + t('mkt.detail.purchaseSuccess') + ' ' +
+          (json.data.trackingCode ? 'Code: ' + esc(json.data.trackingCode) : '') + '</div>';
+        // Refresh listing after purchase
+        setTimeout(function() { navigate('listing', { id: listingId }); }, 2000);
+      } else {
+        resultEl.innerHTML = '<div class="alert alert-error">' + t('mkt.detail.purchaseFailed') + ': ' + esc(json.error ? json.error.message : t('mkt.sell.unknownError')) + '</div>';
+      }
+    })
+    .catch(function() {
+      resultEl.innerHTML = '<div class="alert alert-error">' + t('mkt.sell.networkError') + '</div>';
+    });
+}
+
+// ── Render: Sell ──
+function renderSell(app) {
+  if (!isAuthenticated()) {
+    app.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F512;</div><div class="empty-text">' + t('mkt.sell.authRequired') + '</div></div>' +
+      '<div style="text-align:center; margin-top:16px;"><a href="/v1/portal/human" class="btn btn-primary">' + t('mkt.sell.authBtn') + '</a></div>';
+    return;
+  }
+
+  var categoryOptions = CATEGORIES.map(function(cat) {
+    return '<option value="' + cat.key + '">' + cat.icon + ' ' + esc(t('mkt.cat.' + cat.key)) + '</option>';
+  }).join('');
+
+  var html = '<h1 class="page-title">' + t('mkt.sell.title') + '</h1>' +
+    '<p class="page-subtitle">' + t('mkt.sell.listingFee') + ': 2 morsels</p>' +
+    '<div class="card">' +
+      '<p style="font-size:0.9rem; color:var(--text-dim); margin-bottom:16px;">' + t('mkt.sell.formNote') + '</p>' +
+      '<div class="form-group"><label class="form-label">' + t('mkt.sell.titleLabel') + '</label>' +
+        '<input type="text" id="sell-title" class="form-input" placeholder="' + t('mkt.sell.titlePlaceholder') + '" minlength="3" maxlength="200"></div>' +
+      '<div class="form-group"><label class="form-label">' + t('mkt.sell.descLabel') + '</label>' +
+        '<textarea id="sell-description" class="form-textarea" placeholder="' + t('mkt.sell.descPlaceholder') + '" rows="4" minlength="10" maxlength="5000"></textarea></div>' +
+      '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.sell.categoryLabel') + '</label>' +
+          '<select id="sell-category" class="form-select">' + categoryOptions + '</select></div>' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.sell.priceLabel') + '</label>' +
+          '<input type="number" id="sell-price" class="form-input" placeholder="10" min="1"></div>' +
+      '</div>' +
+      '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.sell.conditionLabel') + '</label>' +
+          '<select id="sell-condition" class="form-select">' +
+            '<option value="">' + t('mkt.sell.conditionNone') + '</option>' +
+            '<option value="new">' + t('mkt.sell.conditionNew') + '</option>' +
+            '<option value="used">' + t('mkt.sell.conditionUsed') + '</option>' +
+            '<option value="digital">' + t('mkt.sell.conditionDigital') + '</option>' +
+          '</select></div>' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.sell.availLabel') + '</label>' +
+          '<select id="sell-availability" class="form-select">' +
+            '<option value="">' + t('mkt.sell.availNone') + '</option>' +
+            '<option value="immediate">' + t('mkt.sell.availImmediate') + '</option>' +
+            '<option value="on_request">' + t('mkt.sell.availOnRequest') + '</option>' +
+            '<option value="scheduled">' + t('mkt.sell.availScheduled') + '</option>' +
+          '</select></div>' +
+      '</div>' +
+      '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.sell.cityLabel') + '</label>' +
+          '<input type="text" id="sell-city" class="form-input" placeholder="' + t('mkt.sell.cityPlaceholder') + '"></div>' +
+        '<div class="form-group"><label class="form-label">' + t('mkt.sell.areaLabel') + '</label>' +
+          '<input type="text" id="sell-area" class="form-input" placeholder="' + t('mkt.sell.areaPlaceholder') + '"></div>' +
+      '</div>' +
+      '<div class="form-group"><label class="form-label">' + t('mkt.sell.tagsLabel') + '</label>' +
+        '<input type="text" id="sell-tags" class="form-input" placeholder="' + t('mkt.sell.tagsPlaceholder') + '"></div>' +
+      '<div id="sell-result" style="margin-top:16px; display:none;"></div>' +
+      '<div style="margin-top:16px;">' +
+        '<button onclick="submitListing()" class="btn btn-primary">' + t('mkt.sell.submitBtn') + ' (2 morsels)</button>' +
+      '</div>' +
+    '</div>';
+
+  app.innerHTML = html;
+}
+
+function submitListing() {
+  var headers = getAuthHeaders();
+  if (!headers) return;
+
+  var data = {
+    title: document.getElementById('sell-title').value,
+    description: document.getElementById('sell-description').value,
+    category: document.getElementById('sell-category').value,
+    priceMorsels: parseInt(document.getElementById('sell-price').value, 10)
+  };
+  var condition = document.getElementById('sell-condition').value;
+  if (condition) data.condition = condition;
+  var availability = document.getElementById('sell-availability').value;
+  if (availability) data.availability = availability;
+  var city = document.getElementById('sell-city').value;
+  var area = document.getElementById('sell-area').value;
+  if (city || area) {
+    data.location = {};
+    if (city) data.location.city = city;
+    if (area) data.location.area = area;
+  }
+  var tags = document.getElementById('sell-tags').value;
+  if (tags) data.tags = tags.split(',').map(function(tg) { return tg.trim(); }).filter(Boolean);
+
+  var el = document.getElementById('sell-result');
+  el.style.display = 'block';
+  el.innerHTML = '<div class="alert alert-info">' + t('mkt.sell.sending') + '</div>';
+
+  fetch(NODE_URL + '/v1/marketplace/listings', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(data)
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.ok) {
+        el.innerHTML = '<div class="alert alert-success">' + t('mkt.sell.success') + ' ' + esc(json.data.listingId) + '</div>';
+        setTimeout(function() {
+          navigate('listing', { id: json.data.listingId });
+        }, 1500);
+      } else {
+        el.innerHTML = '<div class="alert alert-error">' + esc(json.error ? json.error.message : t('mkt.sell.unknownError')) + '</div>';
+      }
+    })
+    .catch(function() {
+      el.innerHTML = '<div class="alert alert-error">' + t('mkt.sell.networkError') + '</div>';
+    });
+}
+
+// ── Render: My Listings ──
+function renderMyListings(app) {
+  if (!isAuthenticated()) {
+    app.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F512;</div><div class="empty-text">' + t('mkt.myListings.authRequired') + '</div></div>';
+    return;
+  }
+
+  app.innerHTML = '<div class="alert alert-info">...</div>';
+  var headers = getAuthHeaders();
+
+  fetch(NODE_URL + '/v1/marketplace/my-listings', { headers: headers })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json.ok) throw new Error(json.error ? json.error.message : 'Failed');
+
+      var listings = json.data.listings || [];
+
+      var listingCards = listings.map(function(l) {
+        var cl = catLabel(l.category);
+        return '<a class="card card-clickable" onclick="navigate(\'listing\', {id:\'' + esc(l.id) + '\'})">' +
+          '<div class="listing-header"><div>' +
+          '<div class="card-title">' + esc(l.title) + '</div>' +
+          '<div class="card-meta">' + cl.icon + ' ' + esc(cl.name) + ' &middot; ' + esc(l.createdAt.slice(0, 10)) + '</div>' +
+          '</div><div style="text-align:right;">' +
+          '<div class="price-badge">' + l.priceMorsels + ' morsels</div>' +
+          '<div style="margin-top:6px;"><span class="status-badge ' + statusClass(l.status) + '">' + statusLabel(l.status) + '</span></div>' +
+          '</div></div></a>';
+      }).join('');
+
+      var html = '<h1 class="page-title">' + t('mkt.myListings.title') + '</h1>' +
+        '<p class="page-subtitle">' + t('mkt.myListings.subtitle') + '</p>' +
+        '<div style="margin-bottom:16px;"><a onclick="navigate(\'sell\')" class="btn btn-primary">' + t('mkt.myListings.newBtn') + '</a></div>';
+
+      if (listings.length > 0) {
+        html += listingCards;
+      } else {
+        html += '<div class="empty-state"><div class="empty-icon">&#x1F4E6;</div><div class="empty-text">' + t('mkt.myListings.empty') + '</div></div>';
+      }
+
+      app.innerHTML = html;
+    })
+    .catch(function() {
+      app.innerHTML = '<div class="alert alert-error">' + t('mkt.myListings.error') + '</div>';
+    });
+}
+
+// ── Render: My Purchases ──
+function renderMyPurchases(app) {
+  if (!isAuthenticated()) {
+    app.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F512;</div><div class="empty-text">' + t('mkt.myPurchases.authRequired') + '</div></div>';
+    return;
+  }
+
+  app.innerHTML = '<div class="alert alert-info">...</div>';
+  var headers = getAuthHeaders();
+
+  fetch(NODE_URL + '/v1/marketplace/my-purchases', { headers: headers })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json.ok) throw new Error(json.error ? json.error.message : 'Failed');
+
+      var purchases = json.data.purchases || [];
+
+      if (purchases.length === 0) {
+        app.innerHTML = '<h1 class="page-title">' + t('mkt.myPurchases.title') + '</h1>' +
+          '<p class="page-subtitle">' + t('mkt.myPurchases.subtitle') + '</p>' +
+          '<div class="empty-state"><div class="empty-icon">&#x1F6D2;</div><div class="empty-text">' + t('mkt.myPurchases.empty') + '</div></div>';
+        return;
+      }
+
+      // Fetch listing details for each purchase
+      var listingPromises = purchases.map(function(p) {
+        return fetch(NODE_URL + '/v1/marketplace/listings/' + encodeURIComponent(p.listingId))
+          .then(function(r) { return r.json(); })
+          .then(function(j) { return j.ok ? j.data.listing : null; })
+          .catch(function() { return null; });
+      });
+
+      Promise.all(listingPromises).then(function(listings) {
+        var purchaseCards = purchases.map(function(p, i) {
+          var listing = listings[i];
+          var title = listing ? listing.title : t('mkt.myPurchases.unknown');
+
+          var html = '<div class="card">' +
+            '<div class="listing-header"><div>' +
+              '<div class="card-title">' + esc(title) + '</div>' +
+              '<div class="card-meta">' + t('mkt.myPurchases.seller') + ': ' + esc(p.sellerOwner) + ' &middot; ' +
+                esc(p.createdAt.slice(0, 10)) + ' &middot; ' +
+                t('mkt.myPurchases.code') + ': ' + esc(p.trackingCode) + '</div>' +
+            '</div><div style="text-align:right;">' +
+              '<div class="price-badge">' + p.totalCostMorsels + ' morsels</div>' +
+              '<div style="margin-top:6px;"><span class="status-badge ' + statusClass(p.status) + '">' + statusLabel(p.status) + '</span></div>' +
+            '</div></div>';
+
+          if (p.rating) {
+            html += '<div style="margin-top:8px;">' + starsHtml(p.rating.score);
+            if (p.rating.comment) {
+              html += '<span style="font-size:0.85rem; color:var(--text-dim); margin-left:8px;">"' + esc(p.rating.comment) + '"</span>';
+            }
+            html += '</div>';
+          } else if (p.status === 'delivered' || p.status === 'completed') {
+            html += '<div style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);">' +
+              t('mkt.myPurchases.rateHint') + esc(p.id) + '/rate</div>';
+          }
+
+          html += '</div>';
+          return html;
+        }).join('');
+
+        app.innerHTML = '<h1 class="page-title">' + t('mkt.myPurchases.title') + '</h1>' +
+          '<p class="page-subtitle">' + t('mkt.myPurchases.subtitle') + '</p>' +
+          purchaseCards;
+      });
+    })
+    .catch(function() {
+      app.innerHTML = '<div class="alert alert-error">' + t('mkt.myPurchases.error') + '</div>';
+    });
+}
+
+// ── Initialize nav labels and boot ──
+function initNav() {
+  var navLinks = document.querySelectorAll('.nav-links a');
+  var brand = document.querySelector('.nav-brand');
+  brand.textContent = t('mkt.brand');
+  navLinks[0].textContent = t('mkt.nav.search');
+  navLinks[1].textContent = t('mkt.nav.sell');
+  navLinks[2].textContent = t('mkt.nav.myListings');
+  navLinks[3].textContent = t('mkt.nav.myPurchases');
+  navLinks[4].textContent = t('mkt.nav.portal');
+  navLinks[5].textContent = t('mkt.lang.switch');
+}
+
+// ── Boot ──
+document.addEventListener('DOMContentLoaded', function() {
+  initNav();
+  var parsed = parseHash();
+  currentView = parsed.view;
+  currentParams = parsed.params;
+  renderCurrentView();
+});
+</script>
+</body>
+</html>
