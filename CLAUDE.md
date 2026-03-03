@@ -128,6 +128,43 @@ The E2E test file (`test/e2e-full.ts`) runs 35 tests across 6 phases + GDPR. Tes
 - `docs/b-config.md` — Node configuration schema
 - `docs/c-platform-notes.md` — AI platform compatibility
 
+## Backend Architecture Rule — NO Server-Side Rendering
+
+**The AIMEAT backend is protocol-only.** Every route in `src/routes/` must provide a generic, reusable API endpoint. The backend NEVER renders HTML, builds UI, or serves page templates.
+
+### Why
+
+AIMEAT's architecture is: **CSM defines data shape + rules → Generic APIs handle storage/consent/validation → Clients (AI chats, portal SPAs, apps) render UI.** Any service (hobby directory, marketplace, dating, news) is just a client reading a CSM definition and talking to generic APIs. No per-service backend code.
+
+### Rules
+
+1. **No SSR in routes.** Never `res.send('<html>...')` or build HTML strings in route handlers. If you need a UI, it's a client-side SPA or a static file.
+2. **Every new route must be generic.** Ask: "Would a second, different service also use this endpoint?" If no, it doesn't belong in the backend.
+3. **No per-service backend files.** Never create `portal-hobbies.ts`, `portal-marketplace.ts`, etc. The CSM format + generic APIs (memory, consent, directory, flags, schemas) cover all service types.
+4. **Admin dashboard is the ONE exception** — operator tooling may render HTML, but should migrate toward client-side SPA over time.
+5. **If data is available via an existing API, don't wrap it.** A route that calls `storage.getMemory()` and renders HTML is redundant — the client should call `GET /v1/memory` directly.
+
+### Core Generic APIs (the only backend you need)
+
+| API | Purpose |
+|-----|---------|
+| Memory | Store/read any key-value data |
+| Schema Locking | Validate data shape (CSM-defined rules) |
+| Consent | Control who sees what + audit trail |
+| Directory/Catalogue | Search by city/interest/geo |
+| Flags | Content moderation |
+| Auth/GHII | Identity + login + TOTP |
+| Stats | Usage counters |
+| Boards | Social discussion |
+| Organisms | Group management |
+| Wallet | Morsel economy |
+| CSM/MSM | Service manifest registration |
+
+### Legacy SSR files (scheduled for removal)
+
+These files violate the architecture rule and are being removed/refactored:
+`portal-hobbies.ts`, `portal-marketplace.ts`, `portal-human.ts`, `portal.ts`, `profile.ts`, `guides.ts`, `aimeat-os.ts`, `admin-dashboard.ts`, `personal.ts`
+
 ## Common Pitfalls
 
 - **Express 5 params:** `req.params.foo` is `string | string[]`. Always cast: `req.params.foo as string`
