@@ -976,6 +976,241 @@
     });
   }
 
+  // ── ZIP Helpers ────────────────────────────────
+
+  function mimeFromExtension(name) {
+    var ext = (name.split('.').pop() || '').toLowerCase();
+    var map = {
+      html: 'text/html', htm: 'text/html',
+      css: 'text/css',
+      js: 'application/javascript', mjs: 'application/javascript',
+      json: 'application/json',
+      svg: 'image/svg+xml',
+      png: 'image/png',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      ico: 'image/x-icon',
+      woff: 'font/woff', woff2: 'font/woff2',
+      ttf: 'font/ttf', otf: 'font/otf',
+      eot: 'application/vnd.ms-fontobject',
+      mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
+      mp4: 'video/mp4', webm: 'video/webm',
+      xml: 'application/xml',
+      txt: 'text/plain',
+      pdf: 'application/pdf'
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+
+  function toBase64(uint8arr) {
+    var binary = '';
+    for (var i = 0; i < uint8arr.length; i++) {
+      binary += String.fromCharCode(uint8arr[i]);
+    }
+    return btoa(binary);
+  }
+
+  // ── Minimal ZIP Parser ────────────────────────────
+
+  async function extractZip(arrayBuffer) {
+    var view = new DataView(arrayBuffer);
+    var files = [];
+    var offset = 0;
+
+    while (offset < view.byteLength - 4) {
+      var sig = view.getUint32(offset, true);
+      if (sig !== 0x04034b50) break; // Not a local file header
+
+      var compressionMethod = view.getUint16(offset + 8, true);
+      var compressedSize = view.getUint32(offset + 18, true);
+      var nameLen = view.getUint16(offset + 26, true);
+      var extraLen = view.getUint16(offset + 28, true);
+      var name = new TextDecoder().decode(new Uint8Array(arrayBuffer, offset + 30, nameLen));
+      var dataStart = offset + 30 + nameLen + extraLen;
+      var rawData = new Uint8Array(arrayBuffer, dataStart, compressedSize);
+
+      var data;
+      if (compressionMethod === 0) {
+        data = rawData; // Stored (no compression)
+      } else if (compressionMethod === 8) {
+        // Deflate — use browser's DecompressionStream
+        var ds = new DecompressionStream('raw');
+        var writer = ds.writable.getWriter();
+        writer.write(rawData);
+        writer.close();
+        var reader = ds.readable.getReader();
+        var chunks = [];
+        while (true) {
+          var result = await reader.read();
+          if (result.done) break;
+          chunks.push(result.value);
+        }
+        var totalLen = chunks.reduce(function (s, c) { return s + c.length; }, 0);
+        data = new Uint8Array(totalLen);
+        var pos = 0;
+        for (var ci = 0; ci < chunks.length; ci++) {
+          data.set(chunks[ci], pos);
+          pos += chunks[ci].length;
+        }
+      } else {
+        throw new Error('Unsupported compression method: ' + compressionMethod);
+      }
+
+      if (!name.endsWith('/')) { // Skip directories
+        files.push({ name: name, data: data });
+      }
+      offset = dataStart + compressedSize;
+    }
+
+    return files;
+  }
+
+  // ── ZIP Inline Bundler ────────────────────────────
+
+  async function bundleZip(files) {
+    // 1. Find index.html or any .html file as the base
+    var htmlFile = null;
+    for (var i = 0; i < files.length; i++) {
+      var lowerName = files[i].name.toLowerCase();
+      if (lowerName === 'index.html' || lowerName.endsWith('/index.html')) {
+        htmlFile = files[i];
+        break;
+      }
+    }
+    if (!htmlFile) {
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].name.toLowerCase().match(/\.html?$/)) {
+          htmlFile = files[i];
+          break;
+        }
+      }
+    }
+    if (!htmlFile) {
+      throw new Error('No HTML file found in ZIP');
+    }
+
+    // 2. Determine the base path (directory containing the HTML file)
+    var lastSlash = htmlFile.name.lastIndexOf('/');
+    var basePath = lastSlash >= 0 ? htmlFile.name.substring(0, lastSlash + 1) : '';
+
+    // 3. Build a map of relative file paths to file data
+    var fileMap = {};
+    for (var i = 0; i < files.length; i++) {
+      var fname = files[i].name;
+      // Store path relative to base
+      if (basePath && fname.startsWith(basePath)) {
+        fileMap[fname.substring(basePath.length)] = files[i].data;
+      }
+      // Also store the full path for lookup
+      fileMap[fname] = files[i].data;
+    }
+
+    // Helper: resolve a reference relative to the HTML file's directory
+    function resolveRef(ref) {
+      // Strip leading ./
+      var cleaned = ref.replace(/^\.\//, '');
+      // Try direct lookup
+      if (fileMap[cleaned]) return fileMap[cleaned];
+      // Try with basePath prepended
+      if (fileMap[basePath + cleaned]) return fileMap[basePath + cleaned];
+      return null;
+    }
+
+    // Helper: get file content as text
+    function fileAsText(data) {
+      return new TextDecoder().decode(data);
+    }
+
+    // Helper: get file content as data URL
+    function fileAsDataUrl(ref, data) {
+      var mime = mimeFromExtension(ref);
+      return 'data:' + mime + ';base64,' + toBase64(data);
+    }
+
+    var html = fileAsText(htmlFile.data);
+
+    // 4. Replace <link rel="stylesheet" href="..."> with inline <style>
+    html = html.replace(/<link\s+[^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi, function (tag) {
+      var hrefMatch = tag.match(/href\s*=\s*["']([^"']+)["']/i);
+      if (!hrefMatch) return tag;
+      var href = hrefMatch[1];
+      var fileData = resolveRef(href);
+      if (!fileData) return tag; // keep original if file not found
+      var cssContent = fileAsText(fileData);
+      // Inline CSS url() references within the stylesheet
+      cssContent = inlineCssUrls(cssContent);
+      return '<style>/* ' + href + ' */\n' + cssContent + '</style>';
+    });
+
+    // 5. Replace <script src="..."></script> with inline <script>
+    html = html.replace(/<script\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>\s*<\/script>/gi, function (tag, src) {
+      var fileData = resolveRef(src);
+      if (!fileData) return tag; // keep original if file not found
+      return '<script>/* ' + src + ' */\n' + fileAsText(fileData) + '<\/script>';
+    });
+
+    // 6. Replace src="..." and href="..." pointing to binary assets with data URLs
+    html = html.replace(/(src|href)\s*=\s*["']([^"']+)["']/gi, function (match, attr, ref) {
+      // Skip data: URLs, http(s) URLs, # anchors, and javascript:
+      if (ref.match(/^(data:|https?:|#|javascript:|mailto:)/i)) return match;
+      // Skip already-inlined stylesheets and scripts (they won't match since already replaced)
+      var fileData = resolveRef(ref);
+      if (!fileData) return match;
+      var mime = mimeFromExtension(ref);
+      // Only inline binary/image/font assets, not html/css/js (already handled above)
+      if (mime.match(/^(image|font|audio|video)\//)) {
+        return attr + '="' + fileAsDataUrl(ref, fileData) + '"';
+      }
+      return match;
+    });
+
+    // 7. Replace CSS url(...) references in inline <style> blocks
+    html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function (tag, cssContent) {
+      var inlined = inlineCssUrls(cssContent);
+      if (inlined !== cssContent) {
+        return tag.replace(cssContent, inlined);
+      }
+      return tag;
+    });
+
+    function inlineCssUrls(css) {
+      return css.replace(/url\(\s*["']?([^"')]+)["']?\s*\)/gi, function (match, ref) {
+        if (ref.match(/^(data:|https?:|#)/i)) return match;
+        var fileData = resolveRef(ref);
+        if (!fileData) return match;
+        return 'url("' + fileAsDataUrl(ref, fileData) + '")';
+      });
+    }
+
+    return html;
+  }
+
+  // ── App Creation from ZIP ─────────────────────────
+
+  async function addAppFromZip(name, arrayBuffer, icon, tags, openMode) {
+    var files = await extractZip(arrayBuffer);
+    var bundledHtml = await bundleZip(files);
+    var encoded = btoa(unescape(encodeURIComponent(bundledHtml)));
+    var app = {
+      id: generateId(),
+      name: name,
+      description: '',
+      source: 'zip',
+      url: null,
+      blob: encoded,
+      tags: tags,
+      openMode: openMode,
+      icon: icon || '\u{1F4E6}',
+      screenshot: null,
+      favorite: false,
+      addedAt: new Date().toISOString(),
+      lastOpenedAt: null
+    };
+    await saveApp(app);
+    return app;
+  }
+
   // ── App Creation from URL ───────────────────────
 
   function addAppFromUrl(name, url, icon, tags, openMode) {
@@ -1075,11 +1310,16 @@
   function handleFileDrop(file) {
     if (!file) return;
     if (file.name.toLowerCase().endsWith('.zip')) {
-      alert('ZIP support coming soon');
+      selectedFile = file;
+      document.getElementById('selected-file-name').textContent = file.name;
+      var nameInput = document.getElementById('app-name');
+      if (!nameInput.value.trim()) {
+        nameInput.value = file.name.replace(/\.zip$/i, '');
+      }
       return;
     }
     if (!file.name.match(/\.html?$/i)) {
-      alert('Please select an HTML file (.html or .htm)');
+      alert('Please select an HTML or ZIP file (.html, .htm, or .zip)');
       return;
     }
     selectedFile = file;
@@ -1152,13 +1392,29 @@
         alert('Please select a file');
         return;
       }
-      if (!name) {
-        name = selectedFile.name.replace(/\.html?$/i, '');
+      if (selectedFile.name.toLowerCase().endsWith('.zip')) {
+        // ZIP file — extract and bundle
+        if (!name) {
+          name = selectedFile.name.replace(/\.zip$/i, '');
+        }
+        selectedFile.arrayBuffer().then(function (arrayBuffer) {
+          return addAppFromZip(name, arrayBuffer, icon, tags, openMode);
+        }).then(function () {
+          closeModal();
+          renderApps();
+        }).catch(function (err) {
+          alert('ZIP import failed: ' + (err.message || err));
+        });
+      } else {
+        // HTML file
+        if (!name) {
+          name = selectedFile.name.replace(/\.html?$/i, '');
+        }
+        addAppFromFile(name, selectedFile, icon, tags, openMode).then(function () {
+          closeModal();
+          renderApps();
+        });
       }
-      addAppFromFile(name, selectedFile, icon, tags, openMode).then(function () {
-        closeModal();
-        renderApps();
-      });
     }
   }
 
@@ -1527,6 +1783,7 @@
     readFileAsText: readFileAsText,
     addAppFromUrl: addAppFromUrl,
     addAppFromFile: addAppFromFile,
+    addAppFromZip: addAppFromZip,
     showModal: showModal,
     closeModal: closeModal
   };
