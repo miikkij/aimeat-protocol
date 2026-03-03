@@ -1426,7 +1426,7 @@
       return '<style>/* ' + href + ' */\n' + cssContent + '</style>';
     });
 
-    // 5. Replace <script src="..."></script> with inline <script>
+    // 5. Replace script-src tags with inline script blocks
     html = html.replace(/<script\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>\s*<\/script>/gi, function (tag, src) {
       var fileData = resolveRef(src);
       if (!fileData) return tag; // keep original if file not found
