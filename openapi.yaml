@@ -338,6 +338,10 @@ components:
         value: {}
         visibility:
           $ref: '#/components/schemas/Visibility'
+        zone:
+          type: string
+          enum: [private, dmz, federation]
+          description: DMZ zone derived from visibility (private→private, owner→dmz, public→federation)
         tags:
           type: array
           items:
@@ -386,6 +390,8 @@ components:
           type: array
           items:
             type: string
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
 
     ActionPricing:
       type: object
@@ -430,6 +436,8 @@ components:
           type: integer
         average_rating:
           type: number
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
 
     # === Work Queue ===
     WorkRequest:
@@ -661,6 +669,8 @@ components:
           items:
             $ref: '#/components/schemas/GAII'
           description: For shared boards only
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
 
     BoardPost:
       type: object
@@ -4039,10 +4049,92 @@ paths:
     get:
       operationId: getStats
       summary: Node statistics
+      description: |
+        Returns operational statistics for this AIMEAT node including request
+        counts, memory operations, consent activity, and daily history.
+
+        Access is controlled by the `AIMEAT_STATS_ACCESS` environment variable:
+        - `public` (default) — no authentication required
+        - `authenticated` — any valid bearer token required
+        - `operator` — operator role required
+
+        Statistics can be disabled entirely by setting `AIMEAT_STATS_ENABLED=false`,
+        in which case this endpoint returns 503.
       tags: [Catalogue]
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: Node statistics snapshot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          uptime_seconds:
+                            type: integer
+                            description: Seconds since server start
+                          started_at:
+                            type: string
+                            format: date-time
+                            description: ISO 8601 timestamp when server started
+                          requests_total:
+                            type: integer
+                          requests_by_method:
+                            type: object
+                            additionalProperties:
+                              type: integer
+                            example:
+                              GET: 5000
+                              POST: 2000
+                          requests_by_status:
+                            type: object
+                            additionalProperties:
+                              type: integer
+                            example:
+                              '2xx': 6500
+                              '4xx': 400
+                              '5xx': 100
+                          memory_writes:
+                            type: integer
+                          memory_reads:
+                            type: integer
+                          consent_grants:
+                            type: integer
+                          consent_revocations:
+                            type: integer
+                          schema_validations:
+                            type: integer
+                          schema_validation_failures:
+                            type: integer
+                          active_owners:
+                            type: integer
+                          active_agents:
+                            type: integer
+                          daily_history:
+                            type: object
+                            description: Daily counter breakdown (last 90 days)
+                            additionalProperties:
+                              type: object
+                              additionalProperties:
+                                type: integer
+                            example:
+                              '2026-03-03':
+                                requests_total: 450
+                                memory_writes: 50
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Statistics feature is disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /.well-known/aimeat:
     get:
