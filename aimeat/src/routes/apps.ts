@@ -112,10 +112,18 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
                         'This app is protected. Provide the access code via ?code= query parameter or X-Access-Code header.'));
                     return;
                 }
-                // Serve as attachment download — never render as page
+                // Serve the file
                 res.setHeader('Content-Type', file.mimeType);
                 res.setHeader('Content-Length', file.size.toString());
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+                const mode = req.query.mode as string | undefined;
+                if (mode === 'inline') {
+                    // Inline mode: serve without attachment disposition for iframe/tab viewing
+                    res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' data: blob:");
+                } else {
+                    // Default: serve as attachment download — never render as page
+                    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                }
                 res.setHeader('X-Content-Type-Options', 'nosniff');
                 res.send(file.data);
                 return;

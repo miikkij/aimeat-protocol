@@ -746,6 +746,193 @@
         padding: 12px 16px;
       }
     }
+
+    /* ── Light Theme ─────────────────────────────────── */
+
+    [data-theme="light"] {
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --text: #1a1a2e;
+      --accent: #e94560;
+      --accent2: #a8d8ea;
+      --surface-glass: rgba(255, 255, 255, .75);
+      --border-subtle: rgba(26, 26, 46, .12);
+      --border-hover: rgba(26, 26, 46, .25);
+      --text-muted: rgba(26, 26, 46, .6);
+      --text-dim: rgba(26, 26, 46, .35);
+    }
+
+    [data-theme="light"] body::before {
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(168, 216, 234, .15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(233, 69, 96, .06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(168, 216, 234, .08) 0%, transparent 60%);
+    }
+
+    [data-theme="light"] header {
+      background: rgba(245, 245, 245, .9);
+    }
+
+    [data-theme="light"] .modal {
+      background: rgba(255, 255, 255, .95);
+    }
+
+    [data-theme="light"] #context-menu {
+      background: rgba(255, 255, 255, .95);
+    }
+
+    [data-theme="light"] #iframe-view .iframe-toolbar {
+      background: rgba(245, 245, 245, .95);
+    }
+
+    /* ── Settings Modal ──────────────────────────────── */
+
+    #settings-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #settings-overlay[hidden] {
+      display: none;
+    }
+
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .settings-section-title {
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .settings-row label {
+      flex: 0 0 130px;
+      font-size: .84rem;
+      color: var(--text-muted);
+    }
+
+    .settings-row .modal-input {
+      flex: 1;
+    }
+
+    .settings-backup-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .modal-btn.danger {
+      background: transparent;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .modal-btn.danger:hover {
+      background: rgba(233, 69, 96, .12);
+    }
+
+    /* ── AIMEAT Import Dialog ─────────────────────────── */
+
+    #aimeat-import-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 550;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #aimeat-import-overlay[hidden] {
+      display: none;
+    }
+
+    .aimeat-app-list {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+
+    .aimeat-app-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      transition: border-color var(--transition);
+    }
+
+    .aimeat-app-item:hover {
+      border-color: var(--border-hover);
+    }
+
+    .aimeat-app-item input[type="checkbox"] {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .aimeat-app-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .aimeat-app-name {
+      font-size: .85rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .aimeat-app-size {
+      font-size: .72rem;
+      color: var(--text-dim);
+    }
+
+    .aimeat-app-item select {
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-size: .78rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .aimeat-app-item select option {
+      background: var(--surface);
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -776,6 +963,7 @@
       <div class="modal-tabs">
         <button class="modal-tab active" data-tab="url">URL</button>
         <button class="modal-tab" data-tab="file">File</button>
+        <button class="modal-tab" data-tab="aimeat">AIMEAT</button>
       </div>
 
       <!-- URL tab content -->
@@ -795,6 +983,16 @@
           <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
           <p class="drop-zone-selected" id="selected-file-name"></p>
         </div>
+      </div>
+
+      <!-- AIMEAT tab content -->
+      <div class="tab-content" id="tab-aimeat">
+        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
+          Import apps from a connected AIMEAT server. Configure the server URL in Settings first.
+        </p>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%">
+          Fetch Available Apps
+        </button>
       </div>
 
       <!-- Common fields -->
@@ -845,6 +1043,74 @@
     <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
     <hr>
     <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-overlay" hidden>
+    <div class="modal" id="settings-modal">
+      <h2>Settings</h2>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <div class="settings-row">
+          <label for="setting-theme">Theme</label>
+          <select id="setting-theme" class="modal-input">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Defaults</div>
+        <div class="settings-row">
+          <label for="setting-open-mode">Default open mode</label>
+          <select id="setting-open-mode" class="modal-input">
+            <option value="tab">New Tab</option>
+            <option value="iframe">Inline (iframe)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">AIMEAT Server</div>
+        <div class="settings-row">
+          <label for="setting-aimeat-url">Server URL</label>
+          <input type="url" id="setting-aimeat-url" class="modal-input" placeholder="http://localhost:40050" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Backup &amp; Restore</div>
+        <div class="settings-backup-actions">
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()">Export JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()">Import JSON</button>
+          <input type="file" id="import-file-input" accept=".json" hidden/>
+        </div>
+      </div>
+
+      <div class="settings-section" style="margin-bottom:0">
+        <div class="settings-section-title">Danger Zone</div>
+        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()">Clear All Data</button>
+      </div>
+
+      <div class="modal-actions" style="margin-top:24px">
+        <button type="button" class="modal-btn secondary" id="settings-cancel-btn">Cancel</button>
+        <button type="button" class="modal-btn primary" id="settings-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIMEAT Import Dialog (dynamically populated) -->
+  <div id="aimeat-import-overlay" hidden>
+    <div class="modal" id="aimeat-import-modal">
+      <h2>Import from AIMEAT</h2>
+      <div class="aimeat-app-list" id="aimeat-app-list"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true">Cancel</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()">Import Selected</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -1758,6 +2024,261 @@
     }
   }
 
+  // ── Theme ────────────────────────────────────────
+
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+
+  // ── Settings ────────────────────────────────────
+
+  function openSettings() {
+    var config = loadConfig();
+    document.getElementById('setting-theme').value = config.theme || 'dark';
+    document.getElementById('setting-open-mode').value = config.defaultOpenMode || 'tab';
+    document.getElementById('setting-aimeat-url').value = config.aimeatUrl || '';
+    document.getElementById('settings-overlay').hidden = false;
+  }
+
+  function saveSettings() {
+    var config = loadConfig();
+    config.theme = document.getElementById('setting-theme').value;
+    config.defaultOpenMode = document.getElementById('setting-open-mode').value;
+    config.aimeatUrl = document.getElementById('setting-aimeat-url').value.trim();
+    saveConfig(config);
+    applyTheme(config.theme);
+    document.getElementById('settings-overlay').hidden = true;
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-overlay').hidden = true;
+  }
+
+  // ── Export / Import ─────────────────────────────
+
+  function exportBackup() {
+    getAllApps().then(function (apps) {
+      var config = loadConfig();
+      var backup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        config: config,
+        apps: apps
+      };
+      var json = JSON.stringify(backup, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'app-launcher-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function handleImportBackup(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var backup = JSON.parse(reader.result);
+        if (!backup.apps || !Array.isArray(backup.apps)) {
+          alert('Invalid backup file: missing apps array');
+          return;
+        }
+        // Import config if present
+        if (backup.config && typeof backup.config === 'object') {
+          var currentConfig = loadConfig();
+          var merged = Object.assign({}, currentConfig, backup.config);
+          saveConfig(merged);
+          applyTheme(merged.theme);
+        }
+        // Import apps with new IDs to avoid conflicts
+        var promises = [];
+        for (var i = 0; i < backup.apps.length; i++) {
+          var app = Object.assign({}, backup.apps[i]);
+          app.id = generateId(); // New ID to avoid conflicts
+          promises.push(saveApp(app));
+        }
+        Promise.all(promises).then(function () {
+          alert('Imported ' + backup.apps.length + ' app(s) successfully');
+          renderApps();
+        });
+      } catch (e) {
+        alert('Failed to parse backup file: ' + (e.message || e));
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ── Clear All Data ──────────────────────────────
+
+  function clearAllData() {
+    if (!confirm('Are you sure you want to clear all data? This cannot be undone.')) return;
+    if (!confirm('This will delete ALL apps and reset settings. Continue?')) return;
+
+    openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).clear();
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    }).then(function () {
+      localStorage.removeItem('appLauncherConfig');
+      applyTheme('dark');
+      renderApps();
+      document.getElementById('settings-overlay').hidden = true;
+      alert('All data cleared');
+    });
+  }
+
+  // ── AIMEAT Import ───────────────────────────────
+
+  var aimeatAppsCache = [];
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function importFromAimeat() {
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      alert('Set AIMEAT server URL in Settings first');
+      return;
+    }
+
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, ''); // strip trailing slash
+    closeModal();
+
+    fetch(aimeatUrl + '/v1/apps')
+      .then(function (resp) {
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+        return resp.json();
+      })
+      .then(function (json) {
+        var apps = json.data && json.data.apps ? json.data.apps : [];
+        if (apps.length === 0) {
+          alert('No apps found on the AIMEAT server');
+          return;
+        }
+        aimeatAppsCache = apps;
+        showAimeatImportDialog(apps, aimeatUrl);
+      })
+      .catch(function (err) {
+        var msg = 'Failed to fetch apps from AIMEAT server.\n\n' + (err.message || err);
+        if (err.message && err.message.indexOf('Failed to fetch') !== -1) {
+          msg += '\n\nIf the launcher is opened via file://, CORS will block the request. Open it from the AIMEAT server instead.';
+        }
+        alert(msg);
+      });
+  }
+
+  function showAimeatImportDialog(apps, aimeatUrl) {
+    var listEl = document.getElementById('aimeat-app-list');
+    var html = '';
+    for (var i = 0; i < apps.length; i++) {
+      var app = apps[i];
+      html +=
+        '<div class="aimeat-app-item">' +
+          '<input type="checkbox" data-index="' + i + '" checked/>' +
+          '<div class="aimeat-app-info">' +
+            '<div class="aimeat-app-name">' + escapeHtml(app.filename) + '</div>' +
+            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (app.owner ? ' \u00B7 ' + escapeHtml(app.owner) : '') + '</div>' +
+          '</div>' +
+          '<select data-index="' + i + '">' +
+            '<option value="link">Link (online only)</option>' +
+            '<option value="download">Download (offline)</option>' +
+          '</select>' +
+        '</div>';
+    }
+    listEl.innerHTML = html;
+    // Store the aimeatUrl for processing
+    listEl.dataset.aimeatUrl = aimeatUrl;
+    document.getElementById('aimeat-import-overlay').hidden = false;
+  }
+
+  function processAimeatImport() {
+    var listEl = document.getElementById('aimeat-app-list');
+    var aimeatUrl = listEl.dataset.aimeatUrl;
+    var checkboxes = listEl.querySelectorAll('input[type="checkbox"]');
+    var selects = listEl.querySelectorAll('select');
+    var config = loadConfig();
+    var defaultOpenMode = config.defaultOpenMode || 'tab';
+
+    var toImport = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+      if (checkboxes[i].checked) {
+        var idx = parseInt(checkboxes[i].getAttribute('data-index'), 10);
+        var mode = selects[i].value;
+        toImport.push({ app: aimeatAppsCache[idx], mode: mode });
+      }
+    }
+
+    if (toImport.length === 0) {
+      alert('No apps selected');
+      return;
+    }
+
+    var promises = [];
+    for (var j = 0; j < toImport.length; j++) {
+      (function (item) {
+        var app = item.app;
+        var name = app.filename.replace(/\.html?$/i, '');
+
+        if (item.mode === 'link') {
+          // Link mode: store URL with ?mode=inline
+          var inlineUrl = aimeatUrl + app.download_url + '?mode=inline';
+          promises.push(addAppFromUrl(name, inlineUrl, '\u{1F4E6}', ['aimeat'], defaultOpenMode));
+        } else {
+          // Download mode: fetch content and store blob
+          var downloadUrl = aimeatUrl + app.download_url;
+          promises.push(
+            fetch(downloadUrl)
+              .then(function (resp) {
+                if (!resp.ok) throw new Error('Download failed: ' + resp.status);
+                return resp.text();
+              })
+              .then(function (content) {
+                var encoded = btoa(unescape(encodeURIComponent(content)));
+                var record = {
+                  id: generateId(),
+                  name: name,
+                  description: '',
+                  source: 'aimeat',
+                  url: null,
+                  blob: encoded,
+                  tags: ['aimeat'],
+                  openMode: defaultOpenMode,
+                  icon: '\u{1F4E6}',
+                  screenshot: null,
+                  favorite: false,
+                  addedAt: new Date().toISOString(),
+                  lastOpenedAt: null
+                };
+                return saveApp(record);
+              })
+          );
+        }
+      })(toImport[j]);
+    }
+
+    Promise.all(promises).then(function () {
+      document.getElementById('aimeat-import-overlay').hidden = true;
+      renderApps();
+    }).catch(function (err) {
+      alert('Import error: ' + (err.message || err));
+    });
+  }
+
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
@@ -1785,12 +2306,23 @@
     addAppFromFile: addAppFromFile,
     addAppFromZip: addAppFromZip,
     showModal: showModal,
-    closeModal: closeModal
+    closeModal: closeModal,
+    openSettings: openSettings,
+    saveSettings: saveSettings,
+    closeSettings: closeSettings,
+    applyTheme: applyTheme,
+    exportBackup: exportBackup,
+    clearAllData: clearAllData,
+    importFromAimeat: importFromAimeat,
+    processAimeatImport: processAimeatImport
   };
 
   // ── Bootstrap ─────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', function () {
+    // ── Apply theme on load ─────────────────────────
+    applyTheme(loadConfig().theme);
+
     renderApps();
 
     // ── Search input ─────────────────────────────────
@@ -1804,8 +2336,44 @@
       showModal();
     });
 
+    // ── Settings button ─────────────────────────────
+    document.getElementById('settings-btn').addEventListener('click', function () {
+      openSettings();
+    });
+
+    // ── Settings save / cancel ──────────────────────
+    document.getElementById('settings-save-btn').addEventListener('click', function () {
+      saveSettings();
+    });
+
+    document.getElementById('settings-cancel-btn').addEventListener('click', function () {
+      closeSettings();
+    });
+
+    // ── Click settings overlay to close ─────────────
+    document.getElementById('settings-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeSettings();
+      }
+    });
+
+    // ── Import backup file input ────────────────────
+    document.getElementById('import-file-input').addEventListener('change', function () {
+      if (this.files && this.files.length > 0) {
+        handleImportBackup(this.files[0]);
+        this.value = ''; // Reset for re-import
+      }
+    });
+
+    // ── Click AIMEAT import overlay to close ────────
+    document.getElementById('aimeat-import-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
     // ── Tab switching ───────────────────────────────
-    var tabBtns = document.querySelectorAll('.modal-tab');
+    var tabBtns = document.querySelectorAll('#add-app-modal .modal-tab');
     tabBtns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         switchTab(btn.getAttribute('data-tab'));
@@ -1880,11 +2448,17 @@
       hideContextMenu();
     });
 
-    // ── Escape key to close context menu ────────────
+    // ── Escape key to close modals ──────────────────
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (!document.getElementById('context-menu').hidden) {
           hideContextMenu();
+        } else if (!document.getElementById('aimeat-import-overlay').hidden) {
+          document.getElementById('aimeat-import-overlay').hidden = true;
+        } else if (!document.getElementById('settings-overlay').hidden) {
+          closeSettings();
+        } else if (!document.getElementById('modal-overlay').hidden) {
+          closeModal();
         }
       }
     });
