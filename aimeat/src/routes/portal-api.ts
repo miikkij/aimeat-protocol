@@ -19,7 +19,10 @@ export function portalApiRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     const gaii = req.auth!.sub;
-    const boardKey = 'board.public';
+    const rawKey = req.body?.boardKey;
+    const boardKey = (typeof rawKey === 'string' && /^board\.[a-z][a-z0-9._-]{0,60}$/.test(rawKey))
+      ? rawKey
+      : 'board.public';
 
     // Read existing board
     const existing = await storage.getMemory(gaii, boardKey);

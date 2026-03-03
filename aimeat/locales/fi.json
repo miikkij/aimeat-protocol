@@ -100,18 +100,18 @@
       "signInLink": "Kirjaudu"
     },
     "launcher": {
-      "title": "Sovellusten käynnistin",
-      "tagline": "Luo oma henkilökohtainen sovellusten käynnistin selaimeen.",
-      "desc": "Sinulle kertyy paljon sovelluksia — pelejä, työkaluja, dashboardeja, seurantoja. Sovellusten käynnistin antaa sinulle yhden paikan, josta löydät ja avaat ne kaikki. Käytä sitä suoraan tai lataa ja muokkaa ihan omanlaiseksesi.",
+      "title": "Sovelluskatalogi",
+      "tagline": "Selaa ja löydä sovelluksia yhdestä paikasta.",
+      "desc": "Sinulle kertyy paljon sovelluksia — pelejä, työkaluja, dashboardeja, seurantoja. Sovelluskatalogi antaa sinulle yhden paikan, josta löydät ja avaat ne kaikki. Käytä sitä suoraan tai lataa ja muokkaa ihan omanlaiseksesi.",
       "feat1": "Kaikki AIMEAT-sovelluksesi yhdessä näkymässä",
       "feat2": "Kiinnitä suosikit nopeaa käyttöä varten",
       "feat3": "Hae ja suodata tageilla",
       "feat4": "Tuo sovelluksia suoraan tältä solmulta",
-      "openBtn": "Avaa sovellusten käynnistin",
+      "openBtn": "Avaa sovelluskatalogi",
       "or": "tai",
       "customizeTitle": "Tee oma versio",
-      "customizeDesc": "Lataa app-launcher.html-tiedosto ja anna se mille tahansa AI:lle alla olevan kehotteen kanssa. AI muokkaa sen juuri sellaiseksi kuin haluat — omat värit, oma asettelu, oma kieli. Tuloksena on yksi HTML-tiedosto, joka toimii offlinenp, kotona sisäverkossa, missä vain.",
-      "step1": "Lataa app-launcher.html alta",
+      "customizeDesc": "Lataa app-catalog.html-tiedosto ja anna se mille tahansa AI:lle alla olevan kehotteen kanssa. AI muokkaa sen juuri sellaiseksi kuin haluat — omat värit, oma asettelu, oma kieli. Tuloksena on yksi HTML-tiedosto, joka toimii offline, kotona sisäverkossa, missä vain.",
+      "step1": "Lataa app-catalog.html alta",
       "step2": "Kopioi muokkauskehotep",
       "step3": "Liitä molemmat mihin tahansa AI-chattiin (ChatGPT, Claude, Grok...) ja kerro mitä haluat muuttaa",
       "downloadBtn": "Lataa HTML",
@@ -122,10 +122,40 @@
       "badgePrivate": "Tietosi pysyvät paikallisena"
     }
   },
+  "groups": {
+    "forMe": "Minulle ja muille",
+    "forMeDesc": "Kokeile heti. Kopioi kehote AI-chattiin, saat sovelluksen jonka voit ajaa omassa selaimessa.",
+    "forMeCopy": "Kopioi kehote",
+    "forMeCopied": "Kopioitu!",
+    "forMeSteps": "1. Kopioi kehote. 2. Liitä mihin tahansa AI-chattiin. 3. Vastaa kysymyksiin. 4. Lataa ja avaa HTML-tiedosto selaimessa.",
+    "forAgents": "Minun AI Agenteilleni",
+    "forAgentsDesc": "Automatisoi tiedon virtaus AIMEAT:iin. Anna AI-agenttisi seurata, kerätä, päättää ja toimia puolestasi.",
+    "forAgentsCopy": "Kopioi agenttikehote",
+    "forAgentsCopied": "Kopioitu!",
+    "forBuilders": "Palveluiden tekijöille",
+    "forBuildersDesc": "Rekisteröi palvelumäärittelyjä (CSM/MSM), hallitse skeemoja ja suostumuksia. Vaatii rekisteröitymisen.",
+    "forBuildersRegister": "Rekisteröidy aloittaaksesi"
+  },
+  "welcome": {
+    "title": "Tervetuloa-viestit",
+    "emptyBoard": "Ei vielä viestejä. Kirjoita ensimmäinen!",
+    "placeholder": "Kirjoita päivän tervehdyksesi...",
+    "sendBtn": "Lähetä",
+    "sent": "Tervehdys lähetetty!",
+    "limit": "Yksi viesti päivässä"
+  },
+  "catalog": {
+    "title": "Sovelluskatalogi",
+    "tagline": "Selaa ja löydä sovelluksia yhdestä paikasta.",
+    "desc": "Sinulle kertyy paljon sovelluksia — pelejä, työkaluja, dashboardeja, seurantoja. Sovelluskatalogia voit selata, löytää muiden sovelluksia ja lisätä omia.",
+    "openBtn": "Avaa sovelluskatalogi",
+    "downloadBtn": "Lataa HTML"
+  },
   "morsels": {
     "name": "sydänmurunen",
     "namePlural": "sydänmurusta",
-    "summary": "Sydänmuruset ovat AIMEAT:n tapa sanoa kiitos. Saat 100 murusta alkuun, ilmaiseksi. Mitä enemmän jaat ja autat, sitä enemmän saat."
+    "summary": "Sydänmuruset ovat AIMEAT:n tapa sanoa kiitos. Saat 100 murusta alkuun, ilmaiseksi. Mitä enemmän jaat ja autat, sitä enemmän saat.",
+    "economy": "Kaikki toiminta kuluttaa sydänmurusia — se suojaa palvelinta ja antaa arvoa jokaiselle teolle. Kun joku käyttää jotain sinun tekemää, saat murusia takaisin. Se on osoitus rakkaudesta: kun luopuu antaakseen, toinen saa. Anonyymikäyttö on rajoitettua; rekisteröityneet käyttäjät saavat paljon enemmän."
   },
   "compat": {
     "title": "Mitkä AI:t osaavat lukea muistisi automaattisesti?",
@@ -139,20 +169,7 @@
     "workaroundNote": "Kopioi muistosi ja liitä se suoraan AI-keskusteluun. Toimii aina, kaikkialla."
   },
   "comingSoon": "Tulossa pian",
-  "more": {
-    "sectionTitle": "Mitä AIMEAT:lla voi tehdä?",
-    "title": "Mitä muuta voit tehdä?",
-    "aiNews": "Tilaa AI-uutiskooste",
-    "aiNewsDesc": "Saa joka aamu tuoreimmat uutiset tiivistettynä AI:lla",
-    "monitor": "Seuraa palvelintasi",
-    "monitorDesc": "Näe serverisi terveys dashboardilta reaaliajassa",
-    "multiAgent": "Yhdistä useita AI-agentteja",
-    "multiAgentDesc": "Anna kaikkien AI:desi jakaa sama muisti",
-    "directory": "Tee oma myynti-ilmoitustaulu",
-    "directoryDesc": "Julkaise ilmoituksia kuvineen, muut näkevät ne boardilta",
-    "buildApps": "Rakenna omia sovelluksia",
-    "buildAppsDesc": "Kaikki mitä tarvitset on HTTP, ei backendia, ei tietokantaa"
-  },
+
   "profile": {
     "title": "Oma profiili",
     "subtitle": "Profiili",

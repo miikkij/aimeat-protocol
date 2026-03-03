@@ -100,18 +100,18 @@
       "signInLink": "Sign in"
     },
     "launcher": {
-      "title": "App Launcher",
-      "tagline": "Create your own personal app launcher in your browser.",
-      "desc": "You're going to have lots of apps — games, tools, dashboards, trackers. The app launcher gives you one place to organize and open them all. Use it directly or download and customize your very own version.",
+      "title": "App Catalog",
+      "tagline": "Browse and discover apps in one place.",
+      "desc": "You're going to have lots of apps — games, tools, dashboards, trackers. The app catalog gives you one place to organize and open them all. Use it directly or download and customize your very own version.",
       "feat1": "All your AIMEAT apps in one view",
       "feat2": "Pin favorites for quick access",
       "feat3": "Search and filter by tags",
       "feat4": "Import apps directly from this node",
-      "openBtn": "Open App Launcher",
+      "openBtn": "Open App Catalog",
       "or": "or",
       "customizeTitle": "Make your own version",
-      "customizeDesc": "Download the app-launcher.html file and give it to any AI along with the prompt below. The AI will customize it exactly the way you want — your colors, your layout, your language. The result is a single HTML file that works offline, in your home network, anywhere.",
-      "step1": "Download app-launcher.html below",
+      "customizeDesc": "Download the app-catalog.html file and give it to any AI along with the prompt below. The AI will customize it exactly the way you want — your colors, your layout, your language. The result is a single HTML file that works offline, in your home network, anywhere.",
+      "step1": "Download app-catalog.html below",
       "step2": "Copy the customization prompt",
       "step3": "Paste both into any AI chat (ChatGPT, Claude, Grok...) and tell it what you want changed",
       "downloadBtn": "Download HTML",
@@ -122,10 +122,40 @@
       "badgePrivate": "Your data stays local"
     }
   },
+  "groups": {
+    "forMe": "For Me & Others",
+    "forMeDesc": "Try it now. Copy the prompt into an AI chat, get an app you can run in your own browser.",
+    "forMeCopy": "Copy prompt",
+    "forMeCopied": "Copied!",
+    "forMeSteps": "1. Copy the prompt. 2. Paste into any AI chat. 3. Answer questions. 4. Download and open the HTML file in your browser.",
+    "forAgents": "For My AI Agents",
+    "forAgentsDesc": "Automate data flow into AIMEAT. Let your AI agents monitor, collect, decide and act on your behalf.",
+    "forAgentsCopy": "Copy agent prompt",
+    "forAgentsCopied": "Copied!",
+    "forBuilders": "For Service Builders",
+    "forBuildersDesc": "Register service manifests (CSM/MSM), manage schemas and consent. Requires registration.",
+    "forBuildersRegister": "Register to get started"
+  },
+  "welcome": {
+    "title": "Welcome messages",
+    "emptyBoard": "No messages yet. Be the first!",
+    "placeholder": "Write your greeting for today...",
+    "sendBtn": "Send",
+    "sent": "Greeting posted!",
+    "limit": "One message per day"
+  },
+  "catalog": {
+    "title": "App Catalog",
+    "tagline": "Browse and discover apps in one place.",
+    "desc": "You're going to have lots of apps — games, tools, dashboards, trackers. The app catalog lets you browse, find others' apps and add your own.",
+    "openBtn": "Open App Catalog",
+    "downloadBtn": "Download HTML"
+  },
   "morsels": {
     "name": "heart morsel",
     "namePlural": "heart morsels",
-    "summary": "Heart morsels are AIMEAT's way of saying thanks. You get 100 to start, for free. The more you share and help, the more you get."
+    "summary": "Heart morsels are AIMEAT's way of saying thanks. You get 100 to start, for free. The more you share and help, the more you get.",
+    "economy": "All activity costs heart morsels — it protects the server and gives value to every action. When someone uses something you made, you get morsels back. It's a gesture of love: when you give up something, another receives. Anonymous usage is limited; registered users get much more."
   },
   "compat": {
     "title": "Which AIs can read your memories automatically?",
@@ -139,20 +169,7 @@
     "workaroundNote": "Copy your memories and paste directly into any AI chat. Always works, everywhere."
   },
   "comingSoon": "Coming soon",
-  "more": {
-    "sectionTitle": "What can you do with AIMEAT?",
-    "title": "What else can you do?",
-    "aiNews": "Subscribe to AI news digest",
-    "aiNewsDesc": "Get the latest news summarized by AI every morning",
-    "monitor": "Monitor your server",
-    "monitorDesc": "See your server health on a real-time dashboard",
-    "multiAgent": "Connect multiple AI agents",
-    "multiAgentDesc": "Let all your AIs share the same memory",
-    "directory": "Create a sales bulletin board",
-    "directoryDesc": "Post listings with images, others see them on the board",
-    "buildApps": "Build your own apps",
-    "buildAppsDesc": "All you need is HTTP, no backend, no database"
-  },
+
   "profile": {
     "title": "My Profile",
     "subtitle": "Profile",
