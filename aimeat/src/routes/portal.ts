@@ -2,8 +2,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
-import { createT, detectLocale, toLocale, resolveLocale, resolveFlat, LOCALES, type Locale, type TFunction } from '../i18n.js';
-import { humanPortalHtml } from './portal-human.js';
+import { resolveLocale, resolveFlat, type Locale } from '../i18n.js';
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 
 /* ──────────────────────────────────────────────────────────
@@ -1410,22 +1409,21 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     const langParam = req.query.lang as string | undefined;
     const locale = resolveLocale(langParam, req.headers.cookie, req.headers['accept-language']);
     if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
-    const t = createT(locale);
-
-    const [agents, chatSessions, actions, boards] = await Promise.all([
-      storage.listAgents(),
-      storage.listChatInstances(),
-      storage.listActions(),
-      storage.listBoards(),
-    ]);
-    const stats = { agents: agents.length, chatSessions: chatSessions.length, actions: actions.length, boards: boards.length };
 
     if (viewParam === 'dev') {
-      // Existing developer portal
+      // Existing developer portal (SSR — kept as exception)
+      const [agents, chatSessions, actions, boards] = await Promise.all([
+        storage.listAgents(),
+        storage.listChatInstances(),
+        storage.listActions(),
+        storage.listBoards(),
+      ]);
+      const stats = { agents: agents.length, chatSessions: chatSessions.length, actions: actions.length, boards: boards.length };
       res.type('text/html').send(portalHtml(config, stats, locale));
     } else {
-      // Human-facing portal (default)
-      res.type('text/html').send(humanPortalHtml(config, t, locale, stats));
+      // Human-facing portal — served as static HTML from public/human.html
+      const langSuffix = langParam ? `?lang=${encodeURIComponent(langParam)}` : '';
+      res.redirect(302, `/human.html${langSuffix}`);
     }
   });
 

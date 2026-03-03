@@ -35,7 +35,6 @@ import { validateRouter } from './routes/validate.js';
 import { mcpRouter } from './routes/mcp.js';
 import { portalRouter } from './routes/portal.js';
 import { portalApiRouter } from './routes/portal-api.js';
-import { profileRouter } from './routes/profile.js';
 import { csmRouter } from './routes/csm.js';
 import { msmRouter } from './routes/msm.js';
 import { ghiiRouter } from './routes/ghii.js';
@@ -43,14 +42,11 @@ import { chatInstancesRouter } from './routes/chat-instances.js';
 import { totpRouter } from './routes/totp.js';
 import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
-import { aimeatOsRouter } from './routes/aimeat-os.js';
-import { guidesRouter } from './routes/guides.js';
 import { flagsRouter } from './routes/flags.js';
 import { appealsRouter } from './routes/appeals.js';
 import { matchesRouter } from './routes/matches.js';
 import { organismsRouter } from './routes/organisms.js';
 import { marketplaceRouter } from './routes/marketplace.js';
-import { portalMarketplaceRouter } from './routes/portal-marketplace.js';
 import { personalRouter } from './routes/personal.js';
 import { pushRouter } from './routes/push.js';
 import { createPushService } from './services/push.js';
@@ -69,7 +65,6 @@ import { startConsentExpiryJob } from './services/consent.js';
 import { seedProfileSchemas } from './services/profile-schemas.js';
 import { createEmailService } from './services/email.js';
 import { DirectoryService } from './services/directory.js';
-import { portalHobbiesRouter } from './routes/portal-hobbies.js';
 import { siteRouter } from './routes/site.js';
 import { SiteService } from './services/site.js';
 import { startSiteSyncJob, triggerSiteSync, getSiteSyncState } from './services/site-sync.js';
@@ -402,9 +397,6 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   }
   app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));
-  app.use(portalHobbiesRouter(config, storage, directoryService));
-  app.use(portalMarketplaceRouter(config, storage));
-  app.use(profileRouter(config, storage));
   // Phase 1.1 — Email service for verification and magic links
   const emailService = createEmailService(config);
 
@@ -442,8 +434,6 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));
-  app.use(aimeatOsRouter(config));
-  app.use(guidesRouter(config));
   app.use(specRouter());
 
   // Personal node management routes
