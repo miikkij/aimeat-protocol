@@ -26,15 +26,17 @@ async function doSync(config: AimeatConfig, storage: Storage, siteService: SiteS
     const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new Error(`Origin returned ${res.status}`);
 
-    const body = await res.json() as { data: {
-        sync_timestamp: string;
-        template: { html: string; updated_at: string } | null;
-        memory_keys: Array<{ key: string; value: unknown; updated_at: string }>;
-        deleted_memory_keys: string[];
-        kv: Record<string, string>;
-        system_board_posts: Array<{ id: string; board_id: string; title: string; body: string; created_at: string }>;
-        deleted_post_ids: string[];
-    } };
+    const body = await res.json() as {
+        data: {
+            sync_timestamp: string;
+            template: { html: string; updated_at: string } | null;
+            memory_keys: Array<{ key: string; value: unknown; updated_at: string }>;
+            deleted_memory_keys: string[];
+            kv: Record<string, string>;
+            system_board_posts: Array<{ id: string; board_id: string; title: string; body: string; created_at: string }>;
+            deleted_post_ids: string[];
+        }
+    };
     const data = body.data;
 
     let templateUpdated = false;
