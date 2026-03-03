@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="aimeat-node" content="">
+<title>AIMEAT Setup Wizard</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f0a14;
+  --card: rgba(30,20,40,.85);
+  --text: #f0e6f6;
+  --muted: #c4a6d0;
+  --accent: #ff6b9d;
+  --accent2: #c44569;
+  --border: rgba(255,107,157,.25);
+  --success: #22c55e;
+  --radius: 12px;
+  --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --error: #ef4444;
+  --bg-input: rgba(255,255,255,.06);
+  --bg-input-focus: rgba(255,255,255,.1);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Background gradient */
+.bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, #1a0e2e 0%, #0f0a14 60%, #0a0510 100%);
+}
+
+.wizard-container {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Logo / Header ── */
+.wizard-logo {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-top: 1rem;
+}
+.wizard-logo h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: .5px;
+  background: linear-gradient(135deg, var(--accent), #ff9ec7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.wizard-logo .subtitle {
+  font-size: .85rem;
+  color: var(--muted);
+  margin-top: .25rem;
+}
+
+/* ── Step Indicator ── */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  margin-bottom: 2rem;
+}
+.step-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(255,107,157,.2);
+  transition: all .3s ease;
+  flex-shrink: 0;
+}
+.step-dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(255,107,157,.5);
+  transform: scale(1.2);
+}
+.step-dot.done {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(34,197,94,.4);
+}
+.step-line {
+  width: 28px; height: 2px;
+  background: rgba(255,107,157,.15);
+  border-radius: 1px;
+  transition: background .3s ease;
+  flex-shrink: 0;
+}
+.step-line.done {
+  background: var(--success);
+}
+.step-label {
+  font-size: .75rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: .5rem;
+}
+
+/* ── Step Content ── */
+.step-panel {
+  display: none;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity .35s ease, transform .35s ease;
+  flex: 1;
+}
+.step-panel.active {
+  display: block;
+}
+.step-panel.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+.step-panel.slide-out-left {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.step-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: .35rem;
+  color: #fff;
+}
+.step-desc {
+  font-size: .9rem;
+  color: var(--muted);
+  margin-bottom: 1.75rem;
+  line-height: 1.5;
+}
+
+/* ── Card ── */
+.wiz-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  backdrop-filter: blur(12px);
+}
+
+/* ── Form elements ── */
+.field {
+  margin-bottom: 1.25rem;
+}
+.field:last-child {
+  margin-bottom: 0;
+}
+.field label {
+  display: block;
+  font-size: .85rem;
+  font-weight: 600;
+  margin-bottom: .35rem;
+  color: var(--text);
+}
+.field .hint {
+  font-size: .75rem;
+  color: var(--muted);
+  margin-bottom: .35rem;
+}
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="password"],
+.field input[type="number"],
+.field input[type="url"] {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .65rem .85rem;
+  color: var(--text);
+  font-size: .95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.field input:focus {
+  border-color: var(--accent);
+  background: var(--bg-input-focus);
+}
+.field input::placeholder {
+  color: rgba(196,166,208,.5);
+}
+.field .field-error {
+  font-size: .78rem;
+  color: var(--error);
+  margin-top: .3rem;
+  min-height: 1.1em;
+}
+.field input.has-error {
+  border-color: var(--error);
+}
+
+/* ── Radio cards ── */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .85rem 1rem;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.radio-card:hover {
+  background: var(--bg-input-focus);
+}
+.radio-card.selected {
+  border-color: var(--accent);
+  background: rgba(255,107,157,.08);
+}
+.radio-card input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 2px;
+  position: relative;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.radio-card input[type="radio"]:checked {
+  border-color: var(--accent);
+}
+.radio-card input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.radio-card .radio-label {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.radio-card .radio-desc {
+  font-size: .8rem;
+  color: var(--muted);
+  margin-top: .15rem;
+}
+
+/* ── Language selector cards (Step 1) ── */
+.lang-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+.lang-card {
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem .75rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+}
+.lang-card:hover {
+  background: var(--bg-input-focus);
+  border-color: rgba(255,107,157,.4);
+}
+.lang-card.selected {
+  border-color: var(--accent);
+  background: rgba(255,107,157,.1);
+}
+.lang-card .lang-flag {
+  font-size: 1.8rem;
+  margin-bottom: .35rem;
+}
+.lang-card .lang-name {
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.lang-card .lang-native {
+  font-size: .78rem;
+  color: var(--muted);
+  margin-top: .1rem;
+}
+
+/* ── Buttons ── */
+.btn-row {
+  display: flex;
+  gap: .75rem;
+  margin-top: 2rem;
+  padding-top: .5rem;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding: .7rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: .95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .2s;
+  text-decoration: none;
+}
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  flex: 1;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255,107,157,.3);
+}
+.btn-secondary {
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255,255,255,.1);
+}
+.btn-success {
+  background: linear-gradient(135deg, var(--success), #16a34a);
+  color: #fff;
+  flex: 1;
+}
+.btn-success:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(34,197,94,.3);
+}
+
+/* ── Summary table ── */
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.summary-table tr {
+  border-bottom: 1px solid rgba(255,107,157,.1);
+}
+.summary-table tr:last-child {
+  border-bottom: none;
+}
+.summary-table td {
+  padding: .6rem .25rem;
+  vertical-align: top;
+}
+.summary-table .s-label {
+  font-size: .8rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  width: 110px;
+  white-space: nowrap;
+}
+.summary-table .s-value {
+  font-size: .9rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* ── Conditional field visibility ── */
+.hidden {
+  display: none !important;
+}
+
+/* ── Status messages ── */
+.status-msg {
+  padding: 1rem;
+  border-radius: 10px;
+  font-size: .9rem;
+  text-align: center;
+  margin-top: 1rem;
+}
+.status-msg.success {
+  background: rgba(34,197,94,.12);
+  border: 1px solid rgba(34,197,94,.3);
+  color: var(--success);
+}
+.status-msg.error {
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.3);
+  color: var(--error);
+}
+
+/* ── Spinner ── */
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Success animation ── */
+.success-icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: rgba(34,197,94,.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pop .4s cubic-bezier(.175,.885,.32,1.275);
+}
+.success-icon svg {
+  width: 32px; height: 32px;
+  stroke: var(--success);
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .wizard-container { padding: 1rem .75rem 2rem; }
+  .step-title { font-size: 1.15rem; }
+  .wiz-card { padding: 1.15rem; }
+  .btn-row { flex-direction: column; }
+  .btn-row .btn { width: 100%; }
+  .summary-table .s-label { width: 90px; font-size: .75rem; }
+  .lang-cards { gap: .5rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-canvas"></div>
+
+<div class="wizard-container">
+  <!-- Logo -->
+  <div class="wizard-logo">
+    <h1>AIMEAT</h1>
+    <div class="subtitle" data-i18n="wizard.subtitle">Node Setup Wizard</div>
+  </div>
+
+  <!-- Step Indicator -->
+  <div class="step-indicator" id="stepIndicator">
+    <div class="step-dot active" data-step="1"></div>
+    <div class="step-line"></div>
+    <div class="step-dot" data-step="2"></div>
+    <div class="step-line"></div>
+    <div class="step-dot" data-step="3"></div>
+    <div class="step-line"></div>
+    <div class="step-dot" data-step="4"></div>
+    <div class="step-line"></div>
+    <div class="step-dot" data-step="5"></div>
+  </div>
+  <div class="step-label" id="stepLabel">1 / 5</div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       STEP 1 — Welcome + Language
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="step-panel active" id="step1">
+    <div class="step-title" data-i18n="wizard.welcome.title">Welcome to AIMEAT</div>
+    <div class="step-desc" data-i18n="wizard.welcome.desc">AIMEAT is an open protocol for AI agent infrastructure. Your data stays yours, your AI works for you. Let's set up your node.</div>
+
+    <div class="wiz-card">
+      <label style="margin-bottom:.75rem; display:block;" data-i18n="wizard.welcome.chooseLang">Choose your language</label>
+      <div class="lang-cards">
+        <div class="lang-card selected" data-lang="en" onclick="setLang('en')">
+          <div class="lang-flag">EN</div>
+          <div class="lang-name">English</div>
+        </div>
+        <div class="lang-card" data-lang="fi" onclick="setLang('fi')">
+          <div class="lang-flag">FI</div>
+          <div class="lang-name">Suomi</div>
+          <div class="lang-native">Finnish</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goToStep(2)" data-i18n="wizard.btn.getStarted">Get Started</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       STEP 2 — Node Configuration
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="step-panel" id="step2">
+    <div class="step-title" data-i18n="wizard.node.title">Node Configuration</div>
+    <div class="step-desc" data-i18n="wizard.node.desc">Configure basic settings for your AIMEAT node.</div>
+
+    <div class="wiz-card">
+      <div class="field">
+        <label data-i18n="wizard.node.nameLabel">Node Name</label>
+        <div class="hint" data-i18n="wizard.node.nameHint">A unique identifier for your node on the network (e.g. my-node-001)</div>
+        <input type="text" id="nodeId" value="aimeat-local-001" placeholder="aimeat-local-001">
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.node.typeLabel">Node Type</label>
+        <div class="radio-group">
+          <label class="radio-card selected" onclick="selectRadio(this,'nodeType','personal')">
+            <input type="radio" name="nodeType" value="personal" checked>
+            <div>
+              <div class="radio-label" data-i18n="wizard.node.typePersonal">Personal</div>
+              <div class="radio-desc" data-i18n="wizard.node.typePersonalDesc">For your own data and AI agents</div>
+            </div>
+          </label>
+          <label class="radio-card" onclick="selectRadio(this,'nodeType','full')">
+            <input type="radio" name="nodeType" value="full">
+            <div>
+              <div class="radio-label" data-i18n="wizard.node.typeFull">Full</div>
+              <div class="radio-desc" data-i18n="wizard.node.typeFullDesc">Community node with extended features</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.node.portLabel">Port</label>
+        <div class="hint" data-i18n="wizard.node.portHint">HTTP port the server listens on</div>
+        <input type="number" id="nodePort" value="40050" min="1" max="65535">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goToStep(1)" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-primary" onclick="goToStep(3)" data-i18n="wizard.btn.next">Next</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       STEP 3 — Create Identity
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="step-panel" id="step3">
+    <div class="step-title" data-i18n="wizard.identity.title">Create Your Identity</div>
+    <div class="step-desc" data-i18n="wizard.identity.desc">Set up your owner account. You'll be the operator of this node.</div>
+
+    <div class="wiz-card">
+      <div class="field">
+        <label data-i18n="wizard.identity.usernameLabel">Username</label>
+        <div class="hint" data-i18n="wizard.identity.usernameHint">3-30 characters, lowercase letters, numbers, hyphens and underscores</div>
+        <input type="text" id="username" placeholder="erkki" autocomplete="username" spellcheck="false">
+        <div class="field-error" id="usernameError"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.displayLabel">Display Name</label>
+        <div class="hint" data-i18n="wizard.identity.displayHint">Optional, defaults to your username</div>
+        <input type="text" id="displayName" placeholder="Erkki">
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.emailLabel">Email</label>
+        <div class="hint" data-i18n="wizard.identity.emailHint">Optional, for verification and magic links</div>
+        <input type="email" id="email" placeholder="erkki@example.com" autocomplete="email">
+        <div class="field-error" id="emailError"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.passwordLabel">Password</label>
+        <div class="hint" data-i18n="wizard.identity.passwordHint">Minimum 8 characters</div>
+        <input type="password" id="password" placeholder="********" autocomplete="new-password">
+        <div class="field-error" id="passwordError"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.confirmLabel">Confirm Password</label>
+        <input type="password" id="passwordConfirm" placeholder="********" autocomplete="new-password">
+        <div class="field-error" id="confirmError"></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goToStep(2)" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-primary" onclick="validateAndGoStep4()" data-i18n="wizard.btn.next">Next</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       STEP 4 — Network
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="step-panel" id="step4">
+    <div class="step-title" data-i18n="wizard.network.title">Network</div>
+    <div class="step-desc" data-i18n="wizard.network.desc">Choose how your node connects to the AIMEAT network.</div>
+
+    <div class="wiz-card">
+      <div class="field">
+        <label data-i18n="wizard.network.anchorLabel">Anchor Operator</label>
+        <div class="radio-group">
+          <label class="radio-card selected" onclick="selectRadio(this,'anchor','standalone'); toggleGenesis()">
+            <input type="radio" name="anchor" value="standalone" checked>
+            <div>
+              <div class="radio-label" data-i18n="wizard.network.standalone">Standalone (no federation)</div>
+              <div class="radio-desc" data-i18n="wizard.network.standaloneDesc">Independent node, no connection to other nodes</div>
+            </div>
+          </label>
+          <label class="radio-card" onclick="selectRadio(this,'anchor','custom'); toggleGenesis()">
+            <input type="radio" name="anchor" value="custom">
+            <div>
+              <div class="radio-label" data-i18n="wizard.network.custom">Custom anchor</div>
+              <div class="radio-desc" data-i18n="wizard.network.customDesc">Connect to an existing AIMEAT network</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="field hidden" id="genesisField">
+        <label data-i18n="wizard.network.genesisLabel">Genesis URL</label>
+        <div class="hint" data-i18n="wizard.network.genesisHint">URL of the network's genesis node (e.g. https://aimeat.io)</div>
+        <input type="url" id="genesisUrl" placeholder="https://aimeat.io">
+        <div class="field-error" id="genesisError"></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goToStep(3)" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-primary" onclick="goToStep(5)" data-i18n="wizard.btn.next">Next</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       STEP 5 — Summary + Launch
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="step-panel" id="step5">
+    <div class="step-title" data-i18n="wizard.summary.title">Review &amp; Launch</div>
+    <div class="step-desc" data-i18n="wizard.summary.desc">Review your settings and initialize the node.</div>
+
+    <div class="wiz-card">
+      <table class="summary-table" id="summaryTable">
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.nodeName">Node Name</td>
+          <td class="s-value" id="sumNodeId"></td>
+        </tr>
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.nodeType">Type</td>
+          <td class="s-value" id="sumNodeType"></td>
+        </tr>
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.port">Port</td>
+          <td class="s-value" id="sumPort"></td>
+        </tr>
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.username">Username</td>
+          <td class="s-value" id="sumUsername"></td>
+        </tr>
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.displayName">Display Name</td>
+          <td class="s-value" id="sumDisplayName"></td>
+        </tr>
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.email">Email</td>
+          <td class="s-value" id="sumEmail"></td>
+        </tr>
+        <tr>
+          <td class="s-label" data-i18n="wizard.summary.network">Network</td>
+          <td class="s-value" id="sumNetwork"></td>
+        </tr>
+      </table>
+    </div>
+
+    <div id="initResult"></div>
+
+    <div class="btn-row" id="step5Buttons">
+      <button class="btn btn-secondary" onclick="goToStep(4)" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-success" id="initBtn" onclick="doInit()" data-i18n="wizard.btn.initialize">Initialize Node</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────
+// Translations
+// ────────────────────────────────────────────────────────────────────
+var T = {
+  en: {
+    "wizard.subtitle": "Node Setup Wizard",
+    "wizard.welcome.title": "Welcome to AIMEAT",
+    "wizard.welcome.desc": "AIMEAT is an open protocol for AI agent infrastructure. Your data stays yours, your AI works for you. Let's set up your node.",
+    "wizard.welcome.chooseLang": "Choose your language",
+    "wizard.btn.getStarted": "Get Started",
+    "wizard.btn.back": "Back",
+    "wizard.btn.next": "Next",
+    "wizard.btn.initialize": "Initialize Node",
+
+    "wizard.node.title": "Node Configuration",
+    "wizard.node.desc": "Configure basic settings for your AIMEAT node.",
+    "wizard.node.nameLabel": "Node Name",
+    "wizard.node.nameHint": "A unique identifier for your node on the network (e.g. my-node-001)",
+    "wizard.node.typeLabel": "Node Type",
+    "wizard.node.typePersonal": "Personal",
+    "wizard.node.typePersonalDesc": "For your own data and AI agents",
+    "wizard.node.typeFull": "Full",
+    "wizard.node.typeFullDesc": "Community node with extended features",
+    "wizard.node.portLabel": "Port",
+    "wizard.node.portHint": "HTTP port the server listens on",
+
+    "wizard.identity.title": "Create Your Identity",
+    "wizard.identity.desc": "Set up your owner account. You'll be the operator of this node.",
+    "wizard.identity.usernameLabel": "Username",
+    "wizard.identity.usernameHint": "3-30 characters, lowercase letters, numbers, hyphens and underscores",
+    "wizard.identity.displayLabel": "Display Name",
+    "wizard.identity.displayHint": "Optional, defaults to your username",
+    "wizard.identity.emailLabel": "Email",
+    "wizard.identity.emailHint": "Optional, for verification and magic links",
+    "wizard.identity.passwordLabel": "Password",
+    "wizard.identity.passwordHint": "Minimum 8 characters",
+    "wizard.identity.confirmLabel": "Confirm Password",
+
+    "wizard.network.title": "Network",
+    "wizard.network.desc": "Choose how your node connects to the AIMEAT network.",
+    "wizard.network.anchorLabel": "Anchor Operator",
+    "wizard.network.standalone": "Standalone (no federation)",
+    "wizard.network.standaloneDesc": "Independent node, no connection to other nodes",
+    "wizard.network.custom": "Custom anchor",
+    "wizard.network.customDesc": "Connect to an existing AIMEAT network",
+    "wizard.network.genesisLabel": "Genesis URL",
+    "wizard.network.genesisHint": "URL of the network's genesis node (e.g. https://aimeat.io)",
+
+    "wizard.summary.title": "Review & Launch",
+    "wizard.summary.desc": "Review your settings and initialize the node.",
+    "wizard.summary.nodeName": "Node Name",
+    "wizard.summary.nodeType": "Type",
+    "wizard.summary.port": "Port",
+    "wizard.summary.username": "Username",
+    "wizard.summary.displayName": "Display Name",
+    "wizard.summary.email": "Email",
+    "wizard.summary.network": "Network",
+    "wizard.summary.standaloneValue": "Standalone",
+    "wizard.summary.customValue": "Custom anchor",
+    "wizard.summary.personalValue": "Personal",
+    "wizard.summary.fullValue": "Full",
+    "wizard.summary.noneValue": "(none)",
+
+    "wizard.init.working": "Initializing your node...",
+    "wizard.init.success": "Your node is ready!",
+    "wizard.init.successDetail": "Redirecting to the portal...",
+    "wizard.init.error": "Setup failed",
+    "wizard.init.tryAgain": "Go back and fix the issue",
+
+    "wizard.validate.usernameRequired": "Username is required",
+    "wizard.validate.usernameFormat": "3-30 chars: lowercase letters, numbers, hyphens, underscores",
+    "wizard.validate.passwordRequired": "Password is required",
+    "wizard.validate.passwordMin": "Password must be at least 8 characters",
+    "wizard.validate.passwordMatch": "Passwords do not match",
+    "wizard.validate.emailFormat": "Please enter a valid email address",
+    "wizard.validate.genesisRequired": "Genesis URL is required when using a custom anchor",
+    "wizard.validate.genesisFormat": "Must start with http:// or https://"
+  },
+  fi: {
+    "wizard.subtitle": "Solmun asetusvelho",
+    "wizard.welcome.title": "Tervetuloa AIMEAT:iin",
+    "wizard.welcome.desc": "AIMEAT on avoin protokolla AI-agenttien infrastruktuurille. Tietosi pysyvat sinun, tekoalysi tyoskentelee puolestasi. Asetetaan solmusi.",
+    "wizard.welcome.chooseLang": "Valitse kieli",
+    "wizard.btn.getStarted": "Aloita",
+    "wizard.btn.back": "Takaisin",
+    "wizard.btn.next": "Seuraava",
+    "wizard.btn.initialize": "Alusta solmu",
+
+    "wizard.node.title": "Solmun asetukset",
+    "wizard.node.desc": "Maarita solmusi perusasetukset.",
+    "wizard.node.nameLabel": "Solmun nimi",
+    "wizard.node.nameHint": "Uniikki tunniste solmullesi verkossa (esim. oma-solmu-001)",
+    "wizard.node.typeLabel": "Solmun tyyppi",
+    "wizard.node.typePersonal": "Henkilokohtainen",
+    "wizard.node.typePersonalDesc": "Omille tiedoille ja AI-agenteille",
+    "wizard.node.typeFull": "Taysi",
+    "wizard.node.typeFullDesc": "Yhteisosolmu laajennetuilla ominaisuuksilla",
+    "wizard.node.portLabel": "Portti",
+    "wizard.node.portHint": "HTTP-portti jota palvelin kuuntelee",
+
+    "wizard.identity.title": "Luo tunnuksesi",
+    "wizard.identity.desc": "Maarita omistajakayttajasi. Sinusta tulee taman solmun operaattori.",
+    "wizard.identity.usernameLabel": "Kayttajanimi",
+    "wizard.identity.usernameHint": "3-30 merkkia, pienet kirjaimet, numerot, valiviivat ja alaviivat",
+    "wizard.identity.displayLabel": "Nayttonimi",
+    "wizard.identity.displayHint": "Valinnainen, oletuksena kayttajanimesi",
+    "wizard.identity.emailLabel": "Sahkoposti",
+    "wizard.identity.emailHint": "Valinnainen, vahvistukseen ja kirjautumislinkkeihin",
+    "wizard.identity.passwordLabel": "Salasana",
+    "wizard.identity.passwordHint": "Vahintaan 8 merkkia",
+    "wizard.identity.confirmLabel": "Vahvista salasana",
+
+    "wizard.network.title": "Verkko",
+    "wizard.network.desc": "Valitse miten solmusi yhdistaa AIMEAT-verkkoon.",
+    "wizard.network.anchorLabel": "Ankkurioperaattori",
+    "wizard.network.standalone": "Itsenainen (ei federaatiota)",
+    "wizard.network.standaloneDesc": "Itsenainen solmu, ei yhteytta muihin solmuihin",
+    "wizard.network.custom": "Mukautettu ankkuri",
+    "wizard.network.customDesc": "Yhdista olemassa olevaan AIMEAT-verkkoon",
+    "wizard.network.genesisLabel": "Genesis-URL",
+    "wizard.network.genesisHint": "Verkon genesis-solmun URL (esim. https://aimeat.io)",
+
+    "wizard.summary.title": "Tarkista ja kaynnista",
+    "wizard.summary.desc": "Tarkista asetukset ja alusta solmu.",
+    "wizard.summary.nodeName": "Solmun nimi",
+    "wizard.summary.nodeType": "Tyyppi",
+    "wizard.summary.port": "Portti",
+    "wizard.summary.username": "Kayttajanimi",
+    "wizard.summary.displayName": "Nayttonimi",
+    "wizard.summary.email": "Sahkoposti",
+    "wizard.summary.network": "Verkko",
+    "wizard.summary.standaloneValue": "Itsenainen",
+    "wizard.summary.customValue": "Mukautettu ankkuri",
+    "wizard.summary.personalValue": "Henkilokohtainen",
+    "wizard.summary.fullValue": "Taysi",
+    "wizard.summary.noneValue": "(ei maaritetty)",
+
+    "wizard.init.working": "Alustetaan solmuasi...",
+    "wizard.init.success": "Solmusi on valmis!",
+    "wizard.init.successDetail": "Ohjataan portaaliin...",
+    "wizard.init.error": "Alustus epaonnistui",
+    "wizard.init.tryAgain": "Palaa takaisin ja korjaa ongelma",
+
+    "wizard.validate.usernameRequired": "Kayttajanimi vaaditaan",
+    "wizard.validate.usernameFormat": "3-30 merkkia: pienet kirjaimet, numerot, valiviivat, alaviivat",
+    "wizard.validate.passwordRequired": "Salasana vaaditaan",
+    "wizard.validate.passwordMin": "Salasanan pitaa olla vahintaan 8 merkkia",
+    "wizard.validate.passwordMatch": "Salasanat eivat tasmaa",
+    "wizard.validate.emailFormat": "Syota kelvollinen sahkopostiosoite",
+    "wizard.validate.genesisRequired": "Genesis-URL vaaditaan mukautetulla ankkurilla",
+    "wizard.validate.genesisFormat": "Pitaa alkaa http:// tai https://"
+  }
+};
+
+// ────────────────────────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────────────────────────
+var currentStep = 1;
+var currentLang = 'en';
+var totalSteps = 5;
+
+// ────────────────────────────────────────────────────────────────────
+// i18n
+// ────────────────────────────────────────────────────────────────────
+function t(key) {
+  return (T[currentLang] && T[currentLang][key]) || T.en[key] || key;
+}
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    var text = t(key);
+    if (text) el.textContent = text;
+  });
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-card').forEach(function(c) {
+    c.classList.toggle('selected', c.getAttribute('data-lang') === lang);
+  });
+  applyTranslations();
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Step Navigation
+// ────────────────────────────────────────────────────────────────────
+function goToStep(n) {
+  if (n < 1 || n > totalSteps) return;
+
+  // Build summary when entering step 5
+  if (n === 5) buildSummary();
+
+  var oldPanel = document.getElementById('step' + currentStep);
+  var newPanel = document.getElementById('step' + n);
+  var goingForward = n > currentStep;
+
+  // Animate out
+  oldPanel.classList.remove('visible');
+  oldPanel.classList.add(goingForward ? 'slide-out-left' : '');
+
+  setTimeout(function() {
+    oldPanel.classList.remove('active', 'slide-out-left');
+    newPanel.classList.add('active');
+    // Set initial position for slide-in
+    newPanel.style.transform = goingForward ? 'translateX(20px)' : 'translateX(-20px)';
+    newPanel.style.opacity = '0';
+
+    // Force reflow then animate in
+    void newPanel.offsetWidth;
+    newPanel.style.transform = '';
+    newPanel.style.opacity = '';
+    newPanel.classList.add('visible');
+
+    currentStep = n;
+    updateIndicator();
+  }, 200);
+}
+
+function updateIndicator() {
+  document.querySelectorAll('.step-dot').forEach(function(dot) {
+    var s = parseInt(dot.getAttribute('data-step'));
+    dot.classList.remove('active', 'done');
+    if (s === currentStep) dot.classList.add('active');
+    else if (s < currentStep) dot.classList.add('done');
+  });
+  document.querySelectorAll('.step-line').forEach(function(line, idx) {
+    line.classList.toggle('done', idx < currentStep - 1);
+  });
+  document.getElementById('stepLabel').textContent = currentStep + ' / ' + totalSteps;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Radio card selection
+// ────────────────────────────────────────────────────────────────────
+function selectRadio(card, groupName, value) {
+  // Clear selection on siblings
+  card.closest('.radio-group').querySelectorAll('.radio-card').forEach(function(c) {
+    c.classList.remove('selected');
+    c.querySelector('input[type="radio"]').checked = false;
+  });
+  card.classList.add('selected');
+  card.querySelector('input[type="radio"]').checked = true;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Toggle Genesis URL field
+// ────────────────────────────────────────────────────────────────────
+function toggleGenesis() {
+  var anchor = document.querySelector('input[name="anchor"]:checked').value;
+  document.getElementById('genesisField').classList.toggle('hidden', anchor !== 'custom');
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Validation — Step 3
+// ────────────────────────────────────────────────────────────────────
+function clearErrors() {
+  document.querySelectorAll('.field-error').forEach(function(el) { el.textContent = ''; });
+  document.querySelectorAll('input.has-error').forEach(function(el) { el.classList.remove('has-error'); });
+}
+
+function setError(inputId, errorId, msg) {
+  document.getElementById(inputId).classList.add('has-error');
+  document.getElementById(errorId).textContent = msg;
+}
+
+function validateAndGoStep4() {
+  clearErrors();
+  var valid = true;
+  var username = document.getElementById('username').value.trim();
+  var password = document.getElementById('password').value;
+  var confirm = document.getElementById('passwordConfirm').value;
+  var email = document.getElementById('email').value.trim();
+
+  // Username
+  if (!username) {
+    setError('username', 'usernameError', t('wizard.validate.usernameRequired'));
+    valid = false;
+  } else if (!/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username) && !/^[a-z0-9]{3}$/.test(username)) {
+    // Allow 3-char names as special case, otherwise need start/end with alnum
+    if (username.length < 3 || username.length > 30 || !/^[a-z0-9_-]+$/.test(username)) {
+      setError('username', 'usernameError', t('wizard.validate.usernameFormat'));
+      valid = false;
+    }
+  }
+
+  // Email (optional, but validate format if provided)
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setError('email', 'emailError', t('wizard.validate.emailFormat'));
+    valid = false;
+  }
+
+  // Password
+  if (!password) {
+    setError('password', 'passwordError', t('wizard.validate.passwordRequired'));
+    valid = false;
+  } else if (password.length < 8) {
+    setError('password', 'passwordError', t('wizard.validate.passwordMin'));
+    valid = false;
+  }
+
+  // Confirm
+  if (valid && password !== confirm) {
+    setError('passwordConfirm', 'confirmError', t('wizard.validate.passwordMatch'));
+    valid = false;
+  }
+
+  if (valid) goToStep(4);
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Build Summary
+// ────────────────────────────────────────────────────────────────────
+function buildSummary() {
+  var nodeId = document.getElementById('nodeId').value.trim() || 'aimeat-local-001';
+  var nodeType = document.querySelector('input[name="nodeType"]:checked').value;
+  var port = document.getElementById('nodePort').value || '40050';
+  var username = document.getElementById('username').value.trim();
+  var displayName = document.getElementById('displayName').value.trim() || username;
+  var email = document.getElementById('email').value.trim();
+  var anchor = document.querySelector('input[name="anchor"]:checked').value;
+  var genesis = document.getElementById('genesisUrl').value.trim();
+
+  document.getElementById('sumNodeId').textContent = nodeId;
+  document.getElementById('sumNodeType').textContent = nodeType === 'personal'
+    ? t('wizard.summary.personalValue') : t('wizard.summary.fullValue');
+  document.getElementById('sumPort').textContent = port;
+  document.getElementById('sumUsername').textContent = username;
+  document.getElementById('sumDisplayName').textContent = displayName;
+  document.getElementById('sumEmail').textContent = email || t('wizard.summary.noneValue');
+
+  if (anchor === 'standalone') {
+    document.getElementById('sumNetwork').textContent = t('wizard.summary.standaloneValue');
+  } else {
+    document.getElementById('sumNetwork').textContent = t('wizard.summary.customValue') + ' — ' + (genesis || '?');
+  }
+
+  // Reset any previous result
+  document.getElementById('initResult').innerHTML = '';
+  document.getElementById('step5Buttons').classList.remove('hidden');
+  document.getElementById('initBtn').disabled = false;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// POST /v1/setup/init
+// ────────────────────────────────────────────────────────────────────
+function doInit() {
+  var btn = document.getElementById('initBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> ' + t('wizard.init.working');
+
+  var nodeId = document.getElementById('nodeId').value.trim() || 'aimeat-local-001';
+  var nodeType = document.querySelector('input[name="nodeType"]:checked').value;
+  var port = parseInt(document.getElementById('nodePort').value) || 40050;
+  var username = document.getElementById('username').value.trim();
+  var displayName = document.getElementById('displayName').value.trim() || undefined;
+  var email = document.getElementById('email').value.trim() || undefined;
+  var password = document.getElementById('password').value;
+  var anchor = document.querySelector('input[name="anchor"]:checked').value;
+  var genesisUrl = anchor === 'custom' ? (document.getElementById('genesisUrl').value.trim() || null) : null;
+
+  var body = {
+    locale: currentLang,
+    nodeId: nodeId,
+    nodeType: nodeType,
+    owner: {
+      username: username,
+      displayName: displayName,
+      email: email,
+      password: password
+    },
+    genesisUrl: genesisUrl,
+    port: port
+  };
+
+  fetch('/v1/setup/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(resp) { return resp.json().then(function(d) { return { ok: resp.ok, data: d }; }); })
+  .then(function(result) {
+    if (result.ok && result.data.data) {
+      // Success — store auth
+      var d = result.data.data;
+      if (d.token) localStorage.setItem('aimeat-token', d.token);
+      if (d.agent && d.agent.gaii) localStorage.setItem('aimeat-gaii', d.agent.gaii);
+      if (d.owner && d.owner.name) localStorage.setItem('aimeat-owner', d.owner.name);
+
+      // Hide buttons, show success
+      document.getElementById('step5Buttons').classList.add('hidden');
+      document.getElementById('initResult').innerHTML =
+        '<div style="text-align:center; margin-top:1.5rem;">' +
+          '<div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+          '<div style="font-size:1.2rem; font-weight:700; color:var(--success); margin-bottom:.5rem;">' + t('wizard.init.success') + '</div>' +
+          '<div style="color:var(--muted);">' + t('wizard.init.successDetail') + '</div>' +
+        '</div>';
+
+      // Redirect after 2 seconds
+      setTimeout(function() {
+        window.location.href = '/v1/portal';
+      }, 2000);
+    } else {
+      // Error
+      var msg = (result.data && result.data.error && result.data.error.message) || t('wizard.init.error');
+      document.getElementById('initResult').innerHTML =
+        '<div class="status-msg error">' +
+          '<strong>' + t('wizard.init.error') + ':</strong> ' + escapeHtml(msg) +
+        '</div>';
+      btn.disabled = false;
+      btn.innerHTML = t('wizard.btn.initialize');
+    }
+  })
+  .catch(function(err) {
+    document.getElementById('initResult').innerHTML =
+      '<div class="status-msg error">' +
+        '<strong>' + t('wizard.init.error') + ':</strong> ' + escapeHtml(err.message || 'Network error') +
+      '</div>';
+    btn.disabled = false;
+    btn.innerHTML = t('wizard.btn.initialize');
+  });
+}
+
+function escapeHtml(str) {
+  var d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// On Load — check setup status
+// ────────────────────────────────────────────────────────────────────
+(function() {
+  // Check if node already configured
+  fetch('/v1/setup/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.data && d.data.needsSetup === false) {
+        window.location.href = '/v1/portal';
+        return;
+      }
+      // Show step 1
+      document.getElementById('step1').classList.add('visible');
+    })
+    .catch(function() {
+      // On error, show wizard anyway
+      document.getElementById('step1').classList.add('visible');
+    });
+
+  // Detect browser language for initial suggestion
+  var browserLang = (navigator.language || '').toLowerCase();
+  if (browserLang.startsWith('fi')) {
+    setLang('fi');
+  }
+})();
+</script>
+</body>
+</html>
