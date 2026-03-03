@@ -114,7 +114,14 @@ var TRANSLATIONS = {
     "hobbies.availability.mornings": "Mornings",
     "hobbies.availability.evenings": "Evenings",
     "hobbies.availability.weekends": "Weekends",
-    "hobbies.availability.evenings-weekends": "Evenings & weekends"
+    "hobbies.availability.evenings-weekends": "Evenings & weekends",
+    "hobbies.matches.title": "Your Matches",
+    "hobbies.matches.subtitle": "People who share your interests",
+    "hobbies.matches.loginRequired": "Log in to see your matches",
+    "hobbies.matches.noMatches": "No matches found yet. Try adding more interests to your profile!",
+    "hobbies.matches.shared": "shared interests",
+    "hobbies.matches.loading": "Finding your matches...",
+    "hobbies.nav.matches": "Matches"
   },
   fi: {
     "hobbies.title": "Harrastehakemisto",
@@ -221,7 +228,14 @@ var TRANSLATIONS = {
     "hobbies.availability.mornings": "Aamut",
     "hobbies.availability.evenings": "Illat",
     "hobbies.availability.weekends": "Viikonloput",
-    "hobbies.availability.evenings-weekends": "Illat & viikonloput"
+    "hobbies.availability.evenings-weekends": "Illat & viikonloput",
+    "hobbies.matches.title": "Osumat",
+    "hobbies.matches.subtitle": "Ihmiset joilla on samoja kiinnostuksen kohteita",
+    "hobbies.matches.loginRequired": "Kirjaudu sisaan nahdaksesi osumasi",
+    "hobbies.matches.noMatches": "Ei osumia viela. Kokeile lisata kiinnostuksia profiiliisi!",
+    "hobbies.matches.shared": "yhteista kiinnostusta",
+    "hobbies.matches.loading": "Etsitaan osumia...",
+    "hobbies.nav.matches": "Osumat"
   }
 };
 </script>
@@ -517,6 +531,7 @@ body {
       <a onclick="showView('search')" id="nav-search"></a>
       <a onclick="showView('join')" id="nav-join"></a>
       <a onclick="showView('me')" id="nav-me"></a>
+      <a onclick="showView('matches')" id="nav-matches" class="matches-link" style="display:none"></a>
       <a href="/v1/portal/human" id="nav-portal"></a>
       <div class="lang-toggle">
         <button class="lang-btn" id="lang-fi" onclick="switchLang('fi')">FI</button>
@@ -627,6 +642,13 @@ body {
   <div id="view-me" class="view">
     <div id="me-content"></div>
   </div>
+
+  <!-- MATCHES VIEW -->
+  <div id="view-matches" class="view">
+    <h1 class="page-title" id="matches-title"></h1>
+    <p class="page-subtitle" id="matches-subtitle"></p>
+    <div id="matches-content"></div>
+  </div>
 </div>
 
 <script>
@@ -717,6 +739,7 @@ function showView(name, data) {
   else if (name === 'profile') loadProfile(data);
   else if (name === 'join') loadJoin();
   else if (name === 'me') loadMe();
+  else if (name === 'matches') loadMatches();
 }
 
 // ── Apply i18n to static elements ──
@@ -728,6 +751,7 @@ function applyTranslations() {
   document.getElementById('nav-search').textContent = T['hobbies.nav.search'];
   document.getElementById('nav-join').textContent = T['hobbies.nav.join'];
   document.getElementById('nav-me').textContent = T['hobbies.nav.me'];
+  document.getElementById('nav-matches').textContent = T['hobbies.nav.matches'];
   document.getElementById('nav-portal').textContent = T['hobbies.nav.portal'];
 
   document.getElementById('home-title').textContent = T['hobbies.title'];
@@ -769,6 +793,9 @@ function applyTranslations() {
   document.getElementById('join-submit-btn').textContent = T['hobbies.join.submitBtn'];
   document.getElementById('join-success-msg').textContent = T['hobbies.join.success'];
   document.getElementById('join-browse-btn').textContent = T['hobbies.join.browseBtn'];
+
+  document.getElementById('matches-title').textContent = T['hobbies.matches.title'];
+  document.getElementById('matches-subtitle').textContent = T['hobbies.matches.subtitle'];
 
   document.getElementById('lang-fi').className = 'lang-btn' + (locale === 'fi' ? ' active' : '');
   document.getElementById('lang-en').className = 'lang-btn' + (locale === 'en' ? ' active' : '');
@@ -1484,13 +1511,167 @@ function submitEdit(e, username) {
 }
 
 // ──────────────────────────────────────────
+// MATCHES VIEW
+// ──────────────────────────────────────────
+function loadMatches() {
+  var contentEl = document.getElementById('matches-content');
+
+  if (!isLoggedIn()) {
+    contentEl.innerHTML =
+      '<div class="empty-state">' +
+      '<div class="empty-icon">\uD83D\uDD12</div>' +
+      '<div class="empty-text">' + esc(t('hobbies.matches.loginRequired')) +
+      ' <a href="/v1/portal/human" style="color:var(--accent);">' + esc(t('hobbies.join.authLink')) + '</a></div>' +
+      '</div>';
+    return;
+  }
+
+  contentEl.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:24px;">' + esc(t('hobbies.matches.loading')) + '</div>';
+
+  var info = getAuthInfo();
+  var headers = { 'Authorization': 'Bearer ' + info.token };
+
+  // Step 1: Fetch user's own interests
+  fetch(NODE_URL + '/v1/memory/profile.' + encodeURIComponent(info.owner) + '.interests', { headers: headers })
+    .then(function(r) { return r.json(); })
+    .then(function(memData) {
+      if (!memData.ok || !memData.data || !memData.data.value) {
+        contentEl.innerHTML =
+          '<div class="empty-state">' +
+          '<div class="empty-icon">\uD83E\uDD37</div>' +
+          '<div class="empty-text">' + esc(t('hobbies.matches.noMatches')) +
+          ' <a onclick="showView(\'join\')" style="color:var(--accent); cursor:pointer;">' + esc(t('hobbies.joinDirectory')) + '</a></div>' +
+          '</div>';
+        return;
+      }
+
+      var myInterests = memData.data.value;
+      if (!Array.isArray(myInterests) || myInterests.length === 0) {
+        contentEl.innerHTML =
+          '<div class="empty-state">' +
+          '<div class="empty-icon">\uD83E\uDD37</div>' +
+          '<div class="empty-text">' + esc(t('hobbies.matches.noMatches')) +
+          ' <a onclick="showView(\'join\')" style="color:var(--accent); cursor:pointer;">' + esc(t('hobbies.joinDirectory')) + '</a></div>' +
+          '</div>';
+        return;
+      }
+
+      // Step 2: Fetch directory entries for each interest
+      var fetches = myInterests.map(function(interest) {
+        return apiFetch('/v1/catalogue/directory?interest=' + encodeURIComponent(interest) + '&per_page=200')
+          .then(function(data) {
+            if (!data.ok) return [];
+            return data.data.entries.map(function(entry) {
+              return { entry: entry, matchedInterest: interest };
+            });
+          })
+          .catch(function() { return []; });
+      });
+
+      return Promise.all(fetches).then(function(results) {
+        // Step 3: Merge results into a Map keyed by GHII
+        var matchMap = {};
+        results.forEach(function(entryList) {
+          entryList.forEach(function(item) {
+            var ghii = item.entry.ghii;
+            if (!matchMap[ghii]) {
+              matchMap[ghii] = { entry: item.entry, sharedInterests: [] };
+            }
+            if (matchMap[ghii].sharedInterests.indexOf(item.matchedInterest) === -1) {
+              matchMap[ghii].sharedInterests.push(item.matchedInterest);
+            }
+          });
+        });
+
+        // Step 4: Exclude self — find user's own GHII
+        return apiFetch('/v1/ghii/directory?owner=' + encodeURIComponent(info.owner))
+          .then(function(ghiiData) {
+            var myGhii = null;
+            if (ghiiData.ok && ghiiData.data && ghiiData.data.profiles && ghiiData.data.profiles.length > 0) {
+              myGhii = ghiiData.data.profiles[0].ghii;
+            }
+
+            // Remove self from matches
+            if (myGhii && matchMap[myGhii]) {
+              delete matchMap[myGhii];
+            }
+
+            // Step 5: Sort by shared interest count (descending)
+            var matches = Object.keys(matchMap).map(function(ghii) {
+              return matchMap[ghii];
+            });
+            matches.sort(function(a, b) { return b.sharedInterests.length - a.sharedInterests.length; });
+
+            // Step 6: Render
+            if (matches.length === 0) {
+              contentEl.innerHTML =
+                '<div class="empty-state">' +
+                '<div class="empty-icon">\uD83D\uDE15</div>' +
+                '<div class="empty-text">' + esc(t('hobbies.matches.noMatches')) + '</div>' +
+                '</div>';
+              return;
+            }
+
+            var cardsHtml = '';
+            matches.forEach(function(match) {
+              var entry = match.entry;
+              var sharedCount = match.sharedInterests.length;
+
+              var interestTags = '';
+              (entry.interests || []).forEach(function(i) {
+                var isShared = match.sharedInterests.indexOf(i) !== -1;
+                interestTags += '<span class="tag' + (isShared ? ' tag-shared' : '') + '">' + esc(i) + '</span>';
+              });
+
+              var locParts = [];
+              if (entry.city) locParts.push(entry.city);
+              if (entry.area) locParts.push(entry.area);
+              var locStr = locParts.join(', ');
+
+              cardsHtml += '<a class="card card-link" onclick="showView(\'profile\', \'' + esc(entry.ghii.replace(/'/g, "\\'")) + '\')">' +
+                '<div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">' +
+                '<span style="font-size:1.5rem;">' + (entry.avatar ? esc(entry.avatar) : '\uD83D\uDE0A') + '</span>' +
+                '<div style="flex:1;">' +
+                '<div class="card-title">' + esc(entry.displayName) + '</div>' +
+                (locStr ? '<div class="card-meta">' + esc(locStr) + '</div>' : '') +
+                '</div>' +
+                '<div style="text-align:right;">' +
+                '<span class="tag tag-shared" style="font-weight:600;">' + sharedCount + ' ' + esc(t('hobbies.matches.shared')) + '</span>' +
+                '</div>' +
+                '</div>' +
+                '<div class="tags">' + interestTags + '</div>' +
+                '</a>';
+            });
+
+            contentEl.innerHTML = cardsHtml;
+          });
+      });
+    })
+    .catch(function() {
+      contentEl.innerHTML = '<div class="alert alert-error">' + esc(t('hobbies.loadError')) + '</div>';
+    });
+}
+
+// ──────────────────────────────────────────
 // AUTH SETUP
 // ──────────────────────────────────────────
+function updateAuthUI() {
+  var matchesLink = document.querySelector('.matches-link');
+  if (matchesLink) {
+    matchesLink.style.display = isLoggedIn() ? '' : 'none';
+  }
+}
+
 var auth = window.AIMEAT && window.AIMEAT.auth;
 if (auth) {
   auth.login().then(function(s) {
     if (s) session = s;
-  }).catch(function() {});
+    updateAuthUI();
+  }).catch(function() {
+    updateAuthUI();
+  });
+} else {
+  updateAuthUI();
 }
 
 // ──────────────────────────────────────────
@@ -1504,6 +1685,7 @@ function handleRoute() {
   if (hash === 'search') showView('search');
   else if (hash === 'join') showView('join');
   else if (hash === 'me') showView('me');
+  else if (hash === 'matches') showView('matches');
   else if (hash.indexOf('profile/') === 0) showView('profile', decodeURIComponent(hash.substring(8)));
   else showView('home');
 }
@@ -1519,6 +1701,7 @@ showView = function(name, data) {
   else if (name === 'profile' && typeof data === 'string') window.location.hash = 'profile/' + encodeURIComponent(data);
   else if (name === 'join') window.location.hash = 'join';
   else if (name === 'me') window.location.hash = 'me';
+  else if (name === 'matches') window.location.hash = 'matches';
   _origShowView(name, data);
 };
 
