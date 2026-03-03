@@ -344,7 +344,31 @@ var TRANSLATIONS = {
     "modal.whyPrivacy": "Your own private memory space, protected by your password",
     "modal.whyControl": "Full control: only you can access your data, no need to share with anyone",
     "modal.whyAgents": "Connect AI agents that remember you and work on your behalf",
-    "modal.whyMorsels": "100 free heart morsels to start! E.g. memory request ~ 1 \u2764\ufe0f, board post ~ 2 \u2764\ufe0f. You get 50 more every day"
+    "modal.whyMorsels": "100 free heart morsels to start! E.g. memory request ~ 1 \u2764\ufe0f, board post ~ 2 \u2764\ufe0f. You get 50 more every day",
+    "profile.tabs.dataWallet": "Data Wallet",
+    "wallet.consents.title": "Active Consents",
+    "wallet.consents.empty": "No active consents",
+    "wallet.consents.pattern": "Data Pattern",
+    "wallet.consents.recipient": "Recipient",
+    "wallet.consents.purpose": "Purpose",
+    "wallet.consents.scope": "Scope",
+    "wallet.consents.granted": "Granted",
+    "wallet.consents.expires": "Expires",
+    "wallet.consents.revoke": "Revoke",
+    "wallet.consents.never": "Never",
+    "wallet.consents.revoking": "Revoking...",
+    "wallet.consents.revoked": "Consent revoked",
+    "wallet.audit.title": "Audit Report",
+    "wallet.audit.empty": "No data access events found",
+    "wallet.audit.who": "Accessed By",
+    "wallet.audit.what": "Data Key",
+    "wallet.audit.when": "When",
+    "wallet.audit.purpose": "Purpose",
+    "wallet.audit.days": "days",
+    "wallet.export.title": "GDPR Export",
+    "wallet.export.description": "Download all your data as a JSON file",
+    "wallet.export.button": "Download All My Data",
+    "wallet.export.downloading": "Preparing export..."
   },
   fi: {
     "profile.title": "Oma profiili",
@@ -681,7 +705,31 @@ var TRANSLATIONS = {
     "modal.whyPrivacy": "Oman yksityisen muistitilan, suojattuna salasanallasi",
     "modal.whyControl": "T\u00e4yden hallinnan: vain sin\u00e4 p\u00e4\u00e4set tietoihisi, ei tarvitse jakaa kenellek\u00e4\u00e4n",
     "modal.whyAgents": "Yhdist\u00e4 AI-agentteja jotka muistavat sinut ja toimivat puolestasi",
-    "modal.whyMorsels": "100 ilmaista syd\u00e4nmurusta alkuun! Esim. muistipynt\u00f6 ~ 1 \u2764\ufe0f, tauluviesti ~ 2 \u2764\ufe0f. Saat 50 lis\u00e4\u00e4 joka p\u00e4iv\u00e4"
+    "modal.whyMorsels": "100 ilmaista syd\u00e4nmurusta alkuun! Esim. muistipynt\u00f6 ~ 1 \u2764\ufe0f, tauluviesti ~ 2 \u2764\ufe0f. Saat 50 lis\u00e4\u00e4 joka p\u00e4iv\u00e4",
+    "profile.tabs.dataWallet": "Tietolompakko",
+    "wallet.consents.title": "Aktiiviset suostumukset",
+    "wallet.consents.empty": "Ei aktiivisia suostumuksia",
+    "wallet.consents.pattern": "Datakuvio",
+    "wallet.consents.recipient": "Vastaanottaja",
+    "wallet.consents.purpose": "Tarkoitus",
+    "wallet.consents.scope": "Laajuus",
+    "wallet.consents.granted": "My\u00f6nnetty",
+    "wallet.consents.expires": "Vanhenee",
+    "wallet.consents.revoke": "Peru",
+    "wallet.consents.never": "Ei koskaan",
+    "wallet.consents.revoking": "Perutaan...",
+    "wallet.consents.revoked": "Suostumus peruttu",
+    "wallet.audit.title": "Auditointiraportti",
+    "wallet.audit.empty": "Ei datank\u00e4ytt\u00f6tapahtumia",
+    "wallet.audit.who": "K\u00e4ytt\u00e4j\u00e4",
+    "wallet.audit.what": "Data-avain",
+    "wallet.audit.when": "Milloin",
+    "wallet.audit.purpose": "Tarkoitus",
+    "wallet.audit.days": "p\u00e4iv\u00e4\u00e4",
+    "wallet.export.title": "GDPR-vienti",
+    "wallet.export.description": "Lataa kaikki tietosi JSON-tiedostona",
+    "wallet.export.button": "Lataa kaikki tietoni",
+    "wallet.export.downloading": "Valmistellaan vienti\u00e4..."
   }
 };
 
@@ -990,6 +1038,20 @@ textarea.input-field{resize:vertical;min-height:60px}
 .star{font-size:1.5rem;cursor:pointer;color:var(--muted);transition:color .15s}
 .star:hover,.star.active{color:var(--warn)}
 
+/* Data Wallet — audit day buttons */
+.audit-day-btn{padding:.4rem .8rem;cursor:pointer;color:var(--muted);font-weight:600;font-size:.8rem;background:var(--card);border:1px solid var(--border);border-radius:6px;transition:all .2s}
+.audit-day-btn:hover{color:var(--text)}
+.audit-day-btn.active{color:var(--love1);border-color:var(--love1);background:rgba(255,107,157,.1)}
+
+/* Data Wallet — consents table */
+.consent-table,.audit-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.consent-table th,.audit-table th{text-align:left;padding:.5rem .6rem;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border)}
+.consent-table td,.audit-table td{padding:.5rem .6rem;border-bottom:1px solid rgba(255,107,157,.06)}
+.consent-table tr:hover,.audit-table tr:hover{background:rgba(255,107,157,.04)}
+.revoke-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--danger);background:transparent;color:var(--danger);cursor:pointer;font-size:.75rem;font-weight:600;transition:all .2s}
+.revoke-btn:hover{background:rgba(239,68,68,.15)}
+.revoke-btn:disabled{opacity:.5;cursor:not-allowed}
+
 /* Responsive */
 @media(max-width:600px){
   .profile-header{flex-direction:column;text-align:center}
@@ -999,6 +1061,8 @@ textarea.input-field{resize:vertical;min-height:60px}
   .action-bar{flex-direction:column;align-items:stretch}
   .search-bar{max-width:100%}
   .app-grid{grid-template-columns:1fr}
+  .consent-table,.audit-table{font-size:.75rem}
+  .consent-table th,.consent-table td,.audit-table th,.audit-table td{padding:.4rem}
 }
 </style>
 </head>
@@ -1073,6 +1137,7 @@ textarea.input-field{resize:vertical;min-height:60px}
     <button class="tab" data-tab="federation" data-t="profile.tabs.federation">Federation</button>
     <button class="tab" data-tab="nodes" data-t="profile.tabs.nodes">Nodes</button>
     <button class="tab" data-tab="access" data-t="profile.tabs.access">Access</button>
+    <button class="tab" data-tab="dataWallet" data-t="profile.tabs.dataWallet">Data Wallet</button>
   </div>
 
   <!-- Tab panels -->
@@ -1326,6 +1391,25 @@ textarea.input-field{resize:vertical;min-height:60px}
     <div class="section-desc" data-t="profile.access.desc"></div>
     <div id="access-area"><span class="spinner"></span><span class="loading-text" data-t="profile.access.loading">Loading access info...</span></div>
   </div>
+
+  <!-- DATA WALLET -->
+  <div class="tab-panel" id="panel-dataWallet">
+    <div class="section-title" data-t="wallet.consents.title">Active Consents</div>
+    <div id="consents-list"><span class="spinner"></span><span class="loading-text">Loading...</span></div>
+
+    <h3 style="color:var(--love1);margin-top:2rem;margin-bottom:.75rem" data-t="wallet.audit.title">Audit Report</h3>
+    <div id="audit-controls" style="display:flex;gap:.5rem;align-items:center;margin-bottom:1rem">
+      <button class="audit-day-btn" data-days="7">7</button>
+      <button class="audit-day-btn active" data-days="30">30</button>
+      <button class="audit-day-btn" data-days="90">90</button>
+      <span style="color:var(--muted);font-size:.85rem" data-t="wallet.audit.days">days</span>
+    </div>
+    <div id="audit-list"></div>
+
+    <h3 style="color:var(--love1);margin-top:2rem;margin-bottom:.5rem" data-t="wallet.export.title">GDPR Export</h3>
+    <p data-t="wallet.export.description" style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">Download all your data as a JSON file</p>
+    <button id="gdpr-export-btn" class="btn-primary" data-t="wallet.export.button">Download All My Data</button>
+  </div>
 </div>
 
 <script>
@@ -1464,6 +1548,8 @@ document.getElementById('tabs').addEventListener('click', function(e) {
   var tab = btn.dataset.tab;
   document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === tab); });
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('active', p.id === 'panel-' + tab); });
+  // Lazy-load Data Wallet tab
+  if (tab === 'dataWallet') { loadDataWallet(); loadAudit(30); }
 });
 
 // ── Sub-tab handling (generic) ──
@@ -2748,6 +2834,138 @@ async function detachNode(nodeId) {
     showToast(t('profile.error'), true);
   }
 }
+
+// ── Data Wallet — Consents ──
+async function loadDataWallet() {
+  var el = document.getElementById('consents-list');
+  el.innerHTML = '<span class="spinner"></span><span class="loading-text">' + t('profile.loading') + '</span>';
+  try {
+    var data = await apiFetch('/v1/consent');
+    var consents = (data && data.data && data.data.consents) ? data.data.consents : (Array.isArray(data && data.data) ? data.data : []);
+    if (consents.length === 0) {
+      el.innerHTML = '<div class="empty">' + t('wallet.consents.empty') + '</div>';
+      return;
+    }
+    var html = '<div class="card" style="overflow-x:auto"><table class="consent-table"><thead><tr>'
+      + '<th>' + t('wallet.consents.pattern') + '</th>'
+      + '<th>' + t('wallet.consents.recipient') + '</th>'
+      + '<th>' + t('wallet.consents.purpose') + '</th>'
+      + '<th>' + t('wallet.consents.scope') + '</th>'
+      + '<th>' + t('wallet.consents.granted') + '</th>'
+      + '<th>' + t('wallet.consents.expires') + '</th>'
+      + '<th></th>'
+      + '</tr></thead><tbody>';
+    consents.forEach(function(c) {
+      var isExpired = c.expires_at && new Date(c.expires_at) < new Date();
+      var statusBadge = isExpired
+        ? '<span class="badge badge-muted">expired</span>'
+        : '<span class="badge badge-success">active</span>';
+      var expiresText = c.expires_at ? new Date(c.expires_at).toLocaleDateString() : t('wallet.consents.never');
+      var grantedText = c.granted_at ? new Date(c.granted_at).toLocaleDateString() : '-';
+      html += '<tr>'
+        + '<td><span style="font-family:monospace;font-size:.8rem;color:var(--love3)">' + escHtml(c.data_pattern || c.pattern || '-') + '</span></td>'
+        + '<td>' + escHtml(c.recipient_gaii || c.recipient || '-') + '</td>'
+        + '<td>' + escHtml(c.purpose || '-') + '</td>'
+        + '<td>' + statusBadge + ' ' + escHtml(c.scope || '-') + '</td>'
+        + '<td style="font-size:.8rem;color:var(--muted)">' + grantedText + '</td>'
+        + '<td style="font-size:.8rem;color:var(--muted)">' + expiresText + '</td>'
+        + '<td>';
+      if (!isExpired) {
+        html += '<button class="revoke-btn" onclick="revokeConsent(\'' + escHtml(c.id || c.consent_id) + '\')" data-t="wallet.consents.revoke">' + t('wallet.consents.revoke') + '</button>';
+      }
+      html += '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div class="empty">' + t('wallet.consents.empty') + '</div>';
+  }
+}
+
+async function revokeConsent(consentId) {
+  if (!consentId) return;
+  try {
+    await session.fetch('/v1/consent/' + encodeURIComponent(consentId), { method: 'DELETE' });
+    showToast(t('wallet.consents.revoked'));
+    loadDataWallet();
+  } catch(e) {
+    showToast(t('profile.error'), true);
+  }
+}
+
+// ── Data Wallet — Audit ──
+async function loadAudit(days) {
+  var el = document.getElementById('audit-list');
+  el.innerHTML = '<span class="spinner"></span><span class="loading-text">' + t('profile.loading') + '</span>';
+  // Update active button
+  document.querySelectorAll('.audit-day-btn').forEach(function(b) {
+    b.classList.toggle('active', Number(b.dataset.days) === days);
+  });
+  try {
+    var data = await apiFetch('/v1/consent/audit?days=' + days);
+    var entries = (data && data.data && data.data.entries) ? data.data.entries : (Array.isArray(data && data.data) ? data.data : []);
+    if (entries.length === 0) {
+      el.innerHTML = '<div class="empty">' + t('wallet.audit.empty') + '</div>';
+      return;
+    }
+    var html = '<div class="card" style="overflow-x:auto"><table class="audit-table"><thead><tr>'
+      + '<th>' + t('wallet.audit.who') + '</th>'
+      + '<th>' + t('wallet.audit.what') + '</th>'
+      + '<th>' + t('wallet.audit.when') + '</th>'
+      + '<th>' + t('wallet.audit.purpose') + '</th>'
+      + '</tr></thead><tbody>';
+    entries.forEach(function(e) {
+      var whenText = e.accessed_at ? timeAgo(e.accessed_at) : (e.timestamp ? timeAgo(e.timestamp) : '-');
+      html += '<tr>'
+        + '<td>' + escHtml(e.accessor_gaii || e.accessed_by || e.who || '-') + '</td>'
+        + '<td><span style="font-family:monospace;font-size:.8rem;color:var(--love3)">' + escHtml(e.data_key || e.key || e.what || '-') + '</span></td>'
+        + '<td style="font-size:.8rem;color:var(--muted)">' + whenText + '</td>'
+        + '<td>' + escHtml(e.purpose || '-') + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div class="empty">' + t('wallet.audit.empty') + '</div>';
+  }
+}
+
+// Wire audit day buttons
+document.getElementById('audit-controls').addEventListener('click', function(e) {
+  var btn = e.target.closest('.audit-day-btn');
+  if (!btn) return;
+  loadAudit(Number(btn.dataset.days));
+});
+
+// ── Data Wallet — GDPR Export ──
+async function exportGdpr() {
+  var btn = document.getElementById('gdpr-export-btn');
+  var origText = btn.textContent;
+  btn.textContent = t('wallet.export.downloading');
+  btn.disabled = true;
+  try {
+    var data = await apiFetch('/v1/owners/' + encodeURIComponent(session.owner) + '/export');
+    var json = JSON.stringify(data, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var dateStr = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = 'aimeat-export-' + dateStr + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    showToast(t('profile.error'), true);
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
+
+// Wire GDPR export button
+document.getElementById('gdpr-export-btn').onclick = exportGdpr;
 
 </script>
 </body>
