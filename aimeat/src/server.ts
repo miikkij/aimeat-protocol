@@ -331,9 +331,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   app.use(ownersRouter(config, storage));
   app.use(agentsRouter(config, storage));
-  app.use(consentRouter(config, storage));  // Phase 0.3
+  app.use(consentRouter(config, storage, stats));  // Phase 0.3
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
-  app.use(memoryRouter(config, storage));
+  app.use(memoryRouter(config, storage, stats));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));

@@ -8,8 +8,9 @@ import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
+import type { StatsCollector } from '../services/stats.js';
 
-export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
+export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector): Router {
   const router = Router();
 
   // Phase 2.3 — Workspace access middleware for organism.* namespace keys
@@ -111,6 +112,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
     if (!existing) emitResourceListChanged(gaii);
 
+    stats?.increment('memory_writes');
+
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,
       visibility: record.visibility,
@@ -211,6 +214,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
       : record.visibility === 'public' ? 'federation'
         : 'dmz';
 
+    stats?.increment('memory_reads');
+
     res.json(success(config.nodeId, {
       key: record.key,
       value: record.value,
@@ -310,6 +315,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
 
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
 
+    stats?.increment('memory_writes');
+
     res.json(success(config.nodeId, {
       key: record.key,
       visibility: record.visibility,
@@ -333,6 +340,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
       return;
     }
+
+    stats?.increment('memory_reads');
 
     res.json(success(config.nodeId, {
       key: record.key,

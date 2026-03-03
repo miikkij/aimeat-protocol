@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import type { ValidateFunction } from 'ajv';
 import type { Storage } from '../storage/interface.js';
+import { getStats } from './stats.js';
 
 // CJS-ESM interop: ajv and ajv-formats are CJS packages
 const require = createRequire(import.meta.url);
@@ -65,6 +66,9 @@ export async function validateMemoryWrite(
 
   const validate = getValidator(schemaToValidate);
   const isValid = validate(value);
+
+  getStats()?.increment('schema_validations');
+  if (!isValid) getStats()?.increment('schema_validation_failures');
 
   if (isValid) {
     return { valid: true };

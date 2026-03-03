@@ -4,8 +4,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import type { StatsCollector } from '../services/stats.js';
 
-export function consentRouter(config: AimeatConfig, storage: Storage): Router {
+export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector): Router {
     const router = Router();
 
     // POST /v1/consent — Create a new consent grant
@@ -46,6 +47,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage): Router {
             revokedAt: null,
             metadata,
         });
+
+        stats?.increment('consent_grants');
 
         res.status(201).json(success(config.nodeId, {
             id: consent.id,
@@ -176,6 +179,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage): Router {
 
         const now = new Date().toISOString();
         await storage.updateConsent(id, { status: 'revoked', revokedAt: now });
+
+        stats?.increment('consent_revocations');
 
         res.json(success(config.nodeId, {
             status: 'revoked',
