@@ -296,5 +296,39 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
     }));
   });
 
+  // GET /v1/admin/realtime — full realtime overview for admin dashboard (operator only)
+  router.get('/v1/admin/realtime', requireAuth(), requireRole('operator'), (_req, res) => {
+    if (!config.realtimeEnabled) {
+      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
+      return;
+    }
+
+    const stats = realtimeManager.getStats();
+    const allRooms = realtimeManager.listAllRooms();
+    const rooms = allRooms.map(r => ({
+      id: r.id,
+      app_type: r.appType,
+      name: r.name,
+      created_by: r.createdBy,
+      max_peers: r.maxPeers,
+      is_public: r.isPublic,
+      tags: r.tags,
+      peer_count: r.peers.size,
+      peers: [...r.peers.values()].map(p => ({
+        peer_id: p.peerId,
+        nick: p.nick,
+        joined_at: p.joinedAt.toISOString(),
+      })),
+      yjs_docs: [...r.yjsSnapshots.keys()].map(docId => ({
+        doc_id: docId,
+        snapshot_size: r.yjsSnapshots.get(docId)?.length ?? 0,
+      })),
+      created_at: r.createdAt.toISOString(),
+      last_activity_at: r.lastActivityAt.toISOString(),
+    }));
+
+    res.json(success(config.nodeId, { stats, rooms, total: rooms.length }));
+  });
+
   return router;
 }

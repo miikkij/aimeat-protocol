@@ -98,6 +98,10 @@
       "registerBenefits": ["Oma yksityinen muistitila, salasanasuojattu", "Täysi hallinta — vain sinä pääset tietoihisi", "Yhdistä AI-agentteja jotka toimivat puolestasi", "Ansaitse sydänmurusia auttamalla muita", "Palvelusi näkyvät profiilissasi"],
       "alreadyHaveAccount": "Onko sinulla jo tili?",
       "signInLink": "Kirjaudu"
+    },
+    "launcher": {
+      "title": "Sovellusten käynnistin",
+      "tagline": "Sinulle kertyy paljon sovelluksia — tämä on helppo tapa hallita niitä kaikkia suoraan selaimesta."
     }
   },
   "morsels": {
@@ -1108,7 +1112,35 @@
     "home": "Koti",
     "grantConfirm": "Myönnä operaattorirooli?",
     "errorLabel": "Virhe",
-    "networkError": "Verkkovirhe"
+    "networkError": "Verkkovirhe",
+
+    "realtime": "Reaaliaikainen",
+    "activeRooms": "Aktiiviset huoneet",
+    "connectedPeers": "Yhdistetyt vertaiset",
+    "messagesIn": "Viestit sisään",
+    "messagesOut": "Viestit ulos",
+    "messagesRejected": "Hylätyt",
+    "peakPeers": "Huippu vertaiset",
+    "roomsCreated": "Luotuja huoneita",
+    "roomsClosed": "Suljettuja huoneita",
+    "noActiveRooms": "Ei aktiivisia reaaliaikahuoneita",
+    "roomName": "Huoneen nimi",
+    "appType": "Sovellustyyppi",
+    "peerCount": "Vertaiset",
+    "createdAt": "Luotu",
+    "yjsDocs": "Yjs-dokumentit",
+    "noYjsDocs": "Ei aktiivisia Yjs-dokumentteja",
+    "docId": "Dokumentin ID",
+    "snapshotSize": "Tilannevedoksen koko",
+    "realtimeNotAvailable": "Reaaliaikatiedot eivät saatavilla",
+    "closeRoom": "Sulje",
+    "closeRoomConfirm": "Sulje tämä huone? Kaikki vertaiset irrotetaan.",
+    "isPublic": "Julkinen",
+    "isPrivate": "Yksityinen",
+    "visibility": "Näkyvyys",
+    "maxPeers": "Maks. vertaiset",
+    "createdBy": "Luoja",
+    "realtimeDisabled": "Reaaliaikatoiminto on poistettu käytöstä tässä solmussa"
   },
   "launcher": {
     "title": "Omat Sovellukset",

@@ -335,6 +335,25 @@ body {
   border-color: rgba(34, 197, 94, 0.2);
 }
 
+.card-icon.launcher-icon {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.15));
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.card-link .card {
+  cursor: pointer;
+}
+
+.card-link .card:hover .card-arrow {
+  transform: translateX(4px);
+}
+
 .card-text {
   flex: 1;
   min-width: 0;
@@ -1431,7 +1450,21 @@ body {
       </div>
     </div>
 
-    <!-- Card 3: Services -->
+    <!-- Card 3: App Launcher -->
+    <a href="/app-launcher.html" class="card-link">
+    <div class="card" id="card-launcher" style="cursor:pointer">
+      <div class="card-header">
+        <div class="card-icon launcher-icon">\u{1F680}</div>
+        <div class="card-text">
+          <div class="card-title">${esc(t('cards.launcher.title'))}</div>
+          <div class="card-tagline">${esc(t('cards.launcher.tagline'))}</div>
+        </div>
+        <div class="card-arrow" style="transform:rotate(-90deg)">\u25BC</div>
+      </div>
+    </div>
+    </a>
+
+    <!-- Card 4: Services -->
     <div class="card" id="card-services" data-card="services">
       <div class="card-header">
         <div class="card-icon services-icon">\u{1F91D}</div>

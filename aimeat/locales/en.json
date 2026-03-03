@@ -98,6 +98,10 @@
       "registerBenefits": ["Your own private memory space, password-protected", "Full control — only you access your data", "Connect AI agents that work for you", "Earn heart morsels by helping others", "Your services appear on your profile"],
       "alreadyHaveAccount": "Already have an account?",
       "signInLink": "Sign in"
+    },
+    "launcher": {
+      "title": "App Launcher",
+      "tagline": "You're going to have lots of apps — this is the easy way to manage them all from your browser."
     }
   },
   "morsels": {
@@ -1108,7 +1112,35 @@
     "home": "Home",
     "grantConfirm": "Grant operator role?",
     "errorLabel": "Error",
-    "networkError": "Network error"
+    "networkError": "Network error",
+
+    "realtime": "Realtime",
+    "activeRooms": "Active Rooms",
+    "connectedPeers": "Connected Peers",
+    "messagesIn": "Messages In",
+    "messagesOut": "Messages Out",
+    "messagesRejected": "Rejected",
+    "peakPeers": "Peak Peers",
+    "roomsCreated": "Rooms Created",
+    "roomsClosed": "Rooms Closed",
+    "noActiveRooms": "No active realtime rooms",
+    "roomName": "Room Name",
+    "appType": "App Type",
+    "peerCount": "Peers",
+    "createdAt": "Created",
+    "yjsDocs": "Yjs Documents",
+    "noYjsDocs": "No active Yjs documents",
+    "docId": "Document ID",
+    "snapshotSize": "Snapshot Size",
+    "realtimeNotAvailable": "Realtime data not available",
+    "closeRoom": "Close",
+    "closeRoomConfirm": "Close this room? All peers will be disconnected.",
+    "isPublic": "Public",
+    "isPrivate": "Private",
+    "visibility": "Visibility",
+    "maxPeers": "Max Peers",
+    "createdBy": "Created By",
+    "realtimeDisabled": "Realtime is disabled on this node"
   },
   "launcher": {
     "title": "My Apps",

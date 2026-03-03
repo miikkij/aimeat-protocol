@@ -119,6 +119,20 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
         marketplaceLabel: t('dashboard.marketplace'), pushLabel: t('dashboard.push'),
         csmLabel: t('dashboard.csm'), genesisLabel: t('dashboard.genesis'),
         language: t('dashboard.language'),
+        realtime: t('dashboard.realtime'), activeRooms: t('dashboard.activeRooms'),
+        connectedPeers: t('dashboard.connectedPeers'), messagesIn: t('dashboard.messagesIn'),
+        messagesOut: t('dashboard.messagesOut'), messagesRejected: t('dashboard.messagesRejected'),
+        peakPeers: t('dashboard.peakPeers'), roomsCreated: t('dashboard.roomsCreated'),
+        roomsClosed: t('dashboard.roomsClosed'), noActiveRooms: t('dashboard.noActiveRooms'),
+        roomName: t('dashboard.roomName'), appType: t('dashboard.appType'),
+        peerCount: t('dashboard.peerCount'), createdAt: t('dashboard.createdAt'),
+        yjsDocs: t('dashboard.yjsDocs'), noYjsDocs: t('dashboard.noYjsDocs'),
+        docId: t('dashboard.docId'), snapshotSize: t('dashboard.snapshotSize'),
+        realtimeNotAvailable: t('dashboard.realtimeNotAvailable'),
+        closeRoom: t('dashboard.closeRoom'), closeRoomConfirm: t('dashboard.closeRoomConfirm'),
+        isPublic: t('dashboard.isPublic'), isPrivate: t('dashboard.isPrivate'),
+        visibility: t('dashboard.visibility'), maxPeers: t('dashboard.maxPeers'),
+        createdBy: t('dashboard.createdBy'), realtimeDisabled: t('dashboard.realtimeDisabled'),
     };
 }
 
@@ -219,6 +233,7 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item" onclick="nav('actions')"><span class="icon">&#x26A1;</span><span class="label">${t('dashboard.actions')}</span><span class="count" id="cntActions">0</span></button>
   <button class="nav-item" onclick="nav('boards')"><span class="icon">&#x1F4CB;</span><span class="label">${t('dashboard.boards')}</span><span class="count" id="cntBoards">0</span></button>
   <button class="nav-item" onclick="nav('chatInstances')"><span class="icon">&#x1F4AC;</span><span class="label">${t('dashboard.chatInstances')}</span><span class="count" id="cntChatInstances">0</span></button>
+  <button class="nav-item" onclick="nav('realtime')"><span class="icon">&#x1F4E1;</span><span class="label">${t('dashboard.realtime')}</span><span class="count" id="cntRooms">0</span></button>
   <button class="nav-item" onclick="nav('work')"><span class="icon">&#x1F4E6;</span><span class="label">${t('dashboard.work')}</span><span class="count" id="cntWork">0</span></button>
   <div class="nav-sep"></div>
   <button class="nav-item" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
@@ -316,7 +331,7 @@ async function switchLang(lang){
 }
 function updateSidebarLabels(){
   var btns=document.querySelectorAll('.nav-item');
-  var keys=['overview','owners','agents','actions','boards','chatInstances','work','economy','federation','hooks','maintenance','config','ghiiLabel','emailLabel','directoryLabel','matchingLabel','marketplaceLabel','pushLabel','csmLabel','genesisLabel'];
+  var keys=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghiiLabel','emailLabel','directoryLabel','matchingLabel','marketplaceLabel','pushLabel','csmLabel','genesisLabel'];
   for(var i=0;i<btns.length&&i<keys.length;i++){
     var lbl=btns[i].querySelector('.label');
     if(lbl&&__t[keys[i]])lbl.textContent=__t[keys[i]];
@@ -386,9 +401,9 @@ function nav(page){
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active')});
   var btns=document.querySelectorAll('.nav-item');
-  var pages=['overview','owners','agents','actions','boards','chatInstances','work','economy','federation','hooks','maintenance','config','ghii','email','directory','matching','marketplace','push','csm','genesis'];
+  var pages=['overview','owners','agents','actions','boards','chatInstances','realtime','work','economy','federation','hooks','maintenance','config','ghii','email','directory','matching','marketplace','push','csm','genesis'];
   for(var i=0;i<btns.length;i++){if(pages[i]===page)btns[i].classList.add('active')}
-  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config,ghii:'\\u{1F511} '+__t.ghiiLabel,email:'\\u2709 '+__t.emailLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,push:'\\u{1F514} '+__t.pushLabel,csm:'\\u{1F4E6} '+__t.csmLabel,genesis:'\\u{1F30D} '+__t.genesisLabel};
+  var titles={overview:'\\u{1F4CA} '+__t.overview,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,economy:'\\u{1FA99} '+__t.economy,federation:'\\u{1F310} '+__t.federation,hooks:'\\u{1F517} '+__t.extensionHooks,maintenance:'\\u{1F6A7} '+__t.maintenance,config:'\\u2699 '+__t.config,ghii:'\\u{1F511} '+__t.ghiiLabel,email:'\\u2709 '+__t.emailLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,push:'\\u{1F514} '+__t.pushLabel,csm:'\\u{1F4E6} '+__t.csmLabel,genesis:'\\u{1F30D} '+__t.genesisLabel};
   document.getElementById('pageTitle').innerHTML=titles[page]||page;
   render();
 }
@@ -419,13 +434,15 @@ async function loadAll(){
       api('/v1/admin/work'),
       api('/v1/admin/federation'),
       api('/v1/admin/hooks'),
-      api('/v1/chat-instances')
+      api('/v1/chat-instances'),
+      api('/v1/admin/realtime')
     ]);
     D.maintenance=extras[0].status==='fulfilled'?extras[0].value.data:null;
     D.workItems=extras[1].status==='fulfilled'?(extras[1].value.data.work||[]):[];
     D.federation=extras[2].status==='fulfilled'?(extras[2].value.data.peers||[]):[];
     D.hooks=extras[3].status==='fulfilled'?(extras[3].value.data.extension_hooks||{}):{};
     D.chatInstances=extras[4].status==='fulfilled'?(extras[4].value.data.chat_instances||[]):[];
+    D.realtime=extras[5].status==='fulfilled'?extras[5].value.data:null;
     var features=await Promise.allSettled([
       api('/v1/admin/ghii'),
       api('/v1/admin/email/status'),
@@ -456,6 +473,7 @@ async function loadAll(){
     }catch(e){D.owners=[];}
     document.getElementById('cntWork').textContent=D.workItems.length;
     document.getElementById('cntPeers').textContent=D.federation.length;
+    if(D.realtime&&D.realtime.stats)document.getElementById('cntRooms').textContent=D.realtime.stats.rooms;
     if(D.ghiiUsers)document.getElementById('cntGhii').textContent=D.ghiiUsers.length;
     if(D.genesisPeers&&D.genesisPeers.peers)document.getElementById('cntGenesis').textContent=D.genesisPeers.peers.length;
     document.getElementById('sideNodeId').textContent=D.dash?D.dash.node_id:'';
@@ -478,6 +496,7 @@ function render(){
     case 'actions':app.innerHTML=renderActions();break;
     case 'boards':app.innerHTML=renderBoards();break;
     case 'chatInstances':app.innerHTML=renderChatInstances();break;
+    case 'realtime':app.innerHTML=renderRealtime();break;
     case 'work':app.innerHTML=renderWork();break;
     case 'economy':app.innerHTML=renderEconomy();break;
     case 'federation':app.innerHTML=renderFederation();break;
@@ -961,6 +980,94 @@ function renderChatInstances(){
   });
   o+='</tbody></table></div>';
   return o;
+}
+
+/* ── REALTIME ── */
+function renderRealtime(){
+  var rt=D.realtime;
+  if(!rt)return emptyState(__t.realtimeNotAvailable);
+  var s=rt.stats||{};
+  var rooms=rt.rooms||[];
+  var o=statsGrid([
+    {label:__t.activeRooms,value:s.rooms||0,color:'var(--cyan)'},
+    {label:__t.connectedPeers,value:s.peers||0,color:'var(--green)'},
+    {label:__t.messagesIn,value:s.messagesIn||0,color:'var(--purple)'},
+    {label:__t.messagesOut,value:s.messagesOut||0,color:'var(--purple)'},
+  ]);
+  o+='<div class="grid grid-4">';
+  o+=sc(__t.messagesRejected,s.messagesRejected||0,'','var(--red)');
+  o+=sc(__t.peakPeers,s.peakConcurrentPeers||0,'','var(--cyan)');
+  o+=sc(__t.roomsCreated,s.roomsCreated||0,'','var(--muted)');
+  o+=sc(__t.roomsClosed,s.roomsClosed||0,'','var(--muted)');
+  o+='</div>';
+
+  // Room table
+  o+='<div class="card" style="margin-top:16px"><h2>'+__t.activeRooms+' ('+rooms.length+')</h2>';
+  if(rooms.length===0){
+    o+=emptyState(__t.noActiveRooms);
+  }else{
+    o+='<div class="scrollable"><table><thead><tr>';
+    o+='<th>'+__t.roomName+'</th>';
+    o+='<th>'+__t.appType+'</th>';
+    o+='<th>'+__t.peerCount+'</th>';
+    o+='<th>'+__t.maxPeers+'</th>';
+    o+='<th>'+__t.visibility+'</th>';
+    o+='<th>'+__t.createdBy+'</th>';
+    o+='<th>'+__t.yjsDocs+'</th>';
+    o+='<th>'+__t.createdAt+'</th>';
+    o+='<th></th>';
+    o+='</tr></thead><tbody>';
+    for(var i=0;i<rooms.length;i++){
+      var r=rooms[i];
+      o+='<tr>';
+      o+='<td><strong>'+esc(r.name)+'</strong>';
+      if(r.tags&&r.tags.length){o+='<br/>';for(var ti=0;ti<r.tags.length;ti++)o+='<span class="tag">'+esc(r.tags[ti])+'</span> ';}
+      o+='</td>';
+      o+='<td>'+badge(r.app_type)+'</td>';
+      o+='<td style="text-align:center"><strong>'+r.peer_count+'</strong>';
+      if(r.peers&&r.peers.length){o+='<br/><span style="color:var(--muted);font-size:.7rem">';for(var pi=0;pi<r.peers.length;pi++){if(pi>0)o+=', ';o+=esc(r.peers[pi].nick);}o+='</span>';}
+      o+='</td>';
+      o+='<td style="text-align:center">'+r.max_peers+'</td>';
+      o+='<td>'+(r.is_public?'<span style="color:var(--green)">'+__t.isPublic+'</span>':'<span style="color:var(--muted)">'+__t.isPrivate+'</span>')+'</td>';
+      o+='<td class="mono" style="font-size:.75rem">'+esc(r.created_by)+'</td>';
+      o+='<td style="text-align:center">'+(r.yjs_docs&&r.yjs_docs.length?r.yjs_docs.length:'\\u2014')+'</td>';
+      o+='<td style="color:var(--muted)">'+dt(r.created_at)+'</td>';
+      o+='<td><button class="expand-btn" onclick="closeRoom(\\''+esc(r.id)+'\\')">'+__t.closeRoom+'</button></td>';
+      o+='</tr>';
+    }
+    o+='</tbody></table></div>';
+  }
+  o+='</div>';
+
+  // Yjs Documents section
+  var allDocs=[];
+  for(var ri=0;ri<rooms.length;ri++){
+    var rm=rooms[ri];
+    if(rm.yjs_docs){for(var di=0;di<rm.yjs_docs.length;di++){allDocs.push({room:rm.name,roomId:rm.id,doc:rm.yjs_docs[di]});}}
+  }
+  o+='<div class="card" style="margin-top:16px"><h2>'+__t.yjsDocs+' ('+allDocs.length+')</h2>';
+  if(allDocs.length===0){
+    o+=emptyState(__t.noYjsDocs);
+  }else{
+    o+='<table><thead><tr><th>'+__t.roomName+'</th><th>'+__t.docId+'</th><th>'+__t.snapshotSize+'</th></tr></thead><tbody>';
+    for(var j=0;j<allDocs.length;j++){
+      var d=allDocs[j];
+      o+='<tr><td>'+esc(d.room)+'</td>';
+      o+='<td class="mono" style="font-size:.8rem">'+esc(d.doc.doc_id)+'</td>';
+      o+='<td>'+(d.doc.snapshot_size>1024?Math.round(d.doc.snapshot_size/1024)+' KB':d.doc.snapshot_size+' B')+'</td></tr>';
+    }
+    o+='</tbody></table>';
+  }
+  o+='</div>';
+  return o;
+}
+
+async function closeRoom(roomId){
+  if(!confirm(__t.closeRoomConfirm))return;
+  try{
+    await api('/v1/realtime/rooms/'+encodeURIComponent(roomId),{method:'DELETE'});
+    loadAll();
+  }catch(e){alert(__t.errorLabel+': '+e.message)}
 }
 
 /* ── GHII USERS ── */

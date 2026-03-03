@@ -405,6 +405,11 @@ export class RealtimeManager {
     return rooms;
   }
 
+  /** List ALL rooms (including private) — for admin/operator use only. */
+  listAllRooms(): RealtimeRoom[] {
+    return [...this.rooms.values()];
+  }
+
   getRoom(roomId: string): RealtimeRoom | null {
     return this.rooms.get(roomId) ?? null;
   }
