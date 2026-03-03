@@ -101,7 +101,25 @@
     },
     "launcher": {
       "title": "App Launcher",
-      "tagline": "You're going to have lots of apps — this is the easy way to manage them all from your browser."
+      "tagline": "Create your own personal app launcher in your browser.",
+      "desc": "You're going to have lots of apps — games, tools, dashboards, trackers. The app launcher gives you one place to organize and open them all. Use it directly or download and customize your very own version.",
+      "feat1": "All your AIMEAT apps in one view",
+      "feat2": "Pin favorites for quick access",
+      "feat3": "Search and filter by tags",
+      "feat4": "Import apps directly from this node",
+      "openBtn": "Open App Launcher",
+      "or": "or",
+      "customizeTitle": "Make your own version",
+      "customizeDesc": "Download the app-launcher.html file and give it to any AI along with the prompt below. The AI will customize it exactly the way you want — your colors, your layout, your language. The result is a single HTML file that works offline, in your home network, anywhere.",
+      "step1": "Download app-launcher.html below",
+      "step2": "Copy the customization prompt",
+      "step3": "Paste both into any AI chat (ChatGPT, Claude, Grok...) and tell it what you want changed",
+      "downloadBtn": "Download HTML",
+      "copyPromptBtn": "Copy prompt",
+      "copiedPromptBtn": "Copied!",
+      "badgeOffline": "Works offline",
+      "badgeIntranet": "Works on intranet",
+      "badgePrivate": "Your data stays local"
     }
   },
   "morsels": {

@@ -248,3 +248,41 @@ model RealtimeRoom {
   createdAt      DateTime @default(now())
   lastActivityAt DateTime @default(now())
 }
+
+model Ghii {
+  id                         String   @id @default(auto()) @map("_id") @db.ObjectId
+  username                   String
+  nodeId                     String
+  ghii                       String   @unique
+  displayName                String
+  bio                        String?
+  avatar                     String?
+  locale                     String?
+  passwordHash               String?
+  verificationLevel          Int      @default(0)
+  ownerName                  String
+  totpSecret                 String?
+  totpEnabled                Boolean  @default(false)
+  totpBackupCodes            String[]
+  totpLastUsedAt             String?
+  totpLastUsedCode           String?
+  totpFailedAttempts         Int      @default(0)
+  totpLockedUntil            String?
+  emailHash                  String?
+  emailVerifiedAt            String?
+  verificationMethod         String?
+  magicLinkEnabled           Boolean  @default(false)
+  lastLoginAt                String?
+  loginCount                 Int      @default(0)
+  verifiedAttributes         String[]
+  verificationIssuer         String?
+  verificationCredentialHash String?
+  ftnVerified                Boolean  @default(false)
+  trustScore                 Int?
+  morselBalance              Int?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([ownerName])
+  @@index([emailHash])
+}

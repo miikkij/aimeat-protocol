@@ -340,18 +340,142 @@ body {
   border-color: rgba(251, 191, 36, 0.2);
 }
 
-.card-link {
+.launcher-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.launcher-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.launcher-feature .feat-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.launcher-feature .feat-text {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.launcher-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.7rem 1.5rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 10px;
+  color: var(--text-bright);
+  font-weight: 700;
+  font-size: 0.95rem;
   text-decoration: none;
-  color: inherit;
-  display: block;
+  transition: all 0.2s;
 }
 
-.card-link .card {
-  cursor: pointer;
+.launcher-cta:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+  transform: translateY(-1px);
 }
 
-.card-link .card:hover .card-arrow {
-  transform: translateX(4px);
+.launcher-cta.secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.launcher-cta.secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(251, 191, 36, 0.4);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.1);
+}
+
+.launcher-or {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.launcher-or::before,
+.launcher-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--card-border);
+}
+
+.launcher-customize {
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.launcher-customize-title {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-bright);
+}
+
+.launcher-customize-desc {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.launcher-steps {
+  font-size: 0.85rem;
+  color: var(--text);
+  margin: 0 0 1rem 1.25rem;
+  padding: 0;
+}
+
+.launcher-steps li {
+  margin-bottom: 0.35rem;
+}
+
+.launcher-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.launcher-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+}
+
+@media (max-width: 500px) {
+  .launcher-features {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card-text {
@@ -1451,18 +1575,68 @@ body {
     </div>
 
     <!-- Card 3: App Launcher -->
-    <a href="/app-launcher.html" class="card-link">
-    <div class="card" id="card-launcher" style="cursor:pointer">
+    <div class="card" id="card-launcher" data-card="launcher">
       <div class="card-header">
         <div class="card-icon launcher-icon">\u{1F680}</div>
         <div class="card-text">
           <div class="card-title">${esc(t('cards.launcher.title'))}</div>
           <div class="card-tagline">${esc(t('cards.launcher.tagline'))}</div>
         </div>
-        <div class="card-arrow" style="transform:rotate(-90deg)">\u25BC</div>
+        <div class="card-arrow">\u25BC</div>
+      </div>
+      <div class="card-body">
+        <p class="card-desc">${esc(t('cards.launcher.desc'))}</p>
+        <div class="launcher-features">
+          <div class="launcher-feature">
+            <span class="feat-icon">\u{1F4F1}</span>
+            <span class="feat-text">${esc(t('cards.launcher.feat1'))}</span>
+          </div>
+          <div class="launcher-feature">
+            <span class="feat-icon">\u{2B50}</span>
+            <span class="feat-text">${esc(t('cards.launcher.feat2'))}</span>
+          </div>
+          <div class="launcher-feature">
+            <span class="feat-icon">\u{1F50D}</span>
+            <span class="feat-text">${esc(t('cards.launcher.feat3'))}</span>
+          </div>
+          <div class="launcher-feature">
+            <span class="feat-icon">\u{1F4E5}</span>
+            <span class="feat-text">${esc(t('cards.launcher.feat4'))}</span>
+          </div>
+        </div>
+
+        <!-- Option 1: Use directly -->
+        <a href="/app-launcher.html" class="launcher-cta" onclick="event.stopPropagation()">
+          \u{1F680} ${esc(t('cards.launcher.openBtn'))}
+        </a>
+
+        <div class="launcher-or" onclick="event.stopPropagation()">${esc(t('cards.launcher.or'))}</div>
+
+        <!-- Option 2: Customize your own -->
+        <div class="launcher-customize" onclick="event.stopPropagation()">
+          <div class="launcher-customize-title">\u{1F3A8} ${esc(t('cards.launcher.customizeTitle'))}</div>
+          <div class="launcher-customize-desc">${esc(t('cards.launcher.customizeDesc'))}</div>
+          <ol class="launcher-steps">
+            <li>${esc(t('cards.launcher.step1'))}</li>
+            <li>${esc(t('cards.launcher.step2'))}</li>
+            <li>${esc(t('cards.launcher.step3'))}</li>
+          </ol>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <a href="/app-launcher.html" download="app-launcher.html" class="launcher-cta secondary" onclick="event.stopPropagation()">
+              \u{1F4E5} ${esc(t('cards.launcher.downloadBtn'))}
+            </a>
+            <button class="launcher-cta secondary" id="copyLauncherPromptBtn" type="button" onclick="event.stopPropagation()">
+              \u{1F4CB} ${esc(t('cards.launcher.copyPromptBtn'))}
+            </button>
+          </div>
+          <div class="launcher-badges">
+            <span class="launcher-badge">\u{1F4F4} ${esc(t('cards.launcher.badgeOffline'))}</span>
+            <span class="launcher-badge">\u{1F3E0} ${esc(t('cards.launcher.badgeIntranet'))}</span>
+            <span class="launcher-badge">\u{1F512} ${esc(t('cards.launcher.badgePrivate'))}</span>
+          </div>
+        </div>
       </div>
     </div>
-    </a>
 
     <!-- Card 4: Services -->
     <div class="card" id="card-services" data-card="services">
@@ -2279,6 +2453,29 @@ body {
     });
   }
 
+  /* ── Launcher: Copy customization prompt ── */
+  var copyLauncherPromptBtn = document.getElementById('copyLauncherPromptBtn');
+  if (copyLauncherPromptBtn) {
+    var launcherPrompt = 'I have an app-launcher.html file (attached or pasted below). It is a personal app launcher that runs as a single HTML file in the browser.\\n\\n' +
+      'I want you to customize it for me. Here is what I want you to change:\\n' +
+      '- [TELL THE AI: colors, layout, language, features you want added or removed]\\n\\n' +
+      'Requirements:\\n' +
+      '- Keep it as a single self-contained HTML file (inline CSS + JS, no external dependencies)\\n' +
+      '- It must work completely offline (no CDN links)\\n' +
+      '- Keep IndexedDB storage for the app registry\\n' +
+      '- Keep the AIMEAT import feature (fetches apps from /v1/apps)\\n' +
+      '- The AIMEAT node URL should be configurable in settings\\n\\n' +
+      'Give me the complete modified HTML file.';
+    var launcherCopyLabel = '${jesc(t('cards.launcher.copyPromptBtn'))}';
+    var launcherCopiedLabel = '${jesc(t('cards.launcher.copiedPromptBtn'))}';
+    copyLauncherPromptBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      copyToClipboard(launcherPrompt).then(function() {
+        copyLauncherPromptBtn.textContent = '\\u2705 ' + launcherCopiedLabel;
+        setTimeout(function() { copyLauncherPromptBtn.textContent = '\\ud83d\\udccb ' + launcherCopyLabel; }, 2000);
+      });
+    });
+  }
 
 })();
 <\/script>

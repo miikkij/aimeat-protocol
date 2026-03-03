@@ -1031,61 +1031,143 @@ export class MongoStorage implements Storage {
         return { id: row.requestId, fromNodeUrl: row.fromNodeUrl, fromNodeId: row.fromNodeId ?? undefined, toNodeId: row.toNodeId ?? undefined, targetUrl: row.targetUrl ?? undefined, publicKey: row.publicKey ?? undefined, message: row.message ?? undefined, status: row.status as any, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
-    // ── GHII (in-memory fallback until Prisma schema is updated) ──
+    // ── GHII (persisted via Prisma) ──
 
-    private ghiis = new Map<string, GHIIRecord>();
     private personalNodes = new Map<string, PersonalNodeRecord>();
     private mailboxItems = new Map<string, MailboxItemRecord>();
 
+    private toGHIIRecord(row: any): GHIIRecord {
+        return {
+            username: row.username,
+            nodeId: row.nodeId,
+            ghii: row.ghii,
+            displayName: row.displayName,
+            bio: row.bio ?? undefined,
+            avatar: row.avatar ?? undefined,
+            locale: row.locale ?? undefined,
+            passwordHash: row.passwordHash ?? undefined,
+            verificationLevel: row.verificationLevel as 0 | 1 | 2,
+            ownerName: row.ownerName,
+            totpSecret: row.totpSecret ?? undefined,
+            totpEnabled: row.totpEnabled ?? false,
+            totpBackupCodes: row.totpBackupCodes ?? undefined,
+            totpLastUsedAt: row.totpLastUsedAt ?? undefined,
+            totpLastUsedCode: row.totpLastUsedCode ?? undefined,
+            totpFailedAttempts: row.totpFailedAttempts ?? undefined,
+            totpLockedUntil: row.totpLockedUntil ?? undefined,
+            emailHash: row.emailHash ?? undefined,
+            emailVerifiedAt: row.emailVerifiedAt ?? undefined,
+            verificationMethod: row.verificationMethod ?? undefined,
+            magicLinkEnabled: row.magicLinkEnabled ?? undefined,
+            lastLoginAt: row.lastLoginAt ?? undefined,
+            loginCount: row.loginCount ?? undefined,
+            verifiedAttributes: row.verifiedAttributes ?? undefined,
+            verificationIssuer: row.verificationIssuer ?? undefined,
+            verificationCredentialHash: row.verificationCredentialHash ?? undefined,
+            ftnVerified: row.ftnVerified ?? undefined,
+            trustScore: row.trustScore ?? undefined,
+            morselBalance: row.morselBalance ?? undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+            semantic: undefined,
+        };
+    }
+
     async createGHII(record: GHIIRecord): Promise<GHIIRecord> {
-        if (this.ghiis.has(record.ghii)) throw new Error('GHII_TAKEN');
-        this.ghiis.set(record.ghii, record);
-        return record;
+        this.ensureReady();
+        try {
+            const row = await this.prisma.ghii.create({
+                data: {
+                    username: record.username,
+                    nodeId: record.nodeId,
+                    ghii: record.ghii,
+                    displayName: record.displayName,
+                    bio: record.bio,
+                    avatar: record.avatar,
+                    locale: record.locale,
+                    passwordHash: record.passwordHash,
+                    verificationLevel: record.verificationLevel,
+                    ownerName: record.ownerName,
+                    totpSecret: record.totpSecret,
+                    totpEnabled: record.totpEnabled ?? false,
+                    totpBackupCodes: record.totpBackupCodes ?? [],
+                    totpLastUsedAt: record.totpLastUsedAt,
+                    totpLastUsedCode: record.totpLastUsedCode,
+                    totpFailedAttempts: record.totpFailedAttempts ?? 0,
+                    totpLockedUntil: record.totpLockedUntil,
+                    emailHash: record.emailHash,
+                    emailVerifiedAt: record.emailVerifiedAt,
+                    verificationMethod: record.verificationMethod,
+                    magicLinkEnabled: record.magicLinkEnabled ?? false,
+                    lastLoginAt: record.lastLoginAt,
+                    loginCount: record.loginCount ?? 0,
+                    verifiedAttributes: record.verifiedAttributes ?? [],
+                    verificationIssuer: record.verificationIssuer,
+                    verificationCredentialHash: record.verificationCredentialHash,
+                    ftnVerified: record.ftnVerified ?? false,
+                    trustScore: record.trustScore,
+                    morselBalance: record.morselBalance,
+                    createdAt: new Date(record.createdAt),
+                    updatedAt: new Date(record.updatedAt),
+                },
+            });
+            return this.toGHIIRecord(row);
+        } catch (e: any) {
+            if (e?.code === 'P2002') throw new Error('GHII_TAKEN');
+            throw e;
+        }
     }
 
     async getGHII(ghii: string): Promise<GHIIRecord | null> {
-        return this.ghiis.get(ghii) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.ghii.findUnique({ where: { ghii } });
+        return row ? this.toGHIIRecord(row) : null;
     }
 
     async getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null> {
-        for (const r of this.ghiis.values()) {
-            if (r.ownerName === ownerName) return r;
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.ghii.findFirst({ where: { ownerName } });
+        return row ? this.toGHIIRecord(row) : null;
     }
 
     async getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null> {
-        for (const r of this.ghiis.values()) {
-            if (r.emailHash === emailHash) return r;
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.ghii.findFirst({ where: { emailHash } });
+        return row ? this.toGHIIRecord(row) : null;
     }
 
     async updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
-        const record = this.ghiis.get(ghii);
-        if (!record) return null;
-        Object.assign(record, updates, { updatedAt: new Date().toISOString() });
-        return record;
+        this.ensureReady();
+        try {
+            const row = await this.prisma.ghii.update({ where: { ghii }, data: updates });
+            return this.toGHIIRecord(row);
+        } catch { return null; }
     }
 
     async listGHIIs(opts?: { q?: string; level?: number }): Promise<GHIIRecord[]> {
-        let results = [...this.ghiis.values()];
+        this.ensureReady();
+        const where: any = {};
         if (opts?.q) {
-            const q = opts.q.toLowerCase();
-            results = results.filter(r =>
-                r.username.toLowerCase().includes(q) ||
-                r.displayName.toLowerCase().includes(q) ||
-                (r.bio?.toLowerCase().includes(q) ?? false)
-            );
+            const q = opts.q;
+            where.OR = [
+                { username: { contains: q, mode: 'insensitive' } },
+                { displayName: { contains: q, mode: 'insensitive' } },
+                { bio: { contains: q, mode: 'insensitive' } },
+            ];
         }
         if (opts?.level !== undefined) {
-            results = results.filter(r => r.verificationLevel >= opts.level!);
+            where.verificationLevel = { gte: opts.level };
         }
-        return results;
+        const rows = await this.prisma.ghii.findMany({ where });
+        return rows.map((r: any) => this.toGHIIRecord(r));
     }
 
     async deleteGHII(ghii: string): Promise<boolean> {
-        return this.ghiis.delete(ghii);
+        this.ensureReady();
+        try {
+            await this.prisma.ghii.delete({ where: { ghii } });
+            return true;
+        } catch { return false; }
     }
 
     // ── Chat Instances (in-memory fallback until Prisma schema is updated) ──
