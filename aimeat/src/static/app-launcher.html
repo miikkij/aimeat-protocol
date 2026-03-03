@@ -1092,15 +1092,41 @@
   }
 
   function handleSave() {
-    var activeTab = document.querySelector('.modal-tab.active');
-    var tabName = activeTab ? activeTab.getAttribute('data-tab') : 'url';
-
     var name = document.getElementById('app-name').value.trim();
     var icon = document.getElementById('app-icon').value.trim();
     var tagsRaw = document.getElementById('app-tags').value.trim();
     var openMode = document.getElementById('app-open-mode').value;
 
     var tags = tagsRaw ? tagsRaw.split(',').map(function (t) { return t.trim(); }).filter(Boolean) : [];
+
+    // ── Edit mode: update existing app ──
+    if (editingAppId) {
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === editingAppId) { app = allApps[i]; break; }
+      }
+      if (!app) {
+        closeModal();
+        return;
+      }
+      if (!name) {
+        alert('Please enter a name');
+        return;
+      }
+      app.name = name;
+      app.icon = icon || app.icon;
+      app.tags = tags;
+      app.openMode = openMode;
+      saveApp(app).then(function () {
+        closeModal();
+        renderApps();
+      });
+      return;
+    }
+
+    // ── Create mode ──
+    var activeTab = document.querySelector('.modal-tab.active');
+    var tabName = activeTab ? activeTab.getAttribute('data-tab') : 'url';
 
     if (tabName === 'url') {
       var url = document.getElementById('app-url').value.trim();
@@ -1323,7 +1349,7 @@
           var app = filtered[i];
           var iconDisplay = app.icon || '\u{1F4DD}';
           html +=
-            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" style="animation-delay:' + (i * 0.04) + 's">' +
+            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" style="animation-delay:' + (i * 0.04) + 's">' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
               '<div class="app-source">' + sourceLabel(app.source) + '</div>' +
@@ -1384,6 +1410,98 @@
     }
   }
 
+  // ── Context Menu ────────────────────────────────
+
+  var contextAppId = null;
+
+  function showContextMenu(event, id) {
+    event.preventDefault();
+    event.stopPropagation();
+    contextAppId = id;
+
+    var menu = document.getElementById('context-menu');
+    menu.hidden = false;
+
+    // Position at cursor, but keep on screen
+    var x = event.clientX;
+    var y = event.clientY;
+    var menuWidth = 200; // approximate min-width
+    var menuHeight = 160; // approximate height
+
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 8;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 8;
+    }
+
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+  }
+
+  function hideContextMenu() {
+    var menu = document.getElementById('context-menu');
+    menu.hidden = true;
+    contextAppId = null;
+  }
+
+  function handleContextAction(action) {
+    if (!contextAppId) return;
+    var appId = contextAppId;
+    hideContextMenu();
+
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === appId) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    switch (action) {
+      case 'edit':
+        // Open modal pre-filled with app data
+        editingAppId = appId;
+        document.getElementById('modal-title').textContent = 'Edit App';
+        document.getElementById('app-name').value = app.name || '';
+        document.getElementById('app-icon').value = app.icon || '';
+        document.getElementById('app-tags').value = (app.tags || []).join(', ');
+        document.getElementById('app-open-mode').value = app.openMode || 'tab';
+
+        // Set the correct source tab
+        if (app.source === 'url') {
+          switchTab('url');
+          document.getElementById('app-url').value = app.url || '';
+        } else {
+          switchTab('file');
+          document.getElementById('selected-file-name').textContent = '(existing file)';
+        }
+
+        document.getElementById('modal-overlay').hidden = false;
+        break;
+
+      case 'favorite':
+        app.favorite = !app.favorite;
+        saveApp(app).then(function () {
+          renderApps();
+        });
+        break;
+
+      case 'toggle-mode':
+        app.openMode = app.openMode === 'iframe' ? 'tab' : 'iframe';
+        saveApp(app).then(function () {
+          renderApps();
+        });
+        break;
+
+      case 'delete':
+        if (confirm('Delete "' + (app.name || 'this app') + '"?')) {
+          deleteApp(appId).then(function () {
+            renderApps();
+          });
+        }
+        break;
+    }
+  }
+
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
@@ -1397,9 +1515,14 @@
     renderTags: renderTags,
     filterByTag: filterByTag,
     launchApp: launchApp,
+    launchInTab: launchInTab,
+    launchInIframe: launchInIframe,
     closeIframe: closeIframe,
     openExternal: openExternal,
     setCurrentIframeUrl: function (url) { currentIframeUrl = url; },
+    showContextMenu: showContextMenu,
+    hideContextMenu: hideContextMenu,
+    handleContextAction: handleContextAction,
     generateId: generateId,
     readFileAsText: readFileAsText,
     addAppFromUrl: addAppFromUrl,
@@ -1482,6 +1605,30 @@
     document.getElementById('modal-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         closeModal();
+      }
+    });
+
+    // ── Context menu action buttons ─────────────────
+    var contextMenu = document.getElementById('context-menu');
+    var contextBtns = contextMenu.querySelectorAll('button[data-action]');
+    contextBtns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        handleContextAction(btn.getAttribute('data-action'));
+      });
+    });
+
+    // ── Click anywhere to close context menu ────────
+    document.addEventListener('click', function () {
+      hideContextMenu();
+    });
+
+    // ── Escape key to close context menu ────────────
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!document.getElementById('context-menu').hidden) {
+          hideContextMenu();
+        }
       }
     });
   });
