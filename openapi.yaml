@@ -355,6 +355,8 @@ components:
         version:
           type: integer
           description: Optimistic locking version
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
 
     # === Actions ===
     ActionPublish:
@@ -684,6 +686,8 @@ components:
           type: array
           items:
             type: string
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
 
     # === Federation ===
     PeeringRequest:
