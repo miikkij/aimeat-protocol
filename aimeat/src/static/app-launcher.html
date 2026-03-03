@@ -262,6 +262,37 @@
       color: var(--text-dim);
     }
 
+    .app-card .app-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .app-card:hover .app-actions {
+      opacity: 1;
+    }
+
+    .app-card .app-actions button {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-glass);
+      color: var(--text-muted);
+      font-size: .7rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .app-card .app-actions button:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(233, 69, 96, .12);
+    }
+
     .app-card .fav-star {
       position: absolute;
       top: 8px;
@@ -1041,10 +1072,177 @@
     }
   }
 
-  // ── Rendering (placeholder) ───────────────────────
+  // ── Module-level state ──────────────────────────────
+
+  var allApps = [];
+  var activeTag = null;
+  var searchQuery = '';
+
+  // ── Helpers ────────────────────────────────────────
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function sourceLabel(source) {
+    switch (source) {
+      case 'local': return '\u{1F4C4} local';
+      case 'url':   return '\u{1F310} url';
+      case 'aimeat': return '\u{1F4E6} aimeat';
+      case 'zip':   return '\u{1F4E6} zip';
+      default:      return source || 'unknown';
+    }
+  }
+
+  // ── Tag Rendering ─────────────────────────────────
+
+  function renderTags() {
+    var tagBar = document.getElementById('tag-bar');
+    var tagSet = {};
+    var hasFavorites = false;
+
+    for (var i = 0; i < allApps.length; i++) {
+      var app = allApps[i];
+      if (app.favorite) hasFavorites = true;
+      if (app.tags && app.tags.length) {
+        for (var j = 0; j < app.tags.length; j++) {
+          tagSet[app.tags[j]] = true;
+        }
+      }
+    }
+
+    var uniqueTags = Object.keys(tagSet).sort();
+    var html = '';
+
+    // "All" button
+    html += '<button class="tag' + (activeTag === null ? ' active' : '') + '" onclick="window._launcher.filterByTag(null)">All</button>';
+
+    // Favorites button (only if any favorites exist)
+    if (hasFavorites) {
+      html += '<button class="tag' + (activeTag === '__favorites__' ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'__favorites__\')">\u2B50 Favorites</button>';
+    }
+
+    // One button per unique tag
+    for (var k = 0; k < uniqueTags.length; k++) {
+      var tag = uniqueTags[k];
+      html += '<button class="tag' + (activeTag === tag ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'' + escapeHtml(tag.replace(/'/g, "\\'")) + '\')">' + escapeHtml(tag) + '</button>';
+    }
+
+    tagBar.innerHTML = html;
+  }
+
+  // ── Tag Filtering ─────────────────────────────────
+
+  function filterByTag(tag) {
+    activeTag = tag;
+    renderApps();
+  }
+
+  // ── Launch App (placeholder) ──────────────────────
+
+  function launchApp(id, mode) {
+    console.log('launch', id, mode);
+  }
+
+  // ── Rendering ─────────────────────────────────────
 
   function renderApps() {
-    // Placeholder — will be implemented in Task 3
+    getAllApps().then(function (apps) {
+      allApps = apps;
+
+      // Sort: favorites first, then by lastOpenedAt or addedAt (newest first)
+      allApps.sort(function (a, b) {
+        // Favorites first
+        if (a.favorite && !b.favorite) return -1;
+        if (!a.favorite && b.favorite) return 1;
+        // Then by most recently used/added
+        var dateA = a.lastOpenedAt || a.addedAt || '';
+        var dateB = b.lastOpenedAt || b.addedAt || '';
+        if (dateA > dateB) return -1;
+        if (dateA < dateB) return 1;
+        return 0;
+      });
+
+      // Filter by activeTag
+      var filtered = allApps;
+      if (activeTag === '__favorites__') {
+        filtered = allApps.filter(function (app) { return app.favorite; });
+      } else if (activeTag !== null) {
+        filtered = allApps.filter(function (app) {
+          return app.tags && app.tags.indexOf(activeTag) !== -1;
+        });
+      }
+
+      // Filter by searchQuery
+      if (searchQuery) {
+        var q = searchQuery.toLowerCase();
+        filtered = filtered.filter(function (app) {
+          if (app.name && app.name.toLowerCase().indexOf(q) !== -1) return true;
+          if (app.tags) {
+            for (var i = 0; i < app.tags.length; i++) {
+              if (app.tags[i].toLowerCase().indexOf(q) !== -1) return true;
+            }
+          }
+          return false;
+        });
+      }
+
+      var grid = document.getElementById('app-grid');
+
+      if (filtered.length === 0) {
+        if (!activeTag && !searchQuery && allApps.length === 0) {
+          // No apps at all — show helpful empty state
+          grid.innerHTML =
+            '<div class="empty-state">' +
+              '<div class="empty-icon">\u{1F680}</div>' +
+              '<p>No apps yet. Tap <strong>+</strong> to add your first app from a URL or local file.</p>' +
+            '</div>';
+        } else {
+          // Filters active but no matches
+          grid.innerHTML =
+            '<div class="empty-state">' +
+              '<div class="empty-icon">\u{1F50D}</div>' +
+              '<p>No apps match the current filter.</p>' +
+            '</div>';
+        }
+      } else {
+        var html = '';
+        for (var i = 0; i < filtered.length; i++) {
+          var app = filtered[i];
+          var iconDisplay = app.icon || '\u{1F4DD}';
+          html +=
+            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" style="animation-delay:' + (i * 0.04) + 's">' +
+              '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
+              '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
+              '<div class="app-source">' + sourceLabel(app.source) + '</div>' +
+              '<div class="app-actions">' +
+                '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'tab\')" title="Open in tab">\u25B6 Tab</button>' +
+                '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'iframe\')" title="Open in iframe">\u25FB</button>' +
+              '</div>' +
+              (app.favorite ? '<span class="fav-star visible">\u2B50</span>' : '') +
+            '</div>';
+        }
+        grid.innerHTML = html;
+      }
+
+      // Update stats
+      var statsEl = document.getElementById('stats');
+      var totalSize = 0;
+      for (var s = 0; s < allApps.length; s++) {
+        if (allApps[s].blob) {
+          totalSize += allApps[s].blob.length;
+        }
+      }
+      var sizeLabel = totalSize < 1024 ? totalSize + ' B'
+        : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB'
+        : (totalSize / 1048576).toFixed(1) + ' MB';
+      statsEl.textContent = allApps.length + ' app' + (allApps.length !== 1 ? 's' : '') + ' \u00B7 ' + sizeLabel + ' stored';
+
+      // Render tag bar
+      renderTags();
+    });
   }
 
   // ── Iframe helpers ────────────────────────────────
@@ -1075,6 +1273,9 @@
     loadConfig: loadConfig,
     saveConfig: saveConfig,
     renderApps: renderApps,
+    renderTags: renderTags,
+    filterByTag: filterByTag,
+    launchApp: launchApp,
     closeIframe: closeIframe,
     openExternal: openExternal,
     setCurrentIframeUrl: function (url) { currentIframeUrl = url; },
@@ -1090,6 +1291,12 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     renderApps();
+
+    // ── Search input ─────────────────────────────────
+    document.getElementById('search-input').addEventListener('input', function (e) {
+      searchQuery = e.target.value.trim();
+      renderApps();
+    });
 
     // ── Add App button ──────────────────────────────
     document.getElementById('add-btn').addEventListener('click', function () {
