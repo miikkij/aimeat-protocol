@@ -10,6 +10,16 @@ import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import type { StatsCollector } from '../services/stats.js';
 
+/** Map memory visibility to DMZ zone (Phase 0.6) */
+function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
+  switch (visibility) {
+    case 'private': return 'private';
+    case 'owner': return 'dmz';
+    case 'public': return 'federation';
+    default: return 'private';
+  }
+}
+
 export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector): Router {
   const router = Router();
 
@@ -117,6 +127,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,
       visibility: record.visibility,
+      zone: visibilityToZone(record.visibility),
       tags: record.tags,
       version: record.version,
       created_at: record.createdAt,
@@ -148,7 +159,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       items: records.map(r => ({
         key: r.key,
         visibility: r.visibility,
-        zone: r.visibility === 'private' ? 'private' : r.visibility === 'public' ? 'federation' : 'dmz',
+        zone: visibilityToZone(r.visibility),
         tags: r.tags,
         version: r.version,
         created_at: r.createdAt,
@@ -188,6 +199,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         key: r.key,
         value: r.value,
         visibility: r.visibility,
+        zone: visibilityToZone(r.visibility),
         tags: r.tags,
         version: r.version,
         created_at: r.createdAt,
@@ -209,18 +221,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // DMZ zone mapping (Phase 0.6)
-    const zone = record.visibility === 'private' ? 'private'
-      : record.visibility === 'public' ? 'federation'
-        : 'dmz';
-
     stats?.increment('memory_reads');
 
     res.json(success(config.nodeId, {
       key: record.key,
       value: record.value,
       visibility: record.visibility,
-      zone,
+      zone: visibilityToZone(record.visibility),
       tags: record.tags,
       version: record.version,
       created_at: record.createdAt,
@@ -320,6 +327,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     res.json(success(config.nodeId, {
       key: record.key,
       visibility: record.visibility,
+      zone: visibilityToZone(record.visibility),
       tags: record.tags,
       version: record.version,
       created_at: record.createdAt,
@@ -347,6 +355,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       key: record.key,
       value: record.value,
       visibility: record.visibility,
+      zone: visibilityToZone(record.visibility),
       tags: record.tags,
       version: record.version,
       owner_gaii: record.ownerGaii,
