@@ -997,7 +997,7 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
       const existingKeys = new Set(
         existing
           .split('\n')
-          .filter(line => line.match(/^[A-Z_]+=/) )
+          .filter(line => line.match(/^[A-Z_]+=/))
           .map(line => line.split('=')[0]),
       );
 

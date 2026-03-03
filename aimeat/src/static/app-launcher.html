@@ -2112,6 +2112,10 @@
         });
         break;
 
+      case 'view-source':
+        viewSource(app);
+        break;
+
       case 'delete':
         if (confirm('Delete "' + (app.name || 'this app') + '"?')) {
           deleteApp(appId).then(function () {
@@ -2120,6 +2124,72 @@
         }
         break;
     }
+  }
+
+  // ── View Source ──────────────────────────────────
+
+  function viewSource(app) {
+    var overlay = document.getElementById('source-overlay');
+    var textarea = document.getElementById('source-code');
+    var title = document.getElementById('source-title');
+
+    title.textContent = 'View Source: ' + (app.name || 'App');
+
+    if (app.blob) {
+      textarea.value = decodeURIComponent(escape(atob(app.blob)));
+    } else if (app.url) {
+      textarea.value = '// This app is URL-based (' + app.url + ')\n// Source code is not stored locally.\n// Open the URL to view the app.';
+    } else {
+      textarea.value = '// No source available';
+    }
+
+    overlay.hidden = false;
+    // Store current app for copy-with-prompt
+    overlay.dataset.appName = app.name || 'App';
+  }
+
+  // ── Generate Homepage Prompt ──────────────────────
+
+  function generateHomepagePrompt() {
+    if (allApps.length === 0) {
+      alert('Add some apps first before generating a homepage.');
+      return;
+    }
+
+    var appList = allApps.map(function(app) {
+      var launchInfo = '';
+      if (app.url) {
+        launchInfo = 'URL: ' + app.url;
+      } else {
+        launchInfo = 'Local HTML app (user will open it from their launcher)';
+      }
+      return '- ' + (app.icon || '') + ' ' + app.name +
+        (app.description ? ' (' + app.description + ')' : '') +
+        ' [' + launchInfo + ']' +
+        (app.tags.length ? ' Tags: ' + app.tags.join(', ') : '');
+    }).join('\n');
+
+    var prompt = 'Create a single HTML file that serves as my personal homepage/dashboard.\n\n' +
+      'My apps:\n' + appList + '\n\n' +
+      'Requirements:\n' +
+      '- Show each app as a clickable card with its icon and name\n' +
+      '- For URL-based apps, clicking opens the URL in a new tab\n' +
+      '- For local apps, show a note that they can be opened from the App Launcher\n' +
+      '- Modern, responsive design with dark theme\n' +
+      '- Group apps by their tags if they have tags\n' +
+      '- Everything in one self-contained HTML file, no external dependencies\n' +
+      '- Add a header with my name/title (I will customize this)\n' +
+      '- Make it visually distinctive and professional';
+
+    // Reuse the source overlay for displaying the prompt
+    var overlay = document.getElementById('source-overlay');
+    var textarea = document.getElementById('source-code');
+    var title = document.getElementById('source-title');
+
+    title.textContent = 'Generate Homepage - Copy this prompt to AI';
+    textarea.value = prompt;
+    overlay.dataset.appName = 'Homepage';
+    overlay.hidden = false;
   }
 
   // ── Theme ────────────────────────────────────────
@@ -2412,7 +2482,9 @@
     exportBackup: exportBackup,
     clearAllData: clearAllData,
     importFromAimeat: importFromAimeat,
-    processAimeatImport: processAimeatImport
+    processAimeatImport: processAimeatImport,
+    viewSource: viewSource,
+    generateHomepagePrompt: generateHomepagePrompt
   };
 
   // ── Bootstrap ─────────────────────────────────────

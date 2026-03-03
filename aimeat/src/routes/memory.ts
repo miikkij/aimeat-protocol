@@ -83,10 +83,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     if (!validation.valid) {
       res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
         'Value does not match the schema for this key', 422, {
-          key,
-          violations: validation.errors,
-          schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,
-        }));
+        key,
+        violations: validation.errors,
+        schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,
+      }));
       return;
     }
 
@@ -209,7 +209,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     // DMZ zone mapping (Phase 0.6)
     const zone = record.visibility === 'private' ? 'private'
       : record.visibility === 'public' ? 'federation'
-      : 'dmz';
+        : 'dmz';
 
     res.json(success(config.nodeId, {
       key: record.key,
@@ -283,10 +283,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage): Router {
     if (!putValidation.valid) {
       res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
         'Value does not match the schema for this key', 422, {
-          key,
-          violations: putValidation.errors,
-          schema_url: `/v1/memory/${encodeURIComponent(putValidation.schemaKey!)}/schema`,
-        }));
+        key,
+        violations: putValidation.errors,
+        schema_url: `/v1/memory/${encodeURIComponent(putValidation.schemaKey!)}/schema`,
+      }));
       return;
     }
 
