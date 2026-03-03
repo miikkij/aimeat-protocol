@@ -369,6 +369,222 @@
       background-clip: text;
     }
 
+    /* ── Modal Form Elements ──────────────────────────── */
+
+    .modal-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .modal-tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: .85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .modal-tab:not(:last-child) {
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .modal-tab:hover {
+      color: var(--text);
+      background: rgba(192, 132, 252, .06);
+    }
+
+    .modal-tab.active {
+      background: linear-gradient(135deg, var(--accent), #c53a50);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .modal-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .label-hint {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-dim);
+    }
+
+    .modal-input {
+      width: 100%;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: .88rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .modal-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, .15);
+    }
+
+    select.modal-input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(196,181,212,.7)' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+
+    select.modal-input option {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .modal-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .modal-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .modal-btn {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-btn.secondary {
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .modal-btn.secondary:hover {
+      color: var(--text);
+      border-color: var(--border-hover);
+    }
+
+    .modal-btn.primary {
+      background: linear-gradient(135deg, var(--accent), #c53a50);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .modal-btn.primary:hover {
+      box-shadow: 0 4px 20px rgba(233, 69, 96, .35);
+      background: linear-gradient(135deg, #f05575, #e94560);
+    }
+
+    /* ── Drop Zone ──────────────────────────────────── */
+
+    .drop-zone {
+      border: 2px dashed var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 28px 20px;
+      text-align: center;
+      transition: border-color var(--transition), background var(--transition);
+      cursor: pointer;
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(233, 69, 96, .06);
+    }
+
+    .drop-zone-icon {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      opacity: .5;
+    }
+
+    .drop-zone-text {
+      font-size: .85rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .drop-zone-hint {
+      font-size: .75rem;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .browse-btn {
+      padding: 7px 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-glass);
+      color: var(--text);
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .browse-btn:hover {
+      border-color: var(--border-hover);
+      background: rgba(30, 20, 45, .8);
+    }
+
+    .drop-zone-selected {
+      margin-top: 10px;
+      font-size: .8rem;
+      color: var(--accent);
+      font-weight: 500;
+      min-height: 1.2em;
+    }
+
     /* ── Iframe View ────────────────────────────────── */
 
     #iframe-view {
@@ -465,7 +681,67 @@
     <span class="footer-brand">AIMEAT</span>
   </footer>
 
-  <div id="modal-overlay" hidden></div>
+  <div id="modal-overlay" hidden>
+    <div class="modal" id="add-app-modal">
+      <h2 id="modal-title">Add App</h2>
+
+      <!-- Source tabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="url">URL</button>
+        <button class="modal-tab" data-tab="file">File</button>
+      </div>
+
+      <!-- URL tab content -->
+      <div class="tab-content active" id="tab-url">
+        <label class="modal-label" for="app-url">App URL</label>
+        <input type="url" id="app-url" class="modal-input" placeholder="https://example.com/app.html" autocomplete="off"/>
+      </div>
+
+      <!-- File tab content -->
+      <div class="tab-content" id="tab-file">
+        <label class="modal-label">HTML File</label>
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-zone-icon">&#x1F4C4;</div>
+          <p class="drop-zone-text">Drag &amp; drop an HTML file here</p>
+          <p class="drop-zone-hint">or</p>
+          <button type="button" class="browse-btn" id="browse-btn">Browse files</button>
+          <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
+          <p class="drop-zone-selected" id="selected-file-name"></p>
+        </div>
+      </div>
+
+      <!-- Common fields -->
+      <div class="modal-fields">
+        <div class="modal-row">
+          <div class="modal-field" style="flex:1">
+            <label class="modal-label" for="app-name">App Name</label>
+            <input type="text" id="app-name" class="modal-input" placeholder="My App" autocomplete="off"/>
+          </div>
+          <div class="modal-field" style="width:72px">
+            <label class="modal-label" for="app-icon">Icon</label>
+            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;" style="text-align:center;font-size:1.2rem"/>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="app-tags">Tags <span class="label-hint">(comma separated)</span></label>
+          <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" autocomplete="off"/>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="app-open-mode">Open Mode</label>
+          <select id="app-open-mode" class="modal-input">
+            <option value="tab">New Tab</option>
+            <option value="iframe">Inline (iframe)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" id="modal-cancel-btn">Cancel</button>
+        <button type="button" class="modal-btn primary" id="modal-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
 
   <div id="iframe-view" hidden>
     <div class="iframe-toolbar">
@@ -576,6 +852,195 @@
     localStorage.setItem('appLauncherConfig', JSON.stringify(config));
   }
 
+  // ── ID Generator ─────────────────────────────────
+
+  function generateId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // ── File Reading Helper ─────────────────────────
+
+  function readFileAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        resolve(reader.result);
+      };
+      reader.onerror = function () {
+        reject(reader.error);
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // ── App Creation from URL ───────────────────────
+
+  function addAppFromUrl(name, url, icon, tags, openMode) {
+    var app = {
+      id: generateId(),
+      name: name,
+      description: '',
+      source: 'url',
+      url: url,
+      blob: null,
+      tags: tags,
+      openMode: openMode,
+      icon: icon || '\u{1F4DD}',
+      screenshot: null,
+      favorite: false,
+      addedAt: new Date().toISOString(),
+      lastOpenedAt: null
+    };
+    return saveApp(app).then(function () {
+      return app;
+    });
+  }
+
+  // ── App Creation from File ──────────────────────
+
+  function addAppFromFile(name, file, icon, tags, openMode) {
+    return readFileAsText(file).then(function (content) {
+      var encoded = btoa(unescape(encodeURIComponent(content)));
+      var app = {
+        id: generateId(),
+        name: name,
+        description: '',
+        source: 'local',
+        url: null,
+        blob: encoded,
+        tags: tags,
+        openMode: openMode,
+        icon: icon || '\u{1F4DD}',
+        screenshot: null,
+        favorite: false,
+        addedAt: new Date().toISOString(),
+        lastOpenedAt: null
+      };
+      return saveApp(app).then(function () {
+        return app;
+      });
+    });
+  }
+
+  // ── Modal State ─────────────────────────────────
+
+  var selectedFile = null;
+  var editingAppId = null;
+
+  function showModal() {
+    document.getElementById('modal-overlay').hidden = false;
+    document.getElementById('modal-title').textContent = 'Add App';
+    // Default to URL tab
+    switchTab('url');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').hidden = true;
+    // Reset form
+    document.getElementById('app-url').value = '';
+    document.getElementById('app-name').value = '';
+    document.getElementById('app-icon').value = '';
+    document.getElementById('app-tags').value = '';
+    document.getElementById('app-open-mode').value = 'tab';
+    document.getElementById('selected-file-name').textContent = '';
+    document.getElementById('file-input').value = '';
+    selectedFile = null;
+    editingAppId = null;
+  }
+
+  function switchTab(tabName) {
+    // Toggle tab buttons
+    var tabs = document.querySelectorAll('.modal-tab');
+    tabs.forEach(function (tab) {
+      if (tab.getAttribute('data-tab') === tabName) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
+    // Toggle tab content
+    var contents = document.querySelectorAll('.tab-content');
+    contents.forEach(function (content) {
+      if (content.id === 'tab-' + tabName) {
+        content.classList.add('active');
+      } else {
+        content.classList.remove('active');
+      }
+    });
+  }
+
+  function handleFileDrop(file) {
+    if (!file) return;
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      alert('ZIP support coming soon');
+      return;
+    }
+    if (!file.name.match(/\.html?$/i)) {
+      alert('Please select an HTML file (.html or .htm)');
+      return;
+    }
+    selectedFile = file;
+    document.getElementById('selected-file-name').textContent = file.name;
+    // Auto-fill name from filename if empty
+    var nameInput = document.getElementById('app-name');
+    if (!nameInput.value.trim()) {
+      nameInput.value = file.name.replace(/\.html?$/i, '');
+    }
+  }
+
+  function handleSave() {
+    var activeTab = document.querySelector('.modal-tab.active');
+    var tabName = activeTab ? activeTab.getAttribute('data-tab') : 'url';
+
+    var name = document.getElementById('app-name').value.trim();
+    var icon = document.getElementById('app-icon').value.trim();
+    var tagsRaw = document.getElementById('app-tags').value.trim();
+    var openMode = document.getElementById('app-open-mode').value;
+
+    var tags = tagsRaw ? tagsRaw.split(',').map(function (t) { return t.trim(); }).filter(Boolean) : [];
+
+    if (tabName === 'url') {
+      var url = document.getElementById('app-url').value.trim();
+      if (!url) {
+        alert('Please enter a URL');
+        return;
+      }
+      if (!name) {
+        // Derive name from URL
+        try {
+          name = new URL(url).hostname;
+        } catch (e) {
+          name = url;
+        }
+      }
+      addAppFromUrl(name, url, icon, tags, openMode).then(function () {
+        closeModal();
+        renderApps();
+      });
+    } else {
+      // File tab
+      if (!selectedFile) {
+        alert('Please select a file');
+        return;
+      }
+      if (!name) {
+        name = selectedFile.name.replace(/\.html?$/i, '');
+      }
+      addAppFromFile(name, selectedFile, icon, tags, openMode).then(function () {
+        closeModal();
+        renderApps();
+      });
+    }
+  }
+
   // ── Rendering (placeholder) ───────────────────────
 
   function renderApps() {
@@ -612,13 +1077,85 @@
     renderApps: renderApps,
     closeIframe: closeIframe,
     openExternal: openExternal,
-    setCurrentIframeUrl: function (url) { currentIframeUrl = url; }
+    setCurrentIframeUrl: function (url) { currentIframeUrl = url; },
+    generateId: generateId,
+    readFileAsText: readFileAsText,
+    addAppFromUrl: addAppFromUrl,
+    addAppFromFile: addAppFromFile,
+    showModal: showModal,
+    closeModal: closeModal
   };
 
   // ── Bootstrap ─────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', function () {
     renderApps();
+
+    // ── Add App button ──────────────────────────────
+    document.getElementById('add-btn').addEventListener('click', function () {
+      showModal();
+    });
+
+    // ── Tab switching ───────────────────────────────
+    var tabBtns = document.querySelectorAll('.modal-tab');
+    tabBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        switchTab(btn.getAttribute('data-tab'));
+      });
+    });
+
+    // ── Drop zone events ────────────────────────────
+    var dropZone = document.getElementById('drop-zone');
+    var fileInput = document.getElementById('file-input');
+    var browseBtn = document.getElementById('browse-btn');
+
+    dropZone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFileDrop(e.dataTransfer.files[0]);
+      }
+    });
+
+    browseBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length > 0) {
+        handleFileDrop(fileInput.files[0]);
+      }
+    });
+
+    // ── Modal save / cancel ─────────────────────────
+    document.getElementById('modal-save-btn').addEventListener('click', function () {
+      handleSave();
+    });
+
+    document.getElementById('modal-cancel-btn').addEventListener('click', function () {
+      closeModal();
+    });
+
+    // ── Click overlay to close ──────────────────────
+    document.getElementById('modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
   });
 
 })();
