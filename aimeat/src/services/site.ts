@@ -1,9 +1,26 @@
 import { randomBytes } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
-import { humanPortalHtml } from '../routes/portal-human.js';
-import { createT, resolveLocale, type Locale } from '../i18n.js';
 import { getSiteSyncState } from './site-sync.js';
+
+const __dirname_site = dirname(fileURLToPath(import.meta.url));
+
+/** Resolve path to public/human.html (works from both src/ and dist/). */
+function resolveHumanHtmlPath(): string {
+    const candidates = [
+        join(__dirname_site, '..', '..', 'public', 'human.html'),      // dev: src/services/../../public
+        join(__dirname_site, '..', '..', '..', 'public', 'human.html'), // dist: dist/src/services/../../../public
+    ];
+    for (const p of candidates) {
+        if (existsSync(p)) return p;
+    }
+    return candidates[0]; // fallback
+}
+
+const HUMAN_HTML_PATH = resolveHumanHtmlPath();
 
 // Reserved storage key for the portal template
 const SITE_TEMPLATE_KEY = '__site_template__';
@@ -452,25 +469,12 @@ export class SiteService {
     }
 
     private async renderDefault(
-        langParam: string | undefined,
-        cookieHeader: string | undefined,
-        acceptLang: string | undefined,
+        _langParam: string | undefined,
+        _cookieHeader: string | undefined,
+        _acceptLang: string | undefined,
     ): Promise<string> {
-        const locale: Locale = resolveLocale(langParam, cookieHeader, acceptLang);
-        const t = createT(locale);
-        const [agents, chatSessions, actions, boards] = await Promise.all([
-            this.storage.listAgents(),
-            this.storage.listChatInstances(),
-            this.storage.listActions(),
-            this.storage.listBoards(),
-        ]);
-        const stats = {
-            agents: agents.length,
-            chatSessions: chatSessions.length,
-            actions: actions.length,
-            boards: boards.length,
-        };
-        return humanPortalHtml(this.config, t, locale, stats);
+        // Serve the static human.html file (language detection happens client-side)
+        return readFileSync(HUMAN_HTML_PATH, 'utf-8');
     }
 }
 
