@@ -378,6 +378,138 @@ await test('GET /v1/admin/translations?lang=fi \u2192 200, mintMorsels contains 
     );
 });
 
+// ─── MSM Templates ───
+console.log('\nMSM Templates');
+
+let msmTemplateYaml = '';
+
+await test('GET /v1/msm/templates → 200, has templates array with total >= 1', async () => {
+    const { status, body } = await json('/v1/msm/templates');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.templates), 'has templates array');
+    assert(typeof body.data?.total === 'number', 'has total');
+    assert(body.data.total >= 1, `total >= 1, got ${body.data.total}`);
+});
+
+await test('GET /v1/msm/templates/weather-pricing → 200, returns YAML content', async () => {
+    const res = await fetch(`${BASE}/v1/msm/templates/weather-pricing`);
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(text.length > 0, 'body is non-empty');
+    assert(text.includes('msm:') || text.startsWith('#'), 'body looks like MSM YAML');
+    msmTemplateYaml = text;
+});
+
+// ─── MSM CRUD ───
+console.log('\nMSM CRUD');
+
+await test('POST /v1/msm → 201, register weather-pricing MSM from template YAML', async () => {
+    assert(msmTemplateYaml.length > 0, 'template YAML was fetched');
+    const { status, body } = await json('/v1/msm', authed({
+        method: 'POST',
+        body: JSON.stringify({ yaml: msmTemplateYaml }),
+    }));
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.integration?.name === 'string', 'has name');
+    assert(typeof body.data?.integration?.category === 'string', 'has category');
+    assert(typeof body.data?.integration?.actions_count === 'number', 'has actions_count');
+    assert(body.data.integration.actions_count > 0, `actions_count > 0, got ${body.data.integration.actions_count}`);
+});
+
+await test('GET /v1/msm → 200, list includes registered MSM', async () => {
+    const { status, body } = await json('/v1/msm');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.integrations), 'has integrations');
+    assert(body.data.integrations.length >= 1, `at least 1 integration, got ${body.data.integrations.length}`);
+    const found = body.data.integrations.find((i: any) => i.name === 'OpenWeather Pricing Intelligence');
+    assert(found, 'found OpenWeather integration in list');
+});
+
+await test('GET /v1/msm/{name} → 200, returns full definition', async () => {
+    const { status, body } = await json(`/v1/msm/${encodeURIComponent('OpenWeather Pricing Intelligence')}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data?.integration?.name === 'string', 'has name');
+    assert(typeof body.data?.integration?.definition === 'object', 'has definition');
+    assert(Array.isArray(body.data.integration.definition.actions), 'definition has actions array');
+});
+
+// ─── MSM Auth ───
+console.log('\nMSM Auth');
+
+await test('POST /v1/msm (no auth) → 401', async () => {
+    const { status } = await json('/v1/msm', {
+        method: 'POST',
+        body: JSON.stringify({ yaml: 'msm: "1.0"\nservice:\n  name: "test"\n' }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('DELETE /v1/msm/{name} (non-operator, non-registerer) → 403', async () => {
+    const { status } = await json(`/v1/msm/${encodeURIComponent('OpenWeather Pricing Intelligence')}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${nonOpToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+// ─── MSM Admin ───
+console.log('\nMSM Admin');
+
+await test('GET /v1/admin/msm → 200, has integrations array with correct fields', async () => {
+    const { status, body } = await json('/v1/admin/msm', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data?.integrations), 'has integrations array');
+    assert(typeof body.data?.total === 'number', 'has total');
+    if (body.data.integrations.length > 0) {
+        const first = body.data.integrations[0];
+        assert(typeof first.name === 'string', 'integration has name');
+        assert(typeof first.category === 'string', 'integration has category');
+        assert(typeof first.auth_type === 'string', 'integration has auth_type');
+        assert(typeof first.actions_count === 'number', 'integration has actions_count');
+    }
+});
+
+// ─── MSM Cleanup ───
+console.log('\nMSM Cleanup');
+
+await test('DELETE /v1/msm/{name} (operator) → 200, deleted', async () => {
+    const { status, body } = await json(`/v1/msm/${encodeURIComponent('OpenWeather Pricing Intelligence')}`, authed({
+        method: 'DELETE',
+    }));
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.deleted === true, 'confirmed deleted');
+});
+
+// ─── Admin Translations (new MSM-related keys) ───
+console.log('\nAdmin Translations (MSM keys)');
+
+await test('GET /v1/admin/translations?lang=en → has navServices, msmLabel, navIntegrations', async () => {
+    const { status, body } = await json('/v1/admin/translations?lang=en');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.translations === 'object', 'has translations');
+    assert(typeof body.translations.navServices === 'string', 'has navServices');
+    assert(typeof body.translations.msmLabel === 'string', 'has msmLabel');
+    assert(typeof body.translations.navIntegrations === 'string', 'has navIntegrations');
+});
+
+await test('GET /v1/admin/translations?lang=fi → navServices equals "Palvelut"', async () => {
+    const { status, body } = await json('/v1/admin/translations?lang=fi');
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.translations === 'object', 'has translations');
+    assert(
+        body.translations.navServices === 'Palvelut',
+        `expected navServices = 'Palvelut', got '${body.translations.navServices}'`,
+    );
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 
