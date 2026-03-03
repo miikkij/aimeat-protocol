@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
 import { humanPortalHtml } from '../routes/portal-human.js';
 import { createT, resolveLocale, type Locale } from '../i18n.js';
+import { getSiteSyncState } from './site-sync.js';
 
 // Reserved storage key for the portal template
 const SITE_TEMPLATE_KEY = '__site_template__';
@@ -186,7 +187,7 @@ export class SiteService {
     async getMetadata(): Promise<Record<string, unknown>> {
         const hasTemplate = await this.hasCustomTemplate();
         const templateInfo = hasTemplate ? await this.getTemplate() : null;
-        return {
+        const meta: Record<string, unknown> = {
             node_id: this.config.nodeId,
             node_type: this.config.nodeType,
             base_url: this.config.baseUrl,
@@ -195,6 +196,17 @@ export class SiteService {
             template_updated_at: templateInfo?.updatedAt ?? null,
             cache_ttl_seconds: this.config.siteCacheTtlSeconds,
         };
+        if (this.config.siteLbEnabled) {
+            const syncState = getSiteSyncState();
+            meta.lb_mode = {
+                enabled: true,
+                origin_url: this.config.siteLbOriginUrl,
+                last_sync: syncState.lastSync,
+                last_error: syncState.lastError,
+                syncing: syncState.syncing,
+            };
+        }
+        return meta;
     }
 
     /** Generate a context-aware prompt for AI-assisted portal editing. */
@@ -288,6 +300,17 @@ export class SiteService {
             return records
                 .filter(r => r.key.startsWith('portal/'))
                 .map(r => r.key);
+        } catch {
+            return [];
+        }
+    }
+
+    async getPortalMemoryEntries(): Promise<Array<{ key: string; value: unknown }>> {
+        try {
+            const records = await this.storage.listMemory(SITE_OWNER_GAII);
+            return records
+                .filter(r => r.key.startsWith('portal/'))
+                .map(r => ({ key: r.key, value: r.value }));
         } catch {
             return [];
         }

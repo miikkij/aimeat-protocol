@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { getSiteSyncState } from '../services/site-sync.js';
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
@@ -151,11 +152,26 @@ export function bootstrapRouter(config: AimeatConfig): Router {
 
   // GET /v1/health — simple liveness/readiness check (Tier 0, no auth)
   router.get('/v1/health', (_req, res) => {
-    res.json(success(config.nodeId, {
+    const healthData: Record<string, unknown> = {
       status: 'healthy',
       uptime_seconds: Math.floor(process.uptime()),
       memory_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-    }));
+    };
+
+    if (config.siteLbEnabled) {
+      const syncState = getSiteSyncState();
+      const lastSyncAge = syncState.lastSync
+        ? (Date.now() - new Date(syncState.lastSync).getTime()) / 1000
+        : Infinity;
+      healthData.site_lb = {
+        enabled: true,
+        origin_url: config.siteLbOriginUrl,
+        last_sync: syncState.lastSync,
+        sync_healthy: syncState.lastError === null && lastSyncAge < config.siteLbSyncIntervalMin * 60 * 2,
+      };
+    }
+
+    res.json(success(config.nodeId, healthData));
   });
 
   return router;

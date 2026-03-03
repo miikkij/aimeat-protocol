@@ -31,7 +31,7 @@
       "copyInstructions": "Kopioi kehote",
       "copiedInstructions": "Kopioitu!",
       "pasteHint": "Liitä mihin tahansa AI-chattiin. AI rakentaa sinulle HTML-sovelluksen, jota voit ajaa omassa selaimessa, joka näyttää taulun automaattipäivityksellä ja jolla voit lähettää uusia viestejä.",
-      "upgradeNote": "Tämä data on julkista ja vanhenee. Rekisteröi GHII saadaksesi oman yksityisen muistitilan."
+      "upgradeNote": "Tämä data on julkista ja vanhenee. Rekisteröi henkilökohtainen tunnus saadaksesi oman yksityisen muistitilan."
     },
     "apps": {
       "title": "Sovellukset",
@@ -1204,6 +1204,14 @@
     "portalAiImport": "Tuo tekoälyn tulos",
     "portalAiExplain": "Kopioi tekoälykehote suosikkiavustajallesi (Claude, ChatGPT, Copilot). Kuvaile portaalisi, niin se luo mallin jonka voit tuoda.",
     "portalTagHelp": "Käytä {{config:avain}}, {{memory:avain}}, {{storage:avain}}, {{kv:avain}}, {{board:slug}} tageja mallissa.",
+    "portalLbMode": "Kuormanjakajamoodi",
+    "portalLbReadOnly": "Portaalin sisältö on vain luku -tilassa. Sisältö synkronoidaan lähdenodesta.",
+    "portalLbOrigin": "Lähde-URL",
+    "portalLbLastSync": "Viimeisin synkronointi",
+    "portalLbError": "Viimeisin virhe",
+    "portalLbStatus": "Synkronointitila",
+    "portalLbSyncNow": "Synkronoi nyt",
+    "portalLbSyncDone": "Portaalin synkronointi valmis.",
     "stats": "Tilastot",
     "statsNotAvailable": "Tilastot on poistettu käytöstä tässä nodessa.",
     "requestsTotal": "Pyyntöjä yhteensä",

@@ -6,7 +6,8 @@ import type { AimeatConfig } from './config.js';
 import { InMemoryStorage } from './storage/memory.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
-import { optionalAuth, enableAnonymousAuth } from './auth/middleware.js';
+import { optionalAuth, enableAnonymousAuth, requireAuth, requireRole } from './auth/middleware.js';
+import { success, error } from './middleware/envelope.js';
 import { logger } from './utils/logger.js';
 
 // Routes
@@ -70,6 +71,8 @@ import { createEmailService } from './services/email.js';
 import { DirectoryService } from './services/directory.js';
 import { portalHobbiesRouter } from './routes/portal-hobbies.js';
 import { siteRouter } from './routes/site.js';
+import { SiteService } from './services/site.js';
+import { startSiteSyncJob, triggerSiteSync, getSiteSyncState } from './services/site-sync.js';
 import { realtimeRouter } from './routes/realtime.js';
 import { RealtimeManager } from './services/realtime-manager.js';
 import { startMatchNotificationJob } from './services/match-notification.js';
@@ -382,7 +385,21 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
   app.use(mcpRouter(config, storage));
-  app.use(siteRouter(config, storage));    // Node Portal — GET / + /v1/site/*
+  const siteService = new SiteService(config, storage);
+  app.use(siteRouter(config, storage, siteService));    // Node Portal — GET / + /v1/site/*
+
+  // Site LB sync — manual trigger endpoint + background job
+  if (config.siteLbEnabled && config.siteLbOriginUrl) {
+    app.post('/v1/admin/site/sync', requireAuth(), requireRole('operator'), async (_req, res) => {
+      try {
+        const result = await triggerSiteSync(config, storage, siteService);
+        res.json(success(config.nodeId, { synced: true, template_updated: result.templateUpdated, memory_keys_synced: result.memoryKeysSynced }));
+      } catch (err) {
+        res.status(502).json(error(config.nodeId, 'SYNC_FAILED', err instanceof Error ? err.message : 'Sync failed'));
+      }
+    });
+    startSiteSyncJob(config, storage, siteService);
+  }
   app.use(portalRouter(config, storage));
   app.use(humanPortalRouter(config, storage));
   app.use(portalHobbiesRouter(config, storage, directoryService));

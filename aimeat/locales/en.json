@@ -31,7 +31,7 @@
       "copyInstructions": "Copy prompt",
       "copiedInstructions": "Copied!",
       "pasteHint": "Paste into any AI chat. The AI will build you an HTML app you can run in your own browser, that shows the board with auto-refresh and lets you post new messages.",
-      "upgradeNote": "This data is public and expires. Register a GHII to get your own private memory space."
+      "upgradeNote": "This data is public and expires. Register a personal identity to get your own private memory space."
     },
     "apps": {
       "title": "Apps",
@@ -1204,6 +1204,14 @@
     "portalAiImport": "Import AI Result",
     "portalAiExplain": "Copy the AI prompt to your favourite AI assistant (Claude, ChatGPT, Copilot). Describe your portal, and it will generate a template you can import.",
     "portalTagHelp": "Use {{config:key}}, {{memory:key}}, {{storage:key}}, {{kv:key}}, {{board:slug}} tags in your template.",
+    "portalLbMode": "Load-Balancer Mode",
+    "portalLbReadOnly": "Portal content is read-only. Content synced from origin node.",
+    "portalLbOrigin": "Origin URL",
+    "portalLbLastSync": "Last Sync",
+    "portalLbError": "Last Error",
+    "portalLbStatus": "Sync Status",
+    "portalLbSyncNow": "Sync Now",
+    "portalLbSyncDone": "Portal sync completed.",
     "stats": "Statistics",
     "statsNotAvailable": "Statistics are disabled on this node.",
     "requestsTotal": "Total Requests",

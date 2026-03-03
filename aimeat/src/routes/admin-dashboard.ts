@@ -152,6 +152,10 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
     portalAiPlaceholder: t('dashboard.portalAiPlaceholder'), portalAiSend: t('dashboard.portalAiSend'),
     portalAiImport: t('dashboard.portalAiImport'), portalAiExplain: t('dashboard.portalAiExplain'),
     portalTagHelp: t('dashboard.portalTagHelp'),
+    portalLbMode: t('dashboard.portalLbMode'), portalLbReadOnly: t('dashboard.portalLbReadOnly'),
+    portalLbOrigin: t('dashboard.portalLbOrigin'), portalLbLastSync: t('dashboard.portalLbLastSync'),
+    portalLbError: t('dashboard.portalLbError'), portalLbStatus: t('dashboard.portalLbStatus'),
+    portalLbSyncNow: t('dashboard.portalLbSyncNow'), portalLbSyncDone: t('dashboard.portalLbSyncDone'),
     stats: t('dashboard.stats'),
     statsNotAvailable: t('dashboard.statsNotAvailable'),
     requestsTotal: t('dashboard.requestsTotal'),
@@ -1380,7 +1384,22 @@ function renderPortal(){
   var tmpl=p.template||{};
   var changes=(p.changelog&&p.changelog.entries)||[];
   var hasTemplate=meta.has_custom_template||false;
+  var isLb=meta.lb_mode&&meta.lb_mode.enabled;
   var o='';
+  // LB mode banner
+  if(isLb){
+    var lb=meta.lb_mode;
+    var syncTime=lb.last_sync?dt(lb.last_sync):'-';
+    o+='<div class="card" style="background:var(--yellow-bg,#fff3cd);border:1px solid var(--yellow-border,#ffc107);border-radius:8px;padding:16px;margin-bottom:16px">';
+    o+='<h3>\u{1F504} '+__t.portalLbMode+'</h3>';
+    o+='<p style="color:var(--muted);margin-bottom:8px">'+__t.portalLbReadOnly+'</p>';
+    o+=er(__t.portalLbOrigin,'<a href="'+esc(lb.origin_url||'')+'" target="_blank">'+esc(lb.origin_url||'-')+'</a>');
+    o+=er(__t.portalLbLastSync,syncTime);
+    if(lb.last_error)o+=er(__t.portalLbError,'<span style="color:var(--red)">'+esc(lb.last_error)+'</span>');
+    o+=er(__t.portalLbStatus,lb.syncing?badge('syncing'):lb.last_error?badge('error'):badge('idle'));
+    o+='<div style="margin-top:8px">'+actionBtn('\u{1F504} '+__t.portalLbSyncNow,'triggerLbSync()')+'</div>';
+    o+='</div>';
+  }
   // Preview iframe
   o+='<div class="card"><h3>'+__t.portalPreview+'</h3>';
   o+='<iframe id="portalPreviewFrame" src="/" style="width:100%;height:400px;border:1px solid var(--border);border-radius:8px;background:#fff" sandbox="allow-same-origin"></iframe>';
@@ -1508,6 +1527,14 @@ async function copyAiPrompt(){
     var prompt=res.data&&res.data.prompt?res.data.prompt:'No prompt available';
     await navigator.clipboard.writeText(prompt);
     alert('AI prompt copied to clipboard!');
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+async function triggerLbSync(){
+  try{
+    var res=await api('/v1/admin/site/sync',{method:'POST'});
+    var d=res.data||{};
+    alert(__t.portalLbSyncDone+' (template: '+(d.template_updated?'yes':'no')+', memory: '+(d.memory_keys_synced||0)+')');
+    loadAll();
   }catch(e){alert(__t.errorLabel+': '+e.message);}
 }
 

@@ -1908,23 +1908,25 @@ body {
             var listUrl = nodeUrl + '/v1/memory/' + BOARD_KEY;
             var writeUrl = nodeUrl + '/v1/memory';
             instructionBlock.value =
-              'There is an AIME AT protocol server at ' + nodeUrl + ' with a public message board.\\n\\n' +
-              '## Data structure\\n' +
-              'Read the board: GET ' + listUrl + '\\n' +
-              'Response JSON: { ok: true, data: { value: { messages: [ { msg: "text", t: "ISO timestamp" }, ... ] } } }\\n' +
-              'Messages are in data.value.messages — an array of objects, each with "msg" (the message text) and "t" (ISO 8601 timestamp). Newest messages are last in the array.\\n\\n' +
-              'Post / update the board: POST ' + writeUrl + '\\n' +
-              'Content-Type: application/json\\n' +
-              'Body: {"key":"' + BOARD_KEY + '","value":{"messages":[...existing messages..., {"msg":"NEW MESSAGE","t":"2026-01-15T12:00:00.000Z"}]},"visibility":"public"}\\n' +
-              'IMPORTANT: Always read the existing messages first (GET), then append the new one to the array, and POST the full updated array back. This is a read-modify-write pattern.\\n\\n' +
+              'There is an AIMEAT protocol server at ' + nodeUrl + ' with a public message board.\\n\\n' +
               '## OPTION A — If you can fetch URLs (Claude Pro, Grok):\\n' +
-              'Fetch the board URL above, show me the messages, and help me post new ones using the POST method described above.\\n\\n' +
+              'Fetch the board URL below, show me the messages, and help me post new ones using the POST method described below.\\n\\n' +
               '## OPTION B — If you cannot fetch URLs:\\n' +
               'Before building, ask me two questions:\\n' +
               '1. What should the board be called? (e.g. "Neighborhood Board", "Game Night Chat", "Family Messages")\\n' +
-              '2. How should it feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
+              '2. How should it look and feel? (e.g. "cozy and warm", "sleek and minimal", "fun and colorful", "professional")\\n' +
               'Use my answers to customize the title, colors, fonts, and overall vibe of the board.\\n\\n' +
-              'Then build a single self-contained HTML file that I will save and open in my browser. Requirements:\\n\\n' +
+              'Then build a single self-contained HTML file that I will save and open in my browser.\\n\\n' +
+              '## Data storage API\\n' +
+              'Server: ' + nodeUrl + ' (no authentication needed, anonymous mode)\\n' +
+              'Save data: POST ' + writeUrl + '\\n' +
+              'Content-Type: application/json\\n' +
+              'Body: {"key":"' + BOARD_KEY + '","value":{"messages":[...existing messages..., {"msg":"NEW MESSAGE","t":"2026-01-15T12:00:00.000Z"}]},"visibility":"public","ttl_hours":24}\\n' +
+              'Read data: GET ' + listUrl + '\\n' +
+              'Response: { ok: true, data: { key: "...", value: { messages: [ { msg: "text", t: "ISO timestamp" }, ... ] } } }\\n' +
+              'Messages are in data.value.messages — an array of objects, each with "msg" (the message text) and "t" (ISO 8601 timestamp). Newest messages are last in the array.\\n' +
+              'IMPORTANT: Always read the existing messages first (GET), then append the new one to the array, and POST the full updated array back. This is a read-modify-write pattern.\\n\\n' +
+              '## App requirements\\n' +
               '1. On load, fetch GET ' + listUrl + ' and display all messages from data.value.messages\\n' +
               '2. Show each message with its text and a human-readable relative time (e.g. "2 minutes ago"), newest first\\n' +
               '3. Show a "Last updated: [time]" label so the user knows when data was last fetched\\n' +
@@ -1932,9 +1934,24 @@ body {
               '5. An auto-refresh toggle (checkbox or button) — when enabled, re-fetches every 15 seconds. Default: off\\n' +
               '6. A text input + Send button to post new messages\\n' +
               '7. To send: GET existing board, append new {msg, t} to the messages array, POST the full updated object back to ' + writeUrl + '\\n' +
-              '8. After sending, immediately refresh the message list to show the new message\\n' +
-              '9. Dark theme (#0a0a1a background, #ff69b4 pink accent), mobile-friendly, clean readable layout\\n\\n' +
-              'Make the HTML a downloadable file. This is a live API — the URLs work right now.';
+              '8. After sending, immediately refresh the message list to show the new message\\n\\n' +
+              'General requirements:\\n' +
+              '- Single HTML file, all CSS and JS inline, no external dependencies\\n' +
+              '- Mobile-friendly, works on any screen size\\n' +
+              '- Clean, modern UI\\n' +
+              '- Dark theme (#0a0a1a background, #ff69b4 pink accent)\\n' +
+              '- Works immediately when opened in a browser\\n\\n' +
+              'Make the HTML a downloadable file. This is a live API — the URLs work right now.' +
+              '\\n\\n## If Something Doesn\\'t Work\\n' +
+              'After giving the user the download link or HTML file, always add this message at the end:\\n' +
+              '"If the app doesn\\'t work as expected or you see errors, don\\'t worry — tell me what happened and we\\'ll fix it together!\\n\\n' +
+              'Here\\'s how to check for errors:\\n' +
+              '1. Open the app in your browser\\n' +
+              '2. Press F12 (or right-click → Inspect) to open Developer Tools\\n' +
+              '3. Click the \\'Console\\' tab\\n' +
+              '4. If you see red error messages, copy them and paste them here\\n' +
+              '5. I\\'ll analyze the errors and give you a fixed version\\n\\n' +
+              'Even if there are no console errors — just describe what\\'s wrong (e.g. \\'the button doesn\\'t do anything\\', \\'I see a blank page\\', \\'the data doesn\\'t save\\') and I\\'ll investigate."';
           }
         }
       })

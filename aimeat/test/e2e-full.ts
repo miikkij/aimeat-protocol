@@ -1367,6 +1367,81 @@ await test('System board — {{board:announcements}} resolves in template', asyn
     assert(!html.includes('{{board:'), 'tag fully resolved');
 });
 
+// ─── LB Sync ───
+console.log('LB Sync');
+
+await test('GET /v1/site/sync — returns sync payload', async () => {
+    // Try to upload a template (may fail if no operator role, which is fine)
+    const template = '<!DOCTYPE html><html><body>{{config:nodeId}}</body></html>';
+    await json('/v1/site/template', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ template }),
+    });
+
+    const { status, body } = await json('/v1/site/sync');
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.ok === true, `sync ok: ${JSON.stringify(body.error)}`);
+    assert(body.data?.sync_timestamp, 'has sync_timestamp');
+    // template may be null if upload failed (no operator role)
+    assert(body.data?.template === null || typeof body.data?.template?.html === 'string', 'template field valid');
+    assert(Array.isArray(body.data?.memory_keys), 'has memory_keys array');
+    assert(Array.isArray(body.data?.deleted_memory_keys), 'has deleted_memory_keys');
+    assert(typeof body.data?.kv === 'object', 'has kv object');
+    assert(Array.isArray(body.data?.system_board_posts), 'has system_board_posts');
+});
+
+await test('GET /v1/site/sync?since=future — returns no changes', async () => {
+    const future = new Date(Date.now() + 86400000).toISOString();
+    const { status, body } = await json(`/v1/site/sync?since=${encodeURIComponent(future)}`);
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data?.template === null, 'no template changes since future');
+    assert(body.data?.memory_keys?.length === 0, 'no memory changes since future');
+    assert(body.data?.system_board_posts?.length === 0, 'no board posts since future');
+});
+
+await test('GET /v1/site/sync — system board posts structure', async () => {
+    const { status, body } = await json('/v1/site/sync');
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(Array.isArray(body.data?.system_board_posts), 'has system_board_posts array');
+    // Posts may be empty if operator tests failed, but array must exist
+    if (body.data.system_board_posts.length > 0) {
+        const post = body.data.system_board_posts[0];
+        assert(post.id, 'post has id');
+        assert(post.title, 'post has title');
+        assert(post.body, 'post has body');
+        assert(post.created_at, 'post has created_at');
+    }
+});
+
+await test('GET /v1/site/sync — no auth required', async () => {
+    // Verify no auth header and get 200
+    const { status } = await json('/v1/site/sync');
+    assert(status === 200, `expected 200 without auth, got ${status}`);
+});
+
+await test('GET /v1/health — no site_lb when LB not enabled', async () => {
+    const { status, body } = await json('/v1/health');
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data?.status === 'healthy', 'status is healthy');
+    assert(body.data?.site_lb === undefined, 'no site_lb when not in LB mode');
+});
+
+await test('POST /v1/admin/site/sync — 404 when LB not enabled', async () => {
+    const { status } = await json('/v1/admin/site/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    // Route only registered when LB mode enabled, so expect 404
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+// Clean up template for GDPR cascade
+await json('/v1/site/template', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 
