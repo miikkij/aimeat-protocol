@@ -8,7 +8,7 @@ import { logger } from '../utils/logger.js';
 
 export interface RealtimeMessage {
   type: 'join' | 'leave' | 'presence' | 'signal' | 'broadcast' | 'yjs-sync'
-    | 'joined' | 'peer-joined' | 'peer-left' | 'peer-presence' | 'error';
+  | 'joined' | 'peer-joined' | 'peer-left' | 'peer-presence' | 'error';
   roomId?: string;
   peerId?: string;
   nick?: string;
@@ -91,7 +91,7 @@ export class RealtimeManager {
   constructor(
     private config: AimeatConfig,
     private storage: Storage,
-  ) {}
+  ) { }
 
   // ── Room lifecycle ──
 
@@ -166,7 +166,7 @@ export class RealtimeManager {
     this.storage.updateRealtimeRoom(roomId, {
       peerCount: room.peers.size,
       lastActivityAt: room.lastActivityAt.toISOString(),
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Notify the new peer
     const peerList = [...room.peers.values()]
@@ -239,12 +239,12 @@ export class RealtimeManager {
       this.storage.updateRealtimeRoom(roomId, {
         peerCount: room.peers.size,
         lastActivityAt: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch(() => { });
 
       // Auto-delete empty rooms
       if (room.peers.size === 0) {
         this.rooms.delete(roomId);
-        this.storage.deleteRealtimeRoom(roomId).catch(() => {});
+        this.storage.deleteRealtimeRoom(roomId).catch(() => { });
         logger.info('Realtime room auto-deleted (empty)', { roomId });
       }
     }
@@ -433,7 +433,7 @@ export class RealtimeManager {
     for (const [roomId, room] of this.rooms) {
       if (room.peers.size === 0 && now - room.lastActivityAt.getTime() > maxIdle) {
         this.rooms.delete(roomId);
-        this.storage.deleteRealtimeRoom(roomId).catch(() => {});
+        this.storage.deleteRealtimeRoom(roomId).catch(() => { });
         cleaned++;
       }
     }
