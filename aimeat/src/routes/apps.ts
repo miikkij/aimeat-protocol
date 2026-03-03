@@ -119,7 +119,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
                 const mode = req.query.mode as string | undefined;
                 if (mode === 'inline') {
                     // Inline mode: serve without attachment disposition for iframe/tab viewing
-                    res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' data: blob:");
+                    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline' data: blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; frame-ancestors 'self'");
                 } else {
                     // Default: serve as attachment download — never render as page
                     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

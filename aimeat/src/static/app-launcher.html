@@ -1796,6 +1796,7 @@
       var blob = new Blob([html], { type: 'text/html' });
       var blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, '_blank');
+      setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 5000);
     }
   }
 
@@ -1891,7 +1892,7 @@
           var app = filtered[i];
           var iconDisplay = app.icon || '\u{1F4DD}';
           html +=
-            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" style="animation-delay:' + (i * 0.04) + 's">' +
+            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" style="animation-delay:' + (i * 0.04) + 's">' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
               '<div class="app-source">' + sourceLabel(app.source) + '</div>' +
