@@ -1281,6 +1281,92 @@ await test('GET /v1/site/template — 401 without auth', async () => {
     assert(status === 401, `expected 401, got ${status}`);
 });
 
+// ─── System Board ───
+console.log('System Board');
+
+await test('System board — operator can create', async () => {
+    const { status, body } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'announcements', description: 'System announcements', visibility: 'system' }),
+    });
+    assert(status === 201, `expected 201, got ${status}`);
+    assert(body.data?.visibility === 'system', 'visibility is system');
+});
+
+await test('System board — agent cannot create system board', async () => {
+    const { status } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ name: 'agent-sys', description: 'Should fail', visibility: 'system' }),
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('System board — operator can post (free)', async () => {
+    // Find the announcements board
+    const { body: listBody } = await json('/v1/boards', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const sysBoard = listBody.data?.boards?.find((b: any) => b.name === 'announcements');
+    assert(sysBoard, 'found announcements board');
+
+    const { status, body } = await json(`/v1/boards/${sysBoard.id}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Welcome', body: 'First announcement!' }),
+    });
+    assert(status === 201, `expected 201, got ${status}`);
+    assert(body.data?.title === 'Welcome', 'post title');
+});
+
+await test('System board — agent cannot post', async () => {
+    const { body: listBody } = await json('/v1/boards', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const sysBoard = listBody.data?.boards?.find((b: any) => b.name === 'announcements');
+    assert(sysBoard, 'found announcements board');
+
+    const { status } = await json(`/v1/boards/${sysBoard.id}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ title: 'Nope', body: 'Should fail' }),
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('System board — publicly readable (no auth)', async () => {
+    const { body: listBody } = await json('/v1/boards', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const sysBoard = listBody.data?.boards?.find((b: any) => b.name === 'announcements');
+    assert(sysBoard, 'found announcements board');
+
+    const { status, body } = await json(`/v1/boards/${sysBoard.id}/posts`);
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(Array.isArray(body.data?.posts), 'has posts array');
+    assert(body.data.posts.length > 0, 'has posts');
+});
+
+await test('System board — {{board:announcements}} resolves in template', async () => {
+    // Upload template with board tag
+    const template = '<!DOCTYPE html><html><body><h1>Portal</h1><div id="news">{{board:announcements}}</div></body></html>';
+    const { status: uploadStatus } = await json('/v1/site/template', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ template }),
+    });
+    assert(uploadStatus === 200, `upload status ${uploadStatus}`);
+
+    // Fetch rendered portal
+    const res = await fetch(`${BASE}/`);
+    const html = await res.text();
+    assert(html.includes('board-posts'), 'rendered board-posts div');
+    assert(html.includes('Welcome'), 'rendered post title');
+    assert(html.includes('First announcement!'), 'rendered post body');
+    assert(!html.includes('{{board:'), 'tag fully resolved');
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 

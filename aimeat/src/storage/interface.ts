@@ -88,7 +88,7 @@ export interface BoardRecord {
   id: string;
   name: string;
   description?: string;
-  visibility: 'private' | 'shared' | 'public';
+  visibility: 'private' | 'shared' | 'public' | 'system';
   ownerGaii: string;
   allowedGaiis: string[];
   createdAt: string;

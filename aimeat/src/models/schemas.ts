@@ -178,7 +178,7 @@ export const OperatorRulingSchema = z.object({
 
 export const BoardCreateSchema = z.object({
     name: z.string().min(1).max(128),
-    visibility: z.enum(['private', 'shared', 'public']),
+    visibility: z.enum(['private', 'shared', 'public', 'system']),
     description: z.string().max(1024).optional(),
     allowed_gaiis: z.array(z.string()).optional(),
 });

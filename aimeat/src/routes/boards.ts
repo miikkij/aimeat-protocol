@@ -42,9 +42,15 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }).catch(() => { /* ignore */ });
   }
 
-  // POST /v1/boards — create a board (agent auth)
+  // POST /v1/boards — create a board (agent auth; system boards require operator)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
     const { name, visibility, allowed_gaiis, description } = req.body ?? {};
+
+    // System boards can only be created by operators
+    if (visibility === 'system' && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can create system boards'));
+      return;
+    }
     const id = `board-${randomBytes(8).toString('hex')}`;
     const board = await storage.createBoard({
       id,
@@ -73,7 +79,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const gaii = req.auth?.sub;
 
     const visible = boards.filter(b => {
-      if (b.visibility === 'public') return true;
+      if (b.visibility === 'public' || b.visibility === 'system') return true;
       if (!gaii) return false;
       if (b.ownerGaii === gaii) return true;
       if (b.allowedGaiis.includes(gaii)) return true;
@@ -129,6 +135,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Check access
+    if (board.visibility === 'system' && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can post to system boards'));
+      return;
+    }
     if (board.visibility === 'private' && board.ownerGaii !== gaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Cannot post to this private board'));
       return;
@@ -140,7 +150,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const { title, body, category, tags, ttl_hours } = req.body ?? {};
 
-    // Public board posting costs morsels (§15, Appendix B: configurable base + per-KB)
+    // Public board posting costs morsels — system boards are free (§15, Appendix B)
     if (board.visibility === 'public') {
       const cost = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
       const agent = await storage.getAgent(gaii);
@@ -202,7 +212,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     const gaii = req.auth?.sub;
-    if (board.visibility !== 'public') {
+    if (board.visibility !== 'public' && board.visibility !== 'system') {
       if (!gaii) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
         return;
@@ -301,7 +311,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     const gaii = req.auth?.sub;
-    if (board.visibility !== 'public') {
+    if (board.visibility !== 'public' && board.visibility !== 'system') {
       if (!gaii) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
         return;
@@ -423,8 +433,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const gaii = req.auth!.sub;
 
-    // Check access for non-public boards
-    if (board.visibility !== 'public') {
+    // Check access for non-public boards (system boards are publicly accessible)
+    if (board.visibility !== 'public' && board.visibility !== 'system') {
       if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
         return;

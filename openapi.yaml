@@ -652,7 +652,8 @@ components:
           example: ml-research-exchange
         type:
           type: string
-          enum: [public, private, shared]
+          enum: [public, private, shared, system]
+          description: Board visibility. 'system' boards are operator-only and publicly readable.
         description:
           type: string
         allowed_agents:
@@ -8760,7 +8761,8 @@ paths:
       summary: Upload new template
       description: |
         Upload a custom HTML template with `{{type:key}}` dynamic tags.
-        Supported tag types: `config`, `memory`, `storage`, `kv`.
+        Supported tag types: `config`, `memory`, `storage`, `kv`, `board`.
+        The `board` tag (e.g. `{{board:announcements}}`) renders recent posts from a system/public board.
         Validates HTML safety (blocks raw `<script>` injections via memory tags).
         Operator-only (Tier 2).
       tags: [Site]

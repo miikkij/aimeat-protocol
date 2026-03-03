@@ -15,7 +15,7 @@ const CONFIG_WHITELIST = new Set([
     'federationName', 'locale', 'version',
 ]);
 
-const TAG_REGEX = /\{\{(config|memory|storage|kv):([^}]+)\}\}/g;
+const TAG_REGEX = /\{\{(config|memory|storage|kv|board):([^}]+)\}\}/g;
 
 function escapeHtml(str: string): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -222,6 +222,7 @@ export class SiteService {
             `- \`{{memory:KEY}}\` — Memory values under the portal/* namespace. Stored via the memory API.`,
             `- \`{{storage:KEY}}\` — Resolves to the download URL of a stored file.`,
             `- \`{{kv:KEY}}\` — Operator-configured key-value pairs from env vars (AIMEAT_SITE_KV_*).`,
+            `- \`{{board:SLUG}}\` — Resolves to the 5 most recent posts from a board (by name or ID). Posts render as \`<div class="board-posts">\` with \`<article>\` elements.`,
             ``,
             `## Current Node Context`,
             ``,
@@ -294,6 +295,34 @@ export class SiteService {
 
     // ── Internal ──
 
+    /** Resolve a {{board:slug}} tag to HTML of recent posts. */
+    private async resolveBoardTag(slug: string): Promise<string> {
+        // Find board by name or ID
+        const boards = await this.storage.listBoards();
+        const board = boards.find(b => b.name === slug || b.id === slug);
+        if (!board) return '';
+
+        // Only system and public boards can be rendered in the portal
+        if (board.visibility !== 'system' && board.visibility !== 'public') return '';
+
+        const posts = await this.storage.listPosts(board.id, { limit: 5 });
+        if (posts.length === 0) return '<div class="board-posts"><p class="board-empty">No posts yet.</p></div>';
+
+        const articles = posts.map(p => {
+            const date = new Date(p.createdAt);
+            const dateStr = date.toISOString().slice(0, 10);
+            return [
+                '<article class="board-post">',
+                `  <h3>${escapeHtml(p.title)}</h3>`,
+                `  <time datetime="${date.toISOString()}">${dateStr}</time>`,
+                `  <p>${escapeHtml(p.body)}</p>`,
+                '</article>',
+            ].join('\n');
+        });
+
+        return `<div class="board-posts">\n${articles.join('\n')}\n</div>`;
+    }
+
     private async resolveTemplate(template: string): Promise<string> {
         const matches = [...template.matchAll(TAG_REGEX)];
         if (matches.length === 0) return template;
@@ -316,12 +345,20 @@ export class SiteService {
             storageUrls.set(key, `${this.config.baseUrl}/v1/storage/${encodeURIComponent(SITE_OWNER_GAII)}/${encodeURIComponent(key)}`);
         }
 
+        // Batch board post lookups
+        const boardSlugs = [...new Set(matches.filter(m => m[1] === 'board').map(m => m[2]))];
+        const boardHtmlMap = new Map<string, string>();
+        for (const slug of boardSlugs) {
+            boardHtmlMap.set(slug, await this.resolveBoardTag(slug));
+        }
+
         return template.replace(TAG_REGEX, (_full, type: string, key: string) => {
             switch (type) {
                 case 'config': return escapeHtml(this.getConfigValue(key));
                 case 'memory': return memoryValues.get(key) ?? '';
                 case 'storage': return escapeHtml(storageUrls.get(key) ?? '');
                 case 'kv': return escapeHtml(this.config.siteKv[key] ?? '');
+                case 'board': return boardHtmlMap.get(key) ?? '';
                 default: return '';
             }
         });
@@ -350,8 +387,13 @@ export class SiteService {
                 if (!record) unresolvable.push(tag);
             } else if (type === 'config') {
                 if (!CONFIG_WHITELIST.has(key)) unresolvable.push(tag);
+            } else if (type === 'board') {
+                // kv and storage are always "resolvable" (might just be empty)
+                // board tags are resolvable if the board exists
+                const boards = await this.storage.listBoards();
+                const found = boards.some(b => b.name === key || b.id === key);
+                if (!found) unresolvable.push(tag);
             }
-            // kv and storage are always "resolvable" (might just be empty)
         }
         return unresolvable;
     }
