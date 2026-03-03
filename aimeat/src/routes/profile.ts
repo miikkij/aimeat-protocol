@@ -550,6 +550,14 @@ textarea.input-field{resize:vertical;min-height:60px}
       <button class="sub-tab" data-subtab="apps-gallery">${sanitize(translations['profile.apps.gallery'] || 'All Apps')}</button>
     </div>
     <div class="sub-panel active" id="subpanel-apps-mine">
+      <div style="background:linear-gradient(135deg, rgba(251,191,36,.1), rgba(245,158,11,.05));border:1px solid rgba(251,191,36,.3);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.25rem">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem">
+          <span style="font-size:1.3rem">\ud83d\ude80</span>
+          <span style="font-weight:700;font-size:1rem;color:#fbbf24">${sanitize(translations['profile.apps.launcherTitle'] || 'App Launcher')}</span>
+        </div>
+        <div style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${sanitize(translations['profile.apps.launcherDesc'] || 'Manage all your apps in one place. Pin favorites, search by tags, publish to your node.')}</div>
+        <a href="/app-launcher.html" class="btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;background:linear-gradient(135deg,#f59e0b,#d97706)">\ud83d\ude80 ${sanitize(translations['profile.apps.launcherOpen'] || 'Open App Launcher')}</a>
+      </div>
       <div class="app-create-guide" style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1.25rem">
         <div style="font-weight:700;font-size:1rem;margin-bottom:.5rem;color:var(--love1)">${sanitize(translations['profile.apps.createGuide'] || 'Create a New App')}</div>
         <div style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${sanitize(translations['profile.apps.createGuideDesc'] || '')}</div>

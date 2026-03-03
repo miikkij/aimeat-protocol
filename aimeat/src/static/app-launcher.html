@@ -1016,6 +1016,135 @@
       background: var(--surface);
       color: var(--text);
     }
+
+    /* ── Publish Modal ──────────────────────────────── */
+
+    #publish-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 560;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #publish-overlay[hidden] {
+      display: none;
+    }
+
+    /* ── Published Apps Section ──────────────────────── */
+
+    #published-section {
+      margin: 0 24px 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .published-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .published-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .published-header .arrow {
+      transition: transform var(--transition);
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+
+    .published-header .arrow.open {
+      transform: rotate(180deg);
+    }
+
+    .published-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .published-card {
+      background: var(--surface-glass);
+      border: 1px solid rgba(52, 211, 153, .25);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .published-card:hover {
+      border-color: rgba(52, 211, 153, .5);
+      box-shadow: 0 4px 20px rgba(52, 211, 153, .08);
+    }
+
+    .published-card-name {
+      font-weight: 600;
+      font-size: .88rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .published-card-meta {
+      font-size: .72rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .published-card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .published-card-actions button {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--text);
+      font-size: .72rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .published-card-actions button:hover {
+      border-color: var(--border-hover);
+      background: rgba(192, 132, 252, .1);
+    }
+
+    .published-card-actions button.danger:hover {
+      border-color: var(--accent);
+      background: rgba(233, 69, 96, .1);
+      color: var(--accent);
+    }
+
+    .published-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: .85rem;
+    }
   </style>
 </head>
 <body>
@@ -1031,6 +1160,15 @@
   </header>
 
   <nav id="tag-bar"></nav>
+
+  <!-- Published Apps Section -->
+  <div id="published-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.togglePublished()">
+      <h2>&#x1F680; Published Apps <span id="published-count"></span></h2>
+      <span class="arrow open" id="published-arrow">&#x25BC;</span>
+    </div>
+    <div id="published-grid" class="published-grid"></div>
+  </div>
 
   <main id="app-grid"></main>
 
@@ -1134,6 +1272,8 @@
     <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
     <button data-action="view-source">&#x1F441; View / Edit Source</button>
     <hr>
+    <button data-action="publish">&#x1F680; Publish to server</button>
+    <hr>
     <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
   </div>
 
@@ -1218,6 +1358,30 @@
       </div>
     </div>
   </div>
+
+  <!-- Publish Modal -->
+  <div id="publish-overlay" hidden>
+    <div class="modal" id="publish-modal">
+      <h2>&#x1F680; Publish App</h2>
+      <div class="form-group">
+        <label for="publish-filename">Filename</label>
+        <input type="text" id="publish-filename" class="modal-input" placeholder="my-app.html" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
+      </div>
+      <div class="form-group">
+        <label for="publish-access-code">Access Code (optional)</label>
+        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">4-64 chars. If set, only people with the code can download.</div>
+      </div>
+      <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true">Cancel</button>
+        <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()">Publish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Published Apps Section (inserted before grid, toggled) -->
 
 <script>
 (function () {
@@ -2174,8 +2338,13 @@
         if (confirm('Delete "' + (app.name || 'this app') + '"?')) {
           deleteApp(appId).then(function () {
             renderApps();
+            loadPublishedApps();
           });
         }
+        break;
+
+      case 'publish':
+        showPublishModal(appId);
         break;
     }
   }
@@ -2508,6 +2677,220 @@
     });
   }
 
+  // ── Publish to AIMEAT ───────────────────────────
+
+  var publishAppId = null;
+
+  function showPublishModal(appId) {
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === appId) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      alert('Set AIMEAT server URL in Settings first');
+      return;
+    }
+
+    publishAppId = appId;
+    var safeName = (app.name || 'app').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').toLowerCase();
+    if (!/\.html?$/i.test(safeName)) safeName += '.html';
+    document.getElementById('publish-filename').value = safeName;
+    document.getElementById('publish-access-code').value = '';
+    document.getElementById('publish-status').textContent = '';
+    document.getElementById('publish-submit-btn').disabled = false;
+    document.getElementById('publish-overlay').hidden = false;
+  }
+
+  function submitPublish() {
+    if (!publishAppId) return;
+
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === publishAppId) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var filename = document.getElementById('publish-filename').value.trim();
+    var accessCode = document.getElementById('publish-access-code').value.trim();
+    var statusEl = document.getElementById('publish-status');
+    var submitBtn = document.getElementById('publish-submit-btn');
+
+    if (!filename || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
+      statusEl.textContent = 'Invalid filename. Use letters, numbers, dots, hyphens, underscores.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    if (accessCode && (accessCode.length < 4 || accessCode.length > 64)) {
+      statusEl.textContent = 'Access code must be 4-64 characters.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    // Get the HTML content
+    var htmlContent = '';
+    if (app.blob) {
+      htmlContent = app.blob; // already base64
+    } else if (app.url) {
+      statusEl.textContent = 'Cannot publish URL-linked apps. Download it first (right-click \u2192 View Source \u2192 Save).';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    } else {
+      statusEl.textContent = 'No app content found.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    statusEl.textContent = 'Publishing...';
+    statusEl.style.color = '#34d399';
+    submitBtn.disabled = true;
+
+    // Get auth token first
+    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(resp) { return resp.json(); })
+      .then(function(authJson) {
+        var token = authJson.data && authJson.data.token;
+        if (!token) throw new Error('Could not get auth token');
+
+        var body = {
+          filename: filename,
+          content: htmlContent,
+          mime_type: 'text/html'
+        };
+        if (accessCode) body.access_code = accessCode;
+
+        return fetch(aimeatUrl + '/v1/apps', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(body)
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          statusEl.textContent = '\u2714 Published! ' + (json.data.download_url || '');
+          statusEl.style.color = '#34d399';
+          // Mark app as published in IndexedDB
+          app.published = true;
+          app.publishedFilename = filename;
+          app.publishedAt = new Date().toISOString();
+          app.publishedUrl = json.data.download_url || null;
+          saveApp(app).then(function() {
+            loadPublishedApps();
+          });
+        } else {
+          statusEl.textContent = '\u2718 ' + (json.error_description || json.error_code || 'Publish failed');
+          statusEl.style.color = 'var(--accent)';
+          submitBtn.disabled = false;
+        }
+      })
+      .catch(function(err) {
+        statusEl.textContent = '\u2718 ' + (err.message || 'Publish failed');
+        statusEl.style.color = 'var(--accent)';
+        submitBtn.disabled = false;
+      });
+  }
+
+  // ── Published Apps Section ──────────────────────
+
+  var publishedVisible = true;
+
+  function togglePublished() {
+    publishedVisible = !publishedVisible;
+    var grid = document.getElementById('published-grid');
+    var arrow = document.getElementById('published-arrow');
+    grid.style.display = publishedVisible ? '' : 'none';
+    arrow.classList.toggle('open', publishedVisible);
+  }
+
+  function loadPublishedApps() {
+    getAllApps().then(function(apps) {
+      var published = apps.filter(function(a) { return a.published; });
+      var section = document.getElementById('published-section');
+      var grid = document.getElementById('published-grid');
+      var countEl = document.getElementById('published-count');
+
+      if (published.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = '';
+      countEl.textContent = '(' + published.length + ')';
+      var config = loadConfig();
+      var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+
+      var html = '';
+      for (var i = 0; i < published.length; i++) {
+        var app = published[i];
+        var url = app.publishedUrl ? (aimeatUrl + app.publishedUrl) : '';
+        html +=
+          '<div class="published-card">' +
+            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + '</div>' +
+            '<div class="published-card-meta">' +
+              '<span>' + escapeHtml(app.publishedFilename || '') + '</span>' +
+              '<span>' + (app.publishedAt ? new Date(app.publishedAt).toLocaleDateString() : '') + '</span>' +
+            '</div>' +
+            '<div class="published-card-actions">' +
+              (url ? '<button onclick="window.open(\'' + escapeHtml(url) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' : '') +
+              '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.id) + '\')" class="danger">&#x1F5D1; Remove</button>' +
+            '</div>' +
+          '</div>';
+      }
+      grid.innerHTML = html;
+    });
+  }
+
+  function unpublishApp(appId) {
+    if (!confirm('Remove this published app from the server?')) return;
+
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === appId) { app = allApps[i]; break; }
+    }
+    if (!app || !app.publishedFilename) return;
+
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+
+    // Get auth token and delete
+    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(resp) { return resp.json(); })
+      .then(function(authJson) {
+        var token = authJson.data && authJson.data.token;
+        if (!token) throw new Error('Could not get auth token');
+        return fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(app.publishedFilename), {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          app.published = false;
+          delete app.publishedFilename;
+          delete app.publishedAt;
+          delete app.publishedUrl;
+          saveApp(app).then(function() {
+            loadPublishedApps();
+          });
+        } else {
+          alert('Failed to remove: ' + (json.error_description || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Error: ' + (err.message || err));
+      });
+  }
+
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
@@ -2546,7 +2929,12 @@
     importFromAimeat: importFromAimeat,
     processAimeatImport: processAimeatImport,
     viewSource: viewSource,
-    generateHomepagePrompt: generateHomepagePrompt
+    generateHomepagePrompt: generateHomepagePrompt,
+    showPublishModal: showPublishModal,
+    submitPublish: submitPublish,
+    loadPublishedApps: loadPublishedApps,
+    togglePublished: togglePublished,
+    unpublishApp: unpublishApp
   };
 
   // ── Bootstrap ─────────────────────────────────────
@@ -2556,6 +2944,7 @@
     applyTheme(loadConfig().theme);
 
     renderApps();
+    loadPublishedApps();
 
     // ── Search input ─────────────────────────────────
     document.getElementById('search-input').addEventListener('input', function (e) {
@@ -2599,6 +2988,13 @@
 
     // ── Click AIMEAT import overlay to close ────────
     document.getElementById('aimeat-import-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
+    // ── Click publish overlay to close ──────────────
+    document.getElementById('publish-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -2690,6 +3086,8 @@
           hideContextMenu();
         } else if (!document.getElementById('aimeat-import-overlay').hidden) {
           document.getElementById('aimeat-import-overlay').hidden = true;
+        } else if (!document.getElementById('publish-overlay').hidden) {
+          document.getElementById('publish-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {

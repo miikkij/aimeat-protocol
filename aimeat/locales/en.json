@@ -410,7 +410,10 @@
       "galleryEmpty": "No apps published yet.",
       "galleryError": "Could not load apps.",
       "download": "Download",
-      "protected": "Protected"
+      "protected": "Protected",
+      "launcherTitle": "App Launcher",
+      "launcherDesc": "Manage all your apps in one place. Pin favorites, search by tags, publish to your node.",
+      "launcherOpen": "Open App Launcher"
     },
     "federation": {
       "title": "Federation & Peers",

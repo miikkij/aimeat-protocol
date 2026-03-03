@@ -410,7 +410,10 @@
       "galleryEmpty": "Ei julkaistuja sovelluksia.",
       "galleryError": "Sovellusten lataus epäonnistui.",
       "download": "Lataa",
-      "protected": "Suojattu"
+      "protected": "Suojattu",
+      "launcherTitle": "Sovelluskäynnistin",
+      "launcherDesc": "Hallitse kaikkia sovelluksiasi yhdestä paikasta. Kiinnitä suosikit, hae tageilla, julkaise solmuusi.",
+      "launcherOpen": "Avaa sovelluskäynnistin"
     },
     "federation": {
       "title": "Federaatio & vertaiset",

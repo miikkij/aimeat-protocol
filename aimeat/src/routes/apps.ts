@@ -256,5 +256,27 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         }));
     });
 
+    // DELETE /v1/apps/:filename — Remove an app you own (requires auth)
+    router.delete('/v1/apps/:filename', requireAuth(), async (req, res) => {
+        const gaii = req.auth!.sub;
+        const filename = req.params.filename as string;
+        const storageKey = `apps/${filename}`;
+
+        const file = await storage.getStorageFile(gaii, storageKey);
+        if (!file) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
+            return;
+        }
+
+        await storage.deleteStorageFile(gaii, storageKey);
+        // Also delete screenshot if exists
+        await storage.deleteStorageFile(gaii, `apps/screenshots/${filename}`);
+
+        res.json(success(config.nodeId, {
+            filename,
+            note: 'App deleted.',
+        }));
+    });
+
     return router;
 }
