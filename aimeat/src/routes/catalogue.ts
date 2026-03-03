@@ -4,8 +4,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import type { DirectoryService } from '../services/directory.js';
+import type { RealtimeStats } from '../services/realtime-manager.js';
 
-export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService): Router {
+export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService, getRealtimeStats?: () => RealtimeStats | null): Router {
   const router = Router();
 
   // GET /v1/catalogue — public action catalogue (Tier 0, no auth)
@@ -161,6 +162,10 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         daily_allowance: config.dailyAllowance,
         burn_rate: config.burnRate,
       },
+      ...(getRealtimeStats ? (() => {
+        const rt = getRealtimeStats();
+        return rt ? { realtime: { rooms: rt.rooms, peers: rt.peers, messages_in: rt.messagesIn, messages_out: rt.messagesOut } } : {};
+      })() : {}),
     }));
   });
 

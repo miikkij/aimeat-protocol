@@ -75,7 +75,7 @@ if (values.version) {
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const envPath = existsSync('.env') ? '.env'
   : existsSync(join(__pkgRoot, '.env')) ? join(__pkgRoot, '.env')
-  : null;
+    : null;
 
 if (envPath) {
   for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
@@ -258,15 +258,15 @@ if (subcommand === 'config') {
   if (!config.adminPassword) {
     config.adminPassword = randomBytes(16).toString('base64url');
   }
-  const { app, tunnelManager, storage } = await createServer(config);
+  const { app, tunnelManager, realtimeManager, storage } = await createServer(config);
   const server = app.listen(config.port, () => {
     // ── Node type banner ──
     const bannerLabel =
-      config.federationRole === 'operator'    ? 'GENESIS-OPERATOR NODE' :
-      config.federationRole === 'contributor'  ? 'FEDERATION NODE' :
-      config.nodeType === 'personal'           ? 'PRIVATE NODE' :
-      config.devMode                           ? 'DEV NODE' :
-                                                 'STANDALONE NODE';
+      config.federationRole === 'operator' ? 'GENESIS-OPERATOR NODE' :
+        config.federationRole === 'contributor' ? 'FEDERATION NODE' :
+          config.nodeType === 'personal' ? 'PRIVATE NODE' :
+            config.devMode ? 'DEV NODE' :
+              'STANDALONE NODE';
     const pad = 4;
     const inner = bannerLabel.length + pad * 2;
     const line = '─'.repeat(inner + 2);
@@ -293,6 +293,9 @@ if (subcommand === 'config') {
     if (tunnelManager) {
       logger.info(`   🔌 Personal Node tunnel: ws://localhost:${config.port}/v1/personal/tunnel`);
     }
+    if (realtimeManager) {
+      logger.info(`   📡 Realtime P2P rooms: ws://localhost:${config.port}/v1/realtime/ws`);
+    }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup?pw=${config.adminPassword}`);
     if (!process.env.AIMEAT_ADMIN_PASSWORD) {
@@ -316,59 +319,112 @@ if (subcommand === 'config') {
     }).catch(() => { /* ignore */ });
   });
 
-  // WebSocket upgrade handling for personal node tunnels
-  if (tunnelManager) {
+  // WebSocket upgrade handling for personal node tunnels + realtime P2P
+  if (tunnelManager || realtimeManager) {
     const { WebSocketServer } = await import('ws');
     const { verifyJWT } = await import('./auth/jwt.js');
-    const wss = new WebSocketServer({ noServer: true });
+    const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
+    const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
 
     server.on('upgrade', async (request, socket, head) => {
       const url = new URL(request.url ?? '', `http://${request.headers.host}`);
-      if (url.pathname !== '/v1/personal/tunnel') {
-        socket.destroy();
-        return;
-      }
 
-      // Authenticate: JWT from Authorization header or ?token= query param
-      const authHeader = request.headers.authorization;
-      const tokenParam = url.searchParams.get('token');
-      const token = authHeader?.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : tokenParam;
+      // ── Personal tunnel upgrade ──
+      if (url.pathname === '/v1/personal/tunnel' && tunnelManager && tunnelWss) {
+        const authHeader = request.headers.authorization;
+        const tokenParam = url.searchParams.get('token');
+        const token = authHeader?.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : tokenParam;
 
-      if (!token) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-
-      try {
-        const payload = await verifyJWT(token);
-        if (!payload || !payload.sub) {
+        if (!token) {
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
 
-        // Extract owner name and look up their personal node
-        const ownerName = (payload.owner as string) ?? '';
-        const personalNode = await storage.getPersonalNodeByOwner(ownerName);
-        if (!personalNode) {
-          socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        try {
+          const payload = await verifyJWT(token);
+          if (!payload || !payload.sub) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          const ownerName = (payload.owner as string) ?? '';
+          const personalNode = await storage.getPersonalNodeByOwner(ownerName);
+          if (!personalNode) {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          tunnelWss.handleUpgrade(request, socket, head, (ws) => {
+            tunnelManager.handleConnection(ws, personalNode.nodeId, ownerName, personalNode.agentGaiis);
+          });
+        } catch {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+        }
+        return;
+      }
+
+      // ── Realtime P2P upgrade ──
+      if (url.pathname === '/v1/realtime/ws' && realtimeManager && realtimeWss) {
+        const roomId = url.searchParams.get('room');
+        const nick = url.searchParams.get('nick') ?? 'anonymous';
+
+        if (!roomId) {
+          socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
           socket.destroy();
           return;
         }
 
-        wss.handleUpgrade(request, socket, head, (ws) => {
-          tunnelManager.handleConnection(ws, personalNode.nodeId, ownerName, personalNode.agentGaiis);
-        });
-      } catch {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
+        // Authenticate: JWT from ?token= or Authorization header
+        const authHeader = request.headers.authorization;
+        const tokenParam = url.searchParams.get('token');
+        const token = authHeader?.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : tokenParam;
+
+        if (!token) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        try {
+          const payload = await verifyJWT(token);
+          if (!payload || !payload.sub) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          // Verify room exists
+          const room = realtimeManager.getRoom(roomId);
+          if (!room) {
+            socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          realtimeWss.handleUpgrade(request, socket, head, (ws) => {
+            realtimeManager.handleUpgrade(ws, roomId, nick);
+          });
+        } catch {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+        }
+        return;
       }
+
+      // Unknown WebSocket path
+      socket.destroy();
     });
 
-    logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
+    if (tunnelManager) logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
+    if (realtimeManager) logger.info('WebSocket upgrade handler registered for /v1/realtime/ws');
   }
 } else if (subcommand) {
   console.error(`Unknown command: ${subcommand}\n`);

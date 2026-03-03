@@ -11,7 +11,7 @@ import type {
   AppealRecord, ListingRecord, PurchaseRecord,
   PushSubscriptionRecord, TrustedIssuerRecord,
   GenesisPeerRecord, OrganismReputationRecord,
-  ChatInstanceRecord,
+  ChatInstanceRecord, RealtimeRoomRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -52,6 +52,7 @@ export class InMemoryStorage implements Storage {
   private genesisPeers = new Map<string, GenesisPeerRecord>();              // key: id
   private organismReputations = new Map<string, OrganismReputationRecord>(); // key: organismId
   private chatInstances = new Map<string, ChatInstanceRecord>();   // key: id
+  private realtimeRooms = new Map<string, RealtimeRoomRecord>();   // key: id
 
   // ── Owners ──
 
@@ -1059,7 +1060,7 @@ export class InMemoryStorage implements Storage {
     const now = new Date().toISOString();
     for (const record of this.emailVerifications.values()) {
       if (record.ownerName === ownerName && record.purpose === purpose &&
-          record.status === 'pending' && record.expiresAt > now) {
+        record.status === 'pending' && record.expiresAt > now) {
         return record;
       }
     }
@@ -1519,6 +1520,32 @@ export class InMemoryStorage implements Storage {
   }
   async getOrganismReputation(organismId: string): Promise<OrganismReputationRecord | null> {
     return this.organismReputations.get(organismId) ?? null;
+  }
+
+  // ── Realtime Rooms (P2P) ──
+
+  async createRealtimeRoom(room: RealtimeRoomRecord): Promise<RealtimeRoomRecord> {
+    this.realtimeRooms.set(room.id, room);
+    return room;
+  }
+  async getRealtimeRoom(id: string): Promise<RealtimeRoomRecord | null> {
+    return this.realtimeRooms.get(id) ?? null;
+  }
+  async listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]> {
+    let rooms = [...this.realtimeRooms.values()];
+    if (filter?.appType) rooms = rooms.filter(r => r.appType === filter.appType);
+    if (filter?.isPublic !== undefined) rooms = rooms.filter(r => r.isPublic === filter.isPublic);
+    return rooms;
+  }
+  async updateRealtimeRoom(id: string, updates: Partial<RealtimeRoomRecord>): Promise<RealtimeRoomRecord | null> {
+    const room = this.realtimeRooms.get(id);
+    if (!room) return null;
+    const updated = { ...room, ...updates };
+    this.realtimeRooms.set(id, updated);
+    return updated;
+  }
+  async deleteRealtimeRoom(id: string): Promise<boolean> {
+    return this.realtimeRooms.delete(id);
   }
 }
 

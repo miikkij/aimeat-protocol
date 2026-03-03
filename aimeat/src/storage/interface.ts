@@ -549,6 +549,20 @@ export interface OrganismReputationRecord {
   calculatedAt: string;
 }
 
+// Realtime P2P rooms
+export interface RealtimeRoomRecord {
+  id: string;
+  appType: string;
+  name: string;
+  createdBy: string;
+  maxPeers: number;
+  isPublic: boolean;
+  tags: string[];
+  peerCount: number;
+  createdAt: string;
+  lastActivityAt: string;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -827,4 +841,11 @@ export interface Storage {
   listPurchasesByBuyer(buyerOwner: string): Promise<PurchaseRecord[]>;
   listPurchasesBySeller(sellerOwner: string): Promise<PurchaseRecord[]>;
   updatePurchase(id: string, updates: Partial<PurchaseRecord>): Promise<PurchaseRecord | null>;
+
+  // Realtime Rooms (P2P)
+  createRealtimeRoom(room: RealtimeRoomRecord): Promise<RealtimeRoomRecord>;
+  getRealtimeRoom(id: string): Promise<RealtimeRoomRecord | null>;
+  listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]>;
+  updateRealtimeRoom(id: string, updates: Partial<RealtimeRoomRecord>): Promise<RealtimeRoomRecord | null>;
+  deleteRealtimeRoom(id: string): Promise<boolean>;
 }

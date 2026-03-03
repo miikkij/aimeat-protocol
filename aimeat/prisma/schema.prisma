@@ -235,3 +235,16 @@ model SystemSetting {
   key   String @unique
   value String
 }
+
+model RealtimeRoom {
+  id             String   @id @map("_id")
+  appType        String
+  name           String
+  createdBy      String
+  maxPeers       Int
+  isPublic       Boolean  @default(true)
+  tags           String[]
+  peerCount      Int      @default(0)
+  createdAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+}

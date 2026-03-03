@@ -48,6 +48,8 @@
         "familyDesc": "Shared calendar, shopping list, messages",
         "creative": "Creative",
         "creativeDesc": "Make images, stories, or fun stuff",
+        "realtime": "Live & multiplayer",
+        "realtimeDesc": "Real-time collaboration — whiteboard, chat, jam session",
         "custom": "Your idea",
         "customDesc": "Tell what you want and AI builds it"
       },

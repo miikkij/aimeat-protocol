@@ -48,6 +48,8 @@
         "familyDesc": "Jaettu kalenteri, ostoslista, viestit",
         "creative": "Luovat",
         "creativeDesc": "Tee kuvia, tarinoita tai muuta hauskaa",
+        "realtime": "Live & moninpeli",
+        "realtimeDesc": "Reaaliaikainen yhteistyö — piirtotaulu, chatti, jam-sessio",
         "custom": "Oma idea",
         "customDesc": "Kerro mitä haluat ja AI rakentaa sen"
       },

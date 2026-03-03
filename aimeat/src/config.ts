@@ -163,6 +163,17 @@ export interface AimeatConfig {
   cookieConsentEnabled: boolean;
   cookieConsentCategories: string[];
   cookieConsentPolicyUrl: string | null;
+
+  // Realtime P2P
+  realtimeEnabled: boolean;
+  realtimeMaxRooms: number;
+  realtimeMaxPeersPerRoom: number;
+  realtimeRoomIdleTimeoutMs: number;
+  realtimeMaxMessageSizeBytes: number;
+  stunServers: string[];
+  turnServer: string | null;
+  turnUsername: string | null;
+  turnCredential: string | null;
 }
 
 export function loadConfig(): AimeatConfig {
@@ -285,6 +296,15 @@ export function loadConfig(): AimeatConfig {
     cookieConsentEnabled: process.env.AIMEAT_COOKIE_CONSENT_ENABLED === 'true',
     cookieConsentCategories: (process.env.AIMEAT_COOKIE_CONSENT_CATEGORIES ?? 'necessary').split(',').map(s => s.trim()).filter(Boolean),
     cookieConsentPolicyUrl: process.env.AIMEAT_COOKIE_CONSENT_POLICY_URL ?? null,
+    realtimeEnabled: process.env.AIMEAT_REALTIME_ENABLED !== 'false',
+    realtimeMaxRooms: parseInt(process.env.AIMEAT_REALTIME_MAX_ROOMS ?? '100', 10),
+    realtimeMaxPeersPerRoom: parseInt(process.env.AIMEAT_REALTIME_MAX_PEERS_PER_ROOM ?? '20', 10),
+    realtimeRoomIdleTimeoutMs: parseInt(process.env.AIMEAT_REALTIME_ROOM_IDLE_TIMEOUT_MS ?? '3600000', 10),
+    realtimeMaxMessageSizeBytes: parseInt(process.env.AIMEAT_REALTIME_MAX_MESSAGE_SIZE ?? '16384', 10),
+    stunServers: (process.env.AIMEAT_STUN_SERVERS ?? 'stun:stun.l.google.com:19302').split(',').map(s => s.trim()).filter(Boolean),
+    turnServer: process.env.AIMEAT_TURN_SERVER ?? null,
+    turnUsername: process.env.AIMEAT_TURN_USERNAME ?? null,
+    turnCredential: process.env.AIMEAT_TURN_CREDENTIAL ?? null,
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },

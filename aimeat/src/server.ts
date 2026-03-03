@@ -68,6 +68,8 @@ import { seedProfileSchemas } from './services/profile-schemas.js';
 import { createEmailService } from './services/email.js';
 import { DirectoryService } from './services/directory.js';
 import { portalHobbiesRouter } from './routes/portal-hobbies.js';
+import { realtimeRouter } from './routes/realtime.js';
+import { RealtimeManager } from './services/realtime-manager.js';
 import { startMatchNotificationJob } from './services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from './services/matching.js';
 import { adminFeaturesRouter } from './routes/admin-features.js';
@@ -76,6 +78,7 @@ import { createGenesisPeeringService } from './services/genesis-peering.js';
 export interface ServerResult {
   app: express.Express;
   tunnelManager: TunnelManager | null;
+  realtimeManager: RealtimeManager | null;
   storage: Storage;
 }
 
@@ -194,6 +197,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // Start federation heartbeat job (pings peers every 5 minutes)
   startHeartbeatJob(config, peers);
 
+  // Realtime manager forward-declaration (initialized after route mounting)
+  let realtimeManager: RealtimeManager | null = null;
+
   // Personal Node tunnel manager (operator-side)
   let tunnelManager: TunnelManager | null = null;
   if (config.personalNodesEnabled && config.nodeType === 'full') {
@@ -309,7 +315,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(memoryRouter(config, storage));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(actionsRouter(config, storage));
-  app.use(catalogueRouter(config, storage, directoryService));
+  app.use(catalogueRouter(config, storage, directoryService, () => realtimeManager?.getStats() ?? null));
   app.use(workRouter(config, storage, peers));
   app.use(walletRouter(config, storage));
 
@@ -405,6 +411,14 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     app.use(personalRouter(config, storage, tunnelManager));
   }
 
+  // Realtime P2P rooms — Phase 0
+  if (config.realtimeEnabled) {
+    realtimeManager = new RealtimeManager(config, storage);
+    app.use(realtimeRouter(config, storage, realtimeManager, peers));
+    realtimeManager.startCleanupJob();
+    logger.info('Realtime P2P rooms enabled', { maxRooms: config.realtimeMaxRooms });
+  }
+
   // Global error handler
   app.use((err: Error & { status?: number; type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = err.status ?? 500;
@@ -430,7 +444,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     });
   });
 
-  return { app, tunnelManager, storage };
+  return { app, tunnelManager, realtimeManager, storage };
 }
 
 // Daily allowance: credit all agents every 24 hours (or on first activity)

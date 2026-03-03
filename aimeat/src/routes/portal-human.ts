@@ -1354,6 +1354,11 @@ body {
               <div class="cat-name">${esc(t('cards.apps.categories.creative'))}</div>
               <div class="cat-desc">${esc(t('cards.apps.categories.creativeDesc'))}</div>
             </div>
+            <div class="cat-card" data-category="realtime" onclick="event.stopPropagation()">
+              <div class="cat-icon">\u{1F4E1}</div>
+              <div class="cat-name">${esc(t('cards.apps.categories.realtime'))}</div>
+              <div class="cat-desc">${esc(t('cards.apps.categories.realtimeDesc'))}</div>
+            </div>
             <div class="cat-card" data-category="custom" onclick="event.stopPropagation()">
               <div class="cat-icon">\u{1F4A1}</div>
               <div class="cat-name">${esc(t('cards.apps.categories.custom'))}</div>
@@ -1724,6 +1729,7 @@ body {
   var copiedLabel = '${jesc(t('cards.apps.copied'))}';
 
   var nodeUrl = (document.querySelector('meta[name="aimeat-node"]') || {}).content || window.location.origin;
+  var anonGaii = encodeURIComponent('shared#anonymous@${jesc(config.nodeId)}');
 
   var askUser = 'Before building, ask me:\\n' +
     '1. What should the app be called?\\n' +
@@ -1749,6 +1755,35 @@ body {
     '- Clean, modern UI\\n' +
     '- Works immediately when opened in a browser\\n';
 
+  var realtimeRef = '## Realtime P2P API (optional — for live multiplayer)\n' +
+    'Your app can create real-time rooms where multiple users interact live (no polling needed).\n' +
+    'Client library: <script src="' + nodeUrl + '/lib/realtime.js"></script>\n\n' +
+    'Quick start:\n' +
+    '  const rt = new AimeatRealtime("' + nodeUrl + '", token);\n' +
+    '  // token comes from: POST ' + nodeUrl + '/v1/auth/anonymous → response.data.token\n' +
+    '  const room = await rt.createRoom({ app_type: "[TYPE]", name: "My Room" });\n' +
+    '  rt.connect(room.id, playerName);\n' +
+    '  rt.on("joined", (msg) => console.log("My peer ID:", msg.peerId, "Peers:", msg.peers));\n' +
+    '  rt.on("peer-joined", (msg) => console.log("New peer:", msg.nick));\n' +
+    '  rt.on("peer-left", (msg) => console.log("Peer left:", msg.peerId));\n' +
+    '  rt.on("broadcast", (msg) => console.log("From", msg.from, ":", msg.payload));\n' +
+    '  rt.broadcast({ action: "move", x: 10, y: 20 }); // send to all peers\n' +
+    '  rt.presence({ status: "ready", cursor: {x:100, y:200} }); // share state\n' +
+    '  rt.on("peer-presence", (msg) => console.log(msg.peerId, "state:", msg.state));\n\n' +
+    'Room lifecycle:\n' +
+    '  - Create: rt.createRoom({ app_type, name, max_peers, is_public, tags })\n' +
+    '  - List: rt.listRooms({ app_type }) → rooms array\n' +
+    '  - Connect: rt.connect(roomId, nickname)\n' +
+    '  - Disconnect: rt.disconnect()\n' +
+    '  - Broadcast (to all): rt.broadcast(payload)\n' +
+    '  - Signal (to one peer): rt.signal(peerId, payload) — for WebRTC handshake\n' +
+    '  - Presence (share state): rt.presence({ key: value })\n' +
+    '  - Leave: rt.leave()\n\n' +
+    'Events: joined, peer-joined, peer-left, peer-presence, broadcast, signal, error, open, close\n' +
+    'IMPORTANT: Get an anonymous auth token FIRST, then pass it to AimeatRealtime constructor:\n' +
+    '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\n' +
+    '  const { data: { token } } = await authRes.json();\n\n';
+
   var baseEnd = '\\nMake the HTML a downloadable file. This is a live API — the URLs work right now.' +
     '\\n\\n## If Something Doesn\\'t Work\\n' +
     'After giving the user the download link or HTML file, always add this message at the end:\\n' +
@@ -1770,6 +1805,9 @@ body {
       'Use my answers to customize the title, game type, colors, fonts, and overall vibe.\\n\\n' +
       'I want a multiplayer game with a lobby system as a single self-contained HTML file.\\n\\n' +
       apiRef +
+      realtimeRef +
+      'NOTE: For real-time multiplayer (instant moves, no polling) use the Realtime P2P API above. ' +
+      'For turn-based games, the memory API polling approach below also works fine.\\n\\n' +
       'NOTE: The lobby is already a shared community space by default \u2014 all players see the same lobby and can join each other\\'s games.\\n' +
       'If user wants a PRIVATE lobby, use a unique key like "apps.games.[gametype].private.[uniqueId].lobby" instead.\\n\\n' +
       '## Data structure\\n\\n' +
@@ -1861,7 +1899,7 @@ body {
       'Content-Type: application/json\\n' +
       'Body: {"key": "apps/art/[unique-id].png", "data": "<base64-encoded-image>", "mime_type": "image/png", "visibility": "public"}\\n' +
       'Response: { ok: true, data: { key: "apps/art/[unique-id].png", size: 12345, ... } }\\n' +
-      'Public image URL (for <img> tags): ' + nodeUrl + '/v1/pub/shared%23anonymous@' + nodeUrl.replace(/^https?:\\/\\//, '').replace(':', '%3A') + '/apps/art/[unique-id].png\\n' +
+      'Public image URL (for <img> tags): ' + nodeUrl + '/v1/pub/' + anonGaii + '/apps/art/[unique-id].png\\n' +
       'IMPORTANT: To convert canvas to base64 for upload, use canvas.toDataURL("image/png").split(",")[1] to get the raw base64 WITHOUT the data:image/png;base64, prefix.\\n\\n' +
       '## Shared community gallery (if user chooses SHARED):\\n' +
       'Store the gallery INDEX (metadata only, no image data) in memory:\\n' +
@@ -1869,7 +1907,7 @@ body {
       'Read: GET ' + nodeUrl + '/v1/memory/apps.art.community.gallery\\n' +
       'Format: {"items": [{"id":"unique","author":"Name","title":"Artwork title","storageKey":"apps/art/[id].png","created":"ISO timestamp"},...]}\\n' +
       'To add: First upload image to storage, then GET existing gallery items, append new item with storageKey (NOT base64 data), POST gallery back to memory.\\n' +
-      'Display images using the public URL: <img src="' + nodeUrl + '/v1/pub/shared%23anonymous@' + nodeUrl.replace(/^https?:\\/\\//, '').replace(':', '%3A') + '/[storageKey]">\\n' +
+      'Display images using the public URL: <img src="' + nodeUrl + '/v1/pub/' + anonGaii + '/[storageKey]">\\n' +
       'Show all community artwork in a gallery grid. Each piece shows author name, title and time. Let user save their drawing alongside others.\\n\\n' +
       'App requirements:\\n' +
       '- Drawing canvas with color picker and brush size\\n' +
@@ -1890,7 +1928,36 @@ body {
       'To add: GET existing items, append new item to items array, POST full updated object back.\\n' +
       'Show all community items and let user add theirs with their name.\\n\\n' +
       baseReqs + '\\n' +
-      'Ask me what the app should do before building it.' + baseEnd
+      'Ask me what the app should do before building it.' + baseEnd,
+
+    realtime: 'Before building, ask me:\\n' +
+      '1. What should the app be called?\\n' +
+      '2. What type of real-time experience? (e.g. "collaborative whiteboard", "live chat room", "multiplayer game", "jam session", "shared timer")\\n' +
+      '3. How should it look and feel? (e.g. "sleek and minimal", "fun and colorful", "dark mode gaming")\\n' +
+      '4. How many people at once? (2–20)\\n' +
+      'Use my answers to customize everything.\\n\\n' +
+      'I want a real-time collaborative app where multiple people interact simultaneously — no page refreshing, instant updates.\\n\\n' +
+      apiRef +
+      realtimeRef +
+      '## How it should work\\n' +
+      '1. On first visit, ask the user for a display name (save to localStorage)\\n' +
+      '2. Show a room browser: list of active rooms (via rt.listRooms({ app_type: "[TYPE]" }))\\n' +
+      '3. "Create Room" button — creates a new room and connects to it\\n' +
+      '4. "Join" button on each room — connects to that room\\n' +
+      '5. Once connected, show the live experience with peer list sidebar\\n' +
+      '6. All interactions broadcast instantly to all peers (NO polling)\\n' +
+      '7. Show who\'s online and their status via presence\\n' +
+      '8. Handle peer join/leave gracefully with notifications\\n' +
+      '9. "Leave Room" button to disconnect and return to room browser\\n\\n' +
+      '## Auth setup\\n' +
+      'The app must first get an anonymous auth token:\\n' +
+      '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\\n' +
+      '  const { data: { token } } = await authRes.json();\\n' +
+      'Then create the realtime client: new AimeatRealtime("' + nodeUrl + '", token)\\n\\n' +
+      baseReqs +
+      '- Include <script src="' + nodeUrl + '/lib/realtime.js"></script> for the realtime client library\\n' +
+      '- Use WebSocket-based realtime API (NOT polling) for all live interactions\\n' +
+      '- Show connection status indicator (connected / disconnected / reconnecting)\\n' + baseEnd
   };
 
   catCards.forEach(function(cat) {

@@ -593,9 +593,14 @@
       color: #fff;
     }
 
-    .modal-btn.primary:hover {
+    .modal-btn.primary:hover:not(:disabled) {
       box-shadow: 0 4px 20px rgba(233, 69, 96, .35);
       background: linear-gradient(135deg, #f05575, #e94560);
+    }
+
+    .modal-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
 
     /* ── Drop Zone ──────────────────────────────────── */
@@ -1042,6 +1047,7 @@
       <div class="modal-tabs">
         <button class="modal-tab active" data-tab="url">URL</button>
         <button class="modal-tab" data-tab="file">File</button>
+        <button class="modal-tab" data-tab="paste">Paste</button>
         <button class="modal-tab" data-tab="aimeat">AIMEAT</button>
       </div>
 
@@ -1062,6 +1068,12 @@
           <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
           <p class="drop-zone-selected" id="selected-file-name"></p>
         </div>
+      </div>
+
+      <!-- Paste tab content -->
+      <div class="tab-content" id="tab-paste">
+        <label class="modal-label" for="app-paste-code">Paste HTML Source Code</label>
+        <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
       </div>
 
       <!-- AIMEAT tab content -->
@@ -1120,7 +1132,7 @@
     <button data-action="edit">&#x270F;&#xFE0F; Edit</button>
     <button data-action="favorite">&#x2B50; Toggle favorite</button>
     <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
-    <button data-action="view-source">&#x1F441; View Source</button>
+    <button data-action="view-source">&#x1F441; View / Edit Source</button>
     <hr>
     <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
   </div>
@@ -1185,11 +1197,12 @@
   <div id="source-overlay" hidden>
     <div class="modal source-modal">
       <h2 id="source-title">View Source</h2>
-      <textarea id="source-code" readonly></textarea>
+      <textarea id="source-code"></textarea>
       <div class="modal-actions">
         <button class="modal-btn secondary" id="copy-source-btn">Copy Source</button>
         <button class="modal-btn primary" id="copy-prompt-btn">Copy with AI Prompt</button>
-        <button class="modal-btn secondary" onclick="document.getElementById('source-overlay').hidden = true">Close</button>
+        <button class="modal-btn primary" id="save-source-btn" disabled>Save Changes</button>
+        <button class="modal-btn secondary" id="close-source-btn">Close</button>
       </div>
     </div>
   </div>
@@ -1619,6 +1632,30 @@
     });
   }
 
+  // ── App Creation from Pasted Source ─────────────
+
+  function addAppFromSource(name, sourceCode, icon, tags, openMode) {
+    var encoded = btoa(unescape(encodeURIComponent(sourceCode)));
+    var app = {
+      id: generateId(),
+      name: name,
+      description: '',
+      source: 'local',
+      url: null,
+      blob: encoded,
+      tags: tags,
+      openMode: openMode,
+      icon: icon || '\u{1F4DD}',
+      screenshot: null,
+      favorite: false,
+      addedAt: new Date().toISOString(),
+      lastOpenedAt: null
+    };
+    return saveApp(app).then(function () {
+      return app;
+    });
+  }
+
   // ── Modal State ─────────────────────────────────
 
   var selectedFile = null;
@@ -1641,6 +1678,7 @@
     document.getElementById('app-open-mode').value = 'tab';
     document.getElementById('selected-file-name').textContent = '';
     document.getElementById('file-input').value = '';
+    document.getElementById('app-paste-code').value = '';
     selectedFile = null;
     editingAppId = null;
   }
@@ -1745,8 +1783,22 @@
         closeModal();
         renderApps();
       });
-    } else {
-      // File tab
+    } else if (tabName === 'paste') {
+      var pastedCode = document.getElementById('app-paste-code').value.trim();
+      if (!pastedCode) {
+        alert('Please paste your HTML source code');
+        return;
+      }
+      if (!name) {
+        // Try to extract title from HTML
+        var titleMatch = pastedCode.match(/<title[^>]*>([^<]+)<\/title>/i);
+        name = titleMatch ? titleMatch[1].trim() : 'Pasted App';
+      }
+      addAppFromSource(name, pastedCode, icon, tags, openMode).then(function () {
+        closeModal();
+        renderApps();
+      });
+    } else if (tabName === 'file') {
       if (!selectedFile) {
         alert('Please select a file');
         return;
@@ -1869,10 +1921,12 @@
       window.open(app.url, '_blank');
     } else if (app.blob) {
       var html = decodeURIComponent(escape(atob(app.blob)));
-      var blob = new Blob([html], { type: 'text/html' });
-      var blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank');
-      setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 5000);
+      var newWin = window.open('', '_blank');
+      if (newWin) {
+        newWin.document.open();
+        newWin.document.write(html);
+        newWin.document.close();
+      }
     }
   }
 
@@ -2132,9 +2186,11 @@
     var overlay = document.getElementById('source-overlay');
     var textarea = document.getElementById('source-code');
     var title = document.getElementById('source-title');
+    var saveBtn = document.getElementById('save-source-btn');
 
-    title.textContent = 'View Source: ' + (app.name || 'App');
+    title.textContent = 'View / Edit Source: ' + (app.name || 'App');
 
+    var isEditable = !!app.blob; // Only blob-based apps can be edited
     if (app.blob) {
       textarea.value = decodeURIComponent(escape(atob(app.blob)));
     } else if (app.url) {
@@ -2143,9 +2199,14 @@
       textarea.value = '// No source available';
     }
 
+    textarea.readOnly = !isEditable;
+    saveBtn.disabled = true;
+    saveBtn.style.display = isEditable ? '' : 'none';
     overlay.hidden = false;
-    // Store current app for copy-with-prompt
+    // Store app metadata for save and prompt
     overlay.dataset.appName = app.name || 'App';
+    overlay.dataset.appId = app.id || '';
+    overlay.dataset.originalSource = textarea.value;
   }
 
   // ── Generate Homepage Prompt ──────────────────────
@@ -2472,6 +2533,7 @@
     readFileAsText: readFileAsText,
     addAppFromUrl: addAppFromUrl,
     addAppFromFile: addAppFromFile,
+    addAppFromSource: addAppFromSource,
     addAppFromZip: addAppFromZip,
     showModal: showModal,
     closeModal: closeModal,
@@ -2688,14 +2750,83 @@
       }
     });
 
+    // ── Build rich AI prompt with AIMEAT instructions ─
+    function buildAiPrompt(appName, code) {
+      var config = loadConfig();
+      var nodeUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : 'https://your-aimeat-node.example';
+
+      return 'Here is an HTML app called "' + appName + '".\n' +
+        'Make the following change: [DESCRIBE YOUR CHANGE HERE]\n\n' +
+        'Return the COMPLETE updated HTML file. Do not omit any parts.\n\n' +
+        '## AIMEAT Platform Instructions\n\n' +
+        'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n' +
+        '### Available Client Libraries\n' +
+        'Load via script tags from the AIMEAT node (' + nodeUrl + '):\n' +
+        '- aimeat-auth (' + nodeUrl + '/v1/libs/aimeat-auth.js) - Identity, login, JWT, session management\n' +
+        '- aimeat-data (' + nodeUrl + '/v1/libs/aimeat-data.js) - Memory storage, search, key-value data\n' +
+        '- aimeat-storage (' + nodeUrl + '/v1/libs/aimeat-storage.js) - File upload/download\n' +
+        '- aimeat-social (' + nodeUrl + '/v1/libs/aimeat-social.js) - Boards, posts, reactions\n' +
+        '- aimeat-wallet (' + nodeUrl + '/v1/libs/aimeat-wallet.js) - Balance, transactions\n' +
+        '- aimeat-work (' + nodeUrl + '/v1/libs/aimeat-work.js) - Actions, work requests\n\n' +
+        '### Auth Pattern\n' +
+        '```html\n' +
+        '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n' +
+        '<script>\n' +
+        'AIMEAT.auth.mountLoginButton("#login", {\n' +
+        '  onLogin: function(session) { /* session.owner, session.jwt, session.fetch() */ },\n' +
+        '  onLogout: function() { /* hide content */ }\n' +
+        '});\n' +
+        '</' + 'script>\n' +
+        '```\n\n' +
+        '### Data Storage\n' +
+        '```javascript\n' +
+        'await AIMEAT.data.set("key", "value", { visibility: "private", tags: ["t1"] });\n' +
+        'var val = await AIMEAT.data.get("key");\n' +
+        'var results = await AIMEAT.data.search("query");\n' +
+        '```\n\n' +
+        '### Upload to AIMEAT Node\n' +
+        'After updating, the user can upload the app to their AIMEAT node:\n' +
+        '```\n' +
+        'POST ' + nodeUrl + '/v1/apps\n' +
+        'Authorization: Bearer <jwt>\n' +
+        'Content-Type: application/json\n' +
+        '{ "filename": "app.html", "content": "<base64>", "mime_type": "text/html" }\n' +
+        '```\n\n' +
+        '### Self-Download Pattern\n' +
+        'Include a download button so users can save the app:\n' +
+        '```javascript\n' +
+        'function downloadSelf() {\n' +
+        '  var html = document.documentElement.outerHTML;\n' +
+        '  var blob = new Blob(["<!DOCTYPE html>" + html], {type:"text/html"});\n' +
+        '  var a = document.createElement("a");\n' +
+        '  a.href = URL.createObjectURL(blob); a.download = "my-app.html"; a.click();\n' +
+        '}\n' +
+        '```\n\n' +
+        '### Browser APIs Available\n' +
+        'Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB,\n' +
+        'Notifications, Drag & Drop, Clipboard, Speech API, Fullscreen, Web Workers,\n' +
+        'CSS Animations, SVG, Gamepad API, Share API.\n\n' +
+        '### Design Guidelines\n' +
+        'Recommended dark theme:\n' +
+        '```css\n' +
+        ':root { --bg:#0f0a14; --card:rgba(30,20,40,0.85); --text:#f0e6f6;\n' +
+        '  --accent:#ff6b9d; --border:rgba(255,107,157,0.25); --radius:12px; }\n' +
+        '```\n' +
+        'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+        'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n' +
+        '### Important Rules\n' +
+        '- Return the COMPLETE HTML file, not fragments\n' +
+        '- Never use literal closing script tags in JS comments or strings (breaks HTML parser)\n' +
+        '- Keep it as a single self-contained HTML file\n' +
+        '- Include error handling and loading states for API calls\n\n' +
+        '--- Source Code ---\n' + code;
+    }
+
     // ── Copy with AI Prompt button ───────────────────
     document.getElementById('copy-prompt-btn').addEventListener('click', function() {
       var code = document.getElementById('source-code').value;
       var appName = document.getElementById('source-overlay').dataset.appName;
-      var prompt = 'Here is an HTML app called "' + appName + '".\n' +
-        'Make the following change: [DESCRIBE YOUR CHANGE HERE]\n\n' +
-        'Return the complete updated HTML file.\n\n' +
-        '--- Source Code ---\n' + code;
+      var prompt = buildAiPrompt(appName, code);
       var btn = this;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(prompt).then(function() {
@@ -2715,12 +2846,79 @@
       }
     });
 
+    // ── Enable/disable Save button when source changes ─
+    document.getElementById('source-code').addEventListener('input', function() {
+      var overlay = document.getElementById('source-overlay');
+      var saveBtn = document.getElementById('save-source-btn');
+      var original = overlay.dataset.originalSource || '';
+      saveBtn.disabled = (this.value === original);
+    });
+
+    // ── Save Changes button ──────────────────────────
+    document.getElementById('save-source-btn').addEventListener('click', function() {
+      var overlay = document.getElementById('source-overlay');
+      var textarea = document.getElementById('source-code');
+      var appId = overlay.dataset.appId;
+      var btn = this;
+
+      if (!appId) {
+        alert('Cannot save: no app ID found.');
+        return;
+      }
+
+      var newSource = textarea.value;
+      // Encode to base64 blob
+      var newBlob = btoa(unescape(encodeURIComponent(newSource)));
+
+      // Find the app in allApps and update it
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === appId) {
+          app = allApps[i];
+          break;
+        }
+      }
+
+      if (!app) {
+        alert('App not found in library.');
+        return;
+      }
+
+      app.blob = newBlob;
+      btn.textContent = 'Saving...';
+      btn.disabled = true;
+
+      saveApp(app).then(function() {
+        btn.textContent = 'Saved!';
+        overlay.dataset.originalSource = newSource;
+        setTimeout(function() {
+          btn.textContent = 'Save Changes';
+          btn.disabled = true;
+        }, 1500);
+        renderApps();
+      }).catch(function(err) {
+        btn.textContent = 'Save Changes';
+        btn.disabled = false;
+        alert('Failed to save: ' + (err.message || err));
+      });
+    });
+
+    // ── Close source modal helper ─────────────────────
+    function closeSourceModal() {
+      var saveBtn = document.getElementById('save-source-btn');
+      if (!saveBtn.disabled) {
+        if (!confirm('You have unsaved changes. Close anyway?')) return;
+      }
+      document.getElementById('source-overlay').hidden = true;
+    }
+
     // ── Click source overlay background to close ─────
     document.getElementById('source-overlay').addEventListener('click', function(e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
+      if (e.target === this) closeSourceModal();
     });
+
+    // ── Close button in source modal ─────────────────
+    document.getElementById('close-source-btn').addEventListener('click', closeSourceModal);
 
     // ── Homepage button ──────────────────────────────
     document.getElementById('homepage-btn').addEventListener('click', generateHomepagePrompt);

@@ -1920,6 +1920,109 @@ export class MongoStorage implements Storage {
     async getOrganismReputation(organismId: string): Promise<import('./interface.js').OrganismReputationRecord | null> {
         return this.organismReputations.get(organismId) ?? null;
     }
+
+    // ── Realtime rooms (MongoDB-backed via Prisma) ──
+
+    async createRealtimeRoom(record: import('./interface.js').RealtimeRoomRecord): Promise<import('./interface.js').RealtimeRoomRecord> {
+        this.ensureReady();
+        const row = await this.prisma.realtimeRoom.create({
+            data: {
+                id: record.id,
+                appType: record.appType,
+                name: record.name,
+                createdBy: record.createdBy,
+                maxPeers: record.maxPeers,
+                isPublic: record.isPublic,
+                tags: record.tags,
+                peerCount: record.peerCount,
+                createdAt: new Date(record.createdAt),
+                lastActivityAt: new Date(record.lastActivityAt),
+            },
+        });
+        return {
+            id: row.id,
+            appType: row.appType,
+            name: row.name,
+            createdBy: row.createdBy,
+            maxPeers: row.maxPeers,
+            isPublic: row.isPublic,
+            tags: row.tags,
+            peerCount: row.peerCount,
+            createdAt: row.createdAt.toISOString(),
+            lastActivityAt: row.lastActivityAt.toISOString(),
+        };
+    }
+    async getRealtimeRoom(id: string): Promise<import('./interface.js').RealtimeRoomRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.realtimeRoom.findUnique({ where: { id } });
+        if (!row) return null;
+        return {
+            id: row.id,
+            appType: row.appType,
+            name: row.name,
+            createdBy: row.createdBy,
+            maxPeers: row.maxPeers,
+            isPublic: row.isPublic,
+            tags: row.tags,
+            peerCount: row.peerCount,
+            createdAt: row.createdAt.toISOString(),
+            lastActivityAt: row.lastActivityAt.toISOString(),
+        };
+    }
+    async listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<import('./interface.js').RealtimeRoomRecord[]> {
+        this.ensureReady();
+        const where: Record<string, unknown> = {};
+        if (filter?.appType) where.appType = filter.appType;
+        if (filter?.isPublic !== undefined) where.isPublic = filter.isPublic;
+        const rows = await this.prisma.realtimeRoom.findMany({ where });
+        return rows.map((row: any) => ({
+            id: row.id,
+            appType: row.appType,
+            name: row.name,
+            createdBy: row.createdBy,
+            maxPeers: row.maxPeers,
+            isPublic: row.isPublic,
+            tags: row.tags,
+            peerCount: row.peerCount,
+            createdAt: row.createdAt.toISOString(),
+            lastActivityAt: row.lastActivityAt.toISOString(),
+        }));
+    }
+    async updateRealtimeRoom(id: string, updates: Partial<import('./interface.js').RealtimeRoomRecord>): Promise<import('./interface.js').RealtimeRoomRecord | null> {
+        this.ensureReady();
+        try {
+            const data: Record<string, unknown> = {};
+            if (updates.peerCount !== undefined) data.peerCount = updates.peerCount;
+            if (updates.lastActivityAt !== undefined) data.lastActivityAt = new Date(updates.lastActivityAt);
+            if (updates.name !== undefined) data.name = updates.name;
+            if (updates.isPublic !== undefined) data.isPublic = updates.isPublic;
+            if (updates.tags !== undefined) data.tags = updates.tags;
+            const row = await this.prisma.realtimeRoom.update({ where: { id }, data });
+            return {
+                id: row.id,
+                appType: row.appType,
+                name: row.name,
+                createdBy: row.createdBy,
+                maxPeers: row.maxPeers,
+                isPublic: row.isPublic,
+                tags: row.tags,
+                peerCount: row.peerCount,
+                createdAt: row.createdAt.toISOString(),
+                lastActivityAt: row.lastActivityAt.toISOString(),
+            };
+        } catch {
+            return null;
+        }
+    }
+    async deleteRealtimeRoom(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.realtimeRoom.delete({ where: { id } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
 }
 
 /**
