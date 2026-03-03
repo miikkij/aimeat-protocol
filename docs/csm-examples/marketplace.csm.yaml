@@ -1,0 +1,83 @@
+csm: "1.0"
+
+service:
+  name: "Marketplace"
+  type: marketplace
+  description: "Buy and sell goods, services, and digital assets using morsels"
+  version: "1.0.0"
+  semantic:
+    "@context":
+      schema: "https://schema.org/"
+    "@type": "Product"
+
+schema_mode: open
+
+data_schema:
+  required:
+    title:
+      type: string
+      min: 3
+      max: 200
+    description:
+      type: string
+      min: 10
+      max: 5000
+    category:
+      type: string
+      enum: ["electronics", "clothing", "home", "vehicles", "services", "digital", "food", "other"]
+    price_morsels:
+      type: integer
+      min: 1
+    seller_ghii:
+      type: string
+  optional:
+    images:
+      type: array
+      items: string
+      max: 10
+    condition:
+      type: string
+      enum: ["new", "like_new", "good", "fair", "poor", "digital"]
+    location:
+      type: object
+      properties:
+        city:
+          type: string
+        area:
+          type: string
+          required: false
+        country:
+          type: string
+          required: false
+    availability:
+      type: string
+      enum: ["immediate", "on_request", "scheduled", "preorder"]
+    shipping_options:
+      type: array
+      items: string
+      max: 5
+    tags:
+      type: array
+      items: string
+      max: 10
+    contact_method:
+      type: string
+      enum: ["in_app", "email", "phone"]
+
+consent_requirements:
+  visibility_default: federation
+  requires_consent: true
+  consent_purpose: "marketplace-listing"
+  data_retention: "until_revoked"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 3
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["title", "price_morsels", "category", "location.city"]
+  detail_view: ["title", "description", "price_morsels", "images", "seller_ghii", "category", "condition", "availability", "shipping_options"]
+  search_fields: ["title", "description", "category", "location.city", "tags"]
+  sort_options: ["created_at", "price_morsels", "title"]
+  card_image_field: "images"

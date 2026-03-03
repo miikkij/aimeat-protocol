@@ -1,0 +1,81 @@
+csm: "1.0"
+
+service:
+  name: "Video Directory"
+  type: media
+  description: "Community video library with categorization, chapters, and search"
+  version: "1.0.0"
+  semantic:
+    "@context":
+      schema: "https://schema.org/"
+    "@type": "VideoObject"
+
+schema_mode: open
+
+data_schema:
+  required:
+    title:
+      type: string
+      min: 3
+      max: 200
+    url:
+      type: string
+      format: uri
+    category:
+      type: string
+      enum: ["tutorial", "entertainment", "documentary", "music", "news", "sports", "education", "other"]
+  optional:
+    description:
+      type: string
+      max: 2000
+    thumbnail_url:
+      type: string
+      format: uri
+    duration_seconds:
+      type: integer
+      min: 1
+    creator_ghii:
+      type: string
+    tags:
+      type: array
+      items: string
+      max: 15
+    language:
+      type: string
+      max: 50
+    resolution:
+      type: string
+      enum: ["360p", "480p", "720p", "1080p", "4k"]
+    chapters:
+      type: array
+      items:
+        type: object
+        properties:
+          title:
+            type: string
+          start_seconds:
+            type: number
+    transcript:
+      type: string
+      max: 50000
+    license:
+      type: string
+      enum: ["cc-by", "cc-by-sa", "cc-by-nc", "cc0", "all-rights-reserved"]
+
+consent_requirements:
+  visibility_default: public
+  requires_consent: false
+  consent_purpose: "video-sharing"
+  data_retention: "until_revoked"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["title", "category", "duration_seconds", "thumbnail_url"]
+  detail_view: ["title", "description", "url", "category", "creator_ghii", "tags", "duration_seconds", "resolution", "language", "chapters", "license"]
+  search_fields: ["title", "description", "category", "tags", "language"]
+  sort_options: ["created_at", "title", "duration_seconds"]
+  card_image_field: "thumbnail_url"

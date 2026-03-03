@@ -1,0 +1,84 @@
+csm: "1.0"
+
+service:
+  name: "Dating Directory"
+  type: dating
+  description: "Privacy-first dating profiles with anonymous browsing and auto-expiry"
+  version: "1.0.0"
+  semantic:
+    "@context":
+      schema: "https://schema.org/"
+    "@type": "Person"
+
+schema_mode: strict
+
+data_schema:
+  required:
+    interests:
+      type: array
+      items: string
+      min: 1
+      max: 15
+    age_range:
+      type: object
+      properties:
+        min:
+          type: integer
+          min: 18
+          max: 120
+        max:
+          type: integer
+          min: 18
+          max: 120
+    seeking:
+      type: array
+      items: string
+      min: 1
+      max: 5
+  optional:
+    display_name:
+      type: string
+      min: 2
+      max: 50
+    bio:
+      type: string
+      max: 1000
+    location:
+      type: object
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+          required: false
+    languages:
+      type: array
+      items: string
+      max: 10
+    availability:
+      type: string
+      enum: ["anytime", "weekdays", "evenings", "weekends"]
+    values:
+      type: array
+      items: string
+      max: 10
+    lifestyle:
+      type: string
+      enum: ["active", "relaxed", "adventurous", "homebody", "balanced"]
+
+consent_requirements:
+  visibility_default: private
+  requires_consent: true
+  consent_purpose: "dating-discovery"
+  data_retention: "90d"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 2
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["display_name", "interests", "age_range", "location.city"]
+  detail_view: ["display_name", "bio", "age_range", "seeking", "interests", "location", "languages", "availability", "values", "lifestyle"]
+  search_fields: ["interests", "location.city", "seeking", "languages"]
+  sort_options: ["created_at"]

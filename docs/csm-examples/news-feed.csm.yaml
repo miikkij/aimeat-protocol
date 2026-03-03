@@ -1,0 +1,82 @@
+csm: "1.0"
+
+service:
+  name: "News Feed"
+  type: news
+  description: "Community news articles and announcements with topic categorization"
+  version: "1.0.0"
+  semantic:
+    "@context":
+      schema: "https://schema.org/"
+    "@type": "NewsArticle"
+
+schema_mode: open
+
+data_schema:
+  required:
+    title:
+      type: string
+      min: 5
+      max: 300
+    body:
+      type: string
+      min: 20
+      max: 50000
+    source:
+      type: string
+      min: 1
+      max: 200
+    category:
+      type: string
+      enum: ["local", "technology", "culture", "sports", "business", "science", "politics", "other"]
+  optional:
+    summary:
+      type: string
+      max: 500
+    url:
+      type: string
+      format: uri
+    author_ghii:
+      type: string
+    image_url:
+      type: string
+      format: uri
+    published_at:
+      type: string
+      format: date-time
+    tags:
+      type: array
+      items: string
+      max: 10
+    location:
+      type: object
+      properties:
+        city:
+          type: string
+        region:
+          type: string
+          required: false
+        country:
+          type: string
+          required: false
+    priority:
+      type: string
+      enum: ["normal", "important", "urgent"]
+
+consent_requirements:
+  visibility_default: public
+  requires_consent: false
+  consent_purpose: "news-distribution"
+  data_retention: "365d"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["title", "source", "category", "published_at"]
+  detail_view: ["title", "body", "source", "category", "author_ghii", "image_url", "tags", "location", "published_at"]
+  search_fields: ["title", "body", "source", "category", "tags"]
+  sort_options: ["created_at", "published_at", "title"]
+  card_image_field: "image_url"

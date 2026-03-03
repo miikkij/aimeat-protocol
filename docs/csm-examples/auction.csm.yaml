@@ -1,0 +1,82 @@
+csm: "1.0"
+
+service:
+  name: "Auction"
+  type: auction
+  description: "Time-limited auctions with morsel-based bidding and escrow protection"
+  version: "1.0.0"
+  semantic:
+    "@context":
+      schema: "https://schema.org/"
+    "@type": "Offer"
+
+schema_mode: strict
+
+data_schema:
+  required:
+    title:
+      type: string
+      min: 5
+      max: 200
+    description:
+      type: string
+      min: 10
+      max: 5000
+    starting_price_morsels:
+      type: integer
+      min: 1
+    ends_at:
+      type: string
+      format: date-time
+    seller_ghii:
+      type: string
+  optional:
+    category:
+      type: string
+      enum: ["art", "collectibles", "electronics", "antiques", "vehicles", "real_estate", "jewelry", "other"]
+    reserve_price_morsels:
+      type: integer
+      min: 1
+    buy_now_price_morsels:
+      type: integer
+      min: 1
+    images:
+      type: array
+      items: string
+      max: 20
+    condition:
+      type: string
+      enum: ["new", "like_new", "good", "fair", "poor"]
+    location:
+      type: object
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+          required: false
+    shipping_options:
+      type: array
+      items: string
+      max: 5
+    provenance:
+      type: string
+      max: 2000
+
+consent_requirements:
+  visibility_default: federation
+  requires_consent: true
+  consent_purpose: "auction-listing"
+  data_retention: "30d"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 2
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["title", "starting_price_morsels", "category", "ends_at"]
+  detail_view: ["title", "description", "starting_price_morsels", "reserve_price_morsels", "buy_now_price_morsels", "category", "condition", "images", "location", "ends_at", "provenance"]
+  search_fields: ["title", "description", "category", "location.city"]
+  sort_options: ["ends_at", "starting_price_morsels", "created_at"]
+  card_image_field: "images"
