@@ -72,6 +72,50 @@ export function workspaceAccessMiddleware(
       return;
     }
 
+    // --- Consent check (Phase 2.3) ---
+    // Determine if consent is required for this operation.
+    // Consent is NOT required for:
+    //   - Writes to the member's own namespace (organism.{id}.member.{owner}.*)
+    // Consent IS required for:
+    //   - All READ operations on shared/meta namespaces
+    //   - Writes to shared namespace (not own member namespace)
+    const isRead = ['GET', 'HEAD'].includes(req.method);
+    const ownMemberPrefix = `organism.${organismId}.member.${ownerName}.`;
+    const isOwnMemberNamespace = key.startsWith(ownMemberPrefix);
+
+    // Skip consent for writes to your own member namespace
+    const needsConsent = isRead
+      ? !isOwnMemberNamespace   // reads outside own namespace need consent
+      : !isOwnMemberNamespace;  // writes outside own namespace need consent
+
+    if (needsConsent) {
+      // Look up all agents for this owner
+      const agents = await storage.getAgentsByOwner(ownerName);
+
+      if (agents.length === 0) {
+        res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'No agent found — consent cannot be verified'));
+        return;
+      }
+
+      // Check if ANY of the owner's agents have a matching active consent
+      const accessorPattern = `organism.${organismId}`;
+      let hasConsent = false;
+
+      for (const agent of agents) {
+        const matching = await storage.findMatchingConsents(agent.gaii, key, accessorPattern);
+        if (matching.length > 0) {
+          hasConsent = true;
+          break;
+        }
+      }
+
+      if (!hasConsent) {
+        res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED',
+          `Active consent required for organism workspace access (key: ${key})`));
+        return;
+      }
+    }
+
     // Meta namespace: only admins/creators can write
     if (key.startsWith(`organism.${organismId}.meta.`) && !['GET', 'HEAD'].includes(req.method)) {
       if (membership.role !== 'admin' && membership.role !== 'creator') {
