@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-04
 **Plan:** `docs/plans/phase-3-polish-future.md`
-**Status:** ~78% reference-implementation complete
+**Status:** ~91% reference-implementation complete
 
 ---
 
@@ -65,7 +65,7 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 | EUDIW service | ✅ | `src/services/eudiw.ts` |
 | VC issuer service | ✅ | `src/services/vc-issuer.ts` |
 | MyData receipt service | ✅ | `src/services/mydata-receipt.ts` |
-| Verification routes (7 endpoints) | ✅ | `src/routes/verification.ts` |
+| Verification routes (8 endpoints incl. callback) | ✅ | `src/routes/verification.ts` |
 | Config (EUDIW/FTN/VC) | ✅ | `src/config.ts` |
 | TrustedIssuerRecord | ✅ | `src/storage/interface.ts` |
 | GHIIRecord Tier 3 fields | ✅ | `src/storage/interface.ts` |
@@ -76,10 +76,10 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 | Unit tests — VC issuer (8) | ✅ | `test/unit/vc-issuer.test.ts` |
 | Unit tests — MyData (7) | ✅ | `test/unit/mydata-receipt.test.ts` |
 
-**Gaps (production-readiness):**
+**Gaps (production-readiness — require real external test environments):**
 - [ ] `@sd-jwt/core` package — NOT installed, no real SD-JWT parsing
 - [ ] Cryptographic signature verification — VP tokens not cryptographically validated
-- [ ] EUDIW callback endpoint (`/v1/ghii/verify/eudiw/callback`) — missing
+- [x] ~~EUDIW callback endpoint~~ — ✅ `POST /v1/ghii/verify/eudiw/callback` added
 - [ ] FTN integration — placeholder only, no real Suomi.fi API calls
 - [ ] VC issuance — returns plain objects, not signed JWTs
 - [ ] Credential revocation checks — not implemented
@@ -88,7 +88,7 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 
 ---
 
-### 3.4 Advanced Federation — ✅ 90% COMPLETE
+### 3.4 Advanced Federation — ✅ 95% COMPLETE
 
 | Component | Status | File |
 |-----------|--------|------|
@@ -108,8 +108,8 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 | Unit tests — reputation (8) | ✅ | `test/unit/organism-reputation.test.ts` |
 
 **Remaining gaps (nice-to-have):**
-- [ ] Scheduled sync — `genesisSyncIntervalHours` config exists, no scheduler implementation
-- [ ] Catalogue hash computation — `catalogueHash` field always empty
+- [x] ~~Scheduled sync~~ — ✅ `src/services/genesis-sync.ts` scheduler wired in `server.ts`
+- [x] ~~Catalogue hash computation~~ — ✅ SHA-256 hash of sorted CSMs computed during sync
 
 ---
 
@@ -127,15 +127,15 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 
 ---
 
-### 3.6 Documentation — ❌ 20% COMPLETE
+### 3.6 Documentation — ✅ 100% COMPLETE
 
 | Document | Status |
 |----------|--------|
 | `docs/aimeat-semantic-ontology.md` | ✅ Exists |
-| `docs/aimeat-pwa-guide.md` | ❌ Missing |
-| `docs/aimeat-eudiw-integration.md` | ❌ Missing |
-| `docs/aimeat-vc-spec.md` | ❌ Missing |
-| `docs/aimeat-cross-federation.md` | ❌ Missing |
+| `docs/aimeat-pwa-guide.md` | ✅ Created |
+| `docs/aimeat-eudiw-integration.md` | ✅ Created |
+| `docs/aimeat-vc-spec.md` | ✅ Created |
+| `docs/aimeat-cross-federation.md` | ✅ Created |
 | OpenAPI updates | ✅ Done (EUDIW/VC endpoints) |
 | `.env.example` updates | ✅ Done |
 
@@ -160,12 +160,12 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 |---|-----------|---------|-------------|---|--------|
 | 3.1 | PWA | 12 items | 12 | 100% | ✅ Complete |
 | 3.2 | Desktop Installer | 10 items | 9 | 95% | ✅ Near-complete |
-| 3.3 | EUDIW / MyData / VC | 15 items | 10 | 80% | ⚠️ Reference impl |
-| 3.4 | Advanced Federation | 14 items | 14 | 90% | ✅ Near-complete |
+| 3.3 | EUDIW / MyData / VC | 15 items | 11 | 85% | ⚠️ Reference impl (+callback) |
+| 3.4 | Advanced Federation | 16 items | 16 | 95% | ✅ Near-complete (+sync, +hash) |
 | 3.5 | Semantic Ontology | 7 items | 7 | 95% | ✅ Near-complete |
-| 3.6 | Documentation | 6 docs | 1 | 20% | ❌ Needs work |
+| 3.6 | Documentation | 6 docs | 6 | 100% | ✅ Complete |
 | 3.7 | Testing Strategy | 97 tests | ~63 | 65% | ⚠️ Missing Phase 3 E2E |
-| **Overall** | | | | **~78%** | |
+| **Overall** | | | | **~91%** | |
 
 ---
 
@@ -178,13 +178,15 @@ Phase 3 covers polish & future-proofing: PWA, desktop installer, EU identity int
 3. ~~**Add genesis peer suspend endpoint**~~ — ✅ `PUT /v1/federation/genesis-peer/:id/suspend`
 4. ~~**Semantic annotations for GenesisPeer + OrganismReputation**~~ — ✅ schema:Organization, schema:Rating
 
-### Nice-to-Have (production polish)
+5. ~~**Phase 3 documentation**~~ — ✅ All 4 docs created (PWA, EUDIW, VC, cross-federation)
+6. ~~**EUDIW callback endpoint**~~ — ✅ `POST /v1/ghii/verify/eudiw/callback`
+7. ~~**Scheduled genesis sync**~~ — ✅ `src/services/genesis-sync.ts` with catalogue hash
 
-5. **Phase 3 documentation** — PWA guide, EUDIW integration, VC spec, cross-federation
-6. **Phase 3 E2E tests** — dedicated test sections for PWA, EUDIW, federation
-7. **SD-JWT + signature verification** — requires real EUDIW test environment
-8. **Tauri unit tests** — `cargo test` for Rust backend
-9. **Scheduled genesis sync** — implement scheduler for `genesisSyncIntervalHours`
+### Remaining (production polish / external dependencies)
+
+8. **Phase 3 E2E tests** — dedicated test sections for PWA, EUDIW, federation
+9. **SD-JWT + signature verification** — requires real EUDIW test environment
+10. **Tauri unit tests** — `cargo test` for Rust backend
 
 ---
 

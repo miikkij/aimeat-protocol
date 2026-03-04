@@ -81,6 +81,77 @@ export function verificationRouter(
     }
   });
 
+  // POST /v1/ghii/verify/eudiw/callback — OpenID4VP Wallet Callback
+  router.post('/v1/ghii/verify/eudiw/callback', requireAuth(), async (req, res) => {
+    try {
+      if (!config.eudiwEnabled) {
+        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'EUDIW verification not available'));
+        return;
+      }
+
+      const { vp_token, state } = req.body;
+      let { presentation_submission } = req.body;
+
+      if (!vp_token) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Missing vp_token'));
+        return;
+      }
+
+      // Log state parameter for CSRF audit trail (validation to be implemented)
+      if (state) {
+        console.log(`[eudiw-callback] state=${state}`);
+      }
+
+      // Wallets may send presentation_submission as a JSON string
+      if (typeof presentation_submission === 'string') {
+        try {
+          presentation_submission = JSON.parse(presentation_submission);
+        } catch {
+          res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid presentation_submission JSON'));
+          return;
+        }
+      }
+
+      const result = await eudiwService.verifyPresentation(vp_token, presentation_submission ?? {});
+      if (!result.valid) {
+        const statusCode = result.error === 'Credential expired' ? 401 : result.error === 'Untrusted issuer' ? 403 : 400;
+        res.status(statusCode).json(error(config.nodeId, 'VERIFICATION_FAILED', result.error ?? 'Verification failed'));
+        return;
+      }
+
+      // Update GHII record to Level 3
+      const ownerName = req.auth!.owner;
+      const ghii = await storage.getGHIIByOwner(ownerName);
+      if (!ghii) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'GHII profile not found'));
+        return;
+      }
+
+      const credentialHash = createHash('sha256').update(vp_token).digest('hex');
+      const verifiedAttributes = Object.keys(result.attributes ?? {});
+
+      await storage.updateGHII(ghii.ghii, {
+        verificationLevel: 3,
+        verifiedAttributes,
+        verificationIssuer: result.issuer,
+        verificationCredentialHash: credentialHash,
+        verificationMethod: 'eidas',
+        updatedAt: new Date().toISOString(),
+      });
+
+      res.json(success(config.nodeId, {
+        ghii: ghii.ghii,
+        verificationLevel: 3,
+        verificationMethod: 'eudiw',
+        verifiedAttributes,
+        issuer: result.issuer,
+        verifiedAt: new Date().toISOString(),
+      }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+    }
+  });
+
   // POST /v1/ghii/verify/ftn — Finnish Trust Network verification
   router.post('/v1/ghii/verify/ftn', requireAuth(), async (req, res) => {
     try {

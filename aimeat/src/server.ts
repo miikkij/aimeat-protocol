@@ -75,6 +75,7 @@ import { createMatchingEngine, startMatchingScheduler } from './services/matchin
 import { adminFeaturesRouter } from './routes/admin-features.js';
 import { setupRouter } from './routes/setup.js';
 import { createGenesisPeeringService } from './services/genesis-peering.js';
+import { createGenesisSyncService } from './services/genesis-sync.js';
 import { initStats } from './services/stats.js';
 import { statsMiddleware } from './middleware/stats.js';
 import { statsRouter } from './routes/stats.js';
@@ -498,6 +499,12 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   if (config.extensionsEnabled) {
     app.use(extensionsRouter(config, storage));
     logger.info('Extension system enabled');
+  }
+
+  // Genesis Sync Scheduler (Phase 3.4)
+  const genesisSyncService = createGenesisSyncService(config, storage);
+  if (genesisSyncService) {
+    genesisSyncService.start();
   }
 
   app.use(specRouter());

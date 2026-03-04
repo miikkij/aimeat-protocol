@@ -19,7 +19,7 @@ var TRANSLATIONS = {
     "provocation.line1": "Opinions are like assholes. Everyone's got one. Here are a few:",
     "provocation.cta": "Make yours heard by copying the prompt below into any AI chat, tell it what you want, and in under a minute your opinion shows up here live.",
     "prompt.title": "",
-    "prompt.copyBtn": "COPY PROMPT",
+    "prompt.copyBtn": "COPY PROMPT & PASTE IT TO AI CHAT",
     "prompt.copied": "COPIED!",
     "prompt.anyAi": "Works with Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek \u2014 all of them.",
     "expand.btn": "\u25BC OPEN THE WHOLE WORLD \u25BC",
@@ -80,7 +80,7 @@ var TRANSLATIONS = {
     "provocation.line1": "Mielipiteitä on maailmassa yhtä paljon kuin perseen\u00adreikiä. Tässä niistä muutama:",
     "provocation.cta": "Anna mielipiteesi kuulua kopioimalla alla oleva kehote mihin tahansa tekoälychattiin, kerro mitä haluat, ja alle minuutissa mielipiteesi näkyy täällä livenä.",
     "prompt.title": "",
-    "prompt.copyBtn": "KOPIOI KEHOTE",
+    "prompt.copyBtn": "KOPIOI KEHOTE & LIITÄ SE AI-CHATTIIN",
     "prompt.copied": "KOPIOITU!",
     "prompt.anyAi": "Toimii Clauden, ChatGPT:n, Grokin, Geminin, Copilotin, DeepSeekin kanssa \u2014 kaikki k\u00e4y.",
     "expand.btn": "\u25BC AVAA KOKO MAAILMA \u25BC",
@@ -275,6 +275,9 @@ body {
   transition: all 0.2s;
   letter-spacing: 0.04em;
   cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font);
 }
 
 .lang-btn.active {
@@ -340,7 +343,7 @@ body {
   position: relative;
   z-index: 1;
   text-align: center;
-  padding: 1.5rem 1.5rem 0;
+  padding: 1.5rem 1.5rem 2rem;
 }
 .genesis-tagline {
   font-size: clamp(1.1rem, 3vw, 1.4rem);
@@ -358,12 +361,59 @@ body {
   line-height: 1.6;
 }
 
+/* ── Content Group Container ── */
+.content-group {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  margin: 5rem auto 0;
+  padding: 2rem 1.5rem;
+  border: 1px solid rgba(255, 105, 180, 0.1);
+  border-radius: 16px;
+  background: rgba(10, 10, 30, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 40px rgba(0, 0, 0, 0.4), 0 0 30px rgba(255, 105, 180, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.content-group > *:first-child { margin-top: 0; }
+.content-group > *:last-child { margin-bottom: 0; }
+
+.content-group .provocation,
+.content-group .oneliners-section,
+.content-group .prompt-section {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.content-group .provocation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 6rem;
+  margin-top: 1rem;
+}
+
+.content-group .oneliners-header {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.85rem;
+  margin-bottom: 0;
+}
+
+.content-group .provocation-line1 {
+  padding-top: 0;
+}
+
 /* ── Section divider ── */
 .section-divider {
   position: relative;
   z-index: 1;
   max-width: 520px;
-  margin: 0 auto;
+  margin: 1rem auto 1.5rem;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255, 105, 180, 0.2), transparent);
 }
@@ -373,15 +423,15 @@ body {
   position: relative;
   z-index: 1;
   max-width: 520px;
-  margin: 2rem auto 0;
-  padding: 0 1.25rem;
+  margin: 0.75rem auto 0;
+  padding: 0;
 }
 
 .oneliners-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
 }
 
 .live-dot {
@@ -465,7 +515,7 @@ body {
   max-width: 440px;
   margin: 0 auto;
   line-height: 1.8;
-  padding: 1rem 0;
+  padding: 1rem 0 1.75rem;
 }
 
 /* ── Prompt Section ── */
@@ -504,7 +554,6 @@ body {
 .prompt-actions {
   display: flex;
   justify-content: center;
-  margin-top: 1.25rem;
   margin-bottom: 1.25rem;
 }
 
@@ -558,7 +607,7 @@ body {
   position: relative;
   z-index: 1;
   text-align: center;
-  margin: 4rem auto 0;
+  margin: 5rem auto 0;
   padding: 0 1.25rem;
 }
 
@@ -791,35 +840,34 @@ body {
 <!-- Divider -->
 <div class="section-divider"></div>
 
-<!-- LAYER 2: Provocation headline -->
-<section class="provocation">
-  <div class="provocation-line1" id="provLine1"></div>
-</section>
-
-<!-- LAYER 3: Live Oneliners -->
-<section class="oneliners-section">
+<!-- GROUP 1: Opinions feed -->
+<div class="content-group">
   <div class="oneliners-header">
     <div class="live-dot"></div>
     <span class="oneliners-label" id="onelinersLabel"></span>
   </div>
-  <div class="oneliners-feed" id="onelinersFeed">
-    <div class="oneliners-empty" id="onelinersEmpty"></div>
-  </div>
-</section>
 
-<!-- LAYER 4: CTA text -->
-<section class="provocation">
-  <div class="provocation-cta" id="provCta"></div>
-</section>
+  <section class="provocation">
+    <div class="provocation-line1" id="provLine1"></div>
+  </section>
 
-<!-- LAYER 5: The Prompt -->
-<section class="prompt-section">
-  <textarea class="prompt-box" id="mainPrompt" readonly></textarea>
-  <div class="prompt-actions">
-    <button class="copy-btn" id="copyMainPrompt" type="button"></button>
-  </div>
-  <div class="prompt-note" id="promptNote"></div>
-</section>
+  <section class="oneliners-section">
+    <div class="oneliners-feed" id="onelinersFeed">
+      <div class="oneliners-empty" id="onelinersEmpty"></div>
+    </div>
+  </section>
+</div>
+
+<!-- GROUP 2: Action prompt -->
+<div class="content-group">
+  <section class="prompt-section">
+    <div class="prompt-actions">
+      <button class="copy-btn" id="copyMainPrompt" type="button"></button>
+    </div>
+    <textarea class="prompt-box" id="mainPrompt" readonly></textarea>
+    <div class="prompt-note" id="promptNote"></div>
+  </section>
+</div>
 
 <!-- LAYER 5: Expand trigger -->
 <section class="expand-section">
@@ -890,16 +938,29 @@ body {
 
 <script>
 // ── Render all text ──
-(function() {
-  'use strict';
-
-  // Language switcher
+function renderAllTexts() {
+  // Language switcher (click-based, no reload)
   var langSwitcher = document.getElementById('langSwitcher');
-  var fiActive = LANG === 'fi' ? ' active' : '';
-  var enActive = LANG === 'en' ? ' active' : '';
   langSwitcher.innerHTML =
-    '<a href="?lang=fi" class="lang-btn' + fiActive + '">FI</a>' +
-    '<a href="?lang=en" class="lang-btn' + enActive + '">EN</a>';
+    '<button type="button" class="lang-btn' + (LANG === 'fi' ? ' active' : '') + '" data-lang="fi">FI</button>' +
+    '<button type="button" class="lang-btn' + (LANG === 'en' ? ' active' : '') + '" data-lang="en">EN</button>';
+  langSwitcher.querySelectorAll('.lang-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var newLang = this.getAttribute('data-lang');
+      if (newLang === LANG) return;
+      LANG = newLang;
+      document.documentElement.lang = LANG;
+      // Persist
+      try { localStorage.setItem('aimeat-lang', LANG); } catch(e) {}
+      document.cookie = 'aimeat-lang=' + LANG + ';path=/;max-age=31536000;SameSite=Lax';
+      // Update URL without reload
+      var url = new URL(window.location);
+      url.searchParams.set('lang', LANG);
+      history.replaceState(null, '', url);
+      // Re-render
+      renderAllTexts();
+    });
+  });
 
   // Nav right: dev + classic links
   var navRight = document.getElementById('navRight');
@@ -913,7 +974,6 @@ body {
 
   // Provocation + CTA
   document.getElementById('provLine1').textContent = t('provocation.line1');
-  document.getElementById('provCta').textContent = t('provocation.cta');
 
   // Oneliners
   document.getElementById('onelinersLabel').textContent = t('oneliners.title');
@@ -947,8 +1007,8 @@ body {
   document.getElementById('morselsText').textContent = t('morsels.economy');
 
   document.title = t('genesis.name');
-
-})();
+}
+renderAllTexts();
 </script>
 <script>
 // ── Load aimeat-auth.js from the same origin ──
@@ -1607,25 +1667,25 @@ body {
   }
 
   /* -- Copy button handlers -- */
-  function setupCopy(btnId, textareaId, copiedText) {
+  function setupCopy(btnId, textareaId, copiedKey) {
     var btn = document.getElementById(btnId);
     var box = document.getElementById(textareaId);
     if (!btn || !box) return;
-    var originalText = btn.textContent;
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
+      var restoreText = btn.textContent;
       copyToClipboard(box.value).then(function() {
-        btn.textContent = (copiedText || t('prompt.copied')) + ' \u2714';
+        btn.textContent = (copiedKey ? t(copiedKey) : t('prompt.copied')) + ' \u2714';
         btn.classList.add('copied');
-        setTimeout(function() { btn.textContent = originalText; btn.classList.remove('copied'); }, 2000);
+        setTimeout(function() { btn.textContent = restoreText; btn.classList.remove('copied'); }, 2000);
       });
     });
   }
 
   setupCopy('copyMainPrompt', 'mainPrompt');
-  setupCopy('copyFullBuilderPrompt', 'fullBuilderPrompt', t('world.fullBuilder.copied'));
-  setupCopy('copyAgentPrompt', 'agentPrompt', t('world.agents.copied'));
-  setupCopy('copyConnectPrompt', 'connectPrompt', t('world.connect.copied'));
+  setupCopy('copyFullBuilderPrompt', 'fullBuilderPrompt', 'world.fullBuilder.copied');
+  setupCopy('copyAgentPrompt', 'agentPrompt', 'world.agents.copied');
+  setupCopy('copyConnectPrompt', 'connectPrompt', 'world.connect.copied');
 
   /* -- Register button (Service Builders) -- */
   var registerBuilderBtn = document.getElementById('registerBuilderBtn');
