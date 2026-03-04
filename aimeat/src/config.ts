@@ -196,6 +196,14 @@ export interface AimeatConfig {
   // Statistics
   statsEnabled: boolean;
   statsAccess: 'public' | 'authenticated' | 'operator';
+
+  // Node Extensions (V8 Isolates)
+  extensionsEnabled: boolean;
+  extensionMaxMemoryMb: number;
+  extensionTimeoutMs: number;
+  extensionMaxApiCalls: number;
+  extensionMaxCodeSizeKb: number;
+  extensionMaxInstalled: number;
 }
 
 export function loadConfig(): AimeatConfig {
@@ -346,6 +354,14 @@ export function loadConfig(): AimeatConfig {
     autoHideThreshold: parseInt(process.env.AIMEAT_AUTO_HIDE_THRESHOLD ?? '5', 10),
     statsEnabled: process.env.AIMEAT_STATS_ENABLED !== 'false',
     statsAccess: (process.env.AIMEAT_STATS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'public',
+
+    // Node Extensions (V8 Isolates)
+    extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED === 'true',
+    extensionMaxMemoryMb: parseInt(process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '64', 10),
+    extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),
+    extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '50', 10),
+    extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
+    extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },
