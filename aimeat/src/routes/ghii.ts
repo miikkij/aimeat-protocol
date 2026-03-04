@@ -202,6 +202,13 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
+        // Email confirmation check — if operator requires it, block unverified users
+        if (config.emailConfirmationRequired && ghiiRecord.verificationLevel < 1) {
+            res.status(403).json(error(config.nodeId, 'EMAIL_NOT_VERIFIED',
+                'Email verification is required before you can log in. Check your email for the verification code.'));
+            return;
+        }
+
         // TOTP 2FA check (Phase 0.5) — if TOTP is enabled, require a valid code
         if (ghiiRecord.totpEnabled && ghiiRecord.totpSecret) {
             // Check lockout
@@ -668,13 +675,14 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verifiedAt: now,
         });
 
-        // Update GHII last login
+        // Update GHII last login + auto-verify email (clicking magic link IS email verification)
         const ghii = `${record.ownerName}@${config.nodeId}`;
         const ghiiRecord = await storage.getGHII(ghii);
         if (ghiiRecord) {
             await storage.updateGHII(ghii, {
                 lastLoginAt: now,
                 loginCount: (ghiiRecord.loginCount ?? 0) + 1,
+                verificationLevel: Math.max(ghiiRecord.verificationLevel ?? 0, 1) as 0 | 1 | 2,
             });
         }
 
