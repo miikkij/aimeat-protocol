@@ -68,7 +68,39 @@ var TRANSLATIONS = {
     "world.fullBuilder.title": "Build Any App",
     "world.fullBuilder.desc": "The full prompt with all categories: games, notes, trackers, music jam, real-time collaboration, services, and more. For when you want maximum control.",
     "world.fullBuilder.copyBtn": "Copy full prompt",
-    "world.fullBuilder.copied": "Copied!"
+    "world.fullBuilder.copied": "Copied!",
+    "expand.signInRequired": "Sign in to open your world.",
+    "expand.userPrefix": "Open the whole world",
+    "expand.userPrefixOpen": "Close",
+    "userWorld.profile.title": "Profile Overview",
+    "userWorld.profile.desc": "Your identity and quick access to your personal dashboard.",
+    "userWorld.profile.owner": "Owner",
+    "userWorld.profile.ghii": "GHII",
+    "userWorld.profile.node": "Node",
+    "userWorld.profile.openProfile": "Open full profile",
+    "userWorld.profile.openWallet": "Open wallet",
+    "userWorld.profile.openMemory": "Open memory",
+    "userWorld.profile.openWork": "Open work",
+    "userWorld.profile.openServices": "Open services",
+    "userWorld.profile.openApps": "Open apps",
+    "userWorld.stats.wallet": "Wallet",
+    "userWorld.stats.agents": "Agents",
+    "userWorld.stats.memory": "Memories",
+    "userWorld.stats.work": "Tasks",
+    "userWorld.stats.services": "Services",
+    "userWorld.stats.apps": "Apps",
+    "userWorld.stats.files": "Files",
+    "userWorld.marketplace.title": "Marketplace",
+    "userWorld.marketplace.desc": "Browse offers and publish what you can provide.",
+    "userWorld.marketplace.open": "Open marketplace",
+    "userWorld.marketplace.manage": "Manage your services",
+    "userWorld.services.title": "Recent Services",
+    "userWorld.services.desc": "Jump into the latest portal services and tools.",
+    "userWorld.services.hobbies": "Hobbies",
+    "userWorld.services.guides": "Guides",
+    "userWorld.services.aimeatOs": "AIMEAT OS",
+    "userWorld.services.openclaw": "OpenClaw runtime",
+    "userWorld.services.catalog": "App catalog"
   },
   fi: {
     "nav.devView": "Kehitt\u00e4jille",
@@ -129,7 +161,39 @@ var TRANSLATIONS = {
     "world.fullBuilder.title": "Rakenna mikä tahansa sovellus",
     "world.fullBuilder.desc": "Täysi kehote kaikilla kategorioilla: pelit, muistiinpanot, seurantatyökalut, musiikkijamit, reaaliaikainen yhteistyö, palvelut ja paljon muuta. Kun haluat täyden hallinnan.",
     "world.fullBuilder.copyBtn": "Kopioi täysi kehote",
-    "world.fullBuilder.copied": "Kopioitu!"
+    "world.fullBuilder.copied": "Kopioitu!",
+    "expand.signInRequired": "Kirjaudu sisään avataksesi oman maailmasi.",
+    "expand.userPrefix": "Avaa koko maailma",
+    "expand.userPrefixOpen": "Sulje",
+    "userWorld.profile.title": "Profiilin yleiskuva",
+    "userWorld.profile.desc": "Identiteettisi ja nopeat linkit omaan hallintanäkymään.",
+    "userWorld.profile.owner": "Käyttäjä",
+    "userWorld.profile.ghii": "GHII",
+    "userWorld.profile.node": "Node",
+    "userWorld.profile.openProfile": "Avaa koko profiili",
+    "userWorld.profile.openWallet": "Avaa lompakko",
+    "userWorld.profile.openMemory": "Avaa muisti",
+    "userWorld.profile.openWork": "Avaa työt",
+    "userWorld.profile.openServices": "Avaa palvelut",
+    "userWorld.profile.openApps": "Avaa sovellukset",
+    "userWorld.stats.wallet": "Lompakko",
+    "userWorld.stats.agents": "Agentit",
+    "userWorld.stats.memory": "Muistit",
+    "userWorld.stats.work": "Tehtävät",
+    "userWorld.stats.services": "Palvelut",
+    "userWorld.stats.apps": "Sovellukset",
+    "userWorld.stats.files": "Tiedostot",
+    "userWorld.marketplace.title": "Marketplace",
+    "userWorld.marketplace.desc": "Selaa tarjouksia ja julkaise oma osaamisesi.",
+    "userWorld.marketplace.open": "Avaa marketplace",
+    "userWorld.marketplace.manage": "Hallitse palveluitasi",
+    "userWorld.services.title": "Uusimmat palvelut",
+    "userWorld.services.desc": "Siirry nopeasti viimeaikaisiin portaalin palveluihin ja työkaluihin.",
+    "userWorld.services.hobbies": "Harrastukset",
+    "userWorld.services.guides": "Oppaat",
+    "userWorld.services.aimeatOs": "AIMEAT OS",
+    "userWorld.services.openclaw": "OpenClaw-ympäristö",
+    "userWorld.services.catalog": "Sovelluskatalogi"
   }
 };
 
@@ -243,6 +307,23 @@ body {
   align-items: center;
   gap: 0.3rem;
   text-decoration: none;
+}
+
+.topnav-brand .brand-name {
+  white-space: nowrap;
+}
+
+.topnav-brand .brand-morsels {
+  display: none;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 105, 180, 0.35);
+  background: rgba(255, 105, 180, 0.12);
+  color: #ffd6ec;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
 }
 
 .topnav-brand .heart {
@@ -756,6 +837,127 @@ body {
   box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4);
 }
 
+/* -- Logged-in user world accordion -- */
+.user-world {
+  margin-bottom: 1rem;
+}
+
+.user-world-item {
+  border: 1px solid rgba(255, 105, 180, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 14px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.user-world-item[open] {
+  border-color: rgba(255, 105, 180, 0.35);
+  box-shadow: 0 0 24px rgba(255, 105, 180, 0.08);
+}
+
+.user-world-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.95rem 1.1rem;
+  color: var(--text-bright);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.user-world-summary::-webkit-details-marker { display: none; }
+
+.user-world-summary::after {
+  content: '\25be';
+  color: var(--accent-bright);
+  font-size: 0.9rem;
+  transition: transform 0.25s ease;
+}
+
+.user-world-item[open] .user-world-summary::after {
+  transform: rotate(180deg);
+}
+
+.user-world-content {
+  padding: 0 1.1rem 1rem;
+}
+
+.user-world-desc {
+  font-size: 0.86rem;
+  color: var(--text-dim);
+  margin-bottom: 0.85rem;
+  line-height: 1.6;
+}
+
+.user-world-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+}
+
+.user-stat {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255,255,255,0.02);
+}
+
+.user-stat-label {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.user-stat-value {
+  font-size: 1.05rem;
+  color: var(--text-bright);
+  font-weight: 700;
+  margin-top: 0.15rem;
+}
+
+.user-meta {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 0.35rem 0.65rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.82rem;
+}
+
+.user-meta-key { color: var(--text-muted); }
+.user-meta-value { color: var(--text); word-break: break-word; }
+
+.user-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.user-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.user-link-btn:hover {
+  border-color: rgba(255, 105, 180, 0.35);
+  color: var(--text-bright);
+  background: rgba(255, 105, 180, 0.08);
+}
+
 /* ── Footer ── */
 .footer {
   position: relative;
@@ -820,7 +1022,7 @@ body {
 
 <!-- Top Navigation (minimal) -->
 <nav class="topnav">
-  <a href="/v1/portal" class="topnav-brand"><span class="heart">&#x1F496;</span> AIME AT</a>
+  <a href="/v1/portal" class="topnav-brand"><span class="heart">&#x1F496;</span><span class="brand-name" id="brandName">AIME AT</span><span class="brand-morsels" id="brandMorsels"></span></a>
   <div class="topnav-center" id="langSwitcher"></div>
   <div class="topnav-right" id="navRight"></div>
 </nav>
@@ -877,6 +1079,62 @@ body {
 <!-- LAYER 6: The World (hidden by default) -->
 <div class="world" id="theWorld">
   <div class="world-divider"></div>
+
+  <div class="user-world" id="userWorldAccordion">
+    <details class="user-world-item" open>
+      <summary class="user-world-summary" id="userProfileSummaryTitle"></summary>
+      <div class="user-world-content">
+        <div class="user-world-desc" id="userProfileSummaryDesc"></div>
+        <div class="user-meta">
+          <div class="user-meta-key" id="uwOwnerLabel"></div><div class="user-meta-value" id="uwOwnerValue">-</div>
+          <div class="user-meta-key" id="uwGhiiLabel"></div><div class="user-meta-value" id="uwGhiiValue">-</div>
+          <div class="user-meta-key" id="uwNodeLabel"></div><div class="user-meta-value" id="uwNodeValue">-</div>
+        </div>
+        <div class="user-world-grid">
+          <div class="user-stat"><div class="user-stat-label" id="uwWalletLabel"></div><div class="user-stat-value" id="uwWallet">-</div></div>
+          <div class="user-stat"><div class="user-stat-label" id="uwAgentsLabel"></div><div class="user-stat-value" id="uwAgents">-</div></div>
+          <div class="user-stat"><div class="user-stat-label" id="uwMemoryLabel"></div><div class="user-stat-value" id="uwMemory">-</div></div>
+          <div class="user-stat"><div class="user-stat-label" id="uwWorkLabel"></div><div class="user-stat-value" id="uwWork">-</div></div>
+          <div class="user-stat"><div class="user-stat-label" id="uwServicesLabel"></div><div class="user-stat-value" id="uwServices">-</div></div>
+          <div class="user-stat"><div class="user-stat-label" id="uwAppsLabel"></div><div class="user-stat-value" id="uwApps">-</div></div>
+          <div class="user-stat"><div class="user-stat-label" id="uwFilesLabel"></div><div class="user-stat-value" id="uwFiles">-</div></div>
+        </div>
+        <div class="user-link-row">
+          <a class="user-link-btn" href="/v1/profile" id="uwOpenProfile"></a>
+          <a class="user-link-btn" href="/v1/profile?tab=wallet" id="uwOpenWallet"></a>
+          <a class="user-link-btn" href="/v1/profile?tab=memory" id="uwOpenMemory"></a>
+          <a class="user-link-btn" href="/v1/profile?tab=work" id="uwOpenWork"></a>
+          <a class="user-link-btn" href="/v1/profile?tab=services" id="uwOpenServices"></a>
+          <a class="user-link-btn" href="/v1/profile?tab=apps" id="uwOpenApps"></a>
+        </div>
+      </div>
+    </details>
+
+    <details class="user-world-item">
+      <summary class="user-world-summary" id="userMarketplaceSummaryTitle"></summary>
+      <div class="user-world-content">
+        <div class="user-world-desc" id="userMarketplaceSummaryDesc"></div>
+        <div class="user-link-row">
+          <a class="user-link-btn" href="/v1/marketplace" id="uwOpenMarketplace"></a>
+          <a class="user-link-btn" href="/v1/profile?tab=services" id="uwManageServices"></a>
+        </div>
+      </div>
+    </details>
+
+    <details class="user-world-item">
+      <summary class="user-world-summary" id="userServicesSummaryTitle"></summary>
+      <div class="user-world-content">
+        <div class="user-world-desc" id="userServicesSummaryDesc"></div>
+        <div class="user-link-row">
+          <a class="user-link-btn" href="/v1/hobbies" id="uwOpenHobbies"></a>
+          <a class="user-link-btn" href="/v1/guides" id="uwOpenGuides"></a>
+          <a class="user-link-btn" href="/v1/aimeat-os" id="uwOpenAimeatOs"></a>
+          <a class="user-link-btn" href="/v1/openclaw" id="uwOpenOpenclaw"></a>
+          <a class="user-link-btn" href="/app-catalog.html" id="uwOpenCatalog"></a>
+        </div>
+      </div>
+    </details>
+  </div>
 
   <!-- Full App Builder -->
   <div class="world-card" id="worldFullBuilder">
@@ -986,6 +1244,39 @@ function renderAllTexts() {
   // Expand
   document.getElementById('expandBtn').textContent = t('expand.btn');
 
+  // Logged-in accordion
+  document.getElementById('userProfileSummaryTitle').textContent = '👤 ' + t('userWorld.profile.title');
+  document.getElementById('userProfileSummaryDesc').textContent = t('userWorld.profile.desc');
+  document.getElementById('uwOwnerLabel').textContent = t('userWorld.profile.owner');
+  document.getElementById('uwGhiiLabel').textContent = t('userWorld.profile.ghii');
+  document.getElementById('uwNodeLabel').textContent = t('userWorld.profile.node');
+  document.getElementById('uwWalletLabel').textContent = t('userWorld.stats.wallet');
+  document.getElementById('uwAgentsLabel').textContent = t('userWorld.stats.agents');
+  document.getElementById('uwMemoryLabel').textContent = t('userWorld.stats.memory');
+  document.getElementById('uwWorkLabel').textContent = t('userWorld.stats.work');
+  document.getElementById('uwServicesLabel').textContent = t('userWorld.stats.services');
+  document.getElementById('uwAppsLabel').textContent = t('userWorld.stats.apps');
+  document.getElementById('uwFilesLabel').textContent = t('userWorld.stats.files');
+  document.getElementById('uwOpenProfile').textContent = t('userWorld.profile.openProfile');
+  document.getElementById('uwOpenWallet').textContent = t('userWorld.profile.openWallet');
+  document.getElementById('uwOpenMemory').textContent = t('userWorld.profile.openMemory');
+  document.getElementById('uwOpenWork').textContent = t('userWorld.profile.openWork');
+  document.getElementById('uwOpenServices').textContent = t('userWorld.profile.openServices');
+  document.getElementById('uwOpenApps').textContent = t('userWorld.profile.openApps');
+
+  document.getElementById('userMarketplaceSummaryTitle').textContent = '🛒 ' + t('userWorld.marketplace.title');
+  document.getElementById('userMarketplaceSummaryDesc').textContent = t('userWorld.marketplace.desc');
+  document.getElementById('uwOpenMarketplace').textContent = t('userWorld.marketplace.open');
+  document.getElementById('uwManageServices').textContent = t('userWorld.marketplace.manage');
+
+  document.getElementById('userServicesSummaryTitle').textContent = '🧭 ' + t('userWorld.services.title');
+  document.getElementById('userServicesSummaryDesc').textContent = t('userWorld.services.desc');
+  document.getElementById('uwOpenHobbies').textContent = t('userWorld.services.hobbies');
+  document.getElementById('uwOpenGuides').textContent = t('userWorld.services.guides');
+  document.getElementById('uwOpenAimeatOs').textContent = t('userWorld.services.aimeatOs');
+  document.getElementById('uwOpenOpenclaw').textContent = t('userWorld.services.openclaw');
+  document.getElementById('uwOpenCatalog').textContent = t('userWorld.services.catalog');
+
   // World cards
   document.getElementById('worldAppsTitle').textContent = t('world.apps.title');
   document.getElementById('worldAppsDesc').textContent = t('world.apps.desc');
@@ -1007,6 +1298,9 @@ function renderAllTexts() {
   document.getElementById('morselsText').textContent = t('morsels.economy');
 
   document.title = t('genesis.name');
+
+  if (window.__refreshExpandButtonLabel) window.__refreshExpandButtonLabel();
+  if (window.__refreshHeaderMorsels) window.__refreshHeaderMorsels();
 }
 renderAllTexts();
 </script>
@@ -1015,6 +1309,10 @@ renderAllTexts();
 (function() {
   var s = document.createElement('script');
   s.src = window.location.origin + '/v1/libs/aimeat-auth.js';
+  s.onload = function() {
+    if (window.__refreshExpandButtonLabel) window.__refreshExpandButtonLabel();
+    if (window.__refreshHeaderMorsels) window.__refreshHeaderMorsels();
+  };
   document.head.appendChild(s);
 })();
 </script>
@@ -1138,21 +1436,230 @@ renderAllTexts();
   /* -- Expand / Collapse -- */
   var expandBtn = document.getElementById('expandBtn');
   var theWorld = document.getElementById('theWorld');
+  var brandMorsels = document.getElementById('brandMorsels');
   var isExpanded = false;
+  var userWorldLoaded = false;
+
+  function hasAuth() {
+    return typeof AIMEAT !== 'undefined' && AIMEAT.auth && typeof AIMEAT.auth.getSession === 'function';
+  }
+
+  function waitForAuthReady(timeoutMs) {
+    var timeout = typeof timeoutMs === 'number' ? timeoutMs : 3500;
+    if (hasAuth()) return Promise.resolve(true);
+    return new Promise(function(resolve) {
+      var start = Date.now();
+      var timer = setInterval(function() {
+        if (hasAuth()) {
+          clearInterval(timer);
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start >= timeout) {
+          clearInterval(timer);
+          resolve(false);
+        }
+      }, 120);
+    });
+  }
+
+  function getCurrentSession() {
+    if (!hasAuth()) return null;
+    var s = AIMEAT.auth.getSession();
+    if (!s) return null;
+    if (s.token || s.jwt || s.valid) return s;
+    return null;
+  }
+
+  function sessionDisplayName(s) {
+    if (!s) return '';
+    return s.owner || s.ghii || 'user';
+  }
+
+  function setUserWorldNumbers(map) {
+    document.getElementById('uwWallet').textContent = String(map.wallet);
+    document.getElementById('uwAgents').textContent = String(map.agents);
+    document.getElementById('uwMemory').textContent = String(map.memory);
+    document.getElementById('uwWork').textContent = String(map.work);
+    document.getElementById('uwServices').textContent = String(map.services);
+    document.getElementById('uwApps').textContent = String(map.apps);
+    document.getElementById('uwFiles').textContent = String(map.files);
+  }
+
+  function updateUserIdentity(s) {
+    document.getElementById('uwOwnerValue').textContent = s && s.owner ? s.owner : '-';
+    document.getElementById('uwGhiiValue').textContent = s && s.ghii ? s.ghii : '-';
+    document.getElementById('uwNodeValue').textContent = window.location.origin;
+  }
+
+  async function loadUserWorldSummary() {
+    var s = getCurrentSession();
+    if (!s || !s.fetch) return;
+
+    updateUserIdentity(s);
+    setUserWorldNumbers({ wallet: '-', agents: '-', memory: '-', work: '-', services: '-', apps: '-', files: '-' });
+
+    function safeResp(promise) {
+      return promise.then(function(v) { return v; }).catch(function() { return null; });
+    }
+
+    var responses = await Promise.all([
+      safeResp(s.fetch('/v1/wallet')),
+      safeResp(s.fetch('/v1/agents')),
+      safeResp(s.fetch('/v1/memory')),
+      safeResp(s.fetch('/v1/work/inbox')),
+      safeResp(s.fetch('/v1/actions')),
+      safeResp(s.fetch('/v1/storage')),
+      safeResp(fetch('/v1/apps').then(function(r){ return r.ok ? r.json() : null; }))
+    ]);
+
+    var wallet = responses[0] && responses[0].data ? responses[0].data : null;
+    var agents = responses[1] && responses[1].data && responses[1].data.agents ? responses[1].data.agents : [];
+    var memories = responses[2] && responses[2].data && responses[2].data.entries ? responses[2].data.entries : [];
+    var work = responses[3] && responses[3].data && responses[3].data.items ? responses[3].data.items : [];
+    var actions = responses[4] && responses[4].data && responses[4].data.actions ? responses[4].data.actions : [];
+    var files = responses[5] && responses[5].data && responses[5].data.files ? responses[5].data.files : [];
+    var apps = responses[6] && responses[6].data && responses[6].data.apps ? responses[6].data.apps : [];
+
+    var ownActions = actions.filter(function(a) { return s.gaii && a.provider_gaii === s.gaii; });
+    var ownApps = apps.filter(function(a) { return s.owner && a.owner === s.owner; });
+
+    setUserWorldNumbers({
+      wallet: wallet && wallet.balance != null ? wallet.balance : '-',
+      agents: agents.length,
+      memory: memories.length,
+      work: work.length,
+      services: ownActions.length,
+      apps: ownApps.length,
+      files: files.length
+    });
+  }
+
+  function updateExpandButtonLabel() {
+    var s = getCurrentSession();
+    if (s) {
+      var prefix = sessionDisplayName(s) + ' : ';
+      expandBtn.textContent = prefix + (isExpanded ? t('expand.userPrefixOpen') : t('expand.userPrefix'));
+    } else {
+      expandBtn.textContent = isExpanded ? t('expand.btnOpen') : t('expand.btn');
+    }
+  }
+
+  window.__refreshExpandButtonLabel = updateExpandButtonLabel;
+
+  function setHeaderMorsels(value) {
+    if (!brandMorsels) return;
+    if (value == null || value === '') {
+      brandMorsels.style.display = 'none';
+      brandMorsels.textContent = '';
+      return;
+    }
+    brandMorsels.style.display = 'inline-block';
+    brandMorsels.textContent = String(value);
+  }
+
+  async function refreshHeaderMorsels() {
+    var s = getCurrentSession();
+    if (!s || !s.fetch) {
+      setHeaderMorsels('');
+      return;
+    }
+    try {
+      var walletResp = await s.fetch('/v1/wallet');
+      var balance = walletResp && walletResp.data && walletResp.data.balance != null ? walletResp.data.balance : null;
+      if (balance == null) {
+        setHeaderMorsels('');
+        return;
+      }
+      setHeaderMorsels(balance);
+    } catch (e) {
+      setHeaderMorsels('');
+    }
+  }
+
+  window.__refreshHeaderMorsels = refreshHeaderMorsels;
+
+  async function openLoginModal(afterLogin) {
+    var authReady = await waitForAuthReady(4500);
+    if (!authReady || !AIMEAT.auth || !AIMEAT.auth.mountLoginButton) {
+      // Fallback: send user to profile login screen if auth lib failed to initialize.
+      window.location.href = '/v1/profile';
+      return;
+    }
+
+    // Cleanup any previous hidden auth mount to avoid duplicate IDs.
+    var oldTmp = document.getElementById('aimeat-expand-auth');
+    if (oldTmp) oldTmp.remove();
+
+    var tmp = document.createElement('div');
+    tmp.id = 'aimeat-expand-auth';
+    tmp.style.position = 'fixed';
+    tmp.style.top = '-9999px';
+    document.body.appendChild(tmp);
+    AIMEAT.auth.mountLoginButton('#aimeat-expand-auth', {
+      nodeUrl: nodeUrl,
+      i18n: __modalI18n,
+      onLogin: function(session) {
+        tmp.remove();
+        updateExpandButtonLabel();
+        refreshHeaderMorsels();
+        loadUserWorldSummary();
+        if (typeof afterLogin === 'function') afterLogin(session);
+      }
+    });
+
+    // The auth library renders a button; click it after mount using scoped selector.
+    var tries = 0;
+    var maxTries = 12;
+    var clickTimer = setInterval(function() {
+      tries += 1;
+      var loginBtn = document.querySelector('#aimeat-expand-auth #aimeat-login-btn');
+      if (loginBtn) {
+        clearInterval(clickTimer);
+        loginBtn.click();
+        return;
+      }
+      if (tries >= maxTries) {
+        clearInterval(clickTimer);
+        // Last-resort fallback so user is never blocked.
+        window.location.href = '/v1/profile';
+      }
+    }, 80);
+  }
+
+  function openWorld() {
+    isExpanded = true;
+    theWorld.classList.add('open');
+    updateExpandButtonLabel();
+    if (!userWorldLoaded) {
+      userWorldLoaded = true;
+      loadUserWorldSummary();
+    }
+    setTimeout(function() {
+      theWorld.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  function closeWorld() {
+    isExpanded = false;
+    theWorld.classList.remove('open');
+    updateExpandButtonLabel();
+  }
 
   expandBtn.addEventListener('click', function() {
-    isExpanded = !isExpanded;
-    if (isExpanded) {
-      theWorld.classList.add('open');
-      expandBtn.textContent = t('expand.btnOpen');
-      setTimeout(function() {
-        theWorld.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    } else {
-      theWorld.classList.remove('open');
-      expandBtn.textContent = t('expand.btn');
+    var s = getCurrentSession();
+    if (!s) {
+      openLoginModal(function() {
+        openWorld();
+      });
+      return;
     }
+    if (isExpanded) closeWorld();
+    else openWorld();
   });
+
+  setTimeout(updateExpandButtonLabel, 700);
+  setTimeout(refreshHeaderMorsels, 900);
 
   /* -- Mega-prompts -- */
   var anonGaii = encodeURIComponent('shared#anonymous@' + (window.location.hostname || 'aimeat-local'));
