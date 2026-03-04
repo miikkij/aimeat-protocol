@@ -4,11 +4,11 @@ import { parse as parseYaml } from 'yaml';
 
 export type CsmServiceType =
   'directory' | 'marketplace' | 'forum' | 'dating' |
-  'news' | 'opinion' | 'auction' | 'media';
+  'news' | 'opinion' | 'auction' | 'media' | 'community';
 
 const VALID_SERVICE_TYPES: CsmServiceType[] = [
   'directory', 'marketplace', 'forum', 'dating',
-  'news', 'opinion', 'auction', 'media',
+  'news', 'opinion', 'auction', 'media', 'community',
 ];
 
 export interface CsmFieldDef {

@@ -1,0 +1,84 @@
+csm: "1.0"
+
+service:
+  name: "Organism"
+  type: community
+  description: "Groups, clubs, teams, cooperatives — organisms that bring people together"
+  version: "1.0.0"
+  semantic:
+    "@context":
+      schema: "https://schema.org/"
+    "@type": "Organization"
+
+schema_mode: open
+
+data_schema:
+  required:
+    name:
+      type: string
+      min: 2
+      max: 200
+    description:
+      type: string
+      min: 10
+      max: 5000
+    type:
+      type: string
+      enum: ["community", "team", "club", "cooperative", "project"]
+    creator_ghii:
+      type: string
+  optional:
+    interests:
+      type: array
+      items: string
+      max: 20
+    location:
+      type: object
+      properties:
+        city:
+          type: string
+        area:
+          type: string
+          required: false
+        country:
+          type: string
+          required: false
+        geo:
+          type: array
+          items: number
+    join_policy:
+      type: string
+      enum: ["open", "approval_required", "invite_only"]
+    max_members:
+      type: integer
+      min: 2
+      max: 10000
+    visibility:
+      type: string
+      enum: ["public", "listed", "private"]
+    moderation_config:
+      type: object
+      properties:
+        flags_enabled:
+          type: boolean
+        auto_hide_threshold:
+          type: integer
+        appeals_enabled:
+          type: boolean
+
+consent_requirements:
+  visibility_default: public
+  requires_consent: false
+  consent_purpose: "organism-participation"
+  data_retention: "until_revoked"
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: true
+
+ui_hints:
+  list_view: ["name", "type", "interests", "location.city"]
+  detail_view: ["name", "description", "type", "interests", "location", "join_policy", "max_members"]
+  search_fields: ["name", "type", "interests", "location.city"]
+  sort_options: ["created_at", "name", "type"]
