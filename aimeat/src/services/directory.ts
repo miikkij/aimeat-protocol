@@ -3,6 +3,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 export interface DirectoryEntry {
+  entryType?: 'person' | 'organism';  // defaults to 'person' for backward compat
   ghii: string;
   displayName: string;
   bio?: string;
@@ -14,6 +15,9 @@ export interface DirectoryEntry {
   lat?: number;
   lon?: number;
   semantic?: Record<string, unknown>;
+  organismId?: string;     // only set for organism entries
+  memberCount?: number;    // only set for organism entries
+  joinPolicy?: string;     // only set for organism entries
 }
 
 export interface DirectorySearchOpts {
@@ -41,6 +45,7 @@ export interface DirectorySearchResult {
 
 export interface DirectoryStats {
   totalPeople: number;
+  totalOrganisms?: number;
   topInterests: Array<{ name: string; count: number }>;
   topCities: Array<{ name: string; count: number }>;
   updatedAt: string;
@@ -195,6 +200,38 @@ export class DirectoryService {
       }
     }
 
+    // Index organisms (Phase 2.2 — directory unification)
+    const organisms = await this.storage.listOrganisms();
+    for (const org of organisms) {
+      // Only index public and listed organisms
+      if (org.visibility === 'private') continue;
+
+      const entry: DirectoryEntry = {
+        entryType: 'organism',
+        ghii: `organism:${org.id}`,  // synthetic GHII for organisms
+        displayName: org.name,
+        bio: org.description,
+        interests: org.interests,
+        city: org.location?.city,
+        area: org.location?.area,
+        country: org.location?.country,
+        lat: org.location?.geo?.[0],
+        lon: org.location?.geo?.[1],
+        organismId: org.id,
+        memberCount: org.members.length,
+        joinPolicy: org.joinPolicy,
+        semantic: {
+          '@context': { schema: 'https://schema.org/' },
+          '@type': 'schema:Organization',
+          'schema:name': org.name,
+          'schema:description': org.description,
+          ...(org.interests.length > 0 ? { 'schema:knowsAbout': org.interests } : {}),
+        },
+      };
+
+      newIndex.set(`organism:${org.id}`, entry);
+    }
+
     this.index = newIndex;
     this.lastUpdated = new Date().toISOString();
     logger.info('Directory index rebuilt', { entries: newIndex.size });
@@ -209,6 +246,10 @@ export class DirectoryService {
     const matched: DirectoryEntry[] = [];
 
     for (const entry of this.index.values()) {
+      // Filter by type (people vs organisms)
+      if (opts.type === 'people' && entry.entryType === 'organism') continue;
+      if (opts.type === 'organisms' && entry.entryType !== 'organism') continue;
+
       // Filter by city (case-insensitive)
       if (opts.city && (!entry.city || entry.city.toLowerCase() !== opts.city.toLowerCase())) {
         continue;
@@ -293,8 +334,10 @@ export class DirectoryService {
   getStats(): DirectoryStats {
     const interestCounts = new Map<string, number>();
     const cityCounts = new Map<string, number>();
+    let totalOrganisms = 0;
 
     for (const entry of this.index.values()) {
+      if (entry.entryType === 'organism') totalOrganisms++;
       for (const interest of entry.interests) {
         interestCounts.set(interest, (interestCounts.get(interest) ?? 0) + 1);
       }
@@ -314,7 +357,8 @@ export class DirectoryService {
       .slice(0, 20);
 
     return {
-      totalPeople: this.index.size,
+      totalPeople: this.index.size - totalOrganisms,
+      totalOrganisms,
       topInterests,
       topCities,
       updatedAt: this.lastUpdated,
