@@ -239,6 +239,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       version: record.version,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
+      _ddc: {
+        flagCount: record.flagCount ?? 0,
+        version: record.version,
+        freshness: record.updatedAt,
+        visibility: record.visibility,
+      },
     }, [
       { description: 'Update this memory entry', method: 'POST', url: '/v1/memory', example_body: { key: record.key, value: '...new value...' } },
       { description: 'Delete this memory entry', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}` },
@@ -376,6 +382,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         owner_gaii: record.ownerGaii,
         created_at: record.createdAt,
         updated_at: record.updatedAt,
+        _ddc: {
+          flagCount: record.flagCount ?? 0,
+          version: record.version,
+          freshness: record.updatedAt,
+          visibility: record.visibility,
+        },
       }));
       return;
     }
@@ -410,6 +422,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       owner_gaii: record.ownerGaii,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
+      _ddc: {
+        flagCount: record.flagCount ?? 0,
+        version: record.version,
+        freshness: record.updatedAt,
+        visibility: record.visibility,
+      },
     }));
   });
 

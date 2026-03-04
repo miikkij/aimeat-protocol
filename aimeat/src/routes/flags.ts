@@ -77,10 +77,9 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         // Phase 2.4 — Auto-hide: check flag count against threshold
-        const AUTO_HIDE_THRESHOLD = 5;
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
         const activeFlagCount = activeFlags.filter(f => f.status === 'active').length;
-        const hidden = activeFlagCount >= AUTO_HIDE_THRESHOLD;
+        const hidden = activeFlagCount >= config.autoHideThreshold;
 
         res.status(201).json(success(config.nodeId, { ...flag, hidden }, [
             { description: 'View flag summary for this target', method: 'GET', url: `/v1/flags/summary/${targetType}/${targetId}` },
@@ -115,10 +114,9 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         // Phase 2.4 — include hidden status based on active flag count
-        const AUTO_HIDE_THRESHOLD = 5;
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
         const activeFlagCount = activeFlags.filter(f => f.status === 'active').length;
-        const hidden = activeFlagCount >= AUTO_HIDE_THRESHOLD;
+        const hidden = activeFlagCount >= config.autoHideThreshold;
 
         res.json(success(config.nodeId, { ...summary, hidden }));
     });
