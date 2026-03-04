@@ -125,9 +125,9 @@ function buildTextMap(cols, rows, mode, score, blinkOn) {
     cx.filter = p.blur > 0 ? `blur(${p.blur}px)` : 'none';
     cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.font = `900 108px Arial Black, Impact, sans-serif`;
-    cx.fillText('GENESIS', TW/2, TH*0.33);
+    cx.fillText('GENESIS', TW/2, TH*0.33 + 4);
     cx.font = `900 80px Arial Black, Impact, sans-serif`;
-    cx.fillText('001', TW/2, TH*0.72);
+    cx.fillText('001', TW/2, TH*0.72 - 42);
     cx.restore();
   }
 
@@ -137,14 +137,72 @@ function buildTextMap(cols, rows, mode, score, blinkOn) {
     glowText(scoreStr, TW * 0.82, TH * 0.14, 52, 16);
   }
 
-  // Blink text
-  if (blinkOn) {
-    if (mode === 'idle') {
-      glowText('CLICK TO PLAY', TW/2, TH * 0.88, 36, 12);
-    } else if (mode === 'dead') {
-      glowText('SNAKE DESTROYED', TW/2, TH * 0.88, 40, 14);
-      glowText('CLICK TO RESTART', TW/2, TH * 0.95, 30, 10);
+  // ── 5×7 bitmap font (1px = 1 grid cell) ──────────────
+  // Each char: 5 columns, each column is 7-bit bitmask (bit0=top)
+  const BMFONT = {
+    ' ':[0,0,0,0,0],
+    'A':[62,9,9,9,62],'B':[127,73,73,73,54],'C':[62,65,65,65,34],
+    'D':[127,65,65,65,62],'E':[127,73,73,73,65],'F':[127,9,9,9,1],
+    'G':[62,65,73,73,58],'H':[127,8,8,8,127],'I':[0,65,127,65,0],
+    'J':[32,64,65,63,1],'K':[127,8,20,34,65],'L':[127,64,64,64,64],
+    'M':[127,2,12,2,127],'N':[127,4,8,16,127],'O':[62,65,65,65,62],
+    'P':[127,9,9,9,6],'Q':[62,65,81,33,94],'R':[127,9,25,41,70],
+    'S':[38,73,73,73,50],'T':[1,1,127,1,1],'U':[63,64,64,64,63],
+    'V':[31,32,64,32,31],'W':[63,64,48,64,63],'X':[99,20,8,20,99],
+    'Y':[3,4,120,4,3],'Z':[97,81,73,69,67],
+    '0':[62,81,73,69,62],'1':[0,66,127,64,0],'2':[66,97,81,73,70],
+    '3':[33,65,73,77,51],'4':[24,20,18,127,16],'5':[39,69,69,69,57],
+    '6':[60,74,73,73,48],'7':[1,113,9,5,3],'8':[54,73,73,73,54],
+    '9':[6,73,73,41,30],
+    '[':[0,127,65,65,0],']':[0,65,65,127,0],'/':[96,16,8,4,3],
+    '\\':[3,4,8,16,96],'.':[0,96,96,0,0],':':[0,54,54,0,0],
+    '!':[0,0,95,0,0],'-':[8,8,8,8,8],'_':[64,64,64,64,64],
+  };
+  const CHAR_W = 5, CHAR_H = 7, CHAR_GAP = 1;
+
+  function drawBitmapText(text, gridX, gridY, map, cols) {
+    let cx2 = gridX;
+    for (const ch of text.toUpperCase()) {
+      const glyph = BMFONT[ch] || BMFONT[' '];
+      for (let col = 0; col < CHAR_W; col++) {
+        const colBits = glyph[col];
+        for (let row = 0; row < CHAR_H; row++) {
+          if (colBits & (1 << row)) {
+            const gc = cx2 + col;
+            const gr = gridY + row;
+            if (gc >= 0 && gc < cols && gr >= 0 && gr < state.rows)
+              map[gr * cols + gc] = 1.0;
+          }
+        }
+      }
+      cx2 += CHAR_W + CHAR_GAP;
     }
+  }
+
+  function centeredX(text, cols) {
+    return Math.round((cols - text.length * (CHAR_W + CHAR_GAP)) / 2);
+  }
+
+  // Merge blink text into map
+  if (blinkOn && (mode === 'idle' || mode === 'dead')) {
+    const px2 = cx.getImageData(0,0,TW,TH).data;
+    const map2 = new Float32Array(cols * rows);
+    for (let r=0; r<rows; r++)
+      for (let c2=0; c2<cols; c2++) {
+        const tx = Math.floor((c2/cols)*TW), ty = Math.floor((r/rows)*TH);
+        map2[r*cols+c2] = Math.min(px2[(ty*TW+tx)*4]/255, 1.0);
+      }
+
+    if (mode === 'idle') {
+      const t1 = '[ CLICK TO PLAY ]';
+      drawBitmapText(t1, centeredX(t1, cols), Math.round(rows*0.83), map2, cols);
+    } else {
+      const t1 = '// SNAKE DESTROYED //';
+      const t2 = '[ CLICK TO RESTART ]';
+      drawBitmapText(t1, centeredX(t1, cols), Math.round(rows*0.78), map2, cols);
+      drawBitmapText(t2, centeredX(t2, cols), Math.round(rows*0.90), map2, cols);
+    }
+    return map2;
   }
 
   const px = cx.getImageData(0,0,TW,TH).data;
@@ -154,6 +212,7 @@ function buildTextMap(cols, rows, mode, score, blinkOn) {
       const tx = Math.floor((c/cols)*TW), ty = Math.floor((r/rows)*TH);
       map[r*cols+c] = Math.min(px[(ty*TW+tx)*4]/255, 1.0);
     }
+
   return map;
 }
 let textMap = buildTextMap(state.cols, state.rows, 'idle', 0, true);
