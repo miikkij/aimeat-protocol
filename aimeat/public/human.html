@@ -1635,75 +1635,16 @@ body {
   var canvas = document.getElementById('genesis3dCanvas');
   if (!container || !canvas) return;
 
-  // ═══ STATE ═══
-  var COLS = 160, ROWS = 100, SPACING = 0.9, TEXT_H = 1.0, WAVE_H = 0.2;
-  var SCROLL_SPEED = 0.22, dirX = 0.0, dirZ = 1.0, scroll = 0;
-  var mouseX = 0;
-  var SNAKE_H = 10, FOOD_H = 5, FOOD_COUNT = 18, TICK_RATE = 7;
-
-  // ═══ UI TEXT STATE ═══
-  var uiMode = 'idle', uiScore = 0, uiBlinkOn = true, uiBlinkFrame = 0;
-
-  // ═══ 5×7 BITMAP FONT ═══
-  var BMFONT = {
-    A:[0x04,0x0A,0x11,0x1F,0x11,0x11,0x11],B:[0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E],
-    C:[0x0E,0x11,0x10,0x10,0x10,0x11,0x0E],D:[0x1C,0x12,0x11,0x11,0x11,0x12,0x1C],
-    E:[0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F],F:[0x1F,0x10,0x10,0x1E,0x10,0x10,0x10],
-    G:[0x0E,0x11,0x10,0x17,0x11,0x11,0x0F],H:[0x11,0x11,0x11,0x1F,0x11,0x11,0x11],
-    I:[0x0E,0x04,0x04,0x04,0x04,0x04,0x0E],J:[0x07,0x02,0x02,0x02,0x02,0x12,0x0C],
-    K:[0x11,0x12,0x14,0x18,0x14,0x12,0x11],L:[0x10,0x10,0x10,0x10,0x10,0x10,0x1F],
-    M:[0x11,0x1B,0x15,0x15,0x11,0x11,0x11],N:[0x11,0x11,0x19,0x15,0x13,0x11,0x11],
-    O:[0x0E,0x11,0x11,0x11,0x11,0x11,0x0E],P:[0x1E,0x11,0x11,0x1E,0x10,0x10,0x10],
-    Q:[0x0E,0x11,0x11,0x11,0x15,0x12,0x0D],R:[0x1E,0x11,0x11,0x1E,0x14,0x12,0x11],
-    S:[0x0E,0x11,0x10,0x0E,0x01,0x11,0x0E],T:[0x1F,0x04,0x04,0x04,0x04,0x04,0x04],
-    U:[0x11,0x11,0x11,0x11,0x11,0x11,0x0E],V:[0x11,0x11,0x11,0x11,0x0A,0x0A,0x04],
-    W:[0x11,0x11,0x11,0x15,0x15,0x15,0x0A],X:[0x11,0x11,0x0A,0x04,0x0A,0x11,0x11],
-    Y:[0x11,0x11,0x0A,0x04,0x04,0x04,0x04],Z:[0x1F,0x01,0x02,0x04,0x08,0x10,0x1F],
-    '0':[0x0E,0x11,0x13,0x15,0x19,0x11,0x0E],'1':[0x04,0x0C,0x04,0x04,0x04,0x04,0x0E],
-    '2':[0x0E,0x11,0x01,0x06,0x08,0x10,0x1F],'3':[0x0E,0x11,0x01,0x06,0x01,0x11,0x0E],
-    '4':[0x02,0x06,0x0A,0x12,0x1F,0x02,0x02],'5':[0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E],
-    '6':[0x06,0x08,0x10,0x1E,0x11,0x11,0x0E],'7':[0x1F,0x01,0x02,0x04,0x08,0x08,0x08],
-    '8':[0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E],'9':[0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C],
-    ' ':[0,0,0,0,0,0,0],'[':[0x0E,0x08,0x08,0x08,0x08,0x08,0x0E],
-    ']':[0x0E,0x02,0x02,0x02,0x02,0x02,0x0E],'/':[0x01,0x01,0x02,0x04,0x08,0x10,0x10],
-    ':':[0x00,0x04,0x04,0x00,0x04,0x04,0x00],'.':[0x00,0x00,0x00,0x00,0x00,0x0C,0x0C],
-    '-':[0x00,0x00,0x00,0x1F,0x00,0x00,0x00],'!':[0x04,0x04,0x04,0x04,0x04,0x00,0x04],
-    '?':[0x0E,0x11,0x01,0x02,0x04,0x00,0x04]
+  // STATE
+  var state = {
+    rotY: 0, tilt: 31, textH: 1.0, spacing: 0.9, cols: 160, rows: 100
   };
 
-  function drawBitmapText(map, text, startCol, startRow, scale) {
-    scale = scale || 1;
-    var col = startCol;
-    for (var i = 0; i < text.length; i++) {
-      var ch = text[i].toUpperCase();
-      var glyph = BMFONT[ch];
-      if (!glyph) { col += 6 * scale; continue; }
-      for (var gy = 0; gy < 7; gy++) {
-        for (var gx = 0; gx < 5; gx++) {
-          if (glyph[gy] & (0x10 >> gx)) {
-            for (var sy = 0; sy < scale; sy++) {
-              for (var sx = 0; sx < scale; sx++) {
-                var mc = col + gx * scale + sx;
-                var mr = startRow + gy * scale + sy;
-                if (mc >= 0 && mc < COLS && mr >= 0 && mr < ROWS) {
-                  map[mr * COLS + mc] = 1.0;
-                }
-              }
-            }
-          }
-        }
-      }
-      col += 6 * scale;
-    }
-  }
+  // UI TEXT STATE
+  var uiMode = 'idle', uiScore = 0, uiBlinkOn = true, uiBlinkFrame = 0;
 
-  function centeredX(text, scale) {
-    scale = scale || 1;
-    return Math.floor((COLS - text.length * 6 * scale) / 2);
-  }
-
-  // ═══ TEXT DEPTH MAP (with blink text + score) ═══
-  function buildTextMap(mode, score, blinkOn) {
+  // TEXT DEPTH MAP
+  function buildTextMap(cols, rows, mode, score, blinkOn) {
     var TW = 960, TH = 480;
     var cv = document.createElement('canvas');
     cv.width = TW; cv.height = TH;
@@ -1729,6 +1670,9 @@ body {
 
     // GENESIS + 001 via canvas glow
     var baseAlpha = (mode === 'playing') ? 0.6 : 1.0;
+    cx.save(); cx.globalAlpha = baseAlpha; cx.globalCompositeOperation = 'source-over';
+    cx.restore();
+
     var gPasses = [
       {blur:28,alpha:0.15*baseAlpha},{blur:16,alpha:0.28*baseAlpha},
       {blur:8,alpha:0.45*baseAlpha},{blur:4,alpha:0.65*baseAlpha},
@@ -1746,45 +1690,107 @@ body {
       cx.restore();
     }
 
-    // Score via canvas glow
+    // Score while playing or after death
     if (mode === 'playing' || mode === 'dead') {
       glowText(String(score).padStart(4,'0'), TW * 0.82, TH * 0.14, 52, 16);
     }
 
-    // Sample canvas → map
-    var px = cx.getImageData(0,0,TW,TH).data;
-    var map = new Float32Array(COLS * ROWS);
-    for (var r=0; r<ROWS; r++)
-      for (var c=0; c<COLS; c++) {
-        var tx = Math.floor((c/COLS)*TW), ty = Math.floor((r/ROWS)*TH);
-        map[r*COLS+c] = Math.min(px[(ty*TW+tx)*4]/255, 1.0);
-      }
+    // 5x7 bitmap font (1px = 1 grid cell)
+    // Each char: 5 columns, each column is 7-bit bitmask (bit0=top)
+    var BMFONT = {
+      ' ':[0,0,0,0,0],
+      'A':[62,9,9,9,62],'B':[127,73,73,73,54],'C':[62,65,65,65,34],
+      'D':[127,65,65,65,62],'E':[127,73,73,73,65],'F':[127,9,9,9,1],
+      'G':[62,65,73,73,58],'H':[127,8,8,8,127],'I':[0,65,127,65,0],
+      'J':[32,64,65,63,1],'K':[127,8,20,34,65],'L':[127,64,64,64,64],
+      'M':[127,2,12,2,127],'N':[127,4,8,16,127],'O':[62,65,65,65,62],
+      'P':[127,9,9,9,6],'Q':[62,65,81,33,94],'R':[127,9,25,41,70],
+      'S':[38,73,73,73,50],'T':[1,1,127,1,1],'U':[63,64,64,64,63],
+      'V':[31,32,64,32,31],'W':[63,64,48,64,63],'X':[99,20,8,20,99],
+      'Y':[3,4,120,4,3],'Z':[97,81,73,69,67],
+      '0':[62,81,73,69,62],'1':[0,66,127,64,0],'2':[66,97,81,73,70],
+      '3':[33,65,73,77,51],'4':[24,20,18,127,16],'5':[39,69,69,69,57],
+      '6':[60,74,73,73,48],'7':[1,113,9,5,3],'8':[54,73,73,73,54],
+      '9':[6,73,73,41,30],
+      '[':[0,127,65,65,0],']':[0,65,65,127,0],'/':[96,16,8,4,3],
+      '\\':[3,4,8,16,96],'.':[0,96,96,0,0],':':[0,54,54,0,0],
+      '!':[0,0,95,0,0],'-':[8,8,8,8,8],'_':[64,64,64,64,64]
+    };
+    var CHAR_W = 5, CHAR_H = 7, CHAR_GAP = 1;
 
-    // Blink text via bitmap font (rendered directly on grid)
-    if (blinkOn) {
-      if (mode === 'idle') {
-        var txt = '[ CLICK TO PLAY ]';
-        drawBitmapText(map, txt, centeredX(txt, 2), Math.floor(ROWS * 0.83), 2);
-      } else if (mode === 'dead') {
-        var t1 = '// SNAKE DESTROYED //';
-        var t2 = '[ CLICK TO RESTART ]';
-        drawBitmapText(map, t1, centeredX(t1, 2), Math.floor(ROWS * 0.78), 2);
-        drawBitmapText(map, t2, centeredX(t2, 2), Math.floor(ROWS * 0.90), 2);
+    function drawBitmapText(text, gridX, gridY, map, mapCols) {
+      var cx2 = gridX;
+      for (var i = 0; i < text.length; i++) {
+        var ch = text[i].toUpperCase();
+        var glyph = BMFONT[ch] || BMFONT[' '];
+        for (var col2 = 0; col2 < CHAR_W; col2++) {
+          var colBits = glyph[col2];
+          for (var row2 = 0; row2 < CHAR_H; row2++) {
+            if (colBits & (1 << row2)) {
+              var gc = cx2 + col2;
+              var gr = gridY + row2;
+              if (gc >= 0 && gc < mapCols && gr >= 0 && gr < rows)
+                map[gr * mapCols + gc] = 1.0;
+            }
+          }
+        }
+        cx2 += CHAR_W + CHAR_GAP;
       }
     }
 
+    function centeredX(text, mapCols) {
+      return Math.round((mapCols - text.length * (CHAR_W + CHAR_GAP)) / 2);
+    }
+
+    // Merge blink text into map
+    if (blinkOn && (mode === 'idle' || mode === 'dead')) {
+      var px2 = cx.getImageData(0,0,TW,TH).data;
+      var map2 = new Float32Array(cols * rows);
+      for (var r=0; r<rows; r++)
+        for (var c2=0; c2<cols; c2++) {
+          var tx2 = Math.floor((c2/cols)*TW), ty2 = Math.floor((r/rows)*TH);
+          map2[r*cols+c2] = Math.min(px2[(ty2*TW+tx2)*4]/255, 1.0);
+        }
+
+      if (mode === 'idle') {
+        var bt1 = '[ CLICK TO PLAY ]';
+        drawBitmapText(bt1, centeredX(bt1, cols), Math.round(rows*0.83), map2, cols);
+      } else {
+        var dt1 = '// SNAKE DESTROYED //';
+        var dt2 = '[ CLICK TO RESTART ]';
+        drawBitmapText(dt1, centeredX(dt1, cols), Math.round(rows*0.78), map2, cols);
+        drawBitmapText(dt2, centeredX(dt2, cols), Math.round(rows*0.90), map2, cols);
+      }
+      return map2;
+    }
+
+    var px = cx.getImageData(0,0,TW,TH).data;
+    var map = new Float32Array(cols * rows);
+    for (var r3=0; r3<rows; r3++)
+      for (var c3=0; c3<cols; c3++) {
+        var tx3 = Math.floor((c3/cols)*TW), ty3 = Math.floor((r3/rows)*TH);
+        map[r3*cols+c3] = Math.min(px[(ty3*TW+tx3)*4]/255, 1.0);
+      }
+
     return map;
   }
-  var textMap = buildTextMap('idle', 0, true);
+  var textMap = buildTextMap(state.cols, state.rows, 'idle', 0, true);
+
   var lastBlinkOn = true, lastUiMode = 'idle', lastUiScore = -1;
   function refreshTextMapIfNeeded() {
     if (uiBlinkOn !== lastBlinkOn || uiMode !== lastUiMode || uiScore !== lastUiScore) {
-      textMap = buildTextMap(uiMode, uiScore, uiBlinkOn);
+      textMap = buildTextMap(state.cols, state.rows, uiMode, uiScore, uiBlinkOn);
       lastBlinkOn = uiBlinkOn; lastUiMode = uiMode; lastUiScore = uiScore;
     }
   }
 
-  // ═══ WAVE ═══
+  // TERRAIN (scrolling waves)
+  var WAVE_H = 0.2;
+  var SCROLL_SPEED = 0.22;
+  var dirX = 0.0, dirZ = 1.0;
+  var scroll = 0;
+  var mouseX = 0;
+
   function wave(wx, wz, t) {
     var phase = wx * dirX + wz * dirZ;
     return (
@@ -1796,8 +1802,9 @@ body {
     ) * WAVE_H;
   }
 
-  // ═══ SNAKE GAME ═══
-  var snakeMap = new Float32Array(COLS * ROWS);
+  // SNAKE GAME
+  var SNAKE_H = 10, FOOD_H = 5, FOOD_COUNT = 18, TICK_RATE = 7;
+  var snakeMap = new Float32Array(state.cols * state.rows);
   var foodCells = new Set();
   var bodyCells = new Map();
   var snakeActive = false, snakeDead = false;
@@ -1806,21 +1813,23 @@ body {
   var explodeParticles = [];
 
   function spawnFood(count) {
+    var cols = state.cols, rows = state.rows;
     var attempts = 0;
     while (count > 0 && attempts < 500) {
       attempts++;
-      var c = Math.floor(Math.random() * COLS);
-      var r = Math.floor(Math.random() * ROWS);
-      var idx = r * COLS + c;
+      var c = Math.floor(Math.random() * cols);
+      var r = Math.floor(Math.random() * rows);
+      var idx = r * cols + c;
       if (!foodCells.has(idx) && !bodyCells.has(idx)) { foodCells.add(idx); count--; }
     }
   }
 
   function initSnake() {
+    var cols = state.cols, rows = state.rows;
     snake = [
-      {c: Math.floor(COLS/2), r: Math.floor(ROWS/2)},
-      {c: Math.floor(COLS/2)-1, r: Math.floor(ROWS/2)},
-      {c: Math.floor(COLS/2)-2, r: Math.floor(ROWS/2)}
+      {c: Math.floor(cols/2), r: Math.floor(rows/2)},
+      {c: Math.floor(cols/2)-1, r: Math.floor(rows/2)},
+      {c: Math.floor(cols/2)-2, r: Math.floor(rows/2)}
     ];
     snakeDir = {dc:1,dr:0}; nextDir = {dc:1,dr:0};
     snakeScore = 0; snakeDead = false;
@@ -1847,11 +1856,12 @@ body {
 
   function stepSnake() {
     if (!snakeActive || snakeDead) return;
+    var cols = state.cols, rows = state.rows;
     snakeDir = {dc: nextDir.dc, dr: nextDir.dr};
     var head = snake[0];
-    var nc = ((head.c + snakeDir.dc) % COLS + COLS) % COLS;
-    var nr = ((head.r + snakeDir.dr) % ROWS + ROWS) % ROWS;
-    var nIdx = nr * COLS + nc;
+    var nc = ((head.c + snakeDir.dc) % cols + cols) % cols;
+    var nr = ((head.r + snakeDir.dr) % rows + rows) % rows;
+    var nIdx = nr * cols + nc;
     if (bodyCells.has(nIdx)) { killSnake(); return; }
     var ateFood = foodCells.has(nIdx);
     if (ateFood) { foodCells.delete(nIdx); snakeScore++; uiScore = snakeScore; spawnFood(1); }
@@ -1859,13 +1869,14 @@ body {
     if (!ateFood) snake.pop();
     bodyCells.clear();
     for (var i = 0; i < snake.length; i++) {
-      var idx = snake[i].r * COLS + snake[i].c;
+      var idx = snake[i].r * cols + snake[i].c;
       bodyCells.set(idx, 1.0 - (i / snake.length) * 0.5);
     }
   }
 
   var foodPulse = 0;
   function buildSnakeMap(frame) {
+    var cols = state.cols, rows = state.rows;
     foodPulse = Math.sin(frame * 0.08) * 0.3 + 0.7;
     snakeMap.fill(0);
     foodCells.forEach(function(idx) { snakeMap[idx] = 0.45 * foodPulse; });
@@ -1874,20 +1885,20 @@ body {
       var p = explodeParticles[i];
       p.c += p.vc; p.r += p.vr; p.vc *= 0.88; p.vr *= 0.88; p.age++;
       var ec = Math.round(p.c), er = Math.round(p.r);
-      if (ec >= 0 && ec < COLS && er >= 0 && er < ROWS) {
-        var eidx = er * COLS + ec;
+      if (ec >= 0 && ec < cols && er >= 0 && er < rows) {
+        var eidx = er * cols + ec;
         var et = p.age / p.maxAge;
         snakeMap[eidx] = Math.max(snakeMap[eidx], (1.0 - et) * 0.9);
       }
       if (p.age >= p.maxAge) {
         var fc = Math.round(p.c), fr = Math.round(p.r);
-        if (fc >= 0 && fc < COLS && fr >= 0 && fr < ROWS) foodCells.add(fr * COLS + fc);
+        if (fc >= 0 && fc < cols && fr >= 0 && fr < rows) foodCells.add(fr * cols + fc);
         explodeParticles.splice(i, 1);
       }
     }
   }
 
-  // ═══ COLORIZE (terrain + text + snake) ═══
+  // COLOR
   function colorize(tv, wv, sv) {
     var tw = WAVE_H > 0 ? (wv / WAVE_H) * 0.5 + 0.5 : 0.5;
     var R = 0.04 + tw * 0.05;
@@ -1914,30 +1925,41 @@ body {
     return [R, G, B];
   }
 
-  // ═══ THREE.JS SETUP ═══
+  // THREE.JS
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(60, 2.6, 0.1, 2000);
+  var camera = new THREE.PerspectiveCamera(50, 2.6, 0.1, 2000);
 
-  var tiltRad = THREE.MathUtils.degToRad(50);
-  var dist = 85;
-  camera.position.set(0, Math.sin(tiltRad) * dist, Math.cos(tiltRad) * dist);
-  camera.lookAt(0, 0, -15);
+  var geo, pts;
+  function buildGrid() {
+    if (pts) scene.remove(pts);
+    var cols = state.cols, rows = state.rows, spacing = state.spacing;
+    var N = cols * rows;
+    geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N*3), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N*3), 3));
+    var mat = new THREE.PointsMaterial({
+      size: Math.max(1.0, spacing * 0.65), vertexColors: true,
+      transparent: true, opacity: 1.0, sizeAttenuation: true,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    pts = new THREE.Points(geo, mat);
+    scene.add(pts);
+  }
+  buildGrid();
 
-  var N = COLS * ROWS;
-  var geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N*3), 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N*3), 3));
-  var mat = new THREE.PointsMaterial({
-    size: Math.max(1.0, SPACING * 0.65), vertexColors: true,
-    transparent: true, opacity: 1.0, sizeAttenuation: true,
-    blending: THREE.AdditiveBlending, depthWrite: false
-  });
-  var pts = new THREE.Points(geo, mat);
-  scene.add(pts);
+  function updateCamera() {
+    var tiltRad = THREE.MathUtils.degToRad(state.tilt);
+    var dist = 100;
+    camera.position.x = 0;
+    camera.position.y = Math.sin(tiltRad) * dist;
+    camera.position.z = Math.cos(tiltRad) * dist;
+    camera.lookAt(0, 4, 0);
+  }
+  updateCamera();
 
   function onResize() {
     var w = container.clientWidth;
@@ -1949,7 +1971,7 @@ body {
   window.addEventListener('resize', onResize);
   onResize();
 
-  // ═══ INPUT ═══
+  // INPUT
   document.addEventListener('mousemove', function(e) {
     mouseX = (e.clientX / window.innerWidth) * 2 - 1;
   });
@@ -1972,11 +1994,12 @@ body {
     }
   });
 
-  // ═══ RENDER LOOP ═══
+  // RENDER LOOP
   var frame = 0;
   function animate() {
     requestAnimationFrame(animate);
     frame++;
+
     dirX += (mouseX * 1.2 - dirX) * 0.04;
     dirZ += (1.0 - dirZ) * 0.04;
     scroll += SCROLL_SPEED;
@@ -1991,18 +2014,19 @@ body {
     if (snakeTick >= TICK_RATE) { snakeTick = 0; stepSnake(); }
     buildSnakeMap(frame);
 
+    var cols = state.cols, rows = state.rows, spacing = state.spacing, textH = state.textH;
     var pos = geo.attributes.position.array;
     var col = geo.attributes.color.array;
-    for (var r = 0; r < ROWS; r++) {
-      for (var c = 0; c < COLS; c++) {
-        var i = r * COLS + c;
-        var wx = (c - COLS/2) * SPACING;
-        var wz = (r - ROWS/2) * SPACING;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var i = r * cols + c;
+        var wx = (c - cols/2) * spacing;
+        var wz = (r - rows/2) * spacing;
         var wv = wave(wx, wz, scroll);
         var tv = textMap[i];
         var sv = snakeMap[i];
         pos[i*3]   = wx;
-        pos[i*3+1] = wv + tv * TEXT_H + sv * (sv > 0.54 ? SNAKE_H : FOOD_H);
+        pos[i*3+1] = wv + tv * textH + sv * (sv > 0.54 ? SNAKE_H : FOOD_H);
         pos[i*3+2] = wz;
         var rgb = colorize(tv, wv, sv);
         col[i*3]   = rgb[0];
