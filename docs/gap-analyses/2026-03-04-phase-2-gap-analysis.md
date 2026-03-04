@@ -437,3 +437,35 @@
 *Generated: 2026-03-04*
 *Source plan: `docs/plans/phase-2-marketplace-community.md`*
 *Cross-references: `docs/gap-analyses/2026-03-04-phase-0-gap-analysis.md`, `docs/gap-analyses/2026-03-04-phase-1-gap-analysis.md`*
+
+---
+
+## Architectural Update: Extension System (2026-03-04)
+
+The Phase 2 gaps identified above have been addressed through an architectural redesign rather than individual gap fixes:
+
+### Decision: CSM-Driven Services + Node Extensions
+
+Marketplace and organism services were re-classified as **ecosystem applications** (per the founding `core-vs-ecosystem-analysis.md`), not core infrastructure. Instead of patching hardcoded routes, a new Node Extension System was built:
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| Extension Runtime (V8 isolate) | Complete | `src/services/extension-runtime.ts` — sandboxed JS execution |
+| Extension Storage Types | Complete | `ExtensionRecord` + `EscrowHoldRecord` in storage interface |
+| Extension Config | Complete | `AIMEAT_EXTENSIONS_ENABLED`, limits, etc. |
+| Extension Routes | Complete | `src/routes/extensions.ts` — 7 endpoints |
+| Organism CSM Template | Complete | `docs/csm-examples/organism.csm.yaml` |
+| marketplace-behaviors Extension | Complete | Reference extension with purchase/deliver/rate |
+| membership-behaviors Extension | Complete | Reference extension with join/invite/leave/promote |
+| OpenAPI Documentation | Complete | Extension endpoints + schema definitions |
+
+### Impact on Phase 2 Gaps
+
+- **2.2 Organisms:** Routes will be replaced by CSM + membership-behaviors extension
+- **2.5 CSM Templates:** Organism CSM template added; operator CRUD via extension system
+- **2.6 Marketplace:** Routes will be replaced by CSM + marketplace-behaviors extension
+- **2.9 Testing:** Extension system has unit tests; E2E test pending
+
+### Future Migration (separate plan)
+
+The hardcoded `marketplace.ts` (385 lines) and `organisms.ts` (873 lines) routes will be removed once the extension system is validated in production. This reduces 1,541 lines of service-specific code to ~1,150 lines of reusable extension infrastructure.

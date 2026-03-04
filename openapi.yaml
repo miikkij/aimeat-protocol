@@ -102,6 +102,8 @@ tags:
     description: Phase 3.4 — Advanced federation features (genesis peering)
   - name: Reputation
     description: Phase 3.4 — Organism reputation scoring
+  - name: Extensions
+    description: Node Extension System — V8 isolate sandbox for operator-installed plugins
 
 components:
   securitySchemes:
@@ -1941,6 +1943,90 @@ components:
           type: string
           format: date-time
           description: When the reputation was last calculated
+
+    # === Extension System ===
+    ExtensionRecord:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        author:
+          type: string
+        status:
+          type: string
+          enum: [inactive, active]
+        requiredApis:
+          type: array
+          items:
+            type: string
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              method:
+                type: string
+              path:
+                type: string
+        config:
+          type: object
+        limits:
+          type: object
+          properties:
+            memoryMb:
+              type: integer
+            timeoutMs:
+              type: integer
+            maxApiCalls:
+              type: integer
+        federation:
+          type: object
+          properties:
+            advertise:
+              type: boolean
+            capabilities:
+              type: array
+              items:
+                type: string
+        installedBy:
+          type: string
+        installedAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+
+    EscrowHoldRecord:
+      type: object
+      properties:
+        holdId:
+          type: string
+        fromGaii:
+          type: string
+        amount:
+          type: integer
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [held, released, disputed, refunded]
+        extensionName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        releasedAt:
+          type: string
+          format: date-time
+        releasedTo:
+          type: string
 
   # === Reusable Response Wrappers ===
   responses:
@@ -9333,3 +9419,285 @@ paths:
                             type: string
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ── Extensions ───────────────────────────────────────────
+  /v1/extensions:
+    get:
+      operationId: listExtensions
+      summary: List all installed node extensions
+      description: |
+        Returns all installed extensions with their name, version, description,
+        status, action count, and federation settings. No authentication required (Tier 0).
+      tags: [Extensions]
+      responses:
+        '200':
+          description: Array of extension summaries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            version:
+                              type: string
+                            description:
+                              type: string
+                            status:
+                              type: string
+                              enum: [inactive, active]
+                            actionCount:
+                              type: integer
+                            federation:
+                              type: object
+                              properties:
+                                advertise:
+                                  type: boolean
+                                capabilities:
+                                  type: array
+                                  items:
+                                    type: string
+
+    post:
+      operationId: installExtension
+      summary: Install a new extension
+      description: |
+        Install an extension from its manifest and script bundle.
+        Requires operator role.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manifest, scripts]
+              properties:
+                manifest:
+                  type: string
+                  description: YAML manifest defining the extension metadata, actions, and limits
+                scripts:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Key-value map of script filenames to JavaScript source code
+      responses:
+        '201':
+          description: Extension installed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExtensionRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/extensions/{name}:
+    get:
+      operationId: getExtension
+      summary: Get extension detail
+      description: |
+        Returns full extension record (without script content).
+        No authentication required (Tier 0).
+      tags: [Extensions]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Extension name
+      responses:
+        '200':
+          description: Extension detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExtensionRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: uninstallExtension
+      summary: Uninstall an extension
+      description: |
+        Remove an installed extension and all its data.
+        Requires operator role.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Extension name
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/extensions/{name}/activate:
+    post:
+      operationId: activateExtension
+      summary: Activate an extension
+      description: |
+        Start the extension runtime and register its action routes.
+        Requires operator role.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Extension name
+      responses:
+        '200':
+          description: Extension activated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExtensionRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/extensions/{name}/deactivate:
+    post:
+      operationId: deactivateExtension
+      summary: Deactivate an extension
+      description: |
+        Stop the extension runtime and unregister its action routes.
+        Requires operator role.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Extension name
+      responses:
+        '200':
+          description: Extension deactivated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ExtensionRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/ext/{extensionName}/{actionId}:
+    post:
+      operationId: executeExtensionAction
+      summary: Execute an extension action
+      description: |
+        Invoke a specific action provided by an installed and active extension.
+        The request body is action-specific and defined by the extension manifest.
+        Requires authentication (Tier 1+).
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: extensionName
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Extension name
+        - name: actionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Action identifier within the extension
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Action-specific input payload defined by the extension manifest
+      responses:
+        '200':
+          description: Action executed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: Action-specific result
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Extension not active
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: EXTENSION_NOT_ACTIVE
