@@ -121,7 +121,11 @@ var TRANSLATIONS = {
     "hobbies.matches.noMatches": "No matches found yet. Try adding more interests to your profile!",
     "hobbies.matches.shared": "shared interests",
     "hobbies.matches.loading": "Finding your matches...",
-    "hobbies.nav.matches": "Matches"
+    "hobbies.nav.matches": "Matches",
+    "hobbies.join.notifications": "Notify me when someone nearby shares my interests",
+    "hobbies.me.notifications": "Match notifications",
+    "hobbies.me.notificationsOn": "You will be notified when someone nearby shares your interests.",
+    "hobbies.me.notificationsOff": "Match notifications are disabled."
   },
   fi: {
     "hobbies.title": "Harrastehakemisto",
@@ -235,7 +239,11 @@ var TRANSLATIONS = {
     "hobbies.matches.noMatches": "Ei osumia viela. Kokeile lisata kiinnostuksia profiiliisi!",
     "hobbies.matches.shared": "yhteista kiinnostusta",
     "hobbies.matches.loading": "Etsitaan osumia...",
-    "hobbies.nav.matches": "Osumat"
+    "hobbies.nav.matches": "Osumat",
+    "hobbies.join.notifications": "Ilmoita minulle kun joku lähellä jakaa kiinnostukseni",
+    "hobbies.me.notifications": "Osumailmoitukset",
+    "hobbies.me.notificationsOn": "Saat ilmoituksen kun joku lähellä jakaa kiinnostuksesi.",
+    "hobbies.me.notificationsOff": "Osumailmoitukset ovat pois käytöstä."
   }
 };
 </script>
@@ -623,10 +631,16 @@ body {
         <input class="form-input" type="text" id="join-seeking">
         <div class="form-hint" id="join-seeking-hint"></div>
       </div>
-      <div style="margin-top:8px; margin-bottom:16px;">
+      <div style="margin-top:8px; margin-bottom:8px;">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-dim);">
           <input type="checkbox" id="join-consent" required>
           <span id="join-consent-label"></span>
+        </label>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-dim);">
+          <input type="checkbox" id="join-notifications" checked>
+          <span id="join-notifications-label"></span>
         </label>
       </div>
       <button type="submit" class="btn btn-primary" id="join-submit-btn"></button>
@@ -790,6 +804,7 @@ function applyTranslations() {
   document.getElementById('join-seeking').placeholder = T['hobbies.join.seekingPlaceholder'];
   document.getElementById('join-seeking-hint').textContent = T['hobbies.join.seekingHint'];
   document.getElementById('join-consent-label').textContent = T['hobbies.join.consent'];
+  document.getElementById('join-notifications-label').textContent = T['hobbies.join.notifications'];
   document.getElementById('join-submit-btn').textContent = T['hobbies.join.submitBtn'];
   document.getElementById('join-success-msg').textContent = T['hobbies.join.success'];
   document.getElementById('join-browse-btn').textContent = T['hobbies.join.browseBtn'];
@@ -1196,6 +1211,8 @@ function submitJoin(e) {
 
   var owner = getAuthInfo().owner;
 
+  var notifyOptIn = document.getElementById('join-notifications').checked;
+
   // Step 1: Create consent grant
   fetch(NODE_URL + '/v1/consent', {
     method: 'POST',
@@ -1207,6 +1224,21 @@ function submitJoin(e) {
       scope: 'federation'
     })
   }).then(function(r) { return r.json(); })
+  .then(function() {
+    // Step 1b: If match notifications opted in, create that consent too
+    if (notifyOptIn) {
+      return fetch(NODE_URL + '/v1/consent', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          data_pattern: 'profile.' + owner + '.*',
+          recipient: '*',
+          purpose: 'match-notification',
+          scope: 'federation'
+        })
+      }).then(function(r) { return r.json(); });
+    }
+  })
   .then(function() {
     // Step 2: Write profile data to memory
     var memPromises = [];
@@ -1324,9 +1356,10 @@ function loadMe() {
             return;
           }
 
-          // Load availability and seeking from memory
+          // Load availability, seeking, and notification consent from memory
           var availValue = '';
           var seekingValue = [];
+          var notifyEnabled = false;
           var username = info.owner;
 
           var memAvailUrl = '/v1/memory/profile.' + encodeURIComponent(username) + '.availability';
@@ -1334,7 +1367,8 @@ function loadMe() {
 
           return Promise.all([
             fetch(NODE_URL + memAvailUrl, { headers: { 'Authorization': 'Bearer ' + info.token } }).then(function(r) { return r.json(); }).catch(function() { return {}; }),
-            fetch(NODE_URL + memSeekUrl, { headers: { 'Authorization': 'Bearer ' + info.token } }).then(function(r) { return r.json(); }).catch(function() { return {}; })
+            fetch(NODE_URL + memSeekUrl, { headers: { 'Authorization': 'Bearer ' + info.token } }).then(function(r) { return r.json(); }).catch(function() { return {}; }),
+            fetch(NODE_URL + '/v1/consent', { headers: { 'Authorization': 'Bearer ' + info.token } }).then(function(r) { return r.json(); }).catch(function() { return {}; })
           ]).then(function(results) {
             // Parse availability
             if (results[0] && results[0].ok && results[0].data && results[0].data.value != null) {
@@ -1348,8 +1382,18 @@ function loadMe() {
               if (Array.isArray(sk)) seekingValue = sk;
               else if (sk && typeof sk === 'object' && Array.isArray(sk.items)) seekingValue = sk.items;
             }
+            // Check for match-notification consent
+            if (results[2] && results[2].ok && results[2].data) {
+              var grants = Array.isArray(results[2].data) ? results[2].data : (results[2].data.grants || []);
+              for (var g = 0; g < grants.length; g++) {
+                if (grants[g].purpose === 'match-notification' && grants[g].status !== 'revoked') {
+                  notifyEnabled = true;
+                  break;
+                }
+              }
+            }
 
-            renderMyProfile(myEntry, myGhii, availValue, seekingValue, username);
+            renderMyProfile(myEntry, myGhii, availValue, seekingValue, username, notifyEnabled);
           });
         });
     })
@@ -1358,7 +1402,7 @@ function loadMe() {
     });
 }
 
-function renderMyProfile(entry, ghii, availability, seeking, username) {
+function renderMyProfile(entry, ghii, availability, seeking, username, notifyEnabled) {
   var contentEl = document.getElementById('me-content');
 
   var interestTags = '';
@@ -1454,6 +1498,14 @@ function renderMyProfile(entry, ghii, availability, seeking, username) {
     '<label class="form-label" for="edit-seeking">' + esc(t('hobbies.join.seeking')) + '</label>' +
     '<input class="form-input" type="text" id="edit-seeking" value="' + esc((seeking || []).join(', ')) + '"></div>';
 
+  html += '<div style="margin-top:8px; margin-bottom:16px;">' +
+    '<label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-dim);">' +
+    '<input type="checkbox" id="edit-notifications"' + (notifyEnabled ? ' checked' : '') + '>' +
+    '<span>' + esc(t('hobbies.join.notifications')) + '</span>' +
+    '</label>' +
+    '<div class="form-hint" style="margin-top:4px;">' + esc(t(notifyEnabled ? 'hobbies.me.notificationsOn' : 'hobbies.me.notificationsOff')) + '</div>' +
+    '</div>';
+
   html += '<button type="submit" class="btn btn-primary">' + esc(t('hobbies.me.saveBtn')) + '</button>' +
     '<div id="editResult" style="margin-top:12px;"></div></form>';
 
@@ -1478,6 +1530,8 @@ function submitEdit(e, username) {
   var av = document.getElementById('edit-availability').value;
   var sk = document.getElementById('edit-seeking').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
 
+  var notifyChecked = document.getElementById('edit-notifications').checked;
+
   var promises = [];
   promises.push(fetch(NODE_URL + '/v1/memory/profile.' + encodeURIComponent(username) + '.interests', {
     method: 'PUT', headers: headers,
@@ -1500,8 +1554,45 @@ function submitEdit(e, username) {
     body: JSON.stringify({ value: sk, visibility: 'public', tags: ['profile', 'seeking'] })
   }));
 
+  // Handle match-notification consent toggle
+  var consentPromise = fetch(NODE_URL + '/v1/consent', { headers: { 'Authorization': headers['Authorization'] } })
+    .then(function(r) { return r.json(); })
+    .then(function(consentData) {
+      var grants = [];
+      if (consentData && consentData.ok && consentData.data) {
+        grants = Array.isArray(consentData.data) ? consentData.data : (consentData.data.grants || []);
+      }
+      var existing = null;
+      for (var g = 0; g < grants.length; g++) {
+        if (grants[g].purpose === 'match-notification' && grants[g].status !== 'revoked') {
+          existing = grants[g];
+          break;
+        }
+      }
+
+      if (notifyChecked && !existing) {
+        // Create match-notification consent
+        return fetch(NODE_URL + '/v1/consent', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({
+            data_pattern: 'profile.' + username + '.*',
+            recipient: '*',
+            purpose: 'match-notification',
+            scope: 'federation'
+          })
+        });
+      } else if (!notifyChecked && existing) {
+        // Revoke match-notification consent
+        return fetch(NODE_URL + '/v1/consent/' + existing.id, {
+          method: 'DELETE', headers: headers
+        });
+      }
+    });
+  promises.push(consentPromise);
+
   Promise.all(promises).then(function(responses) {
-    var allOk = responses.every(function(r) { return r.ok; });
+    // Filter out undefined (from consentPromise when no action needed)
+    var allOk = responses.every(function(r) { return !r || r.ok; });
     resultEl.innerHTML = allOk
       ? '<span style="color:var(--success);">' + esc(t('hobbies.me.saved')) + '</span>'
       : '<span style="color:#ef4444;">' + esc(t('hobbies.me.saveFailed')) + '</span>';
