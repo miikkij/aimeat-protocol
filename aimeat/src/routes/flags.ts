@@ -13,6 +13,16 @@ function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
 }
 
+// Phase 2.4 — DRY helper: resolve organism moderation config from flag target
+async function resolveOrganismConfig(storage: Storage, targetType: string, targetId: string) {
+    if (targetType !== 'memory' || !targetId.includes('::')) return null;
+    const [, ...keyParts] = targetId.split('::');
+    const memoryKey = keyParts.join('::');
+    const orgMatch = memoryKey.match(/^organism\.([^.]+)\./);
+    if (!orgMatch) return null;
+    return storage.getOrganism(orgMatch[1]);
+}
+
 export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
@@ -49,6 +59,14 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
+        // Phase 2.4 — Check organism moderation config if target is organism memory
+        const organism = await resolveOrganismConfig(storage, targetType, targetId);
+        if (organism && !organism.moderationConfig.flagsEnabled) {
+            res.status(403).json(error(config.nodeId, 'FLAGS_DISABLED',
+                'Flagging is disabled for this organism\'s content'));
+            return;
+        }
+
         const now = new Date().toISOString();
         const id = `flag-${randomBytes(8).toString('hex')}`;
 
@@ -76,10 +94,13 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             }
         }
 
-        // Phase 2.4 — Auto-hide: check flag count against threshold
+        // Phase 2.4 — Auto-hide: use per-organism threshold if applicable
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
         const activeFlagCount = activeFlags.filter(f => f.status === 'active').length;
-        const hidden = activeFlagCount >= config.autoHideThreshold;
+        const autoHideThreshold = organism
+            ? organism.moderationConfig.autoHideThreshold
+            : config.autoHideThreshold;
+        const hidden = activeFlagCount >= autoHideThreshold;
 
         res.status(201).json(success(config.nodeId, { ...flag, hidden }, [
             { description: 'View flag summary for this target', method: 'GET', url: `/v1/flags/summary/${targetType}/${targetId}` },
@@ -113,10 +134,14 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Phase 2.4 — include hidden status based on active flag count
+        // Phase 2.4 — include hidden status based on active flag count (per-organism threshold)
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
         const activeFlagCount = activeFlags.filter(f => f.status === 'active').length;
-        const hidden = activeFlagCount >= config.autoHideThreshold;
+        const organism = await resolveOrganismConfig(storage, targetType, targetId);
+        const autoHideThreshold = organism
+            ? organism.moderationConfig.autoHideThreshold
+            : config.autoHideThreshold;
+        const hidden = activeFlagCount >= autoHideThreshold;
 
         res.json(success(config.nodeId, { ...summary, hidden }));
     });
