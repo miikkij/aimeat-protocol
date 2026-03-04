@@ -5,6 +5,7 @@
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!';
 
 let passed = 0;
 let failed = 0;
@@ -60,14 +61,15 @@ console.log('\n=== AIMEAT Extension System E2E Test ===\n');
 // ─── Phase 0: Setup — Create owner + agent + get tokens ───
 console.log('Phase 0 \u2014 Setup');
 
-await test('POST /v1/owners \u2014 register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
+await test('POST /v1/admin/setup/register \u2014 register owner with operator role', async () => {
+    const { status, body } = await json(`/v1/admin/setup/register?pw=${encodeURIComponent(ADMIN_PW)}`, {
         method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
+        body: JSON.stringify({ name: ownerName }),
     });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    ownerPrivKey = body.data.private_key;
+    assert(body.owner?.roles?.includes('operator'), 'has operator role');
+    ownerPrivKey = body.private_key;
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
