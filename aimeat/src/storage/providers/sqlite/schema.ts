@@ -386,6 +386,21 @@ export function initializeSchema(db: Database.Database): void {
       createdAt      TEXT NOT NULL
     );
 
+    -- ── Appeals (Advanced Moderation) ──
+    CREATE TABLE IF NOT EXISTS appeals (
+      id             TEXT PRIMARY KEY,
+      flagId         TEXT NOT NULL,
+      appealedBy     TEXT NOT NULL,
+      reason         TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'pending',
+      reviewedBy     TEXT,
+      reviewNote     TEXT,
+      createdAt      TEXT NOT NULL,
+      reviewedAt     TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_appeals_flagId ON appeals(flagId);
+
     -- ── Matches ──
     CREATE TABLE IF NOT EXISTS matches (
       id             TEXT PRIMARY KEY,

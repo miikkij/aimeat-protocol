@@ -534,10 +534,9 @@ export class SqliteStorage implements Storage {
 
   async getTransactions(gaii: string, limit = 50): Promise<WalletTransaction[]> {
     const rows = this.db.prepare(
-      'SELECT * FROM wallet_transactions WHERE gaii = ? ORDER BY timestamp ASC'
-    ).all(gaii) as Record<string, unknown>[];
-    const all = rows.map(r => this.deserializeTransaction(r));
-    return all.slice(-limit);
+      'SELECT * FROM wallet_transactions WHERE gaii = ? ORDER BY timestamp DESC LIMIT ?'
+    ).all(gaii, limit) as Record<string, unknown>[];
+    return rows.reverse().map(r => this.deserializeTransaction(r));
   }
 
   async listAllTransactions(): Promise<WalletTransaction[]> {
