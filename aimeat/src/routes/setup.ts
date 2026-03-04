@@ -85,7 +85,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 return;
             }
 
-            const { username, displayName, email, password } = owner;
+            const { username, displayName, email, password, importPublicKey } = owner;
 
             // Validate username
             if (!username || typeof username !== 'string') {
@@ -110,19 +110,31 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 return;
             }
 
+            // Validate importPublicKey if provided
+            if (importPublicKey !== undefined && (typeof importPublicKey !== 'string' || importPublicKey.trim().length === 0)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner.importPublicKey must be a non-empty string'));
+                return;
+            }
+
             const resolvedDisplayName = (typeof displayName === 'string' && displayName.length > 0)
                 ? displayName
                 : username;
 
-            // 1. Generate keypair for the owner account
-            const keyPair = await generateKeyPair();
+            // 1. Get keypair: use imported public key or generate a new one
+            let ownerPublicKey: string;
+            if (typeof importPublicKey === 'string' && importPublicKey.trim().length > 0) {
+                ownerPublicKey = importPublicKey.trim();
+            } else {
+                const keyPair = await generateKeyPair();
+                ownerPublicKey = keyPair.publicKey;
+            }
 
             // 2. Create owner with roles ['owner', 'operator'] (first owner = operator)
             const now = new Date().toISOString();
             const ownerRecord = await storage.createOwner({
                 name: username,
                 displayName: resolvedDisplayName,
-                publicKey: keyPair.publicKey,
+                publicKey: ownerPublicKey,
                 roles: ['owner', 'operator'],
                 createdAt: now,
             });

@@ -211,7 +211,8 @@ body {
   margin-top: .3rem;
   min-height: 1.1em;
 }
-.field input.has-error {
+.field input.has-error,
+.field textarea.has-error {
   border-color: var(--error);
 }
 
@@ -565,13 +566,35 @@ body {
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════
-       STEP 3 — Create Identity
+       STEP 3 — Create or Import Identity
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="step-panel" id="step3">
     <div class="step-title" data-i18n="wizard.identity.title">Create Your Identity</div>
     <div class="step-desc" data-i18n="wizard.identity.desc">Set up your owner account. You'll be the operator of this node.</div>
 
+    <!-- Identity mode toggle -->
     <div class="wiz-card">
+      <div class="field">
+        <label data-i18n="wizard.identity.modeLabel">Identity Mode</label>
+        <div class="radio-group">
+          <label class="radio-card selected" onclick="selectRadio(this,'identityMode','create'); toggleIdentityMode()">
+            <input type="radio" name="identityMode" value="create" checked>
+            <div>
+              <div class="radio-label" data-i18n="wizard.identity.modeCreate">Create new identity</div>
+            </div>
+          </label>
+          <label class="radio-card" onclick="selectRadio(this,'identityMode','import'); toggleIdentityMode()">
+            <input type="radio" name="identityMode" value="import">
+            <div>
+              <div class="radio-label" data-i18n="wizard.identity.modeImport">Import existing identity</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create mode fields -->
+    <div class="wiz-card" id="createFields">
       <div class="field">
         <label data-i18n="wizard.identity.usernameLabel">Username</label>
         <div class="hint" data-i18n="wizard.identity.usernameHint">3-30 characters, lowercase letters, numbers, hyphens and underscores</div>
@@ -603,6 +626,45 @@ body {
         <label data-i18n="wizard.identity.confirmLabel">Confirm Password</label>
         <input type="password" id="passwordConfirm" placeholder="********" autocomplete="new-password">
         <div class="field-error" id="confirmError"></div>
+      </div>
+    </div>
+
+    <!-- Import mode fields -->
+    <div class="wiz-card hidden" id="importFields">
+      <div class="field">
+        <label data-i18n="wizard.identity.publicKeyLabel">Public Key (Ed25519, base64)</label>
+        <div class="hint" data-i18n="wizard.identity.publicKeyHint">Paste your existing Ed25519 public key</div>
+        <textarea id="importPublicKey" rows="3" placeholder="base64-encoded Ed25519 public key" spellcheck="false"
+          style="width:100%; background:var(--bg-input); border:1px solid var(--border); border-radius:8px;
+          padding:.65rem .85rem; color:var(--text); font-size:.9rem; font-family:monospace; outline:none;
+          transition:border-color .2s, background .2s; resize:vertical;"></textarea>
+        <div class="field-error" id="importPublicKeyError"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.usernameLabel">Username</label>
+        <div class="hint" data-i18n="wizard.identity.usernameHint">3-30 characters, lowercase letters, numbers, hyphens and underscores</div>
+        <input type="text" id="importUsername" placeholder="erkki" autocomplete="username" spellcheck="false">
+        <div class="field-error" id="importUsernameError"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.displayLabel">Display Name</label>
+        <div class="hint" data-i18n="wizard.identity.displayHint">Optional, defaults to your username</div>
+        <input type="text" id="importDisplayName" placeholder="Erkki">
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.passwordLabel">Password</label>
+        <div class="hint" data-i18n="wizard.identity.passwordHint">Minimum 8 characters</div>
+        <input type="password" id="importPassword" placeholder="********" autocomplete="new-password">
+        <div class="field-error" id="importPasswordError"></div>
+      </div>
+
+      <div class="field">
+        <label data-i18n="wizard.identity.confirmLabel">Confirm Password</label>
+        <input type="password" id="importPasswordConfirm" placeholder="********" autocomplete="new-password">
+        <div class="field-error" id="importConfirmError"></div>
       </div>
     </div>
 
@@ -676,6 +738,10 @@ body {
           <td class="s-value" id="sumPort"></td>
         </tr>
         <tr>
+          <td class="s-label" data-i18n="wizard.summary.identityMode">Identity</td>
+          <td class="s-value" id="sumIdentityMode"></td>
+        </tr>
+        <tr>
           <td class="s-label" data-i18n="wizard.summary.username">Username</td>
           <td class="s-value" id="sumUsername"></td>
         </tr>
@@ -733,6 +799,9 @@ var T = {
 
     "wizard.identity.title": "Create Your Identity",
     "wizard.identity.desc": "Set up your owner account. You'll be the operator of this node.",
+    "wizard.identity.modeLabel": "Identity Mode",
+    "wizard.identity.modeCreate": "Create new identity",
+    "wizard.identity.modeImport": "Import existing identity",
     "wizard.identity.usernameLabel": "Username",
     "wizard.identity.usernameHint": "3-30 characters, lowercase letters, numbers, hyphens and underscores",
     "wizard.identity.displayLabel": "Display Name",
@@ -742,6 +811,8 @@ var T = {
     "wizard.identity.passwordLabel": "Password",
     "wizard.identity.passwordHint": "Minimum 8 characters",
     "wizard.identity.confirmLabel": "Confirm Password",
+    "wizard.identity.publicKeyLabel": "Public Key (Ed25519, base64)",
+    "wizard.identity.publicKeyHint": "Paste your existing Ed25519 public key",
 
     "wizard.network.title": "Network",
     "wizard.network.desc": "Choose how your node connects to the AIMEAT network.",
@@ -767,6 +838,9 @@ var T = {
     "wizard.summary.personalValue": "Personal",
     "wizard.summary.fullValue": "Full",
     "wizard.summary.noneValue": "(none)",
+    "wizard.summary.identityMode": "Identity",
+    "wizard.summary.identityCreate": "New identity",
+    "wizard.summary.identityImport": "Imported key",
 
     "wizard.init.working": "Initializing your node...",
     "wizard.init.success": "Your node is ready!",
@@ -780,6 +854,8 @@ var T = {
     "wizard.validate.passwordMin": "Password must be at least 8 characters",
     "wizard.validate.passwordMatch": "Passwords do not match",
     "wizard.validate.emailFormat": "Please enter a valid email address",
+    "wizard.validate.publicKeyRequired": "Public key is required for import",
+    "wizard.validate.publicKeyFormat": "Public key must be a valid base64 string",
     "wizard.validate.genesisRequired": "Genesis URL is required when using a custom anchor",
     "wizard.validate.genesisFormat": "Must start with http:// or https://"
   },
@@ -807,6 +883,9 @@ var T = {
 
     "wizard.identity.title": "Luo tunnuksesi",
     "wizard.identity.desc": "Maarita omistajakayttajasi. Sinusta tulee taman solmun operaattori.",
+    "wizard.identity.modeLabel": "Identiteettitila",
+    "wizard.identity.modeCreate": "Luo uusi identiteetti",
+    "wizard.identity.modeImport": "Tuo olemassa oleva identiteetti",
     "wizard.identity.usernameLabel": "Kayttajanimi",
     "wizard.identity.usernameHint": "3-30 merkkia, pienet kirjaimet, numerot, valiviivat ja alaviivat",
     "wizard.identity.displayLabel": "Nayttonimi",
@@ -816,6 +895,8 @@ var T = {
     "wizard.identity.passwordLabel": "Salasana",
     "wizard.identity.passwordHint": "Vahintaan 8 merkkia",
     "wizard.identity.confirmLabel": "Vahvista salasana",
+    "wizard.identity.publicKeyLabel": "Julkinen avain (Ed25519, base64)",
+    "wizard.identity.publicKeyHint": "Liita olemassa oleva Ed25519 julkinen avaimesi",
 
     "wizard.network.title": "Verkko",
     "wizard.network.desc": "Valitse miten solmusi yhdistaa AIMEAT-verkkoon.",
@@ -841,6 +922,9 @@ var T = {
     "wizard.summary.personalValue": "Henkilokohtainen",
     "wizard.summary.fullValue": "Taysi",
     "wizard.summary.noneValue": "(ei maaritetty)",
+    "wizard.summary.identityMode": "Identiteetti",
+    "wizard.summary.identityCreate": "Uusi identiteetti",
+    "wizard.summary.identityImport": "Tuotu avain",
 
     "wizard.init.working": "Alustetaan solmuasi...",
     "wizard.init.success": "Solmusi on valmis!",
@@ -854,6 +938,8 @@ var T = {
     "wizard.validate.passwordMin": "Salasanan pitaa olla vahintaan 8 merkkia",
     "wizard.validate.passwordMatch": "Salasanat eivat tasmaa",
     "wizard.validate.emailFormat": "Syota kelvollinen sahkopostiosoite",
+    "wizard.validate.publicKeyRequired": "Julkinen avain vaaditaan tuonnissa",
+    "wizard.validate.publicKeyFormat": "Julkisen avaimen pitaa olla kelvollinen base64-merkkijono",
     "wizard.validate.genesisRequired": "Genesis-URL vaaditaan mukautetulla ankkurilla",
     "wizard.validate.genesisFormat": "Pitaa alkaa http:// tai https://"
   }
@@ -959,11 +1045,24 @@ function toggleGenesis() {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// Toggle Identity Mode (create / import)
+// ────────────────────────────────────────────────────────────────────
+function toggleIdentityMode() {
+  var mode = document.querySelector('input[name="identityMode"]:checked').value;
+  document.getElementById('createFields').classList.toggle('hidden', mode !== 'create');
+  document.getElementById('importFields').classList.toggle('hidden', mode !== 'import');
+}
+
+function getIdentityMode() {
+  return document.querySelector('input[name="identityMode"]:checked').value;
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Validation — Step 3
 // ────────────────────────────────────────────────────────────────────
 function clearErrors() {
   document.querySelectorAll('.field-error').forEach(function(el) { el.textContent = ''; });
-  document.querySelectorAll('input.has-error').forEach(function(el) { el.classList.remove('has-error'); });
+  document.querySelectorAll('.has-error').forEach(function(el) { el.classList.remove('has-error'); });
 }
 
 function setError(inputId, errorId, msg) {
@@ -971,45 +1070,72 @@ function setError(inputId, errorId, msg) {
   document.getElementById(errorId).textContent = msg;
 }
 
+function validateUsername(usernameId, errorId) {
+  var username = document.getElementById(usernameId).value.trim();
+  if (!username) {
+    setError(usernameId, errorId, t('wizard.validate.usernameRequired'));
+    return false;
+  }
+  if (!/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username) && !/^[a-z0-9]{3}$/.test(username)) {
+    if (username.length < 3 || username.length > 30 || !/^[a-z0-9_-]+$/.test(username)) {
+      setError(usernameId, errorId, t('wizard.validate.usernameFormat'));
+      return false;
+    }
+  }
+  return true;
+}
+
+function validatePassword(passwordId, passwordErrorId, confirmId, confirmErrorId) {
+  var password = document.getElementById(passwordId).value;
+  var confirm = document.getElementById(confirmId).value;
+  var valid = true;
+
+  if (!password) {
+    setError(passwordId, passwordErrorId, t('wizard.validate.passwordRequired'));
+    valid = false;
+  } else if (password.length < 8) {
+    setError(passwordId, passwordErrorId, t('wizard.validate.passwordMin'));
+    valid = false;
+  }
+
+  if (valid && password !== confirm) {
+    setError(confirmId, confirmErrorId, t('wizard.validate.passwordMatch'));
+    valid = false;
+  }
+  return valid;
+}
+
 function validateAndGoStep4() {
   clearErrors();
   var valid = true;
-  var username = document.getElementById('username').value.trim();
-  var password = document.getElementById('password').value;
-  var confirm = document.getElementById('passwordConfirm').value;
-  var email = document.getElementById('email').value.trim();
+  var mode = getIdentityMode();
 
-  // Username
-  if (!username) {
-    setError('username', 'usernameError', t('wizard.validate.usernameRequired'));
-    valid = false;
-  } else if (!/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(username) && !/^[a-z0-9]{3}$/.test(username)) {
-    // Allow 3-char names as special case, otherwise need start/end with alnum
-    if (username.length < 3 || username.length > 30 || !/^[a-z0-9_-]+$/.test(username)) {
-      setError('username', 'usernameError', t('wizard.validate.usernameFormat'));
+  if (mode === 'create') {
+    // Validate create mode fields
+    if (!validateUsername('username', 'usernameError')) valid = false;
+
+    var email = document.getElementById('email').value.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('email', 'emailError', t('wizard.validate.emailFormat'));
       valid = false;
     }
-  }
 
-  // Email (optional, but validate format if provided)
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setError('email', 'emailError', t('wizard.validate.emailFormat'));
-    valid = false;
-  }
+    if (!validatePassword('password', 'passwordError', 'passwordConfirm', 'confirmError')) valid = false;
+  } else {
+    // Validate import mode fields
+    var publicKey = document.getElementById('importPublicKey').value.trim();
+    if (!publicKey) {
+      document.getElementById('importPublicKey').classList.add('has-error');
+      document.getElementById('importPublicKeyError').textContent = t('wizard.validate.publicKeyRequired');
+      valid = false;
+    } else if (!/^[A-Za-z0-9+/=]+$/.test(publicKey)) {
+      document.getElementById('importPublicKey').classList.add('has-error');
+      document.getElementById('importPublicKeyError').textContent = t('wizard.validate.publicKeyFormat');
+      valid = false;
+    }
 
-  // Password
-  if (!password) {
-    setError('password', 'passwordError', t('wizard.validate.passwordRequired'));
-    valid = false;
-  } else if (password.length < 8) {
-    setError('password', 'passwordError', t('wizard.validate.passwordMin'));
-    valid = false;
-  }
-
-  // Confirm
-  if (valid && password !== confirm) {
-    setError('passwordConfirm', 'confirmError', t('wizard.validate.passwordMatch'));
-    valid = false;
+    if (!validateUsername('importUsername', 'importUsernameError')) valid = false;
+    if (!validatePassword('importPassword', 'importPasswordError', 'importPasswordConfirm', 'importConfirmError')) valid = false;
   }
 
   if (valid) goToStep(4);
@@ -1022,9 +1148,19 @@ function buildSummary() {
   var nodeId = document.getElementById('nodeId').value.trim() || 'aimeat-local-001';
   var nodeType = document.querySelector('input[name="nodeType"]:checked').value;
   var port = document.getElementById('nodePort').value || '40050';
-  var username = document.getElementById('username').value.trim();
-  var displayName = document.getElementById('displayName').value.trim() || username;
-  var email = document.getElementById('email').value.trim();
+  var mode = getIdentityMode();
+
+  var username, displayName, email;
+  if (mode === 'create') {
+    username = document.getElementById('username').value.trim();
+    displayName = document.getElementById('displayName').value.trim() || username;
+    email = document.getElementById('email').value.trim();
+  } else {
+    username = document.getElementById('importUsername').value.trim();
+    displayName = document.getElementById('importDisplayName').value.trim() || username;
+    email = '';
+  }
+
   var anchor = document.querySelector('input[name="anchor"]:checked').value;
   var genesis = document.getElementById('genesisUrl').value.trim();
 
@@ -1032,6 +1168,8 @@ function buildSummary() {
   document.getElementById('sumNodeType').textContent = nodeType === 'personal'
     ? t('wizard.summary.personalValue') : t('wizard.summary.fullValue');
   document.getElementById('sumPort').textContent = port;
+  document.getElementById('sumIdentityMode').textContent = mode === 'create'
+    ? t('wizard.summary.identityCreate') : t('wizard.summary.identityImport');
   document.getElementById('sumUsername').textContent = username;
   document.getElementById('sumDisplayName').textContent = displayName;
   document.getElementById('sumEmail').textContent = email || t('wizard.summary.noneValue');
@@ -1059,23 +1197,40 @@ function doInit() {
   var nodeId = document.getElementById('nodeId').value.trim() || 'aimeat-local-001';
   var nodeType = document.querySelector('input[name="nodeType"]:checked').value;
   var port = parseInt(document.getElementById('nodePort').value) || 40050;
-  var username = document.getElementById('username').value.trim();
-  var displayName = document.getElementById('displayName').value.trim() || undefined;
-  var email = document.getElementById('email').value.trim() || undefined;
-  var password = document.getElementById('password').value;
+  var mode = getIdentityMode();
+
+  var username, displayName, email, password, importPublicKey;
+  if (mode === 'create') {
+    username = document.getElementById('username').value.trim();
+    displayName = document.getElementById('displayName').value.trim() || undefined;
+    email = document.getElementById('email').value.trim() || undefined;
+    password = document.getElementById('password').value;
+  } else {
+    username = document.getElementById('importUsername').value.trim();
+    displayName = document.getElementById('importDisplayName').value.trim() || undefined;
+    email = undefined;
+    password = document.getElementById('importPassword').value;
+    importPublicKey = document.getElementById('importPublicKey').value.trim();
+  }
+
   var anchor = document.querySelector('input[name="anchor"]:checked').value;
   var genesisUrl = anchor === 'custom' ? (document.getElementById('genesisUrl').value.trim() || null) : null;
+
+  var ownerObj = {
+    username: username,
+    displayName: displayName,
+    email: email,
+    password: password
+  };
+  if (importPublicKey) {
+    ownerObj.importPublicKey = importPublicKey;
+  }
 
   var body = {
     locale: currentLang,
     nodeId: nodeId,
     nodeType: nodeType,
-    owner: {
-      username: username,
-      displayName: displayName,
-      email: email,
-      password: password
-    },
+    owner: ownerObj,
     genesisUrl: genesisUrl,
     port: port
   };
