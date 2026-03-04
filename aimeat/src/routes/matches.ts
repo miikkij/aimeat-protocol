@@ -89,26 +89,35 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
   // ── GET /v1/matches/stats — Matching statistics (operator only) ──
   // Must be registered before /:id route
   router.get('/v1/matches/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
-    // Collect stats from match records
+    const allMatches = await storage.listAllMatches();
+
     const allStatuses = ['suggested', 'notified', 'accepted', 'dismissed', 'expired'] as const;
     const matchesByStatus: Record<string, number> = {};
-
     for (const status of allStatuses) {
-      const matches = await storage.listMatchesByProfile('', { status });
-      // This won't return anything useful since '' doesn't match any profile.
-      // Instead, gather stats by iterating all matches for each status.
       matchesByStatus[status] = 0;
     }
 
-    // Collect all matches to compute stats — list by a few known profiles
-    // Since we don't have a listAllMatches, we provide zeros as a baseline.
-    // The stats endpoint is mainly useful after actual matching runs.
+    let latestMatch: string | null = null;
+    for (const m of allMatches) {
+      if (matchesByStatus[m.status] !== undefined) {
+        matchesByStatus[m.status]++;
+      }
+      if (!latestMatch || m.createdAt > latestMatch) {
+        latestMatch = m.createdAt;
+      }
+    }
+
+    // Count unique profiles involved in matches
+    const uniqueProfiles = new Set<string>();
+    for (const m of allMatches) {
+      uniqueProfiles.add(m.profileA);
+      uniqueProfiles.add(m.profileB);
+    }
 
     res.json(success(config.nodeId, {
-      lastRoundAt: null,
-      lastRoundDurationMs: null,
-      profilesScanned: null,
-      totalMatchesCreated: null,
+      lastRoundAt: latestMatch,
+      profilesScanned: uniqueProfiles.size,
+      totalMatchesCreated: allMatches.length,
       matchesByStatus,
     }, [
       { description: 'View your match suggestions', method: 'GET', url: '/v1/matches' },

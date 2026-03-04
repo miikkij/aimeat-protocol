@@ -1750,6 +1750,10 @@ export class MongoStorage implements Storage {
         return count;
     }
 
+    async listAllMatches(): Promise<import('./interface.js').MatchRecord[]> {
+        return Array.from(this.matchRecords.values());
+    }
+
     // ── Organisms (Phase 2.2 — in-memory fallback until Prisma schema is updated) ──
 
     private organismRecords = new Map<string, import('./interface.js').OrganismRecord>();

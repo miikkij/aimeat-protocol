@@ -1263,6 +1263,10 @@ export class InMemoryStorage implements Storage {
     return count;
   }
 
+  async listAllMatches(): Promise<MatchRecord[]> {
+    return Array.from(this.matches.values());
+  }
+
   // ── Organisms (Phase 2.2) ──────────────────────────────────
 
   async createOrganism(record: OrganismRecord): Promise<OrganismRecord> {
