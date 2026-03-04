@@ -3,7 +3,7 @@
 // Run:  pnpm exec vitest run test/integration/
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
 import type {
     Storage,
     OwnerRecord,

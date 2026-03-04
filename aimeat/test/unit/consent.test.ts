@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { consentMatchPattern } from '../../src/storage/memory.js';
+import { consentMatchPattern, InMemoryStorage } from '../../src/storage/providers/memory/index.js';
 import { checkConsentForRead } from '../../src/services/consent.js';
-import { InMemoryStorage } from '../../src/storage/memory.js';
 
 describe('consentMatchPattern', () => {
   it('matches exact keys', () => {

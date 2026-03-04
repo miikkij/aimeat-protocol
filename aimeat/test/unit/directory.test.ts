@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
 import { DirectoryService } from '../../src/services/directory.js';
 import type { AimeatConfig } from '../../src/config.js';
 

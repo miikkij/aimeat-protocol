@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
 import type { OtkRecord } from '../../src/storage/interface.js';
 
 function makeInitialOtk(key: string, ownerGaii: string): OtkRecord {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
 import { workspaceAccessMiddleware } from '../../src/middleware/workspace-access.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord, OwnerRecord, AgentRecord, ConsentRecord } from '../../src/storage/interface.js';
 
