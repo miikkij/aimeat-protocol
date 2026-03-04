@@ -1042,8 +1042,13 @@ body {
 <!-- Top Navigation (minimal) -->
 <nav class="topnav">
   <a href="/v1/portal" class="topnav-brand"><span class="heart">&#x1F496;</span><span class="brand-name" id="brandName">AIME AT</span><span class="brand-morsels" id="brandMorsels"></span></a>
-  <div class="topnav-center" id="langSwitcher"></div>
-  <div class="topnav-right" id="navRight"></div>
+  <div class="topnav-right" id="navRight">
+    <a href="/v1/classic"></a>
+    <a href="?view=dev"></a>
+    <a href="/v1/profile" class="profile-link" id="headerProfileBtn"></a>
+    <div id="langSwitcher" style="display:inline-flex;gap:2px"></div>
+    <span class="header-auth-slot" id="headerAuth"></span>
+  </div>
 </nav>
 
 <!-- LAYER 1: Genesis Hero 3D -->
@@ -1216,119 +1221,119 @@ body {
 <script>
 // ── Render all text ──
 function renderAllTexts() {
-  // Language switcher (click-based, no reload)
+  // Language switcher & Nav links (update, not initialize)
   var langSwitcher = document.getElementById('langSwitcher');
-  langSwitcher.innerHTML =
-    '<button type="button" class="lang-btn' + (LANG === 'fi' ? ' active' : '') + '" data-lang="fi">FI</button>' +
-    '<button type="button" class="lang-btn' + (LANG === 'en' ? ' active' : '') + '" data-lang="en">EN</button>';
-  langSwitcher.querySelectorAll('.lang-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var newLang = this.getAttribute('data-lang');
-      if (newLang === LANG) return;
-      LANG = newLang;
-      document.documentElement.lang = LANG;
-      // Persist
-      try { localStorage.setItem('aimeat-lang', LANG); } catch(e) {}
-      document.cookie = 'aimeat-lang=' + LANG + ';path=/;max-age=31536000;SameSite=Lax';
-      // Update URL without reload
-      var url = new URL(window.location);
-      url.searchParams.set('lang', LANG);
-      history.replaceState(null, '', url);
-      // Re-render
-      renderAllTexts();
+  if (!langSwitcher) {
+    console.warn('[GENESIS] renderAllTexts: langSwitcher element not found!');
+    return;
+  }
+  var langBtnFi = langSwitcher.querySelector('[data-lang="fi"]');
+  var langBtnEn = langSwitcher.querySelector('[data-lang="en"]');
+  if (!langBtnFi) {
+    langSwitcher.innerHTML =
+      '<button type="button" class="lang-btn' + (LANG === 'fi' ? ' active' : '') + '" data-lang="fi">FI</button>' +
+      '<button type="button" class="lang-btn' + (LANG === 'en' ? ' active' : '') + '" data-lang="en">EN</button>';
+    langSwitcher.querySelectorAll('.lang-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var newLang = this.getAttribute('data-lang');
+        if (newLang === LANG) return;
+        LANG = newLang;
+        document.documentElement.lang = LANG;
+        try { localStorage.setItem('aimeat-lang', LANG); } catch(e) {}
+        document.cookie = 'aimeat-lang=' + LANG + ';path=/;max-age=31536000;SameSite=Lax';
+        var url = new URL(window.location);
+        url.searchParams.set('lang', LANG);
+        history.replaceState(null, '', url);
+        renderAllTexts();
+      });
     });
-  });
-
-  // Nav right: Initialize if empty, update if exists (preserve headerAuth)
-  var navRight = document.getElementById('navRight');
-  var devUrl = '?view=dev' + (LANG !== 'fi' ? '&lang=' + LANG : '');
-  if (navRight.innerHTML.trim() === '') {
-    navRight.innerHTML =
-      '<a href="/v1/classic">' + esc(t('classic.link')) + '</a>' +
-      '<a href="' + devUrl + '">' + esc(t('nav.devView')) + '</a>' +
-      '<a href="/v1/profile" class="profile-link" id="headerProfileBtn">' + esc(t('nav.profile')) + '</a>' +
-      '<span class="header-auth-slot" id="headerAuth"></span>';
   } else {
-    var classicLink = navRight.querySelector('a[href="/v1/classic"]');
-    if (classicLink) classicLink.textContent = esc(t('classic.link'));
-    var devLink = navRight.querySelector('a[href^="?view=dev"]');
-    if (devLink) {
-      devLink.href = devUrl;
-      devLink.textContent = esc(t('nav.devView'));
-    }
-    var profileLink = navRight.querySelector('.profile-link');
-    if (profileLink) profileLink.textContent = esc(t('nav.profile'));
+    if (langBtnFi) langBtnFi.className = 'lang-btn' + (LANG === 'fi' ? ' active' : '');
+    if (langBtnEn) langBtnEn.className = 'lang-btn' + (LANG === 'en' ? ' active' : '');
   }
 
+  // Update nav links (classic, dev, profile)
+  var devUrl = '?view=dev' + (LANG !== 'fi' ? '&lang=' + LANG : '');
+  var classicLink = document.querySelector('a[href="/v1/classic"]');
+  if (classicLink) classicLink.textContent = esc(t('classic.link'));
+  var devLink = document.querySelector('a[href^="?view=dev"]');
+  if (devLink) {
+    devLink.href = devUrl;
+    devLink.textContent = esc(t('nav.devView'));
+  }
+  var profileLink = document.getElementById('headerProfileBtn');
+  if (profileLink) profileLink.textContent = esc(t('nav.profile'));
+
   // Hero
-  document.getElementById('genesisTagline').textContent = t('genesis.tagline');
+  var el; // temp var for checking
+  if ((el = document.getElementById('genesisTagline'))) el.textContent = t('genesis.tagline');
 
   // Provocation + CTA
-  document.getElementById('provLine1').textContent = t('provocation.line1');
+  if ((el = document.getElementById('provLine1'))) el.textContent = t('provocation.line1');
 
   // Oneliners
-  document.getElementById('onelinersLabel').textContent = t('oneliners.title');
-  document.getElementById('onelinersEmpty').textContent = t('oneliners.empty');
+  if ((el = document.getElementById('onelinersLabel'))) el.textContent = t('oneliners.title');
+  if ((el = document.getElementById('onelinersEmpty'))) el.textContent = t('oneliners.empty');
 
   // Prompt
-  document.getElementById('copyMainPrompt').textContent = t('prompt.copyBtn');
-  document.getElementById('promptNote').textContent = t('promptLangNote');
+  if ((el = document.getElementById('copyMainPrompt'))) el.textContent = t('prompt.copyBtn');
+  if ((el = document.getElementById('promptNote'))) el.textContent = t('promptLangNote');
 
   // Expand
-  document.getElementById('expandBtn').textContent = t('expand.btn');
+  if ((el = document.getElementById('expandBtn'))) el.textContent = t('expand.btn');
 
   // Logged-in accordion
-  document.getElementById('userProfileSummaryTitle').textContent = '👤 ' + t('userWorld.profile.title');
-  document.getElementById('userProfileSummaryDesc').textContent = t('userWorld.profile.desc');
-  document.getElementById('uwOwnerLabel').textContent = t('userWorld.profile.owner');
-  document.getElementById('uwGhiiLabel').textContent = t('userWorld.profile.ghii');
-  document.getElementById('uwNodeLabel').textContent = t('userWorld.profile.node');
-  document.getElementById('uwWalletLabel').textContent = t('userWorld.stats.wallet');
-  document.getElementById('uwAgentsLabel').textContent = t('userWorld.stats.agents');
-  document.getElementById('uwMemoryLabel').textContent = t('userWorld.stats.memory');
-  document.getElementById('uwWorkLabel').textContent = t('userWorld.stats.work');
-  document.getElementById('uwServicesLabel').textContent = t('userWorld.stats.services');
-  document.getElementById('uwAppsLabel').textContent = t('userWorld.stats.apps');
-  document.getElementById('uwFilesLabel').textContent = t('userWorld.stats.files');
-  document.getElementById('uwOpenProfile').textContent = t('userWorld.profile.openProfile');
-  document.getElementById('uwOpenWallet').textContent = t('userWorld.profile.openWallet');
-  document.getElementById('uwOpenMemory').textContent = t('userWorld.profile.openMemory');
-  document.getElementById('uwOpenWork').textContent = t('userWorld.profile.openWork');
-  document.getElementById('uwOpenServices').textContent = t('userWorld.profile.openServices');
-  document.getElementById('uwOpenApps').textContent = t('userWorld.profile.openApps');
+  if ((el = document.getElementById('userProfileSummaryTitle'))) el.textContent = '👤 ' + t('userWorld.profile.title');
+  if ((el = document.getElementById('userProfileSummaryDesc'))) el.textContent = t('userWorld.profile.desc');
+  if ((el = document.getElementById('uwOwnerLabel'))) el.textContent = t('userWorld.profile.owner');
+  if ((el = document.getElementById('uwGhiiLabel'))) el.textContent = t('userWorld.profile.ghii');
+  if ((el = document.getElementById('uwNodeLabel'))) el.textContent = t('userWorld.profile.node');
+  if ((el = document.getElementById('uwWalletLabel'))) el.textContent = t('userWorld.stats.wallet');
+  if ((el = document.getElementById('uwAgentsLabel'))) el.textContent = t('userWorld.stats.agents');
+  if ((el = document.getElementById('uwMemoryLabel'))) el.textContent = t('userWorld.stats.memory');
+  if ((el = document.getElementById('uwWorkLabel'))) el.textContent = t('userWorld.stats.work');
+  if ((el = document.getElementById('uwServicesLabel'))) el.textContent = t('userWorld.stats.services');
+  if ((el = document.getElementById('uwAppsLabel'))) el.textContent = t('userWorld.stats.apps');
+  if ((el = document.getElementById('uwFilesLabel'))) el.textContent = t('userWorld.stats.files');
+  if ((el = document.getElementById('uwOpenProfile'))) el.textContent = t('userWorld.profile.openProfile');
+  if ((el = document.getElementById('uwOpenWallet'))) el.textContent = t('userWorld.profile.openWallet');
+  if ((el = document.getElementById('uwOpenMemory'))) el.textContent = t('userWorld.profile.openMemory');
+  if ((el = document.getElementById('uwOpenWork'))) el.textContent = t('userWorld.profile.openWork');
+  if ((el = document.getElementById('uwOpenServices'))) el.textContent = t('userWorld.profile.openServices');
+  if ((el = document.getElementById('uwOpenApps'))) el.textContent = t('userWorld.profile.openApps');
 
-  document.getElementById('userMarketplaceSummaryTitle').textContent = '🛒 ' + t('userWorld.marketplace.title');
-  document.getElementById('userMarketplaceSummaryDesc').textContent = t('userWorld.marketplace.desc');
-  document.getElementById('uwOpenMarketplace').textContent = t('userWorld.marketplace.open');
-  document.getElementById('uwManageServices').textContent = t('userWorld.marketplace.manage');
+  if ((el = document.getElementById('userMarketplaceSummaryTitle'))) el.textContent = '🛒 ' + t('userWorld.marketplace.title');
+  if ((el = document.getElementById('userMarketplaceSummaryDesc'))) el.textContent = t('userWorld.marketplace.desc');
+  if ((el = document.getElementById('uwOpenMarketplace'))) el.textContent = t('userWorld.marketplace.open');
+  if ((el = document.getElementById('uwManageServices'))) el.textContent = t('userWorld.marketplace.manage');
 
-  document.getElementById('userServicesSummaryTitle').textContent = '🧭 ' + t('userWorld.services.title');
-  document.getElementById('userServicesSummaryDesc').textContent = t('userWorld.services.desc');
-  document.getElementById('uwOpenHobbies').textContent = t('userWorld.services.hobbies');
-  document.getElementById('uwOpenGuides').textContent = t('userWorld.services.guides');
-  document.getElementById('uwOpenAimeatOs').textContent = t('userWorld.services.aimeatOs');
-  document.getElementById('uwOpenOpenclaw').textContent = t('userWorld.services.openclaw');
-  document.getElementById('uwOpenCatalog').textContent = t('userWorld.services.catalog');
+  if ((el = document.getElementById('userServicesSummaryTitle'))) el.textContent = '🧭 ' + t('userWorld.services.title');
+  if ((el = document.getElementById('userServicesSummaryDesc'))) el.textContent = t('userWorld.services.desc');
+  if ((el = document.getElementById('uwOpenHobbies'))) el.textContent = t('userWorld.services.hobbies');
+  if ((el = document.getElementById('uwOpenGuides'))) el.textContent = t('userWorld.services.guides');
+  if ((el = document.getElementById('uwOpenAimeatOs'))) el.textContent = t('userWorld.services.aimeatOs');
+  if ((el = document.getElementById('uwOpenOpenclaw'))) el.textContent = t('userWorld.services.openclaw');
+  if ((el = document.getElementById('uwOpenCatalog'))) el.textContent = t('userWorld.services.catalog');
 
   // World cards
-  document.getElementById('worldAppsTitle').textContent = t('world.apps.title');
-  document.getElementById('worldAppsDesc').textContent = t('world.apps.desc');
-  document.getElementById('worldFullBuilderTitle').textContent = t('world.fullBuilder.title');
-  document.getElementById('worldFullBuilderDesc').textContent = t('world.fullBuilder.desc');
-  document.getElementById('copyFullBuilderPrompt').textContent = t('world.fullBuilder.copyBtn');
-  document.getElementById('worldCatalogBtn').textContent = '\uD83D\uDE80 ' + t('world.catalog.openBtn');
-  document.getElementById('worldDownloadBtn').textContent = '\uD83D\uDCE5 ' + t('world.catalog.downloadBtn');
-  document.getElementById('worldAgentsTitle').textContent = t('world.agents.title');
-  document.getElementById('worldAgentsDesc').textContent = t('world.agents.desc');
-  document.getElementById('copyAgentPrompt').textContent = t('world.agents.copyBtn');
-  document.getElementById('worldConnectTitle').textContent = t('world.connect.title');
-  document.getElementById('worldConnectDesc').textContent = t('world.connect.desc');
-  document.getElementById('copyConnectPrompt').textContent = t('world.connect.copyBtn');
-  document.getElementById('connectReadMore').textContent = t('world.connect.readMore') + ' \u2192';
-  document.getElementById('worldBuildersTitle').textContent = t('world.builders.title');
-  document.getElementById('worldBuildersDesc').textContent = t('world.builders.desc');
-  document.getElementById('registerBuilderBtn').textContent = t('world.builders.registerBtn');
-  document.getElementById('morselsText').textContent = t('morsels.economy');
+  if ((el = document.getElementById('worldAppsTitle'))) el.textContent = t('world.apps.title');
+  if ((el = document.getElementById('worldAppsDesc'))) el.textContent = t('world.apps.desc');
+  if ((el = document.getElementById('worldFullBuilderTitle'))) el.textContent = t('world.fullBuilder.title');
+  if ((el = document.getElementById('worldFullBuilderDesc'))) el.textContent = t('world.fullBuilder.desc');
+  if ((el = document.getElementById('copyFullBuilderPrompt'))) el.textContent = t('world.fullBuilder.copyBtn');
+  if ((el = document.getElementById('worldCatalogBtn'))) el.textContent = '\uD83D\uDE80 ' + t('world.catalog.openBtn');
+  if ((el = document.getElementById('worldDownloadBtn'))) el.textContent = '\uD83D\uDCE5 ' + t('world.catalog.downloadBtn');
+  if ((el = document.getElementById('worldAgentsTitle'))) el.textContent = t('world.agents.title');
+  if ((el = document.getElementById('worldAgentsDesc'))) el.textContent = t('world.agents.desc');
+  if ((el = document.getElementById('copyAgentPrompt'))) el.textContent = t('world.agents.copyBtn');
+  if ((el = document.getElementById('worldConnectTitle'))) el.textContent = t('world.connect.title');
+  if ((el = document.getElementById('worldConnectDesc'))) el.textContent = t('world.connect.desc');
+  if ((el = document.getElementById('copyConnectPrompt'))) el.textContent = t('world.connect.copyBtn');
+  if ((el = document.getElementById('connectReadMore'))) el.textContent = t('world.connect.readMore') + ' \u2192';
+  if ((el = document.getElementById('worldBuildersTitle'))) el.textContent = t('world.builders.title');
+  if ((el = document.getElementById('worldBuildersDesc'))) el.textContent = t('world.builders.desc');
+  if ((el = document.getElementById('registerBuilderBtn'))) el.textContent = t('world.builders.registerBtn');
+  if ((el = document.getElementById('morselsText'))) el.textContent = t('morsels.economy');
 
   document.title = t('genesis.name');
 
@@ -1337,7 +1342,7 @@ function renderAllTexts() {
   if (window.__refreshHeaderProfileButton) window.__refreshHeaderProfileButton();
   if (window.__mountHeaderAuthUi) window.__mountHeaderAuthUi();
 }
-renderAllTexts();
+// ── All functions defined above, now safe to load auth library ──
 </script>
 <script>
 // ── Load aimeat-auth.js from the same origin ──
@@ -1345,10 +1350,25 @@ renderAllTexts();
   var s = document.createElement('script');
   s.src = window.location.origin + '/v1/libs/aimeat-auth.js';
   s.onload = function() {
-    if (window.__refreshExpandButtonLabel) window.__refreshExpandButtonLabel();
-    if (window.__refreshHeaderMorsels) window.__refreshHeaderMorsels();
-    if (window.__refreshHeaderProfileButton) window.__refreshHeaderProfileButton();
-    if (window.__mountHeaderAuthUi) window.__mountHeaderAuthUi();
+    var retries = 0;
+    var maxRetries = 5;
+    function callInitFunctions() {
+      retries++;
+      var allReady = window.__refreshExpandButtonLabel && 
+                     window.__refreshHeaderMorsels && 
+                     window.__refreshHeaderProfileButton && 
+                     window.__mountHeaderAuthUi;
+      if (!allReady) {
+        if (retries >= maxRetries) return;
+        setTimeout(callInitFunctions, 200);
+        return;
+      }
+      if (window.__refreshExpandButtonLabel) window.__refreshExpandButtonLabel();
+      if (window.__refreshHeaderMorsels) window.__refreshHeaderMorsels();
+      if (window.__refreshHeaderProfileButton) window.__refreshHeaderProfileButton();
+      if (window.__mountHeaderAuthUi) window.__mountHeaderAuthUi();
+    }
+    callInitFunctions();
   };
   document.head.appendChild(s);
 })();
@@ -1502,10 +1522,12 @@ renderAllTexts();
   }
 
   function getCurrentSession() {
-    if (!hasAuth()) return null;
+    if (!hasAuth()) {
+      return null;
+    }
     var s = AIMEAT.auth.getSession();
     if (!s) return null;
-    if (s.token || s.jwt || s.valid) return s;
+    if (s.jwt || s.valid) return s;
     return null;
   }
 
@@ -1595,34 +1617,46 @@ renderAllTexts();
   window.__refreshHeaderProfileButton = refreshHeaderProfileButton;
 
   function setHeaderMorsels(value) {
-    if (!brandMorsels) return;
+    if (!brandMorsels) {
+      console.warn('[GENESIS] brandMorsels element not found');
+      return;
+    }
     if (value == null || value === '') {
       brandMorsels.style.display = 'none';
       brandMorsels.innerHTML = '';
+
       return;
     }
     brandMorsels.style.display = 'inline-block';
     brandMorsels.innerHTML = '❤️ ' + esc(String(value));
+
   }
 
   async function refreshHeaderMorsels() {
     var s = getCurrentSession();
+
     if (!s || !s.fetch) {
+
       setHeaderMorsels('');
       refreshHeaderProfileButton();
       return;
     }
     try {
+
       var walletResp = await s.fetch('/v1/wallet');
+
       var balance = walletResp && walletResp.data && walletResp.data.balance != null ? walletResp.data.balance : null;
       if (balance == null) {
+
         setHeaderMorsels('');
         refreshHeaderProfileButton();
         return;
       }
+
       setHeaderMorsels(balance);
       refreshHeaderProfileButton();
     } catch (e) {
+      console.error('[GENESIS] refreshHeaderMorsels: error fetching wallet:', e);
       setHeaderMorsels('');
       refreshHeaderProfileButton();
     }
@@ -1632,16 +1666,24 @@ renderAllTexts();
 
   async function mountHeaderAuthUi() {
     var authReady = await waitForAuthReady(2500);
-    if (!authReady || !AIMEAT.auth || !AIMEAT.auth.mountLoginButton) return;
+    if (!authReady || !AIMEAT.auth || !AIMEAT.auth.mountLoginButton) {
+      console.warn('[GENESIS] mountHeaderAuthUi: auth not ready or mountLoginButton not found');
+      return;
+    }
     var slot = document.getElementById('headerAuth');
-    if (!slot) return;
+    if (!slot) {
+      console.warn('[GENESIS] mountHeaderAuthUi: headerAuth slot not found');
+      return;
+    }
     AIMEAT.auth.mountLoginButton('#headerAuth', {
       nodeUrl: nodeUrl,
       i18n: __modalI18n,
       onLogin: function(session) {
+
         updateExpandButtonLabel();
         refreshHeaderMorsels();
         loadUserWorldSummary();
+        refreshHeaderProfileButton();
         // Auto-open world accordion if it exists
         if (theWorld && expandBtn && !isExpanded) {
           isExpanded = true;
@@ -1665,6 +1707,23 @@ renderAllTexts();
         closeWorld();
       }
     });
+    
+    // Restore session from localStorage on hard refresh.
+    // mountLoginButton shows "logged in" from localStorage but does NOT
+    // set the in-memory currentSession. We must call login() explicitly.
+    try {
+      var restored = await AIMEAT.auth.login();
+      if (restored) {
+        console.log('[GENESIS] mountHeaderAuthUi: restored session from storage');
+        updateExpandButtonLabel();
+        refreshHeaderMorsels();
+        refreshHeaderProfileButton();
+        loadUserWorldSummary();
+      }
+    } catch (e) {
+      console.warn('[GENESIS] mountHeaderAuthUi: session restore failed', e);
+    }
+    
     refreshHeaderProfileButton();
   }
 
@@ -1747,6 +1806,7 @@ renderAllTexts();
   }
 
   expandBtn.addEventListener('click', function() {
+
     var s = getCurrentSession();
     if (!s) {
       openLoginModal(function() {
@@ -1758,10 +1818,23 @@ renderAllTexts();
     else openWorld();
   });
 
-  setTimeout(updateExpandButtonLabel, 700);
-  setTimeout(refreshHeaderMorsels, 900);
-  setTimeout(mountHeaderAuthUi, 950);
-
+  // Initialize header UI after a small delay to ensure DOM is ready
+  setTimeout(function() {
+    if (window.renderAllTexts) renderAllTexts();
+  }, 100);
+  
+  setTimeout(function() {
+    if (window.updateExpandButtonLabel) updateExpandButtonLabel();
+  }, 700);
+  
+  setTimeout(function() {
+    if (window.refreshHeaderMorsels) refreshHeaderMorsels();
+  }, 900);
+  
+  setTimeout(function() {
+    if (window.mountHeaderAuthUi) mountHeaderAuthUi();
+  }, 950);
+  
   /* -- Mega-prompts -- */
   var anonGaii = encodeURIComponent('shared#anonymous@' + (window.location.hostname || 'aimeat-local'));
 
