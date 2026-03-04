@@ -45,8 +45,6 @@ import { appsRouter } from './routes/apps.js';
 import { flagsRouter } from './routes/flags.js';
 import { appealsRouter } from './routes/appeals.js';
 import { matchesRouter } from './routes/matches.js';
-import { organismsRouter } from './routes/organisms.js';
-import { marketplaceRouter } from './routes/marketplace.js';
 import { personalRouter } from './routes/personal.js';
 import { pushRouter } from './routes/push.js';
 import { createPushService } from './services/push.js';
@@ -438,8 +436,6 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(flagsRouter(config, storage));
   app.use(appealsRouter(config, storage));
   app.use(matchesRouter(config, storage));
-  app.use(organismsRouter(config, storage));
-  app.use(marketplaceRouter(config, storage));
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));

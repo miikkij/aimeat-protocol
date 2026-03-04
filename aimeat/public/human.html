@@ -225,52 +225,69 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  height: 48px;
+  height: var(--nav-height, 56px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.25rem;
-  background: rgba(5, 5, 16, 0.9);
+  background: rgba(10, 10, 26, 0.85);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 105, 180, 0.06);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 105, 180, 0.1);
 }
 
 .topnav-brand {
   font-weight: 800;
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
+  font-size: 1.05rem;
+  color: var(--text-bright);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
   text-decoration: none;
+}
+
+.topnav-brand .heart {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 4px rgba(255, 105, 180, 0.6));
+  animation: heartPulse 2s ease-in-out infinite;
+}
+
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }
 
 .topnav-center {
   display: flex;
   align-items: center;
   gap: 0.15rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 20px;
-  padding: 0.15rem 0.2rem;
+  padding: 0.2rem 0.25rem;
 }
 
 .lang-btn {
-  padding: 0.2rem 0.55rem;
-  border-radius: 14px;
-  font-size: 0.72rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 16px;
+  font-size: 0.78rem;
   font-weight: 700;
   text-decoration: none;
   color: var(--text-dim);
   transition: all 0.2s;
+  letter-spacing: 0.04em;
   cursor: pointer;
 }
 
 .lang-btn.active {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 0 8px var(--accent-glow);
+  box-shadow: 0 0 10px var(--accent-glow);
 }
 
 .lang-btn:not(.active):hover {
   color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .topnav-right {
@@ -279,16 +296,19 @@ body {
 }
 
 .topnav-right a {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  font-size: 0.82rem;
+  color: var(--text-dim);
   text-decoration: none;
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  transition: color 0.2s;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-xs, 6px);
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .topnav-right a:hover {
   color: var(--accent);
+  border-color: rgba(255, 105, 180, 0.2);
+  background: rgba(255, 105, 180, 0.05);
 }
 
 /* ── Genesis Hero 3D Canvas ── */
@@ -742,7 +762,7 @@ body {
 
 <!-- Top Navigation (minimal) -->
 <nav class="topnav">
-  <a href="/v1/portal" class="topnav-brand">AIME AT</a>
+  <a href="/v1/portal" class="topnav-brand"><span class="heart">&#x1F496;</span> AIME AT</a>
   <div class="topnav-center" id="langSwitcher"></div>
   <div class="topnav-right" id="navRight"></div>
 </nav>
@@ -1931,7 +1951,7 @@ body {
   renderer.setClearColor(0x000000, 0);
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(50, 2.6, 0.1, 2000);
+  var camera = new THREE.PerspectiveCamera(40, 8.6, 0.1, 2000);
 
   var geo, pts;
   function buildGrid() {
@@ -1957,7 +1977,7 @@ body {
     camera.position.x = 0;
     camera.position.y = Math.sin(tiltRad) * dist;
     camera.position.z = Math.cos(tiltRad) * dist;
-    camera.lookAt(0, 4, 0);
+    camera.lookAt(0, -12, 0);
   }
   updateCamera();
 
