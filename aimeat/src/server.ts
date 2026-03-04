@@ -57,6 +57,7 @@ import { createMyDataReceiptService } from './services/mydata-receipt.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
+import { workspaceAccessMiddleware } from './middleware/workspace-access.js';
 import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
@@ -391,6 +392,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(agentsRouter(config, storage));
   app.use(consentRouter(config, storage, stats));  // Phase 0.3
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
+  app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
   app.use(memoryRouter(config, storage, stats));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
