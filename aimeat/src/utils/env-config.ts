@@ -62,12 +62,26 @@ export function formatConfig(config: AimeatConfig): string {
       ],
     },
     {
-      title: 'Database',
+      title: 'Storage',
       entries: [
         {
+          envVar: 'AIMEAT_STORAGE',
+          description: 'Storage backend (memory | sqlite | mongodb)',
+          value: config.storageProvider,
+          defaultVal: 'memory',
+        },
+        {
+          envVar: 'AIMEAT_SQLITE_PATH',
+          description: 'SQLite database file path (when sqlite)',
+          value: config.storageProvider === 'sqlite' ? config.sqlitePath : '(n/a — not using sqlite)',
+          defaultVal: './data/aimeat.db',
+        },
+        {
           envVar: 'DATABASE_URL',
-          description: 'MongoDB connection URL. Leave empty for in-memory storage (data lost on restart)',
-          value: config.dbUrl ? maskUrl(config.dbUrl) : '(not set — using in-memory storage)',
+          description: 'MongoDB connection URL (when mongodb)',
+          value: config.storageProvider === 'mongodb'
+            ? (config.dbUrl ? maskUrl(config.dbUrl) : '(not set — required for mongodb)')
+            : '(n/a — not using mongodb)',
           defaultVal: '(none)',
           secret: true,
         },
