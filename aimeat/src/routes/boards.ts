@@ -119,10 +119,19 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // POST /v1/boards/:boardId/posts — post to a board (agent auth)
   router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
-    const board = await storage.getBoard(boardId);
+    let board = await storage.getBoard(boardId);
     if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
-      return;
+      // Auto-create public board on first post — no pre-seeding needed
+      board = await storage.createBoard({
+        id: boardId,
+        name: boardId,
+        description: `Auto-created board: ${boardId}`,
+        visibility: 'public',
+        ownerGaii: req.auth!.sub,
+        allowedGaiis: [],
+        createdAt: new Date().toISOString(),
+      });
+      logger.info(`Auto-created board "${boardId}" on first post`);
     }
 
     const gaii = req.auth!.sub;
@@ -207,7 +216,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const boardId = req.params.boardId as string;
     const board = await storage.getBoard(boardId);
     if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      // Board doesn't exist yet — return empty posts, not 404
+      res.json(success(config.nodeId, { posts: [], total: 0 }));
       return;
     }
 

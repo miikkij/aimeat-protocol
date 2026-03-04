@@ -16,9 +16,9 @@ var TRANSLATIONS = {
     "genesis.subline": "Copy the prompt. Paste it into any AI chat. You'll have a working multi-user app in minutes.",
     "oneliners.title": "Live",
     "oneliners.empty": "No messages yet. Someone will break the silence soon.",
-    "provocation.line1": "Want to say something?",
-    "provocation.line2": "You can't write from here.",
-    "provocation.line3": "Make your own app \u2014 copy the prompt, tell your AI what you want, and you'll have your own view where you can talk to everyone.",
+    "provocation.line1": "Opinions are like assholes. Everyone's got one.",
+    "provocation.line2": "Make yours heard.",
+    "provocation.line3": "Copy the prompt below into any AI chat, tell it what you want, and in under a minute your opinion shows up here live.",
     "prompt.title": "Copy this and paste into any AI chat",
     "prompt.copyBtn": "COPY PROMPT",
     "prompt.copied": "COPIED!",
@@ -78,9 +78,9 @@ var TRANSLATIONS = {
     "genesis.subline": "Kopioi kehote. Liit\u00e4 mihin tahansa AI-chattiin. Sinulla on toimiva monen k\u00e4ytt\u00e4j\u00e4n sovellus minuuteissa.",
     "oneliners.title": "Livenä",
     "oneliners.empty": "Ei viel\u00e4 viestej\u00e4. Joku rikkoo hiljaisuuden pian.",
-    "provocation.line1": "Haluatko sanoa jotain?",
-    "provocation.line2": "Et voi kirjoittaa t\u00e4st\u00e4.",
-    "provocation.line3": "Tee oma sovellus \u2014 kopioi kehote, kerro AI:lle mit\u00e4 haluat, ja sinulla on oma n\u00e4kym\u00e4 jolla voit puhua kaikille.",
+    "provocation.line1": "Mielipiteitä on maailmassa yhtä paljon kuin perseen\u00adreikiä. Jokaisella on yksi.",
+    "provocation.line2": "Anna omasi kuulua.",
+    "provocation.line3": "Kopioi alla oleva kehote mihin tahansa tekoälychattiin, kerro mitä haluat, ja alle minuutissa mielipiteesi näkyy täällä livenä.",
     "prompt.title": "Kopioi t\u00e4m\u00e4 ja liit\u00e4 mihin tahansa AI-chattiin",
     "prompt.copyBtn": "KOPIOI KEHOTE",
     "prompt.copied": "KOPIOITU!",
@@ -994,7 +994,7 @@ body {
     }
   }
 
-  /* -- Live Oneliners (read-only, from Boards API) -- */
+  /* -- Live Oneliners (anonymous shared memory) -- */
   var onelinersFeed = document.getElementById('onelinersFeed');
 
   function timeAgo(iso) {
@@ -1007,29 +1007,29 @@ body {
     return Math.floor(hr / 24) + 'd';
   }
 
-  function renderOneliners(posts) {
+  function renderOneliners(messages) {
     if (!onelinersFeed) return;
-    if (!posts || posts.length === 0) {
+    if (!messages || messages.length === 0) {
       onelinersFeed.innerHTML = '<div class="oneliners-empty">' + esc(t('oneliners.empty')) + '</div>';
       return;
     }
     onelinersFeed.innerHTML = '';
-    posts.slice(-20).reverse().forEach(function(p) {
+    messages.slice(-20).reverse().forEach(function(m) {
       var div = document.createElement('div');
       div.className = 'oneliner';
-      var text = p.body || '';
-      div.innerHTML = '<span class="oneliner-text"></span><span class="oneliner-time">' + timeAgo(p.created_at) + '</span>';
+      var text = m.msg || '';
+      div.innerHTML = '<span class="oneliner-text"></span><span class="oneliner-time">' + timeAgo(m.t) + '</span>';
       div.querySelector('.oneliner-text').textContent = text;
       onelinersFeed.appendChild(div);
     });
   }
 
   function loadOneliners() {
-    fetch('/v1/boards/welcome/posts?limit=20')
+    fetch('/v1/memory/oneliners')
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(d) {
-        if (d && d.ok && d.data && d.data.posts) {
-          renderOneliners(d.data.posts);
+        if (d && d.ok && d.data && d.data.value && d.data.value.messages) {
+          renderOneliners(d.data.value.messages);
         }
       })
       .catch(function() {});
@@ -1060,7 +1060,7 @@ body {
   /* -- Mega-prompts -- */
   var anonGaii = encodeURIComponent('shared#anonymous@' + (window.location.hostname || 'aimeat-local'));
 
-  // Main prompt (oneliner starter — focused on welcome board)
+  // Main prompt (oneliner starter — simple anonymous memory)
   var mainPromptEl = document.getElementById('mainPrompt');
   if (mainPromptEl) {
     mainPromptEl.value =
@@ -1075,90 +1075,35 @@ body {
       '1. What should your app be called? (e.g. "Neon Shoutbox", "Midnight Feed", "StarChat")\n' +
       '2. Any style preferences? (e.g. "cyberpunk neon", "glassmorphism", "retro terminal", "aurora borealis") \u2014 or surprise them with something gorgeous.\n\n' +
       '## Then build a STUNNING single HTML file.\n\n' +
-      '## STRICT RULE \u2014 Use AIMEAT client libraries!\n' +
-      'NEVER write raw fetch() calls to /v1/memory, /v1/storage, /v1/boards, /v1/auth, etc.\n' +
-      'AIMEAT provides official JavaScript client libraries served from the node itself.\n' +
-      'Always load and use these instead of raw HTTP calls.\n\n' +
-      '### Required libraries (load in this order in <head>):\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>  \u2190 MUST be first!\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-data.js"><\/script>\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-social.js"><\/script>  \u2190 REQUIRED for the Welcome Board!\n' +
-      'Optional (add if needed):\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-storage.js"><\/script>\n' +
-      '<script src="' + nodeUrl + '/lib/realtime.js"><\/script> (WebSocket P2P)\n\n' +
-      '### How the libs work:\n' +
-      '- Each lib is an IIFE that runs on load. No manual init call needed \u2014 globals are set immediately.\n' +
-      '- aimeat-auth.js creates window.AIMEAT.auth. All other libs depend on it.\n' +
-      '- IMPORTANT: You MUST initialize a session before calling AIMEAT.data / AIMEAT.storage / AIMEAT.social!\n' +
-      '- All methods are async (return Promises). Use await inside an async function.\n' +
-      '- The node URL is auto-detected from the page origin \u2014 no manual URL config needed in code.\n\n' +
-      '### AUTHENTICATION \u2014 CRITICAL (do this FIRST, before any API calls):\n' +
-      'You MUST log in before calling any AIMEAT.data / AIMEAT.storage / AIMEAT.social method.\n' +
-      'Without login, all API calls will throw "Not logged in" error.\n\n' +
-      'Use this initAimeat() function at the start of every app:\n\n' +
-      'async function initAimeat() {\n' +
-      '  let session = await AIMEAT.auth.login();\n' +
-      '  if (!session) {\n' +
-      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
-      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
-      '  }\n' +
-      '  return session;\n' +
+      '## HOW THE ONELINERS FEED WORKS (this is the ONLY API you need):\n' +
+      'The shared feed is stored at a single memory key called "oneliners" on the GENESIS 001 server.\n' +
+      'It is a JSON object: { "messages": [{ "msg": "Hello!", "t": "2026-03-04T12:00:00Z" }, ...] }\n' +
+      'Maximum 20 messages. When posting, keep only the latest 20.\n\n' +
+      'This server runs in anonymous mode \u2014 no auth, no registration, no tokens needed.\n' +
+      'Just use plain fetch() calls. That\'s it.\n\n' +
+      '### READ messages:\n' +
+      'const res = await fetch("' + nodeUrl + '/v1/memory/oneliners");\n' +
+      'const json = await res.json();\n' +
+      'if (json.ok && json.data && json.data.value) {\n' +
+      '  const messages = json.data.value.messages; // [{msg, t}, ...]\n' +
+      '} else {\n' +
+      '  // Key doesn\'t exist yet \u2014 no messages posted yet, treat as empty\n' +
+      '  const messages = [];\n' +
       '}\n\n' +
-      '### Bootstrap pattern (use this in every app):\n' +
-      '<script>\n' +
-      'async function initAimeat() {\n' +
-      '  let session = await AIMEAT.auth.login();\n' +
-      '  if (!session) {\n' +
-      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
-      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
-      '  }\n' +
-      '  return session;\n' +
-      '}\n\n' +
-      '(async function() {\n' +
-      '  await initAimeat(); // \u2190 MUST be called first!\n' +
-      '  // NOW you can safely use AIMEAT.data, AIMEAT.storage, AIMEAT.social\n' +
-      '  startApp(); // your app code goes here\n' +
-      '})();\n' +
-      '<\/script>\n\n' +
-      'On subsequent visits, login() restores the saved session from localStorage automatically.\n' +
-      'The user only "registers" once \u2014 after that, login() handles everything.\n\n' +
-      '### AIMEAT.data \u2014 Memory API (private key-value storage per user):\n' +
-      'All methods are async. You must call initAimeat() first!\n' +
-      'WARNING: Memory is PER-USER. Each user has their own isolated storage.\n' +
-      'If you need SHARED data visible to everyone, use AIMEAT.social (Boards API) instead!\n\n' +
-      'Read a key:\n' +
-      '  const value = await AIMEAT.data.get("my.key");\n' +
-      '  // Returns the value DIRECTLY (not wrapped). Returns null if key doesn\'t exist.\n\n' +
-      'Write a key:\n' +
-      '  await AIMEAT.data.set("my.key", {data: "here"}, {visibility: "private"});\n\n' +
-      'List keys by prefix:\n' +
-      '  const entries = await AIMEAT.data.list({prefix: "apps."});\n\n' +
-      'Delete:\n' +
-      '  await AIMEAT.data.delete("mykey");\n\n' +
-      '### AIMEAT.social \u2014 Boards API (SHARED community message boards):\n' +
-      'This is the CORRECT way to share data between users! Boards are visible to ALL users.\n' +
-      'Use this for any shared/community feed, chat, or public data.\n\n' +
-      'Post a message to a board (requires auth via initAimeat):\n' +
-      '  await AIMEAT.social.post("welcome", displayName + ": " + messageText);\n' +
-      '  // The body is a string. Include the author name in the message text!\n\n' +
-      'Read posts from a board (NO auth needed \u2014 public boards are readable by anyone):\n' +
-      '  const result = await AIMEAT.social.posts("welcome", {limit: 20});\n' +
-      '  // result.posts = [{id, body, author_gaii, created_at, ...}, ...]\n' +
-      '  // Posts are sorted newest first by default\n' +
-      '  // Each post has: body (string), created_at (ISO timestamp), author_gaii (who posted)\n\n' +
-      'React to a post:\n' +
-      '  await AIMEAT.social.react("welcome", postId, "\u2764\ufe0f");\n\n' +
-      'Reply to a post:\n' +
-      '  await AIMEAT.social.reply("welcome", postId, "Great point!");\n\n' +
-      'List available boards (no auth):\n' +
-      '  const boards = await AIMEAT.social.boards();\n\n' +
-      '### AIMEAT.storage \u2014 File Storage API (images & large files):\n' +
-      'Upload a file or base64 string:\n' +
-      '  const result = await AIMEAT.storage.upload(file, {\n' +
-      '    key: "art/pic.png", mime_type: "image/png", visibility: "public"\n' +
-      '  });\n\n' +
-      'Get a public URL: const url = AIMEAT.storage.publicUrl("art/pic.png");\n' +
-      'Download: const blob = await AIMEAT.storage.download("art/pic.png");\n\n' +
+      '### WRITE messages (post a new one):\n' +
+      '// 1. Read current messages\n' +
+      'const res = await fetch("' + nodeUrl + '/v1/memory/oneliners");\n' +
+      'const json = await res.json();\n' +
+      'const existing = (json.ok && json.data?.value?.messages) || [];\n' +
+      '// 2. Append new message, keep max 20\n' +
+      'const updated = [...existing, { msg: displayName + ": " + text, t: new Date().toISOString() }].slice(-20);\n' +
+      '// 3. Write back\n' +
+      'await fetch("' + nodeUrl + '/v1/memory", {\n' +
+      '  method: "POST",\n' +
+      '  headers: { "Content-Type": "application/json" },\n' +
+      '  body: JSON.stringify({ key: "oneliners", value: { messages: updated }, visibility: "public" })\n' +
+      '});\n\n' +
+      'That\'s the ENTIRE API. Read, append, write back. No libraries needed. No auth. No registration.\n\n' +
       '### Design Requirements (IMPORTANT \u2014 make it beautiful):\n' +
       '- Use cutting-edge CSS: glassmorphism, gradients, animations, blur effects, glow\n' +
       '- Take inspiration from uiverse.io for buttons, cards, inputs, toggles \u2014 use their creative CSS patterns\n' +
@@ -1169,37 +1114,14 @@ body {
       '- The overall feel should make the user think "wow, I can\'t believe this was made in 5 minutes"\n\n' +
       '### What the app MUST do:\n' +
       '1. Show a message input (styled beautifully \u2014 glowing border, placeholder animation)\n' +
-      '2. Show a live feed of messages from the Welcome Board (auto-refresh every 3\u20135 seconds)\n' +
-      '3. Let the user post new messages that appear in the feed\n' +
+      '2. Show a live feed of messages (auto-refresh every 3\u20135 seconds via the READ pattern above)\n' +
+      '3. Let the user post new messages (via the WRITE pattern above)\n' +
       '4. Ask for a display name on first visit (save to localStorage)\n' +
-      '5. Show each message with the author name and relative time (e.g. "2m ago", "1h ago")\n' +
+      '5. Show each message with the text and relative time (e.g. "2m ago", "1h ago")\n' +
       '6. Smooth animations when new messages appear\n\n' +
-      '### Welcome Board \u2014 How to read & post (USE AIMEAT.social!):\n' +
-      'The Welcome Board is a shared board called "welcome". It uses the Boards API, NOT the Memory API.\n' +
-      'All messages posted by any user from any app appear in the same feed.\n\n' +
-      'Read messages (NO auth needed for reading):\n' +
-      '  const result = await AIMEAT.social.posts("welcome", {limit: 50});\n' +
-      '  const posts = result.posts; // [{id, body, author_gaii, created_at}, ...]\n' +
-      '  // Each post.body is a string like "Mika: Hello everyone!"\n' +
-      '  // post.created_at is an ISO timestamp\n\n' +
-      'Post a message (auth required \u2014 initAimeat() must be called first):\n' +
-      '  const displayName = localStorage.getItem("displayName") || "Anonymous";\n' +
-      '  await AIMEAT.social.post("welcome", displayName + ": " + text);\n' +
-      '  // That\'s it! The message appears in the shared feed immediately.\n' +
-      '  // No read-modify-write needed. No memory keys. Just post and it\'s shared.\n\n' +
-      'Auto-refresh the feed:\n' +
-      '  setInterval(async () => {\n' +
-      '    const result = await AIMEAT.social.posts("welcome", {limit: 50});\n' +
-      '    renderMessages(result.posts);\n' +
-      '  }, 4000); // refresh every 4 seconds\n\n' +
-      'IMPORTANT: Do NOT use AIMEAT.data (Memory API) for the welcome board!\n' +
-      'Memory is per-user. Only the Boards API (AIMEAT.social) is shared between all users.\n\n' +
       '## General Requirements:\n' +
-      '- Single HTML file \u2014 all CSS and JS inline, ONLY external scripts are the AIMEAT libs\n' +
-      '- Load AIMEAT libs from the server: aimeat-auth.js, aimeat-data.js, aimeat-social.js\n' +
-      '- NEVER use raw fetch() for AIMEAT APIs \u2014 always use AIMEAT.data / AIMEAT.storage / AIMEAT.social\n' +
-      '- For shared/community data: use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data\n' +
-      '- For private/per-user data: use AIMEAT.data (Memory API)\n' +
+      '- Single HTML file \u2014 all CSS and JS inline, NO external libraries or scripts\n' +
+      '- Just plain fetch() to ' + nodeUrl + '/v1/memory/oneliners \u2014 that\'s all\n' +
       '- Mobile-friendly, works on any screen size\n' +
       '- Works immediately when opened in a browser\n' +
       '- Make the HTML a downloadable file\n\n' +
@@ -1234,114 +1156,64 @@ body {
       '   - OWN: create a unique key like "apps.[type].[my-unique-id]" \u2014 only I see my data\n' +
       '   - SHARED: use the community key given below \u2014 I see others\' content and can add mine\n' +
       'Use my answers to customize everything.\n\n' +
-      '## Step 2 \u2014 Build a single HTML file using AIMEAT client libraries:\n\n' +
-      '## STRICT RULE \u2014 Use AIMEAT client libraries!\n' +
-      'NEVER write raw fetch() calls to /v1/memory, /v1/storage, /v1/auth, /v1/boards, etc.\n' +
-      'AIMEAT provides official JavaScript client libraries served from the node itself.\n' +
-      'Always load and use these instead of raw HTTP calls.\n\n' +
-      '### Required libraries (load in this order in <head>):\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>  \u2190 MUST be first!\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-data.js"><\/script>\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-social.js"><\/script>  \u2190 REQUIRED for any shared/community data!\n' +
-      'Optional (add if needed):\n' +
-      '<script src="' + nodeUrl + '/v1/libs/aimeat-storage.js"><\/script>  (file upload/download/images)\n' +
-      '<script src="' + nodeUrl + '/lib/realtime.js"><\/script>  (WebSocket P2P rooms)\n\n' +
-      '### How the libs work:\n' +
-      '- Each lib is an IIFE that runs on load. No manual init call needed \u2014 globals are set immediately.\n' +
-      '- aimeat-auth.js creates window.AIMEAT.auth \u2014 all other libs depend on it, load it FIRST.\n' +
-      '- IMPORTANT: You MUST initialize a session before calling AIMEAT.data / AIMEAT.storage / AIMEAT.social!\n' +
-      '- All methods return Promises (use await). Wrap your code in (async function(){ ... })();\n' +
-      '- The node URL is auto-detected from page origin \u2014 no manual URL config in code.\n\n' +
-      '### AUTHENTICATION \u2014 CRITICAL (do this FIRST, before any API calls):\n' +
-      'You MUST log in before calling any AIMEAT.data / AIMEAT.storage / AIMEAT.social method.\n' +
-      'Without login, all API calls will throw "Not logged in" error.\n\n' +
-      'Use this initAimeat() function at the start of every app:\n\n' +
-      'async function initAimeat() {\n' +
-      '  // Try to restore a previous session from localStorage\n' +
-      '  let session = await AIMEAT.auth.login();\n' +
-      '  if (!session) {\n' +
-      '    // First visit \u2014 register a new anonymous account\n' +
-      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
-      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
-      '  }\n' +
-      '  return session;\n' +
+      '## Step 2 \u2014 Build a single HTML file using the AIMEAT Memory API:\n\n' +
+      '## HOW DATA WORKS \u2014 The Memory API (plain fetch, no libraries needed):\n' +
+      'The AIMEAT server runs in anonymous mode. No auth, no registration, no tokens.\n' +
+      'Just use plain fetch() calls. All anonymous users share the same memory space.\n\n' +
+      '### READ a key:\n' +
+      'const res = await fetch("' + nodeUrl + '/v1/memory/MY_KEY");\n' +
+      'const json = await res.json();\n' +
+      'if (json.ok) {\n' +
+      '  const value = json.data.value; // your stored object\n' +
+      '} else {\n' +
+      '  // Key doesn\'t exist yet \u2014 first write will create it\n' +
       '}\n\n' +
-      'Call it once when the app starts, BEFORE any data/storage/social calls:\n\n' +
-      '### Bootstrap pattern (use this in every app):\n' +
-      '<script>\n' +
-      'async function initAimeat() {\n' +
-      '  let session = await AIMEAT.auth.login();\n' +
-      '  if (!session) {\n' +
-      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
-      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
-      '  }\n' +
-      '  return session;\n' +
-      '}\n\n' +
-      '(async function() {\n' +
-      '  await initAimeat(); // \u2190 MUST be called first!\n' +
-      '  // NOW you can safely use AIMEAT.data, AIMEAT.storage, AIMEAT.social\n' +
-      '  startApp(); // your app code goes here\n' +
-      '})();\n' +
-      '<\/script>\n\n' +
-      'On subsequent visits, login() restores the saved session from localStorage automatically.\n' +
-      'The user only "registers" once \u2014 after that, login() handles everything.\n\n' +
-      '### CRITICAL: When to use AIMEAT.data vs AIMEAT.social:\n' +
-      '- AIMEAT.data (Memory API) = PRIVATE per-user storage. Each user has their own isolated data.\n' +
-      '  Use for: personal notes, settings, private app state, per-user data.\n' +
-      '  Two different users writing to the same key will NOT see each other\'s data!\n' +
-      '- AIMEAT.social (Boards API) = SHARED community data. All users see the same board.\n' +
-      '  Use for: shared feeds, community posts, public message boards, chat, leaderboards.\n' +
-      '  ALL users see the same posts regardless of who posted them.\n\n' +
-      '### AIMEAT.data \u2014 Memory API (PRIVATE per-user key-value storage):\n' +
-      'All methods are async. You must call initAimeat() first!\n' +
-      'WARNING: Memory is PER-USER. Data written by one user is NOT visible to other users.\n' +
-      'For shared/community data, use AIMEAT.social (Boards API) instead!\n\n' +
-      'Read a key:\n' +
-      '  const value = await AIMEAT.data.get("apps.[TYPE].[ID]");\n' +
-      '  // Returns the value DIRECTLY (unwrapped). Returns null if key doesn\'t exist.\n' +
-      '  // Example: stored {items: [...]} \u2192 you get {items: [...]}\n\n' +
-      'Write a key:\n' +
-      '  await AIMEAT.data.set("apps.[TYPE].[ID]", {your: "data"});\n' +
-      '  // Default visibility is "private" \u2014 only the writing user can read it back\n\n' +
-      'List keys by prefix:\n' +
-      '  const entries = await AIMEAT.data.list({prefix: "apps.[TYPE]"});\n\n' +
-      'Delete:\n' +
-      '  await AIMEAT.data.delete("apps.[TYPE].[ID]");\n\n' +
-      '### AIMEAT.storage \u2014 File Storage API (images & larger files):\n' +
-      'Upload a file or base64 string:\n' +
-      '  const result = await AIMEAT.storage.upload(fileOrBase64, {\n' +
-      '    key: "apps/art/[id].png",\n' +
-      '    mime_type: "image/png",\n' +
-      '    visibility: "public"\n' +
-      '  });\n' +
-      '  // fileOrBase64 can be: File object, Blob, or base64 string\n' +
-      '  // For canvas: canvas.toDataURL("image/png").split(",")[1] \u2192 base64 string\n\n' +
-      'Get a public URL (synchronous, returns string):\n' +
-      '  const url = AIMEAT.storage.publicUrl("apps/art/[id].png");\n' +
-      '  // Use in: <img src="${url}"> \u2014 works for visibility:"public" files\n\n' +
-      'Download as Blob:\n' +
-      '  const blob = await AIMEAT.storage.download("apps/art/[id].png");\n\n' +
-      'Enable drag & drop upload:\n' +
-      '  AIMEAT.storage.enableDropZone("#drop-area", {\n' +
-      '    accept: "image/*",\n' +
-      '    maxSize: 10 * 1024 * 1024,\n' +
-      '    onUpload: (ref, file) => console.log("Uploaded:", ref),\n' +
-      '    onError: (err) => console.error(err)\n' +
+      '### WRITE a key:\n' +
+      'await fetch("' + nodeUrl + '/v1/memory", {\n' +
+      '  method: "POST",\n' +
+      '  headers: { "Content-Type": "application/json" },\n' +
+      '  body: JSON.stringify({ key: "MY_KEY", value: { your: "data" }, visibility: "public" })\n' +
+      '});\n\n' +
+      '### DELETE a key:\n' +
+      'await fetch("' + nodeUrl + '/v1/memory/MY_KEY", { method: "DELETE" });\n\n' +
+      '### LIST keys by prefix:\n' +
+      'const res = await fetch("' + nodeUrl + '/v1/memory?prefix=apps.notes");\n' +
+      'const json = await res.json(); // json.data.entries = [{key, value, ...}, ...]\n\n' +
+      'That\'s it. Read, write, delete, list. No libraries. No auth. No registration.\n' +
+      'All anonymous users share the same memory space, so data is automatically shared.\n\n' +
+      '### Shared data pattern (read-modify-write):\n' +
+      'For shared lists/feeds, use a single key with an array:\n' +
+      '1. READ current data\n' +
+      '2. Append new item, keep max N items\n' +
+      '3. WRITE back the updated array\n' +
+      'Example:\n' +
+      '  const res = await fetch("' + nodeUrl + '/v1/memory/apps.chat.messages");\n' +
+      '  const json = await res.json();\n' +
+      '  const messages = (json.ok && json.data?.value?.messages) || [];\n' +
+      '  messages.push({ msg: name + ": " + text, t: new Date().toISOString() });\n' +
+      '  const latest = messages.slice(-50); // keep last 50\n' +
+      '  await fetch("' + nodeUrl + '/v1/memory", {\n' +
+      '    method: "POST",\n' +
+      '    headers: { "Content-Type": "application/json" },\n' +
+      '    body: JSON.stringify({ key: "apps.chat.messages", value: { messages: latest }, visibility: "public" })\n' +
       '  });\n\n' +
-      '### AIMEAT.social \u2014 Boards API (SHARED community message boards):\n' +
-      'This is the CORRECT way to share data between users! Boards are visible to ALL users.\n' +
-      'Use for: community feeds, shared chat, leaderboards, public message boards.\n\n' +
-      'Post a message (requires auth via initAimeat):\n' +
-      '  await AIMEAT.social.post("welcome", displayName + ": " + messageText);\n' +
-      '  // The body can be a string or an object: {title: "Post", body: "Content"}\n' +
-      '  // Include author name in the string body so readers know who posted\n\n' +
-      'Read posts (NO auth needed \u2014 public boards readable by anyone):\n' +
-      '  const result = await AIMEAT.social.posts("welcome", {limit: 20});\n' +
-      '  // result.posts = [{id, body, author_gaii, created_at, ...}, ...]\n' +
-      '  // Posts are shared \u2014 ALL users see the same posts\n\n' +
-      'React:  await AIMEAT.social.react("welcome", postId, "\u2764\ufe0f");\n' +
-      'Reply:  await AIMEAT.social.reply("welcome", postId, "Great!");\n' +
-      'List boards (no auth): const boards = await AIMEAT.social.boards();\n\n' +
+      '### AIMEAT client libraries (ONLY needed for advanced features):\n' +
+      'For most apps, plain fetch() is all you need. Only load libraries when you need these features:\n' +
+      '- Realtime P2P (multiplayer games, music jam, live collaboration): needs aimeat-auth.js + realtime.js\n' +
+      '- File storage (images, drawings): needs aimeat-auth.js + aimeat-storage.js\n\n' +
+      'If you do need libs, load auth first in <head>:\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-storage.js"><\/script>\n' +
+      '<script src="' + nodeUrl + '/lib/realtime.js"><\/script>\n\n' +
+      'Auth init (only when using libs that require auth):\n' +
+      'async function initAimeat() {\n' +
+      '  let session = await AIMEAT.auth.login();\n' +
+      '  if (!session) {\n' +
+      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
+      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
+      '  }\n' +
+      '  return session;\n' +
+      '}\n\n' +
       '### AimeatRealtime \u2014 P2P WebSocket (live multiplayer, no polling):\n' +
       'Client library: <script src="' + nodeUrl + '/lib/realtime.js"><\/script>\n' +
       'This is a separate class (NOT on AIMEAT namespace). Requires a JWT token.\n\n' +
@@ -1368,15 +1240,6 @@ body {
       '  - Presence: rt.presence({ key: value })\n' +
       '  - Leave: rt.leave()\n\n' +
       'Events: joined, peer-joined, peer-left, peer-presence, broadcast, signal, error, open, close\n\n' +
-      '### Board (SHARED public message board \u2014 use AIMEAT.social, NOT AIMEAT.data!):\n' +
-      'The "welcome" board is pre-created and visible to all users.\n' +
-      'Read posts (NO auth needed):\n' +
-      '  const result = await AIMEAT.social.posts("welcome", {limit: 50});\n' +
-      '  const posts = result.posts; // [{id, body, author_gaii, created_at}, ...]\n' +
-      'Post a message (auth needed):\n' +
-      '  await AIMEAT.social.post("welcome", displayName + ": " + text);\n' +
-      'IMPORTANT: Do NOT use AIMEAT.data for shared boards! Memory is per-user and isolated.\n' +
-      'Only AIMEAT.social (Boards API) provides truly shared data visible to all users.\n\n' +
       '## Step 3 \u2014 Category-Specific Instructions\n\n' +
       'Based on the user\'s choice in Step 1, follow the matching section below.\n' +
       'Each section is self-contained \u2014 follow ALL instructions in the matching section.\n\n' +
@@ -1385,22 +1248,26 @@ body {
       '- What type of game? (e.g. "tic-tac-toe", "connect four", "battleship", "trivia quiz", "word game")\n' +
       '- How many players? (2\u201320)\n' +
       'I want a multiplayer game with a lobby system as a single self-contained HTML file.\n\n' +
-      'NOTE: Use the Realtime P2P API for ALL multiplayer games (both real-time and turn-based).\n' +
-      'AIMEAT.data (Memory API) is per-user and CANNOT be used for shared game state between players.\n\n' +
+      'NOTE: Use the Realtime P2P API for ALL multiplayer games (both real-time and turn-based).\n\n' +
       '## How multiplayer works\n' +
-      '1. Lobby: Use AIMEAT.social to list and find games.\n' +
-      '   - Post a game listing: await AIMEAT.social.post("games", JSON.stringify({id:gameId, host:name, type:"tictactoe", status:"waiting"}))\n' +
-      '   - Read lobby: const result = await AIMEAT.social.posts("games", {limit: 20})\n' +
+      '1. Lobby: Use the Memory API to store a lobby listing.\n' +
+      '   - Read lobby: fetch("' + nodeUrl + '/v1/memory/apps.games.lobby") \u2192 {games:[{id,host,type,status}]}\n' +
+      '   - Post listing: read-modify-write the apps.games.lobby key\n' +
       '2. Game: Use Realtime P2P API for the actual game.\n' +
       '   - Create room: const room = await rt.createRoom({app_type: "tictactoe", name: "My Game"})\n' +
       '   - Connect: rt.connect(room.id, playerName)\n' +
       '   - Broadcast moves: rt.broadcast({action: "move", x: 1, y: 2})\n' +
       '   - Receive moves: rt.on("broadcast", (msg) => handleMove(msg.payload))\n' +
       '3. For turn-based games, use Realtime with a simple turn flag in broadcasts.\n\n' +
+      'Auth setup (needed for Realtime WebSocket):\n' +
+      'Include <script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script> in <head>\n' +
+      'Call initAimeat() to get a session, then:\n' +
+      '  const session = AIMEAT.auth.getSession();\n' +
+      '  const rt = new AimeatRealtime("' + nodeUrl + '", session.jwt);\n\n' +
       'Game requirements:\n' +
       '1. On first visit, ask the player their name (save to localStorage)\n' +
-      '2. Show lobby screen: list of games from AIMEAT.social.posts("games")\n' +
-      '3. "Create Game" button \u2014 creates a Realtime room + posts lobby listing\n' +
+      '2. Show lobby screen: read games from memory key apps.games.lobby\n' +
+      '3. "Create Game" button \u2014 creates a Realtime room + adds to lobby listing\n' +
       '4. "Join" button \u2014 connects to the room via Realtime\n' +
       '5. Once connected, the game starts. All moves via rt.broadcast()\n' +
       '6. Show game status: waiting, your turn, opponent\'s turn, win/lose/draw\n' +
@@ -1408,71 +1275,68 @@ body {
       '8. Lobby auto-refreshes every 5 seconds\n\n' +
       'Game-specific requirements:\n' +
       '- Game-like UI \u2014 bold visuals, fun animations, satisfying interactions, sound effects if possible\n' +
-      '- Include aimeat-auth.js + aimeat-social.js + realtime.js\n\n' +
+      '- Include aimeat-auth.js + realtime.js (for WebSocket). Lobby data uses plain fetch.\n\n' +
       '### If NOTES/JOURNAL:\n' +
       'I want a note-taking app as a single self-contained HTML file.\n\n' +
-      '## Shared community board (if user chooses SHARED):\n' +
-      'Use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data!\n' +
-      'Post a note: await AIMEAT.social.post("notes", JSON.stringify({author:name, title:"My Note", body:"Content", created:new Date().toISOString()}))\n' +
-      'Read notes: const result = await AIMEAT.social.posts("notes", {limit: 50})\n' +
-      '  Each post.body is a JSON string \u2014 parse it: JSON.parse(post.body) to get {author, title, body, created}\n' +
-      'Show all community notes in a feed/list. Each note shows author name and time. Let user add their own.\n\n' +
+      '## Shared community notes (if user chooses SHARED):\n' +
+      'Use the Memory API with plain fetch \u2014 read-modify-write pattern:\n' +
+      'Read: fetch("' + nodeUrl + '/v1/memory/apps.notes.community") \u2192 {notes:[{author,title,body,created}]}\n' +
+      'Add: read existing, append new note, write back (keep last 50)\n' +
+      'Show all community notes in a feed/list. Each note shows author name and time.\n\n' +
       'App requirements:\n' +
       '- Create, view, edit, and delete notes\n' +
-      '- If OWN: each note stored as "apps.notes.[note-id]" with AIMEAT.data.set() \u2014 private per-user storage\n' +
-      '- If SHARED: post notes to "notes" board with AIMEAT.social.post() \u2014 visible to all users\n' +
+      '- If PRIVATE: each note stored as "apps.notes.[note-id]" via fetch\n' +
+      '- If SHARED: one key "apps.notes.community" with {notes:[...]} array\n' +
       '- Sidebar or list view showing all saved notes with titles and timestamps\n' +
       '- Click a note to view or edit it\n' +
       '- Search or filter notes\n\n' +
       '### If TRACKER (habit/expense/custom):\n' +
       'I want a tracker app as a single self-contained HTML file.\n\n' +
       '## Shared community dashboard (if user chooses SHARED):\n' +
-      'Use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data!\n' +
-      'Post an entry: await AIMEAT.social.post("tracker", JSON.stringify({author:name, category:"habit", entries:[{date,value}], created:new Date().toISOString()}))\n' +
-      'Read entries: const result = await AIMEAT.social.posts("tracker", {limit: 50})\n' +
-      'Show a shared leaderboard/dashboard of everyone\'s tracked items. Let user add theirs.\n\n' +
+      'Use the Memory API with plain fetch \u2014 read-modify-write pattern:\n' +
+      'Read: fetch("' + nodeUrl + '/v1/memory/apps.tracker.community") \u2192 {entries:[{author,category,items,created}]}\n' +
+      'Add: read existing, append new entry, write back (keep last 50)\n' +
+      'Show a shared leaderboard/dashboard. Let user add theirs.\n\n' +
       'App requirements:\n' +
       '- Track daily habits, expenses, or anything the user wants\n' +
-      '- If OWN: each entry stored with AIMEAT.data.set("apps.tracker.[date]", {items, date}) \u2014 private per-user\n' +
-      '- If SHARED: post entries to "tracker" board with AIMEAT.social.post() \u2014 visible to all\n' +
+      '- If PRIVATE: each entry stored as "apps.tracker.[date]" via fetch\n' +
+      '- If SHARED: one key "apps.tracker.community" with {entries:[...]} array\n' +
       '- Calendar or list view of past entries\n' +
       '- Simple charts or progress indicators\n' +
       '- Add and remove tracked items\n\n' +
       '### If FAMILY TOOLS:\n' +
       'I want a shared family tool as a single self-contained HTML file.\n\n' +
-      'NOTE: This category is already shared via URL hash \u2014 family members access the same data.\n' +
-      'If user chooses SHARED, it means a PUBLIC community list visible to everyone (not just family).\n\n' +
-      '## Public community lists (if user chooses SHARED):\n' +
-      'Use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data!\n' +
-      'Post a list: await AIMEAT.social.post("family", JSON.stringify({author:name, listName:"Shopping", entries:[{text,done}], created:new Date().toISOString()}))\n' +
-      'Read lists: const result = await AIMEAT.social.posts("family", {limit: 50})\n' +
-      'Show all public lists. Let user create and contribute to shared lists.\n\n' +
+      '## Shared family lists:\n' +
+      'Use the Memory API with plain fetch \u2014 read-modify-write pattern:\n' +
+      'Read: fetch("' + nodeUrl + '/v1/memory/apps.family.[listId]") \u2192 {items:[{text,done,addedBy}]}\n' +
+      'Update: read existing, modify items, write back\n' +
+      'Shareable via URL hash: use #listId to let family members access the same key.\n\n' +
       'App requirements:\n' +
       '- Shareable via URL so family members can access the same data (use URL hash #listId)\n' +
-      '- Auto-refresh by polling AIMEAT.social.posts() every 3 seconds\n' +
+      '- Auto-refresh by polling the memory key every 3 seconds\n' +
       '- Add and check off items (shopping list, to-do, etc.)\n' +
-      '- If OWN: use AIMEAT.data for per-user family data\n' +
-      '- If SHARED: post to "family" board with AIMEAT.social.post() \u2014 visible to all visitors\n' +
       '- Ask for name on first visit so items show who added them (save to localStorage)\n\n' +
       '### If DRAWING/CREATIVE:\n' +
       'I want a creative/drawing tool as a single self-contained HTML file.\n\n' +
-      '## File storage (for images) \u2014 use AIMEAT.storage:\n' +
+      '## File storage (for images) \u2014 needs aimeat-auth.js + aimeat-storage.js:\n' +
+      'Include in <head>:\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-storage.js"><\/script>\n' +
+      'Call initAimeat() first, then:\n' +
       'Upload: await AIMEAT.storage.upload(base64Data, {key: "apps/art/[unique-id].png", mime_type: "image/png", visibility: "public"})\n' +
       'Public URL: AIMEAT.storage.publicUrl("apps/art/[unique-id].png") \u2192 direct URL for <img src="...">\n' +
       'IMPORTANT: To convert canvas to base64 for upload, use canvas.toDataURL("image/png").split(",")[1]\n\n' +
       '## Shared community gallery (if user chooses SHARED):\n' +
-      'Use AIMEAT.social (Boards API) for the gallery index, AIMEAT.storage for actual images.\n' +
-      'Upload image: await AIMEAT.storage.upload(base64, {key: "apps/art/[id].png", mime_type: "image/png", visibility: "public"})\n' +
-      'Post to gallery: await AIMEAT.social.post("art", JSON.stringify({author:name, title:"My Art", storageKey:"apps/art/[id].png", created:new Date().toISOString()}))\n' +
-      'Read gallery: const result = await AIMEAT.social.posts("art", {limit: 50})\n' +
-      'Display images: <img src="${AIMEAT.storage.publicUrl(JSON.parse(post.body).storageKey)}">\n' +
-      'Show all community artwork in a gallery grid. Each piece shows author name, title and time.\n\n' +
+      'Gallery index stored in memory via plain fetch (read-modify-write pattern):\n' +
+      'Read: fetch("' + nodeUrl + '/v1/memory/apps.art.gallery") \u2192 {items:[{author,title,storageKey,created}]}\n' +
+      'Add: upload image with AIMEAT.storage.upload(), then read gallery index, append metadata, write back\n' +
+      'Display: <img src="${AIMEAT.storage.publicUrl(item.storageKey)}">\n\n' +
       'App requirements:\n' +
       '- Drawing canvas with color picker and brush size\n' +
-      '- Upload images with AIMEAT.storage.upload() (not AIMEAT.data) \u2014 storage supports large files\n' +
-      '- If OWN: upload to storage, store metadata with AIMEAT.data.set("apps.art.[drawing-id]", ...)\n' +
-      '- If SHARED: upload to storage, then post metadata to "art" board with AIMEAT.social.post()\n' +
-      '- Gallery view: AIMEAT.social.posts("art") for metadata, AIMEAT.storage.publicUrl() for images\n' +
+      '- Upload images with AIMEAT.storage.upload() \u2014 storage supports large files\n' +
+      '- If PRIVATE: upload to storage, store metadata at "apps.art.[drawing-id]" via fetch\n' +
+      '- If SHARED: upload to storage, then add metadata to "apps.art.gallery" index via fetch\n' +
+      '- Gallery view: read "apps.art.gallery" for metadata, AIMEAT.storage.publicUrl() for images\n' +
       '- Clear canvas, undo, and download image\n\n' +
       '### If MUSIC JAM SESSION:\n' +
       'Ask additionally:\n' +
@@ -1542,13 +1406,10 @@ body {
       '### If SERVICES (need help / offer help):\n' +
       'I want a service board where people can post requests for help and offers to help.\n\n' +
       'Two modes: "I need help" (post a request) and "I can help" (post an offer)\n\n' +
-      '## Data structure (use AIMEAT.social \u2014 NOT AIMEAT.data!)\n' +
-      'Post a request:\n' +
-      '  await AIMEAT.social.post("services", JSON.stringify({type:"request", text:"...", author:"Name", created:new Date().toISOString()}));\n' +
-      'Post an offer:\n' +
-      '  await AIMEAT.social.post("services", JSON.stringify({type:"offer", text:"...", author:"Name", created:new Date().toISOString()}));\n' +
-      'List all: const result = await AIMEAT.social.posts("services", {limit: 50})\n' +
-      'Filter: parse each post.body as JSON and check .type === "request" or "offer"\n\n' +
+      '## Data structure (plain fetch to Memory API):\n' +
+      'Read: fetch("' + nodeUrl + '/v1/memory/apps.services.board") \u2192 {posts:[{type,text,author,created}]}\n' +
+      'Add: read existing, append new post, write back (keep last 50)\n' +
+      'Filter locally: check .type === "request" or "offer"\n\n' +
       'App requirements:\n' +
       '- Show both feeds side by side (requests and offers)\n' +
       '- Let users post new requests or offers with their name\n' +
@@ -1557,26 +1418,22 @@ body {
       '### If CUSTOM / SOMETHING ELSE:\n' +
       'I want [DESCRIBE YOUR IDEA HERE] as a single self-contained HTML file.\n\n' +
       '## Shared community option (if user chooses SHARED):\n' +
-      'Use AIMEAT.social (Boards API) for shared community data \u2014 NOT AIMEAT.data!\n' +
-      'Ask the user what to call the board (e.g. "custom-[name]").\n' +
-      'Post: await AIMEAT.social.post(boardName, JSON.stringify({author:name, ...data, created:new Date().toISOString()}))\n' +
-      'Read: const result = await AIMEAT.social.posts(boardName, {limit: 50})\n' +
-      'Parse each post.body as JSON to get the structured data back.\n' +
-      'Show all community items and let user add theirs.\n\n' +
+      'Use the Memory API with plain fetch \u2014 read-modify-write pattern.\n' +
+      'Choose a descriptive key like "apps.[type].community".\n' +
+      'Read: fetch("' + nodeUrl + '/v1/memory/apps.[type].community")\n' +
+      'Write: POST to /v1/memory with {key, value, visibility:"public"}\n' +
+      'All anonymous users share the same memory space.\n\n' +
       'Ask me what the app should do before building it.\n\n' +
       '## General Requirements (all categories):\n' +
-      '- Single HTML file \u2014 all CSS and JS inline, ONLY external scripts are the AIMEAT libs\n' +
-      '- NEVER use raw fetch() for AIMEAT APIs \u2014 always use AIMEAT.data / AIMEAT.storage / AIMEAT.social / AIMEAT.auth objects\n' +
-      '- Load AIMEAT libs from the server in <head>, auth first: aimeat-auth.js, then aimeat-data.js, then aimeat-social.js, then others\n' +
-      '- Always include initAimeat() function and call it before any API calls\n' +
-      '- For SHARED community data (feeds, chat, boards): use AIMEAT.social (Boards API)\n' +
-      '- For PRIVATE per-user data (notes, settings, saves): use AIMEAT.data (Memory API)\n' +
-      '- NEVER use AIMEAT.data for shared community content — it is per-user and isolated!\n' +
+      '- Single HTML file \u2014 all CSS and JS inline\n' +
+      '- Use plain fetch() to ' + nodeUrl + '/v1/memory for data (no libraries needed)\n' +
+      '- ONLY load AIMEAT libs when you need Realtime (games/music/collab) or Storage (images)\n' +
+      '- No auth needed \u2014 anonymous mode handles everything\n' +
       '- Mobile-friendly, works on any screen size\n' +
       '- Clean, modern UI\n' +
       '- Works immediately when opened in a browser\n' +
-      '- If using realtime: include aimeat-auth.js + realtime.js, get token via AIMEAT.auth.getSession()\n' +
-      '- If using images: use AIMEAT.storage (not AIMEAT.data)\n\n' +
+      '- If using realtime: include aimeat-auth.js + realtime.js, call initAimeat(), get JWT via AIMEAT.auth.getSession()\n' +
+      '- If using images: include aimeat-auth.js + aimeat-storage.js, call initAimeat()\n\n' +
       'Apps can be built with any AI: Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek \u2014 all work!\n\n' +
       'Make the HTML a downloadable file. This is a live API \u2014 the URLs work right now.\n\n' +
       '## If Something Doesn\'t Work\n' +

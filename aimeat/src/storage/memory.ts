@@ -1618,6 +1618,9 @@ export class InMemoryStorage implements Storage {
   // ── Node Extensions ──
 
   async createExtension(record: ExtensionRecord): Promise<ExtensionRecord> {
+    if (this.extensions.has(record.name)) {
+      throw new Error(`Extension "${record.name}" already exists`);
+    }
     this.extensions.set(record.name, record);
     return record;
   }
@@ -1664,6 +1667,7 @@ export class InMemoryStorage implements Storage {
   async releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null> {
     const hold = this.escrowHolds.get(holdId);
     if (!hold) return null;
+    if (hold.status !== 'held') return null;
     const updated = { ...hold, status: 'released' as const, releasedTo: toGaii, releasedAt: new Date().toISOString() };
     this.escrowHolds.set(holdId, updated);
     return updated;
@@ -1672,6 +1676,7 @@ export class InMemoryStorage implements Storage {
   async refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null> {
     const hold = this.escrowHolds.get(holdId);
     if (!hold) return null;
+    if (hold.status !== 'held') return null;
     const updated = { ...hold, status: 'refunded' as const, releasedAt: new Date().toISOString() };
     this.escrowHolds.set(holdId, updated);
     return updated;

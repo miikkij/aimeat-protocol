@@ -70,7 +70,7 @@
 //  STATE
 // ═══════════════════════════════════════════════════════
 const state = {
-  rotY: 0, tilt: 31, textH: 1.0, spacing: 0.9, cols: 160, rows: 100,
+  rotY: 0, tilt: 31, textH: 2.5, spacing: 1.6, cols: 160, rows: 100,
 };
 
 // ═══════════════════════════════════════════════════════
@@ -542,9 +542,9 @@ document.getElementById('btnSparser').addEventListener('click', () => {
   }
 });
 
-// Canvas click → start/restart snake (only when not currently playing)
+// Canvas click → start/restart snake
 document.getElementById('c').addEventListener('click', () => {
-  if (!snakeActive) initSnake();
+  initSnake();
 });
 
 // Keyboard

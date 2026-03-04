@@ -136,22 +136,32 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
           id: a.id as string,
           method: (a.method as string).toUpperCase(),
           path: a.path as string,
-          inputSchema: (a.input_schema as Record<string, unknown>) ?? {},
-          outputSchema: (a.output_schema as Record<string, unknown>) ?? {},
+          inputSchema: (a.input as Record<string, unknown>) ?? {},
+          outputSchema: (a.output as Record<string, unknown>) ?? {},
           scriptContent: scripts[a.script as string],
         })),
-        config: manifestConfig ?? {},
+        config: manifestConfig
+          ? Object.fromEntries(
+              Object.entries(manifestConfig).map(([k, v]) => {
+                // If value is a schema object with a `.default`, extract just the default
+                if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                  return [k, (v as Record<string, unknown>).default];
+                }
+                return [k, v];
+              }),
+            )
+          : {},
         limits: {
           memoryMb: Math.min(
-            (manifestLimits?.memoryMb as number) ?? config.extensionMaxMemoryMb,
+            (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
             config.extensionMaxMemoryMb,
           ),
           timeoutMs: Math.min(
-            (manifestLimits?.timeoutMs as number) ?? config.extensionTimeoutMs,
+            (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
             config.extensionTimeoutMs,
           ),
           maxApiCalls: Math.min(
-            (manifestLimits?.maxApiCalls as number) ?? config.extensionMaxApiCalls,
+            (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
             config.extensionMaxApiCalls,
           ),
         },
@@ -320,16 +330,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       // Build the ExtensionCtx
+      // Extension memory uses a shared namespace (ext:{name}) so cross-user
+      // workflows (e.g. buyer reads seller's listing) work correctly.
+      const extMemoryOwner = `ext:${ext.name}`;
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {
-            const record = await storage.getMemory(callerGaii, key);
+            const record = await storage.getMemory(extMemoryOwner, key);
             return record ? record.value : null;
           },
           set: async (key, value) => {
             await storage.setMemory({
               key,
-              ownerGaii: callerGaii,
+              ownerGaii: extMemoryOwner,
               value,
               visibility: 'public',
               tags: [],
@@ -340,10 +353,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
             });
           },
           search: async (prefix) => {
-            const records = await storage.listMemory(callerGaii, { prefix });
+            const records = await storage.listMemory(extMemoryOwner, { prefix });
             return records.map(r => ({ key: r.key, value: r.value }));
           },
-          delete: async (key) => storage.deleteMemory(callerGaii, key),
+          delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
         },
         wallet: {
           hold: async (from, amount, reason) => {
