@@ -19,8 +19,7 @@ import type {
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
-// Re-export the wildcard/consent matching functions for schema lookups
-import { matchWildcardPattern, consentMatchPattern } from '../memory/index.js';
+import { matchWildcardPattern, consentMatchPattern } from '../../pattern-utils.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;

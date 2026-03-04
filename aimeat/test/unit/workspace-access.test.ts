@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { workspaceAccessMiddleware } from '../../src/middleware/workspace-access.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord, OwnerRecord, AgentRecord, ConsentRecord } from '../../src/storage/interface.js';
 
@@ -133,11 +133,11 @@ function makeConsent(overrides: Partial<ConsentRecord> = {}): ConsentRecord {
 // ── Tests ───────────────────────────────────────────────────
 
 describe('workspaceAccessMiddleware', () => {
-  let storage: InMemoryStorage;
+  let storage: SqliteStorage;
   let middleware: ReturnType<typeof workspaceAccessMiddleware>;
 
   beforeEach(() => {
-    storage = new InMemoryStorage();
+    storage = new SqliteStorage(':memory:');
     middleware = workspaceAccessMiddleware(config, storage);
   });
 

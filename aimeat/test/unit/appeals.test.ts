@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AppealRecord } from '../../src/storage/interface.js';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -18,11 +18,11 @@ function makeAppeal(overrides: Partial<AppealRecord> = {}): AppealRecord {
 
 // ── Tests ────────────────────────────────────────────────────
 
-describe('Appeals (InMemoryStorage)', () => {
-    let storage: InMemoryStorage;
+describe('Appeals (SqliteStorage)', () => {
+    let storage: SqliteStorage;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
     });
 
     it('creates appeal and retrieves it', async () => {

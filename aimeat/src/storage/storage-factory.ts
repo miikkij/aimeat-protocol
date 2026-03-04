@@ -21,8 +21,9 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
       return mongo;
     }
     default: {
-      const { InMemoryStorage } = await import('./providers/memory/index.js');
-      return new InMemoryStorage();
+      // Use SQLite in-memory mode — single implementation for both memory and sqlite
+      const { SqliteStorage } = await import('./providers/sqlite/index.js');
+      return new SqliteStorage(':memory:');
     }
   }
 }

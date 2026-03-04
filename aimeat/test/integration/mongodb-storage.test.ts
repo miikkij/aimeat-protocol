@@ -1,9 +1,9 @@
 // T-8: Storage Adapter Integration Tests
-// Tests InMemoryStorage (always) and MongoStorage (when DATABASE_URL is set).
+// Tests SQLite in-memory (always) and MongoStorage (when DATABASE_URL is set).
 // Run:  pnpm exec vitest run test/integration/
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/providers/memory/index.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type {
     Storage,
     OwnerRecord,
@@ -150,7 +150,7 @@ interface Backend {
 }
 
 const backends: Backend[] = [
-    { name: 'InMemory', factory: () => new InMemoryStorage() },
+    { name: 'SQLite (in-memory)', factory: () => new SqliteStorage(':memory:') },
 ];
 
 // Add MongoStorage when DATABASE_URL is available
