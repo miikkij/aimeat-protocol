@@ -14,12 +14,11 @@ var TRANSLATIONS = {
     "genesis.name": "GENESIS 001",
     "genesis.tagline": "Build crazy interfaces in seconds that connect to the whole world and other people or agents.",
     "genesis.subline": "Copy the prompt. Paste it into any AI chat. You'll have a working multi-user app in minutes.",
-    "oneliners.title": "Live",
+    "oneliners.title": "Opinions Live",
     "oneliners.empty": "No messages yet. Someone will break the silence soon.",
-    "provocation.line1": "Opinions are like assholes. Everyone's got one.",
-    "provocation.line2": "Make yours heard.",
-    "provocation.line3": "Copy the prompt below into any AI chat, tell it what you want, and in under a minute your opinion shows up here live.",
-    "prompt.title": "Copy this and paste into any AI chat",
+    "provocation.line1": "Opinions are like assholes. Everyone's got one. Here are a few:",
+    "provocation.cta": "Make yours heard by copying the prompt below into any AI chat, tell it what you want, and in under a minute your opinion shows up here live.",
+    "prompt.title": "",
     "prompt.copyBtn": "COPY PROMPT",
     "prompt.copied": "COPIED!",
     "prompt.anyAi": "Works with Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek \u2014 all of them.",
@@ -63,7 +62,7 @@ var TRANSLATIONS = {
     "modal.whyControl": "Full control: only you can access your data, no need to share with anyone",
     "modal.whyAgents": "Connect AI agents that remember you and work on your behalf",
     "modal.whyMorsels": "100 free heart morsels to start! E.g. memory request ~ 1 \u2764\ufe0f, board post ~ 2 \u2764\ufe0f. You get 50 more every day",
-    "promptLangNote": "The prompt is in English because AIs work best with it. You can still ask the AI to respond in your language.",
+    "promptLangNote": "The prompt is in English because AIs work best with it. You can still ask the AI to respond in your language. Works with Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek \u2014 all of them.",
     "morsels.economy": "Heart morsels (\u2764\ufe0f) are the micro-currency here. You start with 100 for free. Actions cost a small amount. You earn 50 more every day.",
     "classic.link": "Classic view",
     "world.fullBuilder.title": "Build Any App",
@@ -76,12 +75,11 @@ var TRANSLATIONS = {
     "genesis.name": "GENESIS 001",
     "genesis.tagline": "Tee hulluja k\u00e4ytt\u00f6liittymi\u00e4 hetkess\u00e4 jotka on yhteydess\u00e4 koko maailmaan ja muihin ihmisiin tai agentteihin.",
     "genesis.subline": "Kopioi kehote. Liit\u00e4 mihin tahansa AI-chattiin. Sinulla on toimiva monen k\u00e4ytt\u00e4j\u00e4n sovellus minuuteissa.",
-    "oneliners.title": "Livenä",
+    "oneliners.title": "Mielipiteet liven\u00e4",
     "oneliners.empty": "Ei viel\u00e4 viestej\u00e4. Joku rikkoo hiljaisuuden pian.",
-    "provocation.line1": "Mielipiteitä on maailmassa yhtä paljon kuin perseen\u00adreikiä. Jokaisella on yksi.",
-    "provocation.line2": "Anna omasi kuulua.",
-    "provocation.line3": "Kopioi alla oleva kehote mihin tahansa tekoälychattiin, kerro mitä haluat, ja alle minuutissa mielipiteesi näkyy täällä livenä.",
-    "prompt.title": "Kopioi t\u00e4m\u00e4 ja liit\u00e4 mihin tahansa AI-chattiin",
+    "provocation.line1": "Mielipiteitä on maailmassa yhtä paljon kuin perseen\u00adreikiä. Tässä niistä muutama:",
+    "provocation.cta": "Anna mielipiteesi kuulua kopioimalla alla oleva kehote mihin tahansa tekoälychattiin, kerro mitä haluat, ja alle minuutissa mielipiteesi näkyy täällä livenä.",
+    "prompt.title": "",
     "prompt.copyBtn": "KOPIOI KEHOTE",
     "prompt.copied": "KOPIOITU!",
     "prompt.anyAi": "Toimii Clauden, ChatGPT:n, Grokin, Geminin, Copilotin, DeepSeekin kanssa \u2014 kaikki k\u00e4y.",
@@ -125,7 +123,7 @@ var TRANSLATIONS = {
     "modal.whyControl": "Täyden hallinnan: vain sinä pääset tietoihisi, ei tarvitse jakaa kenellekään",
     "modal.whyAgents": "Yhdistä AI-agentteja jotka muistavat sinut ja toimivat puolestasi",
     "modal.whyMorsels": "100 ilmaista sydänmurusta alkuun! Esim. muistipyyntö ~ 1 \u2764\ufe0f, tauluviesti ~ 2 \u2764\ufe0f. Saat 50 lisää joka päivä",
-    "promptLangNote": "Kehote on englanniksi koska AI:t toimivat sillä parhaiten. Voit silti pyytää AI:ta vastaamaan suomeksi.",
+    "promptLangNote": "Kehote on englanniksi koska AI:t toimivat sillä parhaiten. Voit silti pyytää AI:ta vastaamaan suomeksi. Toimii Clauden, ChatGPT:n, Grokin, Geminin, Copilotin, DeepSeekin kanssa \u2014 kaikki käy.",
     "morsels.economy": "Sydänmuruset (\u2764\ufe0f) ovat tämän paikan mikrovaluutta. Saat 100 ilmaiseksi alkuun. Toiminnot maksavat pienen määrän. Saat 50 lisää joka päivä.",
     "classic.link": "Klassinen näkymä",
     "world.fullBuilder.title": "Rakenna mikä tahansa sovellus",
@@ -360,11 +358,21 @@ body {
   line-height: 1.6;
 }
 
+/* ── Section divider ── */
+.section-divider {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  margin: 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 105, 180, 0.2), transparent);
+}
+
 /* ── Live Oneliners ── */
 .oneliners-section {
   position: relative;
   z-index: 1;
-  max-width: 640px;
+  max-width: 520px;
   margin: 2rem auto 0;
   padding: 0 1.25rem;
 }
@@ -382,12 +390,12 @@ body {
   border-radius: 50%;
   background: #22c55e;
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
-  animation: livePulse 2s ease-in-out infinite;
+  animation: livePulse 1.5s ease-in-out infinite;
 }
 
 @keyframes livePulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
-  50% { opacity: 0.5; box-shadow: 0 0 16px rgba(34, 197, 94, 0.8); }
+  50% { opacity: 0.4; box-shadow: 0 0 18px rgba(34, 197, 94, 0.9); }
 }
 
 .oneliners-label {
@@ -399,16 +407,19 @@ body {
 }
 
 .oneliners-feed {
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 105, 180, 0.15);
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(10, 10, 30, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   max-height: 280px;
   overflow-y: auto;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 105, 180, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .oneliner {
   padding: 0.6rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   font-size: 0.88rem;
   color: var(--text);
   line-height: 1.5;
@@ -433,83 +444,72 @@ body {
 .provocation {
   position: relative;
   z-index: 1;
-  max-width: 640px;
-  margin: 2.5rem auto 0;
+  max-width: 520px;
+  margin: 1.5rem auto 0;
   padding: 0 1.25rem;
   text-align: center;
 }
 
 .provocation-line1 {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--text-bright);
-  margin-bottom: 0.3rem;
-}
-
-.provocation-line2 {
-  font-size: 1.1rem;
+  font-size: clamp(1.3rem, 3.5vw, 1.7rem);
   font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 1rem;
+  color: var(--text-bright);
+  margin-bottom: 0;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 
-.provocation-line3 {
+.provocation-cta {
   font-size: 0.92rem;
   color: var(--text);
-  max-width: 480px;
+  max-width: 440px;
   margin: 0 auto;
-  line-height: 1.7;
+  line-height: 1.8;
+  padding: 1rem 0;
 }
 
 /* ── Prompt Section ── */
 .prompt-section {
   position: relative;
   z-index: 1;
-  max-width: 640px;
-  margin: 2.5rem auto 0;
+  max-width: 520px;
+  margin: 1.5rem auto 0;
   padding: 0 1.25rem;
-}
-
-.prompt-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 0.5rem;
+  text-align: center;
 }
 
 .prompt-box {
   width: 100%;
   min-height: 140px;
   max-height: 300px;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 105, 180, 0.15);
+  padding: 1.1rem 1.2rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 105, 180, 0.12);
   border-radius: var(--radius-sm);
-  color: var(--text);
-  font-family: 'Courier New', monospace;
-  font-size: 0.78rem;
-  line-height: 1.6;
+  color: #c8b4e0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 0.76rem;
+  line-height: 1.7;
   resize: vertical;
   outline: none;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-align: left;
 }
 
 .prompt-box:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 3px var(--accent-glow);
 }
 
 .prompt-actions {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 0.75rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .copy-btn {
-  padding: 0.75rem 2rem;
+  padding: 0.8rem 2.5rem;
   background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   color: #fff;
   border: none;
@@ -519,29 +519,38 @@ body {
   font-family: var(--font);
   cursor: pointer;
   transition: all 0.25s;
-  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.35);
-  letter-spacing: 0.04em;
+  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.35), 0 0 40px rgba(255, 105, 180, 0.1);
+  letter-spacing: 0.06em;
+  animation: btnGlow 3s ease-in-out infinite;
+}
+
+@keyframes btnGlow {
+  0%, 100% { box-shadow: 0 4px 20px rgba(255, 105, 180, 0.35), 0 0 40px rgba(255, 105, 180, 0.1); }
+  50% { box-shadow: 0 4px 25px rgba(255, 105, 180, 0.5), 0 0 60px rgba(255, 105, 180, 0.2); }
 }
 
 .copy-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(255, 105, 180, 0.5);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 30px rgba(255, 105, 180, 0.5), 0 0 60px rgba(255, 105, 180, 0.25);
 }
 
 .copy-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
+}
+
+.copy-btn.copied {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+  animation: none;
 }
 
 .prompt-note {
-  font-size: 0.78rem;
-  color: var(--text-muted);
+  font-size: 0.8rem;
+  color: var(--text);
   font-style: italic;
-}
-
-.prompt-any-ai {
-  margin-top: 0.5rem;
-  font-size: 0.82rem;
-  color: var(--text-dim);
+  margin-top: 0;
+  text-align: center;
+  line-height: 1.7;
 }
 
 /* ── Expand Button ── */
@@ -777,10 +786,17 @@ body {
 </section>
 <div class="genesis-text-under">
   <p class="genesis-tagline" id="genesisTagline"></p>
-  <p class="genesis-subline" id="genesisSubline"></p>
 </div>
 
-<!-- LAYER 2: Live Oneliners -->
+<!-- Divider -->
+<div class="section-divider"></div>
+
+<!-- LAYER 2: Provocation headline -->
+<section class="provocation">
+  <div class="provocation-line1" id="provLine1"></div>
+</section>
+
+<!-- LAYER 3: Live Oneliners -->
 <section class="oneliners-section">
   <div class="oneliners-header">
     <div class="live-dot"></div>
@@ -791,22 +807,18 @@ body {
   </div>
 </section>
 
-<!-- LAYER 3: Provocation -->
+<!-- LAYER 4: CTA text -->
 <section class="provocation">
-  <div class="provocation-line1" id="provLine1"></div>
-  <div class="provocation-line2" id="provLine2"></div>
-  <div class="provocation-line3" id="provLine3"></div>
+  <div class="provocation-cta" id="provCta"></div>
 </section>
 
-<!-- LAYER 4: The Prompt -->
+<!-- LAYER 5: The Prompt -->
 <section class="prompt-section">
-  <div class="prompt-label" id="promptLabel"></div>
   <textarea class="prompt-box" id="mainPrompt" readonly></textarea>
   <div class="prompt-actions">
     <button class="copy-btn" id="copyMainPrompt" type="button"></button>
-    <span class="prompt-note" id="promptNote"></span>
   </div>
-  <div class="prompt-any-ai" id="promptAnyAi"></div>
+  <div class="prompt-note" id="promptNote"></div>
 </section>
 
 <!-- LAYER 5: Expand trigger -->
@@ -898,22 +910,18 @@ body {
 
   // Hero
   document.getElementById('genesisTagline').textContent = t('genesis.tagline');
-  document.getElementById('genesisSubline').textContent = t('genesis.subline');
+
+  // Provocation + CTA
+  document.getElementById('provLine1').textContent = t('provocation.line1');
+  document.getElementById('provCta').textContent = t('provocation.cta');
 
   // Oneliners
   document.getElementById('onelinersLabel').textContent = t('oneliners.title');
   document.getElementById('onelinersEmpty').textContent = t('oneliners.empty');
 
-  // Provocation
-  document.getElementById('provLine1').textContent = t('provocation.line1');
-  document.getElementById('provLine2').textContent = t('provocation.line2');
-  document.getElementById('provLine3').textContent = t('provocation.line3');
-
   // Prompt
-  document.getElementById('promptLabel').textContent = t('prompt.title');
   document.getElementById('copyMainPrompt').textContent = t('prompt.copyBtn');
   document.getElementById('promptNote').textContent = t('promptLangNote');
-  document.getElementById('promptAnyAi').textContent = t('prompt.anyAi');
 
   // Expand
   document.getElementById('expandBtn').textContent = t('expand.btn');
@@ -1607,8 +1615,9 @@ body {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       copyToClipboard(box.value).then(function() {
-        btn.textContent = copiedText || t('prompt.copied');
-        setTimeout(function() { btn.textContent = originalText; }, 2000);
+        btn.textContent = (copiedText || t('prompt.copied')) + ' \u2714';
+        btn.classList.add('copied');
+        setTimeout(function() { btn.textContent = originalText; btn.classList.remove('copied'); }, 2000);
       });
     });
   }

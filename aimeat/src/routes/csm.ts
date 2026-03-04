@@ -148,6 +148,9 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       ...(semanticContext ? { semanticContext } : {}),
     });
 
+    // Extract federate flag (Phase 3.4 — auto-distribute to federation peers)
+    const federate = !!(req.body.federate ?? (definition as any).federate);
+
     // Store CSM record
     const record = await storage.createCsm({
       name: definition.service.name,
@@ -158,6 +161,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       registeredAt: now,
       updatedAt: now,
       ...(serviceSemantic ? { semantic: serviceSemantic } : {}),
+      ...(federate ? { federate: true } : {}),
     });
 
     res.status(201).json(success(config.nodeId, {
@@ -169,6 +173,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
         registered_at: record.registeredAt,
         definition: record.definition,
         semantic: record.semantic ?? null,
+        federate: record.federate ?? false,
       },
     }, [
       { description: 'List all CSM services', method: 'GET', url: '/v1/csm' },

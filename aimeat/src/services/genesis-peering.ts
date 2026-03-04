@@ -61,9 +61,10 @@ export function createGenesisPeeringService(config: AimeatConfig, storage: Stora
       const activePeers = await storage.listGenesisPeers({ status: 'active' });
       const catalogues: Record<string, unknown>[] = [];
 
-      // Add local catalogue entries
+      // Add local catalogue entries (only CSMs marked for federation)
       const localCsms = await storage.listCsms();
       for (const csm of localCsms) {
+        if (!csm.federate) continue; // Phase 3.4: only federate=true CSMs
         catalogues.push({
           type: 'csm',
           name: csm.name,

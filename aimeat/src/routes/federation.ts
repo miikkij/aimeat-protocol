@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import { PeeringRequestSchema, PeeringDecisionSchema, validateBody } from '../models/schemas.js';
 import type { PeerInfo } from '../services/federation.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
+import { createOrganismReputationService } from '../services/organism-reputation.js';
 
 export function federationRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -1030,7 +1031,15 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         try {
             const status = req.query.status as string | undefined;
             const peers = await storage.listGenesisPeers(status ? { status } : undefined);
-            res.json(success(config.nodeId, { peers, total: peers.length }));
+            res.json(success(config.nodeId, {
+                peers,
+                total: peers.length,
+                semantic: {
+                    '@context': { schema: 'https://schema.org/' },
+                    '@type': 'schema:ItemList',
+                    'schema:itemListElement': 'schema:Organization',
+                },
+            }));
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }
@@ -1081,6 +1090,49 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         try {
             const stats = await genesisPeeringService.getNetworkStats();
             res.json(success(config.nodeId, { stats }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // PUT /v1/federation/genesis-peer/:id/suspend — Suspend genesis peering
+    router.put('/v1/federation/genesis-peer/:id/suspend', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const id = req.params.id as string;
+            const peer = await genesisPeeringService.suspendPeering(id);
+            if (!peer) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Genesis peer not found'));
+                return;
+            }
+            res.json(success(config.nodeId, { peer }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // ── Phase 3.4: Organism Reputation ──
+
+    const organismReputationService = createOrganismReputationService(config, storage);
+
+    // GET /v1/organisms/:id/reputation — Get organism reputation score
+    router.get('/v1/organisms/:id/reputation', async (req, res) => {
+        try {
+            const id = req.params.id as string;
+            const reputation = await organismReputationService.calculateReputation(id);
+            if (!reputation) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Organism not found: ${id}`));
+                return;
+            }
+            res.json(success(config.nodeId, {
+                reputation,
+                semantic: {
+                    '@context': { schema: 'https://schema.org/' },
+                    '@type': 'schema:Rating',
+                    'schema:ratingValue': reputation.score,
+                    'schema:bestRating': 100,
+                    'schema:worstRating': 0,
+                },
+            }));
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }

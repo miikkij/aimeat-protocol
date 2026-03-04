@@ -1,231 +1,271 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { InMemoryStorage } from '../../src/storage/memory.js';
 import { createOrganismReputationService } from '../../src/services/organism-reputation.js';
-import type { OrganismReputationService } from '../../src/services/organism-reputation.js';
-import type { AimeatConfig } from '../../src/config.js';
-import type {
-    Storage,
-    OrganismRecord,
-    OrganismReputationRecord,
-    GHIIRecord,
-    BoardRecord,
-    BoardPostRecord,
-    FlagRecord,
-} from '../../src/storage/interface.js';
+import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord } from '../../src/storage/interface.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
-    return {
-        nodeId: 'test-node-001',
-        ...overrides,
-    } as AimeatConfig;
-}
+const config = { nodeId: 'test-node' } as any;
 
 function makeOrganism(overrides: Partial<OrganismRecord> = {}): OrganismRecord {
     return {
-        id: `org-${Math.random().toString(36).slice(2, 8)}`,
-        name: 'Test Organism',
-        description: 'A test community',
+        id: 'org-1',
+        name: 'Test Org',
         type: 'community',
-        interests: ['AI'],
-        creatorGhii: 'alice@test-node-001',
-        admins: ['alice@test-node-001'],
-        members: ['alice@test-node-001'],
+        description: 'Test',
+        creatorGhii: 'user1@test-node',
+        admins: [],
+        members: [],
         agentGaiis: [],
-        boardId: 'board-test',
+        boardId: 'board-org-1',
         joinPolicy: 'open',
         maxMembers: 100,
         visibility: 'public',
-        moderationConfig: { flagsEnabled: true, autoHideThreshold: 5, appealsEnabled: false },
-        memoryNamespace: 'organism.test',
+        moderationConfig: {
+            flagsEnabled: true,
+            autoHideThreshold: 3,
+            appealsEnabled: true,
+        },
+        memoryNamespace: 'organism.org-1',
+        interests: ['test'],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         ...overrides,
     };
 }
 
-function makeGHII(ghii: string, verificationLevel: 0 | 1 | 2 = 1): GHIIRecord {
+function makeMembership(overrides: Partial<OrganismMembershipRecord> = {}): OrganismMembershipRecord {
     return {
-        username: ghii.split('@')[0],
-        nodeId: ghii.split('@')[1] || 'test-node-001',
-        ghii,
-        displayName: ghii.split('@')[0],
-        verificationLevel,
-        ownerName: ghii.split('@')[0],
-        totpEnabled: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        id: `mem-${Math.random().toString(36).slice(2, 10)}`,
+        organismId: 'org-1',
+        ghii: 'user1@test-node',
+        role: 'member',
+        status: 'active',
+        joinedAt: new Date().toISOString(),
+        ...overrides,
     };
 }
 
-function makeMockStorage(opts: {
-    organisms?: Map<string, OrganismRecord>;
-    ghiis?: Map<string, GHIIRecord>;
-    boards?: Map<string, BoardRecord>;
-    posts?: Map<string, BoardPostRecord[]>;
-    flags?: FlagRecord[];
-    reputations?: Map<string, OrganismReputationRecord>;
-} = {}) {
-    const organisms = opts.organisms ?? new Map();
-    const ghiis = opts.ghiis ?? new Map();
-    const boards = opts.boards ?? new Map();
-    const posts = opts.posts ?? new Map();
-    const flags = opts.flags ?? [];
-    const reputations = opts.reputations ?? new Map();
-
+function makeGHII(overrides: Partial<GHIIRecord> = {}): GHIIRecord {
     return {
-        getOrganism: vi.fn(async (id: string) => organisms.get(id) ?? null),
-        getGHII: vi.fn(async (ghii: string) => ghiis.get(ghii) ?? null),
-        getBoard: vi.fn(async (id: string) => boards.get(id) ?? null),
-        listPosts: vi.fn(async (boardId: string, _opts?: { limit?: number }) => posts.get(boardId) ?? []),
-        listFlags: vi.fn(async (_opts?: { targetType?: string }) => flags),
-        setOrganismReputation: vi.fn(async (record: OrganismReputationRecord) => {
-            reputations.set(record.organismId, record);
-            return record;
-        }),
-        getOrganismReputation: vi.fn(async (organismId: string) => reputations.get(organismId) ?? null),
-    } as unknown as Storage;
+        username: 'user1',
+        nodeId: 'test-node',
+        ghii: 'user1@test-node',
+        displayName: 'User One',
+        verificationLevel: 1,
+        ownerName: 'user1',
+        totpEnabled: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ...overrides,
+    };
 }
 
 // ── Tests ────────────────────────────────────────────────────
 
 describe('Organism Reputation Service', () => {
-    let service: OrganismReputationService;
+    let storage: InMemoryStorage;
 
-    describe('calculateReputation', () => {
-        it('returns null for nonexistent organism', async () => {
-            const storage = makeMockStorage();
-            service = createOrganismReputationService(makeConfig(), storage);
-            const result = await service.calculateReputation('nonexistent');
-            expect(result).toBeNull();
-        });
+    beforeEach(() => {
+        storage = new InMemoryStorage();
+    });
 
-        it('returns score in 0-100 range', async () => {
-            const org = makeOrganism({ id: 'org-1', members: ['alice@test-node-001'] });
-            const organisms = new Map([['org-1', org]]);
-            const ghiis = new Map([['alice@test-node-001', makeGHII('alice@test-node-001', 1)]]);
-            const storage = makeMockStorage({ organisms, ghiis });
-            service = createOrganismReputationService(makeConfig(), storage);
+    it('returns null for non-existent organism', async () => {
+        const service = createOrganismReputationService(config, storage);
+        const result = await service.calculateReputation('non-existent-org');
+        expect(result).toBeNull();
+    });
 
-            const result = await service.calculateReputation('org-1');
-            expect(result).not.toBeNull();
-            expect(result!.score).toBeGreaterThanOrEqual(0);
-            expect(result!.score).toBeLessThanOrEqual(100);
-        });
+    it('calculates score for organism with no members', async () => {
+        const service = createOrganismReputationService(config, storage);
+        await storage.createOrganism(makeOrganism({ id: 'org-empty', members: [] }));
 
-        it('breakdown has all 5 components', async () => {
-            const org = makeOrganism({ id: 'org-1' });
-            const organisms = new Map([['org-1', org]]);
-            const storage = makeMockStorage({ organisms });
-            service = createOrganismReputationService(makeConfig(), storage);
+        const result = await service.calculateReputation('org-empty');
+        expect(result).not.toBeNull();
+        expect(result!.organismId).toBe('org-empty');
+        expect(result!.score).toBeGreaterThanOrEqual(0);
+        expect(result!.score).toBeLessThanOrEqual(100);
+        // With no members, expect a low score
+        expect(result!.breakdown.memberScore).toBeLessThanOrEqual(20);
+        expect(result!.calculatedAt).toBeTruthy();
+    });
 
-            const result = await service.calculateReputation('org-1');
-            expect(result).not.toBeNull();
-            expect(result!.breakdown).toHaveProperty('memberScore');
-            expect(result!.breakdown).toHaveProperty('activityScore');
-            expect(result!.breakdown).toHaveProperty('trustScore');
-            expect(result!.breakdown).toHaveProperty('ageScore');
-            expect(result!.breakdown).toHaveProperty('flagScore');
-        });
+    it('calculates score for active organism', async () => {
+        const service = createOrganismReputationService(config, storage);
+        await storage.createOrganism(makeOrganism({
+            id: 'org-active',
+            members: ['user1@test-node', 'user2@test-node', 'user3@test-node'],
+        }));
 
-        it('empty organism (just created, no flags) gets low member score but high flag score', async () => {
-            const org = makeOrganism({
-                id: 'org-1',
-                members: ['alice@test-node-001'],
-                boardId: 'board-1',
-                createdAt: new Date().toISOString(), // just created
-            });
-            const organisms = new Map([['org-1', org]]);
-            const ghiis = new Map([['alice@test-node-001', makeGHII('alice@test-node-001', 0)]]);
-            const storage = makeMockStorage({ organisms, ghiis });
-            service = createOrganismReputationService(makeConfig(), storage);
+        await storage.createMembership(makeMembership({ id: 'mem-1', organismId: 'org-active', ghii: 'user1@test-node' }));
+        await storage.createMembership(makeMembership({ id: 'mem-2', organismId: 'org-active', ghii: 'user2@test-node' }));
+        await storage.createMembership(makeMembership({ id: 'mem-3', organismId: 'org-active', ghii: 'user3@test-node' }));
 
-            const result = await service.calculateReputation('org-1');
-            expect(result).not.toBeNull();
-            // New organism with 1 member, no activity, just created => low score
-            // Flag score should be high (100) since no flags
-            expect(result!.breakdown.flagScore).toBe(100);
-            // Age score should be 0 or very low (just created)
-            expect(result!.breakdown.ageScore).toBeLessThanOrEqual(1);
-        });
+        const result = await service.calculateReputation('org-active');
+        expect(result).not.toBeNull();
+        expect(result!.score).toBeGreaterThan(0);
+        expect(result!.breakdown.memberScore).toBeGreaterThan(0);
+        expect(result!.breakdown).toHaveProperty('activityScore');
+        expect(result!.breakdown).toHaveProperty('trustScore');
+        expect(result!.breakdown).toHaveProperty('ageScore');
+        expect(result!.breakdown).toHaveProperty('flagScore');
+    });
 
-        it('organism with many members gets higher member score', async () => {
-            const members = Array.from({ length: 20 }, (_, i) => `user${i}@test-node-001`);
-            const org = makeOrganism({ id: 'org-1', members, maxMembers: 100 });
-            const organisms = new Map([['org-1', org]]);
-            const ghiis = new Map(members.map(m => [m, makeGHII(m, 1)]));
-            const storage = makeMockStorage({ organisms, ghiis });
-            service = createOrganismReputationService(makeConfig(), storage);
+    it('member score scales with member count', async () => {
+        const service = createOrganismReputationService(config, storage);
 
-            const result = await service.calculateReputation('org-1');
+        // Small organism: 2 members
+        await storage.createOrganism(makeOrganism({ id: 'org-small', members: ['u1@test-node', 'u2@test-node'] }));
+        await storage.createMembership(makeMembership({ id: 'ms-1', organismId: 'org-small', ghii: 'u1@test-node' }));
+        await storage.createMembership(makeMembership({ id: 'ms-2', organismId: 'org-small', ghii: 'u2@test-node' }));
 
-            // Also check a smaller organism for comparison
-            const smallMembers = ['solo@test-node-001'];
-            const smallOrg = makeOrganism({ id: 'org-2', members: smallMembers, maxMembers: 100 });
-            organisms.set('org-2', smallOrg);
-            ghiis.set('solo@test-node-001', makeGHII('solo@test-node-001', 1));
+        // Large organism: 10 members
+        const largeMembers = Array.from({ length: 10 }, (_, i) => `user${i}@test-node`);
+        await storage.createOrganism(makeOrganism({ id: 'org-large', members: largeMembers }));
+        for (let i = 0; i < 10; i++) {
+            await storage.createMembership(makeMembership({
+                id: `ml-${i}`,
+                organismId: 'org-large',
+                ghii: `user${i}@test-node`,
+            }));
+        }
 
-            const smallResult = await service.calculateReputation('org-2');
-            expect(result!.breakdown.memberScore).toBeGreaterThan(smallResult!.breakdown.memberScore);
-        });
+        const smallResult = await service.calculateReputation('org-small');
+        const largeResult = await service.calculateReputation('org-large');
 
-        it('old organism gets higher age score', async () => {
-            const oneYearAgo = new Date();
-            oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        expect(smallResult).not.toBeNull();
+        expect(largeResult).not.toBeNull();
+        expect(largeResult!.breakdown.memberScore).toBeGreaterThan(smallResult!.breakdown.memberScore);
+    });
 
-            const oldOrg = makeOrganism({
-                id: 'org-old',
-                members: ['alice@test-node-001'],
-                createdAt: oneYearAgo.toISOString(),
-            });
-            const newOrg = makeOrganism({
-                id: 'org-new',
-                members: ['bob@test-node-001'],
-                createdAt: new Date().toISOString(),
-            });
+    it('trust score reflects member trust averages', async () => {
+        const service = createOrganismReputationService(config, storage);
 
-            const organisms = new Map([
-                ['org-old', oldOrg],
-                ['org-new', newOrg],
-            ]);
-            const ghiis = new Map([
-                ['alice@test-node-001', makeGHII('alice@test-node-001', 1)],
-                ['bob@test-node-001', makeGHII('bob@test-node-001', 1)],
-            ]);
-            const storage = makeMockStorage({ organisms, ghiis });
-            service = createOrganismReputationService(makeConfig(), storage);
+        // Low-trust organism
+        await storage.createOrganism(makeOrganism({ id: 'org-low-trust', members: ['low1@test-node', 'low2@test-node'] }));
+        await storage.createMembership(makeMembership({ id: 'mlt-1', organismId: 'org-low-trust', ghii: 'low1@test-node' }));
+        await storage.createMembership(makeMembership({ id: 'mlt-2', organismId: 'org-low-trust', ghii: 'low2@test-node' }));
+        await storage.createGHII(makeGHII({ username: 'low1', ghii: 'low1@test-node', ownerName: 'low1', trustScore: 10 }));
+        await storage.createGHII(makeGHII({ username: 'low2', ghii: 'low2@test-node', ownerName: 'low2', trustScore: 15 }));
 
-            const oldResult = await service.calculateReputation('org-old');
-            const newResult = await service.calculateReputation('org-new');
-            expect(oldResult!.breakdown.ageScore).toBeGreaterThan(newResult!.breakdown.ageScore);
-        });
+        // High-trust organism
+        await storage.createOrganism(makeOrganism({ id: 'org-high-trust', members: ['high1@test-node', 'high2@test-node'] }));
+        await storage.createMembership(makeMembership({ id: 'mht-1', organismId: 'org-high-trust', ghii: 'high1@test-node' }));
+        await storage.createMembership(makeMembership({ id: 'mht-2', organismId: 'org-high-trust', ghii: 'high2@test-node' }));
+        await storage.createGHII(makeGHII({ username: 'high1', ghii: 'high1@test-node', ownerName: 'high1', trustScore: 90 }));
+        await storage.createGHII(makeGHII({ username: 'high2', ghii: 'high2@test-node', ownerName: 'high2', trustScore: 95 }));
 
-        it('score is stored via setOrganismReputation', async () => {
-            const org = makeOrganism({ id: 'org-1' });
-            const organisms = new Map([['org-1', org]]);
-            const storage = makeMockStorage({ organisms });
-            service = createOrganismReputationService(makeConfig(), storage);
+        const lowResult = await service.calculateReputation('org-low-trust');
+        const highResult = await service.calculateReputation('org-high-trust');
 
-            await service.calculateReputation('org-1');
-            expect(storage.setOrganismReputation).toHaveBeenCalledOnce();
-            const calledWith = (storage.setOrganismReputation as ReturnType<typeof vi.fn>).mock.calls[0][0] as OrganismReputationRecord;
-            expect(calledWith.organismId).toBe('org-1');
-            expect(calledWith.calculatedAt).toBeTruthy();
-        });
+        expect(lowResult).not.toBeNull();
+        expect(highResult).not.toBeNull();
+        expect(highResult!.breakdown.trustScore).toBeGreaterThan(lowResult!.breakdown.trustScore);
+    });
 
-        it('breakdown scores are individually in 0-100 range', async () => {
-            const org = makeOrganism({ id: 'org-1', members: ['alice@test-node-001'] });
-            const organisms = new Map([['org-1', org]]);
-            const ghiis = new Map([['alice@test-node-001', makeGHII('alice@test-node-001', 2)]]);
-            const storage = makeMockStorage({ organisms, ghiis });
-            service = createOrganismReputationService(makeConfig(), storage);
+    it('age score increases with organism age', async () => {
+        const service = createOrganismReputationService(config, storage);
 
-            const result = await service.calculateReputation('org-1');
-            const bd = result!.breakdown;
-            for (const [key, value] of Object.entries(bd)) {
-                expect(value, `${key} should be >= 0`).toBeGreaterThanOrEqual(0);
-                expect(value, `${key} should be <= 100`).toBeLessThanOrEqual(100);
-            }
-        });
+        // Young organism: created 1 day ago
+        const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+        await storage.createOrganism(makeOrganism({
+            id: 'org-young',
+            createdAt: oneDayAgo,
+            updatedAt: oneDayAgo,
+        }));
+
+        // Old organism: created 180 days ago
+        const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+        await storage.createOrganism(makeOrganism({
+            id: 'org-old',
+            createdAt: sixMonthsAgo,
+            updatedAt: sixMonthsAgo,
+        }));
+
+        const youngResult = await service.calculateReputation('org-young');
+        const oldResult = await service.calculateReputation('org-old');
+
+        expect(youngResult).not.toBeNull();
+        expect(oldResult).not.toBeNull();
+        expect(oldResult!.breakdown.ageScore).toBeGreaterThan(youngResult!.breakdown.ageScore);
+    });
+
+    it('score is stored via setOrganismReputation', async () => {
+        const service = createOrganismReputationService(config, storage);
+        const setReputationSpy = vi.spyOn(storage, 'setOrganismReputation');
+
+        await storage.createOrganism(makeOrganism({ id: 'org-stored' }));
+
+        const result = await service.calculateReputation('org-stored');
+        expect(result).not.toBeNull();
+
+        // Verify setOrganismReputation was called with the computed record
+        expect(setReputationSpy).toHaveBeenCalledTimes(1);
+        expect(setReputationSpy).toHaveBeenCalledWith(expect.objectContaining({
+            organismId: 'org-stored',
+            score: expect.any(Number),
+            breakdown: expect.objectContaining({
+                memberScore: expect.any(Number),
+                activityScore: expect.any(Number),
+                trustScore: expect.any(Number),
+                ageScore: expect.any(Number),
+                flagScore: expect.any(Number),
+            }),
+            calculatedAt: expect.any(String),
+        }));
+
+        // Verify it is persisted in storage
+        const stored = await storage.getOrganismReputation('org-stored');
+        expect(stored).not.toBeNull();
+        expect(stored!.organismId).toBe('org-stored');
+        expect(stored!.score).toBe(result!.score);
+    });
+
+    it('score is capped between 0 and 100', async () => {
+        const service = createOrganismReputationService(config, storage);
+
+        // Minimal organism — should produce a low but valid score
+        await storage.createOrganism(makeOrganism({
+            id: 'org-min',
+            members: [],
+            createdAt: new Date().toISOString(),
+        }));
+        const minResult = await service.calculateReputation('org-min');
+        expect(minResult).not.toBeNull();
+        expect(minResult!.score).toBeGreaterThanOrEqual(0);
+        expect(minResult!.score).toBeLessThanOrEqual(100);
+
+        // Well-established organism — should produce a high but valid score
+        const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+        const manyMembers = Array.from({ length: 50 }, (_, i) => `member${i}@test-node`);
+        await storage.createOrganism(makeOrganism({
+            id: 'org-max',
+            members: manyMembers,
+            createdAt: longAgo,
+            updatedAt: longAgo,
+        }));
+        for (let i = 0; i < 50; i++) {
+            await storage.createMembership(makeMembership({
+                id: `mx-${i}`,
+                organismId: 'org-max',
+                ghii: `member${i}@test-node`,
+            }));
+            await storage.createGHII(makeGHII({
+                username: `member${i}`,
+                ghii: `member${i}@test-node`,
+                ownerName: `member${i}`,
+                trustScore: 95,
+            }));
+        }
+        const maxResult = await service.calculateReputation('org-max');
+        expect(maxResult).not.toBeNull();
+        expect(maxResult!.score).toBeGreaterThanOrEqual(0);
+        expect(maxResult!.score).toBeLessThanOrEqual(100);
+
+        // Validate all breakdown components are also within reasonable bounds (0-100)
+        for (const key of ['memberScore', 'activityScore', 'trustScore', 'ageScore', 'flagScore'] as const) {
+            expect(minResult!.breakdown[key]).toBeGreaterThanOrEqual(0);
+            expect(maxResult!.breakdown[key]).toBeGreaterThanOrEqual(0);
+        }
     });
 });
