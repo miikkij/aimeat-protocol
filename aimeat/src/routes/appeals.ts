@@ -149,7 +149,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // ── POST /v1/appeals/:id/review — Review an appeal (operator or organism admin) ──
-    router.post('/v1/appeals/:id/review', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/appeals/:id/review', requireAuth(), async (req, res) => {
         const id = param(req.params.id);
         const { decision, note } = req.body ?? {};
 
@@ -164,6 +164,33 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
         const appeal = await storage.getAppeal(id);
         if (!appeal) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Appeal not found: ${id}`));
+            return;
+        }
+
+        // Phase 2.4 — Allow organism admins to review appeals for their organism's content
+        const isOperator = req.auth!.roles.includes('operator');
+        let isOrganismAdmin = false;
+        if (!isOperator) {
+            const flag = await storage.getFlag(appeal.flagId);
+            if (flag && flag.targetType === 'memory' && flag.targetId.includes('::')) {
+                const [, ...keyParts] = flag.targetId.split('::');
+                const memoryKey = keyParts.join('::');
+                const orgMatch = memoryKey.match(/^organism\.([^.]+)\./);
+                if (orgMatch) {
+                    const organism = await storage.getOrganism(orgMatch[1]);
+                    if (organism) {
+                        const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
+                        if (ghiiRecord && organism.admins.includes(ghiiRecord.ghii)) {
+                            isOrganismAdmin = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!isOperator && !isOrganismAdmin) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                'Only operators or organism admins can review appeals'));
             return;
         }
 

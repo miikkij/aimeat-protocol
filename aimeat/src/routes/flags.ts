@@ -160,8 +160,8 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         ], { page, per_page: perPage }));
     });
 
-    // ── PUT /v1/flags/:id — Update flag status (operator only) ──
-    router.put('/v1/flags/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+    // ── PUT /v1/flags/:id — Update flag status (operator or organism admin) ──
+    router.put('/v1/flags/:id', requireAuth(), async (req, res) => {
         const id = param(req.params.id);
         const { status: newStatus } = req.body ?? {};
 
@@ -174,6 +174,25 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         const existing = await storage.getFlag(id);
         if (!existing) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Flag not found: ${id}`));
+            return;
+        }
+
+        // Phase 2.4 — Allow organism admins to moderate flags within their organism
+        const isOperator = req.auth!.roles.includes('operator');
+        let isOrganismAdmin = false;
+        if (!isOperator) {
+            const organism = await resolveOrganismConfig(storage, existing.targetType, existing.targetId);
+            if (organism) {
+                const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
+                if (ghiiRecord && organism.admins.includes(ghiiRecord.ghii)) {
+                    isOrganismAdmin = true;
+                }
+            }
+        }
+
+        if (!isOperator && !isOrganismAdmin) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                'Only operators or organism admins can moderate flags'));
             return;
         }
 
