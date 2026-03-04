@@ -44,6 +44,8 @@ export interface AimeatConfig {
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;
+  storageProvider: 'memory' | 'sqlite' | 'mongodb';
+  sqlitePath: string;
   adminPassword: string | null;
   devMode: boolean;
   anonymousMode: boolean;
@@ -220,6 +222,8 @@ export function loadConfig(): AimeatConfig {
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,
+    storageProvider: (process.env.AIMEAT_STORAGE ?? 'memory') as 'memory' | 'sqlite' | 'mongodb',
+    sqlitePath: process.env.AIMEAT_SQLITE_PATH ?? './data/aimeat.db',
     adminPassword: process.env.AIMEAT_ADMIN_PASSWORD ?? null,
     devMode: process.env.AIMEAT_DEV_MODE === 'true',
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
