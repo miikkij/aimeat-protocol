@@ -787,7 +787,14 @@
     "siteMaxTemplateSizeKb": "Sivupohjan enimmäiskoko (Kt)",
     "siteMaxTemplateSizeKbHint": "Suurin sallittu koko HTML-sivupohjan lataukselle",
     "siteCacheTtlSeconds": "Sivupohjan välimuistin elinaika (sekuntia)",
-    "siteCacheTtlSecondsHint": "Kuinka kauan resolvattua sivupohjaa säilytetään välimuistissa (0 = ei välimuistia)"
+    "siteCacheTtlSecondsHint": "Kuinka kauan resolvattua sivupohjaa säilytetään välimuistissa (0 = ei välimuistia)",
+    "storage_label": "Tallennustausta",
+    "storage_hint": "Mihin data tallennetaan",
+    "storage_memory": "Muistissa (vain kehitys, data häviää uudelleenkäynnistyksessä)",
+    "storage_sqlite": "SQLite (henkilökohtainen käyttö, tiedostopohjainen)",
+    "storage_mongodb": "MongoDB (tuotanto, vaatii erillisen palvelimen)",
+    "sqlite_path_label": "SQLite-tietokannan polku",
+    "sqlite_path_hint": "Tietokantatiedoston polku (luodaan automaattisesti)"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",
