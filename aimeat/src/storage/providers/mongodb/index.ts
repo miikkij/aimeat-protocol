@@ -40,7 +40,7 @@ import type {
     SiteChangeLogEntry,
     ExtensionRecord,
     EscrowHoldRecord,
-} from './interface.js';
+} from '../../interface.js';
 
 // Prisma client will be imported dynamically at runtime
 // import { PrismaClient } from '@prisma/client';
@@ -608,22 +608,22 @@ export class MongoStorage implements Storage {
     // ── Board Subscriptions ─────────────────────────────────────
     // Note: For MongoDB, subscriptions are stored in-memory (same as memory.ts)
     // until a Prisma schema migration adds a BoardSubscription model.
-    private boardSubscriptions = new Map<string, import('./interface.js').BoardSubscriptionRecord>();
+    private boardSubscriptions = new Map<string, import('../../interface.js').BoardSubscriptionRecord>();
 
-    async createBoardSubscription(sub: import('./interface.js').BoardSubscriptionRecord): Promise<import('./interface.js').BoardSubscriptionRecord> {
+    async createBoardSubscription(sub: import('../../interface.js').BoardSubscriptionRecord): Promise<import('../../interface.js').BoardSubscriptionRecord> {
         this.boardSubscriptions.set(`${sub.boardId}::${sub.gaii}`, sub);
         return sub;
     }
 
-    async getBoardSubscription(boardId: string, gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord | null> {
+    async getBoardSubscription(boardId: string, gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord | null> {
         return this.boardSubscriptions.get(`${boardId}::${gaii}`) ?? null;
     }
 
-    async listBoardSubscriptions(boardId: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+    async listBoardSubscriptions(boardId: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
         return [...this.boardSubscriptions.values()].filter(s => s.boardId === boardId);
     }
 
-    async listSubscriptionsByAgent(gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+    async listSubscriptionsByAgent(gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
         return [...this.boardSubscriptions.values()].filter(s => s.gaii === gaii);
     }
 
@@ -1335,14 +1335,14 @@ export class MongoStorage implements Storage {
 
     // ── Maintenance Mode ────────────────────────────────────────
 
-    async getMaintenanceMode(): Promise<import('./interface.js').MaintenanceState> {
+    async getMaintenanceMode(): Promise<import('../../interface.js').MaintenanceState> {
         this.ensureReady();
         const row = await this.prisma.systemSetting.findUnique({ where: { key: 'maintenance' } });
         if (!row) return { enabled: false, message: '', enabledAt: null, enabledBy: null };
-        return JSON.parse(row.value) as import('./interface.js').MaintenanceState;
+        return JSON.parse(row.value) as import('../../interface.js').MaintenanceState;
     }
 
-    async setMaintenanceMode(state: import('./interface.js').MaintenanceState): Promise<import('./interface.js').MaintenanceState> {
+    async setMaintenanceMode(state: import('../../interface.js').MaintenanceState): Promise<import('../../interface.js').MaintenanceState> {
         this.ensureReady();
         await this.prisma.systemSetting.upsert({
             where: { key: 'maintenance' },
@@ -1620,24 +1620,24 @@ export class MongoStorage implements Storage {
 
     // ── Flags (Phase 1.5) ──────────────────────────────────
 
-    private flags = new Map<string, import('./interface.js').FlagRecord>();
+    private flags = new Map<string, import('../../interface.js').FlagRecord>();
 
-    async createFlag(record: import('./interface.js').FlagRecord): Promise<import('./interface.js').FlagRecord> {
+    async createFlag(record: import('../../interface.js').FlagRecord): Promise<import('../../interface.js').FlagRecord> {
         this.flags.set(record.id, record);
         return record;
     }
 
-    async getFlag(id: string): Promise<import('./interface.js').FlagRecord | null> {
+    async getFlag(id: string): Promise<import('../../interface.js').FlagRecord | null> {
         return this.flags.get(id) ?? null;
     }
 
-    async getFlagsByTarget(targetType: string, targetId: string): Promise<import('./interface.js').FlagRecord[]> {
+    async getFlagsByTarget(targetType: string, targetId: string): Promise<import('../../interface.js').FlagRecord[]> {
         return [...this.flags.values()].filter(
             f => f.targetType === targetType && f.targetId === targetId,
         );
     }
 
-    async getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<import('./interface.js').FlagRecord | null> {
+    async getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<import('../../interface.js').FlagRecord | null> {
         for (const f of this.flags.values()) {
             if (f.targetType === targetType && f.targetId === targetId && f.flaggedBy === flaggedBy) {
                 return f;
@@ -1646,7 +1646,7 @@ export class MongoStorage implements Storage {
         return null;
     }
 
-    async getFlagSummary(targetType: string, targetId: string): Promise<import('./interface.js').FlagSummary | null> {
+    async getFlagSummary(targetType: string, targetId: string): Promise<import('../../interface.js').FlagSummary | null> {
         const matching = [...this.flags.values()].filter(
             f => f.targetType === targetType && f.targetId === targetId,
         );
@@ -1668,7 +1668,7 @@ export class MongoStorage implements Storage {
         };
     }
 
-    async updateFlag(id: string, updates: Partial<import('./interface.js').FlagRecord>): Promise<import('./interface.js').FlagRecord | null> {
+    async updateFlag(id: string, updates: Partial<import('../../interface.js').FlagRecord>): Promise<import('../../interface.js').FlagRecord | null> {
         const existing = this.flags.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates };
@@ -1676,7 +1676,7 @@ export class MongoStorage implements Storage {
         return updated;
     }
 
-    async listFlags(opts?: { status?: string; targetType?: string; page?: number; perPage?: number }): Promise<import('./interface.js').FlagRecord[]> {
+    async listFlags(opts?: { status?: string; targetType?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').FlagRecord[]> {
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
         let results = [...this.flags.values()];
@@ -1693,18 +1693,18 @@ export class MongoStorage implements Storage {
 
     // ── Matches (Phase 2.1 — in-memory fallback until Prisma schema is updated) ──
 
-    private matchRecords = new Map<string, import('./interface.js').MatchRecord>();
+    private matchRecords = new Map<string, import('../../interface.js').MatchRecord>();
 
-    async createMatch(record: import('./interface.js').MatchRecord): Promise<import('./interface.js').MatchRecord> {
+    async createMatch(record: import('../../interface.js').MatchRecord): Promise<import('../../interface.js').MatchRecord> {
         this.matchRecords.set(record.id, record);
         return record;
     }
 
-    async getMatch(id: string): Promise<import('./interface.js').MatchRecord | null> {
+    async getMatch(id: string): Promise<import('../../interface.js').MatchRecord | null> {
         return this.matchRecords.get(id) ?? null;
     }
 
-    async getMatchByPair(profileA: string, profileB: string): Promise<import('./interface.js').MatchRecord | null> {
+    async getMatchByPair(profileA: string, profileB: string): Promise<import('../../interface.js').MatchRecord | null> {
         for (const m of this.matchRecords.values()) {
             if (
                 (m.profileA === profileA && m.profileB === profileB) ||
@@ -1716,7 +1716,7 @@ export class MongoStorage implements Storage {
         return null;
     }
 
-    async listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<import('./interface.js').MatchRecord[]> {
+    async listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').MatchRecord[]> {
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 10;
         let results = [...this.matchRecords.values()].filter(
@@ -1732,7 +1732,7 @@ export class MongoStorage implements Storage {
         return results.slice(start, start + perPage);
     }
 
-    async updateMatch(id: string, updates: Partial<import('./interface.js').MatchRecord>): Promise<import('./interface.js').MatchRecord | null> {
+    async updateMatch(id: string, updates: Partial<import('../../interface.js').MatchRecord>): Promise<import('../../interface.js').MatchRecord | null> {
         const existing = this.matchRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates };
@@ -1752,26 +1752,26 @@ export class MongoStorage implements Storage {
         return count;
     }
 
-    async listAllMatches(): Promise<import('./interface.js').MatchRecord[]> {
+    async listAllMatches(): Promise<import('../../interface.js').MatchRecord[]> {
         return Array.from(this.matchRecords.values());
     }
 
     // ── Organisms (Phase 2.2 — in-memory fallback until Prisma schema is updated) ──
 
-    private organismRecords = new Map<string, import('./interface.js').OrganismRecord>();
-    private membershipRecords = new Map<string, import('./interface.js').OrganismMembershipRecord>();
-    private joinRequestRecords = new Map<string, import('./interface.js').JoinRequestRecord>();
+    private organismRecords = new Map<string, import('../../interface.js').OrganismRecord>();
+    private membershipRecords = new Map<string, import('../../interface.js').OrganismMembershipRecord>();
+    private joinRequestRecords = new Map<string, import('../../interface.js').JoinRequestRecord>();
 
-    async createOrganism(record: import('./interface.js').OrganismRecord): Promise<import('./interface.js').OrganismRecord> {
+    async createOrganism(record: import('../../interface.js').OrganismRecord): Promise<import('../../interface.js').OrganismRecord> {
         this.organismRecords.set(record.id, record);
         return record;
     }
 
-    async getOrganism(id: string): Promise<import('./interface.js').OrganismRecord | null> {
+    async getOrganism(id: string): Promise<import('../../interface.js').OrganismRecord | null> {
         return this.organismRecords.get(id) ?? null;
     }
 
-    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<import('./interface.js').OrganismRecord[]> {
+    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').OrganismRecord[]> {
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
         let results = [...this.organismRecords.values()];
@@ -1787,7 +1787,7 @@ export class MongoStorage implements Storage {
         return results.slice(start, start + perPage);
     }
 
-    async updateOrganism(id: string, updates: Partial<import('./interface.js').OrganismRecord>): Promise<import('./interface.js').OrganismRecord | null> {
+    async updateOrganism(id: string, updates: Partial<import('../../interface.js').OrganismRecord>): Promise<import('../../interface.js').OrganismRecord | null> {
         const existing = this.organismRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates, id: existing.id };
@@ -1805,30 +1805,30 @@ export class MongoStorage implements Storage {
         return this.organismRecords.delete(id);
     }
 
-    async createMembership(record: import('./interface.js').OrganismMembershipRecord): Promise<import('./interface.js').OrganismMembershipRecord> {
+    async createMembership(record: import('../../interface.js').OrganismMembershipRecord): Promise<import('../../interface.js').OrganismMembershipRecord> {
         this.membershipRecords.set(record.id, record);
         return record;
     }
 
-    async getMembership(organismId: string, ghii: string): Promise<import('./interface.js').OrganismMembershipRecord | null> {
+    async getMembership(organismId: string, ghii: string): Promise<import('../../interface.js').OrganismMembershipRecord | null> {
         for (const m of this.membershipRecords.values()) {
             if (m.organismId === organismId && m.ghii === ghii) return m;
         }
         return null;
     }
 
-    async listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<import('./interface.js').OrganismMembershipRecord[]> {
+    async listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<import('../../interface.js').OrganismMembershipRecord[]> {
         let results = [...this.membershipRecords.values()].filter(m => m.organismId === organismId);
         if (opts?.role) results = results.filter(m => m.role === opts.role);
         if (opts?.status) results = results.filter(m => m.status === opts.status);
         return results;
     }
 
-    async listMembershipsByGhii(ghii: string): Promise<import('./interface.js').OrganismMembershipRecord[]> {
+    async listMembershipsByGhii(ghii: string): Promise<import('../../interface.js').OrganismMembershipRecord[]> {
         return [...this.membershipRecords.values()].filter(m => m.ghii === ghii);
     }
 
-    async updateMembership(id: string, updates: Partial<import('./interface.js').OrganismMembershipRecord>): Promise<import('./interface.js').OrganismMembershipRecord | null> {
+    async updateMembership(id: string, updates: Partial<import('../../interface.js').OrganismMembershipRecord>): Promise<import('../../interface.js').OrganismMembershipRecord | null> {
         const existing = this.membershipRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates, id: existing.id };
@@ -1840,22 +1840,22 @@ export class MongoStorage implements Storage {
         return this.membershipRecords.delete(id);
     }
 
-    async createJoinRequest(record: import('./interface.js').JoinRequestRecord): Promise<import('./interface.js').JoinRequestRecord> {
+    async createJoinRequest(record: import('../../interface.js').JoinRequestRecord): Promise<import('../../interface.js').JoinRequestRecord> {
         this.joinRequestRecords.set(record.id, record);
         return record;
     }
 
-    async getJoinRequest(id: string): Promise<import('./interface.js').JoinRequestRecord | null> {
+    async getJoinRequest(id: string): Promise<import('../../interface.js').JoinRequestRecord | null> {
         return this.joinRequestRecords.get(id) ?? null;
     }
 
-    async listJoinRequests(organismId: string, opts?: { status?: string }): Promise<import('./interface.js').JoinRequestRecord[]> {
+    async listJoinRequests(organismId: string, opts?: { status?: string }): Promise<import('../../interface.js').JoinRequestRecord[]> {
         let results = [...this.joinRequestRecords.values()].filter(j => j.organismId === organismId);
         if (opts?.status) results = results.filter(j => j.status === opts.status);
         return results;
     }
 
-    async updateJoinRequest(id: string, updates: Partial<import('./interface.js').JoinRequestRecord>): Promise<import('./interface.js').JoinRequestRecord | null> {
+    async updateJoinRequest(id: string, updates: Partial<import('../../interface.js').JoinRequestRecord>): Promise<import('../../interface.js').JoinRequestRecord | null> {
         const existing = this.joinRequestRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates, id: existing.id };
@@ -1865,25 +1865,25 @@ export class MongoStorage implements Storage {
 
     // ── Appeals (Phase 2.4 — in-memory fallback until Prisma schema is updated) ──
 
-    private appealRecords = new Map<string, import('./interface.js').AppealRecord>();
+    private appealRecords = new Map<string, import('../../interface.js').AppealRecord>();
 
-    async createAppeal(record: import('./interface.js').AppealRecord): Promise<import('./interface.js').AppealRecord> {
+    async createAppeal(record: import('../../interface.js').AppealRecord): Promise<import('../../interface.js').AppealRecord> {
         this.appealRecords.set(record.id, record);
         return record;
     }
 
-    async getAppeal(id: string): Promise<import('./interface.js').AppealRecord | null> {
+    async getAppeal(id: string): Promise<import('../../interface.js').AppealRecord | null> {
         return this.appealRecords.get(id) ?? null;
     }
 
-    async getAppealByFlagId(flagId: string): Promise<import('./interface.js').AppealRecord | null> {
+    async getAppealByFlagId(flagId: string): Promise<import('../../interface.js').AppealRecord | null> {
         for (const a of this.appealRecords.values()) {
             if (a.flagId === flagId) return a;
         }
         return null;
     }
 
-    async listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<import('./interface.js').AppealRecord[]> {
+    async listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').AppealRecord[]> {
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
         let results = [...this.appealRecords.values()];
@@ -1897,7 +1897,7 @@ export class MongoStorage implements Storage {
         return results.slice(start, start + perPage);
     }
 
-    async updateAppeal(id: string, updates: Partial<import('./interface.js').AppealRecord>): Promise<import('./interface.js').AppealRecord | null> {
+    async updateAppeal(id: string, updates: Partial<import('../../interface.js').AppealRecord>): Promise<import('../../interface.js').AppealRecord | null> {
         const existing = this.appealRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates, id: existing.id };
@@ -1907,19 +1907,19 @@ export class MongoStorage implements Storage {
 
     // ── Marketplace (Phase 2.6 — in-memory fallback until Prisma schema is updated) ──
 
-    private listingRecords = new Map<string, import('./interface.js').ListingRecord>();
-    private purchaseRecords = new Map<string, import('./interface.js').PurchaseRecord>();
+    private listingRecords = new Map<string, import('../../interface.js').ListingRecord>();
+    private purchaseRecords = new Map<string, import('../../interface.js').PurchaseRecord>();
 
-    async createListing(record: import('./interface.js').ListingRecord): Promise<import('./interface.js').ListingRecord> {
+    async createListing(record: import('../../interface.js').ListingRecord): Promise<import('../../interface.js').ListingRecord> {
         this.listingRecords.set(record.id, record);
         return record;
     }
 
-    async getListing(id: string): Promise<import('./interface.js').ListingRecord | null> {
+    async getListing(id: string): Promise<import('../../interface.js').ListingRecord | null> {
         return this.listingRecords.get(id) ?? null;
     }
 
-    async listListings(opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<import('./interface.js').ListingRecord[]> {
+    async listListings(opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').ListingRecord[]> {
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
         let results = [...this.listingRecords.values()];
@@ -1937,7 +1937,7 @@ export class MongoStorage implements Storage {
         return results.slice(start, start + perPage);
     }
 
-    async updateListing(id: string, updates: Partial<import('./interface.js').ListingRecord>): Promise<import('./interface.js').ListingRecord | null> {
+    async updateListing(id: string, updates: Partial<import('../../interface.js').ListingRecord>): Promise<import('../../interface.js').ListingRecord | null> {
         const existing = this.listingRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates, id: existing.id };
@@ -1949,28 +1949,28 @@ export class MongoStorage implements Storage {
         return this.listingRecords.delete(id);
     }
 
-    async createPurchase(record: import('./interface.js').PurchaseRecord): Promise<import('./interface.js').PurchaseRecord> {
+    async createPurchase(record: import('../../interface.js').PurchaseRecord): Promise<import('../../interface.js').PurchaseRecord> {
         this.purchaseRecords.set(record.id, record);
         return record;
     }
 
-    async getPurchase(id: string): Promise<import('./interface.js').PurchaseRecord | null> {
+    async getPurchase(id: string): Promise<import('../../interface.js').PurchaseRecord | null> {
         return this.purchaseRecords.get(id) ?? null;
     }
 
-    async listPurchasesByBuyer(buyerOwner: string): Promise<import('./interface.js').PurchaseRecord[]> {
+    async listPurchasesByBuyer(buyerOwner: string): Promise<import('../../interface.js').PurchaseRecord[]> {
         return [...this.purchaseRecords.values()]
             .filter(p => p.buyerOwner === buyerOwner)
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
 
-    async listPurchasesBySeller(sellerOwner: string): Promise<import('./interface.js').PurchaseRecord[]> {
+    async listPurchasesBySeller(sellerOwner: string): Promise<import('../../interface.js').PurchaseRecord[]> {
         return [...this.purchaseRecords.values()]
             .filter(p => p.sellerOwner === sellerOwner)
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
 
-    async updatePurchase(id: string, updates: Partial<import('./interface.js').PurchaseRecord>): Promise<import('./interface.js').PurchaseRecord | null> {
+    async updatePurchase(id: string, updates: Partial<import('../../interface.js').PurchaseRecord>): Promise<import('../../interface.js').PurchaseRecord | null> {
         const existing = this.purchaseRecords.get(id);
         if (!existing) return null;
         const updated = { ...existing, ...updates, id: existing.id };
@@ -2022,28 +2022,28 @@ export class MongoStorage implements Storage {
 
     // ── Genesis Peers (Phase 3.4) ──
 
-    private genesisPeers = new Map<string, import('./interface.js').GenesisPeerRecord>();
-    private organismReputations = new Map<string, import('./interface.js').OrganismReputationRecord>();
+    private genesisPeers = new Map<string, import('../../interface.js').GenesisPeerRecord>();
+    private organismReputations = new Map<string, import('../../interface.js').OrganismReputationRecord>();
 
-    async createGenesisPeer(record: import('./interface.js').GenesisPeerRecord): Promise<import('./interface.js').GenesisPeerRecord> {
+    async createGenesisPeer(record: import('../../interface.js').GenesisPeerRecord): Promise<import('../../interface.js').GenesisPeerRecord> {
         this.genesisPeers.set(record.id, record);
         return record;
     }
-    async getGenesisPeer(id: string): Promise<import('./interface.js').GenesisPeerRecord | null> {
+    async getGenesisPeer(id: string): Promise<import('../../interface.js').GenesisPeerRecord | null> {
         return this.genesisPeers.get(id) ?? null;
     }
-    async getGenesisPeerByNodeId(nodeId: string): Promise<import('./interface.js').GenesisPeerRecord | null> {
+    async getGenesisPeerByNodeId(nodeId: string): Promise<import('../../interface.js').GenesisPeerRecord | null> {
         for (const peer of this.genesisPeers.values()) {
             if (peer.genesisNodeId === nodeId) return peer;
         }
         return null;
     }
-    async listGenesisPeers(opts?: { status?: string }): Promise<import('./interface.js').GenesisPeerRecord[]> {
+    async listGenesisPeers(opts?: { status?: string }): Promise<import('../../interface.js').GenesisPeerRecord[]> {
         let peers = [...this.genesisPeers.values()];
         if (opts?.status) peers = peers.filter(p => p.status === opts.status);
         return peers;
     }
-    async updateGenesisPeer(id: string, updates: Partial<import('./interface.js').GenesisPeerRecord>): Promise<import('./interface.js').GenesisPeerRecord | null> {
+    async updateGenesisPeer(id: string, updates: Partial<import('../../interface.js').GenesisPeerRecord>): Promise<import('../../interface.js').GenesisPeerRecord | null> {
         const peer = this.genesisPeers.get(id);
         if (!peer) return null;
         const updated = { ...peer, ...updates };
@@ -2056,17 +2056,17 @@ export class MongoStorage implements Storage {
 
     // ── Organism Reputation (Phase 3.4) ──
 
-    async setOrganismReputation(record: import('./interface.js').OrganismReputationRecord): Promise<import('./interface.js').OrganismReputationRecord> {
+    async setOrganismReputation(record: import('../../interface.js').OrganismReputationRecord): Promise<import('../../interface.js').OrganismReputationRecord> {
         this.organismReputations.set(record.organismId, record);
         return record;
     }
-    async getOrganismReputation(organismId: string): Promise<import('./interface.js').OrganismReputationRecord | null> {
+    async getOrganismReputation(organismId: string): Promise<import('../../interface.js').OrganismReputationRecord | null> {
         return this.organismReputations.get(organismId) ?? null;
     }
 
     // ── Realtime rooms (MongoDB-backed via Prisma) ──
 
-    async createRealtimeRoom(record: import('./interface.js').RealtimeRoomRecord): Promise<import('./interface.js').RealtimeRoomRecord> {
+    async createRealtimeRoom(record: import('../../interface.js').RealtimeRoomRecord): Promise<import('../../interface.js').RealtimeRoomRecord> {
         this.ensureReady();
         const row = await this.prisma.realtimeRoom.create({
             data: {
@@ -2095,7 +2095,7 @@ export class MongoStorage implements Storage {
             lastActivityAt: row.lastActivityAt.toISOString(),
         };
     }
-    async getRealtimeRoom(id: string): Promise<import('./interface.js').RealtimeRoomRecord | null> {
+    async getRealtimeRoom(id: string): Promise<import('../../interface.js').RealtimeRoomRecord | null> {
         this.ensureReady();
         const row = await this.prisma.realtimeRoom.findUnique({ where: { id } });
         if (!row) return null;
@@ -2112,7 +2112,7 @@ export class MongoStorage implements Storage {
             lastActivityAt: row.lastActivityAt.toISOString(),
         };
     }
-    async listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<import('./interface.js').RealtimeRoomRecord[]> {
+    async listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<import('../../interface.js').RealtimeRoomRecord[]> {
         this.ensureReady();
         const where: Record<string, unknown> = {};
         if (filter?.appType) where.appType = filter.appType;
@@ -2131,7 +2131,7 @@ export class MongoStorage implements Storage {
             lastActivityAt: row.lastActivityAt.toISOString(),
         }));
     }
-    async updateRealtimeRoom(id: string, updates: Partial<import('./interface.js').RealtimeRoomRecord>): Promise<import('./interface.js').RealtimeRoomRecord | null> {
+    async updateRealtimeRoom(id: string, updates: Partial<import('../../interface.js').RealtimeRoomRecord>): Promise<import('../../interface.js').RealtimeRoomRecord | null> {
         this.ensureReady();
         try {
             const data: Record<string, unknown> = {};

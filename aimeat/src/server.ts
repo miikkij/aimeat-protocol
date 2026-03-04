@@ -177,7 +177,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // Storage — select based on config
   let storage: Storage;
   if (config.dbUrl) {
-    const { MongoStorage } = await import('./storage/mongodb.js');
+    const { MongoStorage } = await import('./storage/providers/mongodb/index.js');
     const mongo = new MongoStorage(config.dbUrl);
     await mongo.ready;
     storage = mongo;

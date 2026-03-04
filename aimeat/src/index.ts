@@ -160,7 +160,7 @@ if (subcommand === 'config') {
   const action = positionals[1]; // on | off | undefined (show status)
   let storage;
   if (config.dbUrl) {
-    const { MongoStorage } = await import('./storage/mongodb.js');
+    const { MongoStorage } = await import('./storage/providers/mongodb/index.js');
     const mongo = new MongoStorage(config.dbUrl);
     await mongo.ready;
     storage = mongo;
