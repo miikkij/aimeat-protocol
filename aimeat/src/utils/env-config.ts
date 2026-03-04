@@ -392,6 +392,12 @@ export function formatConfig(config: AimeatConfig): string {
           value: String(config.personalNodeMailboxRetentionDays),
           defaultVal: '7',
         },
+        {
+          envVar: 'AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS',
+          description: 'Tunnel request timeout for forwarded messages (ms)',
+          value: String(config.personalNodeRequestTimeoutMs),
+          defaultVal: '60000',
+        },
       ],
     },
     {

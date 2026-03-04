@@ -6,6 +6,7 @@ import { aimeatStorageLib } from './lib-storage.js';
 import { aimeatSocialLib } from './lib-social.js';
 import { aimeatWalletLib } from './lib-wallet.js';
 import { aimeatWorkLib } from './lib-work.js';
+import { aimeatTunnelLib } from './lib-tunnel.js';
 
 /**
  * Serves helper JavaScript libraries at /v1/libs/*
@@ -43,6 +44,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-work.js — Actions & work exchange library
   router.get('/v1/libs/aimeat-work.js', (_req, res) => {
     res.type('application/javascript').send(aimeatWorkLib(config));
+  });
+
+  // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client
+  router.get('/v1/libs/aimeat-tunnel.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatTunnelLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -97,6 +103,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-work.js"></script>`,
           requires: 'aimeat-auth',
         },
+        {
+          name: 'aimeat-tunnel',
+          url: '/v1/libs/aimeat-tunnel.js',
+          description: 'Personal node tunnel: auto-reconnect WebSocket, heartbeat, mailbox sync, request/response',
+          size_estimate: '~10KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-tunnel.js"></script>`,
+          requires: 'aimeat-auth',
+        },
       ],
     });
   });
@@ -114,6 +128,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 <script src="/v1/libs/aimeat-social.js"></script>
 <script src="/v1/libs/aimeat-wallet.js"></script>
 <script src="/v1/libs/aimeat-work.js"></script>
+<script src="/v1/libs/aimeat-tunnel.js"></script>
 </head>
 <body>
 <h1 id="title">AIMEAT Test Harness</h1>
@@ -124,7 +139,7 @@ window.tlog = function(msg) {
   window.__testLog.push(msg);
   document.getElementById('log').textContent = window.__testLog.join('\\n');
 };
-window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work);
+window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel);
 window.__ready = true;
 </script>
 </body></html>`);

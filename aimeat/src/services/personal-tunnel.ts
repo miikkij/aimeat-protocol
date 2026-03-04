@@ -5,7 +5,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 export interface TunnelMessage {
-  type: 'request' | 'response' | 'mailbox_sync' | 'mailbox_ack' | 'heartbeat' | 'heartbeat_ack' | 'disconnect';
+  type: 'request' | 'response' | 'mailbox_sync' | 'mailbox_ack' | 'heartbeat' | 'heartbeat_ack' | 'disconnect' | 'welcome' | 'delivery_receipt';
   id: string;
   from?: string;
   to?: string;
@@ -54,6 +54,26 @@ export class TunnelManager {
     }).catch(err => logger.error('Failed to update personal node status', { nodeId, error: err }));
 
     logger.info('Personal node connected', { nodeId, ownerName, agents: agentGaiis.length });
+
+    // Send welcome message with protocol hints
+    const welcome: TunnelMessage = {
+      type: 'welcome',
+      id: uuidv4(),
+      payload: JSON.stringify({
+        protocol_version: '1.0',
+        heartbeat_interval_ms: this.config.personalNodeHeartbeatIntervalMs,
+        offline_threshold_ms: this.config.personalNodeOfflineThresholdMs,
+        request_timeout_ms: this.config.personalNodeRequestTimeoutMs,
+        reconnect_hint: {
+          strategy: 'exponential_backoff',
+          base_ms: 1000,
+          max_ms: 60000,
+          jitter: true,
+        },
+      }),
+      timestamp: new Date().toISOString(),
+    };
+    ws.send(JSON.stringify(welcome));
 
     // Send initial message with mailbox summary
     this.sendMailboxSummary(nodeId, ws);
@@ -182,17 +202,19 @@ export class TunnelManager {
     }
   }
 
-  async sendRequest(nodeId: string, message: TunnelMessage, timeoutMs = 30000): Promise<TunnelMessage | null> {
+  async sendRequest(nodeId: string, message: TunnelMessage, timeoutMs?: number): Promise<TunnelMessage | null> {
     const conn = this.connections.get(nodeId);
     if (!conn || conn.ws.readyState !== WebSocket.OPEN) {
       return null;
     }
 
+    const effectiveTimeout = timeoutMs ?? this.config.personalNodeRequestTimeoutMs;
+
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.pendingResponses.delete(message.id);
         resolve(null);
-      }, timeoutMs);
+      }, effectiveTimeout);
 
       this.pendingResponses.set(message.id, { resolve, timer });
       conn.ws.send(JSON.stringify(message));

@@ -111,6 +111,7 @@ export interface AimeatConfig {
   personalNodeMailboxRetentionDays: number;
   personalNodeHeartbeatIntervalMs: number;
   personalNodeOfflineThresholdMs: number;
+  personalNodeRequestTimeoutMs: number;
 
   // Email / SMTP (Phase 1.1)
   smtpHost: string | null;
@@ -278,6 +279,7 @@ export function loadConfig(): AimeatConfig {
     personalNodeMailboxRetentionDays: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS ?? '7', 10),
     personalNodeHeartbeatIntervalMs: parseInt(process.env.AIMEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
     personalNodeOfflineThresholdMs: parseInt(process.env.AIMEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),
+    personalNodeRequestTimeoutMs: parseInt(process.env.AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS ?? '60000', 10),
     smtpHost: process.env.AIMEAT_SMTP_HOST ?? null,
     smtpPort: parseInt(process.env.AIMEAT_SMTP_PORT ?? '587', 10),
     smtpUser: process.env.AIMEAT_SMTP_USER ?? null,

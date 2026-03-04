@@ -48,6 +48,20 @@ export async function routeToPersonalNode(
 
     const response = await tunnelManager.sendRequest(personalNode.nodeId, tunnelMsg);
     if (response) {
+      // Send delivery receipt back to confirm end-to-end delivery
+      const receipt: TunnelMessage = {
+        type: 'delivery_receipt',
+        id: uuidv4(),
+        payload: JSON.stringify({
+          original_id: tunnelMsg.id,
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+        }),
+        timestamp: new Date().toISOString(),
+      };
+      // Send delivery receipt (fire-and-forget, don't block the response)
+      void tunnelManager.sendRequest(personalNode.nodeId, receipt, 5000);
+
       return { delivered: true, response };
     }
 
