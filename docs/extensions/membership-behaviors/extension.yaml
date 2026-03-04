@@ -1,0 +1,143 @@
+extension: "1.0"
+
+metadata:
+  name: "membership-behaviors"
+  version: "1.0.0"
+  description: "Group membership with join policies, invitations, roles, and workspace RBAC"
+  author: "aimeat-core"
+  license: "MIT"
+  aimeat: ">=1.5"
+
+required_apis:
+  - memory
+  - consent
+  - trust
+
+actions:
+  - id: join
+    description: "Join an organism (respects join policy)"
+    method: POST
+    path: "/v1/ext/membership-behaviors/join"
+    auth: required
+    input:
+      organismKey:
+        type: string
+        required: true
+        description: "Memory key of the organism to join"
+      message:
+        type: string
+        max: 500
+        description: "Optional message for approval-required organisms"
+    output:
+      status:
+        type: string
+        enum: [joined, pending]
+      role:
+        type: string
+      requestId:
+        type: string
+    script: "actions/join.js"
+
+  - id: invite
+    description: "Invite someone to join (admin only)"
+    method: POST
+    path: "/v1/ext/membership-behaviors/invite"
+    auth: required
+    input:
+      organismKey:
+        type: string
+        required: true
+        description: "Memory key of the organism"
+      inviteeGhii:
+        type: string
+        required: true
+        description: "GHII of the user to invite"
+    output:
+      status:
+        type: string
+        enum: [invited]
+      invitee:
+        type: string
+    script: "actions/invite.js"
+
+  - id: leave
+    description: "Leave an organism"
+    method: POST
+    path: "/v1/ext/membership-behaviors/leave"
+    auth: required
+    input:
+      organismKey:
+        type: string
+        required: true
+        description: "Memory key of the organism to leave"
+    output:
+      status:
+        type: string
+        enum: [left]
+    script: "actions/leave.js"
+
+  - id: promote
+    description: "Change a member's role (admin only)"
+    method: POST
+    path: "/v1/ext/membership-behaviors/promote"
+    auth: required
+    input:
+      organismKey:
+        type: string
+        required: true
+        description: "Memory key of the organism"
+      memberGhii:
+        type: string
+        required: true
+        description: "GHII of the member to promote or demote"
+      role:
+        type: string
+        enum: [member, admin]
+        description: "New role for the member"
+    output:
+      status:
+        type: string
+        enum: [promoted]
+      member:
+        type: string
+      role:
+        type: string
+    script: "actions/promote.js"
+
+  - id: review-request
+    description: "Approve or reject a join request (admin only)"
+    method: POST
+    path: "/v1/ext/membership-behaviors/review-request"
+    auth: required
+    input:
+      organismKey:
+        type: string
+        required: true
+        description: "Memory key of the organism"
+      requestId:
+        type: string
+        required: true
+        description: "ID of the join request to review"
+      decision:
+        type: string
+        enum: [approve, reject]
+        description: "Whether to approve or reject the request"
+    output:
+      status:
+        type: string
+        enum: [approved, rejected]
+      requestId:
+        type: string
+    script: "actions/review-request.js"
+
+limits:
+  memory_mb: 64
+  timeout_ms: 5000
+  max_api_calls: 50
+
+federation:
+  advertise: true
+  capabilities:
+    - "membership"
+    - "join-policies"
+    - "workspace-rbac"
