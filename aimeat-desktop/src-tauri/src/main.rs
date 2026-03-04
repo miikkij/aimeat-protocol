@@ -19,6 +19,9 @@ fn main() {
             node_manager::stop_node,
             node_manager::get_node_status,
             node_manager::write_config,
+            node_manager::read_config,
+            node_manager::read_node_logs,
+            node_manager::clear_node_logs,
             ai_connector::detect_ai_services,
             ai_connector::connect_ai_service,
         ])

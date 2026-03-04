@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fi">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -17,6 +17,8 @@
       flex-direction: column;
       min-height: 100vh;
     }
+
+    /* ── Navigation ─────────────────────────────────────────── */
     nav {
       background: rgba(26, 26, 46, 0.95);
       border-bottom: 1px solid rgba(255, 105, 180, 0.2);
@@ -42,6 +44,8 @@
       background: rgba(167, 139, 250, 0.15);
       color: #d8b4fe;
     }
+
+    /* ── Status Bar ─────────────────────────────────────────── */
     .status-bar {
       background: rgba(15, 15, 30, 0.8);
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -63,6 +67,8 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
+
+    /* ── Main Content ───────────────────────────────────────── */
     main {
       flex: 1;
       padding: 32px 24px;
@@ -77,6 +83,8 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+
+    /* ── Cards ───────────────────────────────────────────────── */
     .card {
       background: rgba(30, 20, 50, 0.6);
       border: 1px solid rgba(167, 139, 250, 0.15);
@@ -89,6 +97,11 @@
       color: #d8b4fe;
       margin-bottom: 12px;
     }
+    .card p {
+      line-height: 1.6;
+    }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
     .btn {
       background: linear-gradient(135deg, #a78bfa, #f472b6);
       color: white;
@@ -106,6 +119,214 @@
       color: #d8b4fe;
       border: 1px solid rgba(167, 139, 250, 0.3);
     }
+    .btn.danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* ── Page Visibility ────────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── Forms ───────────────────────────────────────────────── */
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      color: #a78bfa;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(15, 15, 30, 0.8);
+      border: 1px solid rgba(167, 139, 250, 0.25);
+      border-radius: 10px;
+      color: #e0d4f5;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: rgba(167, 139, 250, 0.6);
+    }
+    .form-group input:read-only {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .form-group select {
+      cursor: pointer;
+    }
+    .form-group select option {
+      background: #1a1a2e;
+      color: #e0d4f5;
+    }
+    .form-hint {
+      font-size: 0.75rem;
+      color: rgba(167, 139, 250, 0.6);
+      margin-top: 4px;
+    }
+
+    /* ── Status Indicators ──────────────────────────────────── */
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .status-indicator.online {
+      background: rgba(74, 222, 128, 0.1);
+      color: #4ade80;
+      border: 1px solid rgba(74, 222, 128, 0.2);
+    }
+    .status-indicator.offline {
+      background: rgba(239, 68, 68, 0.1);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .status-indicator .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* ── Info Grid ───────────────────────────────────────────── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 16px;
+      font-size: 0.9rem;
+    }
+    .info-grid dt {
+      color: #a78bfa;
+      font-weight: 500;
+    }
+    .info-grid dd {
+      color: #e0d4f5;
+      word-break: break-all;
+    }
+
+    /* ── Log Viewer ─────────────────────────────────────────── */
+    .log-viewer {
+      background: rgba(10, 10, 20, 0.9);
+      border: 1px solid rgba(167, 139, 250, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #b4a9c9;
+    }
+    .log-viewer::-webkit-scrollbar {
+      width: 6px;
+    }
+    .log-viewer::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .log-viewer::-webkit-scrollbar-thumb {
+      background: rgba(167, 139, 250, 0.3);
+      border-radius: 3px;
+    }
+    .log-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .log-controls label {
+      font-size: 0.85rem;
+      color: #a78bfa;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .log-controls input[type="checkbox"] {
+      accent-color: #a78bfa;
+    }
+
+    /* ── Toast Notification ─────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: rgba(30, 20, 50, 0.95);
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 0.85rem;
+      color: #e0d4f5;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .toast.success { border-color: rgba(74, 222, 128, 0.4); }
+    .toast.error { border-color: rgba(239, 68, 68, 0.4); }
+
+    /* ── Service Card ───────────────────────────────────────── */
+    .service-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(167, 139, 250, 0.08);
+    }
+    .service-item:last-child {
+      border-bottom: none;
+    }
+    .service-item .service-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .service-item .service-name {
+      font-weight: 600;
+      color: #d8b4fe;
+    }
+    .service-item .service-url {
+      font-size: 0.8rem;
+      color: rgba(167, 139, 250, 0.6);
+    }
+    .service-item .service-models {
+      font-size: 0.8rem;
+      color: #a78bfa;
+    }
+
+    /* ── Empty State ────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: rgba(167, 139, 250, 0.5);
+    }
+    .empty-state .icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      opacity: 0.4;
+    }
+    .empty-state p {
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body>
@@ -122,49 +343,265 @@
     <div class="status-bar">
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Checking node status...</span>
-      <span style="margin-left: auto; color: #a78bfa;">Port: 40050</span>
+      <span id="statusPort" style="margin-left: auto; color: #a78bfa;">Port: 40050</span>
     </div>
 
     <main id="content">
-      <h1>Dashboard</h1>
-      <div class="card">
-        <h2>Node Status</h2>
-        <p id="nodeStatus">Loading...</p>
-        <br />
-        <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
+
+      <!-- ═══════════════════════════════════════════════════════
+           DASHBOARD PAGE
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page active" id="page-dashboard">
+        <h1>Dashboard</h1>
+
+        <div class="card">
+          <h2>Node Status</h2>
+          <p id="nodeStatus">Loading...</p>
+          <p id="nodeUptime" style="font-size: 0.85rem; color: #a78bfa; margin-top: 8px;"></p>
+          <br />
+          <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
+        </div>
+
+        <div class="card">
+          <h2>Quick Info</h2>
+          <dl class="info-grid" id="dashboardInfo">
+            <dt>Node ID</dt>
+            <dd id="dashNodeId">Loading...</dd>
+            <dt>Port</dt>
+            <dd id="dashPort">--</dd>
+            <dt>Role</dt>
+            <dd id="dashRole">--</dd>
+          </dl>
+        </div>
       </div>
 
-      <div class="card">
-        <h2>AI Services</h2>
-        <p id="aiStatus">Scanning for local AI services...</p>
-        <br />
-        <button class="btn secondary" onclick="detectAI()">Scan Again</button>
+      <!-- ═══════════════════════════════════════════════════════
+           CONNECTIONS PAGE
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-connections">
+        <h1>Connections</h1>
+
+        <div class="card">
+          <h2>Node Identity</h2>
+          <dl class="info-grid">
+            <dt>Node ID</dt>
+            <dd id="connNodeId">Loading...</dd>
+            <dt>Port</dt>
+            <dd id="connPort">--</dd>
+            <dt>Federation Role</dt>
+            <dd id="connRole">--</dd>
+            <dt>Status</dt>
+            <dd id="connStatus">--</dd>
+          </dl>
+        </div>
+
+        <div class="card">
+          <h2>Anchor / Genesis</h2>
+          <dl class="info-grid">
+            <dt>Genesis URL</dt>
+            <dd id="connGenesisUrl">Not configured</dd>
+            <dt>Connection</dt>
+            <dd id="connGenesisStatus">--</dd>
+          </dl>
+        </div>
+
+        <div class="card">
+          <h2>Federation Peers</h2>
+          <div class="empty-state">
+            <div class="icon">&#x1f310;</div>
+            <p>Federation peers will appear here once your node<br>is connected to the network.</p>
+            <p style="margin-top: 8px; font-size: 0.8rem;">Configure a Genesis URL in Settings to join a federation.</p>
+          </div>
+        </div>
       </div>
+
+      <!-- ═══════════════════════════════════════════════════════
+           AI SETUP PAGE
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-ai-setup">
+        <h1>AI Setup</h1>
+
+        <div class="card">
+          <h2>Local AI Services</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+            Scanning for LM Studio, Ollama, and OpenAI-compatible endpoints on your machine.
+          </p>
+          <div id="aiServicesList">
+            <p id="aiStatus">Scanning for local AI services...</p>
+          </div>
+          <br />
+          <button class="btn secondary" onclick="detectAI()">Scan Again</button>
+        </div>
+
+        <div class="card">
+          <h2>Custom AI Endpoint</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+            Manually configure a custom OpenAI-compatible endpoint.
+          </p>
+          <div class="form-group">
+            <label for="customAiUrl">Endpoint URL</label>
+            <input type="url" id="customAiUrl" placeholder="http://localhost:1234/v1" />
+            <div class="form-hint">Must expose an OpenAI-compatible /v1/models endpoint</div>
+          </div>
+          <button class="btn secondary" onclick="saveCustomAi()">Save Endpoint</button>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
+           SETTINGS PAGE
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-settings">
+        <h1>Settings</h1>
+
+        <div class="card">
+          <h2>Node Settings</h2>
+          <div class="form-group">
+            <label for="settingsNodeId">Node ID</label>
+            <input type="text" id="settingsNodeId" readonly />
+            <div class="form-hint">Generated during setup. Cannot be changed.</div>
+          </div>
+          <div class="form-group">
+            <label for="settingsPort">Port</label>
+            <input type="number" id="settingsPort" min="1024" max="65535" value="40050" />
+            <div class="form-hint">Network port for the AIMEAT server (default: 40050)</div>
+          </div>
+          <div class="form-group">
+            <label for="settingsRole">Federation Role</label>
+            <select id="settingsRole">
+              <option value="standalone">Standalone</option>
+              <option value="operator">Operator (Genesis)</option>
+              <option value="contributor">Contributor (Anchor)</option>
+              <option value="personal">Personal</option>
+            </select>
+            <div class="form-hint">Determines how this node participates in the network</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Federation</h2>
+          <div class="form-group">
+            <label for="settingsGenesisUrl">Genesis URL</label>
+            <input type="url" id="settingsGenesisUrl" placeholder="https://genesis.example.com" />
+            <div class="form-hint">URL of the genesis node to connect to (for contributor/personal roles)</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>AI Connection</h2>
+          <div class="form-group">
+            <label for="settingsAiEndpoint">AI Endpoint URL</label>
+            <input type="url" id="settingsAiEndpoint" placeholder="http://localhost:1234/v1" />
+            <div class="form-hint">OpenAI-compatible endpoint for AI features</div>
+          </div>
+          <div style="margin-top: 8px;">
+            <span id="settingsAiStatus"></span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 8px;">
+          <button class="btn" onclick="saveSettings()">Save Settings</button>
+          <button class="btn secondary" onclick="loadSettings()">Reset</button>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
+           LOGS PAGE
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-logs">
+        <h1>Logs</h1>
+
+        <div class="card">
+          <div class="log-controls">
+            <label>
+              <input type="checkbox" id="logAutoScroll" checked />
+              Auto-scroll
+            </label>
+            <label>
+              <input type="checkbox" id="logAutoRefresh" checked />
+              Auto-refresh (2s)
+            </label>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <button class="btn secondary" onclick="refreshLogs()" style="padding: 6px 14px; font-size: 0.8rem;">Refresh</button>
+              <button class="btn danger" onclick="clearLogs()" style="padding: 6px 14px; font-size: 0.8rem;">Clear Logs</button>
+            </div>
+          </div>
+          <div class="log-viewer" id="logViewer">No log output yet. Start the node to see logs.</div>
+        </div>
+      </div>
+
     </main>
   </div>
+
+  <!-- Toast notification element -->
+  <div class="toast" id="toast"></div>
 
   <script>
     const { invoke } = window.__TAURI__.tauri;
 
+    // ── Navigation Routing ──────────────────────────────────────
+    const navLinks = document.querySelectorAll('nav a[data-page]');
+    const pages = document.querySelectorAll('.page');
+
+    function navigateTo(pageName) {
+      // Update nav active state
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.dataset.page === pageName);
+      });
+      // Show/hide pages
+      pages.forEach(page => {
+        page.classList.toggle('active', page.id === 'page-' + pageName);
+      });
+      // Run page-specific init
+      if (pageName === 'connections') loadConnections();
+      if (pageName === 'settings') loadSettings();
+      if (pageName === 'ai-setup') detectAI();
+      if (pageName === 'logs') refreshLogs();
+    }
+
+    navLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateTo(link.dataset.page);
+      });
+    });
+
+    // ── Toast Notifications ─────────────────────────────────────
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast ' + type + ' show';
+      setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+
+    // ── Dashboard ───────────────────────────────────────────────
     async function checkStatus() {
       try {
         const status = await invoke('get_node_status');
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
         const btn = document.getElementById('startStopBtn');
+        const portEl = document.getElementById('statusPort');
 
         if (status.running) {
           dot.className = 'status-dot';
-          text.textContent = `Node running (PID: ${status.pid})`;
+          text.textContent = 'Node running (PID: ' + status.pid + ')';
           btn.textContent = 'Stop Node';
           document.getElementById('nodeStatus').textContent =
-            `Running on port ${status.port}`;
+            'Running on port ' + status.port;
+          if (status.uptime_seconds != null) {
+            const mins = Math.floor(status.uptime_seconds / 60);
+            const secs = status.uptime_seconds % 60;
+            document.getElementById('nodeUptime').textContent =
+              'Uptime: ' + mins + 'm ' + secs + 's';
+          }
         } else {
           dot.className = 'status-dot offline';
           text.textContent = 'Node stopped';
           btn.textContent = 'Start Node';
           document.getElementById('nodeStatus').textContent = 'Node is not running';
+          document.getElementById('nodeUptime').textContent = '';
         }
+        portEl.textContent = 'Port: ' + status.port;
       } catch (err) {
         console.error('Status check failed:', err);
       }
@@ -180,31 +617,236 @@
         }
         setTimeout(checkStatus, 1000);
       } catch (err) {
-        alert('Error: ' + err);
+        showToast('Error: ' + err, 'error');
       }
     }
 
-    async function detectAI() {
+    async function loadDashboardConfig() {
       try {
-        const services = await invoke('detect_ai_services');
-        const el = document.getElementById('aiStatus');
-        const available = services.filter(s => s.status === 'available');
-        if (available.length > 0) {
-          el.innerHTML = available.map(s =>
-            `<strong>${s.service_type}</strong> @ ${s.url} — ${s.models.length} model(s)`
-          ).join('<br>');
+        const config = await invoke('read_config');
+        document.getElementById('dashNodeId').textContent = config.node_id;
+        document.getElementById('dashPort').textContent = config.port;
+        document.getElementById('dashRole').textContent = config.federation_role;
+      } catch (err) {
+        document.getElementById('dashNodeId').textContent = 'Not configured';
+      }
+    }
+
+    // ── Connections ─────────────────────────────────────────────
+    async function loadConnections() {
+      try {
+        const config = await invoke('read_config');
+        const status = await invoke('get_node_status');
+
+        document.getElementById('connNodeId').textContent = config.node_id;
+        document.getElementById('connPort').textContent = config.port;
+        document.getElementById('connRole').textContent = config.federation_role;
+
+        // Node running status
+        const connStatusEl = document.getElementById('connStatus');
+        if (status.running) {
+          connStatusEl.innerHTML =
+            '<span class="status-indicator online"><span class="dot"></span>Online</span>';
         } else {
-          el.textContent = 'No AI services detected. Start LM Studio or Ollama first.';
+          connStatusEl.innerHTML =
+            '<span class="status-indicator offline"><span class="dot"></span>Offline</span>';
+        }
+
+        // Genesis URL
+        const genesisEl = document.getElementById('connGenesisUrl');
+        const genesisStatusEl = document.getElementById('connGenesisStatus');
+        if (config.genesis_url) {
+          genesisEl.textContent = config.genesis_url;
+          genesisStatusEl.innerHTML =
+            '<span class="status-indicator offline"><span class="dot"></span>Not verified</span>';
+        } else {
+          genesisEl.textContent = 'Not configured';
+          genesisStatusEl.textContent = '--';
         }
       } catch (err) {
-        document.getElementById('aiStatus').textContent = 'Detection failed: ' + err;
+        document.getElementById('connNodeId').textContent = 'Failed to load config';
       }
     }
 
-    // Initial checks
+    // ── AI Setup ────────────────────────────────────────────────
+    async function detectAI() {
+      try {
+        document.getElementById('aiStatus').textContent = 'Scanning...';
+        const services = await invoke('detect_ai_services');
+        const container = document.getElementById('aiServicesList');
+        const available = services.filter(s => s.status === 'available');
+
+        if (available.length > 0) {
+          container.innerHTML = available.map(s =>
+            '<div class="service-item">' +
+              '<div class="service-info">' +
+                '<span class="service-name">' + escapeHtml(s.service_type) + '</span>' +
+                '<span class="service-url">' + escapeHtml(s.url) + '</span>' +
+                '<span class="service-models">' + s.models.length + ' model(s): ' +
+                  escapeHtml(s.models.slice(0, 3).join(', ')) +
+                  (s.models.length > 3 ? '...' : '') +
+                '</span>' +
+              '</div>' +
+              '<span class="status-indicator online"><span class="dot"></span>Available</span>' +
+            '</div>'
+          ).join('');
+        } else {
+          container.innerHTML =
+            '<div class="empty-state" style="padding: 24px;">' +
+              '<p>No AI services detected.<br>Start LM Studio or Ollama first.</p>' +
+            '</div>';
+        }
+
+        // Also show unavailable services
+        const unavailable = services.filter(s => s.status !== 'available');
+        if (unavailable.length > 0) {
+          container.innerHTML += unavailable.map(s =>
+            '<div class="service-item">' +
+              '<div class="service-info">' +
+                '<span class="service-name" style="opacity: 0.5;">' + escapeHtml(s.service_type) + '</span>' +
+                '<span class="service-url" style="opacity: 0.4;">' + escapeHtml(s.url) + '</span>' +
+              '</div>' +
+              '<span class="status-indicator offline"><span class="dot"></span>Unavailable</span>' +
+            '</div>'
+          ).join('');
+        }
+      } catch (err) {
+        document.getElementById('aiServicesList').innerHTML =
+          '<p style="color: #fca5a5;">Detection failed: ' + escapeHtml(String(err)) + '</p>';
+      }
+    }
+
+    async function saveCustomAi() {
+      const url = document.getElementById('customAiUrl').value.trim();
+      if (!url) {
+        showToast('Please enter a URL', 'error');
+        return;
+      }
+      try {
+        const config = await invoke('read_config');
+        config.ai_endpoint = url;
+        await invoke('write_config', { config });
+        showToast('AI endpoint saved');
+      } catch (err) {
+        showToast('Failed to save: ' + err, 'error');
+      }
+    }
+
+    // ── Settings ────────────────────────────────────────────────
+    async function loadSettings() {
+      try {
+        const config = await invoke('read_config');
+        document.getElementById('settingsNodeId').value = config.node_id;
+        document.getElementById('settingsPort').value = config.port;
+        document.getElementById('settingsRole').value = config.federation_role;
+        document.getElementById('settingsGenesisUrl').value = config.genesis_url || '';
+        document.getElementById('settingsAiEndpoint').value = config.ai_endpoint || '';
+
+        // AI status indicator
+        const aiStatusEl = document.getElementById('settingsAiStatus');
+        if (config.ai_endpoint) {
+          aiStatusEl.innerHTML =
+            '<span class="status-indicator online"><span class="dot"></span>Configured</span>';
+        } else {
+          aiStatusEl.innerHTML =
+            '<span class="status-indicator offline"><span class="dot"></span>Not configured</span>';
+        }
+      } catch (err) {
+        showToast('Failed to load settings: ' + err, 'error');
+      }
+    }
+
+    async function saveSettings() {
+      const config = {
+        node_id: document.getElementById('settingsNodeId').value,
+        port: parseInt(document.getElementById('settingsPort').value, 10) || 40050,
+        federation_role: document.getElementById('settingsRole').value,
+        genesis_url: document.getElementById('settingsGenesisUrl').value || null,
+        ai_endpoint: document.getElementById('settingsAiEndpoint').value || null,
+      };
+
+      try {
+        await invoke('write_config', { config });
+        showToast('Settings saved successfully');
+      } catch (err) {
+        showToast('Failed to save: ' + err, 'error');
+      }
+    }
+
+    // ── Logs ────────────────────────────────────────────────────
+    let logRefreshInterval = null;
+
+    async function refreshLogs() {
+      try {
+        const lines = await invoke('read_node_logs', { lines: 500 });
+        const viewer = document.getElementById('logViewer');
+        if (lines.length === 0) {
+          viewer.textContent = 'No log output yet. Start the node to see logs.';
+        } else {
+          viewer.textContent = lines.join('\n');
+        }
+
+        // Auto-scroll to bottom
+        if (document.getElementById('logAutoScroll').checked) {
+          viewer.scrollTop = viewer.scrollHeight;
+        }
+      } catch (err) {
+        // Log file might not exist yet, that is OK
+        document.getElementById('logViewer').textContent =
+          'No log file found. Start the node to begin logging.';
+      }
+    }
+
+    async function clearLogs() {
+      try {
+        await invoke('clear_node_logs');
+        document.getElementById('logViewer').textContent = 'Logs cleared.';
+        showToast('Logs cleared');
+      } catch (err) {
+        showToast('Failed to clear logs: ' + err, 'error');
+      }
+    }
+
+    function startLogPolling() {
+      stopLogPolling();
+      if (document.getElementById('logAutoRefresh').checked) {
+        logRefreshInterval = setInterval(() => {
+          // Only poll when logs page is visible
+          const logsPage = document.getElementById('page-logs');
+          if (logsPage.classList.contains('active')) {
+            refreshLogs();
+          }
+        }, 2000);
+      }
+    }
+
+    function stopLogPolling() {
+      if (logRefreshInterval) {
+        clearInterval(logRefreshInterval);
+        logRefreshInterval = null;
+      }
+    }
+
+    document.getElementById('logAutoRefresh').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        startLogPolling();
+      } else {
+        stopLogPolling();
+      }
+    });
+
+    // ── Utilities ───────────────────────────────────────────────
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ── Init ────────────────────────────────────────────────────
     checkStatus();
-    detectAI();
+    loadDashboardConfig();
     setInterval(checkStatus, 5000);
+    startLogPolling();
   </script>
 </body>
 </html>
