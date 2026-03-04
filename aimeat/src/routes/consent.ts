@@ -6,7 +6,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { StatsCollector } from '../services/stats.js';
 
-export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector): Router {
+export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
 
     // POST /v1/consent — Create a new consent grant
@@ -49,6 +49,11 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         });
 
         stats?.increment('consent_grants');
+
+        // Notify directory of federation consent changes (Phase 1.4 — event-driven refresh)
+        if (consent.scope === 'federation' && onDirectoryChange) {
+            onDirectoryChange();
+        }
 
         res.status(201).json(success(config.nodeId, {
             id: consent.id,
@@ -181,6 +186,11 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
         await storage.updateConsent(id, { status: 'revoked', revokedAt: now });
 
         stats?.increment('consent_revocations');
+
+        // Notify directory of federation consent revocation (Phase 1.4 — event-driven refresh)
+        if (consent.scope === 'federation' && onDirectoryChange) {
+            onDirectoryChange();
+        }
 
         res.json(success(config.nodeId, {
             status: 'revoked',

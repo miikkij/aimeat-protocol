@@ -62,6 +62,8 @@ tags:
     description: Operator dashboard and configuration
   - name: MCP
     description: Model Context Protocol integration (optional extension)
+  - name: Setup
+    description: Phase 1.2 — First-run node setup wizard and initialization
   - name: Schema
     description: Phase 0.1 — Schema locking for memory key patterns
   - name: CSM
@@ -300,6 +302,40 @@ components:
           type: integer
           minimum: 0
           maximum: 100
+        trust:
+          type: object
+          description: Detailed trust scoring (present in agent detail view)
+          properties:
+            '@type':
+              type: string
+              example: schema:Rating
+            'schema:ratingValue':
+              type: number
+              description: Trust score (0-100)
+            'schema:bestRating':
+              type: integer
+              example: 100
+            'schema:worstRating':
+              type: integer
+              example: 0
+            score:
+              type: number
+            total_deliveries:
+              type: integer
+            successful_deliveries:
+              type: integer
+            success_rate:
+              type: number
+            avg_delivery_time_seconds:
+              type: number
+            positive_ratings:
+              type: integer
+            negative_ratings:
+              type: integer
+            age_days:
+              type: integer
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
         created_at:
           type: string
           format: date-time
@@ -355,6 +391,11 @@ components:
         version:
           type: integer
           description: Optimistic locking version
+        flagCount:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of quality flags raised against this entry (Phase 1.5)
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
 
@@ -599,6 +640,20 @@ components:
     Wallet:
       type: object
       properties:
+        '@context':
+          type: object
+          description: JSON-LD context for semantic interoperability
+          properties:
+            schema:
+              type: string
+              example: https://schema.org/
+            aimeat:
+              type: string
+              example: https://aimeat.io/ns/
+        '@type':
+          type: string
+          description: Semantic type annotation
+          example: aimeat:Wallet
         gaii:
           $ref: '#/components/schemas/GAII'
         balance:
@@ -637,6 +692,10 @@ components:
     Transaction:
       type: object
       properties:
+        '@type':
+          type: string
+          description: Semantic type annotation
+          example: schema:TransferAction
         id:
           type: string
         type:
@@ -776,6 +835,16 @@ components:
     Catalogue:
       type: object
       properties:
+        '@context':
+          type: object
+          description: JSON-LD context for semantic interoperability
+          properties:
+            schema:
+              type: string
+              example: https://schema.org/
+            aimeat:
+              type: string
+              example: https://aimeat.io/ns/
         actions:
           type: array
           items:
@@ -1022,6 +1091,19 @@ components:
           type: string
         service_type:
           type: string
+        registered_by:
+          type: string
+        registered_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        semantic:
+          $ref: '#/components/schemas/SemanticAnnotation'
+        has_semantic:
+          type: boolean
+          description: Present in list responses — true if CSM has semantic annotations
 
     # === Phase 1.3: GHII Web Registration ===
     WebRegistrationRequest:
@@ -2988,6 +3070,12 @@ paths:
           schema:
             type: string
           description: Comma-separated tag filter
+        - name: max_flags
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Exclude entries with flagCount exceeding this value (Phase 1.5 data quality filter)
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -3088,6 +3176,12 @@ paths:
           schema:
             type: string
             enum: [private, owner, public]
+        - name: max_flags
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: Exclude entries with flagCount exceeding this value (Phase 1.5 data quality filter)
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -6212,6 +6306,159 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/DirectoryStats'
+
+  # ============================================================
+  # Phase 1.2: Setup Wizard
+  # ============================================================
+
+  /v1/setup/status:
+    get:
+      operationId: getSetupStatus
+      summary: Check if node needs first-run setup
+      description: |
+        Returns whether the node has been configured. If no owners exist,
+        the node is in first-run mode and should be set up via the wizard.
+        This endpoint requires no authentication.
+      tags: [Setup]
+      security: []
+      responses:
+        '200':
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          needsSetup:
+                            type: boolean
+                            description: True if no owners have been registered yet
+                          nodeId:
+                            type: string
+                            description: Current node identifier
+
+  /v1/setup/wizard:
+    get:
+      operationId: getSetupWizard
+      summary: Serve the setup wizard HTML page
+      description: |
+        Returns the interactive setup wizard as an HTML page.
+        Only functional when the node has no registered owners.
+      tags: [Setup]
+      security: []
+      responses:
+        '200':
+          description: Setup wizard HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Wizard page not found
+
+  /v1/setup/init:
+    post:
+      operationId: initializeNode
+      summary: First-run node initialization
+      description: |
+        Performs initial node setup: creates the first owner (who becomes the operator),
+        a GHII profile, a default agent, and optionally writes a .env file.
+        This endpoint can only be called once — it rejects requests if any owners already exist.
+      tags: [Setup]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner]
+              properties:
+                locale:
+                  type: string
+                  description: Preferred language (e.g. "en", "fi")
+                nodeId:
+                  type: string
+                  description: Override node ID (defaults to current config)
+                nodeType:
+                  type: string
+                  enum: [full, relay, mirror, personal]
+                  description: Node type
+                owner:
+                  type: object
+                  required: [username, password]
+                  properties:
+                    username:
+                      type: string
+                      description: Owner username (lowercase, alphanumeric)
+                    displayName:
+                      type: string
+                      description: Display name (defaults to username)
+                    email:
+                      type: string
+                      format: email
+                      description: Optional email address
+                    password:
+                      type: string
+                      minLength: 8
+                      description: Password (min 8 chars, hashed with scrypt)
+                    importPublicKey:
+                      type: string
+                      description: Optional Ed25519 public key to import instead of generating
+                genesisUrl:
+                  type: string
+                  format: uri
+                  description: Genesis node URL for federation
+                port:
+                  type: integer
+                  description: Override port number
+      responses:
+        '201':
+          description: Node initialized successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              displayName:
+                                type: string
+                              roles:
+                                type: array
+                                items:
+                                  type: string
+                          agent:
+                            type: object
+                            properties:
+                              gaii:
+                                type: string
+                              name:
+                                type: string
+                          token:
+                            type: string
+                            description: JWT for auto-login
+                          expires_at:
+                            type: string
+                            format: date-time
+                          message:
+                            type: string
+        '400':
+          description: Invalid input (missing username, short password, etc.)
+        '403':
+          description: Node already configured (owners exist)
 
   # ============================================================
   # Phase 1.5: Data Quality Flags

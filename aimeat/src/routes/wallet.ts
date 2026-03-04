@@ -31,6 +31,8 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
+      '@type': 'aimeat:Wallet',
       gaii,
       balance: agent.morselBalance,
       in_escrow: inEscrow,
@@ -68,7 +70,9 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const paged = transactions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       transactions: paged.map(tx => ({
+        '@type': 'schema:TransferAction',
         id: tx.id,
         type: tx.type,
         amount: tx.amount,
@@ -80,14 +84,21 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     }, undefined, { page, per_page: perPage, total: transactions.length }));
   });
 
-  // GET /v1/wallet/history — transaction history (legacy path)
+  // GET /v1/wallet/history — transaction history (DEPRECATED: use /v1/wallet/transactions)
   router.get('/v1/wallet/history', requireAuth(), requireRole('agent'), async (req, res) => {
+    res.setHeader('X-Deprecated', 'Use GET /v1/wallet/transactions instead');
+    res.setHeader('Deprecation', 'true');
+    res.setHeader('Sunset', '2026-09-01');
+    res.setHeader('Link', '</v1/wallet/transactions>; rel="successor-version"');
+
     const gaii = req.auth!.sub;
     const limit = Math.min(parseInt(req.query.limit as string ?? '50', 10), 200);
     const transactions = await storage.getTransactions(gaii, limit);
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       transactions: transactions.map(tx => ({
+        '@type': 'schema:TransferAction',
         id: tx.id,
         type: tx.type,
         amount: tx.amount,
@@ -96,6 +107,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
         timestamp: tx.timestamp,
       })),
       total: transactions.length,
+      _deprecated: 'This endpoint is deprecated. Use GET /v1/wallet/transactions instead.',
     }));
   });
 
@@ -128,6 +140,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     res.json(success(config.nodeId, {
+      '@type': 'schema:TransferAction',
       granted: grantAmount,
       new_balance: agent.morselBalance + grantAmount,
       reason,

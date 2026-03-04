@@ -21,7 +21,7 @@ function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' 
   }
 }
 
-export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector): Router {
+export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
   const router = Router();
 
   // Phase 2.3 — Workspace access middleware for organism.* namespace keys
@@ -122,6 +122,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // MCP resource subscription notifications
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
     if (!existing) emitResourceListChanged(gaii);
+
+    // Notify directory of profile data changes (Phase 1.4 — event-driven refresh)
+    if (onDirectoryChange && typeof key === 'string' && /^profile\.[^.]+\.(interests|location)$/.test(key)) {
+      onDirectoryChange();
+    }
 
     stats?.increment('memory_writes');
 

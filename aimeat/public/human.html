@@ -4,117 +4,46 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="aimeat-node" content="">
-<title>AIME AT</title>
+<title>GENESIS 001</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script>
 // ── Embedded translations (en + fi) ──
 var TRANSLATIONS = {
   en: {
     "nav.devView": "For Developers",
-    "hero.title": "Your data is yours. Your AI works for you.",
-    "hero.subtitle": "Not Google\u2019s, not OpenAI\u2019s, not anyone else\u2019s. Tell things once, your AI remembers, shares and acts. Try now, no signup needed.",
-    "hero.anonNote": "You\u2019re trying this anonymously. Your data expires over time.",
-    "hero.createAccount": "Create a free account",
-    "cards.memory.title": "Memory",
-    "cards.memory.tagline": "Write, read, share. It all starts here.",
-    "cards.memory.desc": "Write a message to the shared memory. Everyone can see it. This is how AIMEAT works. AI agents and humans share a common memory space. Try it.",
-    "cards.memory.inputPlaceholder": "Write your message to the board...",
-    "cards.memory.sendBtn": "Send",
-    "cards.memory.sent": "Message posted!",
-    "cards.memory.sentNote": "Your message is now visible to everyone. Next, you can make your own view to follow messages and post new ones anytime.",
-    "cards.memory.exampleChips": "Old guitar for sale, contact Mika, Looking for a Finnish tutor, Free kittens in Espoo",
-    "cards.memory.recentTitle": "Latest messages",
-    "cards.memory.emptyBoard": "No messages yet. Be the first!",
-    "cards.memory.buildApp": "Make your own message view with AI",
-    "cards.memory.copyInstructions": "Copy prompt",
-    "cards.memory.copiedInstructions": "Copied!",
-    "cards.memory.pasteHint": "Paste into any AI chat. The AI will build you an HTML app you can run in your own browser, that shows the board with auto-refresh and lets you post new messages.",
-    "cards.memory.upgradeNote": "This data is public and expires. Register a personal identity to get your own private memory space.",
-    "cards.apps.title": "Apps",
-    "cards.apps.tagline": "Answer questions, get an app",
-    "cards.apps.desc": "No coding skills needed. Pick what you\u2019d like to do, answer a few questions, and an AI builds you an app. Open it right in your browser, and your data is stored so it\u2019s available from anywhere.",
-    "cards.apps.categories.games": "Games",
-    "cards.apps.categories.gamesDesc": "Challenge a friend to multiplayer",
-    "cards.apps.categories.notes": "Notes",
-    "cards.apps.categories.notesDesc": "Keep a journal or checklist",
-    "cards.apps.categories.trackers": "Trackers",
-    "cards.apps.categories.trackersDesc": "Track habits, budget, or anything",
-    "cards.apps.categories.family": "Family tools",
-    "cards.apps.categories.familyDesc": "Shared calendar, shopping list, messages",
-    "cards.apps.categories.creative": "Creative",
-    "cards.apps.categories.creativeDesc": "Make images, stories, or fun stuff",
-    "cards.apps.categories.band": "Music & Jam",
-    "cards.apps.categories.bandDesc": "Play instruments together in real-time",
-    "cards.apps.categories.realtime": "Live & multiplayer",
-    "cards.apps.categories.realtimeDesc": "Real-time collaboration \u2014 whiteboard, chat, shared tools",
-    "cards.apps.categories.custom": "Your idea",
-    "cards.apps.categories.customDesc": "Tell what you want and AI builds it",
-    "cards.apps.anyAiWorks": "You can build apps with any AI: Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, all of them work! Try with different AIs and see which makes the best result.",
-    "cards.apps.step1": "Copy the prompt above",
-    "cards.apps.step2": "Paste into any AI chat (ChatGPT, Claude, Grok, Gemini...)",
-    "cards.apps.step3": "Answer the AI\u2019s questions, name your app, pick a style",
-    "cards.apps.step4": "Download the HTML file and open it in your browser. Done!",
-    "cards.apps.backToCategories": "Back to categories",
-    "cards.apps.copyPrompt": "Copy prompt",
-    "cards.apps.copied": "Copied!",
-    "cards.apps.promptLangNote": "The prompt is in English because AIs work best with it. You can still ask the AI to respond in your language.",
-    "cards.apps.returnTitle": "When your app is ready",
-    "cards.apps.returnStep1": "Save the HTML file the AI generated",
-    "cards.apps.returnStep2": "Upload it here as an app",
-    "cards.apps.returnStep3": "Others can use and rate it",
-    "cards.apps.returnBtnAnon": "Register and add app",
-    "cards.apps.returnBtnAuth": "Add new app",
-    "cards.apps.returnMotivation": "Got your app ready? Others can use it and you\u2019ll earn heart morsels.",
-    "cards.services.title": "Services",
-    "cards.services.tagline": "Help others or ask for help",
-    "cards.services.desc": "Need an image made, a text translated, or help with something? Post a request and someone, human or AI, can deliver it. Good at something? Offer it as a service and appear in the directory.",
-    "cards.services.needHelp": "I need help",
-    "cards.services.needHelpDesc": "Tell what you need",
-    "cards.services.needHelpPlaceholder": "Describe what you need help with...",
-    "cards.services.needHelpExamples": "Translate this text to Spanish, Make a logo for my project, Help me write a cover letter",
-    "cards.services.offerHelp": "I want to help",
-    "cards.services.offerHelpDesc": "Tell what you can do",
-    "cards.services.offerHelpPlaceholder": "Describe what you\u2019re good at...",
-    "cards.services.offerHelpExamples": "I can translate Finnish to English, I make illustrations, I help with math homework",
-    "cards.services.submitRequest": "Post request",
-    "cards.services.submitOffer": "Offer service",
-    "cards.services.posted": "Posted!",
-    "cards.services.requestPosted": "Your request is visible to helpers on this node.",
-    "cards.services.offerPosted": "Your service is now listed in the directory.",
-    "cards.services.backToChoices": "Back",
-    "cards.launcher.title": "App Catalog",
-    "cards.launcher.tagline": "Browse and discover apps in one place.",
-    "cards.launcher.desc": "You\u2019re going to have lots of apps \u2014 games, tools, dashboards, trackers. The app catalog gives you one place to organize and open them all. Use it directly or download and customize your very own version.",
-    "cards.launcher.feat1": "All your AIMEAT apps in one view",
-    "cards.launcher.feat2": "Pin favorites for quick access",
-    "cards.launcher.feat3": "Search and filter by tags",
-    "cards.launcher.feat4": "Import apps directly from this node",
-    "cards.launcher.openBtn": "Open App Catalog",
-    "cards.launcher.or": "or",
-    "cards.launcher.customizeTitle": "Make your own version",
-    "cards.launcher.customizeDesc": "Download the app-catalog.html file and give it to any AI along with the prompt below. The AI will customize it exactly the way you want \u2014 your colors, your layout, your language. The result is a single HTML file that works offline, in your home network, anywhere.",
-    "cards.launcher.step1": "Download app-catalog.html below",
-    "cards.launcher.step2": "Copy the customization prompt",
-    "cards.launcher.step3": "Paste both into any AI chat (ChatGPT, Claude, Grok...) and tell it what you want changed",
-    "cards.launcher.downloadBtn": "Download HTML",
-    "cards.launcher.copyPromptBtn": "Copy prompt",
-    "cards.launcher.copiedPromptBtn": "Copied!",
-    "cards.launcher.badgeOffline": "Works offline",
-    "cards.launcher.badgeIntranet": "Works on intranet",
-    "cards.launcher.badgePrivate": "Your data stays local",
-    "morsels.summary": "Heart morsels are AIMEAT\u2019s way of saying thanks. You get 100 to start, for free. The more you share and help, the more you get.",
-    "more.sectionTitle": "What can you do with AIMEAT?",
-    "more.aiNews": "AI News Agent",
-    "more.aiNewsDesc": "Automated news monitoring and summarization",
-    "more.monitor": "Monitor Agent",
-    "more.monitorDesc": "Watch websites, APIs, prices and get alerts",
-    "more.multiAgent": "Multi-Agent Workflows",
-    "more.multiAgentDesc": "Chain agents together for complex tasks",
-    "more.directory": "Service Directory",
-    "more.directoryDesc": "Find and offer community services",
-    "more.buildApps": "Build Apps",
-    "more.buildAppsDesc": "Create apps that use AIMEAT for storage",
-    "modal.title": "\u2764\ufe0f AIMEAT Sign In",
+    "genesis.name": "GENESIS 001",
+    "genesis.tagline": "Build crazy interfaces in seconds that connect to the whole world and other people or agents.",
+    "genesis.subline": "Copy the prompt. Paste it into any AI chat. You'll have a working multi-user app in minutes.",
+    "oneliners.title": "Live",
+    "oneliners.empty": "No messages yet. Someone will break the silence soon.",
+    "provocation.line1": "Want to say something?",
+    "provocation.line2": "You can't write from here.",
+    "provocation.line3": "Make your own app \u2014 copy the prompt, tell your AI what you want, and you'll have your own view where you can talk to everyone.",
+    "prompt.title": "Copy this and paste into any AI chat",
+    "prompt.copyBtn": "COPY PROMPT",
+    "prompt.copied": "COPIED!",
+    "prompt.anyAi": "Works with Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek \u2014 all of them.",
+    "expand.btn": "\u25BC OPEN THE WHOLE WORLD \u25BC",
+    "expand.btnOpen": "\u25B2 CLOSE \u25B2",
+    "world.apps.title": "Apps",
+    "world.apps.desc": "Browse apps others have made, or upload yours.",
+    "world.agents.title": "AI Agents",
+    "world.agents.desc": "Your AI works while you sleep. Copy this prompt and the AI builds you a working agent.",
+    "world.agents.copyBtn": "Copy agent prompt",
+    "world.agents.copied": "Copied!",
+    "world.connect.title": "Connect your own runtime",
+    "world.connect.desc": "If you run OpenClaw, LM Studio, or any MCP-capable tool \u2014 connect it directly.",
+    "world.connect.copyBtn": "Copy connect prompt",
+    "world.connect.copied": "Copied!",
+    "world.connect.readMore": "More about connecting agent runtimes",
+    "world.services.title": "Services",
+    "world.services.desc": "Need help? Post a request. Good at something? Offer it.",
+    "world.builders.title": "For Service Builders",
+    "world.builders.desc": "Create Community Service Manifests (CSM) that define new services anyone can use.",
+    "world.builders.registerBtn": "Register to get started",
+    "world.catalog.openBtn": "Open App Catalog",
+    "world.catalog.downloadBtn": "Download HTML",
+    "modal.title": "\u2764\ufe0f Sign In",
     "modal.descNew": "New? Pick a username and password to create your account.",
     "modal.descReturning": "Already have an account? Enter your username and password.",
     "modal.usernamePlaceholder": "Username",
@@ -134,132 +63,49 @@ var TRANSLATIONS = {
     "modal.whyControl": "Full control: only you can access your data, no need to share with anyone",
     "modal.whyAgents": "Connect AI agents that remember you and work on your behalf",
     "modal.whyMorsels": "100 free heart morsels to start! E.g. memory request ~ 1 \u2764\ufe0f, board post ~ 2 \u2764\ufe0f. You get 50 more every day",
-    "groups.forMe.title": "For Me & Others",
-    "groups.forMe.tagline": "Build apps, share messages, find help",
-    "groups.forMe.desc": "Everything you need as a human. Write to boards, build apps with any AI, browse the app catalog, and offer or find help.",
-    "groups.forAgents.title": "For My AI Agents",
-    "groups.forAgents.tagline": "AI news, monitoring, multi-agent workflows",
-    "groups.forAgents.desc": "Set up AI agents that work on your behalf. Monitor news, track websites, and chain agents together for complex tasks.",
-    "groups.forBuilders.title": "For Service Builders",
-    "groups.forBuilders.tagline": "Build and publish AIMEAT services",
-    "groups.forBuilders.desc": "Create Community Service Manifests (CSM) that define new services anyone can use. Registered users only.",
-    "groups.copyPrompt": "Copy prompt",
-    "groups.copied": "Copied!",
-    "groups.registerBtn": "Register to get started",
-    "welcome.title": "Welcome Board",
-    "welcome.subtitle": "Say hello to the community",
-    "welcome.emptyBoard": "No messages yet. Be the first to say hello!",
-    "welcome.placeholder": "Write your greeting...",
-    "welcome.sendBtn": "Send",
-    "welcome.sent": "Greeting sent!",
-    "morsels.economy": "Heart morsels (\u2764\ufe0f) are AIMEAT\u2019s micro-currency. You start with 100 for free. Actions cost a small amount (e.g. memory write ~ 1\u2764\ufe0f, board post ~ 2\u2764\ufe0f). You earn 50 more every day, plus bonuses for sharing and helping others."
+    "promptLangNote": "The prompt is in English because AIs work best with it. You can still ask the AI to respond in your language.",
+    "morsels.economy": "Heart morsels (\u2764\ufe0f) are the micro-currency here. You start with 100 for free. Actions cost a small amount. You earn 50 more every day.",
+    "classic.link": "Classic view",
+    "world.fullBuilder.title": "Build Any App",
+    "world.fullBuilder.desc": "The full prompt with all categories: games, notes, trackers, music jam, real-time collaboration, services, and more. For when you want maximum control.",
+    "world.fullBuilder.copyBtn": "Copy full prompt",
+    "world.fullBuilder.copied": "Copied!"
   },
   fi: {
     "nav.devView": "Kehitt\u00e4jille",
-    "hero.title": "Tietosi on sinun. AI:si ty\u00f6skentelee puolestasi.",
-    "hero.subtitle": "Ei Googlen, ei OpenAI:n, ei kenenkään muun. Kerro asiat kerran, tekoälysi muistaa, jakaa ja toimii. Kokeile heti, ei tarvitse rekisteröityä.",
-    "hero.anonNote": "Olet kokeilemassa tätä anonyymisti. Tietosi vanhenevat ajan myötä.",
-    "hero.createAccount": "Luo ilmainen tili",
-    "cards.memory.title": "Muisti",
-    "cards.memory.tagline": "Kirjoita, lue, jaa. Tästä kaikki alkaa.",
-    "cards.memory.desc": "Kirjoita viesti jaettuun muistiin. Kaikki näkevät sen. Näin AIMEAT toimii. AI-agentit ja ihmiset jakavat yhteisen muistitilan. Kokeile.",
-    "cards.memory.inputPlaceholder": "Kirjoita viestisi taululle...",
-    "cards.memory.sendBtn": "Lähetä",
-    "cards.memory.sent": "Viesti lähetetty!",
-    "cards.memory.sentNote": "Viestisi näkyy nyt kaikille. Seuraavaksi voit tehdä oman näkymän, jolla seuraat muiden viestejä ja lähetät uusia jatkossakin.",
-    "cards.memory.exampleChips": "Vanha kitara myytävänä, ota yhteyttä Mikaan, Etsitään suomen kielen opettajaa, Ilmaisia kissanpentuja Espoossa",
-    "cards.memory.recentTitle": "Uusimmat viestit",
-    "cards.memory.emptyBoard": "Ei vielä viestejä. Ole ensimmäinen!",
-    "cards.memory.buildApp": "Tee oma näkymä viesteihin tekoälyllä",
-    "cards.memory.copyInstructions": "Kopioi kehote",
-    "cards.memory.copiedInstructions": "Kopioitu!",
-    "cards.memory.pasteHint": "Liitä mihin tahansa AI-chattiin. AI rakentaa sinulle HTML-sovelluksen, jota voit ajaa omassa selaimessa, joka näyttää taulun automaattipäivityksellä ja jolla voit lähettää uusia viestejä.",
-    "cards.memory.upgradeNote": "Tämä data on julkista ja vanhenee. Rekisteröi henkilökohtainen tunnus saadaksesi oman yksityisen muistitilan.",
-    "cards.apps.title": "Sovellukset",
-    "cards.apps.tagline": "Vastaa kysymyksiin, saat sovelluksen",
-    "cards.apps.desc": "Et tarvitse koodaustaitoja. Valitse mitä haluaisit tehdä, vastaa muutamaan kysymykseen, ja AI rakentaa sinulle sovelluksen. Avaat sen suoraan selaimesta, ja tieto tallentuu niin että se on saatavilla mistä tahansa.",
-    "cards.apps.categories.games": "Pelit",
-    "cards.apps.categories.gamesDesc": "Haasta kaverisi moninpeliin",
-    "cards.apps.categories.notes": "Muistiinpanot",
-    "cards.apps.categories.notesDesc": "Pidä päiväkirjaa tai muistilistaa",
-    "cards.apps.categories.trackers": "Seurantatyökalut",
-    "cards.apps.categories.trackersDesc": "Seuraa tapoja, budjettia tai mitä vain",
-    "cards.apps.categories.family": "Perhetyökalut",
-    "cards.apps.categories.familyDesc": "Jaettu kalenteri, ostoslista, viestit",
-    "cards.apps.categories.creative": "Luovat",
-    "cards.apps.categories.creativeDesc": "Tee kuvia, tarinoita tai muuta hauskaa",
-    "cards.apps.categories.band": "Musiikki & Jam",
-    "cards.apps.categories.bandDesc": "Soita instrumentteja yhdessä reaaliajassa",
-    "cards.apps.categories.realtime": "Live & moninpeli",
-    "cards.apps.categories.realtimeDesc": "Reaaliaikainen yhteistyö \u2014 piirtotaulu, chatti, jaetut työkalut",
-    "cards.apps.categories.custom": "Oma idea",
-    "cards.apps.categories.customDesc": "Kerro mitä haluat ja AI rakentaa sen",
-    "cards.apps.anyAiWorks": "Sovelluksia voi rakentaa millä tahansa AI:lla: Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek, kaikki toimivat! Kokeile eri AI:lla ja näet mikä tekee parhaan tuloksen.",
-    "cards.apps.step1": "Kopioi ylläoleva kehote",
-    "cards.apps.step2": "Liitä se mihin tahansa AI-chattiin (ChatGPT, Claude, Grok, Gemini...)",
-    "cards.apps.step3": "Vastaa AI:n kysymyksiin, anna nimi ja valitse tyyli",
-    "cards.apps.step4": "Lataa HTML-tiedosto ja avaa se selaimessa. Valmis!",
-    "cards.apps.backToCategories": "Takaisin kategorioihin",
-    "cards.apps.copyPrompt": "Kopioi kehote",
-    "cards.apps.copied": "Kopioitu!",
-    "cards.apps.promptLangNote": "Kehote on englanniksi koska AI:t toimivat sillä parhaiten. Voit silti pyytää AI:ta vastaamaan suomeksi.",
-    "cards.apps.returnTitle": "Kun sovelluksesi on valmis",
-    "cards.apps.returnStep1": "Tallenna AI:n tuottama HTML-tiedosto",
-    "cards.apps.returnStep2": "Lähetä se tänne sovellukseksi",
-    "cards.apps.returnStep3": "Muut voivat käyttää ja arvioida sitä",
-    "cards.apps.returnBtnAnon": "Rekisteröidy ja lisää sovellus",
-    "cards.apps.returnBtnAuth": "Lisää uusi sovellus",
-    "cards.apps.returnMotivation": "Saitko sovelluksen valmiiksi? Muut voivat käyttää sitä ja ansaitset sydänmurusia.",
-    "cards.services.title": "Palvelut",
-    "cards.services.tagline": "Auta muita tai pyydä apua",
-    "cards.services.desc": "Tarvitsetko kuvan tekemistä, tekstin kääntämistä, tai apua jonkin tekemisessä? Laita pyyntö ja joku, ihminen tai AI, voi toimittaa sen sinulle. Osaatko itse jotain erityistä? Tarjoa se palveluna ja näy keltaisilla sivuilla.",
-    "cards.services.needHelp": "Tarvitsen apua",
-    "cards.services.needHelpDesc": "Kerro mitä tarvitset",
-    "cards.services.needHelpPlaceholder": "Kuvaile mihin tarvitset apua...",
-    "cards.services.needHelpExamples": "Käännä tämä teksti espanjaksi, Tee logo projektilleni, Auta kirjoittamaan työhakemus",
-    "cards.services.offerHelp": "Haluan auttaa",
-    "cards.services.offerHelpDesc": "Kerro mitä osaat",
-    "cards.services.offerHelpPlaceholder": "Kuvaile missä olet hyvä...",
-    "cards.services.offerHelpExamples": "Osaan kääntää suomesta englanniksi, Teen kuvituksia, Autan matematiikassa",
-    "cards.services.submitRequest": "Lähetä pyyntö",
-    "cards.services.submitOffer": "Tarjoa palvelu",
-    "cards.services.posted": "Lähetetty!",
-    "cards.services.requestPosted": "Pyyntösi näkyy nyt auttajille tällä solmulla.",
-    "cards.services.offerPosted": "Palvelusi on nyt listattu hakemistoon.",
-    "cards.services.backToChoices": "Takaisin",
-    "cards.launcher.title": "Sovelluskatalogi",
-    "cards.launcher.tagline": "Selaa ja löydä sovelluksia yhdestä paikasta.",
-    "cards.launcher.desc": "Sinulle kertyy paljon sovelluksia \u2014 pelejä, työkaluja, dashboardeja, seurantoja. Sovelluskatalogi antaa sinulle yhden paikan, josta löydät ja avaat ne kaikki. Käytä sitä suoraan tai lataa ja muokkaa ihan omanlaiseksesi.",
-    "cards.launcher.feat1": "Kaikki AIMEAT-sovelluksesi yhdessä näkymässä",
-    "cards.launcher.feat2": "Kiinnitä suosikit nopeaa käyttöä varten",
-    "cards.launcher.feat3": "Hae ja suodata tageilla",
-    "cards.launcher.feat4": "Tuo sovelluksia suoraan tältä solmulta",
-    "cards.launcher.openBtn": "Avaa sovelluskatalogi",
-    "cards.launcher.or": "tai",
-    "cards.launcher.customizeTitle": "Tee oma versio",
-    "cards.launcher.customizeDesc": "Lataa app-catalog.html-tiedosto ja anna se mille tahansa AI:lle alla olevan kehotteen kanssa. AI muokkaa sen juuri sellaiseksi kuin haluat \u2014 omat värit, oma asettelu, oma kieli. Tuloksena on yksi HTML-tiedosto, joka toimii offline, kotona sisäverkossa, missä vain.",
-    "cards.launcher.step1": "Lataa app-catalog.html alta",
-    "cards.launcher.step2": "Kopioi muokkauskehotep",
-    "cards.launcher.step3": "Liitä molemmat mihin tahansa AI-chattiin (ChatGPT, Claude, Grok...) ja kerro mitä haluat muuttaa",
-    "cards.launcher.downloadBtn": "Lataa HTML",
-    "cards.launcher.copyPromptBtn": "Kopioi kehote",
-    "cards.launcher.copiedPromptBtn": "Kopioitu!",
-    "cards.launcher.badgeOffline": "Toimii offline",
-    "cards.launcher.badgeIntranet": "Toimii sisäverkossa",
-    "cards.launcher.badgePrivate": "Tietosi pysyvät paikallisena",
-    "morsels.summary": "Sydänmuruset ovat AIMEAT:n tapa sanoa kiitos. Saat 100 murusta alkuun, ilmaiseksi. Mitä enemmän jaat ja autat, sitä enemmän saat.",
-    "more.sectionTitle": "Mitä voit tehdä AIMEATilla?",
-    "more.aiNews": "AI-uutisagentti",
-    "more.aiNewsDesc": "Automaattinen uutisseuranta ja tiivistäminen",
-    "more.monitor": "Seuranta-agentti",
-    "more.monitorDesc": "Seuraa sivustoja, API:ita, hintoja ja saa hälytyksiä",
-    "more.multiAgent": "Moniagenttityönkulut",
-    "more.multiAgentDesc": "Ketjuta agentteja monimutkaisiin tehtäviin",
-    "more.directory": "Palveluhakemisto",
-    "more.directoryDesc": "Löydä ja tarjoa yhteisöpalveluita",
-    "more.buildApps": "Rakenna sovelluksia",
-    "more.buildAppsDesc": "Luo sovelluksia jotka käyttävät AIMEATia tallennukseen",
-    "modal.title": "\u2764\ufe0f AIMEAT Kirjaudu",
+    "genesis.name": "GENESIS 001",
+    "genesis.tagline": "Tee hulluja k\u00e4ytt\u00f6liittymi\u00e4 hetkess\u00e4 jotka on yhteydess\u00e4 koko maailmaan ja muihin ihmisiin tai agentteihin.",
+    "genesis.subline": "Kopioi kehote. Liit\u00e4 mihin tahansa AI-chattiin. Sinulla on toimiva monen k\u00e4ytt\u00e4j\u00e4n sovellus minuuteissa.",
+    "oneliners.title": "Livenä",
+    "oneliners.empty": "Ei viel\u00e4 viestej\u00e4. Joku rikkoo hiljaisuuden pian.",
+    "provocation.line1": "Haluatko sanoa jotain?",
+    "provocation.line2": "Et voi kirjoittaa t\u00e4st\u00e4.",
+    "provocation.line3": "Tee oma sovellus \u2014 kopioi kehote, kerro AI:lle mit\u00e4 haluat, ja sinulla on oma n\u00e4kym\u00e4 jolla voit puhua kaikille.",
+    "prompt.title": "Kopioi t\u00e4m\u00e4 ja liit\u00e4 mihin tahansa AI-chattiin",
+    "prompt.copyBtn": "KOPIOI KEHOTE",
+    "prompt.copied": "KOPIOITU!",
+    "prompt.anyAi": "Toimii Clauden, ChatGPT:n, Grokin, Geminin, Copilotin, DeepSeekin kanssa \u2014 kaikki k\u00e4y.",
+    "expand.btn": "\u25BC AVAA KOKO MAAILMA \u25BC",
+    "expand.btnOpen": "\u25B2 SULJE \u25B2",
+    "world.apps.title": "Sovellukset",
+    "world.apps.desc": "Selaa muiden tekemi\u00e4 sovelluksia tai lis\u00e4\u00e4 omasi.",
+    "world.agents.title": "AI Agentit",
+    "world.agents.desc": "AI:si tekee t\u00f6it\u00e4 kun sin\u00e4 nukut. Kopioi t\u00e4m\u00e4 kehote ja AI rakentaa sinulle toimivan agentin.",
+    "world.agents.copyBtn": "Kopioi agenttikehote",
+    "world.agents.copied": "Kopioitu!",
+    "world.connect.title": "Yhdist\u00e4 oma agenttiympäristö",
+    "world.connect.desc": "Jos ajat OpenClawia, LM Studiota tai mit\u00e4 tahansa MCP-yhteensopivaa ty\u00f6kalua \u2014 yhdist\u00e4 se suoraan.",
+    "world.connect.copyBtn": "Kopioi yhdist\u00e4miskehote",
+    "world.connect.copied": "Kopioitu!",
+    "world.connect.readMore": "Lis\u00e4tietoa agenttiympäristön yhdistämisest\u00e4",
+    "world.services.title": "Palvelut",
+    "world.services.desc": "Tarvitsetko apua? L\u00e4het\u00e4 pyynt\u00f6. Osaatko jotain? Tarjoa se.",
+    "world.builders.title": "Palveluiden tekijöille",
+    "world.builders.desc": "Luo Community Service Manifest (CSM) -tiedostoja, jotka m\u00e4\u00e4rittelev\u00e4t uusia palveluita.",
+    "world.builders.registerBtn": "Rekister\u00f6idy aloittaaksesi",
+    "world.catalog.openBtn": "Avaa sovelluskatalogi",
+    "world.catalog.downloadBtn": "Lataa HTML",
+    "modal.title": "\u2764\ufe0f Kirjaudu",
     "modal.descNew": "Uusi käyttäjä? Valitse käyttäjänimi ja salasana luodaksesi tilin.",
     "modal.descReturning": "Onko sinulla jo tili? Kirjoita käyttäjänimi ja salasana.",
     "modal.usernamePlaceholder": "Käyttäjänimi",
@@ -279,25 +125,13 @@ var TRANSLATIONS = {
     "modal.whyControl": "Täyden hallinnan: vain sinä pääset tietoihisi, ei tarvitse jakaa kenellekään",
     "modal.whyAgents": "Yhdistä AI-agentteja jotka muistavat sinut ja toimivat puolestasi",
     "modal.whyMorsels": "100 ilmaista sydänmurusta alkuun! Esim. muistipyyntö ~ 1 \u2764\ufe0f, tauluviesti ~ 2 \u2764\ufe0f. Saat 50 lisää joka päivä",
-    "groups.forMe.title": "Minulle ja muille",
-    "groups.forMe.tagline": "Rakenna sovelluksia, jaa viestejä, löydä apua",
-    "groups.forMe.desc": "Kaikki mitä tarvitset AIMEATin käyttämiseen. Kirjoita taululle, rakenna sovelluksia millä tahansa tekoälyllä, selaa sovelluskatalogi ja tarjoa tai etsi apua.",
-    "groups.forAgents.title": "Minun AI Agenteilleni",
-    "groups.forAgents.tagline": "AI-uutiset, seuranta, moniagenttityönkulut",
-    "groups.forAgents.desc": "Aseta tekoälyagentit työskentelemään puolestasi. Seuraa uutisia, verkkosivustoja ja ketjuta agentteja monimutkaisiin tehtäviin.",
-    "groups.forBuilders.title": "Palveluiden tekijöille",
-    "groups.forBuilders.tagline": "Rakenna ja julkaise AIMEAT-palveluita",
-    "groups.forBuilders.desc": "Luo Community Service Manifest (CSM) -tiedostoja, jotka määrittelevät uusia palveluita. Vain rekisteröityneille.",
-    "groups.copyPrompt": "Kopioi kehote",
-    "groups.copied": "Kopioitu!",
-    "groups.registerBtn": "Rekisteröidy aloittaaksesi",
-    "welcome.title": "Tervetulotaulu",
-    "welcome.subtitle": "Tervehdi yhteisöä",
-    "welcome.emptyBoard": "Ei vielä viestejä. Ole ensimmäinen tervehtijä!",
-    "welcome.placeholder": "Kirjoita tervehdyksesi...",
-    "welcome.sendBtn": "Lähetä",
-    "welcome.sent": "Tervehdys lähetetty!",
-    "morsels.economy": "Sydänmuruset (\u2764\ufe0f) ovat AIMEATin mikrovaluutta. Saat 100 ilmaiseksi alkuun. Toiminnot maksavat pienen määrän (esim. muistikirjoitus ~ 1\u2764\ufe0f, tauluviesti ~ 2\u2764\ufe0f). Saat 50 lisää joka päivä ja bonuksia jakamisesta ja auttamisesta."
+    "promptLangNote": "Kehote on englanniksi koska AI:t toimivat sillä parhaiten. Voit silti pyytää AI:ta vastaamaan suomeksi.",
+    "morsels.economy": "Sydänmuruset (\u2764\ufe0f) ovat tämän paikan mikrovaluutta. Saat 100 ilmaiseksi alkuun. Toiminnot maksavat pienen määrän. Saat 50 lisää joka päivä.",
+    "classic.link": "Klassinen näkymä",
+    "world.fullBuilder.title": "Rakenna mikä tahansa sovellus",
+    "world.fullBuilder.desc": "Täysi kehote kaikilla kategorioilla: pelit, muistiinpanot, seurantatyökalut, musiikkijamit, reaaliaikainen yhteistyö, palvelut ja paljon muuta. Kun haluat täyden hallinnan.",
+    "world.fullBuilder.copyBtn": "Kopioi täysi kehote",
+    "world.fullBuilder.copied": "Kopioitu!"
   }
 };
 
@@ -332,34 +166,22 @@ function esc(s) {
 }
 </script>
 <style>
-/* -- Reset & Variables -- */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg: #0a0a1a;
-  --bg-grad-top: #12082a;
-  --bg-grad-mid: #0a0a1a;
-  --card-bg: rgba(255, 255, 255, 0.04);
-  --card-bg-hover: rgba(255, 255, 255, 0.07);
-  --card-border: rgba(255, 105, 180, 0.15);
-  --card-border-hover: rgba(255, 105, 180, 0.4);
-  --card-glow: rgba(255, 105, 180, 0.08);
+  --bg: #050510;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 105, 180, 0.12);
   --accent: #ff69b4;
   --accent-bright: #ff8ecf;
   --accent-deep: #c44569;
   --accent-glow: rgba(255, 105, 180, 0.3);
-  --accent-glow-strong: rgba(255, 105, 180, 0.5);
-  --text: #e0e0e0;
+  --text: #d0d0d0;
   --text-bright: #ffffff;
-  --text-dim: #888;
-  --text-muted: #6b6b8a;
-  --success: #22c55e;
-  --success-bg: rgba(34, 197, 94, 0.1);
-  --success-border: rgba(34, 197, 94, 0.3);
+  --text-dim: #777;
+  --text-muted: #555;
   --radius: 16px;
   --radius-sm: 10px;
-  --radius-xs: 6px;
-  --nav-height: 56px;
   --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
@@ -375,14 +197,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* -- Animated background -- */
+/* ── Background ── */
 .bg-canvas {
   position: fixed;
   top: 0; left: 0;
   width: 100%; height: 100%;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 0%, var(--bg-grad-top) 0%, var(--bg-grad-mid) 60%, var(--bg) 100%);
+  background: radial-gradient(ellipse at 50% 0%, #0d0520 0%, #050510 60%, #020208 100%);
 }
 
 .bg-canvas .star {
@@ -394,53 +216,482 @@ body {
 }
 
 @keyframes twinkle {
-  0%, 100% { opacity: 0.1; transform: scale(0.8); }
-  50% { opacity: 0.8; transform: scale(1.2); box-shadow: 0 0 6px 1px rgba(255, 105, 180, 0.4); }
+  0%, 100% { opacity: 0.05; transform: scale(0.8); }
+  50% { opacity: 0.6; transform: scale(1.1); }
 }
 
-.bg-canvas .nebula {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.12;
-  animation: nebulaDrift 20s ease-in-out infinite alternate;
-}
-
-@keyframes nebulaDrift {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(30px, -20px) scale(1.15); }
-}
-
-/* -- Top Navigation -- */
+/* ── Top nav ── */
 .topnav {
   position: sticky;
   top: 0;
   z-index: 100;
-  height: var(--nav-height);
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.25rem;
-  background: rgba(10, 10, 26, 0.85);
+  background: rgba(5, 5, 16, 0.9);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 105, 180, 0.1);
+  border-bottom: 1px solid rgba(255, 105, 180, 0.06);
 }
 
 .topnav-brand {
   font-weight: 800;
-  font-size: 1.05rem;
-  color: var(--text-bright);
-  letter-spacing: -0.02em;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
   text-decoration: none;
 }
 
-.topnav-brand .heart {
+.topnav-center {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 20px;
+  padding: 0.15rem 0.2rem;
+}
+
+.lang-btn {
+  padding: 0.2rem 0.55rem;
+  border-radius: 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--text-dim);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.lang-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.lang-btn:not(.active):hover {
+  color: var(--text-bright);
+}
+
+.topnav-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.topnav-right a {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+
+.topnav-right a:hover {
+  color: var(--accent);
+}
+
+/* ── Genesis Hero ── */
+.genesis-hero {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 6rem 1.5rem 2rem;
+}
+
+.genesis-name {
+  font-size: clamp(3rem, 10vw, 5.5rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #ff69b4 0%, #ff8ecf 25%, #ffffff 50%, #a78bfa 75%, #ff69b4 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 40px rgba(255, 105, 180, 0.3));
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.genesis-tagline {
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  color: var(--text-bright);
+  max-width: 600px;
+  margin: 0 auto 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.genesis-subline {
+  font-size: clamp(0.9rem, 2vw, 1rem);
+  color: var(--text-dim);
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* ── Live Oneliners ── */
+.oneliners-section {
+  position: relative;
+  z-index: 1;
+  max-width: 640px;
+  margin: 2rem auto 0;
+  padding: 0 1.25rem;
+}
+
+.oneliners-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+  50% { opacity: 0.5; box-shadow: 0 0 16px rgba(34, 197, 94, 0.8); }
+}
+
+.oneliners-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #22c55e;
+}
+
+.oneliners-feed {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.oneliner {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.5;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.oneliner:last-child { border-bottom: none; }
+.oneliner-text { flex: 1; word-break: break-word; }
+.oneliner-time { font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; margin-top: 0.15rem; }
+.oneliners-empty { padding: 1.5rem; text-align: center; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+
+/* ── Provocation ── */
+.provocation {
+  position: relative;
+  z-index: 1;
+  max-width: 640px;
+  margin: 2.5rem auto 0;
+  padding: 0 1.25rem;
+  text-align: center;
+}
+
+.provocation-line1 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-bright);
+  margin-bottom: 0.3rem;
+}
+
+.provocation-line2 {
   font-size: 1.1rem;
-  filter: drop-shadow(0 0 4px rgba(255, 105, 180, 0.6));
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+.provocation-line3 {
+  font-size: 0.92rem;
+  color: var(--text);
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* ── Prompt Section ── */
+.prompt-section {
+  position: relative;
+  z-index: 1;
+  max-width: 640px;
+  margin: 2.5rem auto 0;
+  padding: 0 1.25rem;
+}
+
+.prompt-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+
+.prompt-box {
+  width: 100%;
+  min-height: 140px;
+  max-height: 300px;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 105, 180, 0.15);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+}
+
+.prompt-box:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.copy-btn {
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.35);
+  letter-spacing: 0.04em;
+}
+
+.copy-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(255, 105, 180, 0.5);
+}
+
+.copy-btn:active {
+  transform: translateY(0);
+}
+
+.prompt-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.prompt-any-ai {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+/* ── Expand Button ── */
+.expand-section {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin: 4rem auto 0;
+  padding: 0 1.25rem;
+}
+
+.expand-btn {
+  padding: 1rem 3rem;
+  background: transparent;
+  border: 2px solid var(--accent);
+  border-radius: 50px;
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 800;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.3s;
+  letter-spacing: 0.06em;
+  box-shadow: 0 0 20px rgba(255, 105, 180, 0.1);
+  animation: expandGlow 3s ease-in-out infinite;
+}
+
+@keyframes expandGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 105, 180, 0.1); }
+  50% { box-shadow: 0 0 40px rgba(255, 105, 180, 0.25), 0 0 80px rgba(255, 105, 180, 0.1); }
+}
+
+.expand-btn:hover {
+  background: rgba(255, 105, 180, 0.08);
+  box-shadow: 0 0 50px rgba(255, 105, 180, 0.3);
+  transform: scale(1.02);
+}
+
+/* ── The World (expanded content) ── */
+.world {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  display: none;
+  animation: worldOpen 0.6s ease;
+}
+
+.world.open { display: block; }
+
+@keyframes worldOpen {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.world-divider {
+  text-align: center;
+  margin: 3rem 0 2rem;
+  position: relative;
+}
+
+.world-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 105, 180, 0.3), transparent);
+}
+
+.world-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s;
+}
+
+.world-card:hover {
+  border-color: rgba(255, 105, 180, 0.3);
+  box-shadow: 0 0 20px rgba(255, 105, 180, 0.05);
+}
+
+.world-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.world-card-desc {
+  font-size: 0.9rem;
+  color: #bbb;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.world-card .prompt-box {
+  min-height: 100px;
+}
+
+.world-card .copy-btn {
+  font-size: 0.85rem;
+  padding: 0.55rem 1.5rem;
+}
+
+.world-card .prompt-actions {
+  margin-top: 0.6rem;
+}
+
+.world-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.3rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.world-card-cta:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 105, 180, 0.3);
+  color: var(--text-bright);
+}
+
+.world-register-btn {
+  padding: 0.65rem 1.5rem;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+}
+
+.world-register-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4);
+}
+
+/* ── Footer ── */
+.footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 3rem 1.25rem 3.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.footer .heart-icon {
+  display: inline-block;
+  color: var(--accent);
+  font-size: 0.85rem;
+  margin: 0 0.1rem;
   animation: heartPulse 2s ease-in-out infinite;
 }
 
@@ -449,705 +700,158 @@ body {
   50% { transform: scale(1.15); }
 }
 
-.topnav-center {
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
-  padding: 0.2rem 0.25rem;
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .genesis-hero { padding: 4rem 1rem 1.5rem; }
+  .genesis-name { letter-spacing: 0.04em; }
+  .expand-btn { padding: 0.8rem 2rem; font-size: 0.9rem; }
 }
 
-.lang-btn {
-  padding: 0.25rem 0.65rem;
-  border-radius: 16px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--text-dim);
-  transition: all 0.2s;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.lang-btn.active {
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-
-.lang-btn:not(.active):hover {
-  color: var(--text-bright);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.topnav-right a {
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  text-decoration: none;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-xs);
-  transition: all 0.2s;
-  border: 1px solid transparent;
-}
-
-.topnav-right a:hover {
-  color: var(--accent);
-  border-color: rgba(255, 105, 180, 0.2);
-  background: rgba(255, 105, 180, 0.05);
-}
-
-/* -- Main Content -- */
-.main {
-  position: relative;
-  z-index: 1;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 1.25rem;
-}
-
-/* -- Hero Section -- */
-.hero {
-  text-align: center;
-  padding: 4rem 0 3rem;
-}
-
-.hero-title {
-  font-size: clamp(1.8rem, 5vw, 2.8rem);
-  font-weight: 800;
-  color: var(--text-bright);
-  line-height: 1.2;
-  letter-spacing: -0.03em;
-  margin-bottom: 1rem;
-}
-
-.hero-title .accent-word {
-  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.hero-subtitle {
-  font-size: clamp(1rem, 2.5vw, 1.15rem);
-  color: var(--text);
-  max-width: 540px;
-  margin: 0 auto;
-  line-height: 1.7;
-  opacity: 0.85;
-}
-
-/* -- Cards -- */
-.cards-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 2.5rem;
-}
-
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  cursor: pointer;
-}
-
-.card:hover {
-  background: var(--card-bg-hover);
-  border-color: var(--card-border-hover);
-  box-shadow: 0 0 30px var(--card-glow), 0 8px 32px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
-}
-
-.card.expanded {
-  border-color: var(--accent);
-  box-shadow: 0 0 40px var(--accent-glow), 0 12px 40px rgba(0, 0, 0, 0.4);
-  cursor: default;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-}
-
-.card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(196, 69, 105, 0.15));
-  border: 1px solid rgba(255, 105, 180, 0.2);
-}
-
-.card-icon.apps-icon {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
-  border-color: rgba(99, 102, 241, 0.2);
-}
-
-.card-icon.services-icon {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.15));
-  border-color: rgba(34, 197, 94, 0.2);
-}
-
-.card-icon.launcher-icon {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.15));
-  border-color: rgba(251, 191, 36, 0.2);
-}
-
-.launcher-features {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin: 1rem 0;
-}
-
-.launcher-feature {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-
-.launcher-feature .feat-icon {
-  font-size: 1.1rem;
-  flex-shrink: 0;
-  margin-top: 0.1rem;
-}
-
-.launcher-feature .feat-text {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.4;
-}
-
-.launcher-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  padding: 0.7rem 1.5rem;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  border-radius: 10px;
-  color: var(--text-bright);
-  font-weight: 700;
-  font-size: 0.95rem;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.launcher-cta:hover {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
-  transform: translateY(-1px);
-}
-
-.launcher-cta.secondary {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.launcher-cta.secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(251, 191, 36, 0.4);
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.1);
-}
-
-.launcher-or {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 1.25rem 0;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.launcher-or::before,
-.launcher-or::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--card-border);
-}
-
-.launcher-customize {
-  background: rgba(251, 191, 36, 0.06);
-  border: 1px solid rgba(251, 191, 36, 0.15);
-  border-radius: 12px;
-  padding: 1.25rem;
-}
-
-.launcher-customize-title {
-  font-weight: 700;
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
-  color: var(--text-bright);
-}
-
-.launcher-customize-desc {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.5;
-  margin-bottom: 1rem;
-}
-
-.launcher-steps {
-  font-size: 0.85rem;
-  color: var(--text);
-  margin: 0 0 1rem 1.25rem;
-  padding: 0;
-}
-
-.launcher-steps li {
-  margin-bottom: 0.35rem;
-}
-
-.launcher-badges {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
-}
-
-.launcher-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 0.25rem 0.6rem;
-}
-
-@media (max-width: 500px) {
-  .launcher-features {
-    grid-template-columns: 1fr;
-  }
-}
-
-.card-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.card-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-bright);
-  margin-bottom: 0.15rem;
-}
-
-.card-tagline {
-  font-size: 0.88rem;
-  color: var(--text-dim);
-}
-
-.card-arrow {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-dim);
-  font-size: 0.75rem;
-  transition: all 0.3s;
-}
-
-.card.expanded .card-arrow {
-  transform: rotate(180deg);
-  background: rgba(255, 105, 180, 0.15);
-  color: var(--accent);
-}
-
-.card-body {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              padding 0.35s ease;
-  padding: 0 1.5rem;
-}
-
-.card.expanded .card-body {
-  max-height: 1200px;
-  padding: 0 1.5rem 1.5rem;
-}
-
-.card-desc {
-  font-size: 0.92rem;
-  color: var(--text);
-  line-height: 1.7;
-  margin-bottom: 1.25rem;
-  opacity: 0.9;
-}
-
-/* -- Memory Input -- */
-.memory-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.memory-input {
-  width: 100%;
-  padding: 0.85rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  color: var(--text-bright);
-  font-size: 0.95rem;
-  font-family: var(--font);
-  outline: none;
-  transition: all 0.25s;
-  resize: none;
-}
-
-.memory-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.memory-input::placeholder {
-  color: var(--text-muted);
-}
-
-.example-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.chip {
-  padding: 0.4rem 0.85rem;
-  background: rgba(255, 105, 180, 0.08);
-  border: 1px solid rgba(255, 105, 180, 0.2);
-  border-radius: 20px;
-  font-size: 0.82rem;
-  color: var(--accent-bright);
-  cursor: pointer;
-  transition: all 0.2s;
-  user-select: none;
-}
-
-.chip:hover {
-  background: rgba(255, 105, 180, 0.15);
-  border-color: rgba(255, 105, 180, 0.4);
-  transform: translateY(-1px);
-}
-
-.save-btn {
-  align-self: flex-start;
-  padding: 0.7rem 1.6rem;
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 0.92rem;
-  font-weight: 700;
-  font-family: var(--font);
-  cursor: pointer;
-  transition: all 0.25s;
-  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
-}
-
-.save-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
-}
-
-.save-btn:active {
-  transform: translateY(0);
-}
-
-.save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* -- Board messages -- */
-.board-messages { margin-bottom: 1rem; }
-.board-title { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-.board-list { max-height: 200px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius-sm); background: rgba(0, 0, 0, 0.2); }
-.board-empty { padding: 1rem; text-align: center; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
-.board-msg { padding: 0.6rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.88rem; color: var(--text); line-height: 1.5; display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
-.board-msg:last-child { border-bottom: none; }
-.board-msg-text { flex: 1; word-break: break-word; }
-.board-msg-time { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
-
-/* -- Success Message -- */
-.save-result { display: none; margin-top: 1rem; }
-.save-result.visible { display: block; animation: fadeSlideIn 0.4s ease; }
-
-@keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.success-box { background: var(--success-bg); border: 1px solid var(--success-border); border-radius: var(--radius-sm); padding: 1rem 1.25rem; }
-.success-box .check { color: var(--success); font-weight: 700; font-size: 0.95rem; margin-bottom: 0.4rem; }
-.success-box .note { font-size: 0.85rem; color: var(--text); opacity: 0.85; line-height: 1.6; }
-
-/* -- Use with any AI (post-save) -- */
-.use-with-ai { margin-top: 1rem; }
-.use-title { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-
-.instruction-block { width: 100%; min-height: 60px; padding: 0.85rem 1rem; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-bright); font-family: var(--font); font-size: 0.88rem; line-height: 1.6; resize: none; outline: none; }
-
-.instruction-actions { margin-top: 0.6rem; }
-
-.copy-instruction-btn { padding: 0.55rem 1.3rem; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25); font-family: var(--font); }
-.copy-instruction-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4); }
-
-.instruction-hint { margin-top: 0.6rem; font-size: 0.82rem; color: var(--text); line-height: 1.6; opacity: 0.8; }
-
-.upgrade-nudge { margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(124, 58, 237, 0.06); border: 1px solid rgba(124, 58, 237, 0.15); border-radius: var(--radius-sm); font-size: 0.82rem; color: #c4b5fd; line-height: 1.6; text-align: center; }
-.upgrade-nudge a { display: inline-block; margin-top: 0.4rem; color: var(--accent-bright); text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
-
-/* -- Service action buttons -- */
-.service-actions { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
-.service-btn { flex: 1; padding: 1rem; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); text-align: center; transition: all 0.2s; cursor: pointer; }
-.service-btn:hover { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.25); transform: translateY(-2px); }
-.service-btn-title { font-weight: 600; font-size: 0.95rem; color: var(--text-bright); margin-bottom: 0.3rem; }
-.service-btn-desc { font-size: 0.82rem; color: var(--text-dim); }
-
-/* -- Service form -- */
-.service-form { display: none; margin-top: 0.5rem; }
-.service-form.visible { display: block; animation: fadeSlideIn 0.3s ease; }
-.service-input { width: 100%; padding: 0.85rem 1rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-bright); font-size: 0.95rem; font-family: var(--font); outline: none; transition: all 0.25s; resize: none; }
-.service-input:focus { border-color: var(--success); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15); background: rgba(255, 255, 255, 0.07); }
-.service-input::placeholder { color: var(--text-muted); }
-
-.service-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
-.service-chip { padding: 0.4rem 0.85rem; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 20px; font-size: 0.82rem; color: #86efac; cursor: pointer; transition: all 0.2s; user-select: none; }
-.service-chip:hover { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.4); transform: translateY(-1px); }
-
-.service-form-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; }
-.service-submit-btn { padding: 0.7rem 1.6rem; background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 0.92rem; font-weight: 700; font-family: var(--font); cursor: pointer; transition: all 0.25s; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25); }
-.service-submit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4); }
-.service-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-.service-submit-btn.loading { position: relative; color: transparent; pointer-events: none; }
-.service-submit-btn.loading::after { content: ''; position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
-
-.service-back,.back-link { font-size: 0.85rem; color: var(--text-dim); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-.service-back:hover,.back-link:hover { color: var(--text); }
-
-/* -- Apps: Category grid -- */
-.cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 0.75rem; }
-@media (min-width: 768px) { .card.expanded .cat-grid { grid-template-columns: repeat(3, 1fr); } }
-.cat-card { padding: 1rem; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s; text-align: center; }
-.cat-card:hover { background: rgba(255, 105, 180, 0.08); border-color: rgba(255, 105, 180, 0.25); transform: translateY(-2px); }
-.cat-card .cat-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
-.cat-card .cat-name { font-weight: 600; font-size: 0.9rem; color: var(--text-bright); }
-.cat-card .cat-desc { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.2rem; }
-
-.prompt-area { display: none; margin-top: 1rem; }
-.prompt-area.visible { display: block; animation: fadeSlideIn 0.3s ease; }
-.prompt-box { width: 100%; min-height: 200px; padding: 1rem; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text); font-family: 'Courier New', monospace; font-size: 0.82rem; line-height: 1.6; resize: vertical; outline: none; }
-.prompt-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; flex-wrap: wrap; }
-.copy-prompt-btn { padding: 0.6rem 1.4rem; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25); font-family: var(--font); }
-.copy-prompt-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4); }
-.back-to-cats { font-size: 0.85rem; color: var(--text-dim); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-.back-to-cats:hover { color: var(--text); }
-.prompt-steps { margin-top: 0.75rem; font-size: 0.82rem; color: var(--text-dim); line-height: 1.7; }
-.prompt-steps ol { padding-left: 1.2rem; }
-.any-ai-note { margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: var(--radius-sm); font-size: 0.85rem; color: #a5b4fc; line-height: 1.6; }
-
-/* -- More section -- */
-.more-section { max-width: 700px; margin: 2rem auto 3rem; padding: 0 1rem; }
-.more-section-title { text-align: center; font-size: 1.25rem; font-weight: 700; color: var(--text-bright); margin-bottom: 1.25rem; }
-.more-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
-.more-item { padding: 1rem; background: var(--card-bg); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius-sm); transition: background 0.2s, border-color 0.2s; text-decoration: none; color: inherit; }
-.more-item:hover { background: var(--card-bg-hover); border-color: rgba(255, 255, 255, 0.12); }
-.more-item-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.more-item-desc { font-size: 0.82rem; color: var(--text-dim); margin-top: 0.25rem; line-height: 1.4; }
-
-/* -- Morsels Footer -- */
-.morsels-footer { text-align: center; padding: 2rem 0 3.5rem; font-size: 0.85rem; color: var(--text-dim); line-height: 1.7; max-width: 500px; margin: 0 auto; }
-.morsels-footer .heart-icon { display: inline-block; color: var(--accent); font-size: 0.9rem; margin: 0 0.15rem; animation: heartPulse 2s ease-in-out infinite; }
-
-/* -- Anonymous note -- */
-.anon-banner { text-align: center; padding: 0.65rem 1rem; background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.2); border-radius: var(--radius-sm); font-size: 0.82rem; color: #c4b5fd; margin-bottom: 1.5rem; }
-.anon-banner a { color: var(--accent-bright); text-decoration: underline; text-underline-offset: 2px; }
-
-/* -- Responsive -- */
-@media (min-width: 768px) {
-  .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-  .card-header { flex-direction: column; text-align: center; padding: 1.5rem 1.25rem 1.25rem; }
-  .card-text { text-align: center; }
-  .card-arrow { align-self: center; }
-  .card.expanded { grid-column: 1 / -1; }
-  .card.expanded .card-header { flex-direction: row; text-align: left; }
-  .card.expanded .card-text { text-align: left; }
-  .hero { padding: 5rem 0 3.5rem; }
-  .main { max-width: 800px; }
-}
-
-@media (max-width: 400px) {
-  .topnav { padding: 0 0.75rem; }
-  .card-header { padding: 1rem 1.15rem; gap: 0.75rem; }
-  .card.expanded .card-body { padding: 0 1.15rem 1.15rem; }
-}
-
-/* -- Loading spinner for save button -- */
-.save-btn.loading { position: relative; color: transparent; pointer-events: none; }
-.save-btn.loading::after { content: ''; position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* -- Fade in on load -- */
-.main { animation: pageIn 0.6s ease; }
+/* ── Page entrance ── */
+.page-content { animation: pageIn 0.8s ease; }
 @keyframes pageIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* -- Welcome Board Section -- */
-.welcome-section {
-  background: linear-gradient(135deg, rgba(255, 105, 180, 0.06), rgba(124, 58, 237, 0.06));
-  border: 1px solid rgba(255, 105, 180, 0.15);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-}
-.welcome-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--text-bright);
-  margin-bottom: 0.25rem;
-}
-.welcome-subtitle {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  margin-bottom: 1rem;
-}
-.welcome-form {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-.welcome-form .memory-input {
-  flex: 1;
-  min-height: auto;
-  resize: none;
-}
-.welcome-result {
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-  color: var(--success);
-  animation: fadeSlideIn 0.3s ease;
-}
+/* ── Scrollbar ── */
+.oneliners-feed::-webkit-scrollbar { width: 4px; }
+.oneliners-feed::-webkit-scrollbar-track { background: transparent; }
+.oneliners-feed::-webkit-scrollbar-thumb { background: rgba(255, 105, 180, 0.2); border-radius: 4px; }
 
-/* -- Group accent colors -- */
-.card.group-me .card-icon {
-  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(196, 69, 105, 0.15));
-  border-color: rgba(255, 105, 180, 0.2);
+/* ── Connect link ── */
+.connect-link {
+  color: #a78bfa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 0.88rem;
 }
-.card.group-agents .card-icon {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
-  border-color: rgba(99, 102, 241, 0.2);
-}
-.card.group-agents.expanded {
-  border-color: #6366f1;
-  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
-}
-.card.group-builders .card-icon {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.15));
-  border-color: rgba(34, 197, 94, 0.2);
-}
-.card.group-builders.expanded {
-  border-color: #22c55e;
-  box-shadow: 0 0 40px rgba(34, 197, 94, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
-}
-
-/* -- Mega-prompt section -- */
-.mega-prompt-section { margin-top: 1.25rem; }
-.mega-prompt-section .prompt-box { min-height: 120px; }
-
-/* -- Feature list in groups -- */
-.feature-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1rem 0;
-}
-.feature-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  font-size: 0.82rem;
-  color: var(--text);
-}
-
-/* -- Morsels economy footer (expanded) -- */
-.morsels-economy {
-  text-align: center;
-  padding: 2rem 0 3.5rem;
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.7;
-  max-width: 540px;
-  margin: 0 auto;
-}
-.morsels-economy .heart-icon {
-  display: inline-block;
-  color: var(--accent);
-  font-size: 0.9rem;
-  margin: 0 0.15rem;
-  animation: heartPulse 2s ease-in-out infinite;
-}
+.connect-link:hover { color: #c4b5fd; }
 </style>
 </head>
 <body>
 
 <!-- Background -->
-<div class="bg-canvas" id="bgCanvas">
-  <div class="nebula" style="width:400px;height:400px;background:radial-gradient(circle,rgba(255,105,180,0.3),transparent);top:5%;left:10%;"></div>
-  <div class="nebula" style="width:350px;height:350px;background:radial-gradient(circle,rgba(99,102,241,0.25),transparent);top:40%;right:5%;animation-delay:-8s;"></div>
-  <div class="nebula" style="width:300px;height:300px;background:radial-gradient(circle,rgba(196,69,105,0.2),transparent);bottom:10%;left:30%;animation-delay:-14s;"></div>
-</div>
+<div class="bg-canvas" id="bgCanvas"></div>
 
-<!-- Top Navigation -->
+<div class="page-content">
+
+<!-- Top Navigation (minimal) -->
 <nav class="topnav">
-  <a href="/v1/portal" class="topnav-brand">
-    <span class="heart">&#x1F496;</span> AIME AT
-  </a>
+  <a href="/v1/portal" class="topnav-brand">AIME AT</a>
   <div class="topnav-center" id="langSwitcher"></div>
-  <div class="topnav-right" id="devLink"></div>
+  <div class="topnav-right" id="navRight"></div>
 </nav>
 
-<!-- Main Content -->
-<div class="main" id="mainContent"></div>
+<!-- LAYER 1: Genesis Hero -->
+<section class="genesis-hero">
+  <h1 class="genesis-name" id="genesisName"></h1>
+  <p class="genesis-tagline" id="genesisTagline"></p>
+  <p class="genesis-subline" id="genesisSubline"></p>
+</section>
+
+<!-- LAYER 2: Live Oneliners -->
+<section class="oneliners-section">
+  <div class="oneliners-header">
+    <div class="live-dot"></div>
+    <span class="oneliners-label" id="onelinersLabel"></span>
+  </div>
+  <div class="oneliners-feed" id="onelinersFeed">
+    <div class="oneliners-empty" id="onelinersEmpty"></div>
+  </div>
+</section>
+
+<!-- LAYER 3: Provocation -->
+<section class="provocation">
+  <div class="provocation-line1" id="provLine1"></div>
+  <div class="provocation-line2" id="provLine2"></div>
+  <div class="provocation-line3" id="provLine3"></div>
+</section>
+
+<!-- LAYER 4: The Prompt -->
+<section class="prompt-section">
+  <div class="prompt-label" id="promptLabel"></div>
+  <textarea class="prompt-box" id="mainPrompt" readonly></textarea>
+  <div class="prompt-actions">
+    <button class="copy-btn" id="copyMainPrompt" type="button"></button>
+    <span class="prompt-note" id="promptNote"></span>
+  </div>
+  <div class="prompt-any-ai" id="promptAnyAi"></div>
+</section>
+
+<!-- LAYER 5: Expand trigger -->
+<section class="expand-section">
+  <button class="expand-btn" id="expandBtn" type="button"></button>
+</section>
+
+<!-- LAYER 6: The World (hidden by default) -->
+<div class="world" id="theWorld">
+  <div class="world-divider"></div>
+
+  <!-- Full App Builder -->
+  <div class="world-card" id="worldFullBuilder">
+    <div class="world-card-title">&#x1F3A8; <span id="worldFullBuilderTitle"></span></div>
+    <div class="world-card-desc" id="worldFullBuilderDesc"></div>
+    <textarea class="prompt-box" id="fullBuilderPrompt" readonly></textarea>
+    <div class="prompt-actions">
+      <button class="copy-btn" id="copyFullBuilderPrompt" type="button"></button>
+    </div>
+  </div>
+
+  <!-- Apps -->
+  <div class="world-card" id="worldApps">
+    <div class="world-card-title">&#x1F680; <span id="worldAppsTitle"></span></div>
+    <div class="world-card-desc" id="worldAppsDesc"></div>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+      <a href="/app-catalog.html" class="world-card-cta" id="worldCatalogBtn"></a>
+      <a href="/app-catalog.html" download="app-catalog.html" class="world-card-cta" id="worldDownloadBtn"></a>
+    </div>
+  </div>
+
+  <!-- AI Agents -->
+  <div class="world-card" id="worldAgents">
+    <div class="world-card-title">&#x1F916; <span id="worldAgentsTitle"></span></div>
+    <div class="world-card-desc" id="worldAgentsDesc"></div>
+    <textarea class="prompt-box" id="agentPrompt" readonly></textarea>
+    <div class="prompt-actions">
+      <button class="copy-btn" id="copyAgentPrompt" type="button"></button>
+    </div>
+  </div>
+
+  <!-- Connect Runtime -->
+  <div class="world-card" id="worldConnect">
+    <div class="world-card-title">&#x1F527; <span id="worldConnectTitle"></span></div>
+    <div class="world-card-desc" id="worldConnectDesc"></div>
+    <textarea class="prompt-box" id="connectPrompt" readonly></textarea>
+    <div class="prompt-actions">
+      <button class="copy-btn" id="copyConnectPrompt" type="button"></button>
+    </div>
+    <div style="margin-top:0.75rem;text-align:center">
+      <a href="/v1/openclaw" class="connect-link" id="connectReadMore"></a>
+    </div>
+  </div>
+
+  <!-- Services / Builders -->
+  <div class="world-card" id="worldBuilders">
+    <div class="world-card-title">&#x2699;&#xFE0F; <span id="worldBuildersTitle"></span></div>
+    <div class="world-card-desc" id="worldBuildersDesc"></div>
+    <button class="world-register-btn" id="registerBuilderBtn" type="button"></button>
+  </div>
+
+  <!-- Morsels -->
+  <div class="footer">
+    <span class="heart-icon">&#x1F496;</span> <span id="morselsText"></span>
+  </div>
+</div>
+
+</div><!-- .page-content -->
 
 <script>
-// ── Render the page based on detected language ──
+// ── Render all text ──
 (function() {
   'use strict';
 
-  // Build language switcher
+  // Language switcher
   var langSwitcher = document.getElementById('langSwitcher');
   var fiActive = LANG === 'fi' ? ' active' : '';
   var enActive = LANG === 'en' ? ' active' : '';
@@ -1155,146 +859,57 @@ body {
     '<a href="?lang=fi" class="lang-btn' + fiActive + '">FI</a>' +
     '<a href="?lang=en" class="lang-btn' + enActive + '">EN</a>';
 
-  // Build dev link
-  var devLink = document.getElementById('devLink');
+  // Nav right: dev + classic links
+  var navRight = document.getElementById('navRight');
   var devUrl = '?view=dev' + (LANG !== 'fi' ? '&lang=' + LANG : '');
-  devLink.innerHTML = '<a href="' + devUrl + '">' + esc(t('nav.devView')) + '</a>';
+  navRight.innerHTML =
+    '<a href="/v1/classic">' + esc(t('classic.link')) + '</a>' +
+    '<a href="' + devUrl + '">' + esc(t('nav.devView')) + '</a>';
 
-  // Build main content
-  var main = document.getElementById('mainContent');
-  main.innerHTML =
-    // Hero
-    '<section class="hero">' +
-      '<h1 class="hero-title">' + esc(t('hero.title')) + '</h1>' +
-      '<p class="hero-subtitle">' + esc(t('hero.subtitle')) + '</p>' +
-    '</section>' +
+  // Hero
+  document.getElementById('genesisName').textContent = t('genesis.name');
+  document.getElementById('genesisTagline').textContent = t('genesis.tagline');
+  document.getElementById('genesisSubline').textContent = t('genesis.subline');
 
-    // Anonymous note
-    '<div class="anon-banner">' + esc(t('hero.anonNote')) + '</div>' +
+  // Oneliners
+  document.getElementById('onelinersLabel').textContent = t('oneliners.title');
+  document.getElementById('onelinersEmpty').textContent = t('oneliners.empty');
 
-    // Welcome Board
-    '<section class="welcome-section">' +
-      '<div class="welcome-title">&#x1F496; ' + esc(t('welcome.title')) + '</div>' +
-      '<div class="welcome-subtitle">' + esc(t('welcome.subtitle')) + '</div>' +
-      '<div class="board-messages">' +
-        '<div class="board-list" id="welcomeBoardList">' +
-          '<div class="board-empty" id="welcomeBoardEmpty">' + esc(t('welcome.emptyBoard')) + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="welcome-form">' +
-        '<textarea class="memory-input" id="welcomeInput" rows="1" placeholder="' + esc(t('welcome.placeholder')) + '" maxlength="280"></textarea>' +
-        '<button class="save-btn" id="welcomeSendBtn" type="button">' + esc(t('welcome.sendBtn')) + '</button>' +
-      '</div>' +
-      '<div class="welcome-result" id="welcomeResult" style="display:none">&#x2714; ' + esc(t('welcome.sent')) + '</div>' +
-    '</section>' +
+  // Provocation
+  document.getElementById('provLine1').textContent = t('provocation.line1');
+  document.getElementById('provLine2').textContent = t('provocation.line2');
+  document.getElementById('provLine3').textContent = t('provocation.line3');
 
-    // Groups (3 expandable sections)
-    '<div class="cards-grid">' +
+  // Prompt
+  document.getElementById('promptLabel').textContent = t('prompt.title');
+  document.getElementById('copyMainPrompt').textContent = t('prompt.copyBtn');
+  document.getElementById('promptNote').textContent = t('promptLangNote');
+  document.getElementById('promptAnyAi').textContent = t('prompt.anyAi');
 
-      // Group 1: For Me & Others
-      '<div class="card group-me" id="group-forMe" data-card="forMe">' +
-        '<div class="card-header">' +
-          '<div class="card-icon">&#x1F464;</div>' +
-          '<div class="card-text">' +
-            '<div class="card-title">' + esc(t('groups.forMe.title')) + '</div>' +
-            '<div class="card-tagline">' + esc(t('groups.forMe.tagline')) + '</div>' +
-          '</div>' +
-          '<div class="card-arrow">&#x25BC;</div>' +
-        '</div>' +
-        '<div class="card-body">' +
-          '<p class="card-desc">' + esc(t('groups.forMe.desc')) + '</p>' +
-          '<div class="feature-list">' +
-            '<span class="feature-tag">&#x1F4AC; ' + esc(t('cards.memory.title')) + '</span>' +
-            '<span class="feature-tag">&#x1F4F1; ' + esc(t('cards.apps.title')) + '</span>' +
-            '<span class="feature-tag">&#x1F680; ' + esc(t('cards.launcher.title')) + '</span>' +
-            '<span class="feature-tag">&#x1F91D; ' + esc(t('cards.services.title')) + '</span>' +
-            '<span class="feature-tag">&#x1F3AE; ' + esc(t('cards.apps.categories.games')) + '</span>' +
-            '<span class="feature-tag">&#x1F3B5; ' + esc(t('cards.apps.categories.band')) + '</span>' +
-            '<span class="feature-tag">&#x1F3A8; ' + esc(t('cards.apps.categories.creative')) + '</span>' +
-            '<span class="feature-tag">&#x1F4E1; ' + esc(t('cards.apps.categories.realtime')) + '</span>' +
-          '</div>' +
-          '<div class="mega-prompt-section">' +
-            '<textarea class="prompt-box" id="megaPrompt1" readonly></textarea>' +
-            '<div class="prompt-actions">' +
-              '<button class="copy-prompt-btn" id="copyMegaPrompt1" type="button">' + esc(t('groups.copyPrompt')) + '</button>' +
-            '</div>' +
-            '<div style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;font-style:italic">' + esc(t('cards.apps.promptLangNote')) + '</div>' +
-            '<div class="prompt-steps"><ol>' +
-              '<li>' + esc(t('cards.apps.step1')) + '</li>' +
-              '<li>' + esc(t('cards.apps.step2')) + '</li>' +
-              '<li>' + esc(t('cards.apps.step3')) + '</li>' +
-              '<li>' + esc(t('cards.apps.step4')) + '</li>' +
-            '</ol></div>' +
-          '</div>' +
-          '<div style="margin-top:1.5rem;display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">' +
-            '<a href="/app-catalog.html" class="launcher-cta" style="font-size:.9rem;padding:.55rem 1.25rem">&#x1F680; ' + esc(t('cards.launcher.openBtn')) + '</a>' +
-            '<a href="/app-catalog.html" download="app-catalog.html" class="launcher-cta secondary" style="font-size:.85rem;padding:.45rem 1rem">&#x1F4E5; ' + esc(t('cards.launcher.downloadBtn')) + '</a>' +
-          '</div>' +
-          '<div style="margin-top:1.5rem;padding:1rem;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);border-radius:12px">' +
-            '<div style="font-weight:700;font-size:.95rem;margin-bottom:.5rem">' + esc(t('cards.apps.returnTitle')) + '</div>' +
-            '<div style="font-size:.85rem;color:var(--text-muted);margin-bottom:.5rem">' + esc(t('cards.apps.returnMotivation')) + '</div>' +
-            '<button class="copy-prompt-btn" id="return-app-btn" data-auth-text="' + esc(t('cards.apps.returnBtnAuth')) + '" style="font-size:.85rem;padding:.45rem 1rem">' + esc(t('cards.apps.returnBtnAnon')) + '</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
+  // Expand
+  document.getElementById('expandBtn').textContent = t('expand.btn');
 
-      // Group 2: For My AI Agents
-      '<div class="card group-agents" id="group-forAgents" data-card="forAgents">' +
-        '<div class="card-header">' +
-          '<div class="card-icon">&#x1F916;</div>' +
-          '<div class="card-text">' +
-            '<div class="card-title">' + esc(t('groups.forAgents.title')) + '</div>' +
-            '<div class="card-tagline">' + esc(t('groups.forAgents.tagline')) + '</div>' +
-          '</div>' +
-          '<div class="card-arrow">&#x25BC;</div>' +
-        '</div>' +
-        '<div class="card-body">' +
-          '<p class="card-desc">' + esc(t('groups.forAgents.desc')) + '</p>' +
-          '<div class="feature-list">' +
-            '<span class="feature-tag">&#x1F4F0; ' + esc(t('more.aiNews')) + '</span>' +
-            '<span class="feature-tag">&#x1F50D; ' + esc(t('more.monitor')) + '</span>' +
-            '<span class="feature-tag">&#x1F517; ' + esc(t('more.multiAgent')) + '</span>' +
-            '<span class="feature-tag">&#x1F4C2; ' + esc(t('more.directory')) + '</span>' +
-          '</div>' +
-          '<div class="mega-prompt-section">' +
-            '<textarea class="prompt-box" id="megaPrompt2" readonly></textarea>' +
-            '<div class="prompt-actions">' +
-              '<button class="copy-prompt-btn" id="copyMegaPrompt2" type="button">' + esc(t('groups.copyPrompt')) + '</button>' +
-            '</div>' +
-            '<div class="prompt-steps"><ol>' +
-              '<li>' + esc(t('cards.apps.step1')) + '</li>' +
-              '<li>' + esc(t('cards.apps.step2')) + '</li>' +
-              '<li>' + esc(t('cards.apps.step3')) + '</li>' +
-            '</ol></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
+  // World cards
+  document.getElementById('worldAppsTitle').textContent = t('world.apps.title');
+  document.getElementById('worldAppsDesc').textContent = t('world.apps.desc');
+  document.getElementById('worldFullBuilderTitle').textContent = t('world.fullBuilder.title');
+  document.getElementById('worldFullBuilderDesc').textContent = t('world.fullBuilder.desc');
+  document.getElementById('copyFullBuilderPrompt').textContent = t('world.fullBuilder.copyBtn');
+  document.getElementById('worldCatalogBtn').textContent = '\uD83D\uDE80 ' + t('world.catalog.openBtn');
+  document.getElementById('worldDownloadBtn').textContent = '\uD83D\uDCE5 ' + t('world.catalog.downloadBtn');
+  document.getElementById('worldAgentsTitle').textContent = t('world.agents.title');
+  document.getElementById('worldAgentsDesc').textContent = t('world.agents.desc');
+  document.getElementById('copyAgentPrompt').textContent = t('world.agents.copyBtn');
+  document.getElementById('worldConnectTitle').textContent = t('world.connect.title');
+  document.getElementById('worldConnectDesc').textContent = t('world.connect.desc');
+  document.getElementById('copyConnectPrompt').textContent = t('world.connect.copyBtn');
+  document.getElementById('connectReadMore').textContent = t('world.connect.readMore') + ' \u2192';
+  document.getElementById('worldBuildersTitle').textContent = t('world.builders.title');
+  document.getElementById('worldBuildersDesc').textContent = t('world.builders.desc');
+  document.getElementById('registerBuilderBtn').textContent = t('world.builders.registerBtn');
+  document.getElementById('morselsText').textContent = t('morsels.economy');
 
-      // Group 3: For Service Builders
-      '<div class="card group-builders" id="group-forBuilders" data-card="forBuilders">' +
-        '<div class="card-header">' +
-          '<div class="card-icon">&#x1F527;</div>' +
-          '<div class="card-text">' +
-            '<div class="card-title">' + esc(t('groups.forBuilders.title')) + '</div>' +
-            '<div class="card-tagline">' + esc(t('groups.forBuilders.tagline')) + '</div>' +
-          '</div>' +
-          '<div class="card-arrow">&#x25BC;</div>' +
-        '</div>' +
-        '<div class="card-body">' +
-          '<p class="card-desc">' + esc(t('groups.forBuilders.desc')) + '</p>' +
-          '<div style="text-align:center;margin-top:1rem">' +
-            '<button class="save-btn" id="registerBuilderBtn" type="button" style="background:linear-gradient(135deg,#22c55e,#16a34a)">' + esc(t('groups.registerBtn')) + '</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
-    '</div>' + // .cards-grid
-
-    // Morsels economy
-    '<div class="morsels-economy"><span class="heart-icon">&#x1F496;</span> ' + esc(t('morsels.economy')) + '</div>';
-
-  // Update title
-  document.title = t('hero.title') + ' \u2014 AIME AT';
+  document.title = t('genesis.name');
 
 })();
 </script>
@@ -1310,7 +925,9 @@ body {
 (function() {
   'use strict';
 
-  /* -- Modal i18n strings -- */
+  var nodeUrl = window.location.origin;
+
+  /* -- Modal i18n -- */
   var __modalI18n = {
     title: t('modal.title'),
     descNew: t('modal.descNew'),
@@ -1334,7 +951,7 @@ body {
     whyMorsels: t('modal.whyMorsels')
   };
 
-  /* -- Clipboard helper (fallback for HTTP) -- */
+  /* -- Clipboard -- */
   function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard.writeText(text).catch(function() { return fallbackCopy(text); });
@@ -1357,48 +974,28 @@ body {
   var LANG_KEY = 'aimeat-lang';
   var urlParams = new URLSearchParams(window.location.search);
   var langFromUrl = urlParams.get('lang');
-
   if (langFromUrl) {
     try { localStorage.setItem(LANG_KEY, langFromUrl); } catch(e) {}
     document.cookie = LANG_KEY + '=' + langFromUrl + ';path=/;max-age=31536000;SameSite=Lax';
   }
 
-  /* -- Starfield background -- */
+  /* -- Starfield -- */
   var canvas = document.getElementById('bgCanvas');
   if (canvas) {
-    for (var i = 0; i < 60; i++) {
+    for (var i = 0; i < 80; i++) {
       var star = document.createElement('div');
       star.className = 'star';
       star.style.left = (Math.random() * 100) + '%';
       star.style.top = (Math.random() * 100) + '%';
-      star.style.animationDuration = (2 + Math.random() * 4) + 's';
-      star.style.animationDelay = (Math.random() * 4) + 's';
-      star.style.width = star.style.height = (1 + Math.random() * 2) + 'px';
+      star.style.animationDuration = (3 + Math.random() * 6) + 's';
+      star.style.animationDelay = (Math.random() * 5) + 's';
+      star.style.width = star.style.height = (1 + Math.random() * 1.5) + 'px';
       canvas.appendChild(star);
     }
   }
 
-  /* -- Group expand / collapse -- */
-  var cards = document.querySelectorAll('.card');
-  cards.forEach(function(card) {
-    var header = card.querySelector('.card-header');
-    if (!header) return;
-    header.addEventListener('click', function() {
-      var isExpanded = card.classList.contains('expanded');
-      cards.forEach(function(c) { c.classList.remove('expanded'); });
-      if (!isExpanded) {
-        card.classList.add('expanded');
-        setTimeout(function() {
-          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
-      }
-    });
-  });
-
-  /* -- Welcome Board: fetch & render -- */
-  var welcomeBoardList = document.getElementById('welcomeBoardList');
-  var WELCOME_KEY = 'board.welcome';
-  var nodeUrl = window.location.origin;
+  /* -- Live Oneliners (read-only, from Boards API) -- */
+  var onelinersFeed = document.getElementById('onelinersFeed');
 
   function timeAgo(iso) {
     var sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -1410,86 +1007,219 @@ body {
     return Math.floor(hr / 24) + 'd';
   }
 
-  function renderWelcomeBoard(messages) {
-    if (!welcomeBoardList) return;
-    if (!messages || messages.length === 0) {
-      welcomeBoardList.innerHTML = '<div class="board-empty">' + esc(t('welcome.emptyBoard')) + '</div>';
+  function renderOneliners(posts) {
+    if (!onelinersFeed) return;
+    if (!posts || posts.length === 0) {
+      onelinersFeed.innerHTML = '<div class="oneliners-empty">' + esc(t('oneliners.empty')) + '</div>';
       return;
     }
-    welcomeBoardList.innerHTML = '';
-    messages.slice(-10).reverse().forEach(function(m) {
+    onelinersFeed.innerHTML = '';
+    posts.slice(-20).reverse().forEach(function(p) {
       var div = document.createElement('div');
-      div.className = 'board-msg';
-      div.innerHTML = '<span class="board-msg-text"></span><span class="board-msg-time">' + timeAgo(m.t) + '</span>';
-      div.querySelector('.board-msg-text').textContent = m.msg;
-      welcomeBoardList.appendChild(div);
+      div.className = 'oneliner';
+      var text = p.body || '';
+      div.innerHTML = '<span class="oneliner-text"></span><span class="oneliner-time">' + timeAgo(p.created_at) + '</span>';
+      div.querySelector('.oneliner-text').textContent = text;
+      onelinersFeed.appendChild(div);
     });
   }
 
-  function loadWelcomeBoard() {
-    fetch('/v1/memory/' + WELCOME_KEY)
-      .then(function(r) {
-        if (!r.ok) return null;
-        return r.json();
-      })
+  function loadOneliners() {
+    fetch('/v1/boards/welcome/posts?limit=20')
+      .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(d) {
-        if (d && d.ok && d.data && d.data.value && d.data.value.messages) {
-          renderWelcomeBoard(d.data.value.messages);
+        if (d && d.ok && d.data && d.data.posts) {
+          renderOneliners(d.data.posts);
         }
       })
       .catch(function() {});
   }
 
-  loadWelcomeBoard();
+  loadOneliners();
+  setInterval(loadOneliners, 15000); // auto-refresh every 15s
 
-  /* -- Welcome Board: send greeting -- */
-  var welcomeSendBtn = document.getElementById('welcomeSendBtn');
-  var welcomeInput = document.getElementById('welcomeInput');
-  var welcomeResult = document.getElementById('welcomeResult');
+  /* -- Expand / Collapse -- */
+  var expandBtn = document.getElementById('expandBtn');
+  var theWorld = document.getElementById('theWorld');
+  var isExpanded = false;
 
-  if (welcomeSendBtn && welcomeInput) {
-    welcomeSendBtn.addEventListener('click', function() {
-      var text = welcomeInput.value.trim();
-      if (!text) { welcomeInput.focus(); return; }
-      if (text.length > 280) return;
-
-      welcomeSendBtn.disabled = true;
-      welcomeSendBtn.classList.add('loading');
-
-      fetch('/v1/portal/try-memory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text, boardKey: WELCOME_KEY })
-      })
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        welcomeSendBtn.disabled = false;
-        welcomeSendBtn.classList.remove('loading');
-        if (data.ok) {
-          welcomeInput.value = '';
-          loadWelcomeBoard();
-          if (welcomeResult) {
-            welcomeResult.style.display = 'block';
-            setTimeout(function() { welcomeResult.style.display = 'none'; }, 3000);
-          }
-        }
-      })
-      .catch(function() {
-        welcomeSendBtn.disabled = false;
-        welcomeSendBtn.classList.remove('loading');
-      });
-    });
-  }
+  expandBtn.addEventListener('click', function() {
+    isExpanded = !isExpanded;
+    if (isExpanded) {
+      theWorld.classList.add('open');
+      expandBtn.textContent = t('expand.btnOpen');
+      setTimeout(function() {
+        theWorld.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      theWorld.classList.remove('open');
+      expandBtn.textContent = t('expand.btn');
+    }
+  });
 
   /* -- Mega-prompts -- */
   var anonGaii = encodeURIComponent('shared#anonymous@' + (window.location.hostname || 'aimeat-local'));
-  var copyPromptLabel = t('groups.copyPrompt');
-  var copiedPromptLabel = t('groups.copied');
 
-  /* Group 1 mega-prompt: App Builder */
-  var megaPrompt1El = document.getElementById('megaPrompt1');
-  if (megaPrompt1El) {
-    megaPrompt1El.value =
+  // Main prompt (oneliner starter — focused on welcome board)
+  var mainPromptEl = document.getElementById('mainPrompt');
+  if (mainPromptEl) {
+    mainPromptEl.value =
+      'You are helping a user build their very first app on the GENESIS 001 network.\n\n' +
+      'IMPORTANT: If the user pastes error messages or describes a bug, do NOT repeat the welcome message below.\n' +
+      'Instead, immediately analyze the error, explain what went wrong, and provide a fixed version of the code.\n\n' +
+      'If this is the user\'s FIRST message (no errors, no code), start your response by congratulating them:\n' +
+      '"\uD83C\uDF89 CONGRATULATIONS! You just took the first step to building on GENESIS 001!"\n' +
+      'Then explain that this app will let them post messages to a live feed that everyone can see.\n\n' +
+      'The GENESIS 001 server is at: ' + nodeUrl + '\n\n' +
+      '## First, ask the user two quick questions:\n' +
+      '1. What should your app be called? (e.g. "Neon Shoutbox", "Midnight Feed", "StarChat")\n' +
+      '2. Any style preferences? (e.g. "cyberpunk neon", "glassmorphism", "retro terminal", "aurora borealis") \u2014 or surprise them with something gorgeous.\n\n' +
+      '## Then build a STUNNING single HTML file.\n\n' +
+      '## STRICT RULE \u2014 Use AIMEAT client libraries!\n' +
+      'NEVER write raw fetch() calls to /v1/memory, /v1/storage, /v1/boards, /v1/auth, etc.\n' +
+      'AIMEAT provides official JavaScript client libraries served from the node itself.\n' +
+      'Always load and use these instead of raw HTTP calls.\n\n' +
+      '### Required libraries (load in this order in <head>):\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>  \u2190 MUST be first!\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-data.js"><\/script>\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-social.js"><\/script>  \u2190 REQUIRED for the Welcome Board!\n' +
+      'Optional (add if needed):\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-storage.js"><\/script>\n' +
+      '<script src="' + nodeUrl + '/lib/realtime.js"><\/script> (WebSocket P2P)\n\n' +
+      '### How the libs work:\n' +
+      '- Each lib is an IIFE that runs on load. No manual init call needed \u2014 globals are set immediately.\n' +
+      '- aimeat-auth.js creates window.AIMEAT.auth. All other libs depend on it.\n' +
+      '- IMPORTANT: You MUST initialize a session before calling AIMEAT.data / AIMEAT.storage / AIMEAT.social!\n' +
+      '- All methods are async (return Promises). Use await inside an async function.\n' +
+      '- The node URL is auto-detected from the page origin \u2014 no manual URL config needed in code.\n\n' +
+      '### AUTHENTICATION \u2014 CRITICAL (do this FIRST, before any API calls):\n' +
+      'You MUST log in before calling any AIMEAT.data / AIMEAT.storage / AIMEAT.social method.\n' +
+      'Without login, all API calls will throw "Not logged in" error.\n\n' +
+      'Use this initAimeat() function at the start of every app:\n\n' +
+      'async function initAimeat() {\n' +
+      '  let session = await AIMEAT.auth.login();\n' +
+      '  if (!session) {\n' +
+      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
+      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
+      '  }\n' +
+      '  return session;\n' +
+      '}\n\n' +
+      '### Bootstrap pattern (use this in every app):\n' +
+      '<script>\n' +
+      'async function initAimeat() {\n' +
+      '  let session = await AIMEAT.auth.login();\n' +
+      '  if (!session) {\n' +
+      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
+      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
+      '  }\n' +
+      '  return session;\n' +
+      '}\n\n' +
+      '(async function() {\n' +
+      '  await initAimeat(); // \u2190 MUST be called first!\n' +
+      '  // NOW you can safely use AIMEAT.data, AIMEAT.storage, AIMEAT.social\n' +
+      '  startApp(); // your app code goes here\n' +
+      '})();\n' +
+      '<\/script>\n\n' +
+      'On subsequent visits, login() restores the saved session from localStorage automatically.\n' +
+      'The user only "registers" once \u2014 after that, login() handles everything.\n\n' +
+      '### AIMEAT.data \u2014 Memory API (private key-value storage per user):\n' +
+      'All methods are async. You must call initAimeat() first!\n' +
+      'WARNING: Memory is PER-USER. Each user has their own isolated storage.\n' +
+      'If you need SHARED data visible to everyone, use AIMEAT.social (Boards API) instead!\n\n' +
+      'Read a key:\n' +
+      '  const value = await AIMEAT.data.get("my.key");\n' +
+      '  // Returns the value DIRECTLY (not wrapped). Returns null if key doesn\'t exist.\n\n' +
+      'Write a key:\n' +
+      '  await AIMEAT.data.set("my.key", {data: "here"}, {visibility: "private"});\n\n' +
+      'List keys by prefix:\n' +
+      '  const entries = await AIMEAT.data.list({prefix: "apps."});\n\n' +
+      'Delete:\n' +
+      '  await AIMEAT.data.delete("mykey");\n\n' +
+      '### AIMEAT.social \u2014 Boards API (SHARED community message boards):\n' +
+      'This is the CORRECT way to share data between users! Boards are visible to ALL users.\n' +
+      'Use this for any shared/community feed, chat, or public data.\n\n' +
+      'Post a message to a board (requires auth via initAimeat):\n' +
+      '  await AIMEAT.social.post("welcome", displayName + ": " + messageText);\n' +
+      '  // The body is a string. Include the author name in the message text!\n\n' +
+      'Read posts from a board (NO auth needed \u2014 public boards are readable by anyone):\n' +
+      '  const result = await AIMEAT.social.posts("welcome", {limit: 20});\n' +
+      '  // result.posts = [{id, body, author_gaii, created_at, ...}, ...]\n' +
+      '  // Posts are sorted newest first by default\n' +
+      '  // Each post has: body (string), created_at (ISO timestamp), author_gaii (who posted)\n\n' +
+      'React to a post:\n' +
+      '  await AIMEAT.social.react("welcome", postId, "\u2764\ufe0f");\n\n' +
+      'Reply to a post:\n' +
+      '  await AIMEAT.social.reply("welcome", postId, "Great point!");\n\n' +
+      'List available boards (no auth):\n' +
+      '  const boards = await AIMEAT.social.boards();\n\n' +
+      '### AIMEAT.storage \u2014 File Storage API (images & large files):\n' +
+      'Upload a file or base64 string:\n' +
+      '  const result = await AIMEAT.storage.upload(file, {\n' +
+      '    key: "art/pic.png", mime_type: "image/png", visibility: "public"\n' +
+      '  });\n\n' +
+      'Get a public URL: const url = AIMEAT.storage.publicUrl("art/pic.png");\n' +
+      'Download: const blob = await AIMEAT.storage.download("art/pic.png");\n\n' +
+      '### Design Requirements (IMPORTANT \u2014 make it beautiful):\n' +
+      '- Use cutting-edge CSS: glassmorphism, gradients, animations, blur effects, glow\n' +
+      '- Take inspiration from uiverse.io for buttons, cards, inputs, toggles \u2014 use their creative CSS patterns\n' +
+      '- Animated backgrounds (particles, gradients, mesh, aurora effects)\n' +
+      '- Smooth micro-interactions on every click, hover, focus\n' +
+      '- Dark theme by default with vibrant accent colors\n' +
+      '- Mobile-first, responsive, looks incredible on any screen\n' +
+      '- The overall feel should make the user think "wow, I can\'t believe this was made in 5 minutes"\n\n' +
+      '### What the app MUST do:\n' +
+      '1. Show a message input (styled beautifully \u2014 glowing border, placeholder animation)\n' +
+      '2. Show a live feed of messages from the Welcome Board (auto-refresh every 3\u20135 seconds)\n' +
+      '3. Let the user post new messages that appear in the feed\n' +
+      '4. Ask for a display name on first visit (save to localStorage)\n' +
+      '5. Show each message with the author name and relative time (e.g. "2m ago", "1h ago")\n' +
+      '6. Smooth animations when new messages appear\n\n' +
+      '### Welcome Board \u2014 How to read & post (USE AIMEAT.social!):\n' +
+      'The Welcome Board is a shared board called "welcome". It uses the Boards API, NOT the Memory API.\n' +
+      'All messages posted by any user from any app appear in the same feed.\n\n' +
+      'Read messages (NO auth needed for reading):\n' +
+      '  const result = await AIMEAT.social.posts("welcome", {limit: 50});\n' +
+      '  const posts = result.posts; // [{id, body, author_gaii, created_at}, ...]\n' +
+      '  // Each post.body is a string like "Mika: Hello everyone!"\n' +
+      '  // post.created_at is an ISO timestamp\n\n' +
+      'Post a message (auth required \u2014 initAimeat() must be called first):\n' +
+      '  const displayName = localStorage.getItem("displayName") || "Anonymous";\n' +
+      '  await AIMEAT.social.post("welcome", displayName + ": " + text);\n' +
+      '  // That\'s it! The message appears in the shared feed immediately.\n' +
+      '  // No read-modify-write needed. No memory keys. Just post and it\'s shared.\n\n' +
+      'Auto-refresh the feed:\n' +
+      '  setInterval(async () => {\n' +
+      '    const result = await AIMEAT.social.posts("welcome", {limit: 50});\n' +
+      '    renderMessages(result.posts);\n' +
+      '  }, 4000); // refresh every 4 seconds\n\n' +
+      'IMPORTANT: Do NOT use AIMEAT.data (Memory API) for the welcome board!\n' +
+      'Memory is per-user. Only the Boards API (AIMEAT.social) is shared between all users.\n\n' +
+      '## General Requirements:\n' +
+      '- Single HTML file \u2014 all CSS and JS inline, ONLY external scripts are the AIMEAT libs\n' +
+      '- Load AIMEAT libs from the server: aimeat-auth.js, aimeat-data.js, aimeat-social.js\n' +
+      '- NEVER use raw fetch() for AIMEAT APIs \u2014 always use AIMEAT.data / AIMEAT.storage / AIMEAT.social\n' +
+      '- For shared/community data: use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data\n' +
+      '- For private/per-user data: use AIMEAT.data (Memory API)\n' +
+      '- Mobile-friendly, works on any screen size\n' +
+      '- Works immediately when opened in a browser\n' +
+      '- Make the HTML a downloadable file\n\n' +
+      'This is a live API \u2014 the URLs work right now. The messages the user posts from this app will appear on the GENESIS 001 live feed on the portal page.\n\n' +
+      '## If Something Doesn\'t Work\n' +
+      'After giving the user the HTML file, always add this message:\n' +
+      '"If the app doesn\'t work as expected or you see errors, don\'t worry \u2014 tell me what happened and we\'ll fix it together!\n\n' +
+      'Here\'s how to check for errors:\n' +
+      '1. Open the app in your browser\n' +
+      '2. Press F12 (or right-click \u2192 Inspect) to open Developer Tools\n' +
+      '3. Click the \'Console\' tab\n' +
+      '4. If you see red error messages, copy them and paste them here\n' +
+      '5. I\'ll analyze the errors and give you a fixed version\n\n' +
+      'Even if there are no console errors \u2014 just describe what\'s wrong and I\'ll investigate."';
+  }
+
+  // Full App Builder prompt (complete mega-prompt, shown in AVAA KOKO MAAILMA section)
+  var fullBuilderPromptEl = document.getElementById('fullBuilderPrompt');
+  if (fullBuilderPromptEl) {
+    fullBuilderPromptEl.value =
       'You are helping me build an app that uses AIMEAT, an open protocol for AI-managed memory and data storage.\n\n' +
       'The AIMEAT server is at: ' + nodeUrl + '\n\n' +
       '## Step 1 \u2014 Ask me these questions:\n' +
@@ -1504,54 +1234,149 @@ body {
       '   - OWN: create a unique key like "apps.[type].[my-unique-id]" \u2014 only I see my data\n' +
       '   - SHARED: use the community key given below \u2014 I see others\' content and can add mine\n' +
       'Use my answers to customize everything.\n\n' +
-      '## Step 2 \u2014 Build a single HTML file using these APIs:\n\n' +
-      '### Memory API (key-value JSON storage, small data)\n' +
-      'Server: ' + nodeUrl + ' (no authentication needed, anonymous mode)\n' +
-      'Save data: POST ' + nodeUrl + '/v1/memory\n' +
-      'Content-Type: application/json\n' +
-      'Body: {"key": "apps.[TYPE].[ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}\n' +
-      'Read data: GET ' + nodeUrl + '/v1/memory/apps.[TYPE].[ID]\n' +
-      'Response: { ok: true, data: { key: "...", value: {...your data...}, ... } }\n' +
-      'List keys: GET ' + nodeUrl + '/v1/memory?prefix=apps.[TYPE]\n' +
-      'IMPORTANT: When updating, always GET first, modify, then POST back (read-modify-write).\n\n' +
-      '### Storage API (files & images \u2014 larger data)\n' +
-      'Upload image: POST ' + nodeUrl + '/v1/storage\n' +
-      'Content-Type: application/json\n' +
-      'Body: {"key": "apps/art/[unique-id].png", "data": "<base64-encoded-image>", "mime_type": "image/png", "visibility": "public"}\n' +
-      'Response: { ok: true, data: { key: "apps/art/[unique-id].png", size: 12345, ... } }\n' +
-      'Public image URL (for <img> tags): ' + nodeUrl + '/v1/pub/' + anonGaii + '/apps/art/[unique-id].png\n' +
-      'IMPORTANT: To convert canvas to base64 for upload, use canvas.toDataURL("image/png").split(",")[1] to get the raw base64 WITHOUT the data:image/png;base64, prefix.\n\n' +
-      '### Realtime P2P API (WebSocket \u2014 for live multiplayer, no polling needed)\n' +
-      'Client library: <script src="' + nodeUrl + '/lib/realtime.js"><\/script>\n\n' +
+      '## Step 2 \u2014 Build a single HTML file using AIMEAT client libraries:\n\n' +
+      '## STRICT RULE \u2014 Use AIMEAT client libraries!\n' +
+      'NEVER write raw fetch() calls to /v1/memory, /v1/storage, /v1/auth, /v1/boards, etc.\n' +
+      'AIMEAT provides official JavaScript client libraries served from the node itself.\n' +
+      'Always load and use these instead of raw HTTP calls.\n\n' +
+      '### Required libraries (load in this order in <head>):\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>  \u2190 MUST be first!\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-data.js"><\/script>\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-social.js"><\/script>  \u2190 REQUIRED for any shared/community data!\n' +
+      'Optional (add if needed):\n' +
+      '<script src="' + nodeUrl + '/v1/libs/aimeat-storage.js"><\/script>  (file upload/download/images)\n' +
+      '<script src="' + nodeUrl + '/lib/realtime.js"><\/script>  (WebSocket P2P rooms)\n\n' +
+      '### How the libs work:\n' +
+      '- Each lib is an IIFE that runs on load. No manual init call needed \u2014 globals are set immediately.\n' +
+      '- aimeat-auth.js creates window.AIMEAT.auth \u2014 all other libs depend on it, load it FIRST.\n' +
+      '- IMPORTANT: You MUST initialize a session before calling AIMEAT.data / AIMEAT.storage / AIMEAT.social!\n' +
+      '- All methods return Promises (use await). Wrap your code in (async function(){ ... })();\n' +
+      '- The node URL is auto-detected from page origin \u2014 no manual URL config in code.\n\n' +
+      '### AUTHENTICATION \u2014 CRITICAL (do this FIRST, before any API calls):\n' +
+      'You MUST log in before calling any AIMEAT.data / AIMEAT.storage / AIMEAT.social method.\n' +
+      'Without login, all API calls will throw "Not logged in" error.\n\n' +
+      'Use this initAimeat() function at the start of every app:\n\n' +
+      'async function initAimeat() {\n' +
+      '  // Try to restore a previous session from localStorage\n' +
+      '  let session = await AIMEAT.auth.login();\n' +
+      '  if (!session) {\n' +
+      '    // First visit \u2014 register a new anonymous account\n' +
+      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
+      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
+      '  }\n' +
+      '  return session;\n' +
+      '}\n\n' +
+      'Call it once when the app starts, BEFORE any data/storage/social calls:\n\n' +
+      '### Bootstrap pattern (use this in every app):\n' +
+      '<script>\n' +
+      'async function initAimeat() {\n' +
+      '  let session = await AIMEAT.auth.login();\n' +
+      '  if (!session) {\n' +
+      '    const id = "anon-" + Math.random().toString(36).slice(2, 10);\n' +
+      '    session = await AIMEAT.auth.register(id, "Anonymous");\n' +
+      '  }\n' +
+      '  return session;\n' +
+      '}\n\n' +
+      '(async function() {\n' +
+      '  await initAimeat(); // \u2190 MUST be called first!\n' +
+      '  // NOW you can safely use AIMEAT.data, AIMEAT.storage, AIMEAT.social\n' +
+      '  startApp(); // your app code goes here\n' +
+      '})();\n' +
+      '<\/script>\n\n' +
+      'On subsequent visits, login() restores the saved session from localStorage automatically.\n' +
+      'The user only "registers" once \u2014 after that, login() handles everything.\n\n' +
+      '### CRITICAL: When to use AIMEAT.data vs AIMEAT.social:\n' +
+      '- AIMEAT.data (Memory API) = PRIVATE per-user storage. Each user has their own isolated data.\n' +
+      '  Use for: personal notes, settings, private app state, per-user data.\n' +
+      '  Two different users writing to the same key will NOT see each other\'s data!\n' +
+      '- AIMEAT.social (Boards API) = SHARED community data. All users see the same board.\n' +
+      '  Use for: shared feeds, community posts, public message boards, chat, leaderboards.\n' +
+      '  ALL users see the same posts regardless of who posted them.\n\n' +
+      '### AIMEAT.data \u2014 Memory API (PRIVATE per-user key-value storage):\n' +
+      'All methods are async. You must call initAimeat() first!\n' +
+      'WARNING: Memory is PER-USER. Data written by one user is NOT visible to other users.\n' +
+      'For shared/community data, use AIMEAT.social (Boards API) instead!\n\n' +
+      'Read a key:\n' +
+      '  const value = await AIMEAT.data.get("apps.[TYPE].[ID]");\n' +
+      '  // Returns the value DIRECTLY (unwrapped). Returns null if key doesn\'t exist.\n' +
+      '  // Example: stored {items: [...]} \u2192 you get {items: [...]}\n\n' +
+      'Write a key:\n' +
+      '  await AIMEAT.data.set("apps.[TYPE].[ID]", {your: "data"});\n' +
+      '  // Default visibility is "private" \u2014 only the writing user can read it back\n\n' +
+      'List keys by prefix:\n' +
+      '  const entries = await AIMEAT.data.list({prefix: "apps.[TYPE]"});\n\n' +
+      'Delete:\n' +
+      '  await AIMEAT.data.delete("apps.[TYPE].[ID]");\n\n' +
+      '### AIMEAT.storage \u2014 File Storage API (images & larger files):\n' +
+      'Upload a file or base64 string:\n' +
+      '  const result = await AIMEAT.storage.upload(fileOrBase64, {\n' +
+      '    key: "apps/art/[id].png",\n' +
+      '    mime_type: "image/png",\n' +
+      '    visibility: "public"\n' +
+      '  });\n' +
+      '  // fileOrBase64 can be: File object, Blob, or base64 string\n' +
+      '  // For canvas: canvas.toDataURL("image/png").split(",")[1] \u2192 base64 string\n\n' +
+      'Get a public URL (synchronous, returns string):\n' +
+      '  const url = AIMEAT.storage.publicUrl("apps/art/[id].png");\n' +
+      '  // Use in: <img src="${url}"> \u2014 works for visibility:"public" files\n\n' +
+      'Download as Blob:\n' +
+      '  const blob = await AIMEAT.storage.download("apps/art/[id].png");\n\n' +
+      'Enable drag & drop upload:\n' +
+      '  AIMEAT.storage.enableDropZone("#drop-area", {\n' +
+      '    accept: "image/*",\n' +
+      '    maxSize: 10 * 1024 * 1024,\n' +
+      '    onUpload: (ref, file) => console.log("Uploaded:", ref),\n' +
+      '    onError: (err) => console.error(err)\n' +
+      '  });\n\n' +
+      '### AIMEAT.social \u2014 Boards API (SHARED community message boards):\n' +
+      'This is the CORRECT way to share data between users! Boards are visible to ALL users.\n' +
+      'Use for: community feeds, shared chat, leaderboards, public message boards.\n\n' +
+      'Post a message (requires auth via initAimeat):\n' +
+      '  await AIMEAT.social.post("welcome", displayName + ": " + messageText);\n' +
+      '  // The body can be a string or an object: {title: "Post", body: "Content"}\n' +
+      '  // Include author name in the string body so readers know who posted\n\n' +
+      'Read posts (NO auth needed \u2014 public boards readable by anyone):\n' +
+      '  const result = await AIMEAT.social.posts("welcome", {limit: 20});\n' +
+      '  // result.posts = [{id, body, author_gaii, created_at, ...}, ...]\n' +
+      '  // Posts are shared \u2014 ALL users see the same posts\n\n' +
+      'React:  await AIMEAT.social.react("welcome", postId, "\u2764\ufe0f");\n' +
+      'Reply:  await AIMEAT.social.reply("welcome", postId, "Great!");\n' +
+      'List boards (no auth): const boards = await AIMEAT.social.boards();\n\n' +
+      '### AimeatRealtime \u2014 P2P WebSocket (live multiplayer, no polling):\n' +
+      'Client library: <script src="' + nodeUrl + '/lib/realtime.js"><\/script>\n' +
+      'This is a separate class (NOT on AIMEAT namespace). Requires a JWT token.\n\n' +
+      'Setup (get token from AIMEAT.auth):\n' +
+      '  const session = await AIMEAT.auth.getSession();\n' +
+      '  // If no session yet, login first: await AIMEAT.auth.login();\n' +
+      '  const rt = new AimeatRealtime("' + nodeUrl + '", session.jwt);\n\n' +
       'Quick start:\n' +
-      '  const rt = new AimeatRealtime("' + nodeUrl + '", token);\n' +
-      '  // token comes from: POST ' + nodeUrl + '/v1/auth/anonymous \u2192 response.data.token\n' +
       '  const room = await rt.createRoom({ app_type: "[TYPE]", name: "My Room" });\n' +
       '  rt.connect(room.id, playerName);\n' +
-      '  rt.on("joined", (msg) => console.log("My peer ID:", msg.peerId, "Peers:", msg.peers));\n' +
+      '  rt.on("joined", (msg) => console.log("My peer ID:", msg.peerId));\n' +
       '  rt.on("peer-joined", (msg) => console.log("New peer:", msg.nick));\n' +
       '  rt.on("peer-left", (msg) => console.log("Peer left:", msg.peerId));\n' +
       '  rt.on("broadcast", (msg) => console.log("From", msg.from, ":", msg.payload));\n' +
-      '  rt.broadcast({ action: "move", x: 10, y: 20 }); // send to all peers\n' +
-      '  rt.presence({ status: "ready", cursor: {x:100, y:200} }); // share state\n' +
+      '  rt.broadcast({ action: "move", x: 10, y: 20 });\n' +
+      '  rt.presence({ status: "ready" });\n' +
       '  rt.on("peer-presence", (msg) => console.log(msg.peerId, "state:", msg.state));\n\n' +
       'Room lifecycle:\n' +
       '  - Create: rt.createRoom({ app_type, name, max_peers, is_public, tags })\n' +
       '  - List: rt.listRooms({ app_type }) \u2192 rooms array\n' +
       '  - Connect: rt.connect(roomId, nickname)\n' +
-      '  - Disconnect: rt.disconnect()\n' +
-      '  - Broadcast (to all): rt.broadcast(payload)\n' +
-      '  - Signal (to one peer): rt.signal(peerId, payload) \u2014 for WebRTC handshake\n' +
-      '  - Presence (share state): rt.presence({ key: value })\n' +
+      '  - Broadcast: rt.broadcast(payload)\n' +
+      '  - Signal (to one): rt.signal(peerId, payload)\n' +
+      '  - Presence: rt.presence({ key: value })\n' +
       '  - Leave: rt.leave()\n\n' +
-      'Events: joined, peer-joined, peer-left, peer-presence, broadcast, signal, error, open, close\n' +
-      'IMPORTANT: Get an anonymous auth token FIRST, then pass it to AimeatRealtime constructor:\n' +
-      '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\n' +
-      '  const { data: { token } } = await authRes.json();\n\n' +
-      '### Board (public message board)\n' +
-      'Read: GET ' + nodeUrl + '/v1/memory/board.public \u2192 data.value.messages [{msg, t}]\n' +
-      'Post: append {msg:"text", t:new Date().toISOString()} to messages array, POST back.\n' +
-      'Messages are in data.value.messages \u2014 an array of objects, each with "msg" (the message text) and "t" (ISO 8601 timestamp). Newest messages are last in the array.\n\n' +
+      'Events: joined, peer-joined, peer-left, peer-presence, broadcast, signal, error, open, close\n\n' +
+      '### Board (SHARED public message board \u2014 use AIMEAT.social, NOT AIMEAT.data!):\n' +
+      'The "welcome" board is pre-created and visible to all users.\n' +
+      'Read posts (NO auth needed):\n' +
+      '  const result = await AIMEAT.social.posts("welcome", {limit: 50});\n' +
+      '  const posts = result.posts; // [{id, body, author_gaii, created_at}, ...]\n' +
+      'Post a message (auth needed):\n' +
+      '  await AIMEAT.social.post("welcome", displayName + ": " + text);\n' +
+      'IMPORTANT: Do NOT use AIMEAT.data for shared boards! Memory is per-user and isolated.\n' +
+      'Only AIMEAT.social (Boards API) provides truly shared data visible to all users.\n\n' +
       '## Step 3 \u2014 Category-Specific Instructions\n\n' +
       'Based on the user\'s choice in Step 1, follow the matching section below.\n' +
       'Each section is self-contained \u2014 follow ALL instructions in the matching section.\n\n' +
@@ -1560,57 +1385,56 @@ body {
       '- What type of game? (e.g. "tic-tac-toe", "connect four", "battleship", "trivia quiz", "word game")\n' +
       '- How many players? (2\u201320)\n' +
       'I want a multiplayer game with a lobby system as a single self-contained HTML file.\n\n' +
-      'NOTE: For real-time multiplayer (instant moves, no polling) use the Realtime P2P API above. For turn-based games, the memory API polling approach below also works fine.\n\n' +
-      'NOTE: The lobby is already a shared community space by default \u2014 all players see the same lobby and can join each other\'s games.\n' +
-      'If user wants a PRIVATE lobby, use a unique key like "apps.games.[gametype].private.[uniqueId].lobby" instead.\n\n' +
-      '## Data structure\n\n' +
-      'Each game type gets its own memory area. The key format is:\n' +
-      '- Lobby: "apps.games.[gametype].lobby"\n' +
-      '- Individual game: "apps.games.[gametype].[gameId]"\n\n' +
-      'Lobby format (stored at apps.games.[gametype].lobby):\n' +
-      '{"games": [{"id": "abc123", "name": "My Game Room", "host": "Mika", "status": "waiting", "players": 1, "maxPlayers": 2, "created": "ISO timestamp"}, ...]}\n\n' +
-      'Game data format (stored at apps.games.[gametype].[gameId]):\n' +
-      '{"id": "abc123", "name": "My Game Room", "type": "[gametype]", "players": [{"name": "Mika", "joinedAt": "ISO"}, {"name": "Liisa", "joinedAt": "ISO"}], "state": {...game-specific state...}, "turn": "Mika", "status": "playing", "winner": null, "created": "ISO", "updated": "ISO"}\n\n' +
+      'NOTE: Use the Realtime P2P API for ALL multiplayer games (both real-time and turn-based).\n' +
+      'AIMEAT.data (Memory API) is per-user and CANNOT be used for shared game state between players.\n\n' +
+      '## How multiplayer works\n' +
+      '1. Lobby: Use AIMEAT.social to list and find games.\n' +
+      '   - Post a game listing: await AIMEAT.social.post("games", JSON.stringify({id:gameId, host:name, type:"tictactoe", status:"waiting"}))\n' +
+      '   - Read lobby: const result = await AIMEAT.social.posts("games", {limit: 20})\n' +
+      '2. Game: Use Realtime P2P API for the actual game.\n' +
+      '   - Create room: const room = await rt.createRoom({app_type: "tictactoe", name: "My Game"})\n' +
+      '   - Connect: rt.connect(room.id, playerName)\n' +
+      '   - Broadcast moves: rt.broadcast({action: "move", x: 1, y: 2})\n' +
+      '   - Receive moves: rt.on("broadcast", (msg) => handleMove(msg.payload))\n' +
+      '3. For turn-based games, use Realtime with a simple turn flag in broadcasts.\n\n' +
       'Game requirements:\n' +
       '1. On first visit, ask the player their name (save to localStorage)\n' +
-      '2. Show lobby screen: list of open games (fetched from lobby key), with host name, status, and player count\n' +
-      '3. "Create Game" button \u2014 creates a new game, adds it to the lobby, and waits for opponent\n' +
-      '4. "Join" button on each waiting game \u2014 joins the game, updates lobby status\n' +
-      '5. Once two players are in, the game starts. Poll every 2 seconds for opponent moves\n' +
-      '6. Show game status: waiting for opponent, your turn, opponent\'s turn, you won, you lost, draw\n' +
-      '7. When game ends, update lobby to remove it or mark as finished\n' +
-      '8. "Back to Lobby" button to return and play again\n' +
-      '9. Lobby auto-refreshes every 5 seconds to show new games\n\n' +
+      '2. Show lobby screen: list of games from AIMEAT.social.posts("games")\n' +
+      '3. "Create Game" button \u2014 creates a Realtime room + posts lobby listing\n' +
+      '4. "Join" button \u2014 connects to the room via Realtime\n' +
+      '5. Once connected, the game starts. All moves via rt.broadcast()\n' +
+      '6. Show game status: waiting, your turn, opponent\'s turn, win/lose/draw\n' +
+      '7. "Back to Lobby" button to leave and return\n' +
+      '8. Lobby auto-refreshes every 5 seconds\n\n' +
       'Game-specific requirements:\n' +
       '- Game-like UI \u2014 bold visuals, fun animations, satisfying interactions, sound effects if possible\n' +
-      '- For real-time multiplayer (instant moves, no polling) use the Realtime P2P API. For turn-based, memory API polling works fine.\n\n' +
+      '- Include aimeat-auth.js + aimeat-social.js + realtime.js\n\n' +
       '### If NOTES/JOURNAL:\n' +
       'I want a note-taking app as a single self-contained HTML file.\n\n' +
       '## Shared community board (if user chooses SHARED):\n' +
-      'Key: "apps.notes.community.board"\n' +
-      'Read: GET ' + nodeUrl + '/v1/memory/apps.notes.community.board\n' +
-      'Format: {"items": [{"id":"unique","author":"Name","title":"Note title","body":"Note content","created":"ISO timestamp"},...]}\n' +
-      'To add: GET existing items, append new item to items array, POST full updated object back.\n' +
-      'Show all community notes in a feed/list. Each note shows author name and time. Let user add their own with their name.\n\n' +
+      'Use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data!\n' +
+      'Post a note: await AIMEAT.social.post("notes", JSON.stringify({author:name, title:"My Note", body:"Content", created:new Date().toISOString()}))\n' +
+      'Read notes: const result = await AIMEAT.social.posts("notes", {limit: 50})\n' +
+      '  Each post.body is a JSON string \u2014 parse it: JSON.parse(post.body) to get {author, title, body, created}\n' +
+      'Show all community notes in a feed/list. Each note shows author name and time. Let user add their own.\n\n' +
       'App requirements:\n' +
       '- Create, view, edit, and delete notes\n' +
-      '- If OWN: each note stored as "apps.notes.[note-id]" with value: {title, body, created, updated}\n' +
-      '- If SHARED: all notes stored at "apps.notes.community.board" in items array \u2014 show everyone\'s notes\n' +
+      '- If OWN: each note stored as "apps.notes.[note-id]" with AIMEAT.data.set() \u2014 private per-user storage\n' +
+      '- If SHARED: post notes to "notes" board with AIMEAT.social.post() \u2014 visible to all users\n' +
       '- Sidebar or list view showing all saved notes with titles and timestamps\n' +
       '- Click a note to view or edit it\n' +
       '- Search or filter notes\n\n' +
       '### If TRACKER (habit/expense/custom):\n' +
       'I want a tracker app as a single self-contained HTML file.\n\n' +
       '## Shared community dashboard (if user chooses SHARED):\n' +
-      'Key: "apps.tracker.community.dashboard"\n' +
-      'Read: GET ' + nodeUrl + '/v1/memory/apps.tracker.community.dashboard\n' +
-      'Format: {"items": [{"id":"unique","author":"Name","category":"habit or expense or custom","entries":[{"date":"ISO","value":"..."}],"created":"ISO"},...]}\n' +
-      'To add: GET existing items, append new item to items array, POST full updated object back.\n' +
-      'Show a shared leaderboard/dashboard of everyone\'s tracked items. Let user add theirs with their name.\n\n' +
+      'Use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data!\n' +
+      'Post an entry: await AIMEAT.social.post("tracker", JSON.stringify({author:name, category:"habit", entries:[{date,value}], created:new Date().toISOString()}))\n' +
+      'Read entries: const result = await AIMEAT.social.posts("tracker", {limit: 50})\n' +
+      'Show a shared leaderboard/dashboard of everyone\'s tracked items. Let user add theirs.\n\n' +
       'App requirements:\n' +
       '- Track daily habits, expenses, or anything the user wants\n' +
-      '- If OWN: each entry stored as "apps.tracker.[date]" with value: {items: [...], date}\n' +
-      '- If SHARED: all entries stored at "apps.tracker.community.dashboard" in items array \u2014 show everyone\'s progress\n' +
+      '- If OWN: each entry stored with AIMEAT.data.set("apps.tracker.[date]", {items, date}) \u2014 private per-user\n' +
+      '- If SHARED: post entries to "tracker" board with AIMEAT.social.post() \u2014 visible to all\n' +
       '- Calendar or list view of past entries\n' +
       '- Simple charts or progress indicators\n' +
       '- Add and remove tracked items\n\n' +
@@ -1619,42 +1443,36 @@ body {
       'NOTE: This category is already shared via URL hash \u2014 family members access the same data.\n' +
       'If user chooses SHARED, it means a PUBLIC community list visible to everyone (not just family).\n\n' +
       '## Public community lists (if user chooses SHARED):\n' +
-      'Key: "apps.family.community.lists"\n' +
-      'Read: GET ' + nodeUrl + '/v1/memory/apps.family.community.lists\n' +
-      'Format: {"items": [{"id":"unique","author":"Name","listName":"Shopping list","entries":[{"text":"Milk","done":false,"addedBy":"Name"}],"created":"ISO"},...]}\n' +
-      'To add: GET existing items, append new item to items array, POST full updated object back.\n' +
-      'Show all public lists. Let user create and contribute to shared lists with their name.\n\n' +
+      'Use AIMEAT.social (Boards API) \u2014 NOT AIMEAT.data!\n' +
+      'Post a list: await AIMEAT.social.post("family", JSON.stringify({author:name, listName:"Shopping", entries:[{text,done}], created:new Date().toISOString()}))\n' +
+      'Read lists: const result = await AIMEAT.social.posts("family", {limit: 50})\n' +
+      'Show all public lists. Let user create and contribute to shared lists.\n\n' +
       'App requirements:\n' +
       '- Shareable via URL so family members can access the same data (use URL hash #listId)\n' +
-      '- Auto-refresh by polling memory every 3 seconds to see others\' changes\n' +
+      '- Auto-refresh by polling AIMEAT.social.posts() every 3 seconds\n' +
       '- Add and check off items (shopping list, to-do, etc.)\n' +
-      '- If OWN: all data under shared key "apps.family.[list-id]"\n' +
-      '- If SHARED: public lists at "apps.family.community.lists" \u2014 visible to all visitors\n' +
+      '- If OWN: use AIMEAT.data for per-user family data\n' +
+      '- If SHARED: post to "family" board with AIMEAT.social.post() \u2014 visible to all visitors\n' +
       '- Ask for name on first visit so items show who added them (save to localStorage)\n\n' +
       '### If DRAWING/CREATIVE:\n' +
       'I want a creative/drawing tool as a single self-contained HTML file.\n\n' +
-      '## File storage API (for images)\n' +
-      'Use the storage API to save images \u2014 it supports much larger files than memory.\n' +
-      'Upload image: POST ' + nodeUrl + '/v1/storage\n' +
-      'Content-Type: application/json\n' +
-      'Body: {"key": "apps/art/[unique-id].png", "data": "<base64-encoded-image>", "mime_type": "image/png", "visibility": "public"}\n' +
-      'Response: { ok: true, data: { key: "apps/art/[unique-id].png", size: 12345, ... } }\n' +
-      'Public image URL (for <img> tags): ' + nodeUrl + '/v1/pub/' + anonGaii + '/apps/art/[unique-id].png\n' +
-      'IMPORTANT: To convert canvas to base64 for upload, use canvas.toDataURL("image/png").split(",")[1] to get the raw base64 WITHOUT the data:image/png;base64, prefix.\n\n' +
+      '## File storage (for images) \u2014 use AIMEAT.storage:\n' +
+      'Upload: await AIMEAT.storage.upload(base64Data, {key: "apps/art/[unique-id].png", mime_type: "image/png", visibility: "public"})\n' +
+      'Public URL: AIMEAT.storage.publicUrl("apps/art/[unique-id].png") \u2192 direct URL for <img src="...">\n' +
+      'IMPORTANT: To convert canvas to base64 for upload, use canvas.toDataURL("image/png").split(",")[1]\n\n' +
       '## Shared community gallery (if user chooses SHARED):\n' +
-      'Store the gallery INDEX (metadata only, no image data) in memory:\n' +
-      'Key: "apps.art.community.gallery"\n' +
-      'Read: GET ' + nodeUrl + '/v1/memory/apps.art.community.gallery\n' +
-      'Format: {"items": [{"id":"unique","author":"Name","title":"Artwork title","storageKey":"apps/art/[id].png","created":"ISO timestamp"},...]}\n' +
-      'To add: First upload image to storage, then GET existing gallery items, append new item with storageKey (NOT base64 data), POST gallery back to memory.\n' +
-      'Display images using the public URL: <img src="' + nodeUrl + '/v1/pub/' + anonGaii + '/[storageKey]">\n' +
-      'Show all community artwork in a gallery grid. Each piece shows author name, title and time. Let user save their drawing alongside others.\n\n' +
+      'Use AIMEAT.social (Boards API) for the gallery index, AIMEAT.storage for actual images.\n' +
+      'Upload image: await AIMEAT.storage.upload(base64, {key: "apps/art/[id].png", mime_type: "image/png", visibility: "public"})\n' +
+      'Post to gallery: await AIMEAT.social.post("art", JSON.stringify({author:name, title:"My Art", storageKey:"apps/art/[id].png", created:new Date().toISOString()}))\n' +
+      'Read gallery: const result = await AIMEAT.social.posts("art", {limit: 50})\n' +
+      'Display images: <img src="${AIMEAT.storage.publicUrl(JSON.parse(post.body).storageKey)}">\n' +
+      'Show all community artwork in a gallery grid. Each piece shows author name, title and time.\n\n' +
       'App requirements:\n' +
       '- Drawing canvas with color picker and brush size\n' +
-      '- Upload images to storage API (not memory) \u2014 storage supports large files\n' +
-      '- If OWN: upload to storage with key "apps/art/[drawing-id].png", store metadata in memory at "apps.art.[drawing-id]"\n' +
-      '- If SHARED: upload to storage, then add metadata (with storageKey) to "apps.art.community.gallery" items array\n' +
-      '- Gallery view: load metadata from memory, display images via public storage URL\n' +
+      '- Upload images with AIMEAT.storage.upload() (not AIMEAT.data) \u2014 storage supports large files\n' +
+      '- If OWN: upload to storage, store metadata with AIMEAT.data.set("apps.art.[drawing-id]", ...)\n' +
+      '- If SHARED: upload to storage, then post metadata to "art" board with AIMEAT.social.post()\n' +
+      '- Gallery view: AIMEAT.social.posts("art") for metadata, AIMEAT.storage.publicUrl() for images\n' +
       '- Clear canvas, undo, and download image\n\n' +
       '### If MUSIC JAM SESSION:\n' +
       'Ask additionally:\n' +
@@ -1685,12 +1503,13 @@ body {
       '- Synth/Keys: Chromatic keyboard (1\u20132 octaves) with OscillatorNode (sine/square/sawtooth)\n' +
       '- Bass: Simple bass synth with lower octave notes\n\n' +
       'Each instrument should produce short, recognizable sounds even with basic oscillators.\n\n' +
-      '## Auth setup\n' +
-      'The app must first get an anonymous auth token:\n' +
-      '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\n' +
-      '  const { data: { token } } = await authRes.json();\n' +
-      'Then create the realtime client: new AimeatRealtime("' + nodeUrl + '", token)\n\n' +
+      '## Auth setup (use AIMEAT.auth library)\n' +
+      'Load the auth lib: <script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n' +
+      'Initialize session with initAimeat() (see bootstrap pattern above), then:\n' +
+      '  const session = AIMEAT.auth.getSession();\n' +
+      '  const rt = new AimeatRealtime("' + nodeUrl + '", session.jwt);\n\n' +
       'Music-specific requirements:\n' +
+      '- Include <script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script> for auth\n' +
       '- Include <script src="' + nodeUrl + '/lib/realtime.js"><\/script> for the realtime client library\n' +
       '- Use WebSocket-based realtime API (NOT polling) for all live interactions\n' +
       '- Mobile-friendly \u2014 pads/keys work on touch screens\n' +
@@ -1710,25 +1529,26 @@ body {
       '7. Show who\'s online and their status via presence\n' +
       '8. Handle peer join/leave gracefully with notifications\n' +
       '9. "Leave Room" button to disconnect and return to room browser\n\n' +
-      '## Auth setup\n' +
-      'The app must first get an anonymous auth token:\n' +
-      '  const authRes = await fetch("' + nodeUrl + '/v1/auth/anonymous", { method: "POST" });\n' +
-      '  const { data: { token } } = await authRes.json();\n' +
-      'Then create the realtime client: new AimeatRealtime("' + nodeUrl + '", token)\n\n' +
+      '## Auth setup (use AIMEAT.auth library)\n' +
+      'Load the auth lib: <script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script>\n' +
+      'Initialize session with initAimeat() (see bootstrap pattern above), then:\n' +
+      '  const session = AIMEAT.auth.getSession();\n' +
+      '  const rt = new AimeatRealtime("' + nodeUrl + '", session.jwt);\n\n' +
       'Realtime-specific requirements:\n' +
+      '- Include <script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"><\/script> for auth\n' +
       '- Include <script src="' + nodeUrl + '/lib/realtime.js"><\/script> for the realtime client library\n' +
       '- Use WebSocket-based realtime API (NOT polling) for all live interactions\n' +
       '- Show connection status indicator (connected / disconnected / reconnecting)\n\n' +
       '### If SERVICES (need help / offer help):\n' +
       'I want a service board where people can post requests for help and offers to help.\n\n' +
       'Two modes: "I need help" (post a request) and "I can help" (post an offer)\n\n' +
-      '## Data structure\n' +
-      'Requests stored at: POST ' + nodeUrl + '/v1/memory\n' +
-      'Body: {"key": "service-request:[timestamp]", "value": {"type":"service_request", "text":"...", "author":"Name", "created":"ISO"}, "visibility":"public", "ttl_hours":24}\n' +
-      'Offers stored at: POST ' + nodeUrl + '/v1/memory\n' +
-      'Body: {"key": "service-offer:[timestamp]", "value": {"type":"service_offer", "text":"...", "author":"Name", "created":"ISO"}, "visibility":"public", "ttl_hours":24}\n' +
-      'List requests: GET ' + nodeUrl + '/v1/memory?prefix=service-request\n' +
-      'List offers: GET ' + nodeUrl + '/v1/memory?prefix=service-offer\n\n' +
+      '## Data structure (use AIMEAT.social \u2014 NOT AIMEAT.data!)\n' +
+      'Post a request:\n' +
+      '  await AIMEAT.social.post("services", JSON.stringify({type:"request", text:"...", author:"Name", created:new Date().toISOString()}));\n' +
+      'Post an offer:\n' +
+      '  await AIMEAT.social.post("services", JSON.stringify({type:"offer", text:"...", author:"Name", created:new Date().toISOString()}));\n' +
+      'List all: const result = await AIMEAT.social.posts("services", {limit: 50})\n' +
+      'Filter: parse each post.body as JSON and check .type === "request" or "offer"\n\n' +
       'App requirements:\n' +
       '- Show both feeds side by side (requests and offers)\n' +
       '- Let users post new requests or offers with their name\n' +
@@ -1737,23 +1557,26 @@ body {
       '### If CUSTOM / SOMETHING ELSE:\n' +
       'I want [DESCRIBE YOUR IDEA HERE] as a single self-contained HTML file.\n\n' +
       '## Shared community option (if user chooses SHARED):\n' +
-      'Ask the user what to call the shared space (e.g. "apps.custom.community.[name]").\n' +
-      'Use the same pattern: store data as {"items": [...]} at the shared key.\n' +
-      'Read: GET ' + nodeUrl + '/v1/memory/apps.custom.community.[name]\n' +
-      'To add: GET existing items, append new item to items array, POST full updated object back.\n' +
-      'Show all community items and let user add theirs with their name.\n\n' +
+      'Use AIMEAT.social (Boards API) for shared community data \u2014 NOT AIMEAT.data!\n' +
+      'Ask the user what to call the board (e.g. "custom-[name]").\n' +
+      'Post: await AIMEAT.social.post(boardName, JSON.stringify({author:name, ...data, created:new Date().toISOString()}))\n' +
+      'Read: const result = await AIMEAT.social.posts(boardName, {limit: 50})\n' +
+      'Parse each post.body as JSON to get the structured data back.\n' +
+      'Show all community items and let user add theirs.\n\n' +
       'Ask me what the app should do before building it.\n\n' +
       '## General Requirements (all categories):\n' +
-      '- Single HTML file, all CSS and JS inline, no external dependencies\n' +
+      '- Single HTML file \u2014 all CSS and JS inline, ONLY external scripts are the AIMEAT libs\n' +
+      '- NEVER use raw fetch() for AIMEAT APIs \u2014 always use AIMEAT.data / AIMEAT.storage / AIMEAT.social / AIMEAT.auth objects\n' +
+      '- Load AIMEAT libs from the server in <head>, auth first: aimeat-auth.js, then aimeat-data.js, then aimeat-social.js, then others\n' +
+      '- Always include initAimeat() function and call it before any API calls\n' +
+      '- For SHARED community data (feeds, chat, boards): use AIMEAT.social (Boards API)\n' +
+      '- For PRIVATE per-user data (notes, settings, saves): use AIMEAT.data (Memory API)\n' +
+      '- NEVER use AIMEAT.data for shared community content — it is per-user and isolated!\n' +
       '- Mobile-friendly, works on any screen size\n' +
       '- Clean, modern UI\n' +
       '- Works immediately when opened in a browser\n' +
-      '- If using realtime: include realtime.js, get auth token first\n' +
-      '- If using images: use Storage API (not memory)\n' +
-      '- Any app that uses events from multiple users can use this combined format:\n' +
-      '  SHARED community: "apps.[type].community.[name]"\n' +
-      '  data format: {"items":[{id, author, ...data, created}]}\n' +
-      '  Always append to existing items (read-modify-write).\n\n' +
+      '- If using realtime: include aimeat-auth.js + realtime.js, get token via AIMEAT.auth.getSession()\n' +
+      '- If using images: use AIMEAT.storage (not AIMEAT.data)\n\n' +
       'Apps can be built with any AI: Claude, ChatGPT, Grok, Gemini, Copilot, DeepSeek \u2014 all work!\n\n' +
       'Make the HTML a downloadable file. This is a live API \u2014 the URLs work right now.\n\n' +
       '## If Something Doesn\'t Work\n' +
@@ -1768,10 +1591,10 @@ body {
       'Even if there are no console errors \u2014 just describe what\'s wrong (e.g. \'the button doesn\'t do anything\', \'I see a blank page\', \'the data doesn\'t save\') and I\'ll investigate."';
   }
 
-  /* Group 2 mega-prompt: Agent Builder */
-  var megaPrompt2El = document.getElementById('megaPrompt2');
-  if (megaPrompt2El) {
-    megaPrompt2El.value =
+  // Agent prompt
+  var agentPromptEl = document.getElementById('agentPrompt');
+  if (agentPromptEl) {
+    agentPromptEl.value =
       'You are helping me set up an AI agent workflow using AIMEAT, an open protocol for AI memory, coordination and task management.\n\n' +
       'The AIMEAT server is at: ' + nodeUrl + '\n\n' +
       '## Step 1 \u2014 Ask me:\n' +
@@ -1827,10 +1650,7 @@ body {
       '1. Agent A produces output, stores in memory key "pipeline.[name].step1"\n' +
       '2. Agent B watches that key, processes when updated, stores result at "pipeline.[name].step2"\n' +
       '3. Chain any number of agents via shared memory keys\n' +
-      '4. Use Work API for formal task delegation:\n' +
-      '   - Agent A creates work item with POST /v1/work\n' +
-      '   - Agent B checks inbox, accepts task, delivers result\n' +
-      '   - Agent A reads the delivered result\n' +
+      '4. Use Work API for formal task delegation\n' +
       '5. Coordination pattern: each agent polls its input key every N seconds\n\n' +
       '## Output Options\n' +
       '- HTML dashboard (single file, auto-refreshing from memory via polling)\n' +
@@ -1846,70 +1666,82 @@ body {
       'Even if there are no errors \u2014 describe what\'s wrong and I\'ll investigate."';
   }
 
-  /* -- Mega-prompt copy buttons -- */
-  function setupCopyBtn(btnId, textareaId) {
+  // Connect prompt (runtime connect / OpenClaw / LM Studio / MCP)
+  var connectPromptEl = document.getElementById('connectPrompt');
+  if (connectPromptEl) {
+    connectPromptEl.value =
+      'I want to connect an AI agent runtime to an AIMEAT node. Help me set this up.\n\n' +
+      'AIMEAT is an open protocol where AI agents get persistent memory, publish services for other agents and humans, produce content others can browse, and join a network across platforms.\n\n' +
+      'The AIMEAT node is at: ' + nodeUrl + '\n' +
+      'MCP endpoint: ' + nodeUrl + '/v1/mcp (StreamableHTTP transport)\n' +
+      'Documentation: ' + nodeUrl + '/v1/docs\n' +
+      'OpenClaw deep-dive: ' + nodeUrl + '/v1/openclaw\n\n' +
+      '## Step 1 \u2014 Ask me these questions (in my language):\n\n' +
+      '1. What agent runtime are you using?\n' +
+      '   \ud83e\udd16 OpenClaw   \ud83d\udcbb LM Studio   \ud83d\udd27 Other MCP client   \ud83e\udd37 I don\'t have one yet\n\n' +
+      '2. What do you want your agent to do?\n' +
+      '   \ud83d\udce2 Publish services   \ud83d\udcf0 Produce content   \ud83c\udf10 Cross-platform brain\n' +
+      '   \ud83d\udce6 Share data   \u2699\ufe0f Fleet management   \ud83d\udca1 Something else\n\n' +
+      '3. Do you already have an AIMEAT account? (username on this node)\n\n' +
+      '## Step 2 \u2014 Based on their answers, guide them:\n\n' +
+      '### Connecting their runtime:\n\n' +
+      '#### For OpenClaw (MCP):\n' +
+      '```yaml\n' +
+      'mcp_servers:\n' +
+      '  - name: aimeat\n' +
+      '    transport: streamable-http\n' +
+      '    url: ' + nodeUrl + '/v1/mcp\n' +
+      '```\n\n' +
+      '#### For LM Studio:\n' +
+      '```json\n' +
+      '{"mcpServers": {"aimeat": {"transport": "streamable-http", "url": "' + nodeUrl + '/v1/mcp"}}}\n' +
+      '```\n\n' +
+      '#### For other MCP clients:\n' +
+      'MCP URL: ' + nodeUrl + '/v1/mcp\n' +
+      'Transport: StreamableHTTP\n' +
+      'Auth: Bearer token in Authorization header (or anonymous if enabled)\n\n' +
+      '### Authentication:\n' +
+      'Anonymous mode: config above is enough.\n' +
+      'For authenticated access:\n' +
+      '1. Log in at ' + nodeUrl + '/v1/portal\n' +
+      '2. Generate Initial OTK: POST ' + nodeUrl + '/v1/auth/initial-otk (with your JWT)\n' +
+      '3. Add OTK as Bearer token in MCP config headers\n\n' +
+      '## Available MCP Tools (18 total):\n' +
+      'User: aimeat_catalogue_search, aimeat_agent_profile, aimeat_memory_read, aimeat_memory_write, aimeat_memory_list, aimeat_action_execute, aimeat_work_inbox, aimeat_work_accept, aimeat_work_deliver, aimeat_wallet_balance, aimeat_board_read, aimeat_board_post, aimeat_storage_upload, aimeat_storage_download\n' +
+      'Admin: aimeat_admin_stats, aimeat_admin_agents, aimeat_admin_config, aimeat_admin_mint\n\n' +
+      'Respond in the user\'s language. Be conversational. Ask the questions one group at a time. After setup, suggest a concrete first action they can try immediately.';
+  }
+
+  /* -- Copy button handlers -- */
+  function setupCopy(btnId, textareaId, copiedText) {
     var btn = document.getElementById(btnId);
     var box = document.getElementById(textareaId);
-    if (btn && box) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        copyToClipboard(box.value).then(function() {
-          btn.textContent = copiedPromptLabel;
-          setTimeout(function() { btn.textContent = copyPromptLabel; }, 2000);
-        });
+    if (!btn || !box) return;
+    var originalText = btn.textContent;
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      copyToClipboard(box.value).then(function() {
+        btn.textContent = copiedText || t('prompt.copied');
+        setTimeout(function() { btn.textContent = originalText; }, 2000);
       });
-    }
-  }
-  setupCopyBtn('copyMegaPrompt1', 'megaPrompt1');
-  setupCopyBtn('copyMegaPrompt2', 'megaPrompt2');
-
-  /* -- Apps: Return flow button -- */
-  var returnBtn = document.getElementById('return-app-btn');
-  if (returnBtn) {
-    returnBtn.addEventListener('click', function() {
-      if (typeof AIMEAT === 'undefined' || !AIMEAT.auth) return;
-      var existing = AIMEAT.auth.getSession();
-
-      if (existing && existing.token) {
-        window.location.href = '/v1/profile?tab=apps';
-        return;
-      }
-
-      var tmp = document.createElement('div');
-      tmp.id = 'aimeat-return-auth';
-      tmp.style.position = 'fixed';
-      tmp.style.top = '-9999px';
-      document.body.appendChild(tmp);
-      AIMEAT.auth.mountLoginButton('#aimeat-return-auth', {
-        nodeUrl: nodeUrl,
-        i18n: __modalI18n,
-        onLogin: function(session) {
-          tmp.remove();
-          window.location.href = '/v1/profile?tab=apps';
-        }
-      });
-      var loginBtn = document.getElementById('aimeat-login-btn');
-      if (loginBtn) loginBtn.click();
     });
-    setTimeout(function() {
-      if (typeof AIMEAT !== 'undefined' && AIMEAT.auth && AIMEAT.auth.hasSession) {
-        returnBtn.textContent = returnBtn.dataset.authText;
-      }
-    }, 500);
   }
 
-  /* -- Builders: register button -- */
+  setupCopy('copyMainPrompt', 'mainPrompt');
+  setupCopy('copyFullBuilderPrompt', 'fullBuilderPrompt', t('world.fullBuilder.copied'));
+  setupCopy('copyAgentPrompt', 'agentPrompt', t('world.agents.copied'));
+  setupCopy('copyConnectPrompt', 'connectPrompt', t('world.connect.copied'));
+
+  /* -- Register button (Service Builders) -- */
   var registerBuilderBtn = document.getElementById('registerBuilderBtn');
   if (registerBuilderBtn) {
     registerBuilderBtn.addEventListener('click', function() {
       if (typeof AIMEAT === 'undefined' || !AIMEAT.auth) return;
       var existing = AIMEAT.auth.getSession();
-
       if (existing && existing.token) {
         window.location.href = '/v1/profile';
         return;
       }
-
       var tmp = document.createElement('div');
       tmp.id = 'aimeat-builder-auth';
       tmp.style.position = 'fixed';

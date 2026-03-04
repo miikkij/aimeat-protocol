@@ -66,7 +66,7 @@ export function adminFeaturesRouter(
             return;
         }
 
-        const updated = await storage.updateGHII(ghii, { verificationLevel: verificationLevel as 0 | 1 | 2 });
+        const updated = await storage.updateGHII(ghii, { verificationLevel: verificationLevel as 0 | 1 | 2 | 3 });
         if (!updated) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
             return;

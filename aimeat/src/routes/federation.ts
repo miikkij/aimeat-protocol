@@ -685,7 +685,10 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             }
         }
 
-        res.status(201).json(success(config.nodeId, advisory));
+        res.status(201).json(success(config.nodeId, {
+            '@type': 'aimeat:TrustAdvisory',
+            ...advisory,
+        }));
     });
 
     // POST /v1/federation/key-exchange — Exchange public keys with peer

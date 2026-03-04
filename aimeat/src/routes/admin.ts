@@ -6,24 +6,14 @@ import { success, error } from '../middleware/envelope.js';
 import { listHooks } from '../services/hooks.js';
 import type { HookName } from '../config.js';
 import { RoleGrantSchema, validateBody } from '../models/schemas.js';
-import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
 import { createT, resolveLocale, type Locale } from '../i18n.js';
 import { buildDashboardHtml, buildDashboardTranslations } from './admin-dashboard.js';
-
-// Password hashing with scrypt (shared with GHII)
-async function hashPassword(password: string): Promise<string> {
-    const salt = randomBytes(16);
-    return new Promise((resolve, reject) => {
-        scrypt(password, salt, 64, (err, derivedKey) => {
-            if (err) reject(err);
-            else resolve(salt.toString('hex') + ':' + derivedKey.toString('hex'));
-        });
-    });
-}
+import { hashPassword } from '../services/password.js';
 
 export function adminRouter(
     config: AimeatConfig,

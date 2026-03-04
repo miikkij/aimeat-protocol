@@ -48,7 +48,7 @@ export function bootstrapRouter(config: AimeatConfig): Router {
         validate: { method: 'POST', url: '/v1/validate', description: 'Validate request body', tier: 'extended' },
         portal: { method: 'GET', url: '/v1/portal', description: 'Onboarding portal — select your AI platform and get started', tier: 'core' },
         ghii: { method: 'POST', url: '/v1/ghii', description: 'Register a human identity (GHII)', tier: 'core' },
-        ghii_directory: { method: 'GET', url: '/v1/ghii/directory', description: 'Search human identity directory', tier: 'core' },
+        ghii_list: { method: 'GET', url: '/v1/ghii/list', description: 'Search human identity directory', tier: 'core' },
         apps: { method: 'GET', url: '/v1/apps', description: 'Browse downloadable apps', tier: 'core' },
         libs: { method: 'GET', url: '/v1/libs', description: 'JavaScript helper libraries for app development', tier: 'core' },
         personal_anchor: { method: 'POST', url: '/v1/personal/anchor', description: 'Register a personal node with this operator', tier: 'core' },

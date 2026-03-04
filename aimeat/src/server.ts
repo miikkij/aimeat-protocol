@@ -201,6 +201,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     await setupAnonymousIdentity(config, storage);
   }
 
+  // Seed default "welcome" board if it doesn't exist (public, for community feed)
+  await seedWelcomeBoard(config, storage);
+
   // Start daily allowance background job
   startDailyAllowanceJob(config, storage);
 
@@ -390,10 +393,11 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   app.use(ownersRouter(config, storage));
   app.use(agentsRouter(config, storage));
-  app.use(consentRouter(config, storage, stats));  // Phase 0.3
+  const notifyDirectoryChange = () => directoryService.notifyChange();
+  app.use(consentRouter(config, storage, stats, notifyDirectoryChange));  // Phase 0.3
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
-  app.use(memoryRouter(config, storage, stats));
+  app.use(memoryRouter(config, storage, stats, notifyDirectoryChange));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
@@ -492,7 +496,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   }));
 
   app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
-  app.use(ghiiRouter(config, storage, emailService));
+  app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange));
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage));
@@ -761,6 +765,27 @@ function startMailboxCleanupJob(storage: Storage): void {
 
   setInterval(cleanup, 10 * 60_000); // Every 10 minutes
   logger.info('Mailbox cleanup job scheduled (every 10m)');
+}
+
+/** Seed the default "welcome" board for the portal community feed. */
+async function seedWelcomeBoard(config: AimeatConfig, storage: Storage): Promise<void> {
+  try {
+    const existing = await storage.getBoard('welcome');
+    if (!existing) {
+      await storage.createBoard({
+        id: 'welcome',
+        name: 'Welcome Board',
+        description: 'Community feed — post from any app built on this node',
+        visibility: 'public',
+        ownerGaii: `system@${config.nodeId}`,
+        allowedGaiis: [],
+        createdAt: new Date().toISOString(),
+      });
+      logger.info('Seeded default "welcome" board');
+    }
+  } catch (err) {
+    logger.error('Failed to seed welcome board', { error: err });
+  }
 }
 
 /** Set up the anonymous owner + agent + GHII for anonymous mode. Normal auth still works alongside. */

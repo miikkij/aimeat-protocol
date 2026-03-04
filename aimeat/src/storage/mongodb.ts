@@ -1067,7 +1067,7 @@ export class MongoStorage implements Storage {
             avatar: row.avatar ?? undefined,
             locale: row.locale ?? undefined,
             passwordHash: row.passwordHash ?? undefined,
-            verificationLevel: row.verificationLevel as 0 | 1 | 2,
+            verificationLevel: row.verificationLevel as 0 | 1 | 2 | 3,
             ownerName: row.ownerName,
             totpSecret: row.totpSecret ?? undefined,
             totpEnabled: row.totpEnabled ?? false,

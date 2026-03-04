@@ -536,6 +536,77 @@ The memory version is incremented automatically.
 
 ---
 
+## 8. Semantic Ontology Mapping
+
+Profile data aligns with [Schema.org](https://schema.org/) ontologies to enable interoperability with linked data systems and external semantic tools. This section defines recommended mappings for each profile field.
+
+### 8.1 Top-level type
+
+An AIMEAT interest profile maps to `schema:Person`. When the Directory Service (Phase 1.4) builds semantic annotations for profile search results, it uses:
+
+```json
+{
+  "@context": {
+    "schema": "https://schema.org/"
+  },
+  "@type": "schema:Person"
+}
+```
+
+### 8.2 Field-to-property mapping
+
+| Profile Field  | Schema.org Property | Notes |
+|----------------|---------------------|-------|
+| `interests`    | `schema:knowsAbout` | Array of topic strings. Alternatively `schema:interestName` from the `InteractionCounter` type, but `knowsAbout` is more direct. |
+| `location`     | `schema:address` → `schema:PostalAddress` | Sub-fields: `city` → `schema:addressLocality`, `country` → `schema:addressCountry`, `area` → `schema:addressRegion`. |
+| `location.geo` | `schema:geo` → `schema:GeoCoordinates` | `geo[0]` → `schema:latitude`, `geo[1]` → `schema:longitude`. |
+| `bio`          | `schema:description` | Free-text description of the person. |
+| `seeking`      | `schema:seeks` | Array of strings. The `schema:seeks` property expects a `Demand` object, but for simplicity AIMEAT uses plain strings. |
+| `availability` | `schema:availability` | Enum string. Not a direct Schema.org match — custom extension under the `aimeat` namespace. |
+| `languages`    | `schema:knowsLanguage` | ISO 639-1 codes map to Schema.org `Language` type identifiers. |
+
+### 8.3 Composite semantic annotation
+
+When the Directory Service returns a profile in search results, it constructs a full semantic annotation combining the above mappings:
+
+```json
+{
+  "@context": {
+    "schema": "https://schema.org/",
+    "aimeat": "https://aimeat.io/ns/"
+  },
+  "@type": "schema:Person",
+  "schema:knowsAbout": ["birdwatching", "TypeScript"],
+  "schema:address": {
+    "@type": "schema:PostalAddress",
+    "schema:addressLocality": "Helsinki",
+    "schema:addressCountry": "FI"
+  },
+  "schema:geo": {
+    "@type": "schema:GeoCoordinates",
+    "schema:latitude": 60.1842,
+    "schema:longitude": 24.9496
+  },
+  "schema:description": "Nature enthusiast and tech hobbyist.",
+  "schema:knowsLanguage": ["fi", "en", "sv"]
+}
+```
+
+This annotation is generated automatically by the `buildSemanticAnnotation()` function in `src/services/directory.ts` and included in the `semantic` field of directory search results.
+
+### 8.4 Extension properties
+
+The `aimeat` namespace (`https://aimeat.io/ns/`) is used for properties that have no direct Schema.org equivalent:
+
+| Custom Property             | Profile Field    | Description |
+|-----------------------------|------------------|-------------|
+| `aimeat:availability`       | `availability`   | Contact availability enum. |
+| `aimeat:seeking`            | `seeking`        | Free-text array of goals/desires. |
+
+Consumers that do not understand the `aimeat` namespace can safely ignore these properties.
+
+---
+
 *AIMEAT -- AI Memory Exchange and Action Transfer*
 
 Overscale Solutions Oy, 2026

@@ -157,6 +157,10 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       description: agent.description,
       capabilities: agent.capabilities,
       trust: {
+        '@type': 'schema:Rating',
+        'schema:ratingValue': trust.score,
+        'schema:bestRating': 100,
+        'schema:worstRating': 0,
         score: trust.score,
         total_deliveries: trust.totalDeliveries,
         successful_deliveries: trust.successfulDeliveries,

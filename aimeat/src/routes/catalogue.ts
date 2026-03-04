@@ -21,6 +21,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const paged = actions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       actions: paged.map(a => ({
         id: a.id,
         display_name: a.displayName,
@@ -55,6 +56,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const paged = actions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       actions: paged.map(a => ({
         id: a.id,
         display_name: a.displayName,
@@ -79,6 +81,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const paged = agents.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       agents: paged.map(a => ({
         gaii: a.gaii,
         display_name: a.displayName,
@@ -98,6 +101,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const publicBoards = boards.filter(b => b.visibility === 'public');
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       boards: publicBoards.map(b => ({
         id: b.id,
         name: b.name,
@@ -205,6 +209,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     });
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       entries: result.entries,
       facets: result.facets,
       total: result.total,
@@ -243,6 +248,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     }
 
     res.json(success(config.nodeId, {
+      '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       id: action.id,
       display_name: action.displayName,
       description: action.description,

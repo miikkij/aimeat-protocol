@@ -273,12 +273,16 @@ function createSession(data) {
     publicKey: data.publicKey,
     nodeUrl: NODE_URL,
 
-    // Authenticated fetch wrapper
+    // Authenticated fetch wrapper — returns parsed JSON without throwing on error
+    // so callers (e.g. AIMEAT.data.get) can inspect res.ok / res.error themselves
     async fetch(path, opts = {}) {
       if (isExpired(session.jwt)) {
         await session.refresh();
       }
-      return authApi(path, session.jwt, opts);
+      const url = NODE_URL + path;
+      const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.jwt, ...(opts.headers || {}) };
+      const resp = await fetch(url, { ...opts, headers });
+      return resp.json();
     },
 
     // Re-authenticate

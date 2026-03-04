@@ -187,6 +187,9 @@ export interface AimeatConfig {
   siteLbSyncIntervalMin: number;
   siteLbSyncOnStartup: boolean;
 
+  // Setup Wizard (Phase 1.2)
+  setupAllowedIps: string[];
+
   // Content Moderation
   autoHideThreshold: number;
 
@@ -338,6 +341,8 @@ export function loadConfig(): AimeatConfig {
     siteLbOriginUrl: process.env.AIMEAT_SITE_LB_ORIGIN_URL ?? null,
     siteLbSyncIntervalMin: parseInt(process.env.AIMEAT_SITE_LB_SYNC_INTERVAL_MIN ?? '30', 10),
     siteLbSyncOnStartup: process.env.AIMEAT_SITE_LB_SYNC_ON_STARTUP !== 'false',
+    setupAllowedIps: (process.env.AIMEAT_SETUP_ALLOWED_IPS ?? '')
+      .split(',').map(s => s.trim()).filter(Boolean),
     autoHideThreshold: parseInt(process.env.AIMEAT_AUTO_HIDE_THRESHOLD ?? '5', 10),
     statsEnabled: process.env.AIMEAT_STATS_ENABLED !== 'false',
     statsAccess: (process.env.AIMEAT_STATS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'public',

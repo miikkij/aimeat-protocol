@@ -7,32 +7,10 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
-import { createHash, scrypt, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
-
-// Password hashing with scrypt
-async function hashPassword(password: string): Promise<string> {
-    const salt = randomBytes(16);
-    return new Promise((resolve, reject) => {
-        scrypt(password, salt, 64, (err, derivedKey) => {
-            if (err) reject(err);
-            else resolve(salt.toString('hex') + ':' + derivedKey.toString('hex'));
-        });
-    });
-}
-
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-    const [saltHex, keyHex] = hash.split(':');
-    const salt = Buffer.from(saltHex, 'hex');
-    const storedKey = Buffer.from(keyHex, 'hex');
-    return new Promise((resolve, reject) => {
-        scrypt(password, salt, 64, (err, derivedKey) => {
-            if (err) reject(err);
-            else resolve(timingSafeEqual(storedKey, derivedKey));
-        });
-    });
-}
+import { hashPassword, verifyPassword } from '../services/password.js';
 
 /**
  * GHII — Global Human Intelligence Identifier
@@ -44,7 +22,7 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
  * - Operators/admins are owners with role=['owner','operator'] — they manage the node
  * - GHII users are owners with role=['owner'] + a GHII profile — they use apps
  */
-export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService): Router {
+export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService, onDirectoryChange?: () => void): Router {
     const router = Router();
 
     // POST /v1/ghii — Register a new human identity (no auth required)
@@ -465,6 +443,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verificationId = verId;
         }
 
+        // Notify directory of new profile (Phase 1.4 — event-driven refresh)
+        if (onDirectoryChange) onDirectoryChange();
+
         res.status(201).json(success(config.nodeId, {
             ghii: {
                 ghii: ghiiRecord.ghii,
@@ -683,7 +664,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             await storage.updateGHII(ghii, {
                 lastLoginAt: now,
                 loginCount: (ghiiRecord.loginCount ?? 0) + 1,
-                verificationLevel: Math.max(ghiiRecord.verificationLevel ?? 0, 1) as 0 | 1 | 2,
+                verificationLevel: Math.max(ghiiRecord.verificationLevel ?? 0, 1) as 0 | 1 | 2 | 3,
             });
         }
 
@@ -745,9 +726,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         ]));
     });
 
-    // GET /v1/ghii/directory — Search/list human identities (Tier 0, no auth)
+    // GET /v1/ghii/list — Search/list human identities (Tier 0, no auth)
+    // Note: renamed from /v1/ghii/directory to avoid confusion with /v1/catalogue/directory
     // Must be registered BEFORE the /:ghii param route
-    router.get('/v1/ghii/directory', async (req, res) => {
+    router.get('/v1/ghii/list', async (req, res) => {
         const q = typeof req.query.q === 'string' ? req.query.q : undefined;
         const level = typeof req.query.level === 'string' ? parseInt(req.query.level, 10) : undefined;
 
@@ -768,6 +750,14 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             })),
             total: results.length,
         }));
+    });
+
+    // Backward-compatible redirect: /v1/ghii/directory → /v1/ghii/list
+    router.get('/v1/ghii/directory', (req, res) => {
+        const qs = Object.keys(req.query).length > 0
+            ? '?' + new URLSearchParams(req.query as Record<string, string>).toString()
+            : '';
+        res.redirect(301, `/v1/ghii/list${qs}`);
     });
 
     // GET /v1/ghii/:ghii — Public profile (Tier 0, no auth)
@@ -836,6 +826,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verification_level: updated.verificationLevel,
             updated_at: updated.updatedAt,
         }));
+
+        // Notify directory of profile changes (Phase 1.4 — event-driven refresh)
+        if (onDirectoryChange) onDirectoryChange();
     });
 
     // DELETE /v1/ghii — Delete own GHII profile (requires JWT auth as owner)

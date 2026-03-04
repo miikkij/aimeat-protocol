@@ -107,8 +107,32 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 export class DirectoryService {
   private index = new Map<string, DirectoryEntry>();
   private lastUpdated = new Date().toISOString();
+  private rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly DEBOUNCE_MS = 2000;  // 2s debounce for batch changes
 
   constructor(private config: AimeatConfig, private storage: Storage) {}
+
+  /**
+   * Notify the directory that data relevant to its index has changed.
+   * Triggers a debounced rebuild so rapid consecutive writes don't
+   * cause an index rebuild storm.
+   *
+   * Call this when:
+   * - A GHII profile is created, updated, or deleted
+   * - A profile.*.interests or profile.*.location memory key is written
+   * - A federation consent is granted or revoked
+   */
+  notifyChange(): void {
+    if (this.rebuildTimer) {
+      clearTimeout(this.rebuildTimer);
+    }
+    this.rebuildTimer = setTimeout(() => {
+      this.rebuildTimer = null;
+      this.rebuildIndex().catch(err =>
+        logger.error('Directory index rebuild failed after change notification', { error: String(err) }),
+      );
+    }, DirectoryService.DEBOUNCE_MS);
+  }
 
   /** Rebuild the entire directory index from storage */
   async rebuildIndex(): Promise<void> {

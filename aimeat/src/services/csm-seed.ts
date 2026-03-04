@@ -54,6 +54,17 @@ export async function seedCsmTemplates(storage: Storage, systemGaii: string): Pr
       const jsonSchema = csmToJsonSchema(definition);
       const schemaKey = `csm.${definition.service.name}`;
 
+      // Extract semantic annotation from CSM service.semantic (Phase 0.7)
+      const serviceSemantic = definition.service.semantic && typeof definition.service.semantic === 'object'
+        ? definition.service.semantic as Record<string, unknown>
+        : undefined;
+      const semanticContext = serviceSemantic
+        ? {
+            '@context': serviceSemantic['@context'] as Record<string, string> | undefined,
+            '@type': serviceSemantic['@type'] as string | undefined,
+          }
+        : undefined;
+
       // Register schema in Schema Locking system
       await storage.setSchema({
         keyPattern: schemaKey,
@@ -63,6 +74,7 @@ export async function seedCsmTemplates(storage: Storage, systemGaii: string): Pr
         lockedBy: systemGaii,
         setAt: now,
         updatedAt: now,
+        ...(semanticContext ? { semanticContext } : {}),
       });
 
       // Store CSM record
@@ -74,6 +86,7 @@ export async function seedCsmTemplates(storage: Storage, systemGaii: string): Pr
         registeredBy: systemGaii,
         registeredAt: now,
         updatedAt: now,
+        ...(serviceSemantic ? { semantic: serviceSemantic } : {}),
       });
 
       seeded++;

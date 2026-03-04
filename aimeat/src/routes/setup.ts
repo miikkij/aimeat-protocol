@@ -8,21 +8,10 @@ import { generateKeyPair } from '../auth/keypair.js';
 import { issueJWT } from '../auth/jwt.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
-import { scrypt, randomBytes } from 'node:crypto';
+import { hashPassword } from '../services/password.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname_setup = dirname(fileURLToPath(import.meta.url));
-
-// Password hashing with scrypt (same as ghii.ts)
-async function hashPassword(password: string): Promise<string> {
-    const salt = randomBytes(16);
-    return new Promise((resolve, reject) => {
-        scrypt(password, salt, 64, (err, derivedKey) => {
-            if (err) reject(err);
-            else resolve(salt.toString('hex') + ':' + derivedKey.toString('hex'));
-        });
-    });
-}
 
 /** Resolve a file from public/ directory (works from both src/ and dist/). */
 function resolvePublicFile(filename: string): string | null {
@@ -42,6 +31,18 @@ export type SetupCompleteCallback = () => void;
 export function setupRouter(config: AimeatConfig, storage: Storage, onSetupComplete?: SetupCompleteCallback): Router {
     const router = Router();
 
+    // Phase 1.2 — IP restriction for setup endpoints
+    const checkSetupIp = (req: import('express').Request, res: import('express').Response): boolean => {
+        const allowedIps = config.setupAllowedIps;
+        if (allowedIps.length === 0) return true;  // No restriction if not configured
+        const clientIp = req.ip ?? req.socket.remoteAddress ?? '';
+        if (allowedIps.includes(clientIp) || allowedIps.includes('127.0.0.1') && (clientIp === '::1' || clientIp === '::ffff:127.0.0.1')) {
+            return true;
+        }
+        res.status(403).json(error(config.nodeId, 'IP_RESTRICTED', 'Setup access is restricted by IP'));
+        return false;
+    };
+
     // GET /v1/setup/status — Check if node needs setup
     router.get('/v1/setup/status', async (_req, res) => {
         try {
@@ -58,7 +59,8 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
     });
 
     // GET /v1/setup/wizard — Serve the wizard HTML page
-    router.get('/v1/setup/wizard', (_req, res) => {
+    router.get('/v1/setup/wizard', (req, res) => {
+        if (!checkSetupIp(req, res)) return;
         const htmlPath = resolvePublicFile('wizard.html');
         if (htmlPath) {
             res.type('text/html').send(readFileSync(htmlPath, 'utf-8'));
@@ -69,6 +71,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
 
     // POST /v1/setup/init — First-run initialization
     router.post('/v1/setup/init', async (req, res) => {
+        if (!checkSetupIp(req, res)) return;
         try {
             // Guard: only works when no owners exist
             const existingOwners = await storage.listOwners();

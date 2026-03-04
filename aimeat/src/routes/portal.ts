@@ -1544,6 +1544,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/aimeat-os': 'aimeat-os.html',
     '/v1/hobbies': 'hobbies.html',
     '/v1/marketplace': 'marketplace.html',
+    '/v1/openclaw': 'openclaw.html',
+    '/v1/classic': 'human-classic.html',
   };
 
   for (const [path, file] of Object.entries(staticRedirects)) {

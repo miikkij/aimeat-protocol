@@ -122,6 +122,19 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
     const jsonSchema = csmToJsonSchema(definition);
     const schemaKey = `csm.${definition.service.name}`;
 
+    // Extract semantic annotation from CSM service.semantic (Phase 0.7)
+    const serviceSemantic = definition.service.semantic && typeof definition.service.semantic === 'object'
+      ? definition.service.semantic as Record<string, unknown>
+      : undefined;
+
+    // Build semanticContext for Schema Locking from CSM semantic
+    const semanticContext = serviceSemantic
+      ? {
+          '@context': serviceSemantic['@context'] as Record<string, string> | undefined,
+          '@type': serviceSemantic['@type'] as string | undefined,
+        }
+      : undefined;
+
     // Register schema in Schema Locking system
     const now = new Date().toISOString();
     await storage.setSchema({
@@ -132,6 +145,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       lockedBy: ownerName,
       setAt: now,
       updatedAt: now,
+      ...(semanticContext ? { semanticContext } : {}),
     });
 
     // Store CSM record
@@ -143,6 +157,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       registeredBy: ownerName,
       registeredAt: now,
       updatedAt: now,
+      ...(serviceSemantic ? { semantic: serviceSemantic } : {}),
     });
 
     res.status(201).json(success(config.nodeId, {
@@ -153,6 +168,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
         registered_by: record.registeredBy,
         registered_at: record.registeredAt,
         definition: record.definition,
+        semantic: record.semantic ?? null,
       },
     }, [
       { description: 'List all CSM services', method: 'GET', url: '/v1/csm' },
@@ -174,6 +190,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
         registered_by: c.registeredBy,
         registered_at: c.registeredAt,
         updated_at: c.updatedAt,
+        has_semantic: !!c.semantic,
       })),
       total: csms.length,
     }));
@@ -229,6 +246,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
         registered_at: csm.registeredAt,
         updated_at: csm.updatedAt,
         definition: csm.definition,
+        semantic: csm.semantic ?? null,
       },
     }, [
       { description: 'View the generated JSON Schema', method: 'GET', url: `/v1/memory/${encodeURIComponent(csm.jsonSchemaKey)}/schema` },

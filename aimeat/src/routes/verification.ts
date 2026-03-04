@@ -60,7 +60,7 @@ export function verificationRouter(
       const verifiedAttributes = Object.keys(result.attributes ?? {});
 
       await storage.updateGHII(ghii.ghii, {
-        verificationLevel: 2 as 0 | 1 | 2,  // Note: current type only supports 0|1|2
+        verificationLevel: 3,
         verifiedAttributes,
         verificationIssuer: result.issuer,
         verificationCredentialHash: credentialHash,
@@ -104,7 +104,7 @@ export function verificationRouter(
       }
 
       await storage.updateGHII(ghii.ghii, {
-        verificationLevel: 2 as 0 | 1 | 2,
+        verificationLevel: 3,
         ftnVerified: true,
         verificationMethod: 'eidas',
         updatedAt: new Date().toISOString(),

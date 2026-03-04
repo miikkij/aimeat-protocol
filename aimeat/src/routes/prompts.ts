@@ -364,8 +364,70 @@ Check "agents/roster" periodically to see who's active.`
         }));
         break;
       }
+      case 'openclaw': {
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const authMode = config.anonymousMode ? 'anonymous' : 'otk-or-jwt';
+        res.json(success(config.nodeId, {
+          tier: 'openclaw',
+          system_prompt: `You are an AI agent connected to an AIMEAT node via MCP (Model Context Protocol).
+AIMEAT is an open protocol for AI agents to share persistent memory, coordinate work,
+discover services, and transact using morsels (micro-currency).
+
+Your MCP connection gives you direct access to 18 tools on this node.
+Use them — don't fall back to HTTP requests or ask the user to run commands.
+
+BOOT SEQUENCE:
+1. aimeat_memory_list → See what's already stored. Don't start from scratch.
+2. aimeat_memory_read key:"handoff.pending" → Check if a previous session left you tasks.
+3. aimeat_memory_read key:"context.latest" → Read the latest working context.
+4. aimeat_catalogue_search → Discover available services and agents on this node.
+
+CACHE-FIRST RULE: Before searching the web or asking the user, check memory first.
+  aimeat_memory_read key:"notes.{topic}" → Maybe you already know this.
+  aimeat_memory_list prefix:"project." → Maybe this project has context.
+
+MEMORY KEY CONVENTIONS (use dots as separators):
+  context.latest, context.{topic}, handoff.pending, project.{name},
+  project.{name}.status, notes.{topic}, agents.presence.{id},
+  inbox.{agent}, tmp.{anything}
+
+Read before write — always read a key before updating it.
+Store findings back with structured JSON values and descriptive tags.
+
+SESSION CONTINUITY:
+- During work: Periodically update context.latest with summary and open questions.
+- When ending: Write handoff.pending if work remains unfinished.
+- When completing: Clear handoff and update context.latest.`,
+          mcp_config: {
+            transport: 'streamable-http',
+            url: `${baseUrl}/v1/mcp`,
+            auth_mode: authMode,
+          },
+          tools: {
+            user: [
+              'aimeat_catalogue_search', 'aimeat_agent_profile',
+              'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list',
+              'aimeat_action_execute', 'aimeat_work_inbox', 'aimeat_work_accept', 'aimeat_work_deliver',
+              'aimeat_wallet_balance',
+              'aimeat_board_read', 'aimeat_board_post',
+              'aimeat_storage_upload', 'aimeat_storage_download',
+            ],
+            admin: ['aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint'],
+          },
+          auth_instructions: config.anonymousMode
+            ? 'Anonymous mode is enabled. No authentication needed — connect directly to the MCP URL.'
+            : 'Authentication required. Use an Initial OTK (POST /v1/auth/initial-otk) or JWT (POST /v1/auth/token) as a Bearer token in the MCP connection headers.',
+          docs: `${baseUrl}/v1/docs`,
+          integration_guide: 'See docs/integrations/openclaw-setup.md for full setup instructions.',
+        }, [
+          { description: 'Connect via MCP', method: 'POST', url: '/v1/mcp' },
+          { description: 'Generate Initial OTK for auth', method: 'POST', url: '/v1/auth/initial-otk' },
+          { description: 'Browse catalogue', method: 'GET', url: '/v1/catalogue' },
+        ]));
+        break;
+      }
       default:
-        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2, anonymous`));
+        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2, anonymous, openclaw`));
     }
   });
 

@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-**Phase 0 is essentially complete.** All 10 components (0.1–0.9 including 0.7b) have been implemented. The remaining gaps are minor: a missing `CsmRecord.semantic` storage field, absent root-level `@context` on catalogue responses, and unverified `openapi.yaml` updates. No blocking issues exist for Phase 1+ work.
+**Phase 0 is complete.** All 10 components (0.1–0.9 including 0.7b) are fully implemented with zero remaining gaps. All code, documentation, and OpenAPI spec updates have been verified and applied. No blocking issues exist for Phase 1+ work.
 
 ---
 
@@ -20,9 +20,9 @@
 | 0.4 | Interest Profile Standard | **COMPLETE** | 100% |
 | 0.5 | OTP/TOTP Support | **COMPLETE** | 100% |
 | 0.6 | DMZ Architecture Formalization | **COMPLETE** | 100% |
-| 0.7 | Semantic Ontology (new structures) | **LARGELY COMPLETE** | ~95% |
-| 0.7b | Semantic Retrofit (existing APIs) | **SUBSTANTIALLY COMPLETE** | ~90% |
-| 0.8 | Documentation Maintenance Plan | **COMPLETE** | ~95% |
+| 0.7 | Semantic Ontology (new structures) | **COMPLETE** | 100% |
+| 0.7b | Semantic Retrofit (existing APIs) | **COMPLETE** | 100% |
+| 0.8 | Documentation Maintenance Plan | **COMPLETE** | 100% |
 | 0.9 | Testing Strategy | **EXCEEDS PLAN** | 100%+ |
 
 ---
@@ -147,17 +147,17 @@
 - `docs/nextlevel/aimeat-data-description-convention.md` — §3.6 Semantic (Ontology) added (v1.1)
 - `docs/plans/phase-0.7-semantic-ontology.md` — Complete specification
 
-**Gaps:**
+**Gaps:** All resolved (2026-03-04).
 
-| Gap | Severity | Description |
-|-----|----------|-------------|
-| `CsmRecord.semantic` field | Low | The `csm-parser.ts` has inline `@context`/`@type` types but `CsmRecord` in `interface.ts` lacks a formal `semantic` field. Semantic metadata is parsed but not persisted on the record. |
-| CSM spec semantic section | Low | `docs/csm-spec.md` may not include semantic field documentation — unverified. |
-| Profile spec ontology mapping | Low | `docs/aimeat-interest-profile-spec.md` may not include `schema:Person` ontology recommendation — unverified. |
+| Former Gap | Resolution |
+|------------|------------|
+| `CsmRecord.semantic` field | **FIXED** — Added `semantic?: SemanticAnnotation` to `CsmRecord` in `interface.ts`. CSM route (`csm.ts`) and seed (`csm-seed.ts`) now extract `service.semantic` from parsed CSM and persist it on the record. Responses include `semantic` (detail) and `has_semantic` (list). Schema registration also passes `semanticContext`. |
+| CSM spec semantic section | **Already present** — `docs/csm-spec.md` Section 11 "Semantic Annotations" documents the `semantic` block with `@context`, `@type`, and passthrough keys. |
+| Profile spec ontology mapping | **FIXED** — Added Section 8 "Semantic Ontology Mapping" to `docs/aimeat-interest-profile-spec.md` with `schema:Person` top-level type, field-to-property mapping table, composite annotation example, and `aimeat:` namespace extension properties. |
 
 ---
 
-### 0.7b Semantic Retrofit (Existing APIs) — SUBSTANTIALLY COMPLETE
+### 0.7b Semantic Retrofit (Existing APIs) — COMPLETE
 
 **Plan requirement:** Add semantic annotations to all existing record types and API responses.
 
@@ -168,25 +168,27 @@
   - `BoardRecord` — done
   - `BoardPostRecord` — done
   - `GHIIRecord` — done (confirmed via route returning `record.semantic`)
+  - `PersonalNodeRecord` — done (line 268 in `interface.ts`)
 - Route-level semantic passthrough — done across all key routes:
   - `actions.ts` — POST/GET/PUT accept and return `semantic`
-  - `agents.ts` — GET returns `semantic`
+  - `agents.ts` — GET returns `semantic`; trust block includes `schema:Rating` with `ratingValue`/`bestRating`/`worstRating`
   - `boards.ts` — boards and posts return `semantic`
   - `ghii.ts` — directory listing returns `semantic`
-  - `catalogue.ts` — actions and boards return `semantic`
+  - `catalogue.ts` — actions and boards return `semantic`; all catalogue responses include root-level `@context`
   - `directory.ts` — `buildSemanticAnnotation()` generates `schema:Person`/`schema:PostalAddress`
   - `marketplace.ts` — `schema:Offer` annotations
   - `organisms.ts` — `schema:Organization`/`schema:Rating` annotations
-  - `federation.ts` — `@context`/`@type` in organisation + match annotations
+  - `federation.ts` — `@context`/`@type` in organisation + match + trust advisory annotations
+  - `wallet.ts` — `aimeat:Wallet` type on balance, `schema:TransferAction` on transactions
 - Unit tests: `test/unit/semantic-validation.test.ts` (5 tests)
 
-**Gaps:**
+**Gaps:** All resolved (2026-03-04).
 
-| Gap | Severity | Description |
-|-----|----------|-------------|
-| Root-level `@context` on catalogue responses | Medium | Plan 0.7b.5 specified `'@context': { 'schema': 'https://schema.org/', 'aimeat': 'https://aimeat.io/ns/' }` at root of catalogue JSON responses. Not present — `catalogue.ts` only includes `semantic` inside array items. |
-| Trust/wallet semantic annotations | Low | `trust.ts` and `wallet.ts` have no semantic annotations. Spec labels trust as "Phase 1+ medium priority." |
-| `PersonalNodeRecord.semantic` | Low | Not confirmed in storage interface. |
+| Former Gap | Resolution |
+|------------|------------|
+| Root-level `@context` on catalogue responses | **FIXED** — Added `'@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' }` to all 7 catalogue response payloads: main catalogue, actions sub-catalogue, agents sub-catalogue, boards sub-catalogue, directory search, directory stats (via entries), and action detail. |
+| Trust/wallet semantic annotations | **FIXED** — `agents.ts` trust block now includes `@type: 'schema:Rating'` with `schema:ratingValue`, `schema:bestRating`, `schema:worstRating`. `wallet.ts` balance response includes `@type: 'aimeat:Wallet'`, transaction lists include `@type: 'schema:TransferAction'` per item. Federation trust advisory includes `@type: 'aimeat:TrustAdvisory'`. |
+| `PersonalNodeRecord.semantic` | **Already present** — `semantic?: SemanticAnnotation` exists at line 268 of `interface.ts` (Phase 0.7b). |
 
 ---
 
@@ -204,11 +206,11 @@
 - Existing docs updated:
   - `docs/nextlevel/aimeat-data-description-convention.md` — v1.1 with §3.6 Semantic
 
-**Gaps:**
+**Gaps:** All resolved (2026-03-04).
 
-| Gap | Severity | Description |
-|-----|----------|-------------|
-| `openapi.yaml` Phase 0 updates | Medium | Plan requires all 17+ new Phase 0 endpoints in `openapi.yaml`. Status unverified — the file has 75 paths / 88 operations, which may or may not include all new endpoints. |
+| Former Gap | Resolution |
+|------------|------------|
+| `openapi.yaml` Phase 0 updates | **VERIFIED & UPDATED** — All 19 Phase 0 endpoints confirmed present (4 schema locking, 6 CSM, 5 consent, 4 TOTP). Response schemas updated: `CsmDefinition` now includes `semantic`, `has_semantic`, `registered_by`, `registered_at`, `updated_at`; `Catalogue` has `@context`; `Wallet` has `@context` and `@type`; `Transaction` has `@type`; `AgentProfile` has `trust` sub-object with `schema:Rating` annotations and `semantic` field. File validated: 174 paths, 70 schemas. |
 
 ---
 
@@ -241,28 +243,28 @@ None — all gaps are low-to-medium severity and non-blocking.
 
 ### Should-fix (quality improvement)
 
-| # | Gap | Component | Effort |
-|---|-----|-----------|--------|
-| 1 | Add root-level `@context` to catalogue JSON responses | 0.7b | Small — add 2 lines in `catalogue.ts` |
-| 2 | Verify/update `openapi.yaml` with all Phase 0 endpoints | 0.8 | Medium — audit 17+ endpoints against spec |
-| 3 | Add `semantic?: SemanticAnnotation` field to `CsmRecord` in `interface.ts` | 0.7 | Small — add field + wire in CSM routes |
+| # | Gap | Component | Effort | Status |
+|---|-----|-----------|--------|--------|
+| ~~1~~ | ~~Add root-level `@context` to catalogue JSON responses~~ | ~~0.7b~~ | ~~Small~~ | **FIXED 2026-03-04** |
+| ~~2~~ | ~~Verify/update `openapi.yaml` with all Phase 0 endpoints~~ | ~~0.8~~ | ~~Medium~~ | **FIXED 2026-03-04** — 19/19 endpoints verified, schemas updated |
+| ~~3~~ | ~~Add `semantic?: SemanticAnnotation` field to `CsmRecord`~~ | ~~0.7~~ | ~~Small~~ | **FIXED 2026-03-04** |
 
 ### Nice-to-have (can defer to Phase 1+)
 
-| # | Gap | Component | Effort |
-|---|-----|-----------|--------|
-| 4 | Add semantic annotations to `trust.ts` and `wallet.ts` | 0.7b | Small |
-| 5 | Verify `docs/csm-spec.md` includes semantic field documentation | 0.7/0.8 | Small |
-| 6 | Verify `docs/aimeat-interest-profile-spec.md` includes `schema:Person` mapping | 0.7/0.8 | Small |
-| 7 | Add `PersonalNodeRecord.semantic` to storage interface | 0.7b | Trivial |
+| # | Gap | Component | Effort | Status |
+|---|-----|-----------|--------|--------|
+| ~~4~~ | ~~Add semantic annotations to trust and wallet~~ | ~~0.7b~~ | ~~Small~~ | **FIXED 2026-03-04** |
+| ~~5~~ | ~~Verify `docs/csm-spec.md` includes semantic field documentation~~ | ~~0.7/0.8~~ | ~~Small~~ | **Verified — already present (Section 11)** |
+| ~~6~~ | ~~Verify `docs/aimeat-interest-profile-spec.md` includes `schema:Person` mapping~~ | ~~0.7/0.8~~ | ~~Small~~ | **FIXED 2026-03-04 — Section 8 added** |
+| ~~7~~ | ~~Add `PersonalNodeRecord.semantic` to storage interface~~ | ~~0.7b~~ | ~~Trivial~~ | **Already present** (line 268) |
 
 ---
 
 ## Conclusion
 
-Phase 0 Foundation is **production-ready**. All 6 core infrastructure components (0.1–0.6) are fully implemented with no gaps. The semantic ontology layer (0.7/0.7b) is 90–95% complete with minor polish items. The testing strategy (0.9) significantly exceeds the original plan scope. Documentation (0.8) is comprehensive with only `openapi.yaml` verification outstanding.
+Phase 0 Foundation is **complete with zero remaining gaps**. All 10 components (0.1–0.9 including 0.7b) are fully implemented, all response schemas are updated in `openapi.yaml`, and all documentation is current. Every item in both the should-fix and nice-to-have lists has been resolved.
 
-**Recommendation:** Close Phase 0 as complete. Address the 3 "should-fix" items as part of Phase 1 cleanup or a dedicated polish sprint. Phase 1 implementation can proceed without any Phase 0 blockers.
+**Recommendation:** Close Phase 0. Phase 1 and Phase 2 can proceed without blockers.
 
 ---
 

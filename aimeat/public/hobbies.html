@@ -1325,7 +1325,7 @@ function loadMe() {
 
       // Find entry by owner name: we need to check GHII records
       // Since we don't know the user's GHII directly, try to find via the GHII endpoint
-      return apiFetch('/v1/ghii/directory?owner=' + encodeURIComponent(info.owner))
+      return apiFetch('/v1/ghii/list?owner=' + encodeURIComponent(info.owner))
         .then(function(ghiiData) {
           var myGhii = null;
           if (ghiiData.ok && ghiiData.data && ghiiData.data.profiles && ghiiData.data.profiles.length > 0) {
@@ -1675,7 +1675,7 @@ function loadMatches() {
         });
 
         // Step 4: Exclude self — find user's own GHII
-        return apiFetch('/v1/ghii/directory?owner=' + encodeURIComponent(info.owner))
+        return apiFetch('/v1/ghii/list?owner=' + encodeURIComponent(info.owner))
           .then(function(ghiiData) {
             var myGhii = null;
             if (ghiiData.ok && ghiiData.data && ghiiData.data.profiles && ghiiData.data.profiles.length > 0) {

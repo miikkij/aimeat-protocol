@@ -209,7 +209,7 @@ export interface GHIIRecord {
   avatar?: string;                // emoji or storage key
   locale?: string;                // preferred language
   passwordHash?: string;          // scrypt hash for cross-device login
-  verificationLevel: 0 | 1 | 2;  // basic / confirmed / strong
+  verificationLevel: 0 | 1 | 2 | 3;  // 0=none, 1=email, 2=eidas/ftn, 3=eudiw-wallet
   ownerName: string;              // links to OwnerRecord.name
   createdAt: string;
   updatedAt: string;
@@ -321,6 +321,7 @@ export interface CsmRecord {
   registeredBy: string;          // owner name who registered this CSM
   registeredAt: string;          // ISO timestamp
   updatedAt: string;             // ISO timestamp
+  semantic?: SemanticAnnotation;  // Phase 0.7 — JSON-LD-compatible semantic annotation from CSM service.semantic
   federate?: boolean;            // Phase 3.4 — auto-distribute to federation peers
 }
 
