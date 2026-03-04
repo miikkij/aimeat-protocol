@@ -11,6 +11,7 @@
 var TRANSLATIONS = {
   en: {
     "nav.devView": "For Developers",
+    "nav.profile": "Profile",
     "genesis.name": "GENESIS 001",
     "genesis.tagline": "Build crazy interfaces in seconds that connect to the whole world and other people or agents.",
     "genesis.subline": "Copy the prompt. Paste it into any AI chat. You'll have a working multi-user app in minutes.",
@@ -104,6 +105,7 @@ var TRANSLATIONS = {
   },
   fi: {
     "nav.devView": "Kehitt\u00e4jille",
+    "nav.profile": "Profiili",
     "genesis.name": "GENESIS 001",
     "genesis.tagline": "Tee hulluja k\u00e4ytt\u00f6liittymi\u00e4 hetkess\u00e4 jotka on yhteydess\u00e4 koko maailmaan ja muihin ihmisiin tai agentteihin.",
     "genesis.subline": "Kopioi kehote. Liit\u00e4 mihin tahansa AI-chattiin. Sinulla on toimiva monen k\u00e4ytt\u00e4j\u00e4n sovellus minuuteissa.",
@@ -374,6 +376,7 @@ body {
 
 .topnav-right {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -391,6 +394,22 @@ body {
   color: var(--accent);
   border-color: rgba(255, 105, 180, 0.2);
   background: rgba(255, 105, 180, 0.05);
+}
+
+.topnav-right .profile-link {
+  display: none;
+  border-color: rgba(255, 105, 180, 0.35);
+  color: #ffd6ec;
+  background: rgba(255, 105, 180, 0.1);
+}
+
+.topnav-right .profile-link.visible {
+  display: inline-flex;
+}
+
+.header-auth-slot {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ── Genesis Hero 3D Canvas ── */
@@ -1220,12 +1239,26 @@ function renderAllTexts() {
     });
   });
 
-  // Nav right: dev + classic links
+  // Nav right: Initialize if empty, update if exists (preserve headerAuth)
   var navRight = document.getElementById('navRight');
   var devUrl = '?view=dev' + (LANG !== 'fi' ? '&lang=' + LANG : '');
-  navRight.innerHTML =
-    '<a href="/v1/classic">' + esc(t('classic.link')) + '</a>' +
-    '<a href="' + devUrl + '">' + esc(t('nav.devView')) + '</a>';
+  if (navRight.innerHTML.trim() === '') {
+    navRight.innerHTML =
+      '<a href="/v1/classic">' + esc(t('classic.link')) + '</a>' +
+      '<a href="' + devUrl + '">' + esc(t('nav.devView')) + '</a>' +
+      '<a href="/v1/profile" class="profile-link" id="headerProfileBtn">' + esc(t('nav.profile')) + '</a>' +
+      '<span class="header-auth-slot" id="headerAuth"></span>';
+  } else {
+    var classicLink = navRight.querySelector('a[href="/v1/classic"]');
+    if (classicLink) classicLink.textContent = esc(t('classic.link'));
+    var devLink = navRight.querySelector('a[href^="?view=dev"]');
+    if (devLink) {
+      devLink.href = devUrl;
+      devLink.textContent = esc(t('nav.devView'));
+    }
+    var profileLink = navRight.querySelector('.profile-link');
+    if (profileLink) profileLink.textContent = esc(t('nav.profile'));
+  }
 
   // Hero
   document.getElementById('genesisTagline').textContent = t('genesis.tagline');
@@ -1301,6 +1334,8 @@ function renderAllTexts() {
 
   if (window.__refreshExpandButtonLabel) window.__refreshExpandButtonLabel();
   if (window.__refreshHeaderMorsels) window.__refreshHeaderMorsels();
+  if (window.__refreshHeaderProfileButton) window.__refreshHeaderProfileButton();
+  if (window.__mountHeaderAuthUi) window.__mountHeaderAuthUi();
 }
 renderAllTexts();
 </script>
@@ -1312,6 +1347,8 @@ renderAllTexts();
   s.onload = function() {
     if (window.__refreshExpandButtonLabel) window.__refreshExpandButtonLabel();
     if (window.__refreshHeaderMorsels) window.__refreshHeaderMorsels();
+    if (window.__refreshHeaderProfileButton) window.__refreshHeaderProfileButton();
+    if (window.__mountHeaderAuthUi) window.__mountHeaderAuthUi();
   };
   document.head.appendChild(s);
 })();
@@ -1439,6 +1476,7 @@ renderAllTexts();
   var brandMorsels = document.getElementById('brandMorsels');
   var isExpanded = false;
   var userWorldLoaded = false;
+  var pendingLoginAction = null;
 
   function hasAuth() {
     return typeof AIMEAT !== 'undefined' && AIMEAT.auth && typeof AIMEAT.auth.getSession === 'function';
@@ -1547,21 +1585,31 @@ renderAllTexts();
 
   window.__refreshExpandButtonLabel = updateExpandButtonLabel;
 
+  function refreshHeaderProfileButton() {
+    var btn = document.getElementById('headerProfileBtn');
+    if (!btn) return;
+    var s = getCurrentSession();
+    btn.classList.toggle('visible', !!s);
+  }
+
+  window.__refreshHeaderProfileButton = refreshHeaderProfileButton;
+
   function setHeaderMorsels(value) {
     if (!brandMorsels) return;
     if (value == null || value === '') {
       brandMorsels.style.display = 'none';
-      brandMorsels.textContent = '';
+      brandMorsels.innerHTML = '';
       return;
     }
     brandMorsels.style.display = 'inline-block';
-    brandMorsels.textContent = String(value);
+    brandMorsels.innerHTML = '❤️ ' + esc(String(value));
   }
 
   async function refreshHeaderMorsels() {
     var s = getCurrentSession();
     if (!s || !s.fetch) {
       setHeaderMorsels('');
+      refreshHeaderProfileButton();
       return;
     }
     try {
@@ -1569,21 +1617,70 @@ renderAllTexts();
       var balance = walletResp && walletResp.data && walletResp.data.balance != null ? walletResp.data.balance : null;
       if (balance == null) {
         setHeaderMorsels('');
+        refreshHeaderProfileButton();
         return;
       }
       setHeaderMorsels(balance);
+      refreshHeaderProfileButton();
     } catch (e) {
       setHeaderMorsels('');
+      refreshHeaderProfileButton();
     }
   }
 
   window.__refreshHeaderMorsels = refreshHeaderMorsels;
 
+  async function mountHeaderAuthUi() {
+    var authReady = await waitForAuthReady(2500);
+    if (!authReady || !AIMEAT.auth || !AIMEAT.auth.mountLoginButton) return;
+    var slot = document.getElementById('headerAuth');
+    if (!slot) return;
+    AIMEAT.auth.mountLoginButton('#headerAuth', {
+      nodeUrl: nodeUrl,
+      i18n: __modalI18n,
+      onLogin: function(session) {
+        updateExpandButtonLabel();
+        refreshHeaderMorsels();
+        loadUserWorldSummary();
+        // Auto-open world accordion if it exists
+        if (theWorld && expandBtn && !isExpanded) {
+          isExpanded = true;
+          theWorld.classList.add('open');
+          updateExpandButtonLabel();
+          setTimeout(function() {
+            if (theWorld) theWorld.scrollIntoView({ behavior: 'auto', block: 'start' });
+          }, 50);
+        }
+        // Execute pending action
+        if (typeof pendingLoginAction === 'function') {
+          var fn = pendingLoginAction;
+          pendingLoginAction = null;
+          fn(session);
+        }
+      },
+      onLogout: function() {
+        updateExpandButtonLabel();
+        refreshHeaderMorsels();
+        refreshHeaderProfileButton();
+        closeWorld();
+      }
+    });
+    refreshHeaderProfileButton();
+  }
+
+  window.__mountHeaderAuthUi = mountHeaderAuthUi;
+
   async function openLoginModal(afterLogin) {
     var authReady = await waitForAuthReady(4500);
-    if (!authReady || !AIMEAT.auth || !AIMEAT.auth.mountLoginButton) {
-      // Fallback: send user to profile login screen if auth lib failed to initialize.
-      window.location.href = '/v1/profile';
+    if (!authReady || !AIMEAT.auth || !AIMEAT.auth.mountLoginButton) return;
+
+    pendingLoginAction = typeof afterLogin === 'function' ? afterLogin : null;
+
+    // Prefer opening from persistent header auth UI.
+    await mountHeaderAuthUi();
+    var headerLoginBtn = document.querySelector('#headerAuth #aimeat-login-btn');
+    if (headerLoginBtn) {
+      headerLoginBtn.click();
       return;
     }
 
@@ -1604,7 +1701,11 @@ renderAllTexts();
         updateExpandButtonLabel();
         refreshHeaderMorsels();
         loadUserWorldSummary();
-        if (typeof afterLogin === 'function') afterLogin(session);
+        if (typeof pendingLoginAction === 'function') {
+          var fn = pendingLoginAction;
+          pendingLoginAction = null;
+          fn(session);
+        }
       }
     });
 
@@ -1621,8 +1722,7 @@ renderAllTexts();
       }
       if (tries >= maxTries) {
         clearInterval(clickTimer);
-        // Last-resort fallback so user is never blocked.
-        window.location.href = '/v1/profile';
+        tmp.remove();
       }
     }, 80);
   }
@@ -1660,6 +1760,7 @@ renderAllTexts();
 
   setTimeout(updateExpandButtonLabel, 700);
   setTimeout(refreshHeaderMorsels, 900);
+  setTimeout(mountHeaderAuthUi, 950);
 
   /* -- Mega-prompts -- */
   var anonGaii = encodeURIComponent('shared#anonymous@' + (window.location.hostname || 'aimeat-local'));
@@ -2214,10 +2315,12 @@ renderAllTexts();
         i18n: __modalI18n,
         onLogin: function(session) {
           tmp.remove();
+          refreshHeaderMorsels();
+          refreshHeaderProfileButton();
           window.location.href = '/v1/profile';
         }
       });
-      var loginBtn = document.getElementById('aimeat-login-btn');
+      var loginBtn = document.querySelector('#aimeat-builder-auth #aimeat-login-btn');
       if (loginBtn) loginBtn.click();
     });
   }

@@ -1078,7 +1078,7 @@ textarea.input-field{resize:vertical;min-height:60px}
 <!-- Top bar -->
 <div class="topbar">
   <div class="topbar-left">
-    <a href="/v1/portal">&#x1F496; AIMEAT</a>
+    <a href="/v1/portal" style="display:flex;align-items:center;gap:0.3rem;">&#x1F496; <span style="font-weight:700">AIMEAT</span><span id="profileBrandMorsels" style="display:none;margin-left:0.35rem;padding:0.1rem 0.45rem;border-radius:999px;border:1px solid rgba(255,105,180,.35);background:rgba(255,105,180,.12);color:#ffd6ec;font-size:0.72rem;letter-spacing:0.02em;line-height:1.2"></span></a>
     <span id="topbar-subtitle" style="color:var(--muted);font-weight:400;font-size:.85rem"></span>
   </div>
   <div class="topbar-right">
@@ -1468,15 +1468,62 @@ function fallbackCopy(text) {
 function t(key) { return T[key] || key; }
 
 function switchLang(lang) {
+  if (!['en', 'fi'].includes(lang)) return;
+  
+  // Update locale variable
+  window._aimeatLocale = lang;
+  document.documentElement.lang = lang;
+  
+  // Rebuild T object with new locale
+  var T = {};
+  var en = TRANSLATIONS.en;
+  var loc = TRANSLATIONS[lang] || en;
+  for (var k in en) T[k] = en[k];
+  if (lang !== 'en') { for (var k in loc) T[k] = loc[k]; }
+  window.T = T;
+  
+  // Update URL without reload
   var url = new URL(window.location.href);
   url.searchParams.set('lang', lang);
+  window.history.replaceState({}, '', url.toString());
+  
+  // Save to storage
   localStorage.setItem('aimeat-lang', lang);
   document.cookie = 'aimeat-lang=' + lang + ';path=/;max-age=31536000;SameSite=Lax';
-  window.location.href = url.toString();
+  
+  // Apply all translations to the page
+  applyTranslations();
 }
 
 // Apply translations immediately
 applyTranslations();
+
+// ── Header morsel display ──
+function setProfileBrandMorsels(value) {
+  var el = document.getElementById('profileBrandMorsels');
+  if (!el) return;
+  if (value == null || value === '') {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = 'inline-block';
+  el.innerHTML = '&#x2764;&#xFE0F; ' + escHtml(String(value));
+}
+
+async function refreshProfileBrandMorsels() {
+  if (!session || !session.fetch) {
+    setProfileBrandMorsels('');
+    return;
+  }
+  try {
+    var walletResp = await session.fetch('/v1/wallet');
+    var balance = walletResp && walletResp.data && walletResp.data.balance != null ? walletResp.data.balance : null;
+    setProfileBrandMorsels(balance);
+  } catch (e) {
+    setProfileBrandMorsels('');
+  }
+}
 
 // ── Auth setup ──
 console.log('[AIMEAT Profile] Starting auth...', { AIMEAT: !!window.AIMEAT, auth: !!(window.AIMEAT && window.AIMEAT.auth) });
@@ -1491,12 +1538,12 @@ if (auth) {
       for (var k in T) { if (k.indexOf('modal.') === 0) m[k.slice(6)] = T[k]; }
       return m;
     })(),
-    onLogin: function(s) { console.log('[AIMEAT Profile] onLogin callback', s); session = s; showProfile(); },
-    onLogout: function() { console.log('[AIMEAT Profile] onLogout callback'); session = null; hideProfile(); },
+    onLogin: function(s) { console.log('[AIMEAT Profile] onLogin callback', s); session = s; showProfile(); refreshProfileBrandMorsels(); },
+    onLogout: function() { console.log('[AIMEAT Profile] onLogout callback'); session = null; hideProfile(); setProfileBrandMorsels(''); },
   });
   auth.login().then(function(s) {
     console.log('[AIMEAT Profile] auth.login() result:', s ? 'session OK (gaii=' + s.gaii + ')' : 'null');
-    if (s) { session = s; showProfile(); }
+    if (s) { session = s; showProfile(); refreshProfileBrandMorsels(); }
     else {
       console.log('[AIMEAT Profile] No session after login, stored now:', localStorage.getItem('aimeat_session') ? 'still exists' : 'DELETED');
       renderLoginSplash();
