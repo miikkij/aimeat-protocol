@@ -13,10 +13,10 @@
 **Current state:** All 6 masterplan components (2.1–2.6) are addressed — some by pre-existing code, some by the new extension system, and some still by hardcoded routes pending migration. The extension system itself is complete and code-reviewed.
 
 **Key metrics:**
-- **Extension system:** 100% complete (runtime, routes, storage, config, reference extensions, docs)
+- **Extension system:** 100% complete (runtime, routes, storage incl. MongoDB, config, reference extensions, docs)
 - **Pre-existing Phase 2 features:** AI matching, appeals, semantic ontology — all complete
 - **Future migration:** Hardcoded `marketplace.ts` (385 lines) and `organisms.ts` (873 lines) to be replaced by extension-driven equivalents
-- **Tests:** 467 total (441 existing + 26 extension unit tests), plus 21 E2E extension tests written (not yet run against live server)
+- **Tests:** 506 total (485 unit/integration + 21 E2E extension tests), all passing
 
 ---
 
@@ -41,7 +41,8 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 |-----------|---------|--------|-------|
 | V8 Isolate Sandbox Runtime | `src/services/extension-runtime.ts` | Complete | 295 |
 | Extension Storage Types | `src/storage/interface.ts` (ExtensionRecord + EscrowHoldRecord) | Complete | ~100 |
-| Extension Storage Impl | `src/storage/memory.ts` (10 CRUD methods) | Complete | ~100 |
+| Extension Storage Impl (in-memory) | `src/storage/memory.ts` (10 CRUD methods) | Complete | ~100 |
+| Extension Storage Impl (MongoDB) | `src/storage/mongodb.ts` + `prisma/schema.prisma` (Extension + EscrowHold models) | Complete | ~200 |
 | Extension Config | `src/config.ts` (6 fields) + `.env.example` | Complete | ~20 |
 | Extension Management Routes | `src/routes/extensions.ts` (7 endpoints) | Complete | 449 |
 | Server Integration | `src/server.ts` (conditional mount) | Complete | ~5 |
@@ -51,7 +52,7 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 | OpenAPI Documentation | `openapi.yaml` (7 new endpoints, 2 schemas) | Complete | ~250 |
 | Unit Tests (storage) | `test/unit/extension-storage.test.ts` | Complete | 15 tests |
 | Unit Tests (runtime) | `test/unit/extension-runtime.test.ts` | Complete | 11 tests |
-| E2E Tests | `test/e2e-extensions.ts` | Written, not run | 21 tests |
+| E2E Tests | `test/e2e-extensions.ts` | Complete, all passing | 21 tests |
 
 **Design docs:**
 - `docs/plans/2026-03-04-csm-driven-services-and-node-extensions-design.md` — Full architecture
@@ -132,7 +133,7 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 
 **Architecture note:** Workspaces are not dedicated endpoints — workspace access is transparently enforced via memory middleware. This follows the "no per-service backend" rule from CLAUDE.md.
 
-**Tests:** None (138 lines of untested RBAC logic). This is a gap.
+**Tests:** 44 unit tests (`test/unit/workspace-access.test.ts`) covering passthrough, auth enforcement, organism existence, agent access (shared/meta namespaces), GHII/membership validation, consent requirements, admin-only meta writes, cross-member write protection, and edge cases.
 
 ---
 
@@ -281,8 +282,9 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 |------|-------|----------|
 | `test/unit/extension-storage.test.ts` | 15 | CRUD for ExtensionRecord (7) + EscrowHoldRecord (8), incl. status guards |
 | `test/unit/extension-runtime.test.ts` | 11 | V8 sandbox execution, timeout, no-globals, memory API, API limit, caller, config, errors, logging |
+| `test/unit/workspace-access.test.ts` | 44 | RBAC middleware: passthrough, auth, agent access, membership, consent, namespace writes |
 | `test/e2e-extensions.ts` | 21 | Full lifecycle: install → activate → execute → memory → deactivate → uninstall |
-| **Total** | **47** | **26 passing, 21 E2E written (not yet run)** |
+| **Total** | **91** | **All passing (70 unit + 21 E2E)** |
 
 ### Pre-Existing Phase 2 Tests
 
@@ -303,17 +305,18 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 
 | Category | Count | Status |
 |----------|-------|--------|
-| All project unit tests | 441 | ✅ Passing |
+| All project unit/integration tests | 485 | ✅ Passing |
 | Extension unit tests (included above) | 26 | ✅ Passing |
-| Extension E2E tests | 21 | Written, requires `AIMEAT_EXTENSIONS_ENABLED=true` |
+| Workspace-access unit tests (included above) | 44 | ✅ Passing |
+| Extension E2E tests | 21 | ✅ Passing (requires `AIMEAT_EXTENSIONS_ENABLED=true`) |
 | Type-check | — | ✅ Clean |
 
 ### Test Gaps
 
 | Gap | Severity | Description |
 |-----|----------|-------------|
-| workspace-access.test.ts | Medium | 138 lines of RBAC middleware with no unit tests |
-| Extension E2E not run | Medium | 21 tests written but not validated against live server |
+| ~~workspace-access.test.ts~~ | ~~Medium~~ | ✅ **Closed** — 44 unit tests added |
+| ~~Extension E2E not run~~ | ~~Medium~~ | ✅ **Closed** — 21/21 E2E tests passing against live MongoDB server |
 | Phase 2 E2E coverage | Low | No E2E tests for matching, organisms, marketplace routes |
 
 ---
@@ -361,10 +364,12 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 
 ### Must-Fix
 
-| # | Gap | Component | Severity | Description |
-|---|-----|-----------|----------|-------------|
-| 1 | Extension E2E not validated | Extension System | Medium | 21 E2E tests written but not run against live server |
-| 2 | Workspace RBAC tests | 2.3 | Medium | 138 lines of untested security middleware |
+All must-fix gaps have been resolved:
+
+| # | Gap | Component | Status | Resolution |
+|---|-----|-----------|--------|------------|
+| 1 | ~~Extension E2E not validated~~ | Extension System | ✅ **Closed** | 21/21 E2E tests passing against live MongoDB server (admin setup register for operator role) |
+| 2 | ~~Workspace RBAC tests~~ | 2.3 | ✅ **Closed** | 44 unit tests in `test/unit/workspace-access.test.ts` |
 
 ### Should-Fix (before migration)
 
@@ -393,21 +398,22 @@ Layer 0: Core          Generic APIs (memory, wallet, boards, consent, directory,
 |---|---|---|---|
 | **2.1** AI-matchaus-agentti | Federation agent, interest + geo matching, opt-in notifications | `matching.ts` + `matches.ts` + scheduler | **100%** |
 | **2.2** Organismi/ryhmä | OrganismRecord, 3 join policies, directory, workspaces | Hardcoded routes (complete) + CSM/extension (ready) | **95%** (dual impl) |
-| **2.3** Collaborative workspaces | Shared memory, RBAC, consent-gated, AI agents | `workspace-access.ts` middleware | **85%** (no tests) |
+| **2.3** Collaborative workspaces | Shared memory, RBAC, consent-gated, AI agents | `workspace-access.ts` middleware + 44 unit tests | **100%** |
 | **2.4** Laatusuodatus advanced | Moderation tools, appeals, auto-hide | `appeals.ts` + flag system | **100%** |
 | **2.5** CSM-templatekirjasto | 6+ templates for different service types | 8 templates (7 pre-existing + organism) | **100%** |
 | **2.6** Markkinapaikka | Listings, purchases, escrow, ratings, trust integration | Hardcoded routes (near-complete) + extension (ready) | **90%** (missing dispute, stats) |
 
-**Overall Phase 2: ~95% complete** against masterplan requirements, with the extension system providing a reusable foundation for all future service types.
+**Overall Phase 2: ~97% complete** against masterplan requirements, with all must-fix gaps closed and the extension system providing a reusable foundation for all future service types.
 
 ---
 
 ## Next Steps
 
-### Immediate (this sprint)
+### Immediate (this sprint) — ✅ COMPLETED
 
-1. **Run extension E2E tests** against a live server with `AIMEAT_EXTENSIONS_ENABLED=true` on port 40251
-2. **Add workspace-access unit tests** — the 138 lines of RBAC middleware need test coverage
+1. ~~**Run extension E2E tests**~~ — ✅ 21/21 passing against live MongoDB server with `AIMEAT_EXTENSIONS_ENABLED=true`
+2. ~~**Add workspace-access unit tests**~~ — ✅ 44 unit tests covering all RBAC paths
+3. ~~**MongoDB storage for extensions + escrow**~~ — ✅ Full Prisma CRUD in `mongodb.ts` + `Extension`/`EscrowHold` models in `schema.prisma`
 
 ### Migration (separate plan)
 
