@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from './config.js';
-import { InMemoryStorage } from './storage/providers/memory/index.js';
+import { createStorage } from './storage/storage-factory.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
 import { optionalAuth, enableAnonymousAuth, requireAuth, requireRole } from './auth/middleware.js';
@@ -175,17 +175,17 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(idempotency());
 
   // Storage — select based on config
-  let storage: Storage;
-  if (config.dbUrl) {
-    const { MongoStorage } = await import('./storage/providers/mongodb/index.js');
-    const mongo = new MongoStorage(config.dbUrl);
-    await mongo.ready;
-    storage = mongo;
-    logger.info('Using MongoDB storage', { url: config.dbUrl.replace(/\/\/.*@/, '//<credentials>@') });
-  } else {
-    storage = new InMemoryStorage();
-    logger.info('Using in-memory storage (data will not persist across restarts)');
-  }
+  const storage = await createStorage({
+    provider: config.storageProvider,
+    sqlitePath: config.sqlitePath,
+    dbUrl: config.dbUrl ?? undefined,
+  });
+  const storageLabels: Record<string, string> = {
+    memory: 'in-memory (data will not persist across restarts)',
+    sqlite: `SQLite (${config.sqlitePath})`,
+    mongodb: `MongoDB (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
+  };
+  logger.info(`Using ${storageLabels[config.storageProvider]} storage`);
 
   // Maintenance mode cache — loaded once from storage, updated on toggle
   let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
