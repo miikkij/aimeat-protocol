@@ -227,6 +227,7 @@ export interface GHIIRecord {
   emailVerifiedAt?: string;     // ISO timestamp
   verificationMethod?: 'email' | 'phone' | 'operator' | 'eidas';
   magicLinkEnabled?: boolean;
+  notificationEmail?: string;       // plaintext email for users who opt in to notifications
   lastLoginAt?: string;
   loginCount?: number;
   // Phase 3.3 — EUDIW/VC identity verification

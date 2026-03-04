@@ -421,6 +421,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             totpEnabled: false,
             emailHash,
             magicLinkEnabled: !!emailHash,
+            notificationEmail: (typeof email === 'string' && email.length > 0) ? email.toLowerCase().trim() : undefined,
             loginCount: 0,
             createdAt: now,
             updatedAt: now,
@@ -807,12 +808,13 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
-        const { display_name, bio, avatar, locale } = req.body ?? {};
+        const { display_name, bio, avatar, locale, notification_email } = req.body ?? {};
         const updates: Record<string, unknown> = {};
         if (typeof display_name === 'string') updates.displayName = display_name;
         if (typeof bio === 'string') updates.bio = bio;
         if (typeof avatar === 'string') updates.avatar = avatar;
         if (typeof locale === 'string') updates.locale = locale;
+        if (typeof notification_email === 'string') updates.notificationEmail = notification_email;
 
         if (Object.keys(updates).length === 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid fields to update'));

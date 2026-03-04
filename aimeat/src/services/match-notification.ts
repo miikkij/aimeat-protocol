@@ -90,10 +90,10 @@ export function startMatchNotificationJob(
 
         if (matches.length === 0) continue;
 
-        // Find email for this user via GHII record
+        // Find notification email for this user via GHII record
         try {
           const ghiiRecord = await storage.getGHII(existing.ghii);
-          if (!ghiiRecord?.emailHash) continue;
+          if (!ghiiRecord) continue;
 
           // Check consent for notifications
           const agents = await storage.getAgentsByOwner(ghiiRecord.ownerName);
@@ -108,20 +108,23 @@ export function startMatchNotificationJob(
 
           if (!hasNotificationConsent) continue;
 
-          // Look up email from recent verification records for this owner
-          const verifications = await storage.getEmailVerificationsByOwner?.(ghiiRecord.ownerName);
-          if (!verifications || verifications.length === 0) continue;
-          const verified = verifications.find(v => v.status === 'verified');
-          if (!verified) continue;
-
-          // We can't get the email from a hash, so for match notifications
-          // we rely on the verification record having been created with the email.
-          // In a production system, email would be stored encrypted.
-          // For now, log and skip (the notification framework is in place).
-          logger.info('Match notification would send', {
-            recipientGhii: existing.ghii,
-            matchCount: matches.length,
-          });
+          // Send match suggestion email if the user has a notification email
+          if (ghiiRecord.notificationEmail) {
+            await emailService.sendMatchSuggestion(
+              ghiiRecord.notificationEmail,
+              matches,
+              ghiiRecord.locale,
+            );
+            logger.info('Match notification sent', {
+              recipientGhii: existing.ghii,
+              matchCount: matches.length,
+            });
+          } else {
+            logger.info('Match notification skipped (no notification email)', {
+              recipientGhii: existing.ghii,
+              matchCount: matches.length,
+            });
+          }
         } catch {
           // Skip users we can't find email for
         }
