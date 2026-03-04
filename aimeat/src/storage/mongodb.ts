@@ -38,6 +38,8 @@ import type {
     PushSubscriptionRecord,
     TrustedIssuerRecord,
     SiteChangeLogEntry,
+    ExtensionRecord,
+    EscrowHoldRecord,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -2195,6 +2197,42 @@ export class MongoStorage implements Storage {
             changedBy: r.changedBy,
             changedAt: r.changedAt instanceof Date ? r.changedAt.toISOString() : r.changedAt,
         }));
+    }
+
+    // ── Node Extensions (stubs) ──────────────────────────────────
+
+    async createExtension(_record: ExtensionRecord): Promise<ExtensionRecord> {
+        throw new Error('Not implemented');
+    }
+    async getExtension(_name: string): Promise<ExtensionRecord | null> {
+        throw new Error('Not implemented');
+    }
+    async listExtensions(_opts?: { status?: string }): Promise<ExtensionRecord[]> {
+        throw new Error('Not implemented');
+    }
+    async updateExtension(_name: string, _updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
+        throw new Error('Not implemented');
+    }
+    async deleteExtension(_name: string): Promise<boolean> {
+        throw new Error('Not implemented');
+    }
+
+    // ── Generic Escrow (stubs) ───────────────────────────────────
+
+    async createEscrowHold(_record: EscrowHoldRecord): Promise<EscrowHoldRecord> {
+        throw new Error('Not implemented');
+    }
+    async getEscrowHold(_holdId: string): Promise<EscrowHoldRecord | null> {
+        throw new Error('Not implemented');
+    }
+    async listEscrowHolds(_fromGaii: string, _opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
+        throw new Error('Not implemented');
+    }
+    async releaseEscrowHold(_holdId: string, _toGaii: string): Promise<EscrowHoldRecord | null> {
+        throw new Error('Not implemented');
+    }
+    async refundEscrowHold(_holdId: string): Promise<EscrowHoldRecord | null> {
+        throw new Error('Not implemented');
     }
 }
 

@@ -12,6 +12,7 @@ import type {
   PushSubscriptionRecord, TrustedIssuerRecord,
   GenesisPeerRecord, OrganismReputationRecord,
   ChatInstanceRecord, RealtimeRoomRecord, SiteChangeLogEntry,
+  ExtensionRecord, EscrowHoldRecord,
 } from './interface.js';
 
 export class InMemoryStorage implements Storage {
@@ -55,6 +56,8 @@ export class InMemoryStorage implements Storage {
   private chatInstances = new Map<string, ChatInstanceRecord>();   // key: id
   private realtimeRooms = new Map<string, RealtimeRoomRecord>();   // key: id
   private siteChangeLog: SiteChangeLogEntry[] = [];
+  private extensions = new Map<string, ExtensionRecord>();           // key: name
+  private escrowHolds = new Map<string, EscrowHoldRecord>();         // key: holdId
 
   // ── Owners ──
 
@@ -1610,6 +1613,68 @@ export class InMemoryStorage implements Storage {
       if (idx >= 0) entries = entries.slice(idx + 1);
     }
     return entries.slice(0, limit);
+  }
+
+  // ── Node Extensions ──
+
+  async createExtension(record: ExtensionRecord): Promise<ExtensionRecord> {
+    this.extensions.set(record.name, record);
+    return record;
+  }
+
+  async getExtension(name: string): Promise<ExtensionRecord | null> {
+    return this.extensions.get(name) ?? null;
+  }
+
+  async listExtensions(opts?: { status?: string }): Promise<ExtensionRecord[]> {
+    let results = [...this.extensions.values()];
+    if (opts?.status) results = results.filter(e => e.status === opts.status);
+    return results;
+  }
+
+  async updateExtension(name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
+    const existing = this.extensions.get(name);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.extensions.set(name, updated);
+    return updated;
+  }
+
+  async deleteExtension(name: string): Promise<boolean> {
+    return this.extensions.delete(name);
+  }
+
+  // ── Generic Escrow ──
+
+  async createEscrowHold(record: EscrowHoldRecord): Promise<EscrowHoldRecord> {
+    this.escrowHolds.set(record.holdId, record);
+    return record;
+  }
+
+  async getEscrowHold(holdId: string): Promise<EscrowHoldRecord | null> {
+    return this.escrowHolds.get(holdId) ?? null;
+  }
+
+  async listEscrowHolds(fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
+    let results = [...this.escrowHolds.values()].filter(h => h.fromGaii === fromGaii);
+    if (opts?.status) results = results.filter(h => h.status === opts.status);
+    return results;
+  }
+
+  async releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null> {
+    const hold = this.escrowHolds.get(holdId);
+    if (!hold) return null;
+    const updated = { ...hold, status: 'released' as const, releasedTo: toGaii, releasedAt: new Date().toISOString() };
+    this.escrowHolds.set(holdId, updated);
+    return updated;
+  }
+
+  async refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null> {
+    const hold = this.escrowHolds.get(holdId);
+    if (!hold) return null;
+    const updated = { ...hold, status: 'refunded' as const, releasedAt: new Date().toISOString() };
+    this.escrowHolds.set(holdId, updated);
+    return updated;
   }
 }
 

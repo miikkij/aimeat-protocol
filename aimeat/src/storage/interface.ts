@@ -588,6 +588,52 @@ export interface SiteChangeLogEntry {
   changedAt: string;
 }
 
+// ── Node Extensions (V8 Isolates) ──────────────────────────────────
+
+export interface ExtensionRecord {
+  name: string;                        // Unique name: "marketplace-behaviors"
+  version: string;
+  description: string;
+  author: string;
+  status: 'inactive' | 'active';
+  requiredApis: string[];              // ['wallet', 'memory', 'consent', 'trust']
+  actions: Array<{
+    id: string;
+    method: string;
+    path: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
+    scriptContent: string;
+  }>;
+  config: Record<string, unknown>;
+  limits: {
+    memoryMb: number;
+    timeoutMs: number;
+    maxApiCalls: number;
+  };
+  federation: {
+    advertise: boolean;
+    capabilities: string[];
+  };
+  installedBy: string;
+  installedAt: string;
+  activatedAt?: string;
+}
+
+// ── Generic Escrow ─────────────────────────────────────────────────
+
+export interface EscrowHoldRecord {
+  holdId: string;
+  fromGaii: string;
+  amount: number;
+  reason: string;
+  status: 'held' | 'released' | 'disputed' | 'refunded';
+  extensionName: string;
+  createdAt: string;
+  releasedAt?: string;
+  releasedTo?: string;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -886,4 +932,18 @@ export interface Storage {
   // Node Portal (Site)
   addSiteChangeLog(entry: SiteChangeLogEntry): Promise<SiteChangeLogEntry>;
   listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]>;
+
+  // Node Extensions
+  createExtension(record: ExtensionRecord): Promise<ExtensionRecord>;
+  getExtension(name: string): Promise<ExtensionRecord | null>;
+  listExtensions(opts?: { status?: string }): Promise<ExtensionRecord[]>;
+  updateExtension(name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null>;
+  deleteExtension(name: string): Promise<boolean>;
+
+  // Generic Escrow
+  createEscrowHold(record: EscrowHoldRecord): Promise<EscrowHoldRecord>;
+  getEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
+  listEscrowHolds(fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]>;
+  releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null>;
+  refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
 }
