@@ -295,3 +295,39 @@ model Ghii {
   @@index([ownerName])
   @@index([emailHash])
 }
+
+model Extension {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  name         String    @unique
+  version      String
+  description  String
+  author       String
+  status       String    @default("inactive")
+  requiredApis String[]
+  actions      Json
+  config       Json
+  limits       Json
+  federation   Json
+  installedBy  String
+  installedAt  DateTime  @default(now())
+  activatedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model EscrowHold {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  holdId        String    @unique
+  fromGaii      String
+  amount        Int
+  reason        String
+  status        String    @default("held")
+  extensionName String
+  createdAt     DateTime  @default(now())
+  releasedAt    DateTime?
+  releasedTo    String?
+  updatedAt     DateTime  @updatedAt
+
+  @@index([fromGaii])
+  @@index([status])
+}

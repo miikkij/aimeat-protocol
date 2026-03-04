@@ -2199,40 +2199,172 @@ export class MongoStorage implements Storage {
         }));
     }
 
-    // ── Node Extensions (stubs) ──────────────────────────────────
+    // ── Node Extensions ──────────────────────────────────────────
 
-    async createExtension(_record: ExtensionRecord): Promise<ExtensionRecord> {
-        throw new Error('Not implemented');
-    }
-    async getExtension(_name: string): Promise<ExtensionRecord | null> {
-        throw new Error('Not implemented');
-    }
-    async listExtensions(_opts?: { status?: string }): Promise<ExtensionRecord[]> {
-        throw new Error('Not implemented');
-    }
-    async updateExtension(_name: string, _updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
-        throw new Error('Not implemented');
-    }
-    async deleteExtension(_name: string): Promise<boolean> {
-        throw new Error('Not implemented');
+    private toExtensionRecord(row: any): ExtensionRecord {
+        return {
+            name: row.name,
+            version: row.version,
+            description: row.description,
+            author: row.author,
+            status: row.status,
+            requiredApis: row.requiredApis,
+            actions: row.actions as ExtensionRecord['actions'],
+            config: row.config as Record<string, unknown>,
+            limits: row.limits as ExtensionRecord['limits'],
+            federation: row.federation as ExtensionRecord['federation'],
+            installedBy: row.installedBy,
+            installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt,
+            activatedAt: row.activatedAt instanceof Date ? row.activatedAt.toISOString() : row.activatedAt ?? undefined,
+        };
     }
 
-    // ── Generic Escrow (stubs) ───────────────────────────────────
+    async createExtension(record: ExtensionRecord): Promise<ExtensionRecord> {
+        this.ensureReady();
+        const row = await this.prisma.extension.create({
+            data: {
+                name: record.name,
+                version: record.version,
+                description: record.description,
+                author: record.author,
+                status: record.status,
+                requiredApis: record.requiredApis,
+                actions: record.actions as any,
+                config: record.config as any,
+                limits: record.limits as any,
+                federation: record.federation as any,
+                installedBy: record.installedBy,
+                installedAt: new Date(record.installedAt),
+                activatedAt: record.activatedAt ? new Date(record.activatedAt) : null,
+            },
+        });
+        return this.toExtensionRecord(row);
+    }
 
-    async createEscrowHold(_record: EscrowHoldRecord): Promise<EscrowHoldRecord> {
-        throw new Error('Not implemented');
+    async getExtension(name: string): Promise<ExtensionRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.extension.findUnique({ where: { name } });
+        return row ? this.toExtensionRecord(row) : null;
     }
-    async getEscrowHold(_holdId: string): Promise<EscrowHoldRecord | null> {
-        throw new Error('Not implemented');
+
+    async listExtensions(opts?: { status?: string }): Promise<ExtensionRecord[]> {
+        this.ensureReady();
+        const where = opts?.status ? { status: opts.status } : {};
+        const rows = await this.prisma.extension.findMany({ where });
+        return rows.map((r: any) => this.toExtensionRecord(r));
     }
-    async listEscrowHolds(_fromGaii: string, _opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
-        throw new Error('Not implemented');
+
+    async updateExtension(name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
+        this.ensureReady();
+        try {
+            const data: any = { ...updates };
+            if (data.activatedAt && typeof data.activatedAt === 'string') {
+                data.activatedAt = new Date(data.activatedAt);
+            }
+            if (data.actions) data.actions = data.actions as any;
+            if (data.config) data.config = data.config as any;
+            if (data.limits) data.limits = data.limits as any;
+            if (data.federation) data.federation = data.federation as any;
+            const row = await this.prisma.extension.update({ where: { name }, data });
+            return this.toExtensionRecord(row);
+        } catch {
+            return null;
+        }
     }
-    async releaseEscrowHold(_holdId: string, _toGaii: string): Promise<EscrowHoldRecord | null> {
-        throw new Error('Not implemented');
+
+    async deleteExtension(name: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.extension.delete({ where: { name } });
+            return true;
+        } catch {
+            return false;
+        }
     }
-    async refundEscrowHold(_holdId: string): Promise<EscrowHoldRecord | null> {
-        throw new Error('Not implemented');
+
+    // ── Generic Escrow ───────────────────────────────────────────
+
+    private toEscrowHoldRecord(row: any): EscrowHoldRecord {
+        return {
+            holdId: row.holdId,
+            fromGaii: row.fromGaii,
+            amount: row.amount,
+            reason: row.reason,
+            status: row.status,
+            extensionName: row.extensionName,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            releasedAt: row.releasedAt instanceof Date ? row.releasedAt.toISOString() : row.releasedAt ?? undefined,
+            releasedTo: row.releasedTo ?? undefined,
+        };
+    }
+
+    async createEscrowHold(record: EscrowHoldRecord): Promise<EscrowHoldRecord> {
+        this.ensureReady();
+        const row = await this.prisma.escrowHold.create({
+            data: {
+                holdId: record.holdId,
+                fromGaii: record.fromGaii,
+                amount: record.amount,
+                reason: record.reason,
+                status: record.status,
+                extensionName: record.extensionName,
+                createdAt: new Date(record.createdAt),
+                releasedAt: record.releasedAt ? new Date(record.releasedAt) : null,
+                releasedTo: record.releasedTo ?? null,
+            },
+        });
+        return this.toEscrowHoldRecord(row);
+    }
+
+    async getEscrowHold(holdId: string): Promise<EscrowHoldRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.escrowHold.findUnique({ where: { holdId } });
+        return row ? this.toEscrowHoldRecord(row) : null;
+    }
+
+    async listEscrowHolds(fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]> {
+        this.ensureReady();
+        const where: any = { fromGaii };
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.escrowHold.findMany({ where });
+        return rows.map((r: any) => this.toEscrowHoldRecord(r));
+    }
+
+    async releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null> {
+        this.ensureReady();
+        try {
+            const existing = await this.prisma.escrowHold.findUnique({ where: { holdId } });
+            if (!existing || existing.status !== 'held') return null;
+            const row = await this.prisma.escrowHold.update({
+                where: { holdId },
+                data: {
+                    status: 'released',
+                    releasedTo: toGaii,
+                    releasedAt: new Date(),
+                },
+            });
+            return this.toEscrowHoldRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null> {
+        this.ensureReady();
+        try {
+            const existing = await this.prisma.escrowHold.findUnique({ where: { holdId } });
+            if (!existing || existing.status !== 'held') return null;
+            const row = await this.prisma.escrowHold.update({
+                where: { holdId },
+                data: {
+                    status: 'refunded',
+                    releasedAt: new Date(),
+                },
+            });
+            return this.toEscrowHoldRecord(row);
+        } catch {
+            return null;
+        }
     }
 }
 
