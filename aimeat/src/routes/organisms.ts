@@ -381,8 +381,40 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const now = new Date().toISOString();
 
     if (organism.joinPolicy === 'invite_only') {
-      res.status(403).json(error(config.nodeId, 'INVITE_ONLY',
-        'This organism is invite-only. You need an invitation to join.'));
+      // Check for a pending invitation
+      const pendingInvite = existing; // already fetched above
+      if (!pendingInvite || pendingInvite.status !== 'pending') {
+        res.status(403).json(error(config.nodeId, 'INVITE_ONLY',
+          'This organism is invite-only. You need an invitation to join.'));
+        return;
+      }
+
+      // Accept the invitation — activate the pending membership
+      await storage.updateMembership(pendingInvite.id, {
+        status: 'active',
+        joinedAt: now,
+      });
+
+      // Update organism members list
+      await storage.updateOrganism(id, {
+        members: [...organism.members, ghii],
+        updatedAt: now,
+      });
+
+      res.json(success(config.nodeId, {
+        membership: {
+          id: pendingInvite.id,
+          organism_id: id,
+          ghii,
+          role: 'member',
+          status: 'active',
+          joined_at: now,
+          invited_by: pendingInvite.invitedBy,
+        },
+      }, [
+        { description: 'View organism', method: 'GET', url: `/v1/organisms/${id}` },
+        { description: 'Leave organism', method: 'POST', url: `/v1/organisms/${id}/leave` },
+      ]));
       return;
     }
 
@@ -450,6 +482,92 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }, [
       { description: 'View organism', method: 'GET', url: `/v1/organisms/${id}` },
       { description: 'Leave organism', method: 'POST', url: `/v1/organisms/${id}/leave` },
+    ]));
+  });
+
+  // ── POST /v1/organisms/:id/invite — Invite a user (admin/creator only) ──
+  router.post('/v1/organisms/:id/invite', requireAuth(), async (req, res) => {
+    const id = param(req.params.id);
+    const ownerName = req.auth!.owner;
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+
+    // Check admin access
+    const callerGhii = await storage.getGHIIByOwner(ownerName);
+    if (!callerGhii) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'GHII profile required'));
+      return;
+    }
+
+    const isAdmin = organism.admins.includes(callerGhii.ghii);
+    const isOperator = req.auth!.roles.includes('operator');
+    if (!isAdmin && !isOperator) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+        'Only organism admins can invite users'));
+      return;
+    }
+
+    const { ghii: inviteeGhii } = req.body ?? {};
+    if (!inviteeGhii || typeof inviteeGhii !== 'string') {
+      res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
+        'ghii is required (the GHII of the user to invite)'));
+      return;
+    }
+
+    // Check if invitee exists
+    const inviteeRecord = await storage.getGHII(inviteeGhii);
+    if (!inviteeRecord) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `User not found: ${inviteeGhii}`));
+      return;
+    }
+
+    // Check if already a member
+    const existing = await storage.getMembership(id, inviteeGhii);
+    if (existing && existing.status === 'active') {
+      res.status(409).json(error(config.nodeId, 'ALREADY_MEMBER',
+        'User is already a member'));
+      return;
+    }
+
+    // Check max members
+    if (organism.members.length >= organism.maxMembers) {
+      res.status(409).json(error(config.nodeId, 'MAX_MEMBERS_REACHED',
+        'Organism has reached maximum member limit'));
+      return;
+    }
+
+    // Create a pending membership (invited)
+    const now = new Date().toISOString();
+    const membershipId = `mem-${randomBytes(8).toString('hex')}`;
+
+    await storage.createMembership({
+      id: membershipId,
+      organismId: id,
+      ghii: inviteeGhii,
+      role: 'member',
+      status: 'pending',
+      joinedAt: now,
+      invitedBy: callerGhii.ghii,
+    });
+
+    res.status(201).json(success(config.nodeId, {
+      invitation: {
+        id: membershipId,
+        organism_id: id,
+        organism_name: organism.name,
+        ghii: inviteeGhii,
+        invited_by: callerGhii.ghii,
+        status: 'pending',
+        created_at: now,
+      },
+    }, [
+      { description: 'View organism', method: 'GET', url: `/v1/organisms/${id}` },
+      { description: 'Invited user can accept', method: 'POST', url: `/v1/organisms/${id}/join` },
     ]));
   });
 
