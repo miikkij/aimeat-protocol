@@ -13,7 +13,7 @@ import type {
   GenesisPeerRecord, OrganismReputationRecord,
   ChatInstanceRecord, RealtimeRoomRecord, SiteChangeLogEntry,
   ExtensionRecord, EscrowHoldRecord,
-} from './interface.js';
+} from '../../interface.js';
 
 export class InMemoryStorage implements Storage {
   private owners = new Map<string, OwnerRecord>();
@@ -363,22 +363,22 @@ export class InMemoryStorage implements Storage {
 
   // ── Board Subscriptions ──
 
-  private boardSubscriptions = new Map<string, import('./interface.js').BoardSubscriptionRecord>();
+  private boardSubscriptions = new Map<string, import('../../interface.js').BoardSubscriptionRecord>();
 
-  async createBoardSubscription(sub: import('./interface.js').BoardSubscriptionRecord): Promise<import('./interface.js').BoardSubscriptionRecord> {
+  async createBoardSubscription(sub: import('../../interface.js').BoardSubscriptionRecord): Promise<import('../../interface.js').BoardSubscriptionRecord> {
     this.boardSubscriptions.set(`${sub.boardId}::${sub.gaii}`, sub);
     return sub;
   }
 
-  async getBoardSubscription(boardId: string, gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord | null> {
+  async getBoardSubscription(boardId: string, gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord | null> {
     return this.boardSubscriptions.get(`${boardId}::${gaii}`) ?? null;
   }
 
-  async listBoardSubscriptions(boardId: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+  async listBoardSubscriptions(boardId: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
     return [...this.boardSubscriptions.values()].filter(s => s.boardId === boardId);
   }
 
-  async listSubscriptionsByAgent(gaii: string): Promise<import('./interface.js').BoardSubscriptionRecord[]> {
+  async listSubscriptionsByAgent(gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
     return [...this.boardSubscriptions.values()].filter(s => s.gaii === gaii);
   }
 

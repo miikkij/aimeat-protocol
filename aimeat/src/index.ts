@@ -165,7 +165,7 @@ if (subcommand === 'config') {
     await mongo.ready;
     storage = mongo;
   } else {
-    const { InMemoryStorage } = await import('./storage/memory.js');
+    const { InMemoryStorage } = await import('./storage/providers/memory/index.js');
     storage = new InMemoryStorage();
   }
 

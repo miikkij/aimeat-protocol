@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from './config.js';
-import { InMemoryStorage } from './storage/memory.js';
+import { InMemoryStorage } from './storage/providers/memory/index.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
 import { optionalAuth, enableAnonymousAuth, requireAuth, requireRole } from './auth/middleware.js';
