@@ -1,0 +1,96 @@
+extension: "1.0"
+
+metadata:
+  name: "marketplace-behaviors"
+  version: "1.0.0"
+  description: "Purchase workflow with escrow, delivery confirmation, and ratings"
+  author: "aimeat-core"
+  license: "MIT"
+  aimeat: ">=1.5"
+
+required_apis:
+  - wallet
+  - memory
+  - consent
+  - trust
+
+actions:
+  - id: purchase
+    description: "Purchase a listing with morsel escrow"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/purchase"
+    auth: required
+    input:
+      listingKey:
+        type: string
+        required: true
+        description: "Memory key of the listing to purchase"
+    output:
+      purchaseId:
+        type: string
+      status:
+        type: string
+        enum: [purchased]
+    script: "actions/purchase.js"
+
+  - id: deliver
+    description: "Confirm delivery and release escrow to seller"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/deliver"
+    auth: required
+    input:
+      purchaseId:
+        type: string
+        required: true
+    output:
+      status:
+        type: string
+        enum: [delivered]
+    script: "actions/deliver.js"
+
+  - id: rate
+    description: "Rate a completed purchase (1-5 stars)"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/rate"
+    auth: required
+    input:
+      purchaseId:
+        type: string
+        required: true
+      score:
+        type: integer
+        min: 1
+        max: 5
+      comment:
+        type: string
+        max: 500
+    output:
+      rated:
+        type: boolean
+    script: "actions/rate.js"
+
+limits:
+  memory_mb: 64
+  timeout_ms: 5000
+  max_api_calls: 50
+
+config:
+  listing_fee_morsels:
+    type: integer
+    default: 2
+    description: "Fee charged to create a listing"
+  transaction_fee_percent:
+    type: integer
+    default: 5
+    description: "Percentage fee on each transaction"
+  escrow_enabled:
+    type: boolean
+    default: true
+    description: "Whether to hold funds in escrow during purchase"
+
+federation:
+  advertise: true
+  capabilities:
+    - "escrow"
+    - "purchase-workflow"
+    - "ratings"
