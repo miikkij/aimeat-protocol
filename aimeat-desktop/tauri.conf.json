@@ -1,25 +1,12 @@
 {
+  "productName": "AIMEAT Personal Node",
+  "version": "0.1.0",
+  "identifier": "com.overscale.aimeat-desktop",
   "build": {
-    "distDir": "../src",
-    "devPath": "../src"
+    "frontendDist": "../src",
+    "devUrl": "../src"
   },
-  "package": {
-    "productName": "AIMEAT Personal Node",
-    "version": "0.1.0"
-  },
-  "tauri": {
-    "bundle": {
-      "active": true,
-      "identifier": "com.overscale.aimeat-desktop",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "targets": "all"
-    },
+  "app": {
     "security": {
       "csp": null
     },
@@ -34,10 +21,20 @@
         "minHeight": 600
       }
     ],
-    "systemTray": {
+    "trayIcon": {
       "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false
+      "iconAsTemplate": true
     }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "targets": "all"
   }
 }
