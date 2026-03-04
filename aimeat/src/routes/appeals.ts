@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 
 function param(p: string | string[]): string {
@@ -131,17 +131,67 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
         ]));
     });
 
-    // ── GET /v1/appeals — List appeals (operator or organism admin) ──
-    router.get('/v1/appeals', requireAuth(), requireRole('operator'), async (req, res) => {
+    // ── GET /v1/appeals — List appeals (operator sees all; organism admin sees their organism's) ──
+    router.get('/v1/appeals', requireAuth(), async (req, res) => {
         const status = req.query.status as string | undefined;
         const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
         const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string, 10) || 20));
 
-        const appeals = await storage.listAppeals({ status, page, perPage });
+        const isOperator = req.auth!.roles.includes('operator');
 
-        // Count total for pagination metadata
+        // Resolve caller's GHII for organism admin check
+        let callerGhii: string | null = null;
+        if (!isOperator) {
+            const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
+            callerGhii = ghiiRecord?.ghii ?? null;
+        }
+
+        // Find organism IDs where the caller is an admin
+        let adminOrgIds: Set<string> | null = null;
+        if (!isOperator && callerGhii) {
+            adminOrgIds = new Set<string>();
+            const allOrganisms = await storage.listOrganisms();
+            for (const org of allOrganisms) {
+                if (org.admins.includes(callerGhii)) {
+                    adminOrgIds.add(org.id);
+                }
+            }
+        }
+
+        // Must be operator or admin of at least one organism
+        if (!isOperator && (!adminOrgIds || adminOrgIds.size === 0)) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                'Only operators or organism admins can list appeals'));
+            return;
+        }
+
+        // Fetch all appeals matching status filter
         const allAppeals = await storage.listAppeals({ status, page: 1, perPage: 10000 });
-        const total = allAppeals.length;
+
+        // If organism admin (not operator), filter to appeals for their organism's content
+        let filtered = allAppeals;
+        if (!isOperator && adminOrgIds) {
+            filtered = [];
+            for (const appeal of allAppeals) {
+                const flag = await storage.getFlag(appeal.flagId);
+                if (!flag) continue;
+                // Check if the flag targets content in an organism the caller admins
+                if (flag.targetType === 'memory' && flag.targetId.includes('::')) {
+                    const [, ...keyParts] = flag.targetId.split('::');
+                    const memoryKey = keyParts.join('::');
+                    const orgMatch = memoryKey.match(/^organism\.([^.]+)\./);
+                    if (orgMatch && adminOrgIds.has(orgMatch[1])) {
+                        filtered.push(appeal);
+                    }
+                }
+            }
+        }
+
+        const total = filtered.length;
+
+        // Apply pagination manually
+        const start = (page - 1) * perPage;
+        const appeals = filtered.slice(start, start + perPage);
 
         res.json(success(config.nodeId, { appeals, total }, [
             { description: 'Review an appeal', method: 'POST', url: '/v1/appeals/{id}/review' },
