@@ -29,7 +29,7 @@ export class TunnelManager {
   constructor(
     private config: AimeatConfig,
     private storage: Storage,
-  ) {}
+  ) { }
 
   handleConnection(ws: WebSocket, nodeId: string, ownerName: string, agentGaiis: string[]): void {
     // Close existing connection for this nodeId if any

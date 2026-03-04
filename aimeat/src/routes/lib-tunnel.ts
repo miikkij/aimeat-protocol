@@ -6,7 +6,7 @@ import type { AimeatConfig } from '../config.js';
  * Depends on AIMEAT.auth being loaded first.
  */
 export function aimeatTunnelLib(config: AimeatConfig): string {
-    return `// aimeat-tunnel.js — AIMEAT Tunnel Client Library (Personal Node ↔ Operator)
+  return `// aimeat-tunnel.js — AIMEAT Tunnel Client Library (Personal Node ↔ Operator)
 // Node: ${config.nodeId} | Generated: ${new Date().toISOString()}
 // Requires: aimeat-auth.js loaded first
 // Usage: const tunnel = AIMEAT.tunnel.connect({ onRequest, onMailbox }); tunnel.close();
