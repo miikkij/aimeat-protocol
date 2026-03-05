@@ -220,6 +220,11 @@
       "loadingPrompt": "Loading prompt...",
       "loadingAgents": "Loading agents..."
     },
+    "scopes": {
+      "denied": "Scope \"{scope}\" required. Your agent does not have this permission.",
+      "invalid": "Invalid scopes: {scopes}",
+      "updated": "Agent scopes updated successfully"
+    },
     "chatSessions": {
       "title": "Chat Sessions",
       "desc": "Chat sessions represent AI tools you use directly \u2014 like Claude, ChatGPT, Grok, or Copilot. Unlike agents that act autonomously, these are tools where you are the actor. Each session inherits your trust score and morsel balance.",
