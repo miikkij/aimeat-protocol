@@ -58,6 +58,7 @@ export function optionalAuth() {
         node: '',
         roles: ['agent'],
         exp: Math.floor(Date.now() / 1000) + 86400,
+        scopes: ['memory:read', 'catalogue:read', 'social:read'],
       };
     }
     next();
@@ -117,6 +118,49 @@ export function requireRole(role: string) {
     if (!hasRole) {
       res.status(403).json(errorEnvelope('ACCESS_DENIED', `Role "${role}" required`));
       return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Require specific scopes. Must be used after requireAuth().
+ * Checks if the agent's JWT scopes include the required scopes.
+ * Supports exact match, domain wildcards (memory:*), and global wildcard (*).
+ * Operators bypass all scope checks.
+ */
+export function requireScope(...requiredScopes: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      return;
+    }
+
+    // Operators always have full access
+    if (req.auth.roles.includes('operator')) {
+      next();
+      return;
+    }
+
+    const agentScopes = req.auth.scopes;
+
+    // Global wildcard
+    if (agentScopes.includes('*')) {
+      next();
+      return;
+    }
+
+    for (const required of requiredScopes) {
+      const [domain] = required.split(':');
+      const hasExact = agentScopes.includes(required);
+      const hasDomainWild = agentScopes.includes(`${domain}:*`);
+
+      if (!hasExact && !hasDomainWild) {
+        console.warn(`[scope-denied] ${req.auth.sub} needs "${required}", has [${agentScopes.join(', ')}] on ${req.method} ${req.path}`);
+        res.status(403).json(errorEnvelope('SCOPE_DENIED', `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`));
+        return;
+      }
     }
 
     next();
