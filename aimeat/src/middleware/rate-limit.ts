@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { RateLimitTier, RoleMultipliers } from '../config.js';
+import { getStats } from '../services/stats.js';
 
 interface RateBucket {
     count: number;
@@ -51,6 +52,8 @@ export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: R
         res.setHeader('X-RateLimit-Reset', Math.ceil(bucket.resetAt / 1000));
 
         if (bucket.count > max) {
+            const stats = getStats();
+            if (stats) stats.increment('rate_limit_hits_total');
             const retryAfterSec = Math.ceil((bucket.resetAt - now) / 1000);
             res.setHeader('Retry-After', retryAfterSec);
             res.status(429).json({
