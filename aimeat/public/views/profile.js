@@ -177,6 +177,7 @@ const TABS = [
   { id:'actions', key:'profile.tabs.services' },
   { id:'boards', key:'profile.tabs.boards' },
   { id:'apps', key:'profile.tabs.apps' },
+  { id:'extensions', key:'profile.tabs.extensions' },
   { id:'federation', key:'profile.tabs.federation' },
   { id:'nodes', key:'profile.tabs.nodes' },
   { id:'access', key:'profile.tabs.access' },
@@ -241,6 +242,16 @@ export default function Profile({ navigate, locale }) {
   const [promptCopied, setPromptCopied] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [expandedSetups, setExpandedSetups] = useState(new Set());
+
+  // Extensions state
+  const [extensions, setExtensions] = useState(null);
+  const [extDetailName, setExtDetailName] = useState(null);
+  const [extDetail, setExtDetail] = useState(null);
+  const [showExtInstall, setShowExtInstall] = useState(false);
+  const [extManifestMode, setExtManifestMode] = useState('upload');
+  const [extLibMode, setExtLibMode] = useState('upload');
+  const [extLibEntries, setExtLibEntries] = useState([{filename:'', code:''}]);
+
   const loadedRef = useRef(new Set());
   const toastTimer = useRef(null);
 
@@ -419,6 +430,141 @@ export default function Profile({ navigate, locale }) {
       if (data?.data) { setNodeStatsData(data.data); setNodeStatsError(false); }
       else { setNodeStatsError(true); }
     } catch { setNodeStatsError(true); }
+  }
+
+  // ── Extensions loaders ──
+  async function loadExtensions() {
+    const s = getSession();
+    if (!s?.fetch) return;
+    try {
+      const resp = await s.fetch('/v1/cortex');
+      const data = await resp.json();
+      setExtensions(data?.data?.extensions || []);
+    } catch(e) {
+      setExtensions([]);
+    }
+  }
+
+  async function loadExtDetail(name) {
+    setExtDetailName(name);
+    setExtDetail(null);
+    const s = getSession();
+    try {
+      const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name));
+      const data = await resp.json();
+      const ext = data.data;
+
+      // Also fetch prompt content
+      const prompts = (ext.components || []).filter(c => c.type === 'prompt');
+      for (const p of prompts) {
+        try {
+          const pr = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/prompts/' + encodeURIComponent(p.name));
+          const pd = await pr.json();
+          if (pd.data?.content) p._content = pd.data.content;
+        } catch(e) {}
+      }
+
+      // Fetch ontology
+      try {
+        const ontResp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/ontology');
+        const ontData = await ontResp.json();
+        ext._ontologies = ontData.data?.ontologies || [];
+      } catch(e) { ext._ontologies = []; }
+
+      setExtDetail(ext);
+    } catch(e) {
+      setExtDetail({ error: e.message });
+    }
+  }
+
+  async function activateExt(name) {
+    const s = getSession();
+    try {
+      const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/activate', { method: 'POST' });
+      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      showToast(t('profile.extensions.success.activated'));
+      loadExtensions();
+      setExtDetailName(null);
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function deactivateExt(name) {
+    const s = getSession();
+    try {
+      const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/deactivate', { method: 'POST' });
+      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      showToast(t('profile.extensions.success.deactivated'));
+      loadExtensions();
+      setExtDetailName(null);
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function uninstallExt(name) {
+    if (!confirm(t('profile.extensions.uninstallConfirm'))) return;
+    const s = getSession();
+    try {
+      const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name), { method: 'DELETE' });
+      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      showToast(t('profile.extensions.success.uninstalled'));
+      loadExtensions();
+      setExtDetailName(null);
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function installExtension(e) {
+    e.preventDefault();
+    const s = getSession();
+    try {
+      // Read manifest
+      let manifest = '';
+      if (extManifestMode === 'upload') {
+        const fileInput = document.getElementById('ext-manifest-file');
+        if (!fileInput?.files[0]) throw new Error('No manifest file selected');
+        manifest = await fileInput.files[0].text();
+      } else {
+        const textarea = document.getElementById('ext-manifest-text');
+        manifest = textarea?.value || '';
+        if (!manifest.trim()) throw new Error('Manifest is empty');
+      }
+
+      // Read libs
+      const libs = {};
+      if (extLibMode === 'upload') {
+        const libInput = document.getElementById('ext-lib-files');
+        if (libInput?.files) {
+          for (const f of libInput.files) {
+            const content = await f.text();
+            libs[f.name] = btoa(unescape(encodeURIComponent(content)));
+          }
+        }
+      } else {
+        extLibEntries.forEach(entry => {
+          if (entry.filename.trim() && entry.code.trim()) {
+            libs[entry.filename.trim()] = btoa(unescape(encodeURIComponent(entry.code)));
+          }
+        });
+      }
+
+      const body = { manifest };
+      if (Object.keys(libs).length > 0) body.libs = libs;
+
+      const resp = await s.fetch('/v1/cortex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || 'Install failed');
+
+      showToast(t('profile.extensions.success.installed'));
+      setShowExtInstall(false);
+      setExtManifestMode('upload');
+      setExtLibMode('upload');
+      setExtLibEntries([{filename:'', code:''}]);
+      loadExtensions();
+    } catch(e) {
+      showToast(t('profile.extensions.error.installFailed') + ': ' + e.message, true);
+    }
   }
 
   // ── CRUD actions ──
@@ -680,6 +826,7 @@ export default function Profile({ navigate, locale }) {
     if (tabId === 'boards' && brdSubTab === 'mine' && !myBoards) loadMyBoardsData();
     if (tabId === 'boards' && brdSubTab === 'browse' && !allBoards) loadAllBoardsData();
     if (tabId === 'nodeStats' && !nodeStatsData && !nodeStatsError) loadNodeStatsData();
+    if (tabId === 'extensions' && !extensions) loadExtensions();
   }
 
   // ── Render helpers ──
@@ -1449,6 +1596,164 @@ export default function Profile({ navigate, locale }) {
     `;
   };
 
+  // ── Extensions tab ──
+  const COMP_ICONS = {schema:'\u{1F4D0}',prompt:'\u{1F4AC}',action:'\u26A1','board-template':'\u{1F4CC}',ontology:'\u{1F9EC}','seed-data':'\u{1F331}',lib:'\u{1F4E6}'};
+  const COMP_COLORS = {schema:'#60a5fa',prompt:'#a78bfa',action:'#f59e0b','board-template':'#34d399',ontology:'#f472b6','seed-data':'#6ee7b7',lib:'#38bdf8'};
+
+  const renderExtensions = () => {
+    // Detail view
+    if (extDetailName) {
+      if (!extDetail) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><br/><${Spinner} text=${t('profile.extensions.loading')} /></div>`;
+      if (extDetail.error) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><div class="empty">Error: ${escHtml(extDetail.error)}</div></div>`;
+
+      const ext = extDetail;
+      const comps = ext.components || [];
+      const isActive = ext.status === 'active';
+
+      return html`
+        <button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button>
+        <div style="margin:1.5rem 0">
+          <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">${escHtml(ext.name)} <span style="font-size:.8rem;font-weight:400;color:var(--muted)">${'v' + escHtml(ext.version || '?')}</span></div>
+          <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${escHtml(ext.description || '')}</div>
+          <div style="display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);margin-bottom:1.5rem;flex-wrap:wrap">
+            <span>${t('profile.extensions.detail.author')}: ${escHtml(ext.author || '?')}</span>
+            ${ext.license ? html`<span>${t('profile.extensions.detail.license')}: ${escHtml(ext.license)}</span>` : null}
+            <span><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
+            <span>${t('profile.extensions.detail.tags')}: ${escHtml((ext.tags || []).join(', '))}</span>
+          </div>
+        </div>
+
+        <div class="ext-detail-section">
+          <div class="ext-detail-section-title">${t('profile.extensions.detail.whatsIncluded')}</div>
+          ${comps.map(c => html`<div>${COMP_ICONS[c.type] || '\u{1F4C4}'} ${t('profile.extensions.components.' + c.type) || escHtml(c.type)}: ${escHtml(c.type === 'schema' ? c.key_pattern : (c.name || c.filename || ''))}</div>`)}
+        </div>
+
+        ${comps.filter(c => c.type === 'prompt').map(p => {
+          const content = p._content || p.content || '';
+          return html`
+            <div class="ext-detail-section">
+              <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${escHtml(p.name)} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(content); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyPrompt')}</button></div>
+              <div class="ext-detail-code">${escHtml(content.substring(0, 500))}${content.length > 500 ? '...' : ''}</div>
+            </div>`;
+        })}
+
+        ${comps.filter(c => c.type === 'lib').map(lib => {
+          const scriptUrl = NODE_URL + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + encodeURIComponent(lib.filename);
+          const scriptTag = '<script src="' + scriptUrl + '"><\/script>';
+          return html`
+            <div class="ext-detail-section">
+              <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${escHtml(lib.filename)}</div>
+              <div style="margin-bottom:.5rem;font-size:.85rem;color:var(--muted)">${t('profile.extensions.detail.exports')}: ${escHtml((lib.exports || []).join(', '))}</div>
+              <div style="font-size:.85rem;font-weight:600;margin-bottom:4px">${t('profile.extensions.detail.scriptTag')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
+              <div class="ext-detail-code">${escHtml(scriptTag)}</div>
+              ${lib.api_surface ? html`
+                <div style="font-size:.85rem;font-weight:600;margin-top:.75rem;margin-bottom:4px">${t('profile.extensions.detail.apiSurface')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
+                <div class="ext-detail-code">${escHtml(lib.api_surface)}</div>` : null}
+            </div>`;
+        })}
+
+        ${comps.filter(c => c.type === 'schema').length > 0 ? html`
+          <div class="ext-detail-section">
+            <div class="ext-detail-section-title">${'\u{1F4D0}'} Schemas</div>
+            ${comps.filter(c => c.type === 'schema').map(s => html`<div style="font-size:.85rem;color:var(--muted);margin-bottom:.25rem">${escHtml(s.key_pattern)} (${escHtml(s.apply_to || '')})</div>`)}
+          </div>` : null}
+
+        ${(ext._ontologies || []).map(ont => html`
+          <div class="ext-detail-section">
+            <div class="ext-detail-section-title">${'\u{1F9EC}'} Ontology: ${escHtml(ont.name)}</div>
+            <div style="font-size:.85rem;color:var(--muted)">${Object.entries(ont.concepts || {}).map(([k, c]) => escHtml(k) + ' (' + escHtml(c.label?.en || k) + ')').join(', ')}</div>
+          </div>`)}
+
+        <div style="display:flex;gap:1rem;margin-top:1.5rem">
+          ${isActive
+            ? html`<button class="btn-outline" onClick=${() => deactivateExt(ext.name)}>${t('profile.extensions.deactivate')}</button>`
+            : html`<button class="btn-primary" onClick=${() => activateExt(ext.name)}>${t('profile.extensions.activate')}</button>`}
+          <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
+        </div>`;
+    }
+
+    // Grid view
+    return html`
+      <div class="section-title">${t('profile.extensions.title')}</div>
+      <div class="section-desc">${t('profile.extensions.desc')}</div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div></div>
+        <button class="btn-primary" onClick=${() => setShowExtInstall(true)}>${t('profile.extensions.install')}</button>
+      </div>
+
+      ${!extensions ? html`<${Spinner} text=${t('profile.extensions.loading')} />`
+        : extensions.length === 0 ? html`<div class="empty">${t('profile.extensions.empty')}</div>`
+        : html`<div class="ext-grid">
+            ${extensions.map(ext => {
+              const types = ext.component_types || [];
+              const isActive = ext.status === 'active';
+              return html`
+                <div class="ext-card" onClick=${() => loadExtDetail(ext.name)}>
+                  <div class="ext-card-header">
+                    <span class="ext-card-name">${escHtml(ext.name)}</span>
+                    <span class="ext-card-version">${'v' + escHtml(ext.version || '?')}</span>
+                  </div>
+                  <div class="ext-card-desc">${escHtml(ext.description || '')}</div>
+                  <div class="ext-card-tags">
+                    ${types.map(ct => html`<span class="ext-comp-tag" style="color:${COMP_COLORS[ct] || 'var(--muted)'}">${t('profile.extensions.components.' + ct) || escHtml(ct)}</span>`)}
+                  </div>
+                  <div class="ext-card-footer">
+                    <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
+                    <span class="ext-card-actions">
+                      ${isActive
+                        ? html`<button onClick=${(e) => { e.stopPropagation(); deactivateExt(ext.name); }}>${t('profile.extensions.deactivate')}</button>`
+                        : html`<button onClick=${(e) => { e.stopPropagation(); activateExt(ext.name); }}>${t('profile.extensions.activate')}</button>`}
+                      <button class="danger" onClick=${(e) => { e.stopPropagation(); uninstallExt(ext.name); }}>${t('profile.extensions.uninstall')}</button>
+                    </span>
+                  </div>
+                </div>`;
+            })}
+          </div>`}
+
+      ${showExtInstall ? html`
+        <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowExtInstall(false); }}>
+          <div class="modal" style="max-width:600px">
+            <h3>${t('profile.extensions.installModal.title')}</h3>
+            <form onSubmit=${installExtension}>
+              <div style="margin-top:1rem">
+                <label>${t('profile.extensions.installModal.manifestLabel')}</label>
+                <div style="display:flex;gap:1rem;margin:.5rem 0">
+                  <label><input type="radio" name="ext-mmode" checked=${extManifestMode==='upload'} onChange=${() => setExtManifestMode('upload')} /> ${t('profile.extensions.installModal.uploadFile')}</label>
+                  <label><input type="radio" name="ext-mmode" checked=${extManifestMode==='paste'} onChange=${() => setExtManifestMode('paste')} /> ${t('profile.extensions.installModal.pasteYaml')}</label>
+                </div>
+                ${extManifestMode === 'upload'
+                  ? html`<input type="file" id="ext-manifest-file" accept=".yaml,.yml" />`
+                  : html`<textarea id="ext-manifest-text" rows="10" style="width:100%;font-family:monospace;font-size:13px" placeholder="apiVersion: cortex.aimeat.org/v1\nkind: Extension\n..."></textarea>`}
+              </div>
+
+              <div style="margin-top:1rem">
+                <label>${t('profile.extensions.installModal.libsLabel')}</label>
+                <div style="display:flex;gap:1rem;margin:.5rem 0">
+                  <label><input type="radio" name="ext-lmode" checked=${extLibMode==='upload'} onChange=${() => setExtLibMode('upload')} /> ${t('profile.extensions.installModal.uploadFiles')}</label>
+                  <label><input type="radio" name="ext-lmode" checked=${extLibMode==='paste'} onChange=${() => setExtLibMode('paste')} /> ${t('profile.extensions.installModal.pasteCode')}</label>
+                </div>
+                ${extLibMode === 'upload'
+                  ? html`<input type="file" id="ext-lib-files" accept=".js" multiple />`
+                  : html`<div>
+                      ${extLibEntries.map((entry, i) => html`
+                        <div style="margin-bottom:.75rem;padding:.75rem;background:rgba(0,0,0,.2);border-radius:8px">
+                          <input type="text" placeholder=${t('profile.extensions.installModal.filenamePlaceholder')} value=${entry.filename} onInput=${(e) => { const arr = [...extLibEntries]; arr[i] = {...arr[i], filename: e.target.value}; setExtLibEntries(arr); }} style="width:100%;margin-bottom:.5rem" />
+                          <textarea rows="6" placeholder="(function(AIMEAT) { ... })(...)" value=${entry.code} onInput=${(e) => { const arr = [...extLibEntries]; arr[i] = {...arr[i], code: e.target.value}; setExtLibEntries(arr); }} style="width:100%;font-family:monospace;font-size:13px"></textarea>
+                        </div>`)}
+                      <button type="button" class="btn-outline" style="font-size:.85rem" onClick=${() => setExtLibEntries([...extLibEntries, {filename:'', code:''}])}>${t('profile.extensions.installModal.addLib')}</button>
+                    </div>`}
+              </div>
+
+              <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:1.5rem">
+                <button type="button" class="btn-outline" onClick=${() => setShowExtInstall(false)}>${t('profile.extensions.installModal.cancel')}</button>
+                <button type="submit" class="btn-primary">${t('profile.extensions.installModal.installBtn')}</button>
+              </div>
+            </form>
+          </div>
+        </div>` : null}`;
+  };
+
   // ── Tab panel map ──
   const tabContent = {
     agents: renderAgents,
@@ -1459,6 +1764,7 @@ export default function Profile({ navigate, locale }) {
     actions: renderServices,
     boards: renderBoards,
     apps: renderApps,
+    extensions: renderExtensions,
     federation: renderFederation,
     nodes: renderNodes,
     access: renderAccess,

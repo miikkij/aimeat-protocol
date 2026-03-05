@@ -220,3 +220,31 @@
 .pf .scope-row .scope-technical {font-size:.7rem;color:var(--muted,#c4a6d0);font-family:monospace}
 .pf .scope-row.disabled {opacity:.45;pointer-events:none}
 .pf .scope-row .scope-lock {font-size:.7rem;color:var(--muted,#c4a6d0)}
+/* === Extensions === */
+.pf .ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.pf .ext-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:1.25rem;cursor:pointer;transition:all .2s}
+.pf .ext-card:hover{background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.18);transform:translateY(-2px)}
+.pf .ext-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem}
+.pf .ext-card-name{font-weight:600;font-size:.95rem}
+.pf .ext-card-version{font-size:.75rem;color:var(--muted,#c4a6d0);background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:6px}
+.pf .ext-card-desc{font-size:.85rem;color:var(--muted,#c4a6d0);margin-bottom:.75rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pf .ext-card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.75rem}
+.pf .ext-comp-tag{font-size:.7rem;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.08)}
+.pf .ext-card-footer{display:flex;justify-content:space-between;align-items:center}
+.pf .ext-status{font-size:.8rem;display:flex;align-items:center;gap:6px}
+.pf .ext-status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.pf .ext-status-dot.active{background:#4ade80}
+.pf .ext-status-dot.inactive{background:#9ca3af}
+.pf .ext-card-actions{display:flex;gap:.5rem}
+.pf .ext-card-actions button{font-size:.75rem;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:var(--muted,#c4a6d0);cursor:pointer;transition:all .15s}
+.pf .ext-card-actions button:hover{background:rgba(255,255,255,0.1)}
+.pf .ext-card-actions button.danger{border-color:rgba(239,68,68,0.3);color:#f87171}
+.pf .ext-card-actions button.danger:hover{background:rgba(239,68,68,0.15)}
+.pf .ext-detail-section{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:1rem;margin-bottom:1rem}
+.pf .ext-detail-section-title{font-weight:600;font-size:.85rem;margin-bottom:.75rem;display:flex;align-items:center;gap:8px}
+.pf .ext-detail-code{font-family:monospace;font-size:.8rem;background:rgba(0,0,0,.3);padding:10px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
+.pf .ext-copy-btn{font-size:.7rem;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:var(--muted,#c4a6d0);cursor:pointer;margin-left:auto}
+.pf .ext-copy-btn:hover{background:rgba(255,255,255,0.1)}
+@media(max-width:600px){
+  .pf .ext-grid{grid-template-columns:1fr}
+}

@@ -1145,6 +1145,13 @@
       color: var(--text-dim);
       font-size: .85rem;
     }
+
+    /* ── Cortex Extensions Bar ──────────────────────── */
+
+    .cortex-mini-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;cursor:pointer;min-width:160px;flex-shrink:0;transition:all .15s}
+    .cortex-mini-card:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18)}
+    .cortex-mini-name{font-weight:600;font-size:.85rem;margin-bottom:.25rem;white-space:nowrap}
+    .cortex-mini-meta{font-size:.7rem;color:var(--text-muted,#889)}
   </style>
 </head>
 <body>
@@ -1160,6 +1167,25 @@
   </header>
 
   <nav id="tag-bar"></nav>
+
+  <!-- Active Extensions Bar -->
+  <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <h3 style="margin:0;font-size:.95rem;color:var(--text-muted,#aab)">&#x1F50C; Active Extensions</h3>
+      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted,#aab);cursor:pointer;font-size:.8rem">&#x25BC; toggle</button>
+    </div>
+    <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+  </div>
+
+  <!-- Extension Popup Overlay -->
+  <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(10,10,18,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:rgba(22,33,62,.92);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
+      <div id="cortex-popup-content"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Published Apps Section -->
   <div id="published-section" style="display:none">
@@ -2891,6 +2917,119 @@
       });
   }
 
+  // ── Cortex Extensions Bar ─────────────────────────
+
+  var cortexToken = null;
+
+  function cortexEsc(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function loadCortexExtensions() {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+
+    // Get anonymous token first (same pattern as AIMEAT import)
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(authData) {
+        var token = authData.data && authData.data.token;
+        if (!token) return;
+        cortexToken = token;
+        return fetch(url + '/v1/cortex?status=active', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      })
+      .then(function(r) { return r ? r.json() : null; })
+      .then(function(data) {
+        if (!data || !data.data || !data.data.extensions) return;
+        var exts = data.data.extensions;
+        if (!exts.length) return;
+
+        document.getElementById('cortex-bar').style.display = 'block';
+        var grid = document.getElementById('cortex-bar-grid');
+        grid.innerHTML = exts.map(function(ext) {
+          var types = ext.component_types || [];
+          var libCount = types.filter(function(t) { return t === 'lib'; }).length;
+          var schemaCount = types.filter(function(t) { return t === 'schema'; }).length;
+          return '<div class="cortex-mini-card" onclick="showCortexPopup(\'' + encodeURIComponent(ext.name) + '\')">'
+            + '<div class="cortex-mini-name">&#x1F4E6; ' + cortexEsc(ext.short_name || ext.name) + '</div>'
+            + '<div class="cortex-mini-meta">' + libCount + ' lib &middot; ' + schemaCount + ' schema</div>'
+            + '</div>';
+        }).join('');
+      })
+      .catch(function(e) { console.warn('Cortex bar load failed:', e); });
+  }
+
+  function showCortexPopup(encodedName) {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var el = document.getElementById('cortex-popup-content');
+    el.innerHTML = '<p>Loading...</p>';
+    document.getElementById('cortex-popup-overlay').style.display = 'flex';
+
+    if (!cortexToken) { el.innerHTML = '<p>No auth token available</p>'; return; }
+
+    fetch(url + '/v1/cortex/' + encodedName, {
+      headers: { 'Authorization': 'Bearer ' + cortexToken }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var ext = data.data;
+        var comps = ext.components || [];
+        var html = '<h2 style="margin-top:0">' + cortexEsc(ext.name) + '</h2>';
+        html += '<p style="color:var(--text-muted,#889)">' + cortexEsc(ext.description || '') + '</p>';
+        html += '<h3 style="font-size:.9rem">Available for your apps:</h3>';
+
+        // Libs
+        comps.filter(function(c) { return c.type === 'lib'; }).forEach(function(lib) {
+          var scriptUrl = url + '/v1/cortex/' + encodedName + '/libs/' + encodeURIComponent(lib.filename);
+          var tag = '<script src="' + scriptUrl + '"><\/script>';
+          html += '<div style="margin-bottom:1rem">'
+            + '<div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div>'
+            + '<div style="font-family:monospace;font-size:.75rem;background:rgba(0,0,0,.3);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
+            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy</button>';
+          if (lib.api_surface) {
+            html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div>'
+              + '<div style="font-family:monospace;font-size:.75rem;background:rgba(0,0,0,.3);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
+              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy API</button>';
+          }
+          html += '</div>';
+        });
+
+        // Schemas
+        comps.filter(function(c) { return c.type === 'schema'; }).forEach(function(s) {
+          html += '<div style="margin-bottom:.5rem;font-size:.85rem">&#x1F4D0; Schema: <code>' + cortexEsc(s.key_pattern) + '</code> &mdash; data validated automatically</div>';
+        });
+
+        // Prompts
+        comps.filter(function(c) { return c.type === 'prompt'; }).forEach(function(p) {
+          var preview = (p.content || '').substring(0, 150);
+          html += '<div style="margin-bottom:.5rem">'
+            + '<div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div>'
+            + '<div style="font-size:.75rem;color:var(--text-muted,#889)">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
+            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy Prompt</button>'
+            + '</div>';
+        });
+
+        el.innerHTML = html;
+      })
+      .catch(function(e) {
+        el.innerHTML = '<p>Error: ' + cortexEsc(e.message) + '</p>';
+      });
+  }
+
+  function cortexCopy(text, btn) {
+    navigator.clipboard.writeText(text.replace(/\\n/g, '\n')).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+  }
+
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
@@ -2934,8 +3073,15 @@
     submitPublish: submitPublish,
     loadPublishedApps: loadPublishedApps,
     togglePublished: togglePublished,
-    unpublishApp: unpublishApp
+    unpublishApp: unpublishApp,
+    loadCortexExtensions: loadCortexExtensions,
+    showCortexPopup: showCortexPopup,
+    cortexCopy: cortexCopy
   };
+
+  // Expose cortex functions globally for inline onclick handlers
+  window.showCortexPopup = showCortexPopup;
+  window.cortexCopy = cortexCopy;
 
   // ── Bootstrap ─────────────────────────────────────
 
@@ -2945,6 +3091,7 @@
 
     renderApps();
     loadPublishedApps();
+    loadCortexExtensions();
 
     // ── Search input ─────────────────────────────────
     document.getElementById('search-input').addEventListener('input', function (e) {
@@ -2997,6 +3144,13 @@
     document.getElementById('publish-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
+      }
+    });
+
+    // ── Click cortex popup overlay to close ─────────
+    document.getElementById('cortex-popup-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.style.display = 'none';
       }
     });
 
