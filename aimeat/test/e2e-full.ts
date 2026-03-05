@@ -1442,6 +1442,91 @@ await json('/v1/site/template', {
     headers: { Authorization: `Bearer ${ownerToken}` },
 });
 
+// ─── Observability ───
+console.log('Observability');
+
+await test('GET /v1/stats includes tunnel section', async () => {
+    const { body } = await json('/v1/stats');
+    assert(body.ok === true, 'ok');
+    assert(body.data.tunnel !== undefined, 'should include tunnel section');
+    assert(typeof body.data.tunnel.connections_active === 'number', 'connections_active');
+    assert(typeof body.data.tunnel.connections_total === 'number', 'connections_total');
+    assert(typeof body.data.tunnel.disconnections_total === 'number', 'disconnections_total');
+    assert(typeof body.data.tunnel.messages_sent_total === 'number', 'messages_sent_total');
+    assert(typeof body.data.tunnel.delivery_latency_avg_ms === 'number', 'delivery_latency_avg_ms');
+    assert(typeof body.data.tunnel.delivery_latency_p95_ms === 'number', 'delivery_latency_p95_ms');
+    assert(typeof body.data.tunnel.heartbeat_misses_total === 'number', 'heartbeat_misses_total');
+    assert(typeof body.data.tunnel.mailbox_fallbacks_total === 'number', 'mailbox_fallbacks_total');
+});
+
+await test('GET /v1/stats includes mailbox section', async () => {
+    const { body } = await json('/v1/stats');
+    assert(body.ok === true, 'ok');
+    assert(body.data.mailbox !== undefined, 'should include mailbox section');
+    assert(typeof body.data.mailbox.items_total === 'number', 'items_total');
+    assert(typeof body.data.mailbox.bytes_total === 'number', 'bytes_total');
+    assert(typeof body.data.mailbox.enqueued_total === 'number', 'enqueued_total');
+    assert(typeof body.data.mailbox.delivered_total === 'number', 'delivered_total');
+    assert(typeof body.data.mailbox.expired_total === 'number', 'expired_total');
+    assert(typeof body.data.mailbox.quota_rejections_total === 'number', 'quota_rejections_total');
+    assert(typeof body.data.mailbox.oldest_item_age_seconds === 'number', 'oldest_item_age_seconds');
+});
+
+await test('GET /v1/stats includes auth/rate-limit counters', async () => {
+    const { body } = await json('/v1/stats');
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data.auth_failures_total === 'number', 'auth_failures_total');
+    assert(typeof body.data.rate_limit_hits_total === 'number', 'rate_limit_hits_total');
+    assert(typeof body.data.scope_denials_total === 'number', 'scope_denials_total');
+});
+
+await test('GET /v1/stats backward compatibility', async () => {
+    const { body } = await json('/v1/stats');
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data.uptime_seconds === 'number', 'uptime_seconds');
+    assert(typeof body.data.requests_total === 'number', 'requests_total');
+    assert(typeof body.data.requests_by_method === 'object', 'requests_by_method');
+    assert(typeof body.data.requests_by_status === 'object', 'requests_by_status');
+    assert(typeof body.data.memory_writes === 'number', 'memory_writes');
+    assert(typeof body.data.memory_reads === 'number', 'memory_reads');
+    assert(typeof body.data.active_owners === 'number', 'active_owners');
+    assert(typeof body.data.active_agents === 'number', 'active_agents');
+});
+
+await test('Response includes X-Request-Id header', async () => {
+    const { headers } = await json('/v1/health');
+    const requestId = headers.get('x-request-id');
+    assert(requestId !== null && requestId.length > 0, 'should have X-Request-Id header');
+});
+
+await test('X-Request-Id is echoed when provided', async () => {
+    const customId = 'test-correlation-id-e2e-' + Date.now();
+    const { headers } = await json('/v1/health', {
+        headers: { 'X-Request-Id': customId },
+    });
+    const returnedId = headers.get('x-request-id');
+    assert(returnedId === customId, `expected ${customId}, got ${returnedId}`);
+});
+
+await test('GET /v1/health includes subsystems', async () => {
+    const { body } = await json('/v1/health');
+    assert(body.ok === true, 'ok');
+    assert(body.data.status === 'healthy' || body.data.status === 'degraded', 'status');
+    assert(typeof body.data.uptime_seconds === 'number', 'uptime_seconds');
+    assert(typeof body.data.memory_mb === 'number', 'memory_mb');
+    assert(body.data.subsystems !== undefined, 'should include subsystems');
+    assert(body.data.subsystems.storage !== undefined, 'should include storage');
+    assert(body.data.subsystems.storage.healthy === true, 'storage should be healthy');
+});
+
+await test('GET /v1/metrics returns 503 when disabled', async () => {
+    const { status, body } = await json('/v1/metrics');
+    // Metrics disabled by default (AIMEAT_METRICS_ENABLED=false)
+    // Should return 503 FEATURE_DISABLED
+    assert(status === 503, `expected 503, got ${status}`);
+    assert(body.error?.code === 'FEATURE_DISABLED', 'should be FEATURE_DISABLED');
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 
