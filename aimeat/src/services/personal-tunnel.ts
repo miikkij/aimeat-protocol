@@ -4,6 +4,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from './mailbox-notification.js';
 import { logger } from '../utils/logger.js';
+import { getStats } from './stats.js';
+import { getPromMetrics } from './prometheus.js';
 
 export interface TunnelMessage {
   type: 'request' | 'response' | 'mailbox_sync' | 'mailbox_ack' | 'heartbeat' | 'heartbeat_ack' | 'disconnect' | 'welcome' | 'delivery_receipt';
@@ -53,6 +55,19 @@ export class TunnelManager {
     };
     this.connections.set(nodeId, conn);
 
+    const stats = getStats();
+    const prom = getPromMetrics();
+    if (stats) {
+      if (existing) stats.incrementTunnel('reconnects_total');
+      stats.incrementTunnel('connections_total');
+      stats.setTunnelGauge('connections_active', this.connections.size);
+    }
+    if (prom) {
+      if (existing) prom.tunnelReconnectsTotal.inc();
+      prom.tunnelConnectionsTotal.inc();
+      prom.tunnelConnectionsActive.set(this.connections.size);
+    }
+
     // Update storage status to online
     this.storage.updatePersonalNode(nodeId, {
       status: 'online',
@@ -62,7 +77,12 @@ export class TunnelManager {
     // Clear notification cooldown — node is back online (REQ-007)
     this.notificationService?.clearCooldown(nodeId);
 
-    logger.info('Personal node connected', { nodeId, ownerName, agents: agentGaiis.length });
+    logger.info('Personal node connected', {
+      event: 'tunnel.connect',
+      personal_node_id: nodeId,
+      ownerName,
+      agents: agentGaiis.length,
+    });
 
     // Send welcome message with protocol hints
     const welcome: TunnelMessage = {
@@ -92,27 +112,54 @@ export class TunnelManager {
         const msg: TunnelMessage = JSON.parse(data.toString());
         this.handleMessage(nodeId, msg);
       } catch (err) {
-        logger.error('Invalid tunnel message', { nodeId, error: err });
+        logger.error('Invalid tunnel message', {
+          event: 'tunnel.error',
+          personal_node_id: nodeId,
+          error: err,
+        });
       }
     });
 
     ws.on('close', () => {
       this.connections.delete(nodeId);
+      const stats = getStats();
+      if (stats) {
+        stats.incrementTunnel('disconnections_total');
+        stats.setTunnelGauge('connections_active', this.connections.size);
+      }
+      const prom2 = getPromMetrics();
+      if (prom2) {
+        prom2.tunnelDisconnectionsTotal.inc({ reason: 'clean' });
+        prom2.tunnelConnectionsActive.set(this.connections.size);
+      }
       this.storage.updatePersonalNode(nodeId, {
         status: 'offline',
         lastSeen: new Date().toISOString(),
       }).catch(err => logger.error('Failed to update personal node status on disconnect', { nodeId, error: err }));
-      logger.info('Personal node disconnected', { nodeId });
+      logger.info('Personal node disconnected', {
+        event: 'tunnel.disconnect',
+        personal_node_id: nodeId,
+        reason: 'clean',
+      });
     });
 
     ws.on('error', (err) => {
-      logger.error('Personal node WebSocket error', { nodeId, error: err.message });
+      logger.error('Personal node WebSocket error', {
+        event: 'tunnel.error',
+        personal_node_id: nodeId,
+        error: err.message,
+      });
     });
   }
 
   private handleMessage(nodeId: string, msg: TunnelMessage): void {
     const conn = this.connections.get(nodeId);
     if (!conn) return;
+
+    const stats = getStats();
+    const prom = getPromMetrics();
+    if (stats) stats.incrementTunnel('messages_received_total');
+    if (prom) prom.tunnelMessagesReceivedTotal.inc({ type: msg.type });
 
     switch (msg.type) {
       case 'heartbeat': {
@@ -149,6 +196,12 @@ export class TunnelManager {
             for (const id of itemIds) {
               this.storage.deleteMailboxItem(id).catch(() => { /* ignore */ });
             }
+            const stats3 = getStats();
+            if (stats3) {
+              for (let i = 0; i < itemIds.length; i++) stats3.incrementMailbox('delivered_total');
+            }
+            const prom3 = getPromMetrics();
+            if (prom3) prom3.mailboxDeliveredTotal.inc(itemIds.length);
             logger.info('Mailbox items acknowledged and deleted', { nodeId, count: itemIds.length });
           } catch { /* ignore parse errors */ }
         }
@@ -159,16 +212,34 @@ export class TunnelManager {
         // Graceful disconnect from personal node
         conn.ws.close(1000, 'graceful');
         this.connections.delete(nodeId);
+        const stats2 = getStats();
+        if (stats2) {
+          stats2.incrementTunnel('disconnections_total');
+          stats2.setTunnelGauge('connections_active', this.connections.size);
+        }
+        const prom4 = getPromMetrics();
+        if (prom4) {
+          prom4.tunnelDisconnectionsTotal.inc({ reason: 'graceful' });
+          prom4.tunnelConnectionsActive.set(this.connections.size);
+        }
         this.storage.updatePersonalNode(nodeId, {
           status: 'offline',
           lastSeen: new Date().toISOString(),
         }).catch(() => { /* ignore */ });
-        logger.info('Personal node gracefully disconnected', { nodeId });
+        logger.info('Personal node gracefully disconnected', {
+          event: 'tunnel.disconnect',
+          personal_node_id: nodeId,
+          reason: 'graceful',
+        });
         break;
       }
 
       default:
-        logger.warn('Unknown tunnel message type', { nodeId, type: msg.type });
+        logger.warn('Unknown tunnel message type', {
+          event: 'tunnel.error',
+          personal_node_id: nodeId,
+          type: msg.type,
+        });
     }
   }
 
@@ -217,15 +288,35 @@ export class TunnelManager {
       return null;
     }
 
+    const stats = getStats();
+    const prom = getPromMetrics();
+    if (stats) stats.incrementTunnel('messages_sent_total');
+    if (prom) prom.tunnelMessagesSentTotal.inc({ type: message.type });
+
     const effectiveTimeout = timeoutMs ?? this.config.personalNodeRequestTimeoutMs;
+    const startTime = Date.now();
 
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.pendingResponses.delete(message.id);
+        if (stats) stats.incrementTunnel('delivery_failures_total');
+        if (prom) prom.tunnelDeliveryFailuresTotal.inc();
         resolve(null);
       }, effectiveTimeout);
 
-      this.pendingResponses.set(message.id, { resolve, timer });
+      this.pendingResponses.set(message.id, {
+        resolve: (msg) => {
+          const latency = Date.now() - startTime;
+          if (msg && stats) {
+            stats.recordDeliveryLatency(latency);
+          }
+          if (msg && prom) {
+            prom.tunnelDeliveryLatencyMs.observe(latency);
+          }
+          resolve(msg);
+        },
+        timer,
+      });
       conn.ws.send(JSON.stringify(message));
     });
   }
@@ -254,15 +345,36 @@ export class TunnelManager {
 
         if (elapsed > offlineThreshold) {
           // Node hasn't sent heartbeat — mark offline and close
-          logger.warn('Personal node heartbeat timeout', { nodeId, elapsed });
+          logger.warn('Personal node heartbeat timeout', {
+            event: 'tunnel.timeout',
+            personal_node_id: nodeId,
+            elapsed_ms: elapsed,
+          });
           conn.ws.close(1000, 'heartbeat_timeout');
           this.connections.delete(nodeId);
+          const stats = getStats();
+          if (stats) {
+            stats.incrementTunnel('heartbeat_misses_total');
+            stats.incrementTunnel('disconnections_total');
+            stats.setTunnelGauge('connections_active', this.connections.size);
+          }
+          const promHb = getPromMetrics();
+          if (promHb) {
+            promHb.tunnelHeartbeatMissesTotal.inc();
+            promHb.tunnelDisconnectionsTotal.inc({ reason: 'heartbeat_timeout' });
+            promHb.tunnelConnectionsActive.set(this.connections.size);
+          }
           this.storage.updatePersonalNode(nodeId, {
             status: 'offline',
             lastSeen: new Date(conn.lastHeartbeat).toISOString(),
           }).catch(() => { /* ignore */ });
         } else if (elapsed > offlineThreshold * 0.6) {
           // Degraded — heartbeat is late but not dead
+          logger.warn('Personal node heartbeat late', {
+            event: 'tunnel.heartbeat_miss',
+            personal_node_id: nodeId,
+            elapsed_ms: elapsed,
+          });
           this.storage.updatePersonalNode(nodeId, { status: 'degraded' }).catch(() => { /* ignore */ });
         }
       }

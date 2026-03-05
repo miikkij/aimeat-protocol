@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import type { TunnelManager } from '../services/personal-tunnel.js';
 import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
-export function bootstrapRouter(config: AimeatConfig): Router {
+export function bootstrapRouter(
+  config: AimeatConfig,
+  storage: Storage,
+  tunnelManager?: TunnelManager,
+): Router {
   const router = Router();
 
   router.get('/favicon.ico', (_req, res) => {
@@ -151,24 +157,96 @@ export function bootstrapRouter(config: AimeatConfig): Router {
   });
 
   // GET /v1/health — simple liveness/readiness check (Tier 0, no auth)
-  router.get('/v1/health', (_req, res) => {
+  router.get('/v1/health', async (_req, res) => {
     const healthData: Record<string, unknown> = {
       status: 'healthy',
       uptime_seconds: Math.floor(process.uptime()),
       memory_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     };
 
+    let degraded = false;
+    const subsystems: Record<string, unknown> = {};
+
+    // Site LB (existing — keep as-is)
     if (config.siteLbEnabled) {
       const syncState = getSiteSyncState();
       const lastSyncAge = syncState.lastSync
         ? (Date.now() - new Date(syncState.lastSync).getTime()) / 1000
         : Infinity;
+      const syncHealthy = syncState.lastError === null && lastSyncAge < config.siteLbSyncIntervalMin * 60 * 2;
+      if (!syncHealthy) degraded = true;
       healthData.site_lb = {
         enabled: true,
         origin_url: config.siteLbOriginUrl,
         last_sync: syncState.lastSync,
-        sync_healthy: syncState.lastError === null && lastSyncAge < config.siteLbSyncIntervalMin * 60 * 2,
+        sync_healthy: syncHealthy,
       };
+    }
+
+    // Tunnel subsystem
+    if (config.personalNodesEnabled && tunnelManager) {
+      const tunnelSub: Record<string, unknown> = {
+        healthy: true,
+        connections_active: tunnelManager.getOnlineCount(),
+      };
+      // Find most recent connection timestamp from online nodes
+      try {
+        const nodes = await storage.listPersonalNodes();
+        let newest: string | null = null;
+        for (const n of nodes) {
+          if (n.lastSeen && (!newest || n.lastSeen > newest)) newest = n.lastSeen;
+        }
+        if (newest) tunnelSub.last_connection_at = newest;
+      } catch { /* ignore — non-critical */ }
+      subsystems.tunnel = tunnelSub;
+    }
+
+    // Mailbox subsystem
+    if (config.personalNodesEnabled) {
+      try {
+        const nodes = await storage.listPersonalNodes();
+        let totalItems = 0;
+        let totalBytes = 0;
+        let oldestAge = 0;
+
+        for (const node of nodes) {
+          const mbStats = await storage.getMailboxStats(node.nodeId);
+          totalItems += mbStats.count;
+          totalBytes += mbStats.totalBytes;
+          const items = await storage.listMailboxItems(node.nodeId);
+          if (items.length > 0) {
+            const age = Math.floor((Date.now() - new Date(items[0].createdAt).getTime()) / 1000);
+            if (age > oldestAge) oldestAge = age;
+          }
+        }
+
+        subsystems.mailbox = {
+          healthy: true,
+          items_total: totalItems,
+          bytes_total: totalBytes,
+          oldest_item_age_seconds: oldestAge,
+        };
+      } catch {
+        subsystems.mailbox = { healthy: false };
+        degraded = true;
+      }
+    }
+
+    // Storage health probe
+    try {
+      await storage.listOwners();
+      subsystems.storage = { healthy: true };
+    } catch {
+      subsystems.storage = { healthy: false };
+      degraded = true;
+    }
+
+    if (Object.keys(subsystems).length > 0) {
+      healthData.subsystems = subsystems;
+    }
+
+    if (degraded) {
+      healthData.status = 'degraded';
     }
 
     res.json(success(config.nodeId, healthData));

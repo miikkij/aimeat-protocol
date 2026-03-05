@@ -55,6 +55,7 @@ import { createMyDataReceiptService } from './services/mydata-receipt.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
 import { workspaceAccessMiddleware } from './middleware/workspace-access.js';
 import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
@@ -79,6 +80,8 @@ import { createGenesisSyncService } from './services/genesis-sync.js';
 import { initStats } from './services/stats.js';
 import { statsMiddleware } from './middleware/stats.js';
 import { statsRouter } from './routes/stats.js';
+import { createMetricsRegistry } from './services/prometheus.js';
+import { metricsMiddleware } from './middleware/metrics.js';
 import { extensionsRouter } from './routes/extensions.js';
 import { cortexRouter } from './routes/cortex.js';
 import { MailboxNotificationService } from './services/mailbox-notification.js';
@@ -165,6 +168,11 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // Statistics collector
   const stats = initStats();
 
+  // Prometheus metrics registry (opt-in)
+  const metricsRegistry = config.metricsEnabled
+    ? createMetricsRegistry(config)
+    : undefined;
+
   // CORS for Tier 0 endpoints
   app.use((_req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -177,8 +185,16 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     next();
   });
 
+  // Request ID — assigns a unique ID to every request (uses X-Request-Id if present)
+  app.use(requestIdMiddleware());
+
   // Stats middleware — counts requests, methods, and status codes
   app.use(statsMiddleware(stats));
+
+  // Prometheus HTTP metrics middleware (opt-in)
+  if (metricsRegistry) {
+    app.use(metricsMiddleware(metricsRegistry));
+  }
 
   // Rate limiting — global (with role multipliers)
   // optionalAuth() must run first so req.auth is available for per-identity rate limiting
@@ -393,8 +409,8 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Mount routes
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
-  app.use(bootstrapRouter(config));
-  app.use(statsRouter(config, storage, stats));
+  app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined));
+  app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
 
   // IndexNow key verification file (serves /{key}.txt for Bing/Yandex)

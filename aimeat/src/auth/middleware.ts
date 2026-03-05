@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
+import { getStats } from '../services/stats.js';
+import { getPromMetrics } from '../services/prometheus.js';
 
 // Anonymous mode: when enabled, inject this identity for unauthenticated requests
 let _anonymousMode = false;
@@ -79,17 +81,29 @@ export function requireAuth() {
 
     const token = extractToken(req);
     if (!token) {
+      const stats = getStats();
+      if (stats) stats.increment('auth_failures_total');
+      const prom = getPromMetrics();
+      if (prom) prom.authFailuresTotal.inc();
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
       return;
     }
 
     if (isRevoked(token)) {
+      const stats = getStats();
+      if (stats) stats.increment('auth_failures_total');
+      const prom = getPromMetrics();
+      if (prom) prom.authFailuresTotal.inc();
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Token has been revoked'));
       return;
     }
 
     const verified = await verifyJWT(token);
     if (!verified) {
+      const stats = getStats();
+      if (stats) stats.increment('auth_failures_total');
+      const prom = getPromMetrics();
+      if (prom) prom.authFailuresTotal.inc();
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Invalid or expired token'));
       return;
     }
@@ -105,6 +119,10 @@ export function requireAuth() {
 export function requireRole(role: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
+      const stats = getStats();
+      if (stats) stats.increment('auth_failures_total');
+      const prom = getPromMetrics();
+      if (prom) prom.authFailuresTotal.inc();
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
       return;
     }
