@@ -17,6 +17,7 @@ import type {
   ChatInstanceRecord, RealtimeRoomRecord, SiteChangeLogEntry,
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord,
+  PersonalPushSubscriptionRecord, NotificationPreferences,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -3205,6 +3206,135 @@ export class SqliteStorage implements Storage {
       manifest: row.manifest as string,
       components: JSON.parse(row.components as string || '[]'),
       activationArtifacts: JSON.parse(row.activationArtifacts as string || '{}'),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Personal Push Subscriptions (REQ-007) ──
+  // ══════════════════════════════════════════════════════════
+
+  async createPersonalPushSubscription(record: PersonalPushSubscriptionRecord): Promise<PersonalPushSubscriptionRecord> {
+    this.db.prepare(
+      `INSERT INTO personal_push_subscriptions (id, personalNodeId, ownerName, endpoint, keys, failureCount, createdAt, lastUsedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      record.id,
+      record.personalNodeId,
+      record.ownerName,
+      record.endpoint,
+      JSON.stringify(record.keys),
+      record.failureCount,
+      record.createdAt,
+      record.lastUsedAt,
+    );
+    return record;
+  }
+
+  async getPersonalPushSubscription(id: string): Promise<PersonalPushSubscriptionRecord | null> {
+    const row = this.db.prepare('SELECT * FROM personal_push_subscriptions WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.deserializePersonalPushSubscription(row) : null;
+  }
+
+  async listPersonalPushSubscriptions(personalNodeId: string): Promise<PersonalPushSubscriptionRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM personal_push_subscriptions WHERE personalNodeId = ?').all(personalNodeId) as Record<string, unknown>[];
+    return rows.map(r => this.deserializePersonalPushSubscription(r));
+  }
+
+  async updatePersonalPushSubscription(id: string, updates: Partial<PersonalPushSubscriptionRecord>): Promise<boolean> {
+    const existing = await this.getPersonalPushSubscription(id);
+    if (!existing) return false;
+    const merged = { ...existing, ...updates };
+    this.db.prepare(
+      `UPDATE personal_push_subscriptions
+       SET personalNodeId = ?, ownerName = ?, endpoint = ?, keys = ?, failureCount = ?, createdAt = ?, lastUsedAt = ?
+       WHERE id = ?`
+    ).run(
+      merged.personalNodeId,
+      merged.ownerName,
+      merged.endpoint,
+      JSON.stringify(merged.keys),
+      merged.failureCount,
+      merged.createdAt,
+      merged.lastUsedAt,
+      id,
+    );
+    return true;
+  }
+
+  async deletePersonalPushSubscription(id: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM personal_push_subscriptions WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  async deletePersonalPushSubscriptionsByNode(personalNodeId: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM personal_push_subscriptions WHERE personalNodeId = ?').run(personalNodeId);
+    return result.changes;
+  }
+
+  async countPersonalPushSubscriptions(personalNodeId: string): Promise<number> {
+    const row = this.db.prepare('SELECT COUNT(*) as cnt FROM personal_push_subscriptions WHERE personalNodeId = ?').get(personalNodeId) as Record<string, unknown>;
+    return (row.cnt as number) ?? 0;
+  }
+
+  private deserializePersonalPushSubscription(row: Record<string, unknown>): PersonalPushSubscriptionRecord {
+    return {
+      id: row.id as string,
+      personalNodeId: row.personalNodeId as string,
+      ownerName: row.ownerName as string,
+      endpoint: row.endpoint as string,
+      keys: JSON.parse(row.keys as string),
+      failureCount: row.failureCount as number,
+      createdAt: row.createdAt as string,
+      lastUsedAt: (row.lastUsedAt as string) ?? null,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Notification Preferences (REQ-007) ──
+  // ══════════════════════════════════════════════════════════
+
+  async getNotificationPreferences(personalNodeId: string): Promise<NotificationPreferences | null> {
+    const row = this.db.prepare('SELECT * FROM notification_preferences WHERE personalNodeId = ?').get(personalNodeId) as Record<string, unknown> | undefined;
+    return row ? this.deserializeNotificationPreferences(row) : null;
+  }
+
+  async upsertNotificationPreferences(prefs: NotificationPreferences): Promise<NotificationPreferences> {
+    this.db.prepare(
+      `INSERT INTO notification_preferences (personalNodeId, enabled, channels, notifyTypes, cooldownMinutes, quietHoursUtc, email)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(personalNodeId) DO UPDATE SET
+         enabled = excluded.enabled,
+         channels = excluded.channels,
+         notifyTypes = excluded.notifyTypes,
+         cooldownMinutes = excluded.cooldownMinutes,
+         quietHoursUtc = excluded.quietHoursUtc,
+         email = excluded.email`
+    ).run(
+      prefs.personalNodeId,
+      prefs.enabled ? 1 : 0,
+      JSON.stringify(prefs.channels),
+      JSON.stringify(prefs.notifyTypes),
+      prefs.cooldownMinutes,
+      prefs.quietHoursUtc ? JSON.stringify(prefs.quietHoursUtc) : null,
+      prefs.email,
+    );
+    return prefs;
+  }
+
+  async deleteNotificationPreferences(personalNodeId: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM notification_preferences WHERE personalNodeId = ?').run(personalNodeId);
+    return result.changes > 0;
+  }
+
+  private deserializeNotificationPreferences(row: Record<string, unknown>): NotificationPreferences {
+    return {
+      personalNodeId: row.personalNodeId as string,
+      enabled: (row.enabled as number) === 1,
+      channels: JSON.parse(row.channels as string),
+      notifyTypes: JSON.parse(row.notifyTypes as string),
+      cooldownMinutes: row.cooldownMinutes as number,
+      quietHoursUtc: row.quietHoursUtc ? JSON.parse(row.quietHoursUtc as string) : null,
+      email: (row.email as string) ?? null,
     };
   }
 }

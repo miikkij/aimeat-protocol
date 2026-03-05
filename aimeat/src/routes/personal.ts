@@ -1,14 +1,22 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MailboxItemRecord, NotificationPreferences } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
+import type { MailboxNotificationService } from '../services/mailbox-notification.js';
+import { isAllowedPushEndpoint } from '../services/mailbox-notification.js';
 import { MailboxService } from '../services/mailbox.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 
-export function personalRouter(config: AimeatConfig, storage: Storage, tunnelManager: TunnelManager | null): Router {
+export function personalRouter(
+  config: AimeatConfig,
+  storage: Storage,
+  tunnelManager: TunnelManager | null,
+  notificationService?: MailboxNotificationService | null,
+): Router {
   const router = Router();
   const mailboxService = new MailboxService(config, storage);
 
@@ -213,6 +221,9 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
 
       // Clean up: flush mailbox, close tunnel connection, delete record
       await storage.deleteMailboxItemsByNode(nodeId);
+      // Clean up push subscriptions and notification preferences (REQ-007)
+      await storage.deletePersonalPushSubscriptionsByNode(nodeId);
+      await storage.deleteNotificationPreferences(nodeId);
       // Close WebSocket if connected
       const conn = tunnelManager?.getConnection(nodeId);
       if (conn) {
@@ -276,6 +287,373 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
     } catch (err) {
       logger.error('Failed to get mailbox stats', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get mailbox stats'));
+    }
+  });
+
+  // ── Push Subscription Routes (REQ-007) ─────────────────────
+
+  // POST /v1/personal/push/subscribe — Register a push subscription
+  router.post('/v1/personal/push/subscribe', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      if (!config.pushEnabled) {
+        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Push notifications are disabled on this node'));
+        return;
+      }
+
+      const { personalNodeId, endpoint, keys } = req.body ?? {};
+      if (!personalNodeId || !endpoint || !keys?.p256dh || !keys?.auth) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'personalNodeId, endpoint, and keys (p256dh, auth) are required'));
+        return;
+      }
+
+      // Verify node exists
+      const node = await storage.getPersonalNode(personalNodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${personalNodeId} not found`));
+        return;
+      }
+
+      // Verify ownership (or operator)
+      const ownerName = req.auth!.owner;
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only manage push subscriptions for your own personal nodes'));
+        return;
+      }
+
+      // Validate endpoint against allowed domains (SSRF prevention)
+      if (!isAllowedPushEndpoint(endpoint)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Push endpoint domain is not allowed'));
+        return;
+      }
+
+      // Check subscription count limit
+      const count = await storage.countPersonalPushSubscriptions(personalNodeId);
+      if (count >= config.pushMaxSubscriptionsPerNode) {
+        res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${config.pushMaxSubscriptionsPerNode} push subscriptions per node`));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const subscription = await storage.createPersonalPushSubscription({
+        id: uuidv4(),
+        personalNodeId,
+        ownerName,
+        endpoint,
+        keys: { p256dh: keys.p256dh, auth: keys.auth },
+        failureCount: 0,
+        createdAt: now,
+        lastUsedAt: null,
+      });
+
+      logger.info('Push subscription created', { subId: subscription.id, nodeId: personalNodeId });
+
+      res.status(201).json(success(config.nodeId, {
+        id: subscription.id,
+        personal_node_id: subscription.personalNodeId,
+        endpoint: subscription.endpoint.substring(0, 60) + '...',
+        created_at: subscription.createdAt,
+      }, [
+        {
+          description: 'List push subscriptions',
+          method: 'GET',
+          url: `/v1/personal/push/subscriptions/${encodeURIComponent(personalNodeId)}`,
+        },
+        {
+          description: 'Test push notification',
+          method: 'POST',
+          url: `/v1/personal/push/test/${encodeURIComponent(personalNodeId)}`,
+        },
+      ]));
+    } catch (err) {
+      logger.error('Failed to create push subscription', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create push subscription'));
+    }
+  });
+
+  // DELETE /v1/personal/push/subscribe/:id — Remove a push subscription
+  router.delete('/v1/personal/push/subscribe/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const subId = req.params.id as string;
+      const ownerName = req.auth!.owner;
+
+      const subscription = await storage.getPersonalPushSubscription(subId);
+      if (!subscription) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Push subscription ${subId} not found`));
+        return;
+      }
+
+      // Verify ownership (or operator)
+      if (subscription.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only delete your own push subscriptions'));
+        return;
+      }
+
+      await storage.deletePersonalPushSubscription(subId);
+      logger.info('Push subscription deleted', { subId, nodeId: subscription.personalNodeId });
+
+      res.json(success(config.nodeId, {
+        id: subId,
+        deleted: true,
+      }));
+    } catch (err) {
+      logger.error('Failed to delete push subscription', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete push subscription'));
+    }
+  });
+
+  // GET /v1/personal/push/subscriptions/:nodeId — List push subscriptions for a node
+  router.get('/v1/personal/push/subscriptions/:nodeId', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view push subscriptions for your own personal nodes'));
+        return;
+      }
+
+      const subscriptions = await storage.listPersonalPushSubscriptions(nodeId);
+      const truncated = subscriptions.map(sub => ({
+        id: sub.id,
+        endpoint: sub.endpoint.substring(0, 60) + '...',
+        failure_count: sub.failureCount,
+        created_at: sub.createdAt,
+        last_used_at: sub.lastUsedAt,
+      }));
+
+      res.json(success(config.nodeId, {
+        node_id: nodeId,
+        subscriptions: truncated,
+        total: truncated.length,
+        max: config.pushMaxSubscriptionsPerNode,
+      }));
+    } catch (err) {
+      logger.error('Failed to list push subscriptions', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list push subscriptions'));
+    }
+  });
+
+  // POST /v1/personal/push/test/:nodeId — Send a test push notification
+  router.post('/v1/personal/push/test/:nodeId', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only test push notifications for your own personal nodes'));
+        return;
+      }
+
+      if (!notificationService) {
+        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Push notification service is not available'));
+        return;
+      }
+
+      // Create a synthetic test mailbox item
+      const now = new Date().toISOString();
+      const testItem: MailboxItemRecord = {
+        id: `test-${uuidv4()}`,
+        personalNodeId: nodeId,
+        type: 'action_request',
+        fromGaii: 'system:test',
+        toGaii: node.agentGaiis[0] ?? 'unknown',
+        payload: JSON.stringify({ event: 'push.test', message: 'Test notification' }),
+        sizeBytes: 0,
+        retentionDays: 0,
+        expiresAt: now,
+        createdAt: now,
+      };
+
+      const result = await notificationService.notify(nodeId, testItem);
+
+      res.json(success(config.nodeId, {
+        node_id: nodeId,
+        test_sent: result.sent,
+        channel: result.channel ?? null,
+        reason: result.reason ?? null,
+      }));
+    } catch (err) {
+      logger.error('Failed to send test push notification', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to send test push notification'));
+    }
+  });
+
+  // ── Notification Preferences Routes (REQ-007) ──────────────
+
+  // GET /v1/personal/anchor/:nodeId/notifications — Get notification preferences
+  router.get('/v1/personal/anchor/:nodeId/notifications', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view notification preferences for your own personal nodes'));
+        return;
+      }
+
+      const stored = await storage.getNotificationPreferences(nodeId);
+      const defaults: NotificationPreferences = {
+        personalNodeId: nodeId,
+        enabled: true,
+        channels: ['web_push'],
+        notifyTypes: [...config.pushNotifyTypes],
+        cooldownMinutes: config.pushCooldownMin,
+        quietHoursUtc: null,
+        email: null,
+      };
+
+      const prefs = stored ?? defaults;
+
+      res.json(success(config.nodeId, {
+        personal_node_id: prefs.personalNodeId,
+        enabled: prefs.enabled,
+        channels: prefs.channels,
+        notify_types: prefs.notifyTypes,
+        cooldown_minutes: prefs.cooldownMinutes,
+        quiet_hours_utc: prefs.quietHoursUtc,
+        email: prefs.email,
+        is_default: !stored,
+      }, [
+        {
+          description: 'Update notification preferences',
+          method: 'PATCH',
+          url: `/v1/personal/anchor/${encodeURIComponent(nodeId)}/notifications`,
+        },
+      ]));
+    } catch (err) {
+      logger.error('Failed to get notification preferences', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get notification preferences'));
+    }
+  });
+
+  // PATCH /v1/personal/anchor/:nodeId/notifications — Update notification preferences
+  router.patch('/v1/personal/anchor/:nodeId/notifications', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only update notification preferences for your own personal nodes'));
+        return;
+      }
+
+      const body = req.body ?? {};
+
+      // Validate channels
+      if (body.channels !== undefined) {
+        if (!Array.isArray(body.channels) || !body.channels.every((c: unknown) => c === 'web_push' || c === 'email')) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'channels must be an array of "web_push" or "email"'));
+          return;
+        }
+      }
+
+      // Validate cooldownMinutes
+      if (body.cooldownMinutes !== undefined) {
+        if (typeof body.cooldownMinutes !== 'number' || body.cooldownMinutes < 1 || body.cooldownMinutes > 1440) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'cooldownMinutes must be a number between 1 and 1440'));
+          return;
+        }
+      }
+
+      // Validate quietHoursUtc
+      if (body.quietHoursUtc !== undefined && body.quietHoursUtc !== null) {
+        const qh = body.quietHoursUtc;
+        const hhmmRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+        if (!qh.start || !qh.end || !hhmmRegex.test(qh.start) || !hhmmRegex.test(qh.end)) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'quietHoursUtc must have start and end in HH:MM format'));
+          return;
+        }
+      }
+
+      // Validate enabled
+      if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'enabled must be a boolean'));
+        return;
+      }
+
+      // Validate notifyTypes
+      if (body.notifyTypes !== undefined) {
+        const validTypes = ['work_assignment', 'action_request', 'board_notification', 'federation_sync'];
+        if (!Array.isArray(body.notifyTypes) || !body.notifyTypes.every((t: unknown) => typeof t === 'string' && validTypes.includes(t as string))) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `notifyTypes must be an array of: ${validTypes.join(', ')}`));
+          return;
+        }
+      }
+
+      // Validate email
+      if (body.email !== undefined && body.email !== null) {
+        if (typeof body.email !== 'string' || !body.email.includes('@')) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'email must be a valid email address'));
+          return;
+        }
+      }
+
+      // Merge with existing preferences (or defaults)
+      const existing = await storage.getNotificationPreferences(nodeId) ?? {
+        personalNodeId: nodeId,
+        enabled: true,
+        channels: ['web_push'] as ('web_push' | 'email')[],
+        notifyTypes: [...config.pushNotifyTypes],
+        cooldownMinutes: config.pushCooldownMin,
+        quietHoursUtc: null,
+        email: null,
+      };
+
+      const merged: NotificationPreferences = {
+        personalNodeId: nodeId,
+        enabled: body.enabled !== undefined ? body.enabled : existing.enabled,
+        channels: body.channels !== undefined ? body.channels : existing.channels,
+        notifyTypes: body.notifyTypes !== undefined ? body.notifyTypes : existing.notifyTypes,
+        cooldownMinutes: body.cooldownMinutes !== undefined ? body.cooldownMinutes : existing.cooldownMinutes,
+        quietHoursUtc: body.quietHoursUtc !== undefined ? body.quietHoursUtc : existing.quietHoursUtc,
+        email: body.email !== undefined ? body.email : existing.email,
+      };
+
+      const saved = await storage.upsertNotificationPreferences(merged);
+
+      res.json(success(config.nodeId, {
+        personal_node_id: saved.personalNodeId,
+        enabled: saved.enabled,
+        channels: saved.channels,
+        notify_types: saved.notifyTypes,
+        cooldown_minutes: saved.cooldownMinutes,
+        quiet_hours_utc: saved.quietHoursUtc,
+        email: saved.email,
+        is_default: false,
+      }, [
+        {
+          description: 'View notification preferences',
+          method: 'GET',
+          url: `/v1/personal/anchor/${encodeURIComponent(nodeId)}/notifications`,
+        },
+      ]));
+    } catch (err) {
+      logger.error('Failed to update notification preferences', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update notification preferences'));
     }
   });
 

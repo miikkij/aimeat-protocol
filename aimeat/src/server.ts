@@ -81,6 +81,7 @@ import { statsMiddleware } from './middleware/stats.js';
 import { statsRouter } from './routes/stats.js';
 import { extensionsRouter } from './routes/extensions.js';
 import { cortexRouter } from './routes/cortex.js';
+import { MailboxNotificationService } from './services/mailbox-notification.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -277,6 +278,18 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     startMailboxCleanupJob(storage);
   }
 
+  // Mailbox push notification service (REQ-007)
+  let mailboxNotificationService: MailboxNotificationService | null = null;
+  if (config.personalNodesEnabled && config.pushEnabled && config.vapidPublicKey && config.vapidPrivateKey) {
+    mailboxNotificationService = new MailboxNotificationService(config, storage);
+    logger.info('Mailbox push notification service initialized');
+  }
+
+  // Wire notification service to tunnel manager for cooldown clearing on reconnect (REQ-007)
+  if (tunnelManager && mailboxNotificationService) {
+    tunnelManager.setNotificationService(mailboxNotificationService);
+  }
+
   // ── Maintenance mode guard ──
   // Returns 503 for non-essential paths when maintenance is enabled.
   // Operators always pass. Essential paths (health, admin, spec, well-known) always pass.
@@ -418,7 +431,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
   app.use(catalogueRouter(config, storage, directoryService, () => realtimeManager?.getStats() ?? null));
-  app.use(workRouter(config, storage, peers));
+  app.use(workRouter(config, storage, peers, mailboxNotificationService));
   app.use(walletRouter(config, storage));
 
   // Extended features guard — returns 503 when extended features are disabled
@@ -536,7 +549,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Personal node management routes
   if (config.personalNodesEnabled) {
-    app.use(personalRouter(config, storage, tunnelManager));
+    app.use(personalRouter(config, storage, tunnelManager, mailboxNotificationService));
   }
 
   // Realtime P2P rooms — Phase 0

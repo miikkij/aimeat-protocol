@@ -41,6 +41,7 @@ import type {
     ExtensionRecord,
     EscrowHoldRecord,
     CortexExtensionRecord,
+    PersonalPushSubscriptionRecord, NotificationPreferences,
 } from '../../interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -2429,6 +2430,63 @@ export class MongoStorage implements Storage {
 
     async deleteCortexLibFile(extName: string, libName: string): Promise<boolean> {
         return this.cortexLibFiles.delete(`${extName}::${libName}`);
+    }
+
+    // ── Personal Push Subscriptions (REQ-007) ──
+
+    private personalPushSubscriptions = new Map<string, PersonalPushSubscriptionRecord>();
+    private notificationPreferences = new Map<string, NotificationPreferences>();
+
+    async createPersonalPushSubscription(record: PersonalPushSubscriptionRecord): Promise<PersonalPushSubscriptionRecord> {
+        this.personalPushSubscriptions.set(record.id, record);
+        return record;
+    }
+
+    async getPersonalPushSubscription(id: string): Promise<PersonalPushSubscriptionRecord | null> {
+        return this.personalPushSubscriptions.get(id) ?? null;
+    }
+
+    async listPersonalPushSubscriptions(personalNodeId: string): Promise<PersonalPushSubscriptionRecord[]> {
+        return [...this.personalPushSubscriptions.values()].filter(s => s.personalNodeId === personalNodeId);
+    }
+
+    async updatePersonalPushSubscription(id: string, updates: Partial<PersonalPushSubscriptionRecord>): Promise<boolean> {
+        const existing = this.personalPushSubscriptions.get(id);
+        if (!existing) return false;
+        this.personalPushSubscriptions.set(id, { ...existing, ...updates });
+        return true;
+    }
+
+    async deletePersonalPushSubscription(id: string): Promise<boolean> {
+        return this.personalPushSubscriptions.delete(id);
+    }
+
+    async deletePersonalPushSubscriptionsByNode(personalNodeId: string): Promise<number> {
+        let count = 0;
+        for (const [id, sub] of this.personalPushSubscriptions) {
+            if (sub.personalNodeId === personalNodeId) {
+                this.personalPushSubscriptions.delete(id);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    async countPersonalPushSubscriptions(personalNodeId: string): Promise<number> {
+        return [...this.personalPushSubscriptions.values()].filter(s => s.personalNodeId === personalNodeId).length;
+    }
+
+    async getNotificationPreferences(personalNodeId: string): Promise<NotificationPreferences | null> {
+        return this.notificationPreferences.get(personalNodeId) ?? null;
+    }
+
+    async upsertNotificationPreferences(prefs: NotificationPreferences): Promise<NotificationPreferences> {
+        this.notificationPreferences.set(prefs.personalNodeId, prefs);
+        return prefs;
+    }
+
+    async deleteNotificationPreferences(personalNodeId: string): Promise<boolean> {
+        return this.notificationPreferences.delete(personalNodeId);
     }
 }
 

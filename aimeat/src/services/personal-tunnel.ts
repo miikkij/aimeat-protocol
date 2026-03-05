@@ -2,6 +2,7 @@ import { WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { MailboxNotificationService } from './mailbox-notification.js';
 import { logger } from '../utils/logger.js';
 
 export interface TunnelMessage {
@@ -25,11 +26,16 @@ export class TunnelManager {
   private connections = new Map<string, PersonalNodeConnection>();
   private pendingResponses = new Map<string, { resolve: (msg: TunnelMessage | null) => void; timer: ReturnType<typeof setTimeout> }>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private notificationService: MailboxNotificationService | null = null;
 
   constructor(
     private config: AimeatConfig,
     private storage: Storage,
   ) { }
+
+  setNotificationService(service: MailboxNotificationService | null): void {
+    this.notificationService = service;
+  }
 
   handleConnection(ws: WebSocket, nodeId: string, ownerName: string, agentGaiis: string[]): void {
     // Close existing connection for this nodeId if any
@@ -52,6 +58,9 @@ export class TunnelManager {
       status: 'online',
       lastSeen: new Date().toISOString(),
     }).catch(err => logger.error('Failed to update personal node status', { nodeId, error: err }));
+
+    // Clear notification cooldown — node is back online (REQ-007)
+    this.notificationService?.clearCooldown(nodeId);
 
     logger.info('Personal node connected', { nodeId, ownerName, agents: agentGaiis.length });
 
