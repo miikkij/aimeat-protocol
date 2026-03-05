@@ -1,0 +1,241 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-canvas
+  namespace: aimeat
+  description: "A full-featured drawing canvas for your apps. Draw with pen, shapes, and text. Auto-saves to AIMEAT storage. Touch, mouse, and mobile support with undo/redo and PNG/SVG export."
+  author: AIMEAT
+  tags: [drawing, canvas, art, ui]
+  labels:
+    domain: creative
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: schema
+      name: drawing-data
+      key_pattern: "drawing:*"
+      apply_to: prefix
+      schema:
+        type: object
+        required: [strokes, canvasSize]
+        properties:
+          strokes:
+            type: array
+            items:
+              type: object
+              required: [tool, color, lineWidth, points]
+              properties:
+                tool:
+                  type: string
+                  enum: [pen, line, rect, circle, eraser, text]
+                color:
+                  type: string
+                lineWidth:
+                  type: number
+                  minimum: 1
+                  maximum: 50
+                opacity:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                points:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      x:
+                        type: number
+                      y:
+                        type: number
+                text:
+                  type: string
+                  maxLength: 500
+                fontSize:
+                  type: number
+                  minimum: 8
+                  maximum: 200
+          canvasSize:
+            type: object
+            required: [width, height]
+            properties:
+              width:
+                type: number
+                minimum: 1
+              height:
+                type: number
+                minimum: 1
+          backgroundColor:
+            type: string
+          metadata:
+            type: object
+            properties:
+              createdAt:
+                type: string
+                format: date-time
+              updatedAt:
+                type: string
+                format: date-time
+
+    - type: prompt
+      name: canvas-assistant
+      content: |
+        You are a drawing canvas assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        You help users create apps with interactive drawing canvases. The aimeat-canvas extension
+        is installed and provides a pure Canvas API drawing library with zero external dependencies.
+
+        IMPORTANT: When creating apps that use the drawing canvas, include the script tag:
+          <script src="{{node_url}}/v1/cortex/aimeat-canvas/libs/aimeat-canvas.js"></script>
+
+        Available API:
+
+        AIMEAT.canvas.DrawingCanvas({elementId, storageKey, nodeUrl, token?, options?})
+          - Creates a full drawing canvas with toolbar inside the target element
+          - elementId: string — DOM element id to render into
+          - storageKey: string — AIMEAT memory key for auto-save (e.g. 'drawing:my-sketch')
+          - nodeUrl: string — AIMEAT node URL (e.g. 'http://localhost:40050')
+          - token: string — optional auth token for private data
+          - options: object — optional configuration overrides
+
+        Options object:
+          - width: number — canvas width in pixels (default: 800)
+          - height: number — canvas height in pixels (default: 600)
+          - tools: string[] — enabled tools (default: ['pen','line','rect','circle','eraser','text'])
+          - backgroundColor: string — canvas background color (default: '#ffffff')
+          - autoSave: boolean — enable auto-save to storage (default: true)
+          - autoSaveDelay: number — debounce delay in ms (default: 2000)
+
+        Returns a controller object:
+          - canvas: HTMLCanvasElement — the underlying canvas element
+          - export(format): triggers download; format is 'png' or 'svg'
+          - clear(): clears all strokes and the canvas
+          - undo(): undoes the last stroke (also Ctrl+Z)
+          - redo(): redoes the last undone stroke (also Ctrl+Y)
+          - setTool(name): switches active tool ('pen','line','rect','circle','eraser','text')
+          - setColor(hex): sets the drawing color (e.g. '#6366f1')
+          - setLineWidth(px): sets the line width in pixels (1-20)
+          - loadFromStorage(): returns Promise — loads drawing from AIMEAT memory
+          - saveToStorage(): returns Promise — saves drawing to AIMEAT memory
+
+        Available tools:
+          - pen: freehand drawing
+          - line: straight line (click start, drag to end)
+          - rect: rectangle (click corner, drag to opposite corner)
+          - circle: ellipse (click center, drag to set radius)
+          - eraser: erases strokes (draws with background color)
+          - text: click to place text (opens prompt for input)
+
+        Drawing data stored in AIMEAT memory uses the schema key pattern "drawing:*".
+        Example keys: "drawing:my-sketch", "drawing:welcome", "drawing:diagram-v2"
+
+        The drawing data structure is:
+        {
+          strokes: [
+            { tool: "pen", color: "#000000", lineWidth: 2, opacity: 1, points: [{x:10,y:20}, ...] },
+            { tool: "rect", color: "#6366f1", lineWidth: 2, opacity: 1, points: [{x:50,y:50}, {x:200,y:150}] },
+            { tool: "text", color: "#000000", lineWidth: 1, opacity: 1, points: [{x:100,y:100}], text: "Hello", fontSize: 16 }
+          ],
+          canvasSize: { width: 800, height: 600 },
+          backgroundColor: "#ffffff",
+          metadata: { createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }
+        }
+
+        Color palette (AIMEAT theme):
+        #000000, #ffffff, #6366f1, #8b5cf6, #ef4444, #f59e0b, #10b981, #3b82f6, #ec4899, #64748b
+
+        Example usage:
+        ```html
+        <!DOCTYPE html>
+        <html>
+        <head><title>My Drawing App</title></head>
+        <body>
+          <div id="canvas-area"></div>
+          <script src="{{node_url}}/v1/cortex/aimeat-canvas/libs/aimeat-canvas.js"></script>
+          <script>
+            var dc = AIMEAT.canvas.DrawingCanvas({
+              elementId: 'canvas-area',
+              storageKey: 'drawing:my-sketch',
+              nodeUrl: '{{node_url}}',
+              options: { width: 800, height: 600 }
+            });
+            // dc.setTool('rect');
+            // dc.setColor('#6366f1');
+            // dc.export('png');
+          </script>
+        </body>
+        </html>
+        ```
+
+        When the user asks for a drawing canvas:
+        1. Ask what they want to draw or what the canvas is for
+        2. Suggest appropriate options (size, tools, background)
+        3. Generate the app HTML with the script tag and DrawingCanvas call
+        4. Explain the keyboard shortcuts (Ctrl+Z undo, Ctrl+Y redo)
+      variables:
+        - "{{node_url}}"
+
+    - type: seed-data
+      entries:
+        - key: "drawing:welcome"
+          value:
+            strokes:
+              - tool: rect
+                color: "#6366f1"
+                lineWidth: 3
+                opacity: 1
+                points: [{x: 100, y: 80}, {x: 700, y: 520}]
+              - tool: pen
+                color: "#8b5cf6"
+                lineWidth: 2
+                opacity: 1
+                points: [{x: 150, y: 200}, {x: 170, y: 180}, {x: 200, y: 160}, {x: 240, y: 155}, {x: 280, y: 160}, {x: 310, y: 180}, {x: 330, y: 200}]
+              - tool: pen
+                color: "#ef4444"
+                lineWidth: 2
+                opacity: 1
+                points: [{x: 450, y: 200}, {x: 470, y: 180}, {x: 500, y: 160}, {x: 540, y: 155}, {x: 580, y: 160}, {x: 610, y: 180}, {x: 630, y: 200}]
+              - tool: text
+                color: "#000000"
+                lineWidth: 1
+                opacity: 1
+                points: [{x: 300, y: 400}]
+                text: "Welcome to AIMEAT Canvas!"
+                fontSize: 24
+            canvasSize:
+              width: 800
+              height: 600
+            backgroundColor: "#ffffff"
+            metadata:
+              createdAt: "2026-01-01T00:00:00Z"
+              updatedAt: "2026-01-01T00:00:00Z"
+
+    - type: lib
+      name: aimeat-canvas
+      filename: aimeat-canvas.js
+      exports:
+        - DrawingCanvas
+      api_surface: |
+        AIMEAT.canvas.DrawingCanvas({elementId, storageKey, nodeUrl, token?, options?})
+          Creates a full-featured drawing canvas with toolbar, tools, and auto-save.
+          elementId: string — DOM element id to render into
+          storageKey: string — AIMEAT memory key (e.g. 'drawing:my-sketch')
+          nodeUrl: string — AIMEAT node URL
+          token?: string — optional auth token
+          options?: {
+            width: number (default 800),
+            height: number (default 600),
+            tools: string[] (default ['pen','line','rect','circle','eraser','text']),
+            backgroundColor: string (default '#ffffff'),
+            autoSave: boolean (default true),
+            autoSaveDelay: number (default 2000)
+          }
+
+          Returns: {
+            canvas, export(format), clear(), undo(), redo(),
+            setTool(name), setColor(hex), setLineWidth(px),
+            loadFromStorage(), saveToStorage()
+          }
+
+        No external dependencies — pure Canvas API.
