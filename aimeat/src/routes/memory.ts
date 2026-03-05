@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
@@ -28,7 +28,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   const workspaceAccess = workspaceAccessMiddleware(config, storage);
 
   // POST /v1/memory — write a memory entry (agent auth required)
-  router.post('/v1/memory', requireAuth(), requireRole('agent'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
     const { key, value, visibility, tags, ttl_hours } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
@@ -146,7 +146,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory — list memory keys (agent auth required)
-  router.get('/v1/memory', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
     const gaii = req.auth!.sub;
     const prefix = req.query.prefix as string | undefined;
     const visibility = req.query.visibility as string | undefined;
@@ -192,7 +192,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
-  router.get('/v1/memory/search', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/memory/search', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
     const gaii = req.auth!.sub;
     const q = req.query.q as string;
     if (!q) {
@@ -223,7 +223,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory/:key — read a memory entry
-  router.get('/v1/memory/:key', requireAuth(), requireRole('agent'), workspaceAccess, async (req, res) => {
+  router.get('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:read'), workspaceAccess, async (req, res) => {
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
 
@@ -258,7 +258,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // DELETE /v1/memory/:key — delete a memory entry
-  router.delete('/v1/memory/:key', requireAuth(), requireRole('agent'), workspaceAccess, async (req, res) => {
+  router.delete('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:delete'), workspaceAccess, async (req, res) => {
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
 
@@ -281,7 +281,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // PUT /v1/memory/:key — update memory with optimistic locking
-  router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
+  router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:write'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
     const { value, visibility, tags, ttl_hours, version } = req.body ?? {};
