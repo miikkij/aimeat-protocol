@@ -91,6 +91,32 @@ Edit the `.env` file with any text editor to change settings. The most important
 
 See [.env.example](aimeat/.env.example) for the full list with descriptions, or run `aimeat config` to see all settings.
 
+### Push Notifications (Optional)
+
+AIMEAT can send Web Push and email notifications to personal node owners when messages arrive while their node is offline.
+
+**Quick setup:**
+
+```bash
+# 1. Generate VAPID keys (one-time)
+cd aimeat && npx web-push generate-vapid-keys
+
+# 2. Add to .env
+AIMEAT_PUSH_ENABLED=true
+AIMEAT_VAPID_PUBLIC_KEY="<paste public key>"
+AIMEAT_VAPID_PRIVATE_KEY="<paste private key>"
+AIMEAT_VAPID_SUBJECT="mailto:you@example.com"
+
+# 3. Optional: Add SMTP for email notifications
+AIMEAT_SMTP_HOST="smtp.example.com"
+AIMEAT_SMTP_PORT=587
+AIMEAT_SMTP_USER="noreply@example.com"
+AIMEAT_SMTP_PASS="password"
+
+# Or configure interactively
+aimeat init
+```
+
 ### Start the Node
 
 ```bash
@@ -238,6 +264,7 @@ node --import tsx test/run-e2e-ci.ts --test=micro-memory
 | Storage (binary upload/download, chunked, Range) | 5 | Done |
 | Validation (POST /v1/validate) | 1 | Done |
 | GDPR (owner data export + cascade delete) | 2 | Done |
+| Personal Nodes (registration, tunnel, mailbox, push) | 12 | Done |
 
 **Storage backends:** In-memory (default) and MongoDB/Prisma (16 models).
 
