@@ -61,7 +61,12 @@ export class TunnelManager {
       lastSeen: new Date().toISOString(),
     }).catch(err => logger.error('Failed to update personal node status', { nodeId, error: err }));
 
-    logger.info('Personal node connected', { nodeId, ownerName, agents: agentGaiis.length });
+    logger.info('Personal node connected', {
+      event: 'tunnel.connect',
+      personal_node_id: nodeId,
+      ownerName,
+      agents: agentGaiis.length,
+    });
 
     // Send welcome message with protocol hints
     const welcome: TunnelMessage = {
@@ -91,7 +96,11 @@ export class TunnelManager {
         const msg: TunnelMessage = JSON.parse(data.toString());
         this.handleMessage(nodeId, msg);
       } catch (err) {
-        logger.error('Invalid tunnel message', { nodeId, error: err });
+        logger.error('Invalid tunnel message', {
+          event: 'tunnel.error',
+          personal_node_id: nodeId,
+          error: err,
+        });
       }
     });
 
@@ -106,11 +115,19 @@ export class TunnelManager {
         status: 'offline',
         lastSeen: new Date().toISOString(),
       }).catch(err => logger.error('Failed to update personal node status on disconnect', { nodeId, error: err }));
-      logger.info('Personal node disconnected', { nodeId });
+      logger.info('Personal node disconnected', {
+        event: 'tunnel.disconnect',
+        personal_node_id: nodeId,
+        reason: 'clean',
+      });
     });
 
     ws.on('error', (err) => {
-      logger.error('Personal node WebSocket error', { nodeId, error: err.message });
+      logger.error('Personal node WebSocket error', {
+        event: 'tunnel.error',
+        personal_node_id: nodeId,
+        error: err.message,
+      });
     });
   }
 
@@ -179,12 +196,20 @@ export class TunnelManager {
           status: 'offline',
           lastSeen: new Date().toISOString(),
         }).catch(() => { /* ignore */ });
-        logger.info('Personal node gracefully disconnected', { nodeId });
+        logger.info('Personal node gracefully disconnected', {
+          event: 'tunnel.disconnect',
+          personal_node_id: nodeId,
+          reason: 'graceful',
+        });
         break;
       }
 
       default:
-        logger.warn('Unknown tunnel message type', { nodeId, type: msg.type });
+        logger.warn('Unknown tunnel message type', {
+          event: 'tunnel.error',
+          personal_node_id: nodeId,
+          type: msg.type,
+        });
     }
   }
 
@@ -283,7 +308,11 @@ export class TunnelManager {
 
         if (elapsed > offlineThreshold) {
           // Node hasn't sent heartbeat — mark offline and close
-          logger.warn('Personal node heartbeat timeout', { nodeId, elapsed });
+          logger.warn('Personal node heartbeat timeout', {
+            event: 'tunnel.timeout',
+            personal_node_id: nodeId,
+            elapsed_ms: elapsed,
+          });
           conn.ws.close(1000, 'heartbeat_timeout');
           this.connections.delete(nodeId);
           const stats = getStats();
@@ -298,6 +327,11 @@ export class TunnelManager {
           }).catch(() => { /* ignore */ });
         } else if (elapsed > offlineThreshold * 0.6) {
           // Degraded — heartbeat is late but not dead
+          logger.warn('Personal node heartbeat late', {
+            event: 'tunnel.heartbeat_miss',
+            personal_node_id: nodeId,
+            elapsed_ms: elapsed,
+          });
           this.storage.updatePersonalNode(nodeId, { status: 'degraded' }).catch(() => { /* ignore */ });
         }
       }
