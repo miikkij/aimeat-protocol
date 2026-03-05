@@ -14,7 +14,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/agents — register a new agent (requires owner JWT)
   router.post('/v1/agents', requireAuth(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
-    const { name, owner, display_name, description, capabilities } = req.body ?? {};
+    const { name, owner, display_name, description, capabilities, scopes } = req.body ?? {};
 
     // Extension hook: pre_agent_registration
     const hookResult = await executeHooks(config, storage, 'pre_agent_registration', { name, owner, display_name });
@@ -51,6 +51,22 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // REQ-006 — Resolve agent scopes
+    const requestedScopes: string[] = Array.isArray(scopes) ? scopes : config.defaultAgentScopes;
+
+    // Validate scopes against node maximum
+    if (!config.maxAgentScopes.includes('*')) {
+      const invalid = requestedScopes.filter(s => {
+        if (s === '*') return true; // only operator can have global wildcard
+        const [domain] = s.split(':');
+        return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
+      });
+      if (invalid.length > 0) {
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+        return;
+      }
+    }
+
     const keyPair = await generateKeyPair();
     const now = new Date().toISOString();
 
@@ -61,6 +77,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       displayName: display_name,
       description,
       capabilities: capabilities ?? [],
+      defaultScopes: requestedScopes,
       publicKey: keyPair.publicKey,
       trustScore: 50,
       morselBalance: config.welcomeBonus,
@@ -88,6 +105,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         display_name: agent.displayName,
         description: agent.description,
         capabilities: agent.capabilities,
+        scopes: agent.defaultScopes,
         trust_score: agent.trustScore,
         morsel_balance: agent.morselBalance,
         created_at: agent.createdAt,

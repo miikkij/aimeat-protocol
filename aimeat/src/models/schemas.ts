@@ -35,6 +35,7 @@ export const AgentRegistrationSchema = z.object({
     display_name: z.string().max(128).optional(),
     description: z.string().max(1024).optional(),
     capabilities: z.array(z.string()).optional(),
+    scopes: z.array(z.string().max(64)).max(50).optional(),
 });
 
 // ── Auth ────────────────────────────────────────────────────
