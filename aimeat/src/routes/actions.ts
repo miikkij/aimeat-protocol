@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { ActionPublishSchema, ActionUpdateSchema, validateBody } from '../models/schemas.js';
@@ -15,7 +15,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/actions — publish an action (agent auth)
-  router.post('/v1/actions', requireAuth(), requireRole('agent'), validateBody(ActionPublishSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/actions', requireAuth(), requireRole('agent'), requireScope('work:publish'), validateBody(ActionPublishSchema, config.nodeId), async (req, res) => {
     const { id, display_name, description, category, input_schema, output_schema, pricing, estimated_time_seconds, max_input_size_bytes, tags, webhook_url, semantic } = req.body ?? {};
 
     // Category validation
@@ -93,7 +93,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/actions/:id — remove an action (agent auth)
-  router.delete('/v1/actions/:id', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/actions/:id', requireAuth(), requireRole('agent'), requireScope('work:publish'), async (req, res) => {
     const gaii = req.auth!.sub;
     const deleted = await storage.deleteAction(req.params.id as string, gaii);
     if (!deleted) {

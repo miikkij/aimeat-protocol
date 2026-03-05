@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
@@ -225,7 +225,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   const router = Router();
 
   // POST /v1/work/request — submit a work request (spec path)
-  router.post('/v1/work/request', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/work/request', requireAuth(), requireRole('agent'), requireScope('work:request'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
     const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers);
     if ('forwarded' in result) {
       res.status(result.remoteStatus as number).json(result.remoteResult);
@@ -252,7 +252,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work — legacy submit path (alias)
-  router.post('/v1/work', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/work', requireAuth(), requireRole('agent'), requireScope('work:request'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
     const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers);
     if ('forwarded' in result) {
       res.status(result.remoteStatus as number).json(result.remoteResult);
@@ -278,7 +278,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work/batch — batch work requests
-  router.post('/v1/work/batch', requireAuth(), requireRole('agent'), validateBody(WorkBatchSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/work/batch', requireAuth(), requireRole('agent'), requireScope('work:request'), validateBody(WorkBatchSchema, config.nodeId), async (req, res) => {
     const { requests } = req.body ?? {};
 
     const results = [];
@@ -301,7 +301,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // GET /v1/work/inbox — pending work items for provider (agent auth)
-  router.get('/v1/work/inbox', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/work/inbox', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
     const gaii = req.auth!.sub;
     const items = await storage.listWorkByProvider(gaii);
     const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
@@ -321,7 +321,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // GET /v1/work/:tc — work status (agent auth)
-  router.get('/v1/work/:tc', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/work/:tc', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -352,7 +352,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work/:tc/accept — accept work (provider, agent auth)
-  router.post('/v1/work/:tc/accept', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/:tc/accept', requireAuth(), requireRole('agent'), requireScope('work:accept'), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -383,7 +383,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work/:tc/progress — transition accepted → in_progress (§10.3)
-  router.post('/v1/work/:tc/progress', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/:tc/progress', requireAuth(), requireRole('agent'), requireScope('work:accept'), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -423,7 +423,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work/:tc/reject — reject work (provider, agent auth)
-  router.post('/v1/work/:tc/reject', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/work/:tc/reject', requireAuth(), requireRole('agent'), requireScope('work:accept'), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -458,7 +458,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work/:tc/deliver — deliver work output (provider, agent auth)
-  router.post('/v1/work/:tc/deliver', requireAuth(), requireRole('agent'), validateBody(WorkDeliverySchema, config.nodeId), async (req, res) => {
+  router.post('/v1/work/:tc/deliver', requireAuth(), requireRole('agent'), requireScope('work:accept'), validateBody(WorkDeliverySchema, config.nodeId), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
@@ -517,7 +517,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   });
 
   // POST /v1/work/:tc/rate — rate delivered work (requester, agent auth)
-  router.post('/v1/work/:tc/rate', requireAuth(), requireRole('agent'), validateBody(WorkRatingSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/work/:tc/rate', requireAuth(), requireRole('agent'), requireScope('work:request'), validateBody(WorkRatingSchema, config.nodeId), async (req, res) => {
     const tc = param(req.params.tc);
     const work = await storage.getWork(tc);
     if (!work) {
