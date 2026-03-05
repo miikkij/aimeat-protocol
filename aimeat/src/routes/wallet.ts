@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
@@ -10,7 +10,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/wallet — check balance (agent auth)
-  router.get('/v1/wallet', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/wallet', requireAuth(), requireRole('agent'), requireScope('wallet:read'), async (req, res) => {
     const gaii = req.auth!.sub;
     const agent = await storage.getAgent(gaii);
     if (!agent) {
@@ -55,7 +55,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/wallet/transactions — transaction history (spec path)
-  router.get('/v1/wallet/transactions', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/wallet/transactions', requireAuth(), requireRole('agent'), requireScope('wallet:read'), async (req, res) => {
     const gaii = req.auth!.sub;
     const typeFilter = req.query.type as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
@@ -85,7 +85,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/wallet/history — transaction history (DEPRECATED: use /v1/wallet/transactions)
-  router.get('/v1/wallet/history', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/wallet/history', requireAuth(), requireRole('agent'), requireScope('wallet:read'), async (req, res) => {
     res.setHeader('X-Deprecated', 'Use GET /v1/wallet/transactions instead');
     res.setHeader('Deprecation', 'true');
     res.setHeader('Sunset', '2026-09-01');
@@ -112,7 +112,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/wallet/request — request morsels from operator (agent auth)
-  router.post('/v1/wallet/request', requireAuth(), requireRole('agent'), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/wallet/request', requireAuth(), requireRole('agent'), requireScope('wallet:read'), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
     const gaii = req.auth!.sub;
     const { amount, reason } = req.body ?? {};
 

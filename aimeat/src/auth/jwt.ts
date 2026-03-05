@@ -33,6 +33,7 @@ export interface JWTPayload {
   owner: string;
   node: string;
   roles: string[];
+  scopes?: string[];  // omitted = ['*'] for backward compat
 }
 
 export async function issueJWT(payload: JWTPayload, ttlSeconds: number): Promise<string> {
@@ -42,6 +43,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number): Promise
     owner: payload.owner,
     node: payload.node,
     roles: payload.roles,
+    scopes: payload.scopes ?? ['*'],
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -56,6 +58,7 @@ export interface VerifiedToken {
   node: string;
   roles: string[];
   exp: number;
+  scopes: string[];
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -71,6 +74,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       node: payload.node as string,
       roles: payload.roles as string[],
       exp: payload.exp as number,
+      scopes: (payload.scopes as string[]) ?? ['*'],
     };
   } catch {
     return null;

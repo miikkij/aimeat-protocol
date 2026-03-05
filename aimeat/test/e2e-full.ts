@@ -1436,6 +1436,116 @@ await test('POST /v1/admin/site/sync — 404 when LB not enabled', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
+// ─── Phase 8: Scope Enforcement (REQ-006) ───
+console.log('Phase 8 — Scope Enforcement');
+
+// Register a scoped agent with limited permissions
+let scopedAgentGaii = '';
+let scopedAgentPrivKey = '';
+let scopedAgentToken = '';
+const scopedAgentName = 'scoped-test-' + Date.now();
+
+await test('Register agent with limited scopes', async () => {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: scopedAgentName,
+            owner: ownerName,
+            capabilities: ['memory'],
+            scopes: ['memory:read', 'catalogue:read'],
+        }),
+    });
+    assert(status === 201, `status: ${status}`);
+    assert(body.ok === true, `register: ${JSON.stringify(body.error)}`);
+    assert(Array.isArray(body.data?.agent?.scopes), 'scopes returned');
+    assert(body.data.agent.scopes.includes('memory:read'), 'has memory:read');
+    assert(!body.data.agent.scopes.includes('memory:write'), 'no memory:write');
+    scopedAgentGaii = body.data.agent.gaii;
+    scopedAgentPrivKey = body.data.private_key;
+});
+
+await test('Authenticate scoped agent', async () => {
+    const timestamp = new Date().toISOString();
+    const message = scopedAgentGaii + timestamp;
+    const signature = await signMsg(scopedAgentPrivKey, message);
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: scopedAgentGaii, timestamp, signature }),
+    });
+    assert(body.ok === true, `auth: ${JSON.stringify(body.error)}`);
+    scopedAgentToken = body.data.token;
+});
+
+await test('Scoped agent can read memory (has memory:read)', async () => {
+    const { status, body } = await json('/v1/memory', {
+        headers: { Authorization: `Bearer ${scopedAgentToken}` },
+    });
+    assert(status === 200, `status: ${status}`);
+    assert(body.ok === true, `read: ${JSON.stringify(body.error)}`);
+});
+
+await test('Scoped agent denied memory write (no memory:write)', async () => {
+    const { status, body } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${scopedAgentToken}` },
+        body: JSON.stringify({ key: 'test-scope', value: 'denied', visibility: 'private' }),
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+    assert(body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${body.error?.code}`);
+});
+
+await test('Scoped agent denied wallet access (no wallet:read)', async () => {
+    const { status, body } = await json('/v1/wallet', {
+        headers: { Authorization: `Bearer ${scopedAgentToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+    assert(body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${body.error?.code}`);
+});
+
+await test('Wildcard agent still has full access', async () => {
+    // The original test agent has ['*'] scopes (backward compat)
+    const { status: memStatus } = await json('/v1/memory', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(memStatus === 200, `wildcard memory: ${memStatus}`);
+    const { status: walStatus } = await json('/v1/wallet', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(walStatus === 200, `wildcard wallet: ${walStatus}`);
+});
+
+await test('PATCH scopes updates agent permissions', async () => {
+    const { status, body } = await json(`/v1/agents/${scopedAgentName}/scopes`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ scopes: ['memory:*', 'catalogue:read'] }),
+    });
+    assert(status === 200, `patch status: ${status}`);
+    assert(body.ok === true, `patch: ${JSON.stringify(body.error)}`);
+    assert(body.data?.scopes?.includes('memory:*'), 'updated to memory:*');
+});
+
+await test('Re-auth scoped agent gets new scopes', async () => {
+    const timestamp = new Date().toISOString();
+    const message = scopedAgentGaii + timestamp;
+    const signature = await signMsg(scopedAgentPrivKey, message);
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: scopedAgentGaii, timestamp, signature }),
+    });
+    assert(body.ok === true, `re-auth: ${JSON.stringify(body.error)}`);
+    scopedAgentToken = body.data.token;
+
+    // Now memory:write should work (has memory:*)
+    const { status: writeStatus, body: writeBody } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${scopedAgentToken}` },
+        body: JSON.stringify({ key: 'scope-test-write', value: 'allowed now', visibility: 'private' }),
+    });
+    assert(writeStatus === 200 || writeStatus === 201, `write after scope update: ${writeStatus} ${JSON.stringify(writeBody.error)}`);
+});
+
 // Clean up template for GDPR cascade
 await json('/v1/site/template', {
     method: 'DELETE',

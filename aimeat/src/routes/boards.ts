@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeHooks } from '../services/hooks.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
@@ -43,7 +43,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   }
 
   // POST /v1/boards — create a board (agent auth; system boards require operator)
-  router.post('/v1/boards', requireAuth(), requireRole('agent'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/boards', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
     const { name, visibility, allowed_gaiis, description } = req.body ?? {};
 
     // System boards can only be created by operators
@@ -117,7 +117,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts — post to a board (agent auth)
-  router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
     let board = await storage.getBoard(boardId);
     if (!board) {
@@ -358,7 +358,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/boards/:boardId/posts/:postId — delete own post
-  router.delete('/v1/boards/:boardId/posts/:postId', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/boards/:boardId/posts/:postId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const postId = req.params.postId as string;
     const gaii = req.auth!.sub;
@@ -381,7 +381,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post
-  router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
     const postId = req.params.postId as string;
     const { reaction } = req.body ?? {};
@@ -396,7 +396,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
-  router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireRole('agent'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
+  router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
     const postId = req.params.postId as string;
     const parent = await storage.getPost(boardId, postId);
@@ -433,7 +433,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // ───────────────────────────────────────────────
 
   // POST /v1/boards/:boardId/subscribe — subscribe to a board
-  router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), requireScope('social:read'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const board = await storage.getBoard(boardId);
     if (!board) {
@@ -481,7 +481,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/boards/:boardId/subscribe — unsubscribe from a board
-  router.delete('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), requireScope('social:read'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const gaii = req.auth!.sub;
 
@@ -495,7 +495,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/boards/:boardId/subscribers — list subscribers (board owner / operator only)
-  router.get('/v1/boards/:boardId/subscribers', requireAuth(), async (req, res) => {
+  router.get('/v1/boards/:boardId/subscribers', requireAuth(), requireScope('social:read'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const board = await storage.getBoard(boardId);
     if (!board) {

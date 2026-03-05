@@ -238,6 +238,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         owner: parsed.owner,
         node: config.nodeId,
         roles,
+        scopes: agent.defaultScopes,
       }, config.jwtTtlSeconds);
 
       // Update last seen
