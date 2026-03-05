@@ -107,6 +107,21 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_SITE_ENABLED: 'true',
   AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB: '512',
   AIMEAT_SITE_CACHE_TTL_SECONDS: '60',
+  AIMEAT_PUSH_ENABLED: 'false',
+  AIMEAT_VAPID_PUBLIC_KEY: '',
+  AIMEAT_VAPID_PRIVATE_KEY: '',
+  AIMEAT_VAPID_SUBJECT: 'mailto:admin@aimeat.example.com',
+  AIMEAT_PUSH_NOTIFY_TYPES: 'work_assignment,action_request',
+  AIMEAT_PUSH_COOLDOWN_MIN: '5',
+  AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE: '5',
+  AIMEAT_PUSH_MAX_FAILURES: '3',
+  AIMEAT_SMTP_HOST: '',
+  AIMEAT_SMTP_PORT: '587',
+  AIMEAT_SMTP_USER: '',
+  AIMEAT_SMTP_PASS: '',
+  AIMEAT_SMTP_FROM: 'AIMEAT <noreply@localhost>',
+  AIMEAT_SMTP_SECURE: 'false',
+  AIMEAT_EMAIL_RATE_LIMIT_MIN: '30',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -286,6 +301,31 @@ function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_SITE_ENABLED', comment: 'Enable custom HTML template portal at GET /' },
         { key: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB', comment: 'Max template size in KB' },
         { key: 'AIMEAT_SITE_CACHE_TTL_SECONDS', comment: 'Resolved template cache TTL (0 = no cache)' },
+      ],
+    },
+    {
+      title: 'Push Notifications (REQ-007)',
+      vars: [
+        { key: 'AIMEAT_PUSH_ENABLED' },
+        { key: 'AIMEAT_VAPID_PUBLIC_KEY', comment: 'Generate: npx web-push generate-vapid-keys' },
+        { key: 'AIMEAT_VAPID_PRIVATE_KEY' },
+        { key: 'AIMEAT_VAPID_SUBJECT' },
+        { key: 'AIMEAT_PUSH_NOTIFY_TYPES', comment: 'Comma-separated message types that trigger push' },
+        { key: 'AIMEAT_PUSH_COOLDOWN_MIN' },
+        { key: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE' },
+        { key: 'AIMEAT_PUSH_MAX_FAILURES' },
+        { key: 'AIMEAT_EMAIL_RATE_LIMIT_MIN' },
+      ],
+    },
+    {
+      title: 'Email / SMTP',
+      vars: [
+        { key: 'AIMEAT_SMTP_HOST' },
+        { key: 'AIMEAT_SMTP_PORT' },
+        { key: 'AIMEAT_SMTP_USER' },
+        { key: 'AIMEAT_SMTP_PASS' },
+        { key: 'AIMEAT_SMTP_FROM' },
+        { key: 'AIMEAT_SMTP_SECURE' },
       ],
     },
   ];
@@ -644,6 +684,136 @@ async function askCoreSettings(
         t,
       );
       if (policyUrl) settings.AIMEAT_COOKIE_CONSENT_POLICY_URL = policyUrl;
+    }
+  }
+
+  // ── Push Notifications ──
+  if (useCase === 'public' || useCase === 'custom') {
+    const pushDefault = env.AIMEAT_PUSH_ENABLED === 'true';
+    const pushEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.pushEnabled'),
+        initialValue: pushDefault,
+      }),
+      t,
+    );
+
+    if (pushEnabled) {
+      settings.AIMEAT_PUSH_ENABLED = 'true';
+
+      const pubKeyDefault = env.AIMEAT_VAPID_PUBLIC_KEY || '';
+      const pubKey = checkCancel(
+        await p.text({
+          message: t('init.vapidPublicKey'),
+          placeholder: pubKeyDefault || t('init.vapidPublicKeyHint'),
+          ...(pubKeyDefault ? { defaultValue: pubKeyDefault } : {}),
+        }),
+        t,
+      );
+      if (pubKey) settings.AIMEAT_VAPID_PUBLIC_KEY = pubKey;
+
+      const privKeyDefault = env.AIMEAT_VAPID_PRIVATE_KEY || '';
+      const privKey = checkCancel(
+        await p.text({
+          message: t('init.vapidPrivateKey'),
+          placeholder: privKeyDefault ? '••••••••' : t('init.vapidPrivateKeyHint'),
+          ...(privKeyDefault ? { defaultValue: privKeyDefault } : {}),
+        }),
+        t,
+      );
+      if (privKey) settings.AIMEAT_VAPID_PRIVATE_KEY = privKey;
+
+      const subjectDefault = env.AIMEAT_VAPID_SUBJECT || 'mailto:admin@aimeat.example.com';
+      const subject = checkCancel(
+        await p.text({
+          message: t('init.vapidSubject'),
+          placeholder: t('init.vapidSubjectHint'),
+          defaultValue: subjectDefault,
+          validate: (val) => {
+            if (val && !val.startsWith('mailto:') && !val.startsWith('https://')) {
+              return t('init.vapidSubjectInvalid');
+            }
+          },
+        }),
+        t,
+      );
+      settings.AIMEAT_VAPID_SUBJECT = subject;
+    }
+
+    // ── Email / SMTP ──
+    const smtpDefault = !!env.AIMEAT_SMTP_HOST;
+    const smtpEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.smtpEnabled'),
+        initialValue: smtpDefault,
+      }),
+      t,
+    );
+
+    if (smtpEnabled) {
+      const hostDefault = env.AIMEAT_SMTP_HOST || '';
+      const smtpHost = checkCancel(
+        await p.text({
+          message: t('init.smtpHost'),
+          placeholder: hostDefault || t('init.smtpHostHint'),
+          ...(hostDefault ? { defaultValue: hostDefault } : {}),
+        }),
+        t,
+      );
+      if (smtpHost) settings.AIMEAT_SMTP_HOST = smtpHost;
+
+      const portDefault = env.AIMEAT_SMTP_PORT || '587';
+      const smtpPort = checkCancel(
+        await p.text({
+          message: t('init.smtpPort'),
+          placeholder: t('init.smtpPortHint'),
+          defaultValue: portDefault,
+          validate: (val) => validatePort(val, t),
+        }),
+        t,
+      );
+      settings.AIMEAT_SMTP_PORT = smtpPort;
+
+      const userDefault = env.AIMEAT_SMTP_USER || '';
+      const smtpUser = checkCancel(
+        await p.text({
+          message: t('init.smtpUser'),
+          placeholder: userDefault || t('init.smtpUserHint'),
+          ...(userDefault ? { defaultValue: userDefault } : {}),
+        }),
+        t,
+      );
+      if (smtpUser) settings.AIMEAT_SMTP_USER = smtpUser;
+
+      const smtpPass = checkCancel(
+        await p.text({
+          message: t('init.smtpPass'),
+          placeholder: '••••••••',
+        }),
+        t,
+      );
+      if (smtpPass) settings.AIMEAT_SMTP_PASS = smtpPass;
+
+      const fromDefault = env.AIMEAT_SMTP_FROM || 'AIMEAT <noreply@localhost>';
+      const smtpFrom = checkCancel(
+        await p.text({
+          message: t('init.smtpFrom'),
+          placeholder: t('init.smtpFromHint'),
+          defaultValue: fromDefault,
+        }),
+        t,
+      );
+      settings.AIMEAT_SMTP_FROM = smtpFrom;
+
+      const secureDefault = env.AIMEAT_SMTP_SECURE === 'true';
+      const smtpSecure = checkCancel(
+        await p.confirm({
+          message: t('init.smtpSecure'),
+          initialValue: secureDefault,
+        }),
+        t,
+      );
+      if (smtpSecure) settings.AIMEAT_SMTP_SECURE = 'true';
     }
   }
 
