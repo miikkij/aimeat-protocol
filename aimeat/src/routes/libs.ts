@@ -534,7 +534,16 @@ const auth = {
           if (opts.onLogout) opts.onLogout();
         });
       } else {
-        container.innerHTML = '<style>.aimeat-sign-btn{padding:10px 20px;background:linear-gradient(135deg,#e8457a,#c44569);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-family:system-ui;font-size:14px;letter-spacing:.3px;box-shadow:0 2px 8px rgba(196,69,105,.3);transition:transform .15s,box-shadow .15s}.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(196,69,105,.4)}</style>'
+        container.innerHTML = '<style>.aimeat-sign-btn{'
+          + 'padding:8px 18px;'
+          + 'background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);'
+          + 'color:#2a1800;border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);'
+          + 'border-radius:10px;cursor:pointer;font-weight:800;font-family:system-ui;font-size:14px;letter-spacing:.3px;'
+          + 'box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);'
+          + 'text-shadow:0 1px 0 rgba(245,230,163,.5);'
+          + 'transition:transform .15s,box-shadow .15s}'
+          + '.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}'
+          + '</style>'
           + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
           + (opts.buttonText || i.signInBtn || '\\u2764\\ufe0f Sign In') + '</button>';
         document.getElementById('aimeat-login-btn').addEventListener('click', () => showLoginModal(opts, render));
