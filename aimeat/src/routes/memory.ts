@@ -227,10 +227,24 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
 
-    const record = await storage.getMemory(gaii, key);
+    let record = await storage.getMemory(gaii, key);
     if (!record) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
-      return;
+      // Auto-create empty memory key (upsert on read)
+      const now = new Date().toISOString();
+      record = await storage.setMemory({
+        key,
+        ownerGaii: gaii,
+        value: null,
+        visibility: 'private',
+        tags: [],
+        ttlHours: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
+      emitResourceListChanged(gaii);
     }
 
     stats?.increment('memory_reads');
