@@ -396,9 +396,8 @@ await test('Violating memory write returns 422 (missing required fields)', async
 
 await test('Seed data was written on activation', async () => {
   // The recipe-collection manifest has 3 seed data entries
-  const { status, body } = await json(`/v1/memory/${encodeURIComponent('recipe:spaghetti-aglio-olio')}`, {
-    headers: { Authorization: `Bearer ${agentToken}` },
-  });
+  // Seed data is stored under the owner's GAII (ownerName), read via public endpoint
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(ownerName)}/${encodeURIComponent('recipe:spaghetti-aglio-olio')}`);
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.ok === true, 'ok');
   assert(body.data.value.title === 'Spaghetti Aglio e Olio', `title: ${body.data.value.title}`);
@@ -435,9 +434,8 @@ await test('After deactivation, violating write succeeds (schema removed)', asyn
 
 await test('Existing data survives deactivation', async () => {
   // Seed data should still be there even after deactivation
-  const { status, body } = await json(`/v1/memory/${encodeURIComponent('recipe:spaghetti-aglio-olio')}`, {
-    headers: { Authorization: `Bearer ${agentToken}` },
-  });
+  // Read via public endpoint since seed data is under owner's GAII
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(ownerName)}/${encodeURIComponent('recipe:spaghetti-aglio-olio')}`);
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.ok === true, 'ok');
   assert(body.data.value.title === 'Spaghetti Aglio e Olio', `title: ${body.data.value.title}`);
@@ -575,7 +573,7 @@ await test('Extension without ontology returns empty array', async () => {
 console.log('\nPhase 8 — Lib Component');
 
 await test('Lib file is served with correct Content-Type', async () => {
-  const res = await rawFetch(`${BASE}/v1/cortex/${RECIPE_ENC}/libs/recipe-ui.js`);
+  const res = await rawFetch(`/v1/cortex/${RECIPE_ENC}/libs/recipe-ui.js`);
   assert(res.status === 200, `status ${res.status}`);
   const ct = res.headers.get('content-type') ?? '';
   assert(ct.includes('application/javascript'), `content-type: ${ct}`);
@@ -584,7 +582,7 @@ await test('Lib file is served with correct Content-Type', async () => {
 });
 
 await test('Lib has cache headers', async () => {
-  const res = await rawFetch(`${BASE}/v1/cortex/${RECIPE_ENC}/libs/recipe-ui.js`);
+  const res = await rawFetch(`/v1/cortex/${RECIPE_ENC}/libs/recipe-ui.js`);
   assert(res.status === 200, `status ${res.status}`);
   const cache = res.headers.get('cache-control') ?? '';
   assert(cache.includes('public'), `cache-control: ${cache}`);
@@ -592,7 +590,7 @@ await test('Lib has cache headers', async () => {
 });
 
 await test('Non-existent lib returns 404', async () => {
-  const res = await rawFetch(`${BASE}/v1/cortex/${RECIPE_ENC}/libs/nonexistent.js`);
+  const res = await rawFetch(`/v1/cortex/${RECIPE_ENC}/libs/nonexistent.js`);
   assert(res.status === 404, `status ${res.status}`);
 });
 
@@ -673,9 +671,8 @@ await test('Uninstall active extension deactivates first', async () => {
 
 await test('Seed data removed after uninstall', async () => {
   // The seed data keys should be gone after uninstall
-  const { status } = await json(`/v1/memory/${encodeURIComponent('recipe:spaghetti-aglio-olio')}`, {
-    headers: { Authorization: `Bearer ${agentToken}` },
-  });
+  // Read via public endpoint since seed data was under owner's GAII
+  const { status } = await json(`/v1/memory/${encodeURIComponent(ownerName)}/${encodeURIComponent('recipe:spaghetti-aglio-olio')}`);
   assert(status === 404, `seed data should be gone, status ${status}`);
 });
 
