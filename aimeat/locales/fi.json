@@ -616,10 +616,31 @@
       "title": "Cortex-laajennukset",
       "desc": "Asenna ja hallinnoi deklaratiivisia laajennuksia, jotka tarjoavat skeemoja, prompteja, ontologioita ja UI-kirjastoja sovelluksillesi.",
       "loading": "Ladataan laajennuksia...",
-      "empty": "Ei asennettuja laajennuksia. Klikkaa '+ Asenna laajennus' lis\u00e4\u00e4ksesi.",
-      "install": "+ Asenna laajennus",
+      "empty": "Ei laajennuksia vielä. Kokeile luoda AI:lla tai lisää valmis laajennus alta!",
+      "install": "+ Lisää",
+      "createWithAi": "Luo AI:lla",
+      "promptCopied": "Prompt kopioitu! Liitä se AI Chatiin.",
+      "readyExtensions": "Valmiita laajennuksia:",
+      "addThis": "Lisää tämä",
+      "heroDesc": "Laajennuksilla saat enemmän aikaiseksi vähemmällä. AI Chat pystyy suoriutumaan isommista sovelluksista kun annat sille valmiita rakennuspalikoita. Voit käyttää samaa laajennetta useassa sovelluksessasi — teet luomisen helpommaksi itsellesi ja tekoälykaveerillesi.",
+      "visibility": {
+        "private": "Yksityinen",
+        "public": "Julkinen"
+      },
+      "publish": "Julkaise",
+      "unpublish": "Tee yksityiseksi",
+      "bundled": {
+        "charts": {
+          "name": "Charts",
+          "desc": "Nätit kaaviot datallesi — pylväs, viiva, piirakka ja muut. Touch + hiiri."
+        },
+        "canvas": {
+          "name": "Piirtoalusta",
+          "desc": "Piirtopinta jolla piirrät ja tallennat suoraan storageen. Undo, export, kynä & muodot."
+        }
+      },
       "installModal": {
-        "title": "Asenna Cortex-laajennus",
+        "title": "Lisää Cortex-laajennus",
         "manifestLabel": "Manifesti",
         "uploadFile": "Lataa tiedosto",
         "pasteYaml": "Liit\u00e4 YAML",

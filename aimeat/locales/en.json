@@ -616,10 +616,31 @@
       "title": "Cortex Extensions",
       "desc": "Install and manage declarative extensions that provide schemas, prompts, ontologies, and UI libraries for your apps.",
       "loading": "Loading extensions...",
-      "empty": "No extensions installed yet. Click '+ Install Extension' to add one.",
-      "install": "+ Install Extension",
+      "empty": "No extensions yet. Try creating one with AI or add a ready-made extension below!",
+      "install": "+ Add",
+      "createWithAi": "Create with AI",
+      "promptCopied": "Prompt copied! Paste it into AI Chat.",
+      "readyExtensions": "Ready-made extensions:",
+      "addThis": "Add this",
+      "heroDesc": "Get more done with less. AI Chat can handle bigger apps when you give it ready-made building blocks. Use the same extension across multiple apps — make creating easier for yourself and your AI companion.",
+      "visibility": {
+        "private": "Private",
+        "public": "Public"
+      },
+      "publish": "Make public",
+      "unpublish": "Make private",
+      "bundled": {
+        "charts": {
+          "name": "Charts",
+          "desc": "Beautiful charts for your data — bar, line, pie, and more. Touch + mouse support."
+        },
+        "canvas": {
+          "name": "Drawing Canvas",
+          "desc": "Drawing surface with pen, shapes, and text. Auto-saves to storage. Undo, export, touch support."
+        }
+      },
       "installModal": {
-        "title": "Install Cortex Extension",
+        "title": "Add Cortex Extension",
         "manifestLabel": "Manifest",
         "uploadFile": "Upload file",
         "pasteYaml": "Paste YAML",
