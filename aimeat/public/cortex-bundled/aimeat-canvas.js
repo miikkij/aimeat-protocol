@@ -709,6 +709,7 @@
     var redoStack = [];     // Strokes that were undone (for redo).
     var currentStroke = null; // Stroke being drawn right now.
     var isDrawing = false;
+    var createdAt = '';     // Timestamp of first save (preserved across undo/clear).
 
     var activeTool = enabledTools[0] || 'pen';
     var activeColor = '#000000';

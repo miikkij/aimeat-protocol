@@ -683,7 +683,9 @@ function GenesisCanvas() {
     }
 
     // SNAKE GAME
-    const SNAKE_H = 10, FOOD_H = 5, FOOD_COUNT = 18, TICK_RATE = 7;
+    const SNAKE_H = 10, FOOD_H = 5, FOOD_COUNT = 18;
+    const TICK_RATE_INIT = 7, TICK_RATE_MIN = 2;
+    let tickRate = TICK_RATE_INIT;
     const snakeMap = new Float32Array(state.cols * state.rows);
     const foodCells = new Set();
     const bodyCells = new Map();
@@ -712,7 +714,7 @@ function GenesisCanvas() {
         { c: Math.floor(cols / 2) - 2, r: Math.floor(rows / 2) }
       ];
       snakeDir = { dc: 1, dr: 0 }; nextDir = { dc: 1, dr: 0 };
-      snakeScore = 0; snakeDead = false;
+      snakeScore = 0; snakeDead = false; tickRate = TICK_RATE_INIT;
       foodCells.clear(); bodyCells.clear(); explodeParticles.length = 0;
       spawnFood(FOOD_COUNT);
       snakeActive = true;
@@ -744,7 +746,7 @@ function GenesisCanvas() {
       const nIdx = nr * cols + nc;
       if (bodyCells.has(nIdx)) { killSnake(); return; }
       const ateFood = foodCells.has(nIdx);
-      if (ateFood) { foodCells.delete(nIdx); snakeScore++; uiScore = snakeScore; spawnFood(1); }
+      if (ateFood) { foodCells.delete(nIdx); snakeScore++; uiScore = snakeScore; spawnFood(1); tickRate = Math.max(TICK_RATE_MIN, tickRate - 1); }
       snake.unshift({ c: nc, r: nr });
       if (!ateFood) snake.pop();
       bodyCells.clear();
@@ -857,10 +859,26 @@ function GenesisCanvas() {
     };
     document.addEventListener('mousemove', onMouseMove);
 
-    const onCanvasClick = () => {
-      if (!snakeActive) initSnake();
-    };
+    // Left half of canvas = turn left, right half = turn right (relative to heading).
+    function handlePointerTurn(clientX) {
+      if (!snakeActive) { initSnake(); return; }
+      const rect = canvas.getBoundingClientRect();
+      const turnLeft = clientX < rect.left + rect.width / 2;
+      const cur = nextDir;
+      // Rotate 90° CCW (left) or CW (right)
+      nextDir = turnLeft
+        ? { dc: cur.dr, dr: -cur.dc }
+        : { dc: -cur.dr, dr: cur.dc };
+    }
+
+    const onCanvasClick = (e) => { handlePointerTurn(e.clientX); };
     canvas.addEventListener('click', onCanvasClick);
+
+    const onCanvasTouch = (e) => {
+      e.preventDefault();
+      if (e.changedTouches.length > 0) handlePointerTurn(e.changedTouches[0].clientX);
+    };
+    canvas.addEventListener('touchstart', onCanvasTouch, { passive: false });
 
     const onKeyDown = (e) => {
       if (snakeActive) {
@@ -877,12 +895,17 @@ function GenesisCanvas() {
     };
     document.addEventListener('keydown', onKeyDown);
 
-    // RENDER LOOP
+    // RENDER LOOP — capped at 30fps
+    const TARGET_FPS = 30;
+    const FRAME_MS = 1000 / TARGET_FPS;
     let frame = 0;
     let running = true;
-    function animate() {
+    let lastTime = 0;
+    function animate(now) {
       if (!running) return;
       animFrameRef.current = requestAnimationFrame(animate);
+      if (now - lastTime < FRAME_MS) return;
+      lastTime = now;
       frame++;
 
       dirX += (mouseX * 1.2 - dirX) * 0.04;
@@ -896,7 +919,7 @@ function GenesisCanvas() {
 
       // Snake tick
       snakeTick++;
-      if (snakeTick >= TICK_RATE) { snakeTick = 0; stepSnake(); }
+      if (snakeTick >= tickRate) { snakeTick = 0; stepSnake(); }
       buildSnakeMap(frame);
 
       const { cols, rows, spacing, textH } = state;
@@ -934,6 +957,7 @@ function GenesisCanvas() {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('keydown', onKeyDown);
       canvas.removeEventListener('click', onCanvasClick);
+      canvas.removeEventListener('touchstart', onCanvasTouch);
       renderer.dispose();
       if (geo) geo.dispose();
     };
