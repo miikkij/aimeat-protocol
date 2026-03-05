@@ -199,6 +199,10 @@ export interface AimeatConfig {
   statsEnabled: boolean;
   statsAccess: 'public' | 'authenticated' | 'operator';
 
+  // Prometheus Metrics
+  metricsEnabled: boolean;
+  metricsAccess: 'public' | 'authenticated' | 'operator';
+
   // Node Extensions (V8 Isolates)
   extensionsEnabled: boolean;
   extensionMaxMemoryMb: number;
@@ -363,6 +367,8 @@ export function loadConfig(): AimeatConfig {
     autoHideThreshold: parseInt(process.env.AIMEAT_AUTO_HIDE_THRESHOLD ?? '5', 10),
     statsEnabled: process.env.AIMEAT_STATS_ENABLED !== 'false',
     statsAccess: (process.env.AIMEAT_STATS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'public',
+    metricsEnabled: process.env.AIMEAT_METRICS_ENABLED === 'true',
+    metricsAccess: (process.env.AIMEAT_METRICS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'operator',
 
     // Node Extensions (V8 Isolates)
     extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED === 'true',
