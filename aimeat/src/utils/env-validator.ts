@@ -116,6 +116,10 @@ export function validateEnv(): ValidationResult[] {
     { key: 'AIMEAT_STORAGE_QUOTA_MB', name: 'Storage Quota MB', defaultVal: '100', min: 1 },
     { key: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB', name: 'Site Max Template Size KB', defaultVal: '512', min: 1 },
     { key: 'AIMEAT_SITE_CACHE_TTL_SECONDS', name: 'Site Cache TTL Seconds', defaultVal: '60', min: 0 },
+    { key: 'AIMEAT_PUSH_COOLDOWN_MIN', name: 'Push Cooldown', defaultVal: '5', min: 1, max: 1440 },
+    { key: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', name: 'Push Max Subscriptions', defaultVal: '5', min: 1, max: 100 },
+    { key: 'AIMEAT_PUSH_MAX_FAILURES', name: 'Push Max Failures', defaultVal: '3', min: 1, max: 50 },
+    { key: 'AIMEAT_EMAIL_RATE_LIMIT_MIN', name: 'Email Rate Limit', defaultVal: '30', min: 1, max: 1440 },
   ];
 
   for (const field of numericFields) {
@@ -162,6 +166,62 @@ export function validateEnv(): ValidationResult[] {
     }
     if (!env.AIMEAT_COOKIE_CONSENT_POLICY_URL) {
       results.push({ level: 'warning', variable: 'AIMEAT_COOKIE_CONSENT_POLICY_URL', message: 'Cookie consent enabled but no privacy policy URL set. Recommended for GDPR compliance.' });
+    }
+  }
+
+  // ── Push Notifications ──────────────────────────────────────
+  const pushEnabled = env.AIMEAT_PUSH_ENABLED;
+  if (pushEnabled === 'true') {
+    const vapidPub = env.AIMEAT_VAPID_PUBLIC_KEY;
+    if (!vapidPub) {
+      results.push({ level: 'error', variable: 'AIMEAT_VAPID_PUBLIC_KEY', message: 'Required when AIMEAT_PUSH_ENABLED=true. Generate with: npx web-push generate-vapid-keys' });
+    } else if (vapidPub.length < 80 || vapidPub.length > 100) {
+      results.push({ level: 'warning', variable: 'AIMEAT_VAPID_PUBLIC_KEY', message: `Key length ${vapidPub.length} looks unusual (expected ~87 chars). Verify with: npx web-push generate-vapid-keys` });
+    }
+
+    const vapidPriv = env.AIMEAT_VAPID_PRIVATE_KEY;
+    if (!vapidPriv) {
+      results.push({ level: 'error', variable: 'AIMEAT_VAPID_PRIVATE_KEY', message: 'Required when AIMEAT_PUSH_ENABLED=true. Generate with: npx web-push generate-vapid-keys' });
+    } else if (vapidPriv.length < 35 || vapidPriv.length > 55) {
+      results.push({ level: 'warning', variable: 'AIMEAT_VAPID_PRIVATE_KEY', message: `Key length ${vapidPriv.length} looks unusual (expected ~43 chars). Verify with: npx web-push generate-vapid-keys` });
+    }
+
+    const vapidSubject = env.AIMEAT_VAPID_SUBJECT;
+    if (!vapidSubject) {
+      results.push({ level: 'warning', variable: 'AIMEAT_VAPID_SUBJECT', message: 'Not set. Should be a mailto: or https:// URI for push service contact.' });
+    } else if (!vapidSubject.startsWith('mailto:') && !vapidSubject.startsWith('https://')) {
+      results.push({ level: 'warning', variable: 'AIMEAT_VAPID_SUBJECT', message: `Value "${vapidSubject}" must start with mailto: or https://` });
+    }
+  } else if (pushEnabled === 'false' || !pushEnabled) {
+    if (env.AIMEAT_VAPID_PUBLIC_KEY || env.AIMEAT_VAPID_PRIVATE_KEY) {
+      results.push({ level: 'info', variable: 'AIMEAT_PUSH_ENABLED', message: 'VAPID keys are configured but push is disabled. Set AIMEAT_PUSH_ENABLED=true to enable.' });
+    }
+  }
+
+  // ── Email / SMTP ────────────────────────────────────────────
+  const smtpHost = env.AIMEAT_SMTP_HOST;
+  if (smtpHost) {
+    if (!env.AIMEAT_SMTP_USER) {
+      results.push({ level: 'warning', variable: 'AIMEAT_SMTP_USER', message: 'SMTP host is set but no username configured. Most SMTP servers require authentication.' });
+    }
+    if (!env.AIMEAT_SMTP_PASS) {
+      results.push({ level: 'warning', variable: 'AIMEAT_SMTP_PASS', message: 'SMTP host is set but no password configured. Most SMTP servers require authentication.' });
+    }
+
+    const smtpPort = env.AIMEAT_SMTP_PORT;
+    if (smtpPort) {
+      const port = parseInt(smtpPort, 10);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        results.push({ level: 'error', variable: 'AIMEAT_SMTP_PORT', message: `Invalid port "${smtpPort}". Must be 1-65535.` });
+      } else {
+        const secure = env.AIMEAT_SMTP_SECURE === 'true';
+        if (secure && port !== 465) {
+          results.push({ level: 'warning', variable: 'AIMEAT_SMTP_SECURE', message: `TLS enabled but port is ${port}. Port 465 is standard for direct TLS. Port ${port} typically uses STARTTLS (secure=false).` });
+        }
+        if (!secure && port === 465) {
+          results.push({ level: 'warning', variable: 'AIMEAT_SMTP_SECURE', message: 'Port 465 requires TLS. Set AIMEAT_SMTP_SECURE=true or change port to 587.' });
+        }
+      }
     }
   }
 
