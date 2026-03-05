@@ -1,0 +1,195 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: project-tracker
+  namespace: test
+  description: "Project and task tracking extension with status workflows and time estimates"
+  author: test
+  tags: [projects, tasks, productivity, kanban]
+  labels:
+    domain: productivity
+
+spec:
+  version: "1.0.0"
+  components:
+    # ── Schema ────────────────────────────────────────────────
+    - type: schema
+      name: project
+      key_pattern: "project:*"
+      apply_to: prefix
+      schema:
+        type: object
+        required: [name, status]
+        properties:
+          name:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description:
+            type: string
+            maxLength: 2000
+          status:
+            type: string
+            enum: [planning, active, paused, completed, archived]
+          priority:
+            type: string
+            enum: [low, medium, high, critical]
+          owner_gaii:
+            type: string
+          created_at:
+            type: string
+            format: date-time
+          due_date:
+            type: string
+            format: date
+          tags:
+            type: array
+            items:
+              type: string
+          tasks:
+            type: array
+            items:
+              type: object
+              required: [id, title, status]
+              properties:
+                id:
+                  type: string
+                title:
+                  type: string
+                status:
+                  type: string
+                  enum: [todo, in_progress, review, done]
+                assignee:
+                  type: string
+                estimate_hours:
+                  type: number
+                  minimum: 0
+                actual_hours:
+                  type: number
+                  minimum: 0
+
+    # ── Prompt ────────────────────────────────────────────────
+    - type: prompt
+      name: project-assistant
+      content: |
+        You are a project management assistant on an AIMEAT node at {{node_url}}.
+        You help users track projects and tasks stored under the "project:" prefix.
+
+        Available actions:
+        - create-project: Set up a new project with tasks
+        - update-task-status: Move a task through the workflow (todo -> in_progress -> review -> done)
+
+        When listing projects, show their name, status, priority, and task completion
+        ratio (e.g., 3/5 tasks done). Warn about overdue projects when due_date is
+        in the past and status is not completed.
+      variables:
+        - "{{node_url}}"
+
+    # ── Actions ───────────────────────────────────────────────
+    - type: action
+      name: create-project
+      description: "Create a new project with initial task list"
+      input_schema:
+        type: object
+        required: [name, tasks]
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          priority:
+            type: string
+            enum: [low, medium, high, critical]
+          due_date:
+            type: string
+            format: date
+          tasks:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                assignee:
+                  type: string
+                estimate_hours:
+                  type: number
+
+    - type: action
+      name: update-task-status
+      description: "Update the status of a task within a project"
+      input_schema:
+        type: object
+        required: [project_key, task_id, new_status]
+        properties:
+          project_key:
+            type: string
+            description: "Full memory key, e.g. project:website-redesign"
+          task_id:
+            type: string
+          new_status:
+            type: string
+            enum: [todo, in_progress, review, done]
+          actual_hours:
+            type: number
+            minimum: 0
+            description: "Hours spent so far (set when moving to done)"
+
+    # ── Seed Data ─────────────────────────────────────────────
+    - type: seed-data
+      entries:
+        - key: "project:website-redesign"
+          value:
+            name: "Website Redesign"
+            description: "Modernise the company website with a fresh design and improved performance"
+            status: active
+            priority: high
+            created_at: "2026-02-01T09:00:00Z"
+            due_date: "2026-04-15"
+            tags: [web, design, frontend]
+            tasks:
+              - id: task-001
+                title: "Create wireframes"
+                status: done
+                assignee: alice
+                estimate_hours: 8
+                actual_hours: 6
+              - id: task-002
+                title: "Design component library"
+                status: in_progress
+                assignee: bob
+                estimate_hours: 16
+              - id: task-003
+                title: "Implement responsive layout"
+                status: todo
+                assignee: charlie
+                estimate_hours: 24
+              - id: task-004
+                title: "Performance audit"
+                status: todo
+                estimate_hours: 4
+
+        - key: "project:api-v2"
+          value:
+            name: "API v2 Migration"
+            description: "Migrate all REST endpoints to v2 with improved pagination and filtering"
+            status: planning
+            priority: medium
+            created_at: "2026-02-15T14:30:00Z"
+            due_date: "2026-06-01"
+            tags: [api, backend, migration]
+            tasks:
+              - id: task-001
+                title: "Audit existing endpoints"
+                status: todo
+                estimate_hours: 12
+              - id: task-002
+                title: "Design new pagination scheme"
+                status: todo
+                estimate_hours: 6
+              - id: task-003
+                title: "Write migration guide"
+                status: todo
+                estimate_hours: 8
