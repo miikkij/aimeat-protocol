@@ -8,11 +8,11 @@ import { getSiteSyncState } from './site-sync.js';
 
 const __dirname_site = dirname(fileURLToPath(import.meta.url));
 
-/** Resolve path to public/human.html (works from both src/ and dist/). */
-function resolveHumanHtmlPath(): string {
+/** Resolve path to public/spa.html (works from both src/ and dist/). */
+function resolveSpaHtmlPath(): string {
     const candidates = [
-        join(__dirname_site, '..', '..', 'public', 'human.html'),      // dev: src/services/../../public
-        join(__dirname_site, '..', '..', '..', 'public', 'human.html'), // dist: dist/src/services/../../../public
+        join(__dirname_site, '..', '..', 'public', 'spa.html'),      // dev: src/services/../../public
+        join(__dirname_site, '..', '..', '..', 'public', 'spa.html'), // dist: dist/src/services/../../../public
     ];
     for (const p of candidates) {
         if (existsSync(p)) return p;
@@ -20,7 +20,7 @@ function resolveHumanHtmlPath(): string {
     return candidates[0]; // fallback
 }
 
-const HUMAN_HTML_PATH = resolveHumanHtmlPath();
+const SPA_HTML_PATH = resolveSpaHtmlPath();
 
 // Reserved storage key for the portal template
 const SITE_TEMPLATE_KEY = '__site_template__';
@@ -473,8 +473,8 @@ export class SiteService {
         _cookieHeader: string | undefined,
         _acceptLang: string | undefined,
     ): Promise<string> {
-        // Serve the static human.html file (language detection happens client-side)
-        return readFileSync(HUMAN_HTML_PATH, 'utf-8');
+        // Serve the SPA shell (language detection happens client-side)
+        return readFileSync(SPA_HTML_PATH, 'utf-8');
     }
 }
 
