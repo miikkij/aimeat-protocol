@@ -206,6 +206,13 @@ a { color: inherit; text-decoration: none; }
   animation-duration: 30s;
 }
 
+/* ── App root — must sit above bg-canvas (z-index:0) so all non-positioned
+   descendants form a stacking context that paints over the fixed background ── */
+#app {
+  position: relative;
+  z-index: 1;
+}
+
 /* ── Top Navigation ── */
 .topnav {
   position: sticky;
