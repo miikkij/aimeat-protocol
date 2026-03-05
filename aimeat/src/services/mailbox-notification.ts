@@ -127,9 +127,10 @@ export class MailboxNotificationService {
       }
 
       const stats = await this.storage.getMailboxStats(personalNodeId);
-      const items = await this.storage.listMailboxItems(personalNodeId);
-      const oldestAge = items.length > 0
-        ? Math.round((now - new Date(items[0].createdAt).getTime()) / 60_000)
+      // Only fetch oldest item for age calculation (limit 1 to avoid loading all items)
+      const oldestItems = await this.storage.listMailboxItems(personalNodeId, { limit: 1 });
+      const oldestAge = oldestItems.length > 0
+        ? Math.round((now - new Date(oldestItems[0].createdAt).getTime()) / 60_000)
         : 0;
 
       const payload: MailboxPushPayload = {
@@ -143,26 +144,28 @@ export class MailboxNotificationService {
       };
 
       let sentAny = false;
+      const sentChannels: string[] = [];
 
       if (prefs.channels.includes('web_push') && this.webpush) {
         const subscriptions = await this.storage.listPersonalPushSubscriptions(personalNodeId);
         for (const sub of subscriptions) {
           const ok = await this.sendWebPush(sub, payload);
-          if (ok) sentAny = true;
+          if (ok) { sentAny = true; sentChannels.push('web_push'); }
         }
       }
 
-      // Email channel stub (Phase 2)
+      // Email channel
       if (prefs.channels.includes('email') && prefs.email) {
         const emailSent = await this.sendEmail(personalNodeId, prefs.email, payload);
-        if (emailSent) sentAny = true;
+        if (emailSent) { sentAny = true; sentChannels.push('email'); }
       }
 
       if (sentAny) {
         this.cooldownMap.set(personalNodeId, now);
       }
 
-      return { sent: sentAny, channel: sentAny ? 'web_push' : undefined };
+      const uniqueChannels = [...new Set(sentChannels)];
+      return { sent: sentAny, channel: uniqueChannels.join(',') || undefined };
     } catch (err) {
       logger.error('MailboxNotificationService.notify failed', { personalNodeId, error: String(err) });
       return { sent: false, reason: 'internal_error' };

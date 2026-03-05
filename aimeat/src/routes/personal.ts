@@ -589,6 +589,29 @@ export function personalRouter(
         }
       }
 
+      // Validate enabled
+      if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'enabled must be a boolean'));
+        return;
+      }
+
+      // Validate notifyTypes
+      if (body.notifyTypes !== undefined) {
+        const validTypes = ['work_assignment', 'action_request', 'board_notification', 'federation_sync'];
+        if (!Array.isArray(body.notifyTypes) || !body.notifyTypes.every((t: unknown) => typeof t === 'string' && validTypes.includes(t as string))) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `notifyTypes must be an array of: ${validTypes.join(', ')}`));
+          return;
+        }
+      }
+
+      // Validate email
+      if (body.email !== undefined && body.email !== null) {
+        if (typeof body.email !== 'string' || !body.email.includes('@')) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'email must be a valid email address'));
+          return;
+        }
+      }
+
       // Merge with existing preferences (or defaults)
       const existing = await storage.getNotificationPreferences(nodeId) ?? {
         personalNodeId: nodeId,
