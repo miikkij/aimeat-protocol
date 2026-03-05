@@ -35,6 +35,11 @@ export function statsRouter(config: AimeatConfig, storage: Storage, stats: Stats
       ...snap,
       active_owners: owners.length,
       active_agents: agents.length,
+      // Push notification status (REQ-007)
+      push_notifications: {
+        enabled: config.pushEnabled && !!config.vapidPublicKey,
+        personal_node_support: config.personalNodesEnabled,
+      },
     }));
   });
 
