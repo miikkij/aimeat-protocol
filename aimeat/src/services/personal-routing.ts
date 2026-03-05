@@ -4,6 +4,7 @@ import { MailboxService } from './mailbox.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { getStats } from './stats.js';
+import { getPromMetrics } from './prometheus.js';
 
 export interface RoutingResult {
   delivered: boolean;
@@ -76,6 +77,8 @@ export async function routeToPersonalNode(
   // Queue to mailbox
   const stats = getStats();
   if (stats) stats.incrementTunnel('mailbox_fallbacks_total');
+  const prom = getPromMetrics();
+  if (prom) prom.tunnelMailboxFallbacksTotal.inc();
   const retentionDays = message.type === 'board_notification' ? 3 : 7;
   const sizeBytes = Buffer.byteLength(message.payload, 'utf-8');
 

@@ -185,10 +185,20 @@ export function bootstrapRouter(
 
     // Tunnel subsystem
     if (config.personalNodesEnabled && tunnelManager) {
-      subsystems.tunnel = {
+      const tunnelSub: Record<string, unknown> = {
         healthy: true,
         connections_active: tunnelManager.getOnlineCount(),
       };
+      // Find most recent connection timestamp from online nodes
+      try {
+        const nodes = await storage.listPersonalNodes();
+        let newest: string | null = null;
+        for (const n of nodes) {
+          if (n.lastSeen && (!newest || n.lastSeen > newest)) newest = n.lastSeen;
+        }
+        if (newest) tunnelSub.last_connection_at = newest;
+      } catch { /* ignore — non-critical */ }
+      subsystems.tunnel = tunnelSub;
     }
 
     // Mailbox subsystem

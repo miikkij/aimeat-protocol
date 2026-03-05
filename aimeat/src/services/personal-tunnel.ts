@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { getStats } from './stats.js';
+import { getPromMetrics } from './prometheus.js';
 
 export interface TunnelMessage {
   type: 'request' | 'response' | 'mailbox_sync' | 'mailbox_ack' | 'heartbeat' | 'heartbeat_ack' | 'disconnect' | 'welcome' | 'delivery_receipt';
@@ -49,10 +50,16 @@ export class TunnelManager {
     this.connections.set(nodeId, conn);
 
     const stats = getStats();
+    const prom = getPromMetrics();
     if (stats) {
       if (existing) stats.incrementTunnel('reconnects_total');
       stats.incrementTunnel('connections_total');
       stats.setTunnelGauge('connections_active', this.connections.size);
+    }
+    if (prom) {
+      if (existing) prom.tunnelReconnectsTotal.inc();
+      prom.tunnelConnectionsTotal.inc();
+      prom.tunnelConnectionsActive.set(this.connections.size);
     }
 
     // Update storage status to online
@@ -111,6 +118,11 @@ export class TunnelManager {
         stats.incrementTunnel('disconnections_total');
         stats.setTunnelGauge('connections_active', this.connections.size);
       }
+      const prom2 = getPromMetrics();
+      if (prom2) {
+        prom2.tunnelDisconnectionsTotal.inc({ reason: 'clean' });
+        prom2.tunnelConnectionsActive.set(this.connections.size);
+      }
       this.storage.updatePersonalNode(nodeId, {
         status: 'offline',
         lastSeen: new Date().toISOString(),
@@ -136,7 +148,9 @@ export class TunnelManager {
     if (!conn) return;
 
     const stats = getStats();
+    const prom = getPromMetrics();
     if (stats) stats.incrementTunnel('messages_received_total');
+    if (prom) prom.tunnelMessagesReceivedTotal.inc({ type: msg.type });
 
     switch (msg.type) {
       case 'heartbeat': {
@@ -177,6 +191,8 @@ export class TunnelManager {
             if (stats3) {
               for (let i = 0; i < itemIds.length; i++) stats3.incrementMailbox('delivered_total');
             }
+            const prom3 = getPromMetrics();
+            if (prom3) prom3.mailboxDeliveredTotal.inc(itemIds.length);
             logger.info('Mailbox items acknowledged and deleted', { nodeId, count: itemIds.length });
           } catch { /* ignore parse errors */ }
         }
@@ -191,6 +207,11 @@ export class TunnelManager {
         if (stats2) {
           stats2.incrementTunnel('disconnections_total');
           stats2.setTunnelGauge('connections_active', this.connections.size);
+        }
+        const prom4 = getPromMetrics();
+        if (prom4) {
+          prom4.tunnelDisconnectionsTotal.inc({ reason: 'graceful' });
+          prom4.tunnelConnectionsActive.set(this.connections.size);
         }
         this.storage.updatePersonalNode(nodeId, {
           status: 'offline',
@@ -259,7 +280,9 @@ export class TunnelManager {
     }
 
     const stats = getStats();
+    const prom = getPromMetrics();
     if (stats) stats.incrementTunnel('messages_sent_total');
+    if (prom) prom.tunnelMessagesSentTotal.inc({ type: message.type });
 
     const effectiveTimeout = timeoutMs ?? this.config.personalNodeRequestTimeoutMs;
     const startTime = Date.now();
@@ -268,13 +291,18 @@ export class TunnelManager {
       const timer = setTimeout(() => {
         this.pendingResponses.delete(message.id);
         if (stats) stats.incrementTunnel('delivery_failures_total');
+        if (prom) prom.tunnelDeliveryFailuresTotal.inc();
         resolve(null);
       }, effectiveTimeout);
 
       this.pendingResponses.set(message.id, {
         resolve: (msg) => {
+          const latency = Date.now() - startTime;
           if (msg && stats) {
-            stats.recordDeliveryLatency(Date.now() - startTime);
+            stats.recordDeliveryLatency(latency);
+          }
+          if (msg && prom) {
+            prom.tunnelDeliveryLatencyMs.observe(latency);
           }
           resolve(msg);
         },
@@ -320,6 +348,12 @@ export class TunnelManager {
             stats.incrementTunnel('heartbeat_misses_total');
             stats.incrementTunnel('disconnections_total');
             stats.setTunnelGauge('connections_active', this.connections.size);
+          }
+          const promHb = getPromMetrics();
+          if (promHb) {
+            promHb.tunnelHeartbeatMissesTotal.inc();
+            promHb.tunnelDisconnectionsTotal.inc({ reason: 'heartbeat_timeout' });
+            promHb.tunnelConnectionsActive.set(this.connections.size);
           }
           this.storage.updatePersonalNode(nodeId, {
             status: 'offline',

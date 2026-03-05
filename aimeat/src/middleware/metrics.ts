@@ -14,7 +14,7 @@ export function metricsMiddleware(registry: Registry) {
 
     res.on('finish', () => {
       const duration = Date.now() - start;
-      const route = (req.route?.path as string) ?? req.path;
+      const route = (req.route?.path as string) ?? 'unmatched';
       const method = req.method;
       const status = String(res.statusCode);
 

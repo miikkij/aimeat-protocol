@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { getStats } from './stats.js';
+import { getPromMetrics } from './prometheus.js';
 
 export class MailboxService {
   constructor(
@@ -19,6 +20,8 @@ export class MailboxService {
     if (!hasRoom) {
       const stats = getStats();
       if (stats) stats.incrementMailbox('quota_rejections_total');
+      const prom = getPromMetrics();
+      if (prom) prom.mailboxQuotaRejectionsTotal.inc();
       logger.warn('Mailbox quota exceeded', { personalNodeId, sizeBytes: item.sizeBytes });
       return null;
     }
@@ -35,6 +38,8 @@ export class MailboxService {
     const created = await this.storage.createMailboxItem(record);
     const stats = getStats();
     if (stats) stats.incrementMailbox('enqueued_total');
+    const prom = getPromMetrics();
+    if (prom) prom.mailboxEnqueuedTotal.inc({ type: item.type });
     logger.info('Mailbox item queued', {
       personalNodeId,
       type: item.type,
@@ -61,6 +66,8 @@ export class MailboxService {
     if (stats && removed > 0) {
       for (let i = 0; i < removed; i++) stats.incrementMailbox('expired_total');
     }
+    const prom = getPromMetrics();
+    if (prom && removed > 0) prom.mailboxExpiredTotal.inc(removed);
     if (removed > 0) {
       logger.info(`Mailbox cleanup: removed ${removed} expired items`);
     }

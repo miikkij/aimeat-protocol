@@ -20,6 +20,7 @@ const contextFormat = winston.format((info) => {
 
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL ?? 'info',
+  defaultMeta: { node_id: process.env.AIMEAT_NODE_ID || 'aimeat-local-001-dev' },
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
@@ -28,7 +29,7 @@ export const logger = winston.createLogger({
       ? winston.format.json()
       : winston.format.combine(
         winston.format.colorize(),
-        winston.format.printf(({ timestamp, level, message, ...meta }) => {
+        winston.format.printf(({ timestamp, level, message, node_id: _nid, ...meta }) => {
           const extra = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
           return `${timestamp} ${level}: ${message}${extra}`;
         }),
