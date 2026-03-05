@@ -7,7 +7,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t as globalT } from '/js/i18n.js';
-import { copyToClipboard } from '/js/utils.js';
+import { copyToClipboard, sanitizeHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
@@ -152,12 +152,12 @@ function McpPanel({ locale }) {
       <h3>${dt('panel.mcpBadge', locale)}</h3>
       <div class="dv-instructions">
         <ol>
-          <li dangerouslySetInnerHTML=${{ __html: dt('panel.mcpStep1', locale) }}></li>
+          <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep1', locale)) }}></li>
           <li>${dt('panel.mcpStep2', locale)}<br/><code>${NODE_URL}/v1/mcp</code></li>
           <li>${dt('panel.mcpStep3', locale)}</li>
-          <li dangerouslySetInnerHTML=${{ __html: dt('panel.mcpStep4', locale) }}></li>
+          <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep4', locale)) }}></li>
         </ol>
-        <p dangerouslySetInnerHTML=${{ __html: dt('panel.mcpTools', locale) }}></p>
+        <p dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpTools', locale)) }}></p>
       </div>
     </div>
   `;
@@ -193,7 +193,7 @@ function BrowsePanel({ locale }) {
       <ul style="margin-left:1.5rem">
         <li>${dt('panel.browseUpgrade1', locale)}</li>
         <li>${dt('panel.browseUpgrade2', locale)}</li>
-        <li dangerouslySetInnerHTML=${{ __html: dt('panel.browseUpgrade3', locale) }}></li>
+        <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.browseUpgrade3', locale)) }}></li>
       </ul>
     </div>
   `;
@@ -223,7 +223,7 @@ function PromptPackagePanel({ locale, platform, variant, isLoggedIn }) {
   return html`
     <div class="dv-panel">
       <h3>${dt('panel.promptBadge', locale)}</h3>
-      <p dangerouslySetInnerHTML=${{ __html: dt('panel.promptDesc', locale) }}></p>
+      <p dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.promptDesc', locale)) }}></p>
       ${isLoggedIn
         ? html`<p style="color:var(--success);font-size:.85rem">\u2705 ${dt('panel.promptLoggedIn', locale)}</p>`
         : html`<p style="color:var(--muted);font-size:.85rem">\ud83d\udc64 ${dt('panel.promptAnon', locale)}</p>`

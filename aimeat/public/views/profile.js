@@ -714,6 +714,8 @@ export default function Profile({ navigate, locale }) {
                   <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
                 `)}
               </div>
+              ${/* SAFE: PLATFORMS is a hardcoded developer constant, not user input.
+                 sanitizeHtml excluded — h4 tags in content are not in the allowlist and would be stripped. */''}
               <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
             </div>
           `}
