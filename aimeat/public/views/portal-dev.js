@@ -194,9 +194,9 @@ function BrowsePanel({ locale, onSwitchToPromptPackage }) {
         <li>${dt('panel.browseUpgrade1', locale)}</li>
         <li>${dt('panel.browseUpgrade2', locale)}</li>
         ${(() => {
-          const text = dt('panel.browseUpgrade3');
+          const text = dt('panel.browseUpgrade3', locale);
           const parts = text.split('{{promptPackageLink}}');
-          return html`<li>${parts[0]}<a href="#" onClick=${(e) => { e.preventDefault(); onSwitchToPromptPackage(); }}>${dt('panel.promptPackageLabel')}</a>${parts[1] ?? ''}</li>`;
+          return html`<li>${parts[0]}<a href="#" onClick=${(e) => { e.preventDefault(); onSwitchToPromptPackage(); }}>${dt('panel.promptPackageLabel', locale)}</a>${parts[1] ?? ''}</li>`;
         })()}
       </ul>
     </div>
