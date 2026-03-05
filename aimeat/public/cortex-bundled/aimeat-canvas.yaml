@@ -35,7 +35,7 @@ spec:
                 lineWidth:
                   type: number
                   minimum: 1
-                  maximum: 50
+                  maximum: 20
                 opacity:
                   type: number
                   minimum: 0

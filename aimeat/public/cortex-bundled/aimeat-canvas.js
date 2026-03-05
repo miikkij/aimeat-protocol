@@ -1075,8 +1075,15 @@
 
     function redo() {
       if (redoStack.length === 0) return;
-      var stroke = redoStack.pop();
-      strokes.push(stroke);
+      var item = redoStack.pop();
+      // Handle composite clear snapshots — restore all strokes at once.
+      if (item && item._clearSnapshot) {
+        for (var i = 0; i < item._clearSnapshot.length; i++) {
+          strokes.push(item._clearSnapshot[i]);
+        }
+      } else {
+        strokes.push(item);
+      }
       redrawCanvas(ctx, canvasWidth, canvasHeight, bgColor, strokes);
       updateButtonStates();
 
@@ -1091,10 +1098,8 @@
 
     function clear() {
       if (strokes.length === 0) return;
-      // Push all current strokes to redo so user can undo the clear.
-      for (var i = strokes.length - 1; i >= 0; i--) {
-        redoStack.push(strokes[i]);
-      }
+      // Treat clear as a single composite undo operation — push snapshot.
+      redoStack.push({ _clearSnapshot: strokes.slice() });
       strokes.length = 0;
       redrawCanvas(ctx, canvasWidth, canvasHeight, bgColor, strokes);
       updateButtonStates();
@@ -1109,7 +1114,7 @@
     // -----------------------------------------------------------------------
 
     function setTool(name) {
-      if (TOOLS.indexOf(name) === -1) return;
+      if (enabledTools.indexOf(name) === -1) return;
       activeTool = name;
 
       // Update toolbar button active states.
@@ -1192,14 +1197,14 @@
         canvasSize: { width: canvasWidth, height: canvasHeight },
         backgroundColor: bgColor,
         metadata: {
-          createdAt: strokes._createdAt || new Date().toISOString(),
+          createdAt: createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
       };
 
       // Remember createdAt for subsequent saves.
-      if (!strokes._createdAt) {
-        strokes._createdAt = drawingData.metadata.createdAt;
+      if (!createdAt) {
+        createdAt = drawingData.metadata.createdAt;
       }
 
       var url = nodeUrl + '/v1/memory/' + encodeURIComponent(storageKey);
@@ -1287,7 +1292,7 @@
 
           // Restore createdAt for future saves.
           if (data.metadata && data.metadata.createdAt) {
-            strokes._createdAt = data.metadata.createdAt;
+            createdAt = data.metadata.createdAt;
           }
 
           redoStack.length = 0;
