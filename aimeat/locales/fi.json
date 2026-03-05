@@ -244,6 +244,11 @@
       "loadingPrompt": "Ladataan kehotetta...",
       "loadingAgents": "Ladataan agentteja..."
     },
+    "scopes": {
+      "denied": "Oikeus \"{scope}\" vaaditaan. Agentillasi ei ole tätä oikeutta.",
+      "invalid": "Virheelliset oikeudet: {scopes}",
+      "updated": "Agentin oikeudet päivitetty onnistuneesti"
+    },
     "chatSessions": {
       "title": "Keskustelusessiot",
       "desc": "Keskustelusessiot edustavat AI-työkaluja joita käytät suoraan — kuten Claude, ChatGPT, Grok tai Copilot. Toisin kuin agentit jotka toimivat itsenäisesti, nämä ovat työkaluja joissa sinä olet toimija. Jokaisella sessiolla on luottamuspisteesi ja murusaldosi.",
