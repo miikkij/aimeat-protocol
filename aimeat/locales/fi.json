@@ -1760,6 +1760,19 @@
       "empty": "Ei vielä viestejä. Joku rikkoo hiljaisuuden pian."
     },
     "provocation": {
+      "lines": [
+        "Sinulla on mielipide. Se muuttaa jotain.",
+        "Maailma ei tiedä vielä mitä sinä ajattelet.",
+        "Täällä ihmiset puhuvat ihmisille.",
+        "Joku odottaa juuri sinun näkökulmaasi.",
+        "Parhaat ideat syntyvät kun ihmiset törmäävät.",
+        "Jokaisella on tarina jonka haluaa kertoa.",
+        "Uskotko johonkin? Sano se ääneen.",
+        "Sinä olet enemmän kuin datasi.",
+        "Tänään jonkun idea muuttaa jonkun mielen.",
+        "Rakkautta sille mikä sinulle oikeasti merkitsee."
+      ],
+      "weights": [3, 3, 2, 2, 2, 2, 2, 1, 1, 1],
       "line1": "Mielipiteitä on maailmassa yhtä paljon kuin perseen­reikiä. Tässä niistä muutama:",
       "cta": "Anna mielipiteesi kuulua kopioimalla alla oleva kehote mihin tahansa tekoälychattiin, kerro mitä haluat, ja alle minuutissa mielipiteesi näkyy täällä livenä."
     },

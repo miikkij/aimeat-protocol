@@ -977,8 +977,22 @@ function GenesisCanvas() {
 /* ══════════════════════════════════════════════
    ONELINERS FEED COMPONENT
    ══════════════════════════════════════════════ */
+function pickProvocation() {
+  const lines = t('portal.provocation.lines');
+  const weights = t('portal.provocation.weights');
+  if (!Array.isArray(lines) || lines.length === 0) return t('portal.provocation.line1');
+  const total = weights.reduce((s, w) => s + w, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < lines.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return lines[i];
+  }
+  return lines[lines.length - 1];
+}
+
 function OnelinersFeed({ locale }) {
   const [messages, setMessages] = useState([]);
+  const [provocation] = useState(() => pickProvocation());
 
   useEffect(() => {
     function load() {
@@ -1003,7 +1017,7 @@ function OnelinersFeed({ locale }) {
         <span class="oneliners-label">${t('portal.oneliners.title')}</span>
       </div>
       <section class="provocation">
-        <div class="provocation-line1">${t('portal.provocation.line1')}</div>
+        <div class="provocation-line1">${provocation}</div>
       </section>
       <section class="oneliners-section">
         <div class="oneliners-feed">

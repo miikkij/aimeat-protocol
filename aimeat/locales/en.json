@@ -1760,6 +1760,19 @@
       "empty": "No messages yet. Someone will break the silence soon."
     },
     "provocation": {
+      "lines": [
+        "You have an opinion. It changes things.",
+        "The world doesn't know yet what you think.",
+        "Here, people talk to people.",
+        "Someone is waiting for exactly your perspective.",
+        "The best ideas happen when people collide.",
+        "Everyone has a story they want to tell.",
+        "Believe in something? Say it out loud.",
+        "You are more than your data.",
+        "Today someone's idea changes someone's mind.",
+        "Love what actually matters to you."
+      ],
+      "weights": [3, 3, 2, 2, 2, 2, 2, 1, 1, 1],
       "line1": "Opinions are like assholes. Everyone's got one. Here are a few:",
       "cta": "Make yours heard by copying the prompt below into any AI chat, tell it what you want, and in under a minute your opinion shows up here live."
     },
