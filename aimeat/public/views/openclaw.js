@@ -6,52 +6,20 @@ import { h } from 'preact';
 import { useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { copyToClipboard } from '/js/utils.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
 
 function OpenClawView() {
   const nodeUrl = window.location.origin;
 
+  useViewCSS('/css/views/openclaw.css');
+
   useEffect(() => {
     document.title = 'OpenClaw + AIMEAT | AIME AT';
   }, []);
 
   return html`
-    <style>
-      .oc-container { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
-      .oc-hero { text-align: center; padding: 3rem 0 2rem; }
-      .oc-hero h1 { font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: .75rem; }
-      .oc-hero p { font-size: 1.1rem; color: var(--text-dim); max-width: 600px; margin: 0 auto; }
-      .oc-section { margin: 3rem 0; }
-      .oc-section h2 { font-size: 1.5rem; font-weight: 700; color: var(--text-bright); margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
-      .oc-section h3 { font-size: 1.15rem; font-weight: 600; color: var(--purple); margin: 1.5rem 0 .5rem; }
-      .oc-section p, .oc-section li { color: var(--text); font-size: .95rem; margin-bottom: .5rem; }
-      .oc-section ul, .oc-section ol { padding-left: 1.5rem; }
-      .oc-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-      .oc-info-card { background: var(--card-bg); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 1.25rem; transition: background .2s; }
-      .oc-info-card:hover { background: var(--card-bg-hover); }
-      .oc-info-card .icon { font-size: 1.8rem; margin-bottom: .5rem; }
-      .oc-info-card h4 { font-size: 1rem; font-weight: 700; color: var(--text-bright); margin-bottom: .25rem; }
-      .oc-info-card p { font-size: .85rem; color: var(--text-muted); margin: 0; }
-      .oc-code-block { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-sm); padding: 1rem 1.25rem; font-family: var(--font-mono); font-size: .85rem; color: #c4b5fd; overflow-x: auto; white-space: pre; margin: 1rem 0; position: relative; }
-      .oc-code-block .label { position: absolute; top: .5rem; right: .75rem; font-size: .7rem; color: var(--text-muted); font-family: var(--font); text-transform: uppercase; letter-spacing: .05em; }
-      .oc-tool-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .85rem; }
-      .oc-tool-table th { text-align: left; padding: .6rem .75rem; font-weight: 700; color: var(--text-bright); border-bottom: 2px solid rgba(255,255,255,0.1); font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
-      .oc-tool-table td { padding: .5rem .75rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
-      .oc-tool-table tr:hover td { background: rgba(255,255,255,0.02); }
-      .oc-tool-name { color: var(--purple); font-family: monospace; font-weight: 600; white-space: nowrap; }
-      .oc-tool-params { color: var(--text-muted); font-family: monospace; font-size: .8rem; }
-      .oc-scenario { background: var(--card-bg); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius); padding: 1.5rem; margin: 1rem 0; }
-      .oc-scenario h4 { color: var(--accent); font-size: 1rem; margin-bottom: .5rem; }
-      .oc-scenario .flow { color: var(--text-dim); font-size: .9rem; }
-      .oc-scenario .flow code { color: var(--purple); background: rgba(167,139,250,.1); padding: .1rem .4rem; border-radius: 4px; }
-      .oc-cta-section { text-align: center; margin: 3rem 0 1rem; padding: 2rem; background: rgba(124,58,237,.08); border: 1px solid rgba(124,58,237,.2); border-radius: var(--radius); }
-      .oc-cta-section h3 { color: var(--text-bright); margin-bottom: .75rem; }
-      .oc-cta-btn { display: inline-block; padding: .7rem 1.5rem; background: linear-gradient(135deg, var(--accent), #a855f7); color: #fff; font-weight: 700; font-size: .95rem; border: none; border-radius: var(--radius-sm); text-decoration: none; cursor: pointer; transition: transform .15s, box-shadow .15s; }
-      .oc-cta-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px var(--accent-glow); }
-      @media (max-width: 600px) { .oc-hero h1 { font-size: 1.6rem; } .oc-container { padding: 1rem 1rem 3rem; } .oc-card-grid { grid-template-columns: 1fr; } }
-    </style>
-
     <div class="oc-container">
       <div class="oc-hero">
         <h1>OpenClaw + AIMEAT</h1>

@@ -7,6 +7,7 @@ import { h } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { copyToClipboard } from '/js/utils.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
 
@@ -162,6 +163,8 @@ function AimeatOsView() {
   const nodeUrl = window.location.origin;
   const today = new Date().toISOString().split('T')[0];
 
+  useViewCSS('/css/views/aimeat-os.css');
+
   useEffect(() => {
     document.title = 'AIMEAT-OS | Operating System Guide for AI App Builders';
   }, []);
@@ -171,39 +174,6 @@ function AimeatOsView() {
   };
 
   return html`
-    <style>
-      .os-wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
-      .os-wrap h2 { font-size: 1.5rem; font-weight: 700; color: var(--text-bright); margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border, rgba(255,105,180,.2)); letter-spacing: -.01em; }
-      .os-wrap h3 { font-size: 1.15rem; font-weight: 600; color: var(--text-bright); margin: 2rem 0 .75rem; }
-      .os-wrap h4 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 .5rem; }
-      .os-wrap p { margin-bottom: 1rem; color: var(--text); }
-      .os-wrap ul, .os-wrap ol { margin: .75rem 0 1rem 1.5rem; }
-      .os-wrap li { margin-bottom: .35rem; color: var(--text); }
-      .os-wrap strong { color: var(--text-bright); }
-      .os-wrap hr { border: none; border-top: 1px solid rgba(255,105,180,.2); margin: 2.5rem 0; }
-      .os-wrap code { background: rgba(255,255,255,.06); padding: .15em .45em; border-radius: 4px; color: var(--accent); font-size: .88em; font-family: 'Fira Code','Cascadia Code','SF Mono',monospace; }
-      .os-wrap pre { background: rgba(0,0,0,.4); border: 1px solid rgba(255,105,180,.2); border-radius: var(--radius-sm); padding: 1.25rem; margin: 1rem 0 1.5rem; overflow-x: auto; position: relative; }
-      .os-wrap pre code { background: none; padding: 0; color: var(--text); font-size: .85rem; line-height: 1.6; }
-      .os-copy-btn { position: absolute; top: .5rem; right: .5rem; background: var(--card-bg); border: 1px solid rgba(255,105,180,.2); border-radius: 6px; color: var(--text-muted); padding: .25rem .5rem; font-size: .75rem; cursor: pointer; opacity: 0; transition: opacity .2s; }
-      pre:hover .os-copy-btn { opacity: 1; }
-      .os-copy-btn:hover { color: var(--accent); border-color: var(--accent); }
-      .os-wrap table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: .9rem; }
-      .os-wrap th { background: rgba(255,105,180,.08); color: var(--text-bright); font-weight: 600; text-align: left; padding: .75rem 1rem; border-bottom: 2px solid rgba(255,105,180,.2); }
-      .os-wrap td { padding: .6rem 1rem; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--text); }
-      .os-wrap td code { font-size: .82em; }
-      .os-wrap tr:hover td { background: rgba(255,255,255,.02); }
-      .os-wrap blockquote { background: var(--card-bg); border-left: 3px solid var(--accent); padding: 1rem 1.25rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: var(--text); }
-      .os-wrap blockquote p { margin-bottom: .25rem; }
-      .os-wrap blockquote p:last-child { margin-bottom: 0; }
-      .os-doc-header { text-align: center; margin-bottom: 2.5rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(255,105,180,.2); }
-      .os-doc-header h1 { font-size: 2rem; font-weight: 700; color: var(--text-bright); margin-bottom: 1rem; letter-spacing: -.02em; }
-      .os-meta-info { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem; color: var(--text-muted); font-size: .9rem; }
-      .os-copy-all-btn { display: inline-flex; align-items: center; gap: .5rem; margin-top: 1.5rem; padding: .6rem 1.2rem; background: var(--card-bg); border: 1px solid rgba(255,105,180,.2); border-radius: var(--radius-sm); color: var(--accent); font-size: .9rem; cursor: pointer; transition: all .2s; }
-      .os-copy-all-btn:hover { background: var(--card-bg-hover); border-color: var(--accent); }
-      .os-doc-footer { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid rgba(255,105,180,.2); color: var(--text-muted); font-size: .85rem; font-style: italic; }
-      @media (max-width: 600px) { .os-wrap { padding: 1rem 1rem 3rem; } .os-doc-header h1 { font-size: 1.5rem; } .os-wrap h2 { font-size: 1.25rem; } .os-wrap table { font-size: .8rem; } .os-wrap th, .os-wrap td { padding: .5rem .6rem; } .os-wrap pre { padding: .75rem; font-size: .8rem; } }
-    </style>
-
     <div class="os-wrap">
       <!-- Header -->
       <div class="os-doc-header">

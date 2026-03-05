@@ -1,0 +1,484 @@
+/* portal-classic view — scoped under .cl */
+/* ── Hero Section ── */
+.cl-hero {
+  text-align: center;
+  padding: 4rem 0 3rem;
+}
+.cl-hero-title {
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  font-weight: 800;
+  color: var(--text-bright, #fff);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+}
+.cl-hero-subtitle {
+  font-size: clamp(1rem, 2.5vw, 1.15rem);
+  color: var(--text, #e0e0e0);
+  max-width: 540px;
+  margin: 0 auto;
+  line-height: 1.7;
+  opacity: 0.85;
+}
+
+/* ── Anonymous banner ── */
+.cl-anon-banner {
+  text-align: center;
+  padding: 0.65rem 1rem;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: #c4b5fd;
+  margin-bottom: 1.5rem;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ── Welcome Board ── */
+.cl-welcome-section {
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.06), rgba(124, 58, 237, 0.06));
+  border: 1px solid rgba(255, 105, 180, 0.15);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.cl-welcome-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-bright, #fff);
+  margin-bottom: 0.25rem;
+}
+.cl-welcome-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-dim, #888);
+  margin-bottom: 1rem;
+}
+.cl-board-messages { margin-bottom: 1rem; }
+.cl-board-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.cl-board-empty {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted, #6b6b8a);
+  font-style: italic;
+}
+.cl-board-msg {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.88rem;
+  color: var(--text, #e0e0e0);
+  line-height: 1.5;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.cl-board-msg:last-child { border-bottom: none; }
+.cl-board-msg-text { flex: 1; word-break: break-word; }
+.cl-board-msg-time {
+  font-size: 0.7rem;
+  color: var(--text-muted, #6b6b8a);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cl-welcome-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.cl-memory-input {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--text-bright, #fff);
+  font-size: 0.95rem;
+  font-family: var(--font, system-ui, sans-serif);
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  resize: none;
+}
+.cl-memory-input:focus {
+  border-color: var(--accent, #ff69b4);
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.3);
+  background: rgba(255, 255, 255, 0.07);
+}
+.cl-memory-input::placeholder { color: var(--text-muted, #6b6b8a); }
+.cl-welcome-result {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #22c55e;
+  animation: cl-fadeSlideIn 0.3s ease;
+}
+
+/* ── Save / Submit Button ── */
+.cl-save-btn {
+  padding: 0.7rem 1.6rem;
+  background: linear-gradient(135deg, var(--accent, #ff69b4), var(--accent-deep, #c44569));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: var(--font, system-ui, sans-serif);
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+}
+.cl-save-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+}
+.cl-save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.cl-save-btn.loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+.cl-save-btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 18px; height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cl-spin 0.6s linear infinite;
+}
+.cl-register-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+}
+.cl-register-btn:hover {
+  box-shadow: 0 6px 25px rgba(34, 197, 94, 0.4);
+}
+
+/* ── Cards Grid ── */
+.cl-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (min-width: 768px) {
+  .cl-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    max-width: 800px;
+  }
+  .cl-card.expanded { grid-column: 1 / -1; }
+  .cl-card-header { flex-direction: column; text-align: center; padding: 1.5rem 1.25rem 1.25rem; }
+  .cl-card-text { text-align: center; }
+  .cl-card-arrow { align-self: center; }
+  .cl-card.expanded .cl-card-header { flex-direction: row; text-align: left; }
+  .cl-card.expanded .cl-card-text { text-align: left; }
+}
+
+/* ── Card ── */
+.cl-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 105, 180, 0.15);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease;
+  cursor: pointer;
+}
+.cl-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 105, 180, 0.4);
+  box-shadow: 0 0 30px rgba(255, 105, 180, 0.08), 0 8px 32px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+.cl-card.expanded {
+  border-color: var(--accent, #ff69b4);
+  box-shadow: 0 0 40px rgba(255, 105, 180, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.cl-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+.cl-card-icon {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(196, 69, 105, 0.15));
+  border: 1px solid rgba(255, 105, 180, 0.2);
+}
+.cl-card-text { flex: 1; min-width: 0; }
+.cl-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-bright, #fff);
+  margin-bottom: 0.15rem;
+}
+.cl-card-tagline {
+  font-size: 0.88rem;
+  color: var(--text-dim, #888);
+}
+.cl-card-arrow {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim, #888);
+  font-size: 0.75rem;
+  transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
+}
+.cl-card.expanded .cl-card-arrow {
+  transform: rotate(180deg);
+  background: rgba(255, 105, 180, 0.15);
+  color: var(--accent, #ff69b4);
+}
+
+.cl-card-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94), padding 0.35s ease;
+  padding: 0 1.5rem;
+}
+.cl-card.expanded .cl-card-body {
+  max-height: 3000px;
+  padding: 0 1.5rem 1.5rem;
+}
+
+.cl-card-desc {
+  font-size: 0.92rem;
+  color: #ccc;
+  line-height: 1.7;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Group accent colors ── */
+.cl-group-me .cl-card-icon {
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(196, 69, 105, 0.15));
+  border-color: rgba(255, 105, 180, 0.2);
+}
+.cl-group-agents .cl-card-icon {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
+  border-color: rgba(99, 102, 241, 0.2);
+}
+.cl-group-agents.expanded {
+  border-color: #6366f1;
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.cl-group-builders .cl-card-icon {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.15));
+  border-color: rgba(34, 197, 94, 0.2);
+}
+.cl-group-builders.expanded {
+  border-color: #22c55e;
+  box-shadow: 0 0 40px rgba(34, 197, 94, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Starter hints ── */
+.cl-starter-hint {
+  font-size: 0.88rem;
+  color: var(--accent, #ff69b4);
+  margin-bottom: 1.25rem;
+  font-style: italic;
+}
+
+/* ── Mega-prompt section ── */
+.cl-mega-prompt-section { margin-top: 1.25rem; }
+.cl-prompt-box {
+  width: 100%;
+  min-height: 200px;
+  max-height: 400px;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--text, #e0e0e0);
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+}
+.cl-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+.cl-copy-prompt-btn {
+  padding: 0.6rem 1.4rem;
+  background: linear-gradient(135deg, var(--accent, #ff69b4), var(--accent-deep, #c44569));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+  font-family: var(--font, system-ui, sans-serif);
+}
+.cl-copy-prompt-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+}
+.cl-prompt-lang-note {
+  font-size: 0.8rem;
+  color: var(--text-muted, #6b6b8a);
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+.cl-beginner-tip {
+  font-size: 0.85rem;
+  color: var(--accent, #ff69b4);
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+.cl-prompt-steps {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  color: #aaa;
+  line-height: 1.7;
+}
+.cl-prompt-steps ol { padding-left: 1.2rem; }
+
+/* ── Catalog links ── */
+.cl-catalog-links {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.cl-launcher-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.25rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 10px;
+  color: var(--text-bright, #fff);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.cl-launcher-cta:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+  transform: translateY(-1px);
+}
+.cl-launcher-cta.secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.15);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.45rem 1rem;
+}
+.cl-launcher-cta.secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+/* ── Return / upload section ── */
+.cl-return-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 12px;
+}
+.cl-return-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  color: #e0e0e0;
+}
+.cl-return-motivation {
+  font-size: 0.85rem;
+  color: #bbb;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Connect section ── */
+.cl-connect-section {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 12px;
+}
+.cl-connect-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  color: #e0e0e0;
+}
+.cl-connect-desc {
+  font-size: 0.88rem;
+  color: #bbb;
+  margin-bottom: 0.75rem;
+}
+.cl-connect-link {
+  color: #a78bfa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 0.9rem;
+}
+.cl-connect-link:hover { color: #c4b5fd; }
+
+/* ── Morsels economy footer ── */
+.cl-morsels-economy {
+  text-align: center;
+  padding: 2rem 0 3.5rem;
+  font-size: 0.85rem;
+  color: var(--text-dim, #888);
+  line-height: 1.7;
+  max-width: 540px;
+  margin: 0 auto;
+}
+.cl-heart-icon {
+  display: inline-block;
+  color: var(--accent, #ff69b4);
+  font-size: 0.9rem;
+  margin: 0 0.15rem;
+  animation: cl-heartPulse 2s ease-in-out infinite;
+}
+
+/* ── Animations ── */
+@keyframes cl-fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes cl-spin { to { transform: rotate(360deg); } }
+@keyframes cl-heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
