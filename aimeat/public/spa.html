@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="aimeat-node" content="">
+  <title>AIMEAT</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#050510">
+  <link rel="stylesheet" href="/css/theme.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "preact": "https://esm.sh/preact@10.25.4",
+      "preact/": "https://esm.sh/preact@10.25.4/",
+      "htm": "https://esm.sh/htm@3.1.1"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- Background -->
+  <div class="bg-canvas" id="bgCanvas"></div>
+
+  <!-- App root (Preact mounts here) -->
+  <div id="app"></div>
+
+  <script type="module">
+    import { h, render } from 'preact';
+    import { useState, useEffect, useCallback } from 'preact/hooks';
+    import htm from 'htm';
+    import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
+    import { generateStars } from '/js/utils.js';
+
+    const html = htm.bind(h);
+
+    // ── Route definitions ──
+    const ROUTES = {
+      '/v1/portal':      () => import('/views/portal.js'),
+      '/v1/profile':     () => import('/views/profile.js'),
+      '/v1/guides':      () => import('/views/guides.js'),
+      '/v1/hobbies':     () => import('/views/hobbies.js'),
+      '/v1/marketplace': () => import('/views/marketplace.js'),
+      '/v1/aimeat-os':   () => import('/views/aimeat-os.js'),
+      '/v1/openclaw':    () => import('/views/openclaw.js'),
+      '/v1/classic':     () => import('/views/portal-classic.js'),
+    };
+
+    // Match route, handling query params for special views
+    function matchRoute(pathname, search) {
+      // Dev portal is ?view=dev on /v1/portal
+      if (pathname === '/v1/portal' && search.includes('view=dev')) {
+        return () => import('/views/portal-dev.js');
+      }
+      return ROUTES[pathname] || ROUTES['/v1/portal'];
+    }
+
+    // ── App Component ──
+    function App() {
+      const [View, setView] = useState(null);
+      const [locale, setLocale] = useState(getLocale());
+
+      // Navigate to a route
+      const navigate = useCallback(async (path, replace = false) => {
+        const url = new URL(path, window.location.origin);
+        const loader = matchRoute(url.pathname, url.search);
+        
+        if (replace) {
+          history.replaceState(null, '', path);
+        } else {
+          history.pushState(null, '', path);
+        }
+        
+        try {
+          const mod = await loader();
+          setView(() => mod.default);
+        } catch (err) {
+          console.error('Failed to load view:', err);
+        }
+      }, []);
+
+      // Initial load + popstate
+      useEffect(() => {
+        // Load initial route
+        const path = location.pathname + location.search;
+        navigate(path, true);
+
+        // Handle back/forward
+        const onPopState = () => {
+          const p = location.pathname + location.search;
+          const loader = matchRoute(location.pathname, location.search);
+          loader().then(mod => setView(() => mod.default));
+        };
+        window.addEventListener('popstate', onPopState);
+
+        // Intercept internal link clicks for SPA navigation
+        const onClick = (e) => {
+          const a = e.target.closest('a[href]');
+          if (!a) return;
+          const href = a.getAttribute('href');
+          // Only intercept internal /v1/ links
+          if (!href || !href.startsWith('/v1/')) return;
+          if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+          e.preventDefault();
+          navigate(href);
+        };
+        document.addEventListener('click', onClick);
+
+        return () => {
+          window.removeEventListener('popstate', onPopState);
+          document.removeEventListener('click', onClick);
+        };
+      }, [navigate]);
+
+      // Listen for locale changes
+      useEffect(() => {
+        return onLocaleChange((loc) => setLocale(loc));
+      }, []);
+
+      return html`
+        <${Header} navigate=${navigate} locale=${locale} />
+        <div class="page-content">
+          ${View ? html`<${View} navigate=${navigate} locale=${locale} />` : html`<div class="empty"><div class="spinner"></div></div>`}
+        </div>
+      `;
+    }
+
+    // ── Header Component ──
+    function Header({ navigate, locale }) {
+      const [session, setSession] = useState(null);
+      const [morsels, setMorsels] = useState(null);
+
+      // Check auth state
+      useEffect(() => {
+        const checkAuth = () => {
+          if (window.AIMEAT?.auth?.hasSession) {
+            const s = window.AIMEAT.auth.getSession();
+            setSession(s);
+          } else {
+            setSession(null);
+          }
+        };
+        checkAuth();
+        // Re-check when auth lib fires events
+        window.addEventListener('aimeat-auth-change', checkAuth);
+        return () => window.removeEventListener('aimeat-auth-change', checkAuth);
+      }, []);
+
+      // Fetch morsels when session is available
+      useEffect(() => {
+        if (!session) { setMorsels(null); return; }
+        fetch('/v1/wallet', {
+          headers: { 'Authorization': 'Bearer ' + session.jwt }
+        })
+          .then(r => r.json())
+          .then(d => { if (d.ok) setMorsels(d.data?.balance ?? null); })
+          .catch(() => {});
+      }, [session]);
+
+      const handleLangSwitch = (lang) => {
+        switchLocale(lang);
+      };
+
+      const handleNav = (e, path) => {
+        e.preventDefault();
+        navigate(path);
+      };
+
+      const currentPath = location.pathname;
+
+      return html`
+        <nav class="topnav">
+          <a href="/v1/portal" class="topnav-brand" onClick=${(e) => handleNav(e, '/v1/portal')}>
+            <span class="heart">\u{1F496}</span>
+            <span class="brand-name">AIME AT</span>
+            ${morsels !== null && html`<span class="brand-morsels" style="display:inline">${morsels} ❤️</span>`}
+          </a>
+
+          <div class="topnav-right">
+            <a href="/v1/classic" onClick=${(e) => handleNav(e, '/v1/classic')}>${t('nav.try')}</a>
+            <a href="/v1/portal?view=dev" onClick=${(e) => handleNav(e, '/v1/portal?view=dev')}>${t('nav.devView')}</a>
+            ${session && html`
+              <a href="/v1/profile" class="profile-link visible" onClick=${(e) => handleNav(e, '/v1/profile')}>
+                ${t('nav.profile')}
+              </a>
+            `}
+            <div class="topnav-center">
+              <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
+              <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
+            </div>
+            <span class="header-auth-slot" id="headerAuth"></span>
+          </div>
+        </nav>
+      `;
+    }
+
+    // ── Bootstrap ──
+    async function boot() {
+      // Generate background stars
+      const bg = document.getElementById('bgCanvas');
+      if (bg) generateStars(bg, 80);
+
+      // Load translations
+      await loadTranslations();
+
+      // Load auth library (served from /v1/libs/aimeat-auth.js)
+      await new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = '/v1/libs/aimeat-auth.js';
+        script.onload = resolve;
+        script.onerror = resolve; // Continue even if auth fails
+        document.head.appendChild(script);
+      });
+
+      // Mount Preact app
+      render(html`<${App} />`, document.getElementById('app'));
+
+      // Mount auth button after Preact renders
+      requestAnimationFrame(() => {
+        const authSlot = document.getElementById('headerAuth');
+        if (authSlot && window.AIMEAT?.auth?.mountLoginButton) {
+          window.AIMEAT.auth.mountLoginButton(authSlot, {
+            onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+            onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+          });
+        }
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>
