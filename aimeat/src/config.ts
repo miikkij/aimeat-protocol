@@ -199,6 +199,10 @@ export interface AimeatConfig {
   statsEnabled: boolean;
   statsAccess: 'public' | 'authenticated' | 'operator';
 
+  // Scoped Agent Capabilities (REQ-006)
+  defaultAgentScopes: string[];
+  maxAgentScopes: string[];
+
   // Node Extensions (V8 Isolates)
   extensionsEnabled: boolean;
   extensionMaxMemoryMb: number;
@@ -363,6 +367,10 @@ export function loadConfig(): AimeatConfig {
     autoHideThreshold: parseInt(process.env.AIMEAT_AUTO_HIDE_THRESHOLD ?? '5', 10),
     statsEnabled: process.env.AIMEAT_STATS_ENABLED !== 'false',
     statsAccess: (process.env.AIMEAT_STATS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'public',
+
+    // Scoped Agent Capabilities (REQ-006)
+    defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,catalogue:read').split(',').map(s => s.trim()),
+    maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
 
     // Node Extensions (V8 Isolates)
     extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED === 'true',

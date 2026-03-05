@@ -26,6 +26,7 @@ export interface AgentRecord {
   createdAt: string;
   lastSeen: string;
   semantic?: SemanticAnnotation;  // Phase 0.7b
+  defaultScopes?: string[];      // REQ-006 — scopes assigned at registration
 }
 
 export interface MemoryRecord {
