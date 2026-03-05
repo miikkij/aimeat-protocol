@@ -633,13 +633,14 @@ function GenesisCanvas() {
             map2[r * cols + c2] = Math.min(px2[(ty2 * TW + tx2) * 4] / 255, 1.0);
           }
         if (mode === 'idle') {
-          const bt1 = '[ CLICK TO PLAY ]';
-          drawBitmapText(bt1, centeredX(bt1, cols), Math.round(rows * 0.83), map2, cols);
+          // Easter egg — hidden intentionally. Let users discover it themselves.
+          // const bt1 = '[ CLICK TO PLAY ]';
+          // drawBitmapText(bt1, centeredX(bt1, cols), Math.round(rows * 0.83), map2, cols);
         } else {
           const dt1 = '// SNAKE DESTROYED //';
-          const dt2 = '[ CLICK TO RESTART ]';
           drawBitmapText(dt1, centeredX(dt1, cols), Math.round(rows * 0.78), map2, cols);
-          drawBitmapText(dt2, centeredX(dt2, cols), Math.round(rows * 0.90), map2, cols);
+          // const dt2 = '[ CLICK TO RESTART ]';
+          // drawBitmapText(dt2, centeredX(dt2, cols), Math.round(rows * 0.90), map2, cols);
         }
         return map2;
       }
