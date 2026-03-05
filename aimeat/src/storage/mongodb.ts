@@ -40,6 +40,7 @@ import type {
     SiteChangeLogEntry,
     ExtensionRecord,
     EscrowHoldRecord,
+    CortexExtensionRecord,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -2365,6 +2366,54 @@ export class MongoStorage implements Storage {
         } catch {
             return null;
         }
+    }
+
+    // ── Cortex Extensions (Manifest-based) ── (in-memory fallback, no Prisma model yet)
+
+    private cortexExtensions = new Map<string, CortexExtensionRecord>();
+    private cortexLibFiles = new Map<string, string>();
+
+    async createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord> {
+        if (this.cortexExtensions.has(record.name)) {
+            throw new Error(`Cortex extension "${record.name}" already exists`);
+        }
+        this.cortexExtensions.set(record.name, record);
+        return record;
+    }
+
+    async getCortexExtension(name: string): Promise<CortexExtensionRecord | null> {
+        return this.cortexExtensions.get(name) ?? null;
+    }
+
+    async listCortexExtensions(opts?: { status?: string; namespace?: string }): Promise<CortexExtensionRecord[]> {
+        let results = [...this.cortexExtensions.values()];
+        if (opts?.status) results = results.filter(e => e.status === opts.status);
+        if (opts?.namespace) results = results.filter(e => e.namespace === opts.namespace);
+        return results;
+    }
+
+    async updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null> {
+        const existing = this.cortexExtensions.get(name);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates };
+        this.cortexExtensions.set(name, updated);
+        return updated;
+    }
+
+    async deleteCortexExtension(name: string): Promise<boolean> {
+        return this.cortexExtensions.delete(name);
+    }
+
+    async setCortexLibFile(extName: string, libName: string, content: string): Promise<void> {
+        this.cortexLibFiles.set(`${extName}::${libName}`, content);
+    }
+
+    async getCortexLibFile(extName: string, libName: string): Promise<string | null> {
+        return this.cortexLibFiles.get(`${extName}::${libName}`) ?? null;
+    }
+
+    async deleteCortexLibFile(extName: string, libName: string): Promise<boolean> {
+        return this.cortexLibFiles.delete(`${extName}::${libName}`);
     }
 }
 
