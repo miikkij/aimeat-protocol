@@ -1859,3 +1859,153 @@ function RateModal({ desc, onSubmit, onCancel }) {
       </div>
     </div>`;
 }
+
+function ScopesModal({ agent, session, onSave, onCancel }) {
+  const scopes = agent.default_scopes ?? ['*'];
+
+  function expandScopes(scopeList) {
+    const set = new Set();
+    if (scopeList.includes('*')) {
+      for (const d of SCOPE_DOMAINS) {
+        for (const p of d.permissions) set.add(`${d.key}:${p}`);
+      }
+      return set;
+    }
+    for (const s of scopeList) {
+      const [domain, perm] = s.split(':');
+      if (perm === '*') {
+        const domDef = SCOPE_DOMAINS.find(d => d.key === domain);
+        if (domDef) domDef.permissions.forEach(p => set.add(`${domain}:${p}`));
+      } else {
+        set.add(s);
+      }
+    }
+    return set;
+  }
+
+  const [checked, setChecked] = useState(() => expandScopes(scopes));
+  const [advanced, setAdvanced] = useState(() => detectTemplate(scopes) === 'custom');
+  const [saving, setSaving] = useState(false);
+  const currentTemplate = detectTemplate([...checked]);
+
+  function applyTemplate(name) {
+    if (name === 'full') {
+      const all = new Set();
+      for (const d of SCOPE_DOMAINS) {
+        for (const p of d.permissions) all.add(`${d.key}:${p}`);
+      }
+      setChecked(all);
+    } else {
+      setChecked(new Set(SCOPE_TEMPLATES[name] || []));
+    }
+  }
+
+  function toggleScope(scope) {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(scope)) next.delete(scope);
+      else next.add(scope);
+      return next;
+    });
+  }
+
+  function toggleDomain(domain) {
+    const domDef = SCOPE_DOMAINS.find(d => d.key === domain);
+    if (!domDef) return;
+    const domScopes = domDef.permissions.map(p => `${domain}:${p}`);
+    const allChecked = domScopes.every(s => checked.has(s));
+    setChecked(prev => {
+      const next = new Set(prev);
+      domScopes.forEach(s => allChecked ? next.delete(s) : next.add(s));
+      return next;
+    });
+  }
+
+  function buildScopesArray() {
+    const arr = [...checked];
+    const allScopes = SCOPE_DOMAINS.flatMap(d => d.permissions.map(p => `${d.key}:${p}`));
+    if (allScopes.every(s => checked.has(s))) return ['*'];
+    return arr.length > 0 ? arr : ['catalogue:read'];
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await onSave(agent.name, buildScopesArray());
+    setSaving(false);
+  }
+
+  const isReadOnly = !(session.roles?.includes('owner') || session.roles?.includes('operator'));
+
+  return html`
+    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
+      <div class="modal scope-modal">
+        <h3>${t('profile.agents.scopeUi.scopeProfile')}: ${escHtml(agent.display_name || agent.name)}</h3>
+        <div class="scope-agent-info">${escHtml(agent.gaii || '')}</div>
+
+        ${isReadOnly ? html`
+          <p style="color:var(--muted);margin-bottom:1rem;font-size:.85rem">${t('profile.agents.scopeUi.readOnlyView')}</p>
+          <div class="scope-readonly-list">
+            ${scopes.map(s => html`<span class="scope-tag">${escHtml(s)}</span>`)}
+          </div>
+          <div class="form-actions" style="margin-top:1.5rem">
+            <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
+          </div>
+        ` : html`
+          <div class="scope-templates">
+            ${['readonly', 'standard', 'full'].map(tpl => html`
+              <button class="scope-tpl-btn ${currentTemplate === tpl ? 'active' : ''}"
+                      onClick=${() => applyTemplate(tpl)}>
+                ${templateLabel(tpl)}
+              </button>
+            `)}
+          </div>
+
+          <button class="scope-advanced-toggle" onClick=${() => setAdvanced(!advanced)}>
+            <span>${t('profile.agents.scopeUi.advanced')}</span>
+            <span style="transition:transform .2s;${advanced ? 'transform:rotate(180deg)' : ''}">\u25BC</span>
+          </button>
+
+          ${advanced && html`
+            <div class="scope-domains">
+              ${SCOPE_DOMAINS.map(d => {
+                const domScopes = d.permissions.map(p => `${d.key}:${p}`);
+                const allChecked = domScopes.every(s => checked.has(s));
+                const isCatalogue = d.key === 'catalogue';
+                return html`
+                  <div class="scope-domain">
+                    <div class="scope-domain-header" onClick=${() => !isCatalogue && toggleDomain(d.key)}>
+                      <span class="domain-label">${domainLabel(d.key)}</span>
+                      ${!isCatalogue && html`<span class="domain-toggle">${allChecked ? '\u2611 all' : '\u2610'}</span>`}
+                    </div>
+                    ${d.permissions.map(p => {
+                      const scope = `${d.key}:${p}`;
+                      const isLocked = isCatalogue && p === 'read';
+                      return html`
+                        <div class="scope-row ${isLocked ? 'disabled' : ''}">
+                          <label>
+                            <input type="checkbox"
+                              checked=${checked.has(scope) || isLocked}
+                              onChange=${() => !isLocked && toggleScope(scope)}
+                              disabled=${isLocked}
+                            />
+                            <span class="scope-friendly">${permLabel(p)}</span>
+                            <span class="scope-technical">${scope}</span>
+                            ${isLocked && html`<span class="scope-lock" title=${t('profile.agents.scopeUi.alwaysOn')}>\uD83D\uDD12</span>`}
+                          </label>
+                        </div>`;
+                    })}
+                  </div>`;
+              })}
+            </div>
+          `}
+
+          <div class="form-actions" style="margin-top:1.25rem">
+            <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
+              ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
+            </button>
+            <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
+          </div>
+        `}
+      </div>
+    </div>`;
+}
