@@ -48,6 +48,14 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Manifest size limit (reuse lib size config as reasonable upper bound)
+    const manifestSizeKb = Buffer.byteLength(manifest, 'utf-8') / 1024;
+    if (manifestSizeKb > config.cortexMaxLibSizeKb) {
+      res.status(413).json(error(config.nodeId, 'MANIFEST_TOO_LARGE',
+        `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB`));
+      return;
+    }
+
     // Check install limit
     const existing = await storage.listCortexExtensions();
     if (existing.length >= config.cortexMaxInstalled) {
@@ -182,8 +190,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Remove seed-data entries (uninstall removes them, unlike deactivation)
+    // Use ext.installedBy since seed-data was created with that GAII as ownerGaii
     for (const key of ext.activationArtifacts.seedDataKeys) {
-      await storage.deleteMemory(req.auth!.sub, key);
+      await storage.deleteMemory(ext.installedBy, key);
     }
 
     // Remove lib files
@@ -371,6 +380,13 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     const libFile = req.params.libFile as string;
 
+    // Only serve libs from active extensions
+    const ext = await storage.getCortexExtension(name);
+    if (!ext || ext.status !== 'active') {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found or not active`));
+      return;
+    }
+
     const content = await storage.getCortexLibFile(name, libFile);
     if (!content) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Lib file "${libFile}" not found for extension "${name}"`));
@@ -413,7 +429,7 @@ async function activateExtension(
           keyPattern: comp.key_pattern,
           applyTo: comp.apply_to,
           schemaJson: comp.schema,
-          schemaMode: 'open',
+          schemaMode: 'strict',
           lockedBy: gaii,
           setAt: now,
           updatedAt: now,
