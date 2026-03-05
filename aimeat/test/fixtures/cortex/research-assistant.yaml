@@ -1,0 +1,116 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: research-assistant
+  namespace: test
+  description: "Research workflow assistant with academic domain ontology and structured prompts"
+  author: test
+  tags: [research, academic, knowledge, citations]
+  labels:
+    domain: academia
+
+spec:
+  version: "1.0.0"
+  components:
+    # ── Prompt ────────────────────────────────────────────────
+    - type: prompt
+      name: research-guide
+      content: |
+        You are a research assistant on an AIMEAT node at {{node_url}}.
+        You help users organise academic research: finding papers,
+        summarising key findings, identifying gaps, and structuring
+        literature reviews.
+
+        Use the ontology concepts to classify papers by methodology,
+        field, and publication type. When a user shares a paper reference,
+        extract and store metadata under the "paper:" memory prefix.
+
+        Guidelines:
+        - Always cite sources with author, year, and title
+        - Distinguish between primary research and review articles
+        - Flag potential methodological concerns
+        - Suggest related work based on ontology relationships
+      variables:
+        - "{{node_url}}"
+
+    # ── Ontology ──────────────────────────────────────────────
+    - type: ontology
+      name: academic-domains
+      description: "Academic research domain taxonomy covering fields, methodologies, and publication types"
+      concepts:
+        research_field:
+          label:
+            en: Research Field
+            fi: Tutkimusala
+          properties:
+            - scope
+            - interdisciplinary
+          values:
+            - computer_science
+            - biology
+            - physics
+            - psychology
+            - economics
+            - sociology
+            - medicine
+            - engineering
+
+        methodology:
+          label:
+            en: Research Methodology
+            fi: Tutkimusmenetelm\u00e4
+          broader: research_field
+          properties:
+            - data_type
+            - sample_size_range
+          values:
+            - quantitative_experimental
+            - qualitative_interview
+            - mixed_methods
+            - systematic_review
+            - meta_analysis
+            - case_study
+            - simulation
+            - survey
+
+        publication_type:
+          label:
+            en: Publication Type
+            fi: Julkaisutyyppi
+          properties:
+            - peer_reviewed
+            - open_access
+          values:
+            - journal_article
+            - conference_paper
+            - preprint
+            - thesis
+            - book_chapter
+            - technical_report
+            - working_paper
+
+        evidence_level:
+          label:
+            en: Evidence Level
+            fi: N\u00e4ytt\u00f6taso
+          broader: methodology
+          related_to: [publication_type]
+          values:
+            - meta_analysis_sr
+            - randomised_controlled
+            - cohort_study
+            - case_control
+            - expert_opinion
+
+        research_phase:
+          label:
+            en: Research Phase
+            fi: Tutkimusvaihe
+          values:
+            - literature_review
+            - hypothesis_formation
+            - data_collection
+            - analysis
+            - writing
+            - peer_review
+            - publication

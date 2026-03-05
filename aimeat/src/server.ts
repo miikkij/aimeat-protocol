@@ -80,6 +80,7 @@ import { initStats } from './services/stats.js';
 import { statsMiddleware } from './middleware/stats.js';
 import { statsRouter } from './routes/stats.js';
 import { extensionsRouter } from './routes/extensions.js';
+import { cortexRouter } from './routes/cortex.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -509,6 +510,12 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   if (config.extensionsEnabled) {
     app.use(extensionsRouter(config, storage));
     logger.info('Extension system enabled');
+  }
+
+  // Cortex Extensions (Manifest-based)
+  if (config.cortexEnabled) {
+    app.use(cortexRouter(config, storage));
+    logger.info('Cortex extension system enabled');
   }
 
   // Genesis Sync Scheduler (Phase 3.4)

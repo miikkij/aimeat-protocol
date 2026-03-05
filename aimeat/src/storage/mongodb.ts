@@ -40,6 +40,7 @@ import type {
     SiteChangeLogEntry,
     ExtensionRecord,
     EscrowHoldRecord,
+    CortexExtensionRecord,
 } from './interface.js';
 
 // Prisma client will be imported dynamically at runtime
@@ -1393,7 +1394,7 @@ export class MongoStorage implements Storage {
         const exact = this.schemas.get(`exact:${memoryKey}`);
         if (exact) return exact;
 
-        // 2. Wildcard pattern match — supports profile.*.interests style
+        // 2. Wildcard pattern match — supports profile.*.interests style (dot-separated)
         let bestWildcard: SchemaRecord | null = null;
         let bestSegments = 0;
         for (const record of this.schemas.values()) {
@@ -1408,6 +1409,21 @@ export class MongoStorage implements Storage {
             }
         }
         if (bestWildcard) return bestWildcard;
+
+        // 2b. Glob-style pattern match — supports "recipe:*", "sensor:*" style (colon-separated)
+        let bestGlob: SchemaRecord | null = null;
+        let bestGlobLen = 0;
+        for (const record of this.schemas.values()) {
+            if (record.applyTo !== 'prefix') continue;
+            if (!record.keyPattern.includes('*')) continue;
+            if (mongoMatchGlobPattern(record.keyPattern, memoryKey)) {
+                if (record.keyPattern.length > bestGlobLen) {
+                    bestGlob = record;
+                    bestGlobLen = record.keyPattern.length;
+                }
+            }
+        }
+        if (bestGlob) return bestGlob;
 
         // 3. Simple prefix match — longest prefix wins
         const parts = memoryKey.split('.');
@@ -2366,6 +2382,54 @@ export class MongoStorage implements Storage {
             return null;
         }
     }
+
+    // ── Cortex Extensions (Manifest-based) ── (in-memory fallback, no Prisma model yet)
+
+    private cortexExtensions = new Map<string, CortexExtensionRecord>();
+    private cortexLibFiles = new Map<string, string>();
+
+    async createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord> {
+        if (this.cortexExtensions.has(record.name)) {
+            throw new Error(`Cortex extension "${record.name}" already exists`);
+        }
+        this.cortexExtensions.set(record.name, record);
+        return record;
+    }
+
+    async getCortexExtension(name: string): Promise<CortexExtensionRecord | null> {
+        return this.cortexExtensions.get(name) ?? null;
+    }
+
+    async listCortexExtensions(opts?: { status?: string; namespace?: string }): Promise<CortexExtensionRecord[]> {
+        let results = [...this.cortexExtensions.values()];
+        if (opts?.status) results = results.filter(e => e.status === opts.status);
+        if (opts?.namespace) results = results.filter(e => e.namespace === opts.namespace);
+        return results;
+    }
+
+    async updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null> {
+        const existing = this.cortexExtensions.get(name);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates };
+        this.cortexExtensions.set(name, updated);
+        return updated;
+    }
+
+    async deleteCortexExtension(name: string): Promise<boolean> {
+        return this.cortexExtensions.delete(name);
+    }
+
+    async setCortexLibFile(extName: string, libName: string, content: string): Promise<void> {
+        this.cortexLibFiles.set(`${extName}::${libName}`, content);
+    }
+
+    async getCortexLibFile(extName: string, libName: string): Promise<string | null> {
+        return this.cortexLibFiles.get(`${extName}::${libName}`) ?? null;
+    }
+
+    async deleteCortexLibFile(extName: string, libName: string): Promise<boolean> {
+        return this.cortexLibFiles.delete(`${extName}::${libName}`);
+    }
 }
 
 /**
@@ -2392,6 +2456,20 @@ function mongoMatchWildcardPattern(pattern: string, key: string): boolean {
         ki++;
     }
     return pi === patternParts.length && ki === keyParts.length;
+}
+
+/**
+ * Glob-style pattern matching: converts a pattern like "recipe:*" to a regex.
+ * Supports '*' as a wildcard that matches any characters.
+ */
+function mongoMatchGlobPattern(pattern: string, key: string): boolean {
+    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    const regexStr = '^' + escaped.replace(/\*/g, '.+') + '$';
+    try {
+        return new RegExp(regexStr).test(key);
+    } catch {
+        return false;
+    }
 }
 
 /**

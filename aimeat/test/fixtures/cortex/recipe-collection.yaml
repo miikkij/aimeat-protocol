@@ -1,0 +1,396 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: recipe-collection
+  namespace: test
+  description: "A recipe management extension with full CRUD, community boards, and semantic categorisation"
+  author: test
+  tags: [recipes, cooking, food, community]
+  labels:
+    domain: culinary
+
+spec:
+  version: "1.0.0"
+  components:
+    # ── Schema ────────────────────────────────────────────────
+    - type: schema
+      name: recipe
+      key_pattern: "recipe:*"
+      apply_to: prefix
+      schema:
+        type: object
+        required: [title, ingredients, instructions]
+        properties:
+          title:
+            type: string
+            minLength: 1
+            maxLength: 200
+          description:
+            type: string
+            maxLength: 1000
+          cuisine:
+            type: string
+            enum: [italian, japanese, mexican, indian, french, thai, american, other]
+          prep_time_minutes:
+            type: integer
+            minimum: 0
+          cook_time_minutes:
+            type: integer
+            minimum: 0
+          servings:
+            type: integer
+            minimum: 1
+            maximum: 100
+          difficulty:
+            type: string
+            enum: [easy, medium, hard]
+          ingredients:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [name, amount]
+              properties:
+                name:
+                  type: string
+                amount:
+                  type: string
+                unit:
+                  type: string
+                optional:
+                  type: boolean
+          instructions:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required: [step, text]
+              properties:
+                step:
+                  type: integer
+                  minimum: 1
+                text:
+                  type: string
+          tags:
+            type: array
+            items:
+              type: string
+          image_url:
+            type: string
+            format: uri
+
+    # ── Prompt ────────────────────────────────────────────────
+    - type: prompt
+      name: recipe-assistant
+      content: |
+        You are a recipe assistant on an AIMEAT node at {{node_url}}.
+        When a user asks about recipes, search the memory store using the
+        prefix "recipe:" to find matching entries. You can filter by
+        cuisine, difficulty, or ingredient keywords.
+
+        Available actions:
+        - search-recipes: Find recipes by criteria
+        - add-recipe: Create a new recipe entry
+
+        Always present results with the recipe title, prep time, cook time,
+        difficulty, and a short summary. Offer to show full ingredient lists
+        or step-by-step instructions on request.
+      variables:
+        - "{{node_url}}"
+
+    # ── Action ────────────────────────────────────────────────
+    - type: action
+      name: search-recipes
+      description: "Search recipes by cuisine, difficulty, ingredient, or free-text query"
+      input_schema:
+        type: object
+        properties:
+          query:
+            type: string
+            description: "Free-text search across title and description"
+          cuisine:
+            type: string
+            enum: [italian, japanese, mexican, indian, french, thai, american, other]
+          difficulty:
+            type: string
+            enum: [easy, medium, hard]
+          max_prep_minutes:
+            type: integer
+            minimum: 0
+            description: "Maximum prep time in minutes"
+          ingredient:
+            type: string
+            description: "Filter recipes containing this ingredient"
+          limit:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+
+    - type: action
+      name: add-recipe
+      description: "Add a new recipe to the collection"
+      input_schema:
+        type: object
+        required: [title, ingredients, instructions]
+        properties:
+          title:
+            type: string
+          description:
+            type: string
+          cuisine:
+            type: string
+          prep_time_minutes:
+            type: integer
+          cook_time_minutes:
+            type: integer
+          servings:
+            type: integer
+          difficulty:
+            type: string
+            enum: [easy, medium, hard]
+          ingredients:
+            type: array
+            items:
+              type: object
+              required: [name, amount]
+              properties:
+                name:
+                  type: string
+                amount:
+                  type: string
+                unit:
+                  type: string
+          instructions:
+            type: array
+            items:
+              type: object
+              required: [step, text]
+              properties:
+                step:
+                  type: integer
+                text:
+                  type: string
+          tags:
+            type: array
+            items:
+              type: string
+
+    # ── Board Template ────────────────────────────────────────
+    - type: board-template
+      name: recipe-reviews
+      title: "Recipe Reviews & Discussions"
+      description: "Community board for sharing cooking experiences, tips, and recipe modifications"
+      visibility: public
+      seed_posts:
+        - title: "Welcome to Recipe Reviews"
+          body: "Share your cooking experiences, rate recipes, and suggest modifications. Be kind and constructive!"
+        - title: "Weekly Challenge Thread"
+          body: "Each week we pick a recipe from the collection. Try it out and share your results here."
+
+    # ── Ontology ──────────────────────────────────────────────
+    - type: ontology
+      name: culinary-taxonomy
+      description: "Culinary domain taxonomy for recipe categorisation and discovery"
+      concepts:
+        cuisine:
+          label:
+            en: Cuisine
+            fi: Keittiö
+          properties:
+            - region
+          values:
+            - italian
+            - japanese
+            - mexican
+            - indian
+            - french
+            - thai
+            - american
+        cooking_method:
+          label:
+            en: Cooking Method
+            fi: Ruoanlaittotapa
+          properties:
+            - temperature_range
+            - equipment_needed
+          values:
+            - baking
+            - frying
+            - grilling
+            - steaming
+            - boiling
+            - roasting
+            - sauteing
+        meal_type:
+          label:
+            en: Meal Type
+            fi: Ateriatyyppi
+          broader: cuisine
+          values:
+            - breakfast
+            - lunch
+            - dinner
+            - snack
+            - dessert
+        dietary_restriction:
+          label:
+            en: Dietary Restriction
+            fi: Ruokavaliorajoitus
+          related_to: [cuisine, meal_type]
+          values:
+            - vegetarian
+            - vegan
+            - gluten-free
+            - dairy-free
+            - nut-free
+            - halal
+            - kosher
+        ingredient_category:
+          label:
+            en: Ingredient Category
+            fi: Ainesosaluokka
+          properties:
+            - shelf_life
+            - storage_temp
+          values:
+            - protein
+            - vegetable
+            - grain
+            - dairy
+            - spice
+            - oil
+            - sweetener
+
+    # ── Seed Data ─────────────────────────────────────────────
+    - type: seed-data
+      entries:
+        - key: "recipe:spaghetti-aglio-olio"
+          value:
+            title: "Spaghetti Aglio e Olio"
+            description: "A classic Roman pasta with garlic, olive oil, and chilli flakes"
+            cuisine: italian
+            prep_time_minutes: 5
+            cook_time_minutes: 15
+            servings: 2
+            difficulty: easy
+            ingredients:
+              - name: spaghetti
+                amount: "200"
+                unit: g
+              - name: garlic
+                amount: "4"
+                unit: cloves
+              - name: extra-virgin olive oil
+                amount: "60"
+                unit: ml
+              - name: red chilli flakes
+                amount: "1"
+                unit: tsp
+                optional: true
+              - name: fresh parsley
+                amount: "2"
+                unit: tbsp
+                optional: true
+            instructions:
+              - step: 1
+                text: "Bring a large pot of salted water to the boil and cook spaghetti until al dente."
+              - step: 2
+                text: "While pasta cooks, thinly slice garlic. Heat olive oil in a large pan over medium-low heat."
+              - step: 3
+                text: "Add garlic and chilli flakes to the oil. Cook until garlic is golden (about 2 minutes). Do not burn."
+              - step: 4
+                text: "Reserve 120 ml of pasta water, then drain the spaghetti."
+              - step: 5
+                text: "Add spaghetti to the pan with garlic oil. Toss, adding pasta water a splash at a time until glossy."
+            tags: [pasta, quick, garlic, weeknight]
+
+        - key: "recipe:miso-soup"
+          value:
+            title: "Classic Miso Soup"
+            description: "A warming Japanese soup with tofu, wakame, and spring onions"
+            cuisine: japanese
+            prep_time_minutes: 10
+            cook_time_minutes: 10
+            servings: 4
+            difficulty: easy
+            ingredients:
+              - name: dashi stock
+                amount: "800"
+                unit: ml
+              - name: white miso paste
+                amount: "3"
+                unit: tbsp
+              - name: silken tofu
+                amount: "150"
+                unit: g
+              - name: dried wakame
+                amount: "1"
+                unit: tbsp
+              - name: spring onions
+                amount: "2"
+                unit: stalks
+            instructions:
+              - step: 1
+                text: "Soak dried wakame in cold water for 5 minutes, then drain."
+              - step: 2
+                text: "Bring dashi stock to a gentle simmer in a saucepan."
+              - step: 3
+                text: "Cut tofu into 1 cm cubes. Add tofu and wakame to the stock."
+              - step: 4
+                text: "Ladle a small amount of hot stock into a bowl, dissolve miso paste in it, then return to the pan."
+              - step: 5
+                text: "Heat through without boiling. Serve topped with sliced spring onions."
+            tags: [soup, japanese, healthy, quick]
+
+        - key: "recipe:guacamole"
+          value:
+            title: "Fresh Guacamole"
+            description: "Creamy avocado dip with lime, coriander, and a gentle kick of jalape\u00f1o"
+            cuisine: mexican
+            prep_time_minutes: 10
+            cook_time_minutes: 0
+            servings: 4
+            difficulty: easy
+            ingredients:
+              - name: ripe avocados
+                amount: "3"
+                unit: whole
+              - name: lime juice
+                amount: "2"
+                unit: tbsp
+              - name: red onion
+                amount: "0.5"
+                unit: whole
+              - name: fresh coriander
+                amount: "3"
+                unit: tbsp
+              - name: jalape\u00f1o
+                amount: "1"
+                unit: whole
+                optional: true
+              - name: salt
+                amount: "0.5"
+                unit: tsp
+            instructions:
+              - step: 1
+                text: "Halve the avocados, remove the stones, and scoop the flesh into a bowl."
+              - step: 2
+                text: "Mash with a fork to desired consistency (chunky or smooth)."
+              - step: 3
+                text: "Finely dice the red onion, jalape\u00f1o (if using), and chop the coriander."
+              - step: 4
+                text: "Fold the onion, jalape\u00f1o, coriander, lime juice, and salt into the avocado."
+              - step: 5
+                text: "Taste and adjust seasoning. Serve immediately with tortilla chips."
+            tags: [dip, no-cook, vegetarian, quick]
+
+    # ── Lib ───────────────────────────────────────────────────
+    - type: lib
+      name: recipe-ui
+      filename: recipe-ui.js
+      exports:
+        - RecipeCard
+        - RecipeSearchForm
+        - IngredientList
+      api_surface: "RecipeCard({recipe,onClick}) RecipeSearchForm({onSearch,cuisines}) IngredientList({ingredients,showOptional})"
