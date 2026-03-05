@@ -143,7 +143,22 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
       next();
     });
 
-    app.use(express.static(publicDir, { maxAge: '7d' }));
+    // JS, CSS, and HTML: Cache-Control: no-cache with ETag.
+    // The browser revalidates on every load; if the file hasn't changed the server
+    // returns 304 Not Modified (no download). When a file changes on disk, the ETag
+    // changes and the browser receives the fresh version automatically — no manual
+    // cache clearing needed, no hard refresh, works after every server restart.
+    // Static assets (images, fonts, etc.) keep the 7-day cache — they rarely change.
+    app.use(express.static(publicDir, {
+      maxAge: '7d',
+      etag: true,
+      lastModified: true,
+      setHeaders: (res, filePath) => {
+        if (/\.(js|css|html)$/.test(filePath)) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }));
   }
 
   // Serve locale files at /locales/*.json (used by SPA i18n module)
