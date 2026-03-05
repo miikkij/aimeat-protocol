@@ -234,7 +234,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       record = await storage.setMemory({
         key,
         ownerGaii: gaii,
-        value: null,
+        value: {},
         visibility: 'private',
         tags: [],
         ttlHours: null,
