@@ -176,6 +176,33 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
     lastWeek: t('dashboard.lastWeek'),
     twoWeeksAgo: t('dashboard.twoWeeksAgo'),
     threeWeeksAgo: t('dashboard.threeWeeksAgo'),
+    tunnelStats: t('dashboard.tunnelStats'),
+    tunnelActive: t('dashboard.tunnelActive'),
+    tunnelTotal: t('dashboard.tunnelTotal'),
+    tunnelDisconnections: t('dashboard.tunnelDisconnections'),
+    tunnelReconnects: t('dashboard.tunnelReconnects'),
+    tunnelMsgSent: t('dashboard.tunnelMsgSent'),
+    tunnelMsgReceived: t('dashboard.tunnelMsgReceived'),
+    tunnelDeliveryFails: t('dashboard.tunnelDeliveryFails'),
+    tunnelLatencyAvg: t('dashboard.tunnelLatencyAvg'),
+    tunnelLatencyP95: t('dashboard.tunnelLatencyP95'),
+    tunnelHeartbeatMisses: t('dashboard.tunnelHeartbeatMisses'),
+    tunnelMailboxFallbacks: t('dashboard.tunnelMailboxFallbacks'),
+    mailboxStats: t('dashboard.mailboxStats'),
+    mailboxItems: t('dashboard.mailboxItems'),
+    mailboxBytes: t('dashboard.mailboxBytes'),
+    mailboxEnqueued: t('dashboard.mailboxEnqueued'),
+    mailboxDelivered: t('dashboard.mailboxDelivered'),
+    mailboxExpired: t('dashboard.mailboxExpired'),
+    mailboxQuotaRejects: t('dashboard.mailboxQuotaRejects'),
+    mailboxOldestAge: t('dashboard.mailboxOldestAge'),
+    securityStats: t('dashboard.securityStats'),
+    authFailures: t('dashboard.authFailures'),
+    rateLimitHits: t('dashboard.rateLimitHits'),
+    scopeDenials: t('dashboard.scopeDenials'),
+    messages: t('dashboard.messages'),
+    latency: t('dashboard.latency'),
+    tunnelActivity: t('dashboard.tunnelActivity'),
   };
 }
 
@@ -467,6 +494,7 @@ function dataTable(headers,rows,opts){var o='';if(opts&&opts.card)o+='<div class
 function emptyState(msg){return '<div class="empty">'+esc(msg)+'</div>';}
 function actionBtn(label,onclick){return '<button class="action-btn" onclick="'+onclick+'">'+esc(label)+'</button>';}
 function fmtUp(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return (d?d+'d ':'')+(h?h+'h ':'')+(m?m+'m':'<1m')}
+function fmtBytes(b){if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(1)+' MB';}
 
 function nav(page){
   currentPage=page;
@@ -1576,6 +1604,53 @@ function renderStats(){
   h+='</div>';
   h+='<div class="card" style="margin-top:16px"><h2>'+__t.monthlyTrend+'</h2><canvas id="chartMonthly" height="160"></canvas></div>';
 
+  // ── Tunnel Stats ──
+  var ts=sd.tunnel||{};
+  h+='<h3 style="margin-top:24px;font-size:.9rem;color:var(--cyan)">'+__t.tunnelStats+'</h3>';
+  h+='<div class="grid grid-4" style="margin-top:12px">';
+  h+=sc(__t.tunnelActive,ts.connections_active||0,'','var(--green)');
+  h+=sc(__t.tunnelTotal,ts.connections_total||0,'','var(--cyan)');
+  h+=sc(__t.tunnelDisconnections,ts.disconnections_total||0,'','var(--yellow)');
+  h+=sc(__t.tunnelReconnects,ts.reconnects_total||0,'','var(--blue)');
+  h+='</div>';
+  h+='<div class="grid grid-4">';
+  h+=sc(__t.tunnelMsgSent,ts.messages_sent_total||0,'','var(--cyan)');
+  h+=sc(__t.tunnelMsgReceived,ts.messages_received_total||0,'','var(--cyan)');
+  h+=sc(__t.tunnelDeliveryFails,ts.delivery_failures_total||0,'',ts.delivery_failures_total>0?'var(--red)':'var(--green)');
+  h+=sc(__t.tunnelHeartbeatMisses,ts.heartbeat_misses_total||0,'',ts.heartbeat_misses_total>0?'var(--yellow)':'var(--green)');
+  h+='</div>';
+  h+='<div class="grid grid-2">';
+  h+='<div class="card"><h2>'+__t.latency+'</h2>';
+  h+='<div class="econ-row"><span class="econ-label">'+__t.tunnelLatencyAvg+'</span><span class="econ-val">'+(ts.delivery_latency_avg_ms||0).toFixed(1)+' ms</span></div>';
+  h+='<div class="econ-row"><span class="econ-label">'+__t.tunnelLatencyP95+'</span><span class="econ-val">'+(ts.delivery_latency_p95_ms||0).toFixed(1)+' ms</span></div>';
+  h+='<div class="econ-row"><span class="econ-label">'+__t.tunnelMailboxFallbacks+'</span><span class="econ-val">'+num(ts.mailbox_fallbacks_total||0)+'</span></div>';
+  h+='</div>';
+  h+='<div class="card"><h2>'+__t.tunnelActivity+'</h2><canvas id="chartTunnel" height="180"></canvas></div>';
+  h+='</div>';
+
+  // ── Mailbox Stats ──
+  var ms=sd.mailbox||{};
+  h+='<h3 style="margin-top:24px;font-size:.9rem;color:var(--purple)">'+__t.mailboxStats+'</h3>';
+  h+='<div class="grid grid-4" style="margin-top:12px">';
+  h+=sc(__t.mailboxItems,ms.items_total||0,'','var(--cyan)');
+  h+=sc(__t.mailboxBytes,fmtBytes(ms.bytes_total||0),'','var(--cyan)');
+  h+=sc(__t.mailboxEnqueued,ms.enqueued_total||0,'','var(--blue)');
+  h+=sc(__t.mailboxDelivered,ms.delivered_total||0,'','var(--green)');
+  h+='</div>';
+  h+='<div class="grid grid-4">';
+  h+=sc(__t.mailboxExpired,ms.expired_total||0,'',ms.expired_total>0?'var(--yellow)':'var(--green)');
+  h+=sc(__t.mailboxQuotaRejects,ms.quota_rejections_total||0,'',ms.quota_rejections_total>0?'var(--red)':'var(--green)');
+  h+=sc(__t.mailboxOldestAge,fmtUp(ms.oldest_item_age_seconds||0),'','var(--muted)');
+  h+='</div>';
+
+  // ── Security Stats ──
+  h+='<h3 style="margin-top:24px;font-size:.9rem;color:var(--red)">'+__t.securityStats+'</h3>';
+  h+='<div class="grid grid-4" style="margin-top:12px">';
+  h+=sc(__t.authFailures,sd.auth_failures_total||0,'',sd.auth_failures_total>0?'var(--red)':'var(--green)');
+  h+=sc(__t.rateLimitHits,sd.rate_limit_hits_total||0,'',sd.rate_limit_hits_total>0?'var(--yellow)':'var(--green)');
+  h+=sc(__t.scopeDenials,sd.scope_denials_total||0,'',sd.scope_denials_total>0?'var(--yellow)':'var(--green)');
+  h+='</div>';
+
   app.innerHTML=h;
   renderStatsCharts(sd);
 }
@@ -1642,6 +1717,16 @@ async function renderStatsCharts(sd){
         {label:__t.reads,data:mKeys.map(function(m){return months[m].reads}),backgroundColor:'#06b6d488'}
       ]
     },options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}},y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}}}});
+  }
+
+  var tc=document.getElementById('chartTunnel');
+  if(tc&&sd.tunnel){
+    var t=sd.tunnel;
+    new Chart(tc,{type:'doughnut',data:{
+      labels:[__t.tunnelMsgSent,__t.tunnelMsgReceived,__t.tunnelDeliveryFails,__t.tunnelMailboxFallbacks],
+      datasets:[{data:[t.messages_sent_total||0,t.messages_received_total||0,t.delivery_failures_total||0,t.mailbox_fallbacks_total||0],
+      backgroundColor:['#3b82f6','#22c55e','#ef4444','#eab308']}]
+    },options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#94a3b8',font:{size:11}}}}}});
   }
 }
 

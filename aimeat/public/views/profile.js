@@ -181,6 +181,7 @@ const TABS = [
   { id:'nodes', key:'profile.tabs.nodes' },
   { id:'access', key:'profile.tabs.access' },
   { id:'dataWallet', key:'profile.tabs.dataWallet' },
+  { id:'nodeStats', key:'profile.tabs.nodeStats' },
 ];
 
 /* ── Loading indicator ── */
@@ -215,6 +216,8 @@ export default function Profile({ navigate, locale }) {
   const [consents, setConsents] = useState(null);
   const [auditEntries, setAuditEntries] = useState(null);
   const [auditDays, setAuditDays] = useState(30);
+  const [nodeStatsData, setNodeStatsData] = useState(null);
+  const [nodeStatsError, setNodeStatsError] = useState(false);
 
   // UI state
   const [toast, setToast] = useState(null);
@@ -408,6 +411,14 @@ export default function Profile({ navigate, locale }) {
       const data = await apiFetch('/v1/consent/audit?days=' + days);
       setAuditEntries(data?.data?.entries || (Array.isArray(data?.data) ? data.data : []));
     } catch { setAuditEntries([]); }
+  }
+
+  async function loadNodeStatsData() {
+    try {
+      const data = await publicFetch('/v1/stats');
+      if (data?.data) { setNodeStatsData(data.data); setNodeStatsError(false); }
+      else { setNodeStatsError(true); }
+    } catch { setNodeStatsError(true); }
   }
 
   // ── CRUD actions ──
@@ -668,6 +679,7 @@ export default function Profile({ navigate, locale }) {
     if (tabId === 'actions' && svcSubTab === 'catalogue' && !catalogue) loadCatalogueData(catFilter);
     if (tabId === 'boards' && brdSubTab === 'mine' && !myBoards) loadMyBoardsData();
     if (tabId === 'boards' && brdSubTab === 'browse' && !allBoards) loadAllBoardsData();
+    if (tabId === 'nodeStats' && !nodeStatsData && !nodeStatsError) loadNodeStatsData();
   }
 
   // ── Render helpers ──
@@ -1343,6 +1355,98 @@ export default function Profile({ navigate, locale }) {
     `;
   };
 
+  // ── Node Stats helpers ──
+  function fmtUptime(s) {
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+    if (h > 0) return h + 'h ' + m + 'm';
+    return m + 'm';
+  }
+  function fmtBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+  function StatCard({ label, value, color }) {
+    return html`<div class="card" style="text-align:center;padding:1rem">
+      <div style="font-size:1.5rem;font-weight:700;color:${color}">${value}</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem">${label}</div>
+    </div>`;
+  }
+
+  const renderNodeStats = () => {
+    if (nodeStatsError) return html`<div class="section-title">${t('profile.nodeStats.title')}</div>
+      <p style="color:var(--muted)">${t('profile.nodeStats.error')}</p>`;
+    if (!nodeStatsData) return html`<${Spinner} text=${t('profile.nodeStats.loading')} />`;
+    const s = nodeStatsData;
+    return html`
+      <div class="section-title">${t('profile.nodeStats.title')}</div>
+      <div class="section-desc">${t('profile.nodeStats.desc')}</div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem">
+        <${StatCard} label=${t('profile.nodeStats.uptime')} value=${fmtUptime(s.uptime_seconds)} color="var(--love1)" />
+        <${StatCard} label=${t('profile.nodeStats.requests')} value=${(s.requests_total || 0).toLocaleString()} color="var(--accent)" />
+        <${StatCard} label=${t('profile.nodeStats.owners')} value=${s.active_owners || 0} color="var(--success)" />
+        <${StatCard} label=${t('profile.nodeStats.agents')} value=${s.active_agents || 0} color="var(--success)" />
+        <${StatCard} label=${t('profile.nodeStats.memoryWrites')} value=${(s.memory_writes || 0).toLocaleString()} color="#8b5cf6" />
+        <${StatCard} label=${t('profile.nodeStats.memoryReads')} value=${(s.memory_reads || 0).toLocaleString()} color="#8b5cf6" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+        <div class="card" style="padding:1rem">
+          <h4 style="color:var(--love1);margin:0 0 .75rem;font-size:.9rem">${t('profile.nodeStats.requestsByMethod')}</h4>
+          ${s.requests_by_method ? Object.entries(s.requests_by_method).map(([m, c]) => html`
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+              <span style="font-weight:600;font-size:.85rem">${m}</span>
+              <span style="color:var(--muted);font-size:.85rem">${c.toLocaleString()}</span>
+            </div>`) : null}
+        </div>
+        <div class="card" style="padding:1rem">
+          <h4 style="color:var(--love1);margin:0 0 .75rem;font-size:.9rem">${t('profile.nodeStats.requestsByStatus')}</h4>
+          ${s.requests_by_status ? Object.entries(s.requests_by_status).map(([code, c]) => {
+            const color = code.startsWith('2') ? 'var(--success)' : code.startsWith('4') ? 'var(--warn)' : code.startsWith('5') ? 'var(--danger)' : 'var(--muted)';
+            return html`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+              <span style="color:${color};font-weight:600;font-size:.85rem">${code}</span>
+              <span style="color:var(--muted);font-size:.85rem">${c.toLocaleString()}</span>
+            </div>`;
+          }) : null}
+        </div>
+      </div>
+
+      ${s.tunnel ? html`
+        <h3 style="color:var(--love1);margin:1.5rem 0 .75rem;font-size:1rem">${t('profile.nodeStats.tunnelTitle')}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;margin-bottom:1rem">
+          <${StatCard} label=${t('profile.nodeStats.tunnelActive')} value=${s.tunnel.connections_active} color="var(--success)" />
+          <${StatCard} label=${t('profile.nodeStats.tunnelTotal')} value=${s.tunnel.connections_total} color="var(--accent)" />
+          <${StatCard} label=${t('profile.nodeStats.msgSent')} value=${(s.tunnel.messages_sent_total || 0).toLocaleString()} color="#3b82f6" />
+          <${StatCard} label=${t('profile.nodeStats.msgReceived')} value=${(s.tunnel.messages_received_total || 0).toLocaleString()} color="#3b82f6" />
+          <${StatCard} label=${t('profile.nodeStats.deliveryFails')} value=${s.tunnel.delivery_failures_total} color=${s.tunnel.delivery_failures_total > 0 ? 'var(--danger)' : 'var(--success)'} />
+          <${StatCard} label=${t('profile.nodeStats.latencyAvg')} value=${(s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'} color="var(--accent)" />
+          <${StatCard} label=${t('profile.nodeStats.latencyP95')} value=${(s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'} color=${(s.tunnel.delivery_latency_p95_ms || 0) > 200 ? 'var(--warn)' : 'var(--accent)'} />
+        </div>` : null}
+
+      ${s.mailbox ? html`
+        <h3 style="color:var(--love1);margin:1.5rem 0 .75rem;font-size:1rem">${t('profile.nodeStats.mailboxTitle')}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;margin-bottom:1rem">
+          <${StatCard} label=${t('profile.nodeStats.mailboxItems')} value=${s.mailbox.items_total} color="var(--accent)" />
+          <${StatCard} label=${t('profile.nodeStats.mailboxBytes')} value=${fmtBytes(s.mailbox.bytes_total)} color="var(--accent)" />
+          <${StatCard} label=${t('profile.nodeStats.mailboxDelivered')} value=${(s.mailbox.delivered_total || 0).toLocaleString()} color="var(--success)" />
+          <${StatCard} label=${t('profile.nodeStats.mailboxExpired')} value=${s.mailbox.expired_total} color=${s.mailbox.expired_total > 0 ? 'var(--warn)' : 'var(--success)'} />
+        </div>` : null}
+
+      <h3 style="color:var(--love1);margin:1.5rem 0 .75rem;font-size:1rem">${t('profile.nodeStats.securityTitle')}</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;margin-bottom:1rem">
+        <${StatCard} label=${t('profile.nodeStats.authFailures')} value=${s.auth_failures_total || 0} color=${(s.auth_failures_total || 0) > 0 ? 'var(--danger)' : 'var(--success)'} />
+        <${StatCard} label=${t('profile.nodeStats.rateLimitHits')} value=${s.rate_limit_hits_total || 0} color=${(s.rate_limit_hits_total || 0) > 0 ? 'var(--warn)' : 'var(--success)'} />
+        <${StatCard} label=${t('profile.nodeStats.scopeDenials')} value=${s.scope_denials_total || 0} color=${(s.scope_denials_total || 0) > 0 ? 'var(--warn)' : 'var(--success)'} />
+      </div>
+
+      <p style="color:var(--muted);font-size:.8rem;margin-top:1rem">${t('profile.nodeStats.startedAt')}: ${new Date(s.started_at).toLocaleString()}</p>
+    `;
+  };
+
   // ── Tab panel map ──
   const tabContent = {
     agents: renderAgents,
@@ -1357,6 +1461,7 @@ export default function Profile({ navigate, locale }) {
     nodes: renderNodes,
     access: renderAccess,
     dataWallet: renderDataWallet,
+    nodeStats: renderNodeStats,
   };
 
   // ── Main render ──

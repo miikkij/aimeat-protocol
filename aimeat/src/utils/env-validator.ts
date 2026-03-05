@@ -225,6 +225,17 @@ export function validateEnv(): ValidationResult[] {
     }
   }
 
+  // ── Metrics & Observability ─────────────────────────────────────
+  const metricsAccess = env.AIMEAT_METRICS_ACCESS;
+  if (metricsAccess && !['public', 'authenticated', 'operator'].includes(metricsAccess)) {
+    results.push({ level: 'error', variable: 'AIMEAT_METRICS_ACCESS', message: `Invalid value "${metricsAccess}". Must be: public, authenticated, or operator.` });
+  }
+
+  const statsAccess = env.AIMEAT_STATS_ACCESS;
+  if (statsAccess && !['public', 'authenticated', 'operator'].includes(statsAccess)) {
+    results.push({ level: 'error', variable: 'AIMEAT_STATS_ACCESS', message: `Invalid value "${statsAccess}". Must be: public, authenticated, or operator.` });
+  }
+
   return results;
 }
 
