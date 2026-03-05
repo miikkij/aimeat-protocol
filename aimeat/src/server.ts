@@ -106,27 +106,35 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   ];
   const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
-    // Block direct access to portal HTML files — they are served via /v1/ routes instead
-    const portalHtmlFiles = new Set(['/human.html', '/profile.html', '/guides.html', '/aimeat-os.html', '/hobbies.html', '/marketplace.html', '/wizard.html']);
+    // Redirect legacy HTML URLs to canonical /v1/ routes
     app.use((req, res, next) => {
-      if (portalHtmlFiles.has(req.path)) {
-        // Redirect to the canonical /v1/ URL
-        const routeMap: Record<string, string> = {
-          '/human.html': '/v1/portal',
-          '/profile.html': '/v1/profile',
-          '/guides.html': '/v1/guides',
-          '/aimeat-os.html': '/v1/aimeat-os',
-          '/hobbies.html': '/v1/hobbies',
-          '/marketplace.html': '/v1/marketplace',
-          '/wizard.html': '/v1/setup/wizard',
-        };
-        const canonical = routeMap[req.path] || '/v1/portal';
+      if (req.path === '/wizard.html') {
         const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-        res.redirect(301, canonical + qs);
+        res.redirect(301, '/v1/setup/wizard' + qs);
         return;
       }
       next();
     });
+
+    // Security headers — CSP, anti-clickjacking, content-type enforcement
+    app.use((_req, res, next) => {
+      res.setHeader('Content-Security-Policy', [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+        "style-src 'self' 'unsafe-inline'",
+        "connect-src 'self' wss: ws:",
+        "img-src 'self' data: blob:",
+        "font-src 'self'",
+        "frame-src 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join('; '));
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      next();
+    });
+
     app.use(express.static(publicDir, { maxAge: '7d' }));
   }
 
