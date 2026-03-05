@@ -217,47 +217,54 @@ Fields:
 COMPONENT TYPE 3: action
 ────────────────────────────────────────────
 
-Actions define external API integrations. They let the extension call third-party
-services with templated URLs and map the response into a usable format.
+Actions define operations that the extension can perform. They describe
+callable actions with a name, description, and input schema.
 
 Example:
 
 - type: action
   name: fetch-weather
-  method: GET
-  url_template: "https://api.open-meteo.com/v1/forecast?latitude={{lat}}&longitude={{lon}}&current_weather=true"
-  variables:
-    - "{{lat}}"
-    - "{{lon}}"
-  response_mapping:
-    temperature: "current_weather.temperature"
-    windspeed: "current_weather.windspeed"
+  description: "Fetch current weather for a given city"
+  input_schema:
+    type: object
+    required: [city]
+    properties:
+      city:
+        type: string
+        description: "City name"
+      units:
+        type: string
+        enum: [metric, imperial]
 
 Fields:
-  name             — identifier for this action
-  method           — HTTP method (GET, POST, PUT, DELETE)
-  url_template     — URL with {{variable}} placeholders
-  variables        — list of variables used
-  response_mapping — maps response JSON paths to named fields
+  name         — identifier for this action
+  description  — what this action does
+  input_schema — JSON Schema describing the expected input parameters
 
 ────────────────────────────────────────────
 COMPONENT TYPE 4: board-template
 ────────────────────────────────────────────
 
-Board templates create pre-configured discussion boards.
+Board templates create pre-configured discussion boards that come
+with the extension.
 
 Example:
 
 - type: board-template
   name: feedback
-  template:
-    title: "Feedback"
-    description: "Share your thoughts"
-    categories: [general, bugs, features]
+  title: "Feedback Board"
+  description: "Share your thoughts and suggestions"
+  visibility: public
+  seed_posts:
+    - title: "Welcome!"
+      body: "This is the feedback board for this extension."
 
 Fields:
-  name     — identifier for this board template
-  template — board configuration with title, description, categories
+  name        — identifier for this board template
+  title       — display title for the board
+  description — what this board is for
+  visibility  — public, private, or shared
+  seed_posts  — optional initial posts (each with title + body)
 
 ────────────────────────────────────────────
 COMPONENT TYPE 5: ontology
@@ -270,6 +277,7 @@ Example:
 
 - type: ontology
   name: concepts
+  description: "Core concepts for task management"
   concepts:
     priority:
       label: { en: "Priority", fi: "Prioriteetti" }
@@ -277,10 +285,17 @@ Example:
     status:
       label: { en: "Status", fi: "Tila" }
       values: [open, in_progress, done, cancelled]
+      broader: priority
 
 Fields:
-  name     — identifier for this ontology
-  concepts — map of concept names to their definitions (label + values)
+  name        — identifier for this ontology
+  description — what these concepts represent
+  concepts    — map of concept names to their definitions:
+    label      — i18n labels (e.g. { en: "Name", fi: "Nimi" })
+    values     — allowed values (optional)
+    properties — related property names (optional)
+    broader    — parent concept name (optional)
+    related_to — related concept name (optional)
 
 ────────────────────────────────────────────
 COMPONENT TYPE 6: seed-data
@@ -895,13 +910,13 @@ export default function Profile({ navigate, locale }) {
         if (libInput?.files) {
           for (const f of libInput.files) {
             const content = await f.text();
-            libs[f.name] = btoa(unescape(encodeURIComponent(content)));
+            libs[f.name] = content;
           }
         }
       } else {
         extLibEntries.forEach(entry => {
           if (entry.filename.trim() && entry.code.trim()) {
-            libs[entry.filename.trim()] = btoa(unescape(encodeURIComponent(entry.code)));
+            libs[entry.filename.trim()] = entry.code;
           }
         });
       }
@@ -941,7 +956,7 @@ export default function Profile({ navigate, locale }) {
         const jsResp = await fetch(NODE_URL + '/cortex-bundled/' + name + '.js');
         if (jsResp.ok) {
           const jsContent = await jsResp.text();
-          libs[name + '.js'] = btoa(unescape(encodeURIComponent(jsContent)));
+          libs[name + '.js'] = jsContent;
         }
       } catch(e) { /* no lib file, ok */ }
 

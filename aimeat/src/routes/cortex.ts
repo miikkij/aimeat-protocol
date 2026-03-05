@@ -32,6 +32,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         status: e.status,
         visibility: e.visibility,
         tags: e.tags,
+        component_types: [...new Set(e.components.map(c => c.type))],
         installed_at: e.installedAt,
         activated_at: e.activatedAt,
         installed_by: e.installedBy,
