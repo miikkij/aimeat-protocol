@@ -1,0 +1,178 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-charts
+  namespace: aimeat
+  description: "Beautiful interactive charts for your apps. Bar, line, pie, doughnut, radar, scatter, and bubble charts with touch support, hover tooltips, and responsive layout."
+  author: AIMEAT
+  tags: [charts, visualization, data, ui]
+  labels:
+    domain: visualization
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: schema
+      name: chart-data
+      key_pattern: "chart:*"
+      apply_to: prefix
+      schema:
+        type: object
+        required: [type, data]
+        properties:
+          type:
+            type: string
+            enum: [bar, line, pie, doughnut, radar, scatter, bubble]
+          title:
+            type: string
+            maxLength: 200
+          data:
+            type: object
+            required: [labels, datasets]
+            properties:
+              labels:
+                type: array
+                items:
+                  type: string
+              datasets:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [label, data]
+                  properties:
+                    label:
+                      type: string
+                    data:
+                      type: array
+                      items:
+                        type: number
+                    backgroundColor:
+                      oneOf:
+                        - type: string
+                        - type: array
+                          items:
+                            type: string
+                    borderColor:
+                      oneOf:
+                        - type: string
+                        - type: array
+                          items:
+                            type: string
+          options:
+            type: object
+
+    - type: prompt
+      name: chart-assistant
+      content: |
+        You are a chart assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        You help users create beautiful interactive charts. The aimeat-charts extension
+        is installed and provides a Chart.js wrapper.
+
+        IMPORTANT: When creating apps that use charts, include BOTH script tags:
+        1. <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        2. <script src="{{node_url}}/v1/cortex/aimeat-charts/libs/aimeat-charts.js"></script>
+
+        Available API:
+
+        AIMEAT.charts.ChartPanel({elementId, chartKey, nodeUrl, token?})
+          - Reads a chart:* key from AIMEAT storage and renders it
+          - elementId: string — DOM element id to render into
+          - chartKey: string — AIMEAT memory key (e.g. 'chart:sales-2024')
+          - nodeUrl: string — AIMEAT node URL
+          - token: string — optional auth token for private data
+
+        AIMEAT.charts.ChartBuilder({elementId, data, type, options?})
+          - Renders a chart directly from inline data
+          - elementId: string — DOM element id
+          - data: {labels: string[], datasets: [{label, data: number[], backgroundColor?, borderColor?}]}
+          - type: 'bar'|'line'|'pie'|'doughnut'|'radar'|'scatter'|'bubble'
+          - options: Chart.js options object (optional)
+
+        AIMEAT.charts.TYPES — array of supported chart types
+
+        Chart data stored in AIMEAT memory uses the schema key pattern "chart:*".
+        Example key: "chart:sales-2024", "chart:temperature-march"
+
+        The chart data structure is:
+        {
+          type: "bar",
+          title: "Monthly Sales",
+          data: {
+            labels: ["Jan", "Feb", "Mar"],
+            datasets: [{
+              label: "Revenue",
+              data: [1200, 1800, 2400],
+              backgroundColor: ["#6366f1", "#8b5cf6", "#a78bfa"]
+            }]
+          },
+          options: {}  // optional Chart.js options
+        }
+
+        Color palette (AIMEAT theme):
+        Primary: #6366f1, #8b5cf6, #a78bfa, #c4b5fd
+        Accent: #f59e0b, #10b981, #ef4444, #3b82f6, #ec4899, #14b8a6
+
+        When the user asks for a chart:
+        1. Ask what data they want to visualize
+        2. Suggest the best chart type for their data
+        3. Generate the chart data structure
+        4. Create the app HTML with both script tags and AIMEAT.charts.ChartBuilder call
+      variables:
+        - "{{node_url}}"
+
+    - type: seed-data
+      entries:
+        - key: "chart:sales-2024"
+          value:
+            type: bar
+            title: "Quarterly Sales 2024"
+            data:
+              labels: ["Q1", "Q2", "Q3", "Q4"]
+              datasets:
+                - label: "Revenue (€k)"
+                  data: [42, 58, 71, 63]
+                  backgroundColor: ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd"]
+        - key: "chart:temperature"
+          value:
+            type: line
+            title: "Monthly Temperature (Helsinki)"
+            data:
+              labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+              datasets:
+                - label: "°C"
+                  data: [-5, -6, -2, 4, 11, 16, 19, 17, 12, 6, 1, -3]
+                  borderColor: "#ef4444"
+                  backgroundColor: "rgba(239,68,68,0.1)"
+        - key: "chart:categories"
+          value:
+            type: doughnut
+            title: "App Categories"
+            data:
+              labels: ["Productivity", "Games", "Social", "Education", "Utilities"]
+              datasets:
+                - label: "Count"
+                  data: [12, 8, 15, 6, 9]
+                  backgroundColor: ["#6366f1", "#f59e0b", "#ec4899", "#10b981", "#3b82f6"]
+
+    - type: lib
+      name: aimeat-charts
+      filename: aimeat-charts.js
+      exports:
+        - ChartPanel
+        - ChartBuilder
+        - TYPES
+      api_surface: |
+        AIMEAT.charts.ChartPanel({elementId, chartKey, nodeUrl, token?})
+          Reads chart:* key from storage, renders Chart.js chart. Auto-responsive.
+
+        AIMEAT.charts.ChartBuilder({elementId, data, type, options?})
+          Renders chart from inline data.
+          data: {labels:[], datasets:[{label, data:[], backgroundColor?, borderColor?}]}
+          type: 'bar'|'line'|'pie'|'doughnut'|'radar'|'scatter'|'bubble'
+
+        AIMEAT.charts.TYPES = ['bar','line','pie','doughnut','radar','scatter','bubble']
+
+        Requires: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
