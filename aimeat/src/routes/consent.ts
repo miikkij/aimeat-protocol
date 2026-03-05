@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { StatsCollector } from '../services/stats.js';
 
@@ -10,7 +10,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     const router = Router();
 
     // POST /v1/consent — Create a new consent grant
-    router.post('/v1/consent', requireAuth(), async (req, res) => {
+    router.post('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const ownerGaii = req.auth!.sub;
         const {
             data_pattern,
@@ -75,7 +75,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     });
 
     // GET /v1/consent — List own consents
-    router.get('/v1/consent', requireAuth(), async (req, res) => {
+    router.get('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const ownerGaii = req.auth!.sub;
         const opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {};
 
@@ -106,7 +106,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     });
 
     // GET /v1/consent/audit — Audit report (MUST be before /:id)
-    router.get('/v1/consent/audit', requireAuth(), async (req, res) => {
+    router.get('/v1/consent/audit', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const ownerGaii = req.auth!.sub;
         const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
         const opts: { days?: number; accessorGaii?: string; consentId?: string } = { days };
@@ -136,7 +136,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     });
 
     // GET /v1/consent/:id — Get single consent
-    router.get('/v1/consent/:id', requireAuth(), async (req, res) => {
+    router.get('/v1/consent/:id', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const id = req.params.id as string;
         const consent = await storage.getConsent(id);
 
@@ -168,7 +168,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     });
 
     // DELETE /v1/consent/:id — Revoke consent (soft-delete: sets status to 'revoked')
-    router.delete('/v1/consent/:id', requireAuth(), async (req, res) => {
+    router.delete('/v1/consent/:id', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const id = req.params.id as string;
         const consent = await storage.getConsent(id);
 

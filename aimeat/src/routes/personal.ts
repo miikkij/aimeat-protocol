@@ -3,7 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import { MailboxService } from '../services/mailbox.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
@@ -13,7 +13,7 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
   const mailboxService = new MailboxService(config, storage);
 
   // POST /v1/personal/anchor — Register a personal node with this operator
-  router.post('/v1/personal/anchor', requireAuth(), requireRole('owner'), validateBody(AnchorRequestSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/personal/anchor', requireAuth(), requireRole('owner'), requireScope('tunnel:connect'), validateBody(AnchorRequestSchema, config.nodeId), async (req, res) => {
     try {
       if (!config.personalNodesEnabled) {
         res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Personal node support is disabled on this node'));
@@ -88,7 +88,7 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
   });
 
   // GET /v1/personal/status — Check personal node status (by owner)
-  router.get('/v1/personal/status', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/personal/status', requireAuth(), requireRole('owner'), requireScope('tunnel:connect'), async (req, res) => {
     try {
       const ownerName = req.auth!.owner;
       const node = await storage.getPersonalNodeByOwner(ownerName);
@@ -162,7 +162,7 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
 
   // PATCH /v1/personal/anchor/:nodeId — Update personal node settings (visibility)
   // Note: operators can also update any personal node (consistent with DELETE pattern)
-  router.patch('/v1/personal/anchor/:nodeId', requireAuth(), requireRole('owner'), validateBody(VisibilityUpdateSchema, config.nodeId), async (req, res) => {
+  router.patch('/v1/personal/anchor/:nodeId', requireAuth(), requireRole('owner'), requireScope('tunnel:connect'), validateBody(VisibilityUpdateSchema, config.nodeId), async (req, res) => {
     try {
       const nodeId = req.params.nodeId as string;
       const ownerName = req.auth!.owner;
@@ -194,7 +194,7 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
   });
 
   // DELETE /v1/personal/anchor/:nodeId — Deregister personal node
-  router.delete('/v1/personal/anchor/:nodeId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/personal/anchor/:nodeId', requireAuth(), requireRole('owner'), requireScope('tunnel:connect'), async (req, res) => {
     try {
       const nodeId = req.params.nodeId as string;
       const ownerName = req.auth!.owner;
@@ -240,7 +240,7 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
   });
 
   // GET /v1/personal/mailbox/:nodeId — View mailbox stats (owner or operator)
-  router.get('/v1/personal/mailbox/:nodeId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/personal/mailbox/:nodeId', requireAuth(), requireRole('owner'), requireScope('tunnel:connect'), async (req, res) => {
     try {
       const nodeId = req.params.nodeId as string;
       const ownerName = req.auth!.owner;
