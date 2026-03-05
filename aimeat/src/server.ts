@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,6 +96,9 @@ export interface ServerResult {
 
 export async function createServer(config: AimeatConfig): Promise<ServerResult> {
   const app = express();
+
+  // Compress all responses (gzip/deflate based on Accept-Encoding)
+  app.use(compression());
 
   // Global middleware
   app.use(express.json({ limit: '15mb' }));
