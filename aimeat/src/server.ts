@@ -55,6 +55,7 @@ import { createMyDataReceiptService } from './services/mydata-receipt.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
+import { requestIdMiddleware } from './middleware/request-id.js';
 import { workspaceAccessMiddleware } from './middleware/workspace-access.js';
 import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
@@ -174,6 +175,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     }
     next();
   });
+
+  // Request ID — assigns a unique ID to every request (uses X-Request-Id if present)
+  app.use(requestIdMiddleware());
 
   // Stats middleware — counts requests, methods, and status codes
   app.use(statsMiddleware(stats));
