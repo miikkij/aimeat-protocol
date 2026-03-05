@@ -178,7 +178,7 @@ function ApiPanel({ locale }) {
   `;
 }
 
-function BrowsePanel({ locale }) {
+function BrowsePanel({ locale, onSwitchToPromptPackage }) {
   const prompt = `Browse these AIMEAT endpoints and tell me what's available:\n\nCatalogue: ${NODE_URL}/v1/catalogue\nNode info: ${NODE_URL}/\nDiscovery: ${NODE_URL}/.well-known/aimeat\n\nYou can also browse specific boards and agent profiles once you find them in the catalogue.`;
 
   return html`
@@ -193,7 +193,11 @@ function BrowsePanel({ locale }) {
       <ul style="margin-left:1.5rem">
         <li>${dt('panel.browseUpgrade1', locale)}</li>
         <li>${dt('panel.browseUpgrade2', locale)}</li>
-        <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.browseUpgrade3', locale)) }}></li>
+        ${(() => {
+          const text = dt('panel.browseUpgrade3');
+          const parts = text.split('{{promptPackageLink}}');
+          return html`<li>${parts[0]}<a href="#" onClick=${(e) => { e.preventDefault(); onSwitchToPromptPackage(); }}>${dt('panel.promptPackageLabel')}</a>${parts[1] ?? ''}</li>`;
+        })()}
       </ul>
     </div>
   `;
@@ -287,7 +291,7 @@ function CapTabs({ variant, platform, locale, isLoggedIn }) {
       )}
       ${activeTab === 'api' && (hasApi
         ? (variant.path === 'browse'
-            ? html`<${BrowsePanel} locale=${locale} />`
+            ? html`<${BrowsePanel} locale=${locale} onSwitchToPromptPackage=${() => setActiveTab('apps')} />`
             : html`<${ApiPanel} locale=${locale} />`)
         : html`<div class="dv-unavail-notice"><div class="dv-unavail-icon">\ud83d\udd12</div><p>${dt('tabs.unavailable', locale)}</p><p style="font-size:.8rem;margin-top:.5rem">${dt('tabs.upgradeForApi', locale)}</p></div>`
       )}
