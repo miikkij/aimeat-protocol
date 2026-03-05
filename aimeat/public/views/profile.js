@@ -451,6 +451,7 @@ export default function Profile({ navigate, locale }) {
   const [expandedMem, setExpandedMem] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [rateModal, setRateModal] = useState(null);
+  const [scopesModal, setScopesModal] = useState(null);
   const [platExpand, setPlatExpand] = useState(false);
   const [activePlat, setActivePlat] = useState('windows');
   const [memSubTab, setMemSubTab] = useState('entries');
@@ -958,6 +959,23 @@ export default function Profile({ navigate, locale }) {
             ${a.capabilities?.length > 0 && html`
               <div class="caps">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
             `}
+            ${(() => {
+              const scopes = a.default_scopes ?? ['*'];
+              const tpl = detectTemplate(scopes);
+              const count = scopes.includes('*') ? '\u221E' : scopes.length;
+              const isOwnerOrOp = session.roles?.includes('owner') || session.roles?.includes('operator');
+              return html`
+                <div class="scope-summary">
+                  <span class="scope-badge">${templateLabel(tpl)}</span>
+                  <span class="scope-count">${count} ${t('profile.agents.scopeUi.scopes')}</span>
+                  ${isOwnerOrOp
+                    ? html`<button class="scope-manage-btn" onClick=${(e) => { e.stopPropagation(); setScopesModal(a); }}>
+                        ${t('profile.agents.scopeUi.manage')} \u25B8
+                      </button>`
+                    : html`<span class="scope-lock">\uD83D\uDD12</span>`
+                  }
+                </div>`;
+            })()}
           </div>
         `)
       }`;
@@ -1628,6 +1646,34 @@ export default function Profile({ navigate, locale }) {
           desc=${rateModal.desc}
           onSubmit=${(rating, comment) => submitRating(rateModal.workId, rating, comment)}
           onCancel=${() => setRateModal(null)}
+        />`}
+
+      ${scopesModal && html`
+        <${ScopesModal}
+          agent=${scopesModal}
+          session=${session}
+          onSave=${async (agentName, newScopes) => {
+            try {
+              const s = getSession();
+              if (!s?.fetch) return;
+              const resp = await s.fetch('/v1/agents/' + encodeURIComponent(agentName) + '/scopes', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scopes: newScopes }),
+              });
+              if (resp.ok !== false) {
+                showToast(t('profile.agents.scopeUi.saved'));
+                setScopesModal(null);
+                loadAgentsData();
+              } else {
+                const data = resp.json ? await resp.json() : {};
+                showToast(data?.error?.message || t('profile.agents.scopeUi.saveError'), true);
+              }
+            } catch (err) {
+              showToast(t('profile.agents.scopeUi.saveError'), true);
+            }
+          }}
+          onCancel=${() => setScopesModal(null)}
         />`}
 
       <!-- Toast -->
