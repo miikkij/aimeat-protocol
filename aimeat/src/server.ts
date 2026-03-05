@@ -388,7 +388,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Mount routes
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
-  app.use(bootstrapRouter(config));
+  app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined));
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
 
