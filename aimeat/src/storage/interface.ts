@@ -749,6 +749,7 @@ export interface CortexExtensionRecord {
   labels: Record<string, string>;
   aimeatCompat?: string;
   status: 'inactive' | 'active';
+  visibility: 'private' | 'public';
   installedAt: string;
   activatedAt?: string;
   installedBy: string;

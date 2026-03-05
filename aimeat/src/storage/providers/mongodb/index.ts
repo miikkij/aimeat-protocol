@@ -2401,10 +2401,12 @@ export class MongoStorage implements Storage {
         return this.cortexExtensions.get(name) ?? null;
     }
 
-    async listCortexExtensions(opts?: { status?: string; namespace?: string }): Promise<CortexExtensionRecord[]> {
+    async listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> {
         let results = [...this.cortexExtensions.values()];
         if (opts?.status) results = results.filter(e => e.status === opts.status);
         if (opts?.namespace) results = results.filter(e => e.namespace === opts.namespace);
+        if (opts?.visibility) results = results.filter(e => e.visibility === opts.visibility);
+        if (opts?.installedBy) results = results.filter(e => e.installedBy === opts.installedBy);
         return results;
     }
 

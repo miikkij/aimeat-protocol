@@ -42,7 +42,7 @@ export interface NodeRepository {
   refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
   createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord>;
   getCortexExtension(name: string): Promise<CortexExtensionRecord | null>;
-  listCortexExtensions(opts?: { status?: string; namespace?: string }): Promise<CortexExtensionRecord[]>;
+  listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]>;
   updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null>;
   deleteCortexExtension(name: string): Promise<boolean>;
   setCortexLibFile(extName: string, libName: string, content: string): Promise<void>;

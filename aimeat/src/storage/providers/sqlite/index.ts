@@ -3124,11 +3124,11 @@ export class SqliteStorage implements Storage {
   async createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord> {
     const existing = this.db.prepare('SELECT name FROM cortex_extensions WHERE name = ?').get(record.name);
     if (existing) throw new Error(`Cortex extension "${record.name}" already exists`);
-    this.db.prepare(`INSERT INTO cortex_extensions (name, namespace, shortName, apiVersion, version, description, author, license, tags, labels, aimeatCompat, status, installedAt, activatedAt, installedBy, manifest, components, activationArtifacts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    this.db.prepare(`INSERT INTO cortex_extensions (name, namespace, shortName, apiVersion, version, description, author, license, tags, labels, aimeatCompat, status, visibility, installedAt, activatedAt, installedBy, manifest, components, activationArtifacts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       record.name, record.namespace, record.shortName, record.apiVersion, record.version,
       record.description, record.author, record.license ?? null,
       JSON.stringify(record.tags), JSON.stringify(record.labels),
-      record.aimeatCompat ?? null, record.status, record.installedAt, record.activatedAt ?? null,
+      record.aimeatCompat ?? null, record.status, record.visibility ?? 'private', record.installedAt, record.activatedAt ?? null,
       record.installedBy, record.manifest,
       JSON.stringify(record.components), JSON.stringify(record.activationArtifacts),
     );
@@ -3140,11 +3140,13 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeCortexExtension(row) : null;
   }
 
-  async listCortexExtensions(opts?: { status?: string; namespace?: string }): Promise<CortexExtensionRecord[]> {
+  async listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> {
     let sql = 'SELECT * FROM cortex_extensions WHERE 1=1';
     const params: unknown[] = [];
     if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
     if (opts?.namespace) { sql += ' AND namespace = ?'; params.push(opts.namespace); }
+    if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
+    if (opts?.installedBy) { sql += ' AND installedBy = ?'; params.push(opts.installedBy); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeCortexExtension(r));
   }
@@ -3153,11 +3155,11 @@ export class SqliteStorage implements Storage {
     const existing = await this.getCortexExtension(name);
     if (!existing) return null;
     const merged = { ...existing, ...updates };
-    this.db.prepare(`UPDATE cortex_extensions SET namespace=?, shortName=?, apiVersion=?, version=?, description=?, author=?, license=?, tags=?, labels=?, aimeatCompat=?, status=?, installedAt=?, activatedAt=?, installedBy=?, manifest=?, components=?, activationArtifacts=? WHERE name=?`).run(
+    this.db.prepare(`UPDATE cortex_extensions SET namespace=?, shortName=?, apiVersion=?, version=?, description=?, author=?, license=?, tags=?, labels=?, aimeatCompat=?, status=?, visibility=?, installedAt=?, activatedAt=?, installedBy=?, manifest=?, components=?, activationArtifacts=? WHERE name=?`).run(
       merged.namespace, merged.shortName, merged.apiVersion, merged.version,
       merged.description, merged.author, merged.license ?? null,
       JSON.stringify(merged.tags), JSON.stringify(merged.labels),
-      merged.aimeatCompat ?? null, merged.status, merged.installedAt, merged.activatedAt ?? null,
+      merged.aimeatCompat ?? null, merged.status, merged.visibility ?? 'private', merged.installedAt, merged.activatedAt ?? null,
       merged.installedBy, merged.manifest,
       JSON.stringify(merged.components), JSON.stringify(merged.activationArtifacts), name,
     );
@@ -3200,6 +3202,7 @@ export class SqliteStorage implements Storage {
       labels: JSON.parse(row.labels as string || '{}'),
       aimeatCompat: row.aimeatCompat as string | undefined,
       status: row.status as 'inactive' | 'active',
+      visibility: (row.visibility as string) === 'public' ? 'public' : 'private',
       installedAt: row.installedAt as string,
       activatedAt: row.activatedAt as string | undefined,
       installedBy: row.installedBy as string,

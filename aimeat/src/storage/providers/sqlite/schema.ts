@@ -608,6 +608,7 @@ export function initializeSchema(db: Database.Database): void {
       labels             TEXT NOT NULL DEFAULT '{}',
       aimeatCompat       TEXT,
       status             TEXT NOT NULL DEFAULT 'inactive',
+      visibility         TEXT NOT NULL DEFAULT 'private',
       installedAt        TEXT NOT NULL,
       activatedAt        TEXT,
       installedBy        TEXT NOT NULL,

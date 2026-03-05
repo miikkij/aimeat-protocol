@@ -91,6 +91,7 @@ export function parseCortexManifest(
   const shortName = (metadata.shortName as string) ?? (name ?? '').split('/').pop() ?? '';
   const labels = (metadata.labels as Record<string, string>) ?? {};
   const tags = Array.isArray(metadata.tags) ? metadata.tags as string[] : [];
+  const visibility = (metadata.visibility as string) === 'public' ? 'public' as const : 'private' as const;
 
   // Validate spec
   const spec = doc.spec as Record<string, unknown> | undefined;
@@ -190,6 +191,7 @@ export function parseCortexManifest(
     labels,
     aimeatCompat,
     status: 'inactive',
+    visibility,
     installedAt: now,
     installedBy,
     manifest: yamlString,

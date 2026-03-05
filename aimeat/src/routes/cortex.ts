@@ -14,9 +14,11 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/cortex', requireAuth(), async (req, res) => {
     const status = req.query.status as string | undefined;
     const namespace = req.query.namespace as string | undefined;
+    const visibility = req.query.visibility as string | undefined;
     const extensions = await storage.listCortexExtensions({
       status: status || undefined,
       namespace: namespace || undefined,
+      visibility: visibility || undefined,
     });
 
     res.json(success(config.nodeId, {
@@ -28,6 +30,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         description: e.description,
         author: e.author,
         status: e.status,
+        visibility: e.visibility,
         tags: e.tags,
         installed_at: e.installedAt,
         activated_at: e.activatedAt,
@@ -158,6 +161,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       labels: ext.labels,
       aimeat_compat: ext.aimeatCompat,
       status: ext.status,
+      visibility: ext.visibility,
       installed_at: ext.installedAt,
       activated_at: ext.activatedAt,
       installed_by: ext.installedBy,
@@ -296,6 +300,27 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/activate` },
     ]));
+  });
+
+  // ── POST /v1/cortex/:name/visibility — toggle visibility ──
+  router.post('/v1/cortex/:name/visibility', requireAuth(), requireRole('owner'), async (req, res) => {
+    const name = decodeURIComponent(req.params.name as string);
+    const ext = await storage.getCortexExtension(name);
+    if (!ext) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+      return;
+    }
+    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
+      return;
+    }
+    const { visibility } = req.body ?? {};
+    if (visibility !== 'public' && visibility !== 'private') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "public" or "private"'));
+      return;
+    }
+    const updated = await storage.updateCortexExtension(name, { visibility });
+    res.json(success(config.nodeId, { name, visibility: updated?.visibility }));
   });
 
   // ── GET /v1/cortex/:name/prompts — list prompts from extension ──
