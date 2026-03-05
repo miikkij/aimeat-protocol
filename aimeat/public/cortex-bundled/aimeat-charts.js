@@ -30,7 +30,7 @@
   ];
 
   /** Chart types where each data-point gets its own colour slice. */
-  var SLICE_TYPES = ['pie', 'doughnut', 'polarArea'];
+  var SLICE_TYPES = ['pie', 'doughnut'];
 
   // ---------------------------------------------------------------------------
   // CSS injection (once)
@@ -438,20 +438,18 @@
     };
   }
 
-  AIMEAT.register('aimeat-charts', {
+  var exports = {
     ChartPanel: ChartPanel,
     ChartBuilder: ChartBuilder,
     TYPES: TYPES
-  });
+  };
+
+  AIMEAT.register('aimeat-charts', exports);
 
   // Also expose under the short alias "charts" for convenience:
   // AIMEAT.charts.ChartBuilder(...)
   if (!AIMEAT.charts) {
-    AIMEAT.charts = {
-      ChartPanel: ChartPanel,
-      ChartBuilder: ChartBuilder,
-      TYPES: TYPES
-    };
+    AIMEAT.charts = exports;
   }
 
 })(window.AIMEAT || (window.AIMEAT = {}));
