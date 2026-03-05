@@ -226,7 +226,8 @@
       "access": "Access",
       "nodes": "Nodes",
       "dataWallet": "Data Wallet",
-      "nodeStats": "Node Stats"
+      "nodeStats": "Node Stats",
+      "extensions": "Extensions"
     },
     "agents": {
       "title": "Your Agents",
@@ -610,6 +611,66 @@
       "scopeDenials": "Scope Denials",
       "requestsByMethod": "Requests by Method",
       "requestsByStatus": "Requests by Status"
+    },
+    "extensions": {
+      "title": "Cortex Extensions",
+      "desc": "Install and manage declarative extensions that provide schemas, prompts, ontologies, and UI libraries for your apps.",
+      "loading": "Loading extensions...",
+      "empty": "No extensions installed yet. Click '+ Install Extension' to add one.",
+      "install": "+ Install Extension",
+      "installModal": {
+        "title": "Install Cortex Extension",
+        "manifestLabel": "Manifest",
+        "uploadFile": "Upload file",
+        "pasteYaml": "Paste YAML",
+        "libsLabel": "Library files (optional)",
+        "uploadFiles": "Upload files",
+        "pasteCode": "Paste code",
+        "filenameLabel": "Filename",
+        "filenamePlaceholder": "e.g. recipe-ui.js",
+        "addLib": "+ Add another lib",
+        "cancel": "Cancel",
+        "installBtn": "Install",
+        "installing": "Installing..."
+      },
+      "status": { "active": "Active", "inactive": "Inactive" },
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "uninstall": "Uninstall",
+      "uninstallConfirm": "Are you sure? Seed data will be removed.",
+      "detail": {
+        "back": "\u2190 Back",
+        "whatsIncluded": "What's included",
+        "copyPrompt": "Copy prompt",
+        "copyApi": "Copy API",
+        "copyUrl": "Copy URL",
+        "copied": "Copied!",
+        "exports": "Exports",
+        "apiSurface": "API Surface",
+        "scriptTag": "Script tag",
+        "author": "Author",
+        "license": "License",
+        "tags": "Tags"
+      },
+      "components": {
+        "schema": "Schema",
+        "prompt": "Prompt",
+        "action": "Action",
+        "board-template": "Board",
+        "ontology": "Ontology",
+        "seed-data": "Seed data",
+        "lib": "Library"
+      },
+      "success": {
+        "installed": "Extension installed successfully!",
+        "activated": "Extension activated",
+        "deactivated": "Extension deactivated",
+        "uninstalled": "Extension uninstalled"
+      },
+      "error": {
+        "installFailed": "Installation failed",
+        "loadFailed": "Failed to load extensions"
+      }
     }
   },
   "dev": {

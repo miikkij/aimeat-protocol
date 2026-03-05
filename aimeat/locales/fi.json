@@ -226,7 +226,8 @@
       "access": "Pääsy",
       "nodes": "Solmut",
       "dataWallet": "Tietolompakko",
-      "nodeStats": "Solmutilastot"
+      "nodeStats": "Solmutilastot",
+      "extensions": "Laajennukset"
     },
     "agents": {
       "title": "Agenttisi",
@@ -610,6 +611,66 @@
       "scopeDenials": "Oikeushylkäykset",
       "requestsByMethod": "Pyynnöt metodin mukaan",
       "requestsByStatus": "Pyynnöt statuskoodin mukaan"
+    },
+    "extensions": {
+      "title": "Cortex-laajennukset",
+      "desc": "Asenna ja hallinnoi deklaratiivisia laajennuksia, jotka tarjoavat skeemoja, prompteja, ontologioita ja UI-kirjastoja sovelluksillesi.",
+      "loading": "Ladataan laajennuksia...",
+      "empty": "Ei asennettuja laajennuksia. Klikkaa '+ Asenna laajennus' lis\u00e4\u00e4ksesi.",
+      "install": "+ Asenna laajennus",
+      "installModal": {
+        "title": "Asenna Cortex-laajennus",
+        "manifestLabel": "Manifesti",
+        "uploadFile": "Lataa tiedosto",
+        "pasteYaml": "Liit\u00e4 YAML",
+        "libsLabel": "Kirjastotiedostot (valinnainen)",
+        "uploadFiles": "Lataa tiedostot",
+        "pasteCode": "Liit\u00e4 koodi",
+        "filenameLabel": "Tiedostonimi",
+        "filenamePlaceholder": "esim. recipe-ui.js",
+        "addLib": "+ Lis\u00e4\u00e4 kirjasto",
+        "cancel": "Peruuta",
+        "installBtn": "Asenna",
+        "installing": "Asennetaan..."
+      },
+      "status": { "active": "Aktiivinen", "inactive": "Ei k\u00e4yt\u00f6ss\u00e4" },
+      "activate": "Aktivoi",
+      "deactivate": "Deaktivoi",
+      "uninstall": "Poista",
+      "uninstallConfirm": "Oletko varma? Esimerkkidata poistetaan.",
+      "detail": {
+        "back": "\u2190 Takaisin",
+        "whatsIncluded": "Sis\u00e4lt\u00f6",
+        "copyPrompt": "Kopioi prompt",
+        "copyApi": "Kopioi API",
+        "copyUrl": "Kopioi URL",
+        "copied": "Kopioitu!",
+        "exports": "Exportit",
+        "apiSurface": "API-pinta",
+        "scriptTag": "Script-tagi",
+        "author": "Tekij\u00e4",
+        "license": "Lisenssi",
+        "tags": "Tagit"
+      },
+      "components": {
+        "schema": "Skeema",
+        "prompt": "Prompt",
+        "action": "Toiminto",
+        "board-template": "Keskustelualue",
+        "ontology": "Ontologia",
+        "seed-data": "Esimerkkidata",
+        "lib": "Kirjasto"
+      },
+      "success": {
+        "installed": "Laajennus asennettu!",
+        "activated": "Laajennus aktivoitu",
+        "deactivated": "Laajennus deaktivoitu",
+        "uninstalled": "Laajennus poistettu"
+      },
+      "error": {
+        "installFailed": "Asennus ep\u00e4onnistui",
+        "loadFailed": "Laajennusten lataus ep\u00e4onnistui"
+      }
     }
   },
   "dev": {
