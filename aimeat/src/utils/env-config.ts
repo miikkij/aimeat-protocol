@@ -460,6 +460,109 @@ export function formatConfig(config: AimeatConfig): string {
         },
       ],
     },
+    {
+      title: 'Push Notifications',
+      entries: [
+        {
+          envVar: 'AIMEAT_PUSH_ENABLED',
+          description: 'Push notifications enabled',
+          value: config.pushEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_VAPID_PUBLIC_KEY',
+          description: 'VAPID public key',
+          value: config.vapidPublicKey ? mask(config.vapidPublicKey) : '(not set)',
+          defaultVal: '(none)',
+          secret: true,
+        },
+        {
+          envVar: 'AIMEAT_VAPID_PRIVATE_KEY',
+          description: 'VAPID private key',
+          value: config.vapidPrivateKey ? mask(config.vapidPrivateKey) : '(not set)',
+          defaultVal: '(none)',
+          secret: true,
+        },
+        {
+          envVar: 'AIMEAT_VAPID_SUBJECT',
+          description: 'VAPID subject (contact URI)',
+          value: config.vapidSubject,
+          defaultVal: 'mailto:admin@aimeat.example.com',
+        },
+        {
+          envVar: 'AIMEAT_PUSH_NOTIFY_TYPES',
+          description: 'Message types triggering push',
+          value: config.pushNotifyTypes.join(', '),
+          defaultVal: 'work_assignment, action_request',
+        },
+        {
+          envVar: 'AIMEAT_PUSH_COOLDOWN_MIN',
+          description: 'Min minutes between notifications per node',
+          value: String(config.pushCooldownMin),
+          defaultVal: '5',
+        },
+        {
+          envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE',
+          description: 'Max subscriptions per node',
+          value: String(config.pushMaxSubscriptionsPerNode),
+          defaultVal: '5',
+        },
+        {
+          envVar: 'AIMEAT_PUSH_MAX_FAILURES',
+          description: 'Auto-remove after N failures',
+          value: String(config.pushMaxFailures),
+          defaultVal: '3',
+        },
+        {
+          envVar: 'AIMEAT_EMAIL_RATE_LIMIT_MIN',
+          description: 'Min minutes between email notifications',
+          value: String(config.emailRateLimitMin),
+          defaultVal: '30',
+        },
+      ],
+    },
+    {
+      title: 'Email / SMTP',
+      entries: [
+        {
+          envVar: 'AIMEAT_SMTP_HOST',
+          description: 'SMTP server host',
+          value: config.smtpHost ?? '(not set)',
+          defaultVal: '(none)',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_PORT',
+          description: 'SMTP port',
+          value: String(config.smtpPort),
+          defaultVal: '587',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_USER',
+          description: 'SMTP username',
+          value: config.smtpUser ?? '(not set)',
+          defaultVal: '(none)',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_PASS',
+          description: 'SMTP password',
+          value: config.smtpPass ? '****' : '(not set)',
+          defaultVal: '(none)',
+          secret: true,
+        },
+        {
+          envVar: 'AIMEAT_SMTP_FROM',
+          description: 'From address',
+          value: config.smtpFrom,
+          defaultVal: 'AIMEAT <noreply@localhost>',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_SECURE',
+          description: 'Use TLS (port 465)',
+          value: config.smtpSecure ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+      ],
+    },
   ];
 
   const lines: string[] = [];
