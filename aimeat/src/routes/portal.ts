@@ -10,6 +10,51 @@ import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 
 const __dirname_portal = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Unique token set once when the server process starts.
+ * Used as a query-string version stamp on all first-party ES module URLs so
+ * that every server restart busts the browser's ES-module cache automatically.
+ * (HTTP ETag/no-cache alone is insufficient — browsers keep modules in the
+ *  module registry for the entire session regardless of HTTP headers.)
+ */
+const BUILD_ID = Date.now().toString(36);
+
+/**
+ * Serve spa.html with:
+ *  - Cache-Control: no-cache so the browser always revalidates the shell
+ *  - window.__B injected so dynamic import() calls can append ?v=BUILD_ID
+ *  - importmap entries stamped with BUILD_ID so ALL first-party modules
+ *    (static + dynamic imports from any view) get fresh URLs after restart
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serveSpa(res: any, spaPath: string): void {
+  const v = `?v=${BUILD_ID}`;
+  let html = readFileSync(spaPath, 'utf-8');
+
+  // Inject window.__B for dynamic import() cache-busting in spa.html scripts
+  html = html.replace('</head>', `<script>window.__B="${v}";</script>\n</head>`);
+
+  // Stamp all importmap entries with the build version
+  html = html.replace(
+    /"preact": "\/lib\/preact\.mjs"/,
+    `"preact": "/lib/preact.mjs${v}"`
+  ).replace(
+    /"preact\/hooks": "\/lib\/preact-hooks\.mjs"/,
+    `"preact/hooks": "/lib/preact-hooks.mjs${v}"`
+  ).replace(
+    /"htm": "\/lib\/htm\.mjs"/,
+    `"htm": "/lib/htm.mjs${v}"`
+  )
+  // Stamp utility module importmap entries (added to spa.html importmap)
+  .replace(/"\/js\/i18n\.js": "\/js\/i18n\.js"/, `"/js/i18n.js": "/js/i18n.js${v}"`)
+  .replace(/"\/js\/utils\.js": "\/js\/utils\.js"/, `"/js/utils.js": "/js/utils.js${v}"`)
+  .replace(/"\/js\/api\.js": "\/js\/api\.js"/, `"/js/api.js": "/js/api.js${v}"`)
+  .replace(/"\/js\/hooks\.js": "\/js\/hooks\.js"/, `"/js/hooks.js": "/js/hooks.js${v}"`);
+
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('text/html').send(html);
+}
+
 /** Resolve a file from public/ directory (works from both src/ and dist/). */
 function resolvePublicFile(filename: string): string | null {
   const candidates = [
@@ -488,7 +533,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/portal', (_req, res) => {
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      res.type('text/html').send(readFileSync(spaPath, 'utf-8'));
+      serveSpa(res, spaPath);
     } else {
       res.redirect(302, '/spa.html');
     }
@@ -598,7 +643,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     router.get(path, (_req, res) => {
       const spaPath = resolvePublicFile('spa.html');
       if (spaPath) {
-        res.type('text/html').send(readFileSync(spaPath, 'utf-8'));
+        serveSpa(res, spaPath);
       } else {
         res.redirect(302, '/spa.html');
       }

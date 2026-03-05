@@ -14,7 +14,11 @@
     "imports": {
       "preact": "/lib/preact.mjs",
       "preact/hooks": "/lib/preact-hooks.mjs",
-      "htm": "/lib/htm.mjs"
+      "htm": "/lib/htm.mjs",
+      "/js/i18n.js": "/js/i18n.js",
+      "/js/utils.js": "/js/utils.js",
+      "/js/api.js": "/js/api.js",
+      "/js/hooks.js": "/js/hooks.js"
     }
   }
   </script>
@@ -66,22 +70,26 @@
     }
 
     // ── Route definitions ──
+    // window.__B is injected by the server as "?v=BUILD_ID" to bust the browser's
+    // ES module cache on every server restart (HTTP no-cache/ETag alone is
+    // insufficient — modules stay in the module registry for the full session).
+    const B = window.__B || '';
     const ROUTES = {
-      '/v1/portal':      () => import('/views/portal.js'),
-      '/v1/profile':     () => import('/views/profile.js'),
-      '/v1/guides':      () => import('/views/guides.js'),
-      '/v1/hobbies':     () => import('/views/hobbies.js'),
-      '/v1/marketplace': () => import('/views/marketplace.js'),
-      '/v1/aimeat-os':   () => import('/views/aimeat-os.js'),
-      '/v1/openclaw':    () => import('/views/openclaw.js'),
-      '/v1/classic':     () => import('/views/portal-classic.js'),
+      '/v1/portal':      () => import('/views/portal.js' + B),
+      '/v1/profile':     () => import('/views/profile.js' + B),
+      '/v1/guides':      () => import('/views/guides.js' + B),
+      '/v1/hobbies':     () => import('/views/hobbies.js' + B),
+      '/v1/marketplace': () => import('/views/marketplace.js' + B),
+      '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
+      '/v1/openclaw':    () => import('/views/openclaw.js' + B),
+      '/v1/classic':     () => import('/views/portal-classic.js' + B),
     };
 
     // Match route, handling query params for special views
     function matchRoute(pathname, search) {
       // Dev portal is ?view=dev on /v1/portal
       if (pathname === '/v1/portal' && search.includes('view=dev')) {
-        return () => import('/views/portal-dev.js');
+        return () => import('/views/portal-dev.js' + B);
       }
       return ROUTES[pathname] || ROUTES['/v1/portal'];
     }
