@@ -494,14 +494,28 @@ function GenesisCanvas() {
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
 
-    // Load Three.js dynamically
+    // Load Three.js dynamically (local first, CDN fallback)
     let cleanup = null;
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-    script.onload = () => {
-      cleanup = initThreeJS(container, canvas);
-    };
-    document.head.appendChild(script);
+    function loadScript(src, integrity) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        if (integrity) {
+          s.integrity = integrity;
+          s.crossOrigin = 'anonymous';
+        }
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    loadScript('/lib/three.min.js')
+      .catch(() => loadScript(
+        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+        'sha512-dLRZkJFxYnrzUDxZPOSqtoPL4bv/Ph5//CYzcDBJnKsYV8naPXQdMcY0rU1NY1MBNnxeimUaVGNumzm3AtrQQ=='
+      ))
+      .then(() => { cleanup = initThreeJS(container, canvas); })
+      .catch(() => { /* Three.js unavailable — canvas stays blank */ });
 
     return () => {
       if (cleanup) cleanup();

@@ -91,6 +91,40 @@ export function persistLocale(locale) {
   document.cookie = `aimeat-lang=${locale};path=/;max-age=31536000;SameSite=Lax`;
 }
 
+/** Strip HTML tags, allowing only a safe whitelist. */
+export function sanitizeHtml(html) {
+  if (!html) return '';
+  const ALLOWED = /^(b|i|em|strong|code|a|br|p|ul|ol|li|blockquote)$/i;
+  const div = document.createElement('div');
+  div.innerHTML = String(html);
+  function walk(node) {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) continue; // text node — keep
+      if (child.nodeType !== 1) { child.remove(); continue; }
+      const tag = child.tagName.toLowerCase();
+      if (!ALLOWED.test(tag)) {
+        // Replace disallowed element with its text content
+        child.replaceWith(document.createTextNode(child.textContent || ''));
+        continue;
+      }
+      // Strip all attributes except href on <a>
+      for (const attr of Array.from(child.attributes)) {
+        if (tag === 'a' && attr.name === 'href') {
+          // Only allow http(s) and relative URLs
+          if (!/^(https?:\/\/|\/)/.test(attr.value)) child.removeAttribute('href');
+          child.setAttribute('rel', 'noopener noreferrer');
+          child.setAttribute('target', '_blank');
+        } else {
+          child.removeAttribute(attr.name);
+        }
+      }
+      walk(child);
+    }
+  }
+  walk(div);
+  return div.innerHTML;
+}
+
 /** Generate twinkling star elements for background canvas. */
 export function generateStars(container, count = 80) {
   for (let i = 0; i < count; i++) {

@@ -9,6 +9,9 @@
  * Automatically attaches JWT if a session exists.
  * Returns the parsed AIMEAT envelope: { ok, data, error, hints }
  */
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 500;
+
 export async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
 
@@ -20,9 +23,27 @@ export async function api(path, opts = {}) {
     }
   }
 
-  const resp = await fetch(path, { ...opts, headers });
-  return resp.json();
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const resp = await fetch(path, { ...opts, headers });
+      if (resp.status === 429 || (resp.status >= 500 && attempt < MAX_RETRIES)) {
+        await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
+        continue;
+      }
+      return resp.json();
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
+        continue;
+      }
+    }
+  }
+  return { ok: false, error: { code: 'NETWORK_ERROR', message: lastError?.message || 'Request failed' } };
 }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 /** GET shorthand. */
 export function apiGet(path) {
