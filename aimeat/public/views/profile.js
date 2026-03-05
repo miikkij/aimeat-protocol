@@ -611,6 +611,7 @@ export default function Profile({ navigate, locale }) {
   const [extManifestMode, setExtManifestMode] = useState('upload');
   const [extLibMode, setExtLibMode] = useState('upload');
   const [extLibEntries, setExtLibEntries] = useState([{filename:'', code:''}]);
+  const [bundledInstalling, setBundledInstalling] = useState(null);
 
   const loadedRef = useRef(new Set());
   const toastTimer = useRef(null);
@@ -925,6 +926,66 @@ export default function Profile({ navigate, locale }) {
     } catch(e) {
       showToast(t('profile.extensions.error.installFailed') + ': ' + e.message, true);
     }
+  }
+
+  async function installBundledExtension(name) {
+    setBundledInstalling(name);
+    const s = getSession();
+    try {
+      const yamlResp = await fetch(NODE_URL + '/cortex-bundled/' + name + '.yaml');
+      if (!yamlResp.ok) throw new Error('Could not fetch manifest');
+      const manifest = await yamlResp.text();
+
+      const libs = {};
+      try {
+        const jsResp = await fetch(NODE_URL + '/cortex-bundled/' + name + '.js');
+        if (jsResp.ok) {
+          const jsContent = await jsResp.text();
+          libs[name + '.js'] = btoa(unescape(encodeURIComponent(jsContent)));
+        }
+      } catch(e) { /* no lib file, ok */ }
+
+      const body = { manifest };
+      if (Object.keys(libs).length > 0) body.libs = libs;
+
+      const resp = await s.fetch('/v1/cortex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || 'Install failed');
+
+      showToast(t('profile.extensions.success.installed'));
+      loadExtensions();
+    } catch(e) {
+      showToast(e.message, true);
+    } finally {
+      setBundledInstalling(null);
+    }
+  }
+
+  function copyExtensionPrompt() {
+    const sess = getSession() || {};
+    const prompt = buildCortexPrompt(sess);
+    copyToClipboard(prompt);
+    showToast(t('profile.extensions.promptCopied'));
+  }
+
+  async function toggleVisibility(name, currentVis) {
+    const s = getSession();
+    const newVis = currentVis === 'public' ? 'private' : 'public';
+    try {
+      const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: newVis }),
+      });
+      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      showToast(newVis === 'public' ? t('profile.extensions.publish') : t('profile.extensions.unpublish'));
+      loadExtensions();
+      if (extDetailName === name) loadExtDetail(name);
+    } catch(e) { showToast(e.message, true); }
   }
 
   // ── CRUD actions ──
@@ -1961,7 +2022,7 @@ export default function Profile({ navigate, locale }) {
   const COMP_COLORS = {schema:'#60a5fa',prompt:'#a78bfa',action:'#f59e0b','board-template':'#34d399',ontology:'#f472b6','seed-data':'#6ee7b7',lib:'#38bdf8'};
 
   const renderExtensions = () => {
-    // Detail view
+    // Detail view (when viewing a specific extension)
     if (extDetailName) {
       if (!extDetail) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><br/><${Spinner} text=${t('profile.extensions.loading')} /></div>`;
       if (extDetail.error) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><div class="empty">Error: ${escHtml(extDetail.error)}</div></div>`;
@@ -1969,11 +2030,16 @@ export default function Profile({ navigate, locale }) {
       const ext = extDetail;
       const comps = ext.components || [];
       const isActive = ext.status === 'active';
+      const vis = ext.visibility || 'private';
 
       return html`
         <button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button>
         <div style="margin:1.5rem 0">
-          <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">${escHtml(ext.name)} <span style="font-size:.8rem;font-weight:400;color:var(--muted)">${'v' + escHtml(ext.version || '?')}</span></div>
+          <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">
+            ${escHtml(ext.name)}
+            <span style="font-size:.8rem;font-weight:400;color:var(--muted)">${'v' + escHtml(ext.version || '?')}</span>
+            <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'} ${t('profile.extensions.visibility.' + vis)}</span>
+          </div>
           <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${escHtml(ext.description || '')}</div>
           <div style="display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);margin-bottom:1.5rem;flex-wrap:wrap">
             <span>${t('profile.extensions.detail.author')}: ${escHtml(ext.author || '?')}</span>
@@ -2024,35 +2090,53 @@ export default function Profile({ navigate, locale }) {
             <div style="font-size:.85rem;color:var(--muted)">${Object.entries(ont.concepts || {}).map(([k, c]) => escHtml(k) + ' (' + escHtml(c.label?.en || k) + ')').join(', ')}</div>
           </div>`)}
 
-        <div style="display:flex;gap:1rem;margin-top:1.5rem">
+        <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap">
           ${isActive
             ? html`<button class="btn-outline" onClick=${() => deactivateExt(ext.name)}>${t('profile.extensions.deactivate')}</button>`
             : html`<button class="btn-primary" onClick=${() => activateExt(ext.name)}>${t('profile.extensions.activate')}</button>`}
+          <button class="btn-outline" onClick=${() => toggleVisibility(ext.name, vis)}>
+            ${vis === 'public' ? t('profile.extensions.unpublish') : t('profile.extensions.publish')}
+          </button>
           <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
         </div>`;
     }
 
-    // Grid view
-    return html`
-      <div class="section-title">${t('profile.extensions.title')}</div>
-      <div class="section-desc">${t('profile.extensions.desc')}</div>
+    // ── Grid view (main extensions page) ──
+    const hasExtensions = extensions && extensions.length > 0;
+    const installedNames = (extensions || []).map(e => e.name);
+    const BUNDLED = [
+      { id: 'aimeat-charts', icon: '\u{1F4CA}', nameKey: 'profile.extensions.bundled.charts.name', descKey: 'profile.extensions.bundled.charts.desc' },
+      { id: 'aimeat-canvas', icon: '\u{1F3A8}', nameKey: 'profile.extensions.bundled.canvas.name', descKey: 'profile.extensions.bundled.canvas.desc' },
+    ];
+    const unbundled = BUNDLED.filter(b => !installedNames.includes(b.id));
 
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <div></div>
-        <button class="btn-primary" onClick=${() => setShowExtInstall(true)}>${t('profile.extensions.install')}</button>
+    return html`
+      <!-- Hero section -->
+      <div class="ext-hero">
+        <div class="section-title">${'\u{1F9E9}'} ${t('profile.extensions.title')}</div>
+        ${!hasExtensions
+          ? html`<div class="ext-hero-desc">${t('profile.extensions.heroDesc')}</div>`
+          : html`<div class="section-desc">${t('profile.extensions.desc')}</div>`}
+        <div class="ext-hero-actions">
+          <button class="btn-primary" onClick=${copyExtensionPrompt}>${'\u{1F916}'} ${t('profile.extensions.createWithAi')}</button>
+          <button class="btn-outline" onClick=${() => setShowExtInstall(true)}>${t('profile.extensions.install')}</button>
+        </div>
       </div>
 
+      <!-- Installed extensions grid -->
       ${!extensions ? html`<${Spinner} text=${t('profile.extensions.loading')} />`
-        : extensions.length === 0 ? html`<div class="empty">${t('profile.extensions.empty')}</div>`
+        : !hasExtensions ? null
         : html`<div class="ext-grid">
             ${extensions.map(ext => {
               const types = ext.component_types || [];
               const isActive = ext.status === 'active';
+              const vis = ext.visibility || 'private';
               return html`
                 <div class="ext-card" onClick=${() => loadExtDetail(ext.name)}>
                   <div class="ext-card-header">
                     <span class="ext-card-name">${escHtml(ext.name)}</span>
                     <span class="ext-card-version">${'v' + escHtml(ext.version || '?')}</span>
+                    <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'}</span>
                   </div>
                   <div class="ext-card-desc">${escHtml(ext.description || '')}</div>
                   <div class="ext-card-tags">
@@ -2071,6 +2155,29 @@ export default function Profile({ navigate, locale }) {
             })}
           </div>`}
 
+      <!-- Empty state message (only when no extensions AND no bundled to show) -->
+      ${!hasExtensions && unbundled.length === 0 ? html`<div class="empty">${t('profile.extensions.empty')}</div>` : null}
+
+      <!-- Bundled extensions (only show uninstalled ones) -->
+      ${unbundled.length > 0 ? html`
+        <div style="margin-top:${hasExtensions ? '2rem' : '0'}">
+          <div style="font-size:.95rem;font-weight:600;margin-bottom:.75rem;color:var(--muted)">${t('profile.extensions.readyExtensions')}</div>
+          <div class="ext-bundled-grid">
+            ${unbundled.map(b => html`
+              <div class="ext-bundled-card">
+                <div class="ext-bundled-icon">${b.icon}</div>
+                <div class="ext-bundled-name">${t(b.nameKey)}</div>
+                <div class="ext-bundled-desc">${t(b.descKey)}</div>
+                <button class="btn-primary" style="font-size:.85rem;padding:.5rem 1rem"
+                  disabled=${bundledInstalling === b.id}
+                  onClick=${() => installBundledExtension(b.id)}>
+                  ${bundledInstalling === b.id ? html`<${Spinner} />` : t('profile.extensions.addThis')}
+                </button>
+              </div>`)}
+          </div>
+        </div>` : null}
+
+      <!-- Install modal (unchanged) -->
       ${showExtInstall ? html`
         <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowExtInstall(false); }}>
           <div class="modal" style="max-width:600px">

@@ -245,6 +245,22 @@
 .pf .ext-detail-code{font-family:monospace;font-size:.8rem;background:rgba(0,0,0,.3);padding:10px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
 .pf .ext-copy-btn{font-size:.7rem;padding:3px 10px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:var(--muted,#c4a6d0);cursor:pointer;margin-left:auto}
 .pf .ext-copy-btn:hover{background:rgba(255,255,255,0.1)}
+/* Extensions hero */
+.pf .ext-hero{margin-bottom:1.5rem}
+.pf .ext-hero-desc{font-size:.95rem;color:var(--muted);line-height:1.7;margin-bottom:1.25rem;max-width:600px}
+.pf .ext-hero-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem}
+/* Bundled extension cards */
+.pf .ext-bundled-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:.75rem}
+.pf .ext-bundled-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:1.25rem;transition:all .2s}
+.pf .ext-bundled-card:hover{background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.15)}
+.pf .ext-bundled-icon{font-size:2rem;margin-bottom:.75rem}
+.pf .ext-bundled-name{font-weight:700;font-size:1rem;margin-bottom:.5rem}
+.pf .ext-bundled-desc{font-size:.85rem;color:var(--muted);line-height:1.5;margin-bottom:1rem}
+/* Visibility badge */
+.pf .ext-visibility-badge{font-size:.7rem;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.08);margin-left:.5rem}
+.pf .ext-visibility-badge.public{color:#4ade80}
+.pf .ext-visibility-badge.private{color:var(--muted)}
 @media(max-width:600px){
   .pf .ext-grid{grid-template-columns:1fr}
+  .pf .ext-bundled-grid{grid-template-columns:1fr}
 }
