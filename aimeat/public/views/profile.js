@@ -5,6 +5,51 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 
+// === Scope Management Constants ===
+const SCOPE_DOMAINS = [
+  { key: 'memory',    permissions: ['read', 'write', 'delete'] },
+  { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },
+  { key: 'social',    permissions: ['read', 'write'] },
+  { key: 'wallet',    permissions: ['read'] },
+  { key: 'consent',   permissions: ['manage'] },
+  { key: 'tunnel',    permissions: ['connect'] },
+  { key: 'agent',     permissions: ['register'] },
+  { key: 'catalogue', permissions: ['read'] },
+];
+
+const SCOPE_TEMPLATES = {
+  readonly:  ['memory:read', 'catalogue:read', 'social:read'],
+  standard:  ['memory:read', 'memory:write', 'catalogue:read', 'social:read', 'work:request', 'work:read'],
+  full:      ['*'],
+};
+
+function detectTemplate(scopes) {
+  if (!scopes || scopes.length === 0) return 'full';
+  if (scopes.includes('*')) return 'full';
+  const sorted = [...scopes].sort();
+  for (const [name, tpl] of Object.entries(SCOPE_TEMPLATES)) {
+    if (name === 'full') continue;
+    const tplSorted = [...tpl].sort();
+    if (sorted.length === tplSorted.length && sorted.every((s, i) => s === tplSorted[i])) return name;
+  }
+  return 'custom';
+}
+
+function templateLabel(name) {
+  const map = { readonly: 'readOnly', standard: 'standard', full: 'fullAccess', custom: 'custom' };
+  return t(`profile.agents.scopeUi.${map[name] || 'custom'}`);
+}
+
+function domainLabel(domain) {
+  const cap = domain.charAt(0).toUpperCase() + domain.slice(1);
+  return t(`profile.agents.scopeUi.domain${cap}`);
+}
+
+function permLabel(perm) {
+  const cap = perm.charAt(0).toUpperCase() + perm.slice(1);
+  return t(`profile.agents.scopeUi.perm${cap}`);
+}
+
 /* ── CSS (scoped under .pf) ── */
 const PROFILE_CSS = `
 .pf{max-width:1000px;margin:0 auto;padding:2rem 1.5rem;position:relative;z-index:1}
