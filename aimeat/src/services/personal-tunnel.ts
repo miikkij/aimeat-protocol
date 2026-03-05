@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { getStats } from './stats.js';
 
 export interface TunnelMessage {
   type: 'request' | 'response' | 'mailbox_sync' | 'mailbox_ack' | 'heartbeat' | 'heartbeat_ack' | 'disconnect' | 'welcome' | 'delivery_receipt';
@@ -47,6 +48,13 @@ export class TunnelManager {
     };
     this.connections.set(nodeId, conn);
 
+    const stats = getStats();
+    if (stats) {
+      if (existing) stats.incrementTunnel('reconnects_total');
+      stats.incrementTunnel('connections_total');
+      stats.setTunnelGauge('connections_active', this.connections.size);
+    }
+
     // Update storage status to online
     this.storage.updatePersonalNode(nodeId, {
       status: 'online',
@@ -89,6 +97,11 @@ export class TunnelManager {
 
     ws.on('close', () => {
       this.connections.delete(nodeId);
+      const stats = getStats();
+      if (stats) {
+        stats.incrementTunnel('disconnections_total');
+        stats.setTunnelGauge('connections_active', this.connections.size);
+      }
       this.storage.updatePersonalNode(nodeId, {
         status: 'offline',
         lastSeen: new Date().toISOString(),
@@ -104,6 +117,9 @@ export class TunnelManager {
   private handleMessage(nodeId: string, msg: TunnelMessage): void {
     const conn = this.connections.get(nodeId);
     if (!conn) return;
+
+    const stats = getStats();
+    if (stats) stats.incrementTunnel('messages_received_total');
 
     switch (msg.type) {
       case 'heartbeat': {
@@ -150,6 +166,11 @@ export class TunnelManager {
         // Graceful disconnect from personal node
         conn.ws.close(1000, 'graceful');
         this.connections.delete(nodeId);
+        const stats2 = getStats();
+        if (stats2) {
+          stats2.incrementTunnel('disconnections_total');
+          stats2.setTunnelGauge('connections_active', this.connections.size);
+        }
         this.storage.updatePersonalNode(nodeId, {
           status: 'offline',
           lastSeen: new Date().toISOString(),
@@ -208,15 +229,28 @@ export class TunnelManager {
       return null;
     }
 
+    const stats = getStats();
+    if (stats) stats.incrementTunnel('messages_sent_total');
+
     const effectiveTimeout = timeoutMs ?? this.config.personalNodeRequestTimeoutMs;
+    const startTime = Date.now();
 
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.pendingResponses.delete(message.id);
+        if (stats) stats.incrementTunnel('delivery_failures_total');
         resolve(null);
       }, effectiveTimeout);
 
-      this.pendingResponses.set(message.id, { resolve, timer });
+      this.pendingResponses.set(message.id, {
+        resolve: (msg) => {
+          if (msg && stats) {
+            stats.recordDeliveryLatency(Date.now() - startTime);
+          }
+          resolve(msg);
+        },
+        timer,
+      });
       conn.ws.send(JSON.stringify(message));
     });
   }
@@ -248,6 +282,12 @@ export class TunnelManager {
           logger.warn('Personal node heartbeat timeout', { nodeId, elapsed });
           conn.ws.close(1000, 'heartbeat_timeout');
           this.connections.delete(nodeId);
+          const stats = getStats();
+          if (stats) {
+            stats.incrementTunnel('heartbeat_misses_total');
+            stats.incrementTunnel('disconnections_total');
+            stats.setTunnelGauge('connections_active', this.connections.size);
+          }
           this.storage.updatePersonalNode(nodeId, {
             status: 'offline',
             lastSeen: new Date(conn.lastHeartbeat).toISOString(),
