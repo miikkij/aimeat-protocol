@@ -225,7 +225,8 @@
       "federation": "Federaatio",
       "access": "Pääsy",
       "nodes": "Solmut",
-      "dataWallet": "Tietolompakko"
+      "dataWallet": "Tietolompakko",
+      "nodeStats": "Solmutilastot"
     },
     "agents": {
       "title": "Agenttisi",
@@ -573,6 +574,42 @@
       "wsl2": "WSL2",
       "android": "Android",
       "aws": "AWS / Cloud"
+    },
+    "nodeStats": {
+      "title": "Solmun tilastot",
+      "desc": "Reaaliaikaiset tilastot tältä AIMEAT-solmulta. Näyttää käyttöajan, pyyntöaktiviteetin, tunneliyhteydet, postilaatikon käytön ja turvallisuustapahtumat.",
+      "loading": "Ladataan tilastoja...",
+      "error": "Tilastojen lataus epäonnistui. Tilastot voivat olla pois käytöstä tässä solmussa.",
+      "uptime": "Käyttöaika",
+      "startedAt": "Käynnistetty",
+      "requests": "Pyynnöt",
+      "owners": "Omistajat",
+      "agents": "Agentit",
+      "memoryWrites": "Muistikirjoitukset",
+      "memoryReads": "Muistiluvut",
+      "consentGrants": "Suostumusten myönnöt",
+      "consentRevocations": "Suostumusten perut",
+      "schemaValidations": "Skeemavalidoinnit",
+      "schemaFailures": "Skeemavirheet",
+      "tunnelTitle": "Tunneli",
+      "tunnelActive": "Aktiiviset",
+      "tunnelTotal": "Yhteydet yhteensä",
+      "msgSent": "Viestejä lähetetty",
+      "msgReceived": "Viestejä vastaanotettu",
+      "deliveryFails": "Toimitusvirheet",
+      "latencyAvg": "Keskim. viive",
+      "latencyP95": "P95-viive",
+      "mailboxTitle": "Postilaatikko",
+      "mailboxItems": "Jonossa",
+      "mailboxBytes": "Tallennustila",
+      "mailboxDelivered": "Toimitettu",
+      "mailboxExpired": "Vanhentuneet",
+      "securityTitle": "Turvallisuus",
+      "authFailures": "Tunnistusvirheet",
+      "rateLimitHits": "Rajoitusosumia",
+      "scopeDenials": "Oikeushylkäykset",
+      "requestsByMethod": "Pyynnöt metodin mukaan",
+      "requestsByStatus": "Pyynnöt statuskoodin mukaan"
     }
   },
   "dev": {
