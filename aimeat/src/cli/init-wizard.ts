@@ -122,6 +122,8 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_SMTP_FROM: 'AIMEAT <noreply@localhost>',
   AIMEAT_SMTP_SECURE: 'false',
   AIMEAT_EMAIL_RATE_LIMIT_MIN: '30',
+  AIMEAT_METRICS_ENABLED: 'false',
+  AIMEAT_METRICS_ACCESS: 'operator',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -326,6 +328,13 @@ function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_SMTP_PASS' },
         { key: 'AIMEAT_SMTP_FROM' },
         { key: 'AIMEAT_SMTP_SECURE' },
+      ],
+    },
+    {
+      title: 'Metrics & Observability (REQ-008)',
+      vars: [
+        { key: 'AIMEAT_METRICS_ENABLED', comment: 'Enable Prometheus metrics at GET /v1/metrics' },
+        { key: 'AIMEAT_METRICS_ACCESS', comment: 'public | authenticated | operator' },
       ],
     },
   ];
@@ -814,6 +823,37 @@ async function askCoreSettings(
         t,
       );
       if (smtpSecure) settings.AIMEAT_SMTP_SECURE = 'true';
+    }
+  }
+
+  // ── Metrics & Observability ──
+  if (useCase === 'public' || useCase === 'custom') {
+    const metricsDefault = env.AIMEAT_METRICS_ENABLED === 'true';
+    const metricsEnabled = checkCancel(
+      await p.confirm({
+        message: t('init.metricsEnabled'),
+        initialValue: metricsDefault,
+      }),
+      t,
+    );
+
+    if (metricsEnabled) {
+      settings.AIMEAT_METRICS_ENABLED = 'true';
+
+      const accessDefault = env.AIMEAT_METRICS_ACCESS || 'operator';
+      const metricsAccess = checkCancel(
+        await p.select({
+          message: t('init.metricsAccess'),
+          initialValue: accessDefault,
+          options: [
+            { value: 'public', label: t('init.metricsAccessPublic') },
+            { value: 'authenticated', label: t('init.metricsAccessAuthenticated') },
+            { value: 'operator', label: t('init.metricsAccessOperator') },
+          ],
+        }),
+        t,
+      );
+      settings.AIMEAT_METRICS_ACCESS = metricsAccess as string;
     }
   }
 

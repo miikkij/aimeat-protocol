@@ -563,6 +563,35 @@ export function formatConfig(config: AimeatConfig): string {
         },
       ],
     },
+    {
+      title: 'Metrics & Observability',
+      entries: [
+        {
+          envVar: 'AIMEAT_STATS_ENABLED',
+          description: 'Enable stats endpoint (GET /v1/stats)',
+          value: config.statsEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_STATS_ACCESS',
+          description: 'Stats access level (public | authenticated | operator)',
+          value: config.statsAccess,
+          defaultVal: 'public',
+        },
+        {
+          envVar: 'AIMEAT_METRICS_ENABLED',
+          description: 'Enable Prometheus metrics endpoint (GET /v1/metrics)',
+          value: config.metricsEnabled ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_METRICS_ACCESS',
+          description: 'Metrics access level (public | authenticated | operator)',
+          value: config.metricsAccess,
+          defaultVal: 'operator',
+        },
+      ],
+    },
   ];
 
   const lines: string[] = [];
