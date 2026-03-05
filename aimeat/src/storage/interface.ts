@@ -281,6 +281,29 @@ export interface MailboxItemRecord {
   createdAt: string;
 }
 
+// ── Personal Push Subscriptions (REQ-007) ──────────────────
+
+export interface PersonalPushSubscriptionRecord {
+  id: string;
+  personalNodeId: string;
+  ownerName: string;
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  failureCount: number;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface NotificationPreferences {
+  personalNodeId: string;
+  enabled: boolean;
+  channels: ('web_push' | 'email')[];
+  notifyTypes: string[];
+  cooldownMinutes: number;
+  quietHoursUtc: { start: string; end: string } | null;
+  email: string | null;
+}
+
 export interface MaintenanceState {
   enabled: boolean;
   message: string;
@@ -754,6 +777,7 @@ import type { OrganismRepository } from './repositories/organism.repository.js';
 import type { MarketplaceRepository } from './repositories/marketplace.repository.js';
 import type { FederationRepository } from './repositories/federation.repository.js';
 import type { NodeRepository } from './repositories/node.repository.js';
+import type { NotificationRepository } from './repositories/notification.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -762,4 +786,4 @@ export interface Storage extends
   MicroMemoryRepository, FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
-  FederationRepository, NodeRepository {}
+  FederationRepository, NodeRepository, NotificationRepository {}

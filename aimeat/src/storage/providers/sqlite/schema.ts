@@ -639,6 +639,29 @@ export function initializeSchema(db: Database.Database): void {
       enabledBy      TEXT
     );
 
+    -- ── Personal Push Subscriptions (REQ-007) ──
+    CREATE TABLE IF NOT EXISTS personal_push_subscriptions (
+      id              TEXT PRIMARY KEY,
+      personalNodeId  TEXT NOT NULL,
+      ownerName       TEXT NOT NULL,
+      endpoint        TEXT NOT NULL,
+      keys            TEXT NOT NULL DEFAULT '{}',
+      failureCount    INTEGER NOT NULL DEFAULT 0,
+      createdAt       TEXT NOT NULL,
+      lastUsedAt      TEXT
+    );
+
+    -- ── Notification Preferences (REQ-007) ──
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      personalNodeId  TEXT PRIMARY KEY,
+      enabled         INTEGER NOT NULL DEFAULT 1,
+      channels        TEXT NOT NULL DEFAULT '["web_push"]',
+      notifyTypes     TEXT NOT NULL DEFAULT '["work_assignment","action_request"]',
+      cooldownMinutes INTEGER NOT NULL DEFAULT 5,
+      quietHoursUtc   TEXT,
+      email           TEXT
+    );
+
     -- ═══════════════════════════════════════════════════════
     -- Indexes
     -- ═══════════════════════════════════════════════════════
@@ -675,6 +698,8 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_purchases_sellerOwner ON purchases(sellerOwner);
     CREATE INDEX IF NOT EXISTS idx_genesis_nodeId ON genesis_peers(genesisNodeId);
     CREATE INDEX IF NOT EXISTS idx_escrow_fromGaii ON escrow_holds(fromGaii);
+    CREATE INDEX IF NOT EXISTS idx_pps_nodeId ON personal_push_subscriptions(personalNodeId);
+    CREATE INDEX IF NOT EXISTS idx_pps_ownerName ON personal_push_subscriptions(ownerName);
 
   `);
 }

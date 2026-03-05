@@ -148,6 +148,11 @@ export interface AimeatConfig {
   vapidPublicKey: string | null;
   vapidPrivateKey: string | null;
   vapidSubject: string;
+  pushNotifyTypes: string[];
+  pushCooldownMin: number;
+  pushMaxSubscriptionsPerNode: number;
+  pushMaxFailures: number;
+  emailRateLimitMin: number;
 
   // EUDIW / Identity Verification (Phase 3.3)
   eudiwEnabled: boolean;
@@ -324,6 +329,11 @@ export function loadConfig(): AimeatConfig {
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
     vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,
     vapidSubject: process.env.AIMEAT_VAPID_SUBJECT ?? 'mailto:admin@aimeat.example.com',
+    pushNotifyTypes: (process.env.AIMEAT_PUSH_NOTIFY_TYPES ?? 'work_assignment,action_request').split(',').map(s => s.trim()),
+    pushCooldownMin: parseInt(process.env.AIMEAT_PUSH_COOLDOWN_MIN ?? '5', 10),
+    pushMaxSubscriptionsPerNode: parseInt(process.env.AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE ?? '5', 10),
+    pushMaxFailures: parseInt(process.env.AIMEAT_PUSH_MAX_FAILURES ?? '3', 10),
+    emailRateLimitMin: parseInt(process.env.AIMEAT_EMAIL_RATE_LIMIT_MIN ?? '30', 10),
     eudiwEnabled: process.env.AIMEAT_EUDIW_ENABLED === 'true',
     eudiwClientId: process.env.AIMEAT_EUDIW_CLIENT_ID ?? 'aimeat-verifier-001',
     eudiwRedirectUri: process.env.AIMEAT_EUDIW_REDIRECT_URI ?? '',
