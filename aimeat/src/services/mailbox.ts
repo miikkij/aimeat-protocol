@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { getStats } from './stats.js';
 
 export class MailboxService {
   constructor(
@@ -16,6 +17,8 @@ export class MailboxService {
     // Check capacity
     const hasRoom = await this.hasCapacity(personalNodeId, item.sizeBytes);
     if (!hasRoom) {
+      const stats = getStats();
+      if (stats) stats.incrementMailbox('quota_rejections_total');
       logger.warn('Mailbox quota exceeded', { personalNodeId, sizeBytes: item.sizeBytes });
       return null;
     }
@@ -30,6 +33,8 @@ export class MailboxService {
     };
 
     const created = await this.storage.createMailboxItem(record);
+    const stats = getStats();
+    if (stats) stats.incrementMailbox('enqueued_total');
     logger.info('Mailbox item queued', {
       personalNodeId,
       type: item.type,
@@ -52,6 +57,10 @@ export class MailboxService {
 
   async cleanExpired(): Promise<number> {
     const removed = await this.storage.cleanExpiredMailboxItems();
+    const stats = getStats();
+    if (stats && removed > 0) {
+      for (let i = 0; i < removed; i++) stats.incrementMailbox('expired_total');
+    }
     if (removed > 0) {
       logger.info(`Mailbox cleanup: removed ${removed} expired items`);
     }

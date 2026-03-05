@@ -156,6 +156,10 @@ export class TunnelManager {
             for (const id of itemIds) {
               this.storage.deleteMailboxItem(id).catch(() => { /* ignore */ });
             }
+            const stats3 = getStats();
+            if (stats3) {
+              for (let i = 0; i < itemIds.length; i++) stats3.incrementMailbox('delivered_total');
+            }
             logger.info('Mailbox items acknowledged and deleted', { nodeId, count: itemIds.length });
           } catch { /* ignore parse errors */ }
         }
