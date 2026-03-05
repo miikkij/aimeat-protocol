@@ -129,6 +129,16 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     app.use(express.static(publicDir, { maxAge: '7d' }));
   }
 
+  // Serve locale files at /locales/*.json (used by SPA i18n module)
+  const localeCandidates = [
+    join(__dirname, '..', 'locales'),      // dev: src/../locales
+    join(__dirname, '..', '..', 'locales'), // dist: dist/src/../../locales
+  ];
+  const localeDir = localeCandidates.find(p => existsSync(p));
+  if (localeDir) {
+    app.use('/locales', express.static(localeDir, { maxAge: '1h' }));
+  }
+
   // PWA static files (manifest.json, sw.js, offline.html, icons)
   const pwaCandidates = [
     join(__dirname, '..', 'src', 'static'),      // dev

@@ -27,13 +27,43 @@
   <div id="app"></div>
 
   <script type="module">
-    import { h, render } from 'preact';
+    import { h, render, Component } from 'preact';
     import { useState, useEffect, useCallback } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
     import { generateStars } from '/js/utils.js';
 
     const html = htm.bind(h);
+
+    // ── Error Boundary ──
+    class ErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { error };
+      }
+      componentDidCatch(error, info) {
+        console.error('View render error:', error, info);
+      }
+      render() {
+        if (this.state.error) {
+          const retry = () => {
+            this.setState({ error: null });
+            if (this.props.onRetry) this.props.onRetry();
+          };
+          return html`
+            <div style="text-align:center; padding:3rem 1.5rem; color:var(--text-dim,#888);">
+              <h2 style="color:var(--text-bright,#fff); margin-bottom:0.5rem;">Something went wrong</h2>
+              <p style="margin-bottom:1rem; font-size:0.9rem;">${this.state.error?.message || 'Unknown error'}</p>
+              <button class="btn-primary" onClick=${retry} style="animation:none;">Retry</button>
+            </div>
+          `;
+        }
+        return this.props.children;
+      }
+    }
 
     // ── Route definitions ──
     const ROUTES = {
@@ -59,6 +89,7 @@
     // ── App Component ──
     function App() {
       const [View, setView] = useState(null);
+      const [viewError, setViewError] = useState(null);
       const [locale, setLocale] = useState(getLocale());
 
       // Navigate to a route
@@ -73,10 +104,13 @@
         }
         
         try {
+          setViewError(null);
           const mod = await loader();
           setView(() => mod.default);
         } catch (err) {
           console.error('Failed to load view:', err);
+          setViewError(err);
+          setView(null);
         }
       }, []);
 
@@ -88,9 +122,15 @@
 
         // Handle back/forward
         const onPopState = () => {
-          const p = location.pathname + location.search;
           const loader = matchRoute(location.pathname, location.search);
-          loader().then(mod => setView(() => mod.default));
+          loader().then(mod => {
+            setViewError(null);
+            setView(() => mod.default);
+          }).catch(err => {
+            console.error('Popstate view load failed:', err);
+            setViewError(err);
+            setView(null);
+          });
         };
         window.addEventListener('popstate', onPopState);
 
@@ -118,10 +158,23 @@
         return onLocaleChange((loc) => setLocale(loc));
       }, []);
 
+      const retryView = useCallback(() => {
+        navigate(location.pathname + location.search, true);
+      }, [navigate]);
+
       return html`
         <${Header} navigate=${navigate} locale=${locale} />
         <div class="page-content">
-          ${View ? html`<${View} navigate=${navigate} locale=${locale} />` : html`<div class="empty"><div class="spinner"></div></div>`}
+          ${viewError
+            ? html`<div style="text-align:center; padding:3rem 1.5rem; color:var(--text-dim,#888);">
+                <h2 style="color:var(--text-bright,#fff); margin-bottom:0.5rem;">Failed to load page</h2>
+                <p style="margin-bottom:1rem; font-size:0.9rem;">${viewError.message || 'Network error'}</p>
+                <button class="btn-primary" onClick=${retryView} style="animation:none;">Retry</button>
+              </div>`
+            : View
+              ? html`<${ErrorBoundary} onRetry=${retryView}><${View} navigate=${navigate} locale=${locale} /></${ErrorBoundary}>`
+              : html`<div class="empty"><div class="spinner"></div></div>`
+          }
         </div>
       `;
     }
@@ -213,22 +266,38 @@
         document.head.appendChild(script);
       });
 
+      // Restore session from localStorage (critical for Ctrl+F5 / page reload)
+      if (window.AIMEAT?.auth?.login) {
+        try { await window.AIMEAT.auth.login(); } catch (_) {}
+      }
+
       // Mount Preact app
       render(html`<${App} />`, document.getElementById('app'));
 
       // Mount auth button after Preact renders
       requestAnimationFrame(() => {
-        const authSlot = document.getElementById('headerAuth');
-        if (authSlot && window.AIMEAT?.auth?.mountLoginButton) {
-          window.AIMEAT.auth.mountLoginButton(authSlot, {
-            onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
-            onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
-          });
+        try {
+          if (document.getElementById('headerAuth') && window.AIMEAT?.auth?.mountLoginButton) {
+            window.AIMEAT.auth.mountLoginButton('#headerAuth', {
+              onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+              onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+            });
+          }
+        } catch (err) {
+          console.error('Auth mount failed:', err);
         }
       });
     }
 
-    boot();
+    boot().catch(err => {
+      console.error('Boot failed:', err);
+      document.getElementById('app').innerHTML =
+        '<div style="text-align:center;padding:3rem;color:#ccc;font-family:system-ui">' +
+        '<h2>AIMEAT failed to start</h2>' +
+        '<p>' + (err.message || 'Unknown error') + '</p>' +
+        '<button onclick="location.reload()" style="margin-top:1rem;padding:0.6rem 1.5rem;background:#ff69b4;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">Reload</button>' +
+        '</div>';
+    });
   </script>
 </body>
 </html>

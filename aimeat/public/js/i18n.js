@@ -30,8 +30,10 @@ export async function loadTranslations(locale) {
 
   // Always load English as fallback
   const enRes = await fetch('/locales/en.json');
-  const enData = await enRes.json();
-  fallback = flatten(enData);
+  if (enRes.ok) {
+    const enData = await enRes.json();
+    fallback = flatten(enData);
+  }
   translations = fallback;
 
   if (currentLocale !== 'en') {

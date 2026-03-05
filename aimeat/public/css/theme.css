@@ -438,7 +438,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 1.5rem;
-  transition: all 0.3s;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card:hover {
