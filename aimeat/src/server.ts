@@ -277,6 +277,11 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     logger.info('Mailbox push notification service initialized');
   }
 
+  // Wire notification service to tunnel manager for cooldown clearing on reconnect (REQ-007)
+  if (tunnelManager && mailboxNotificationService) {
+    tunnelManager.setNotificationService(mailboxNotificationService);
+  }
+
   // ── Maintenance mode guard ──
   // Returns 503 for non-essential paths when maintenance is enabled.
   // Operators always pass. Essential paths (health, admin, spec, well-known) always pass.

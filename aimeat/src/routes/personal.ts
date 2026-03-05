@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MailboxItemRecord } from '../storage/interface.js';
+import type { Storage, MailboxItemRecord, NotificationPreferences } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { isAllowedPushEndpoint } from '../services/mailbox-notification.js';
@@ -487,6 +487,150 @@ export function personalRouter(
     } catch (err) {
       logger.error('Failed to send test push notification', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to send test push notification'));
+    }
+  });
+
+  // ── Notification Preferences Routes (REQ-007) ──────────────
+
+  // GET /v1/personal/anchor/:nodeId/notifications — Get notification preferences
+  router.get('/v1/personal/anchor/:nodeId/notifications', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view notification preferences for your own personal nodes'));
+        return;
+      }
+
+      const stored = await storage.getNotificationPreferences(nodeId);
+      const defaults: NotificationPreferences = {
+        personalNodeId: nodeId,
+        enabled: true,
+        channels: ['web_push'],
+        notifyTypes: [...config.pushNotifyTypes],
+        cooldownMinutes: config.pushCooldownMin,
+        quietHoursUtc: null,
+        email: null,
+      };
+
+      const prefs = stored ?? defaults;
+
+      res.json(success(config.nodeId, {
+        personal_node_id: prefs.personalNodeId,
+        enabled: prefs.enabled,
+        channels: prefs.channels,
+        notify_types: prefs.notifyTypes,
+        cooldown_minutes: prefs.cooldownMinutes,
+        quiet_hours_utc: prefs.quietHoursUtc,
+        email: prefs.email,
+        is_default: !stored,
+      }, [
+        {
+          description: 'Update notification preferences',
+          method: 'PATCH',
+          url: `/v1/personal/anchor/${encodeURIComponent(nodeId)}/notifications`,
+        },
+      ]));
+    } catch (err) {
+      logger.error('Failed to get notification preferences', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get notification preferences'));
+    }
+  });
+
+  // PATCH /v1/personal/anchor/:nodeId/notifications — Update notification preferences
+  router.patch('/v1/personal/anchor/:nodeId/notifications', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only update notification preferences for your own personal nodes'));
+        return;
+      }
+
+      const body = req.body ?? {};
+
+      // Validate channels
+      if (body.channels !== undefined) {
+        if (!Array.isArray(body.channels) || !body.channels.every((c: unknown) => c === 'web_push' || c === 'email')) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'channels must be an array of "web_push" or "email"'));
+          return;
+        }
+      }
+
+      // Validate cooldownMinutes
+      if (body.cooldownMinutes !== undefined) {
+        if (typeof body.cooldownMinutes !== 'number' || body.cooldownMinutes < 1 || body.cooldownMinutes > 1440) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'cooldownMinutes must be a number between 1 and 1440'));
+          return;
+        }
+      }
+
+      // Validate quietHoursUtc
+      if (body.quietHoursUtc !== undefined && body.quietHoursUtc !== null) {
+        const qh = body.quietHoursUtc;
+        const hhmmRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+        if (!qh.start || !qh.end || !hhmmRegex.test(qh.start) || !hhmmRegex.test(qh.end)) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'quietHoursUtc must have start and end in HH:MM format'));
+          return;
+        }
+      }
+
+      // Merge with existing preferences (or defaults)
+      const existing = await storage.getNotificationPreferences(nodeId) ?? {
+        personalNodeId: nodeId,
+        enabled: true,
+        channels: ['web_push'] as ('web_push' | 'email')[],
+        notifyTypes: [...config.pushNotifyTypes],
+        cooldownMinutes: config.pushCooldownMin,
+        quietHoursUtc: null,
+        email: null,
+      };
+
+      const merged: NotificationPreferences = {
+        personalNodeId: nodeId,
+        enabled: body.enabled !== undefined ? body.enabled : existing.enabled,
+        channels: body.channels !== undefined ? body.channels : existing.channels,
+        notifyTypes: body.notifyTypes !== undefined ? body.notifyTypes : existing.notifyTypes,
+        cooldownMinutes: body.cooldownMinutes !== undefined ? body.cooldownMinutes : existing.cooldownMinutes,
+        quietHoursUtc: body.quietHoursUtc !== undefined ? body.quietHoursUtc : existing.quietHoursUtc,
+        email: body.email !== undefined ? body.email : existing.email,
+      };
+
+      const saved = await storage.upsertNotificationPreferences(merged);
+
+      res.json(success(config.nodeId, {
+        personal_node_id: saved.personalNodeId,
+        enabled: saved.enabled,
+        channels: saved.channels,
+        notify_types: saved.notifyTypes,
+        cooldown_minutes: saved.cooldownMinutes,
+        quiet_hours_utc: saved.quietHoursUtc,
+        email: saved.email,
+        is_default: false,
+      }, [
+        {
+          description: 'View notification preferences',
+          method: 'GET',
+          url: `/v1/personal/anchor/${encodeURIComponent(nodeId)}/notifications`,
+        },
+      ]));
+    } catch (err) {
+      logger.error('Failed to update notification preferences', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update notification preferences'));
     }
   });
 
