@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { TunnelManager, TunnelMessage } from './personal-tunnel.js';
 import { MailboxService } from './mailbox.js';
+import type { MailboxNotificationService } from './mailbox-notification.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -26,6 +27,7 @@ export async function routeToPersonalNode(
     fromGaii: string;
     payload: string;
   },
+  notificationService?: MailboxNotificationService | null,
 ): Promise<RoutingResult> {
   // Find which personal node hosts this agent
   const allNodes = await storage.listPersonalNodes();
@@ -87,6 +89,10 @@ export async function routeToPersonalNode(
   });
 
   if (queued) {
+    // Fire-and-forget push notification to node owner (REQ-007)
+    if (notificationService) {
+      void notificationService.notify(personalNode.nodeId, queued);
+    }
     return { delivered: false, queued: true, reason: 'node_offline' };
   }
 

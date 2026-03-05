@@ -1,14 +1,22 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MailboxItemRecord } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
+import type { MailboxNotificationService } from '../services/mailbox-notification.js';
+import { isAllowedPushEndpoint } from '../services/mailbox-notification.js';
 import { MailboxService } from '../services/mailbox.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 
-export function personalRouter(config: AimeatConfig, storage: Storage, tunnelManager: TunnelManager | null): Router {
+export function personalRouter(
+  config: AimeatConfig,
+  storage: Storage,
+  tunnelManager: TunnelManager | null,
+  notificationService?: MailboxNotificationService | null,
+): Router {
   const router = Router();
   const mailboxService = new MailboxService(config, storage);
 
@@ -213,6 +221,9 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
 
       // Clean up: flush mailbox, close tunnel connection, delete record
       await storage.deleteMailboxItemsByNode(nodeId);
+      // Clean up push subscriptions and notification preferences (REQ-007)
+      await storage.deletePersonalPushSubscriptionsByNode(nodeId);
+      await storage.deleteNotificationPreferences(nodeId);
       // Close WebSocket if connected
       const conn = tunnelManager?.getConnection(nodeId);
       if (conn) {
@@ -276,6 +287,206 @@ export function personalRouter(config: AimeatConfig, storage: Storage, tunnelMan
     } catch (err) {
       logger.error('Failed to get mailbox stats', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get mailbox stats'));
+    }
+  });
+
+  // ── Push Subscription Routes (REQ-007) ─────────────────────
+
+  // POST /v1/personal/push/subscribe — Register a push subscription
+  router.post('/v1/personal/push/subscribe', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      if (!config.pushEnabled) {
+        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Push notifications are disabled on this node'));
+        return;
+      }
+
+      const { personalNodeId, endpoint, keys } = req.body ?? {};
+      if (!personalNodeId || !endpoint || !keys?.p256dh || !keys?.auth) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'personalNodeId, endpoint, and keys (p256dh, auth) are required'));
+        return;
+      }
+
+      // Verify node exists
+      const node = await storage.getPersonalNode(personalNodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${personalNodeId} not found`));
+        return;
+      }
+
+      // Verify ownership (or operator)
+      const ownerName = req.auth!.owner;
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only manage push subscriptions for your own personal nodes'));
+        return;
+      }
+
+      // Validate endpoint against allowed domains (SSRF prevention)
+      if (!isAllowedPushEndpoint(endpoint)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Push endpoint domain is not allowed'));
+        return;
+      }
+
+      // Check subscription count limit
+      const count = await storage.countPersonalPushSubscriptions(personalNodeId);
+      if (count >= config.pushMaxSubscriptionsPerNode) {
+        res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${config.pushMaxSubscriptionsPerNode} push subscriptions per node`));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const subscription = await storage.createPersonalPushSubscription({
+        id: uuidv4(),
+        personalNodeId,
+        ownerName,
+        endpoint,
+        keys: { p256dh: keys.p256dh, auth: keys.auth },
+        failureCount: 0,
+        createdAt: now,
+        lastUsedAt: null,
+      });
+
+      logger.info('Push subscription created', { subId: subscription.id, nodeId: personalNodeId });
+
+      res.status(201).json(success(config.nodeId, {
+        id: subscription.id,
+        personal_node_id: subscription.personalNodeId,
+        endpoint: subscription.endpoint.substring(0, 60) + '...',
+        created_at: subscription.createdAt,
+      }, [
+        {
+          description: 'List push subscriptions',
+          method: 'GET',
+          url: `/v1/personal/push/subscriptions/${encodeURIComponent(personalNodeId)}`,
+        },
+        {
+          description: 'Test push notification',
+          method: 'POST',
+          url: `/v1/personal/push/test/${encodeURIComponent(personalNodeId)}`,
+        },
+      ]));
+    } catch (err) {
+      logger.error('Failed to create push subscription', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create push subscription'));
+    }
+  });
+
+  // DELETE /v1/personal/push/subscribe/:id — Remove a push subscription
+  router.delete('/v1/personal/push/subscribe/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const subId = req.params.id as string;
+      const ownerName = req.auth!.owner;
+
+      const subscription = await storage.getPersonalPushSubscription(subId);
+      if (!subscription) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Push subscription ${subId} not found`));
+        return;
+      }
+
+      // Verify ownership (or operator)
+      if (subscription.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only delete your own push subscriptions'));
+        return;
+      }
+
+      await storage.deletePersonalPushSubscription(subId);
+      logger.info('Push subscription deleted', { subId, nodeId: subscription.personalNodeId });
+
+      res.json(success(config.nodeId, {
+        id: subId,
+        deleted: true,
+      }));
+    } catch (err) {
+      logger.error('Failed to delete push subscription', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete push subscription'));
+    }
+  });
+
+  // GET /v1/personal/push/subscriptions/:nodeId — List push subscriptions for a node
+  router.get('/v1/personal/push/subscriptions/:nodeId', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view push subscriptions for your own personal nodes'));
+        return;
+      }
+
+      const subscriptions = await storage.listPersonalPushSubscriptions(nodeId);
+      const truncated = subscriptions.map(sub => ({
+        id: sub.id,
+        endpoint: sub.endpoint.substring(0, 60) + '...',
+        failure_count: sub.failureCount,
+        created_at: sub.createdAt,
+        last_used_at: sub.lastUsedAt,
+      }));
+
+      res.json(success(config.nodeId, {
+        node_id: nodeId,
+        subscriptions: truncated,
+        total: truncated.length,
+        max: config.pushMaxSubscriptionsPerNode,
+      }));
+    } catch (err) {
+      logger.error('Failed to list push subscriptions', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list push subscriptions'));
+    }
+  });
+
+  // POST /v1/personal/push/test/:nodeId — Send a test push notification
+  router.post('/v1/personal/push/test/:nodeId', requireAuth(), requireRole('owner'), async (req, res) => {
+    try {
+      const nodeId = req.params.nodeId as string;
+      const ownerName = req.auth!.owner;
+
+      const node = await storage.getPersonalNode(nodeId);
+      if (!node) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Personal node ${nodeId} not found`));
+        return;
+      }
+
+      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only test push notifications for your own personal nodes'));
+        return;
+      }
+
+      if (!notificationService) {
+        res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Push notification service is not available'));
+        return;
+      }
+
+      // Create a synthetic test mailbox item
+      const now = new Date().toISOString();
+      const testItem: MailboxItemRecord = {
+        id: `test-${uuidv4()}`,
+        personalNodeId: nodeId,
+        type: 'action_request',
+        fromGaii: 'system:test',
+        toGaii: node.agentGaiis[0] ?? 'unknown',
+        payload: JSON.stringify({ event: 'push.test', message: 'Test notification' }),
+        sizeBytes: 0,
+        retentionDays: 0,
+        expiresAt: now,
+        createdAt: now,
+      };
+
+      const result = await notificationService.notify(nodeId, testItem);
+
+      res.json(success(config.nodeId, {
+        node_id: nodeId,
+        test_sent: result.sent,
+        channel: result.channel ?? null,
+        reason: result.reason ?? null,
+      }));
+    } catch (err) {
+      logger.error('Failed to send test push notification', { error: err });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to send test push notification'));
     }
   });
 

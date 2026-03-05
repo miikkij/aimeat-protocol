@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
@@ -90,6 +91,7 @@ async function createWorkItem(
   requesterGaii: string,
   body: any,
   peers: Map<string, PeerInfo>,
+  notificationService?: MailboxNotificationService | null,
 ) {
   const { action_id, provider_gaii, input, ttl_hours, callback_url, priority } = body;
 
@@ -202,7 +204,7 @@ async function createWorkItem(
   if (personalNodeTarget) {
     const { MailboxService } = await import('../services/mailbox.js');
     const mailboxService = new MailboxService(config, storage);
-    await mailboxService.enqueue(personalNodeTarget, {
+    const enqueuedItem = await mailboxService.enqueue(personalNodeTarget, {
       personalNodeId: personalNodeTarget,
       type: 'work_assignment',
       fromGaii: requesterGaii,
@@ -215,18 +217,26 @@ async function createWorkItem(
       }),
       sizeBytes: 0,
       retentionDays: 7,
-    }).catch(err => logger.warn('Failed to queue work notification for personal node', { nodeId: personalNodeTarget, error: String(err) }));
+    }).catch(err => {
+      logger.warn('Failed to queue work notification for personal node', { nodeId: personalNodeTarget, error: String(err) });
+      return null;
+    });
+
+    // Fire-and-forget push notification to node owner (REQ-007)
+    if (enqueuedItem && notificationService) {
+      void notificationService.notify(personalNodeTarget, enqueuedItem);
+    }
   }
 
   return { work, personalNodeTarget };
 }
 
-export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
+export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, notificationService?: MailboxNotificationService | null): Router {
   const router = Router();
 
   // POST /v1/work/request — submit a work request (spec path)
   router.post('/v1/work/request', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
-    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers);
+    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers, notificationService);
     if ('forwarded' in result) {
       res.status(result.remoteStatus as number).json(result.remoteResult);
       return;
@@ -253,7 +263,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
   // POST /v1/work — legacy submit path (alias)
   router.post('/v1/work', requireAuth(), requireRole('agent'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
-    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers);
+    const result = await createWorkItem(config, storage, req.auth!.sub, req.body ?? {}, peers, notificationService);
     if ('forwarded' in result) {
       res.status(result.remoteStatus as number).json(result.remoteResult);
       return;
@@ -283,7 +293,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     const results = [];
     for (const r of requests) {
-      const result = await createWorkItem(config, storage, req.auth!.sub, r, peers);
+      const result = await createWorkItem(config, storage, req.auth!.sub, r, peers, notificationService);
       if ('forwarded' in result) {
         results.push({ forwarded: true, remote_result: result.remoteResult });
       } else if ('error' in result) {
