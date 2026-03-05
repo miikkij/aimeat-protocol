@@ -200,6 +200,34 @@ const PROFILE_CSS = `
   .pf .consent-table,.pf .audit-table{font-size:.75rem}
   .pf .consent-table th,.pf .consent-table td,.pf .audit-table th,.pf .audit-table td{padding:.4rem}
 }
+/* === Scope Management UI === */
+.pf .scope-summary {display:flex;align-items:center;gap:.5rem;margin-top:.65rem;padding-top:.5rem;border-top:1px solid rgba(255,107,157,.1);font-size:.8rem}
+.pf .scope-summary .scope-badge {background:rgba(255,107,157,.12);color:var(--love4,#f48fb1);padding:.15rem .5rem;border-radius:5px;font-weight:600;font-size:.72rem}
+.pf .scope-summary .scope-count {color:var(--muted,#c4a6d0);font-size:.78rem}
+.pf .scope-summary .scope-manage-btn {margin-left:auto;background:none;border:1px solid var(--border,rgba(255,107,157,.25));color:var(--love4,#f48fb1);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.72rem;font-weight:600;transition:all .2s}
+.pf .scope-summary .scope-manage-btn:hover {border-color:var(--love1,#ff6b9d);color:var(--love1,#ff6b9d)}
+.pf .scope-readonly-list {display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}
+.pf .scope-readonly-list .scope-tag {font-size:.68rem;background:rgba(255,107,157,.08);color:var(--muted,#c4a6d0);padding:.12rem .4rem;border-radius:4px}
+.pf .scope-modal {max-width:560px}
+.pf .scope-modal h3 {margin-bottom:.25rem}
+.pf .scope-modal .scope-agent-info {color:var(--muted,#c4a6d0);font-size:.8rem;margin-bottom:1.25rem;font-family:monospace}
+.pf .scope-templates {display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem}
+.pf .scope-tpl-btn {flex:1;min-width:100px;padding:.6rem .75rem;background:var(--card,rgba(30,20,40,.85));border:1px solid var(--border,rgba(255,107,157,.25));border-radius:8px;cursor:pointer;color:var(--muted,#c4a6d0);font-size:.8rem;font-weight:600;transition:all .2s;text-align:center}
+.pf .scope-tpl-btn:hover {color:var(--text,#f0e6f6);border-color:var(--love4,#f48fb1)}
+.pf .scope-tpl-btn.active {color:var(--love1,#ff6b9d);border-color:var(--love1,#ff6b9d);background:rgba(255,107,157,.1)}
+.pf .scope-advanced-toggle {background:none;border:1px solid var(--border,rgba(255,107,157,.25));color:var(--love4,#f48fb1);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px;margin-bottom:1rem}
+.pf .scope-advanced-toggle:hover {border-color:var(--love1,#ff6b9d);color:var(--love1,#ff6b9d)}
+.pf .scope-domain {background:rgba(15,10,20,.5);border:1px solid rgba(255,107,157,.1);border-radius:8px;padding:.75rem;margin-bottom:.5rem}
+.pf .scope-domain-header {display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;cursor:pointer}
+.pf .scope-domain-header .domain-label {font-weight:600;font-size:.85rem;color:var(--text,#f0e6f6)}
+.pf .scope-domain-header .domain-toggle {font-size:.65rem;color:var(--muted,#c4a6d0)}
+.pf .scope-row {display:flex;align-items:center;gap:.6rem;padding:.3rem 0}
+.pf .scope-row label {display:flex;align-items:center;gap:.5rem;cursor:pointer;flex:1}
+.pf .scope-row input[type="checkbox"] {accent-color:var(--love1,#ff6b9d);width:16px;height:16px;cursor:pointer}
+.pf .scope-row .scope-friendly {font-size:.82rem;color:var(--text,#f0e6f6)}
+.pf .scope-row .scope-technical {font-size:.7rem;color:var(--muted,#c4a6d0);font-family:monospace}
+.pf .scope-row.disabled {opacity:.45;pointer-events:none}
+.pf .scope-row .scope-lock {font-size:.7rem;color:var(--muted,#c4a6d0)}
 `;
 
 /* ── Auth helpers ── */
