@@ -206,9 +206,11 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       agents: agents.map(a => ({
         gaii: a.gaii,
+        name: a.name,
         display_name: a.displayName,
         description: a.description,
         capabilities: a.capabilities,
+        default_scopes: a.defaultScopes ?? ['*'],
         trust_score: a.trustScore,
         morsel_balance: a.morselBalance,
         created_at: a.createdAt,
