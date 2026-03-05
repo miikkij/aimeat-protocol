@@ -634,6 +634,105 @@ export interface EscrowHoldRecord {
   releasedTo?: string;
 }
 
+// ── Cortex Extensions (Manifest-based) ────────────────────────────
+
+export interface CortexSchemaComponent {
+  type: 'schema';
+  name: string;
+  key_pattern: string;
+  apply_to: 'prefix' | 'exact';
+  schema: Record<string, unknown>;
+}
+
+export interface CortexPromptComponent {
+  type: 'prompt';
+  name: string;
+  content: string;
+  variables?: string[];
+}
+
+export interface CortexActionComponent {
+  type: 'action';
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export interface CortexBoardTemplateComponent {
+  type: 'board-template';
+  name: string;
+  title: string;
+  description: string;
+  visibility: 'public' | 'private' | 'shared';
+  seed_posts?: Array<{ title: string; body: string }>;
+}
+
+export interface CortexOntologyComponent {
+  type: 'ontology';
+  name: string;
+  description: string;
+  concepts: Record<string, {
+    label: Record<string, string>;
+    properties?: string[];
+    broader?: string;
+    related_to?: string;
+    values?: string[];
+  }>;
+}
+
+export interface CortexSeedDataComponent {
+  type: 'seed-data';
+  entries: Array<{ key: string; value: unknown }>;
+}
+
+export interface CortexLibComponent {
+  type: 'lib';
+  name: string;
+  filename: string;
+  exports: string[];
+  api_surface: string;
+}
+
+export type CortexComponent =
+  | CortexSchemaComponent
+  | CortexPromptComponent
+  | CortexActionComponent
+  | CortexBoardTemplateComponent
+  | CortexOntologyComponent
+  | CortexSeedDataComponent
+  | CortexLibComponent;
+
+export interface CortexActivationArtifacts {
+  schemaKeys: string[];
+  promptKeys: string[];
+  actionIds: string[];
+  boardIds: string[];
+  seedDataKeys: string[];
+  ontologyKeys: string[];
+  libFiles: string[];
+}
+
+export interface CortexExtensionRecord {
+  name: string;
+  namespace: string;
+  shortName: string;
+  apiVersion: string;
+  version: string;
+  description: string;
+  author: string;
+  license?: string;
+  tags: string[];
+  labels: Record<string, string>;
+  aimeatCompat?: string;
+  status: 'inactive' | 'active';
+  installedAt: string;
+  activatedAt?: string;
+  installedBy: string;
+  manifest: string;  // raw YAML string
+  components: CortexComponent[];
+  activationArtifacts: CortexActivationArtifacts;
+}
+
 export interface Storage {
   // Owners
   createOwner(owner: OwnerRecord): Promise<OwnerRecord>;
@@ -946,4 +1045,14 @@ export interface Storage {
   listEscrowHolds(fromGaii: string, opts?: { status?: string }): Promise<EscrowHoldRecord[]>;
   releaseEscrowHold(holdId: string, toGaii: string): Promise<EscrowHoldRecord | null>;
   refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
+
+  // Cortex Extensions (Manifest-based)
+  createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord>;
+  getCortexExtension(name: string): Promise<CortexExtensionRecord | null>;
+  listCortexExtensions(opts?: { status?: string; namespace?: string }): Promise<CortexExtensionRecord[]>;
+  updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null>;
+  deleteCortexExtension(name: string): Promise<boolean>;
+  setCortexLibFile(extName: string, libName: string, content: string): Promise<void>;
+  getCortexLibFile(extName: string, libName: string): Promise<string | null>;
+  deleteCortexLibFile(extName: string, libName: string): Promise<boolean>;
 }
