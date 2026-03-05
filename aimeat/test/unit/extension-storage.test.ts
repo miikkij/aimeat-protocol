@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { ExtensionRecord, EscrowHoldRecord } from '../../src/storage/interface.js';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -53,11 +53,11 @@ function makeEscrowHold(overrides: Partial<EscrowHoldRecord> = {}): EscrowHoldRe
 
 // ── Extension Tests ─────────────────────────────────────────
 
-describe('ExtensionRecord (InMemoryStorage)', () => {
-    let storage: InMemoryStorage;
+describe('ExtensionRecord (SqliteStorage)', () => {
+    let storage: SqliteStorage;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
     });
 
     it('creates and retrieves an extension record', async () => {
@@ -135,11 +135,11 @@ describe('ExtensionRecord (InMemoryStorage)', () => {
 
 // ── Escrow Hold Tests ───────────────────────────────────────
 
-describe('EscrowHoldRecord (InMemoryStorage)', () => {
-    let storage: InMemoryStorage;
+describe('EscrowHoldRecord (SqliteStorage)', () => {
+    let storage: SqliteStorage;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
     });
 
     it('creates and retrieves an escrow hold', async () => {

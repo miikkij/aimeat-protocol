@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { DirectoryService } from '../../src/services/directory.js';
 import type { AimeatConfig } from '../../src/config.js';
 
@@ -10,7 +10,7 @@ const testConfig = {
 
 // Helper to seed a complete user with GHII, owner, agent, consent, and memory
 async function seedUser(
-    storage: InMemoryStorage,
+    storage: SqliteStorage,
     opts: {
         username: string;
         displayName: string;
@@ -113,11 +113,11 @@ async function seedUser(
 }
 
 describe('DirectoryService', () => {
-    let storage: InMemoryStorage;
+    let storage: SqliteStorage;
     let directory: DirectoryService;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
         directory = new DirectoryService(testConfig, storage);
     });
 

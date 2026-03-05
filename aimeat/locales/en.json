@@ -788,7 +788,14 @@
     "siteMaxTemplateSizeKb": "Max template size (KB)",
     "siteMaxTemplateSizeKbHint": "Maximum allowed size for the HTML template upload",
     "siteCacheTtlSeconds": "Template cache TTL (seconds)",
-    "siteCacheTtlSecondsHint": "How long to cache the resolved template (0 = no cache)"
+    "siteCacheTtlSecondsHint": "How long to cache the resolved template (0 = no cache)",
+    "storage_label": "Storage backend",
+    "storage_hint": "Where to store data",
+    "storage_memory": "In-memory (development only, data lost on restart)",
+    "storage_sqlite": "SQLite (personal use, zero-config file-based storage)",
+    "storage_mongodb": "MongoDB (production, requires external server)",
+    "sqlite_path_label": "SQLite database path",
+    "sqlite_path_hint": "File path for the SQLite database (auto-created)"
   },
   "join": {
     "title": "Join AIMEAT Federation",

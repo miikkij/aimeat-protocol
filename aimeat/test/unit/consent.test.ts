@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { consentMatchPattern } from '../../src/storage/memory.js';
+import { consentMatchPattern } from '../../src/storage/pattern-utils.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkConsentForRead } from '../../src/services/consent.js';
-import { InMemoryStorage } from '../../src/storage/memory.js';
 
 describe('consentMatchPattern', () => {
   it('matches exact keys', () => {
@@ -31,28 +31,28 @@ describe('consentMatchPattern', () => {
 
 describe('checkConsentForRead', () => {
   it('allows public data without consent', async () => {
-    const storage = new InMemoryStorage();
+    const storage = new SqliteStorage(':memory:');
     const result = await checkConsentForRead(storage, 'key', 'owner#app@node', 'reader#app@node', 'public');
     expect(result.allowed).toBe(true);
     expect(result.reason).toBe('public_data');
   });
 
   it('allows owner to read own data', async () => {
-    const storage = new InMemoryStorage();
+    const storage = new SqliteStorage(':memory:');
     const result = await checkConsentForRead(storage, 'key', 'alice#app@node', 'alice#app@node', 'private');
     expect(result.allowed).toBe(true);
     expect(result.reason).toBe('owner_access');
   });
 
   it('denies private data without consent', async () => {
-    const storage = new InMemoryStorage();
+    const storage = new SqliteStorage(':memory:');
     const result = await checkConsentForRead(storage, 'key', 'alice#app@node', 'bob#app@node', 'private');
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe('no_matching_consent');
   });
 
   it('allows with matching consent', async () => {
-    const storage = new InMemoryStorage();
+    const storage = new SqliteStorage(':memory:');
     await storage.createConsent({
       id: 'c1', ownerGaii: 'agent1#alice@node', dataPattern: 'profile.*',
       recipient: '*', purpose: 'test', scope: 'federation',
@@ -64,7 +64,7 @@ describe('checkConsentForRead', () => {
   });
 
   it('denies with expired consent', async () => {
-    const storage = new InMemoryStorage();
+    const storage = new SqliteStorage(':memory:');
     const pastDate = new Date(Date.now() - 86400000).toISOString();
     await storage.createConsent({
       id: 'c2', ownerGaii: 'agent1#alice@node', dataPattern: 'profile.*',
@@ -76,7 +76,7 @@ describe('checkConsentForRead', () => {
   });
 
   it('denies with wrong recipient', async () => {
-    const storage = new InMemoryStorage();
+    const storage = new SqliteStorage(':memory:');
     await storage.createConsent({
       id: 'c3', ownerGaii: 'agent1#alice@node', dataPattern: 'profile.*',
       recipient: 'agent3#charlie@node', purpose: 'test', scope: 'federation',

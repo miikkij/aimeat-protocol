@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { OtkRecord } from '../../src/storage/interface.js';
 
 function makeInitialOtk(key: string, ownerGaii: string): OtkRecord {
@@ -33,10 +33,10 @@ function makeRegularOtk(key: string, ownerGaii: string, ttlMs: number = 60_000):
 }
 
 describe('Initial OTK — consumeOtk behavior', () => {
-    let storage: InMemoryStorage;
+    let storage: SqliteStorage;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
     });
 
     it('activates timer on first use of initial OTK', async () => {

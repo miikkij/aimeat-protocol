@@ -158,16 +158,12 @@ if (subcommand === 'config') {
   process.exit(0);
 } else if (subcommand === 'maintenance') {
   const action = positionals[1]; // on | off | undefined (show status)
-  let storage;
-  if (config.dbUrl) {
-    const { MongoStorage } = await import('./storage/mongodb.js');
-    const mongo = new MongoStorage(config.dbUrl);
-    await mongo.ready;
-    storage = mongo;
-  } else {
-    const { InMemoryStorage } = await import('./storage/memory.js');
-    storage = new InMemoryStorage();
-  }
+  const { createStorage } = await import('./storage/storage-factory.js');
+  const storage = await createStorage({
+    provider: config.storageProvider,
+    sqlitePath: config.sqlitePath,
+    dbUrl: config.dbUrl ?? undefined,
+  });
 
   if (action === 'on') {
     const message = positionals.slice(2).join(' ') || 'Maintenance';
@@ -279,7 +275,7 @@ if (subcommand === 'config') {
     logger.info(`   ❤️  AIMEAT node started`);
     logger.info(`   Node ID:   ${config.nodeId}`);
     logger.info(`   Port:      ${config.port}`);
-    logger.info(`   Storage:   ${config.dbUrl ? 'mongodb' : 'in-memory'}`);
+    logger.info(`   Storage:   ${config.storageProvider}${config.storageProvider === 'sqlite' ? ` (${config.sqlitePath})` : ''}`);
     logger.info(`   URL:       ${config.baseUrl}/`);
     logger.info(`   Protocol:  AIMEAT v1.3 | License: MIT`);
     if (config.devMode) {

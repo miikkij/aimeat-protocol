@@ -65,11 +65,26 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'info', variable: 'AIMEAT_BASE_URL', message: 'Not set. Default: http://localhost:<port>' });
   }
 
+  // ── Storage Provider ──
+  const storageProvider = env.AIMEAT_STORAGE;
+  if (storageProvider && !['memory', 'sqlite', 'mongodb'].includes(storageProvider)) {
+    results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: `Invalid value "${storageProvider}". Must be one of: memory, sqlite, mongodb` });
+  } else if (!storageProvider) {
+    results.push({ level: 'info', variable: 'AIMEAT_STORAGE', message: 'Not set. Default: memory' });
+  }
+
+  if (storageProvider === 'sqlite') {
+    const sqlitePath = env.AIMEAT_SQLITE_PATH ?? './data/aimeat.db';
+    results.push({ level: 'info', variable: 'AIMEAT_SQLITE_PATH', message: `Database file: ${sqlitePath}` });
+  }
+
   // ── Database URL ──
   const dbUrl = env.DATABASE_URL;
-  if (!dbUrl) {
+  if (storageProvider === 'mongodb' && !dbUrl) {
+    results.push({ level: 'error', variable: 'DATABASE_URL', message: 'Required when AIMEAT_STORAGE=mongodb' });
+  } else if (!storageProvider && !dbUrl) {
     results.push({ level: 'warning', variable: 'DATABASE_URL', message: 'Not set. Using in-memory storage — data will not persist across restarts.' });
-  } else {
+  } else if (dbUrl) {
     try {
       new URL(dbUrl);
     } catch {

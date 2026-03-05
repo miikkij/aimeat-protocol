@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { createOrganismReputationService } from '../../src/services/organism-reputation.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord } from '../../src/storage/interface.js';
 
@@ -64,10 +64,10 @@ function makeGHII(overrides: Partial<GHIIRecord> = {}): GHIIRecord {
 // ── Tests ────────────────────────────────────────────────────
 
 describe('Organism Reputation Service', () => {
-    let storage: InMemoryStorage;
+    let storage: SqliteStorage;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
     });
 
     it('returns null for non-existent organism', async () => {

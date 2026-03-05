@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryStorage } from '../../src/storage/memory.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { FlagRecord } from '../../src/storage/interface.js';
 
 function makeFlag(overrides: Partial<FlagRecord> = {}): FlagRecord {
@@ -15,11 +15,11 @@ function makeFlag(overrides: Partial<FlagRecord> = {}): FlagRecord {
     };
 }
 
-describe('Flags (InMemoryStorage)', () => {
-    let storage: InMemoryStorage;
+describe('Flags (SqliteStorage)', () => {
+    let storage: SqliteStorage;
 
     beforeEach(() => {
-        storage = new InMemoryStorage();
+        storage = new SqliteStorage(':memory:');
     });
 
     it('creates and retrieves a flag', async () => {

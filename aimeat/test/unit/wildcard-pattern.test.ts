@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchWildcardPattern, consentMatchPattern } from '../../src/storage/memory.js';
+import { matchWildcardPattern, consentMatchPattern } from '../../src/storage/pattern-utils.js';
 
 describe('matchWildcardPattern', () => {
   it('exact match', () => {

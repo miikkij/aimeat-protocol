@@ -70,6 +70,8 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_PORT: '40050',
   AIMEAT_NODE_TYPE: 'full',
   AIMEAT_BASE_URL: '',
+  AIMEAT_STORAGE: 'memory',
+  AIMEAT_SQLITE_PATH: './data/aimeat.db',
   DATABASE_URL: '',
   AIMEAT_ADMIN_PASSWORD: '',
   AIMEAT_DEV_MODE: 'false',
@@ -203,9 +205,11 @@ function generateEnvContent(settings: Record<string, string>): string {
       ],
     },
     {
-      title: 'Database',
+      title: 'Storage Backend',
       vars: [
-        { key: 'DATABASE_URL', comment: 'Leave empty for in-memory storage (data lost on restart)' },
+        { key: 'AIMEAT_STORAGE', comment: 'Storage backend: memory (default), sqlite (file-based), mongodb (production)' },
+        { key: 'AIMEAT_SQLITE_PATH', comment: 'SQLite database file path (when AIMEAT_STORAGE=sqlite)' },
+        { key: 'DATABASE_URL', comment: 'MongoDB connection URL (when AIMEAT_STORAGE=mongodb)' },
       ],
     },
     {
@@ -314,6 +318,8 @@ function generateJsonContent(settings: Record<string, string>): string {
     AIMEAT_PORT: 'port',
     AIMEAT_NODE_TYPE: 'nodeType',
     AIMEAT_BASE_URL: 'baseUrl',
+    AIMEAT_STORAGE: 'storageProvider',
+    AIMEAT_SQLITE_PATH: 'sqlitePath',
     DATABASE_URL: 'db',
     AIMEAT_ADMIN_PASSWORD: 'adminPassword',
     AIMEAT_DEV_MODE: 'devMode',
@@ -428,34 +434,64 @@ async function askCoreSettings(
     }
   }
 
-  // MongoDB URL — prefer existing env value
-  if (useCase === 'public') {
-    const dbDefault = env.DATABASE_URL || preset.dbUrl || '';
-    const dbUrl = checkCancel(
+  // Storage backend selection
+  const storageBackend = checkCancel(
+    await p.select({
+      message: t('init.storage_label'),
+      options: [
+        { value: 'memory', label: t('init.storage_memory') },
+        { value: 'sqlite', label: t('init.storage_sqlite') },
+        { value: 'mongodb', label: t('init.storage_mongodb') },
+      ],
+      initialValue: useCase === 'dev' ? 'memory' : useCase === 'personal' ? 'sqlite' : 'mongodb',
+    }),
+    t,
+  );
+  settings.AIMEAT_STORAGE = storageBackend as string;
+
+  // If sqlite, ask for path
+  if (storageBackend === 'sqlite') {
+    const sqlitePath = checkCancel(
       await p.text({
-        message: t('init.dbUrl'),
-        placeholder: dbDefault || 'mongodb://user:pass@localhost:27017/aimeat',
-        ...(dbDefault ? { defaultValue: dbDefault } : {}),
-        validate: val => {
-          if (!val) return undefined;
-          return validateDbUrl(val, t);
-        },
+        message: t('init.sqlite_path_label'),
+        placeholder: './data/aimeat.db',
+        defaultValue: './data/aimeat.db',
       }),
       t,
     );
-    if (dbUrl) settings.DATABASE_URL = dbUrl;
-  } else if (useCase === 'personal' || useCase === 'custom') {
-    const dbDefault = env.DATABASE_URL || preset.dbUrl || '';
-    const dbUrl = checkCancel(
-      await p.text({
-        message: t('init.dbUrl'),
-        placeholder: dbDefault || t('init.dbUrlHint'),
-        defaultValue: dbDefault,
-        validate: val => validateDbUrl(val, t),
-      }),
-      t,
-    );
-    if (dbUrl) settings.DATABASE_URL = dbUrl;
+    settings.AIMEAT_SQLITE_PATH = sqlitePath;
+  }
+
+  // MongoDB URL — only when mongodb storage is selected
+  if (storageBackend === 'mongodb') {
+    if (useCase === 'public') {
+      const dbDefault = env.DATABASE_URL || preset.dbUrl || '';
+      const dbUrl = checkCancel(
+        await p.text({
+          message: t('init.dbUrl'),
+          placeholder: dbDefault || 'mongodb://user:pass@localhost:27017/aimeat',
+          ...(dbDefault ? { defaultValue: dbDefault } : {}),
+          validate: val => {
+            if (!val) return undefined;
+            return validateDbUrl(val, t);
+          },
+        }),
+        t,
+      );
+      if (dbUrl) settings.DATABASE_URL = dbUrl;
+    } else {
+      const dbDefault = env.DATABASE_URL || preset.dbUrl || '';
+      const dbUrl = checkCancel(
+        await p.text({
+          message: t('init.dbUrl'),
+          placeholder: dbDefault || t('init.dbUrlHint'),
+          defaultValue: dbDefault,
+          validate: val => validateDbUrl(val, t),
+        }),
+        t,
+      );
+      if (dbUrl) settings.DATABASE_URL = dbUrl;
+    }
   }
 
   // Admin password — required for public, optional for others
