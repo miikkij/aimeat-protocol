@@ -204,6 +204,11 @@ export interface AimeatConfig {
   extensionMaxApiCalls: number;
   extensionMaxCodeSizeKb: number;
   extensionMaxInstalled: number;
+
+  // Cortex Extensions (Manifest-based)
+  cortexEnabled: boolean;
+  cortexMaxInstalled: number;
+  cortexMaxLibSizeKb: number;
 }
 
 export function loadConfig(): AimeatConfig {
@@ -362,6 +367,11 @@ export function loadConfig(): AimeatConfig {
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '50', 10),
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
+
+    // Cortex Extensions (Manifest-based)
+    cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
+    cortexMaxInstalled: parseInt(process.env.AIMEAT_CORTEX_MAX_INSTALLED ?? '50', 10),
+    cortexMaxLibSizeKb: parseInt(process.env.AIMEAT_CORTEX_MAX_LIB_SIZE_KB ?? '512', 10),
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },
