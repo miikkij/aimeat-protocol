@@ -104,7 +104,7 @@ spec:
     # ── Lib ───────────────────────────────────────────────────
     - type: lib
       name: iot-sensor-ui
-      file: iot-sensor-ui.js
+      filename: iot-sensor-ui.js
       exports:
         - SensorGauge
         - DeviceStatusBadge

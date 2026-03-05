@@ -388,7 +388,7 @@ spec:
     # ── Lib ───────────────────────────────────────────────────
     - type: lib
       name: recipe-ui
-      file: recipe-ui.js
+      filename: recipe-ui.js
       exports:
         - RecipeCard
         - RecipeSearchForm
