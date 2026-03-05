@@ -494,5 +494,58 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // PATCH /v1/agents/:name/scopes — update agent scopes (owner only)
+  router.patch('/v1/agents/:name/scopes', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const ownerName = req.auth!.owner;
+    const { scopes } = req.body ?? {};
+
+    if (!Array.isArray(scopes) || scopes.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scopes must be a non-empty array of strings'));
+      return;
+    }
+
+    // Validate all scopes are strings
+    if (!scopes.every((s: unknown) => typeof s === 'string')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Each scope must be a string'));
+      return;
+    }
+
+    // Validate scopes against node maximum
+    if (!config.maxAgentScopes.includes('*')) {
+      const invalid = scopes.filter((s: string) => {
+        if (s === '*') return true;
+        const [domain] = s.split(':');
+        return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
+      });
+      if (invalid.length > 0) {
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+        return;
+      }
+    }
+
+    // Find the agent by name under this owner
+    const agents = await storage.getAgentsByOwner(ownerName);
+    const agent = agents.find(a => a.name === agentName);
+
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
+      return;
+    }
+
+    const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });
+    if (!updated) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update agent scopes'));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      scopes: updated.defaultScopes,
+    }, [
+      { description: 'Re-authenticate to get a new JWT with updated scopes', method: 'POST', url: '/v1/auth/token' },
+    ]));
+  });
+
   return router;
 }
