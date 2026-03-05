@@ -56,6 +56,7 @@ function defaultPreferences(personalNodeId: string, config: AimeatConfig): Notif
 
 export class MailboxNotificationService {
   private webpush: typeof import('web-push') | null = null;
+  private emailTransport: import('nodemailer').Transporter | null = null;
   private cooldownMap = new Map<string, number>();
   private emailCooldownMap = new Map<string, number>();
 
@@ -74,6 +75,25 @@ export class MailboxNotificationService {
         logger.info('MailboxNotificationService: web-push initialized');
       } catch (err) {
         logger.warn('MailboxNotificationService: failed to initialize web-push', { error: String(err) });
+      }
+    }
+
+    // Email transport (Phase 2)
+    if (config.smtpHost && config.smtpUser) {
+      try {
+        const nodemailer = require('nodemailer') as typeof import('nodemailer');
+        this.emailTransport = nodemailer.createTransport({
+          host: config.smtpHost,
+          port: config.smtpPort,
+          secure: config.smtpSecure,
+          auth: {
+            user: config.smtpUser,
+            pass: config.smtpPass ?? '',
+          },
+        });
+        logger.info('MailboxNotificationService: email transport initialized');
+      } catch (err) {
+        logger.warn('MailboxNotificationService: failed to initialize email transport', { error: String(err) });
       }
     }
   }
@@ -194,10 +214,44 @@ export class MailboxNotificationService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private async sendEmail(_personalNodeId: string, _email: string, _payload: MailboxPushPayload): Promise<boolean> {
-    // Phase 2 implementation
-    return false;
+  private async sendEmail(personalNodeId: string, email: string, payload: MailboxPushPayload): Promise<boolean> {
+    if (!this.emailTransport) return false;
+
+    // Check email-specific rate limit
+    const now = Date.now();
+    const lastEmail = this.emailCooldownMap.get(personalNodeId) ?? 0;
+    const emailCooldownMs = this.config.emailRateLimitMin * 60_000;
+    if (now - lastEmail < emailCooldownMs) {
+      return false;
+    }
+
+    try {
+      await this.emailTransport.sendMail({
+        from: this.config.smtpFrom,
+        to: email,
+        subject: `AIMEAT: ${payload.pending_count} pending message(s) for your node`,
+        text: [
+          `Your personal node "${payload.node_id}" has ${payload.pending_count} pending message(s).`,
+          '',
+          `Highest priority: ${payload.highest_priority_type}`,
+          `Oldest message: ${payload.oldest_item_age_minutes} minutes ago`,
+          '',
+          'Please reconnect your personal node to retrieve these messages.',
+          `Operator: ${payload.operator_node}`,
+          '',
+          '---',
+          'This notification was sent by the AIMEAT Protocol.',
+          'To unsubscribe, update your notification preferences via PATCH /v1/personal/anchor/<nodeId>/notifications',
+        ].join('\n'),
+      });
+
+      this.emailCooldownMap.set(personalNodeId, now);
+      logger.info('Email notification sent', { personalNodeId, email: email.substring(0, 3) + '***' });
+      return true;
+    } catch (err) {
+      logger.error('Email notification failed', { personalNodeId, error: String(err) });
+      return false;
+    }
   }
 
   private isInQuietHours(prefs: NotificationPreferences): boolean {
