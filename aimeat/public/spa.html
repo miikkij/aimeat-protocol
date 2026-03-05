@@ -9,6 +9,17 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#050510">
   <link rel="stylesheet" href="/css/theme.css">
+  <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
+  <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
+  <link rel="stylesheet" href="/css/views/portal.css">
+  <link rel="stylesheet" href="/css/views/portal-classic.css">
+  <link rel="stylesheet" href="/css/views/portal-dev.css">
+  <link rel="stylesheet" href="/css/views/profile.css">
+  <link rel="stylesheet" href="/css/views/guides.css">
+  <link rel="stylesheet" href="/css/views/hobbies.css">
+  <link rel="stylesheet" href="/css/views/marketplace.css">
+  <link rel="stylesheet" href="/css/views/aimeat-os.css">
+  <link rel="stylesheet" href="/css/views/openclaw.css">
   <script type="importmap">
   {
     "imports": {

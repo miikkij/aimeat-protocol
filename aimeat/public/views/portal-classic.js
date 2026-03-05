@@ -347,7 +347,7 @@ function CardGroup({ id, icon, title, tagline, expanded, onToggle, accentClass, 
 export default function PortalClassicView({ navigate }) {
   const [expandedCard, setExpandedCard] = useState(null);
 
-  const cssReady = useViewCSS('/css/views/portal-classic.css');
+  useViewCSS('/css/views/portal-classic.css');
 
   useEffect(() => {
     document.title = ct('hero.title') + ' \u2014 AIME AT';
@@ -362,7 +362,7 @@ export default function PortalClassicView({ navigate }) {
   const connectPrompt = buildConnectPrompt();
 
   return html`
-    <div class="cl-root" style=${cssReady ? '' : 'visibility:hidden'}>
+    <div class="cl-root">
     <!-- Hero -->
     <section class="cl-hero">
       <h1 class="cl-hero-title">${ct('hero.title')}</h1>

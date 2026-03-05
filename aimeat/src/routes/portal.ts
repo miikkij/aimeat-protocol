@@ -51,6 +51,17 @@ function serveSpa(res: any, spaPath: string): void {
   .replace(/"\/js\/api\.js": "\/js\/api\.js"/, `"/js/api.js": "/js/api.js${v}"`)
   .replace(/"\/js\/hooks\.js": "\/js\/hooks\.js"/, `"/js/hooks.js": "/js/hooks.js${v}"`);
 
+  // Stamp all view CSS hrefs (preloaded in spa.html head) with the build version
+  html = html.replace(
+    /(<link rel="stylesheet" href=")(\/css\/views\/[^"?]+\.css)(")/g,
+    `$1$2${v}$3`
+  );
+  // Also stamp theme.css
+  html = html.replace(
+    /(<link rel="stylesheet" href=")(\/css\/theme\.css)(")/,
+    `$1$2${v}$3`
+  );
+
   res.setHeader('Cache-Control', 'no-cache');
   res.type('text/html').send(html);
 }
