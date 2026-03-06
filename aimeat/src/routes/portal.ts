@@ -666,6 +666,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/openclaw',
     '/v1/classic',
     '/v1/portfolio',
+    '/v1/admin',
   ];
 
   for (const path of spaRoutes) {

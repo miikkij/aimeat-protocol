@@ -11,8 +11,8 @@ import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { generateOtk } from '../utils/otk.js';
-import { createT, resolveLocale, type Locale } from '../i18n.js';
-import { buildDashboardHtml, buildDashboardTranslations } from './admin-dashboard.js';
+// i18n imports removed — admin UI is now a client-side SPA
+// admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
 import { hashPassword } from '../services/password.js';
 
 export function adminRouter(
@@ -152,7 +152,7 @@ export function adminRouter(
             token,
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
             roles: ownerRecord.roles,
-            dashboard_url: `/v1/admin/ui?token=${token}`,
+            dashboard_url: '/v1/admin',
         });
     });
 
@@ -394,21 +394,9 @@ export function adminRouter(
         ]));
     });
 
-    // GET /v1/admin/ui — graphical admin dashboard
-    // Serves HTML always; auth is checked client-side via API calls.
-    // If token is invalid/missing, the dashboard shows a login form.
-    router.get('/v1/admin/ui', (req, res) => {
-        const langParam = req.query.lang as string | undefined;
-        const locale = resolveLocale(langParam, req.headers.cookie, req.headers['accept-language']);
-        if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
-        res.type('text/html').send(buildDashboardHtml(locale));
-    });
-
-    // GET /v1/admin/translations — return dashboard translations as JSON for SPA language switching
-    router.get('/v1/admin/translations', (req, res) => {
-        const lang = resolveLocale(req.query.lang as string | undefined, req.headers.cookie, req.headers['accept-language']);
-        const t = createT(lang);
-        res.json({ ok: true, locale: lang, translations: buildDashboardTranslations(t) });
+    // GET /v1/admin/ui — legacy URL, redirect to SPA
+    router.get('/v1/admin/ui', (_req, res) => {
+        res.redirect(301, '/v1/admin');
     });
 
     // GET /v1/admin/work — list all work items (operator only)
@@ -1166,7 +1154,7 @@ function esc(s){const d=document.createElement('div');d.textContent=String(s??''
 function showLoginSuccess(token,roles,dashUrl){
   document.getElementById('loginResult').classList.add('hidden');
   document.getElementById('loginRoles').textContent='Roles: '+(Array.isArray(roles)?roles.join(', '):roles);
-  document.getElementById('loginDashLink').href=dashUrl||('/v1/admin/ui?token='+token);
+  document.getElementById('loginDashLink').href=dashUrl||'/v1/admin';
   document.getElementById('loginJwtBox').textContent=token;
   document.getElementById('loginSuccess').classList.remove('hidden');
 }
@@ -1186,7 +1174,7 @@ async function doPasswordLogin(){
       document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';return;
     }
     var d=r.data;
-    showLoginSuccess(d.token,['owner','operator'],'/v1/admin/ui?token='+d.token);
+    showLoginSuccess(d.token,['owner','operator'],'/v1/admin');
     document.getElementById('btnPwLogin').textContent='Login';
     document.getElementById('btnPwLogin').disabled=false;
   }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';}
