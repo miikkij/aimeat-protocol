@@ -130,6 +130,7 @@ export class MongoStorage implements Storage {
                 publicKey: agent.publicKey,
                 trustScore: agent.trustScore,
                 morselBalance: agent.morselBalance,
+                allowedOrigins: agent.allowedOrigins ?? [],
                 createdAt: new Date(agent.createdAt),
                 lastSeen: new Date(agent.lastSeen),
             },
@@ -186,6 +187,7 @@ export class MongoStorage implements Storage {
                 ttlHours: record.ttlHours,
                 version: record.version,
                 flagCount: record.flagCount ?? 0,
+                allowedOrigins: record.allowedOrigins ?? [],
                 createdAt: new Date(record.createdAt),
                 updatedAt: new Date(record.updatedAt),
             },
@@ -196,6 +198,7 @@ export class MongoStorage implements Storage {
                 ttlHours: record.ttlHours,
                 version: record.version,
                 flagCount: record.flagCount ?? 0,
+                allowedOrigins: record.allowedOrigins ?? [],
                 updatedAt: new Date(record.updatedAt),
             },
         });
@@ -1028,11 +1031,11 @@ export class MongoStorage implements Storage {
     }
 
     private toAgentRecord(row: any): AgentRecord {
-        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
+        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined };
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined };
     }
 
     private toActionRecord(row: any): ActionRecord {
@@ -1095,6 +1098,7 @@ export class MongoStorage implements Storage {
             ftnVerified: row.ftnVerified ?? undefined,
             trustScore: row.trustScore ?? undefined,
             morselBalance: row.morselBalance ?? undefined,
+            allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
             semantic: undefined,
@@ -1135,6 +1139,7 @@ export class MongoStorage implements Storage {
                     ftnVerified: record.ftnVerified ?? false,
                     trustScore: record.trustScore,
                     morselBalance: record.morselBalance,
+                    allowedOrigins: record.allowedOrigins ?? [],
                     createdAt: new Date(record.createdAt),
                     updatedAt: new Date(record.updatedAt),
                 },

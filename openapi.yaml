@@ -104,6 +104,8 @@ tags:
     description: Phase 3.4 — Organism reputation scoring
   - name: Extensions
     description: Node Extension System — V8 isolate sandbox for operator-installed plugins
+  - name: CORS
+    description: Per-entity CORS origin management (node → GHII → agent → memory)
 
 components:
   securitySchemes:
@@ -3118,6 +3120,120 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/cors:
+    get:
+      operationId: getAgentCors
+      summary: View agent CORS configuration
+      description: |
+        Returns the CORS allowed origins for a specific agent owned by the
+        authenticated owner, plus the effective origins resolved through the
+        inheritance chain (agent → GHII → node default).
+      tags: [CORS]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name (not full GAII)
+      responses:
+        '200':
+          description: Agent CORS configuration
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+                          effective:
+                            type: array
+                            items:
+                              type: string
+                          inherited_from:
+                            type: string
+                            enum: [none, ghii, node]
+                            description: Where effective origins are inherited from
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: setAgentCors
+      summary: Set agent CORS allowed origins
+      description: |
+        Set custom CORS allowed origins for a specific agent. Pass
+        `allowed_origins: null` to clear and inherit from GHII owner
+        or node default. Requires owner role.
+      tags: [CORS]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name (not full GAII)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed_origins]
+              properties:
+                allowed_origins:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Array of origin URLs, or null to inherit
+                  example: ["https://myapp.example.com"]
+      responses:
+        '200':
+          description: Agent CORS updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
     post:
@@ -3288,6 +3404,114 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/memory/cors/{key}:
+    get:
+      operationId: getMemoryCors
+      summary: View memory key CORS configuration
+      description: |
+        Returns the CORS allowed origins for a specific memory key,
+        plus the effective origins resolved through the full inheritance
+        chain (memory → agent → GHII → node default).
+      tags: [CORS]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URL-encoded memory key
+      responses:
+        '200':
+          description: Memory key CORS configuration
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+                          effective:
+                            type: array
+                            items:
+                              type: string
+                          inherited_from:
+                            type: string
+                            enum: [none, agent, ghii, node]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: setMemoryCors
+      summary: Set memory key CORS allowed origins
+      description: |
+        Set custom CORS allowed origins for a specific memory key. Pass
+        `allowed_origins: null` to clear and inherit from the agent/GHII/node
+        chain. Requires agent auth with memory:write scope.
+      tags: [CORS]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URL-encoded memory key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed_origins]
+              properties:
+                allowed_origins:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Array of origin URLs, or null to inherit
+      responses:
+        '200':
+          description: Memory key CORS updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
@@ -5123,12 +5347,137 @@ paths:
     get:
       operationId: listAllAgents
       summary: List all agents (operator)
+      description: |
+        Returns all agents on the node. Response includes `allowed_origins`
+        field for CORS override visibility.
       tags: [Admin]
       security:
         - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/admin/ghii/{ghii}/cors:
+    put:
+      operationId: adminSetGhiiCors
+      summary: Set/clear CORS for any GHII user (operator)
+      description: |
+        Operator endpoint to set or clear CORS allowed origins for any
+        GHII user on the node. Pass `allowed_origins: null` to clear
+        custom settings and revert to node default.
+      tags: [Admin, CORS]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ghii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Full GHII identifier (e.g. alice@node-id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed_origins]
+              properties:
+                allowed_origins:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Array of origin URLs, or null to clear
+      responses:
+        '200':
+          description: GHII CORS updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/agents/{gaii}/cors:
+    put:
+      operationId: adminSetAgentCors
+      summary: Set/clear CORS for any agent (operator)
+      description: |
+        Operator endpoint to set or clear CORS allowed origins for any
+        agent on the node. Pass `allowed_origins: null` to clear custom
+        settings and revert to inheritance chain.
+      tags: [Admin, CORS]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Full GAII (e.g. agent#owner@node-id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed_origins]
+              properties:
+                allowed_origins:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Array of origin URLs, or null to clear
+      responses:
+        '200':
+          description: Agent CORS updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/admin/stats:
     get:
@@ -8890,6 +9239,110 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/FeatureDisabled'
+
+  # ── CORS Management ───────────────────────────────────────
+
+  /v1/ghii/cors:
+    get:
+      operationId: getGhiiCors
+      summary: View own CORS configuration
+      description: |
+        Returns the authenticated owner's CORS allowed origins, plus
+        the effective origins (inherited from node default if none set).
+      tags: [CORS]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: CORS configuration
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+                            description: Custom origins or null if inheriting
+                          effective:
+                            type: array
+                            items:
+                              type: string
+                            description: Resolved origins (custom or inherited from node)
+                          inherited:
+                            type: boolean
+                            description: True if using node default origins
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: setGhiiCors
+      summary: Set own CORS allowed origins
+      description: |
+        Set custom CORS allowed origins for your GHII identity. Pass
+        `allowed_origins: null` to clear and inherit from node default.
+        Origins must be http(s) URLs or `*` for wildcard.
+      tags: [CORS]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [allowed_origins]
+              properties:
+                allowed_origins:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Array of origin URLs, or null to inherit node default
+                  example: ["https://myapp.example.com", "https://localhost:3000"]
+      responses:
+        '200':
+          description: CORS configuration updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: string
+                          allowed_origins:
+                            type: array
+                            items:
+                              type: string
+                            nullable: true
+                          effective:
+                            type: array
+                            items:
+                              type: string
+                          inherited:
+                            type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/trusted-issuers:
     post:

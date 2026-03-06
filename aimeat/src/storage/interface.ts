@@ -27,6 +27,7 @@ export interface AgentRecord {
   lastSeen: string;
   semantic?: SemanticAnnotation;  // Phase 0.7b
   defaultScopes?: string[];      // REQ-006 — scopes assigned at registration
+  allowedOrigins?: string[];     // CORS — per-agent origin restrictions (Phase 3)
 }
 
 export interface MemoryRecord {
@@ -40,6 +41,7 @@ export interface MemoryRecord {
   createdAt: string;
   updatedAt: string;
   flagCount?: number;   // Phase 1.5 — moderation flag counter
+  allowedOrigins?: string[];  // CORS — per-key origin restrictions (Phase 4)
 }
 
 export interface ActionRecord {
@@ -239,6 +241,8 @@ export interface GHIIRecord {
   // Economy (documented in GHII plan, now implemented)
   trustScore?: number;              // Aggregate trust score (0-100)
   morselBalance?: number;           // Morsel wallet balance
+  // CORS — per-GHII origin restrictions (Phase 2)
+  allowedOrigins?: string[];        // undefined = inherit from node default
 }
 
 export interface ChatInstanceRecord {
@@ -788,4 +792,4 @@ export interface Storage extends
   MicroMemoryRepository, FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
-  FederationRepository, NodeRepository, NotificationRepository {}
+  FederationRepository, NodeRepository, NotificationRepository { }

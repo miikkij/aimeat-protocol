@@ -549,5 +549,83 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // ── CORS per-agent management ──
+
+  // GET /v1/agents/:name/cors — Get agent CORS allowed origins
+  router.get('/v1/agents/:name/cors', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const ownerName = req.auth!.owner;
+
+    const agents = await storage.getAgentsByOwner(ownerName);
+    const agent = agents.find(a => a.name === agentName);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found`));
+      return;
+    }
+
+    // Resolve effective origins: agent → GHII owner → node default
+    let effective = config.corsAllowedOrigins;
+    let inherited = 'node';
+    if (agent.allowedOrigins?.length) {
+      effective = agent.allowedOrigins;
+      inherited = 'none';
+    } else {
+      const ghii = await storage.getGHIIByOwner(ownerName);
+      if (ghii?.allowedOrigins?.length) {
+        effective = ghii.allowedOrigins;
+        inherited = 'ghii';
+      }
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: agent.gaii,
+      allowed_origins: agent.allowedOrigins ?? null,
+      effective,
+      inherited_from: inherited,
+    }));
+  });
+
+  // PUT /v1/agents/:name/cors — Set agent CORS allowed origins
+  router.put('/v1/agents/:name/cors', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const ownerName = req.auth!.owner;
+
+    const agents = await storage.getAgentsByOwner(ownerName);
+    const agent = agents.find(a => a.name === agentName);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found`));
+      return;
+    }
+
+    const { allowed_origins } = req.body ?? {};
+
+    if (allowed_origins !== null && !Array.isArray(allowed_origins)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_origins must be an array of origin URLs or null to inherit'));
+      return;
+    }
+
+    if (Array.isArray(allowed_origins)) {
+      for (const origin of allowed_origins) {
+        if (typeof origin !== 'string' || (origin !== '*' && !/^https?:\/\//.test(origin))) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid origin: ${origin}. Must be an http(s) URL or '*'`));
+          return;
+        }
+      }
+    }
+
+    const updated = await storage.updateAgent(agent.gaii, {
+      allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
+    });
+    if (!updated) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update CORS settings'));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      allowed_origins: updated.allowedOrigins ?? null,
+    }));
+  });
+
   return router;
 }

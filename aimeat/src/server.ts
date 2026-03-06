@@ -7,6 +7,7 @@ import type { AimeatConfig } from './config.js';
 import { createStorage } from './storage/storage-factory.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
+import { corsMiddleware } from './middleware/cors.js';
 import { optionalAuth, enableAnonymousAuth, requireAuth, requireRole } from './auth/middleware.js';
 import { success, error } from './middleware/envelope.js';
 import { logger } from './utils/logger.js';
@@ -193,17 +194,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     ? createMetricsRegistry(config)
     : undefined;
 
-  // CORS for Tier 0 endpoints
-  app.use((_req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
-    if (_req.method === 'OPTIONS') {
-      res.status(204).end();
-      return;
-    }
-    next();
-  });
+  // CORS — per-entity origin resolution (defaults to config.corsAllowedOrigins)
+  // Uses lazy storage getter — storage is initialized later but available before first request
+  let storageForCors: Storage | null = null;
 
   // Request ID — assigns a unique ID to every request (uses X-Request-Id if present)
   app.use(requestIdMiddleware());
@@ -216,9 +209,14 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     app.use(metricsMiddleware(metricsRegistry));
   }
 
-  // Rate limiting — global (with role multipliers)
-  // optionalAuth() must run first so req.auth is available for per-identity rate limiting
+  // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution
   app.use(optionalAuth());
+
+  // CORS after auth — can look up GHII-level origins for authenticated requests.
+  // OPTIONS preflights bypass rate limiting since CORS responds with 204.
+  app.use(corsMiddleware(config, () => storageForCors));
+
+  // Rate limiting — global (with role multipliers)
   app.use(rateLimit(config.rateLimits.global, config.rateLimits.roleMultipliers));
 
   // Per-tier rate limits
@@ -242,6 +240,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     mongodb: `MongoDB (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
   };
   logger.info(`Using ${storageLabels[config.storageProvider]} storage`);
+
+  // Wire storage into CORS middleware (lazy reference, now populated)
+  storageForCors = storage;
 
   // Maintenance mode cache — loaded once from storage, updated on toggle
   let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };

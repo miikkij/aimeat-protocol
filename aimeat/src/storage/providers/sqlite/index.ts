@@ -114,8 +114,8 @@ export class SqliteStorage implements Storage {
   async createAgent(agent: AgentRecord): Promise<AgentRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -123,6 +123,7 @@ export class SqliteStorage implements Storage {
         agent.trustScore, agent.morselBalance,
         agent.createdAt, agent.lastSeen,
         agent.semantic ? JSON.stringify(agent.semantic) : null,
+        agent.allowedOrigins ? JSON.stringify(agent.allowedOrigins) : null,
       );
       return agent;
     } catch (err: unknown) {
@@ -147,7 +148,8 @@ export class SqliteStorage implements Storage {
     const updated = { ...existing, ...updates };
     this.db.prepare(
       `UPDATE agents SET name = ?, owner = ?, displayName = ?, description = ?, capabilities = ?,
-       publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?
+       publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
+       allowedOrigins = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -156,6 +158,7 @@ export class SqliteStorage implements Storage {
       updated.trustScore, updated.morselBalance,
       updated.createdAt, updated.lastSeen,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
+      updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
       gaii,
     );
     return updated;
@@ -186,6 +189,7 @@ export class SqliteStorage implements Storage {
     if (row.displayName) record.displayName = row.displayName as string;
     if (row.description) record.description = row.description as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+    if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     return record;
   }
 
@@ -199,24 +203,26 @@ export class SqliteStorage implements Storage {
       record.version = existing.version + 1;
       this.db.prepare(
         `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
-         createdAt = ?, updatedAt = ?, flagCount = ? WHERE ownerGaii = ? AND key = ?`
+         createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ? WHERE ownerGaii = ? AND key = ?`
       ).run(
         JSON.stringify(record.value), record.visibility,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
+        record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
         record.ownerGaii, record.key,
       );
     } else {
       this.db.prepare(
-        `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ownerGaii, record.key,
         JSON.stringify(record.value), record.visibility,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
+        record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       );
     }
     return record;
@@ -332,6 +338,7 @@ export class SqliteStorage implements Storage {
     if (row.flagCount !== null && row.flagCount !== undefined) {
       record.flagCount = row.flagCount as number;
     }
+    if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     return record;
   }
 
@@ -1162,8 +1169,8 @@ export class SqliteStorage implements Storage {
          totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil, semantic, emailHash,
          emailVerifiedAt, verificationMethod, magicLinkEnabled, notificationEmail, lastLoginAt,
          loginCount, verifiedAttributes, verificationIssuer, verificationCredentialHash, ftnVerified,
-         trustScore, morselBalance)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         trustScore, morselBalance, allowedOrigins)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ghii, record.username, record.nodeId, record.displayName,
         record.bio ?? null, record.avatar ?? null, record.locale ?? null,
@@ -1182,6 +1189,7 @@ export class SqliteStorage implements Storage {
         record.verificationIssuer ?? null, record.verificationCredentialHash ?? null,
         record.ftnVerified ? 1 : 0,
         record.trustScore ?? null, record.morselBalance ?? null,
+        record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       );
       return record;
     } catch (err: unknown) {
@@ -1217,7 +1225,7 @@ export class SqliteStorage implements Storage {
        emailHash = ?, emailVerifiedAt = ?, verificationMethod = ?, magicLinkEnabled = ?,
        notificationEmail = ?, lastLoginAt = ?, loginCount = ?, verifiedAttributes = ?,
        verificationIssuer = ?, verificationCredentialHash = ?, ftnVerified = ?,
-       trustScore = ?, morselBalance = ?
+       trustScore = ?, morselBalance = ?, allowedOrigins = ?
        WHERE ghii = ?`
     ).run(
       updated.username, updated.nodeId, updated.displayName,
@@ -1237,6 +1245,7 @@ export class SqliteStorage implements Storage {
       updated.verificationIssuer ?? null, updated.verificationCredentialHash ?? null,
       updated.ftnVerified ? 1 : 0,
       updated.trustScore ?? null, updated.morselBalance ?? null,
+      updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
       ghii,
     );
     return updated;
@@ -1300,6 +1309,7 @@ export class SqliteStorage implements Storage {
     if (row.ftnVerified) record.ftnVerified = (row.ftnVerified as number) === 1;
     if (row.trustScore !== null && row.trustScore !== undefined) record.trustScore = row.trustScore as number;
     if (row.morselBalance !== null && row.morselBalance !== undefined) record.morselBalance = row.morselBalance as number;
+    if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     return record;
   }
 

@@ -392,6 +392,83 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     ]));
   });
 
+  // ── CORS per-memory-key management ──
+
+  // GET /v1/memory/cors/:key — Get memory key CORS allowed origins
+  router.get('/v1/memory/cors/:key', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const key = decodeURIComponent(req.params.key as string);
+
+    const record = await storage.getMemory(gaii, key);
+    if (!record) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found`));
+      return;
+    }
+
+    // Resolve effective origins: memory → agent → GHII → node
+    let effective = config.corsAllowedOrigins;
+    let inherited = 'node';
+
+    const ghii = await storage.getGHIIByOwner(req.auth!.owner);
+    if (ghii?.allowedOrigins?.length) {
+      effective = ghii.allowedOrigins;
+      inherited = 'ghii';
+    }
+    const agent = await storage.getAgent(gaii);
+    if (agent?.allowedOrigins?.length) {
+      effective = agent.allowedOrigins;
+      inherited = 'agent';
+    }
+    if (record.allowedOrigins?.length) {
+      effective = record.allowedOrigins;
+      inherited = 'none';
+    }
+
+    res.json(success(config.nodeId, {
+      key: record.key,
+      allowed_origins: record.allowedOrigins ?? null,
+      effective,
+      inherited_from: inherited,
+    }));
+  });
+
+  // PUT /v1/memory/cors/:key — Set memory key CORS allowed origins
+  router.put('/v1/memory/cors/:key', requireAuth(), requireRole('agent'), requireScope('memory:write'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const key = decodeURIComponent(req.params.key as string);
+
+    const record = await storage.getMemory(gaii, key);
+    if (!record) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found`));
+      return;
+    }
+
+    const { allowed_origins } = req.body ?? {};
+
+    if (allowed_origins !== null && !Array.isArray(allowed_origins)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_origins must be an array of origin URLs or null to inherit'));
+      return;
+    }
+
+    if (Array.isArray(allowed_origins)) {
+      for (const origin of allowed_origins) {
+        if (typeof origin !== 'string' || (origin !== '*' && !/^https?:\/\//.test(origin))) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid origin: ${origin}. Must be an http(s) URL or '*'`));
+          return;
+        }
+      }
+    }
+
+    record.allowedOrigins = allowed_origins === null ? undefined : allowed_origins;
+    record.updatedAt = new Date().toISOString();
+    await storage.setMemory(record);
+
+    res.json(success(config.nodeId, {
+      key: record.key,
+      allowed_origins: record.allowedOrigins ?? null,
+    }));
+  });
+
   // GET /v1/memory/:gaii/:key — public memory read (no auth for public entries)
   // This allows Tier 0 access to public memory, with consent checking for non-public data
   router.get('/v1/memory/:gaii/:key', async (req, res) => {

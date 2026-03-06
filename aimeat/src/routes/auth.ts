@@ -51,6 +51,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       owner,
       node: config.nodeId,
       roles: ['agent'],
+      scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'catalogue:read', 'social:read'],
     }, 86400); // 24 hours
 
     res.json(success(config.nodeId, {

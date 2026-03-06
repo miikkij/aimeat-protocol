@@ -1147,6 +1147,17 @@ async function askAllAdvancedSettings(
     if (consentAuditDays !== '365') settings.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS = consentAuditDays;
   }
 
+  // ── CORS ──
+  const corsOrigins = checkCancel(
+    await p.text({
+      message: t('init.corsOrigins'),
+      defaultValue: cfg.corsAllowedOrigins.join(', '),
+      placeholder: '* or https://example.com, https://app.example.com',
+    }),
+    t,
+  );
+  if (corsOrigins !== '*') settings.AIMEAT_CORS_ALLOWED_ORIGINS = corsOrigins;
+
   return settings;
 }
 

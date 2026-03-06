@@ -558,6 +558,7 @@ const TABS = [
   { id:'access', key:'profile.tabs.access' },
   { id:'dataWallet', key:'profile.tabs.dataWallet' },
   { id:'nodeStats', key:'profile.tabs.nodeStats' },
+  { id:'security', key:'profile.tabs.security' },
 ];
 
 /* ── Loading indicator ── */
@@ -599,6 +600,12 @@ export default function Profile({ navigate, locale }) {
   const [keyRulesPopover, setKeyRulesPopover] = useState(null); // { key, rules, visibility }
   const [nodeStatsData, setNodeStatsData] = useState(null);
   const [nodeStatsError, setNodeStatsError] = useState(false);
+
+  // Security/CORS state
+  const [securityData, setSecurityData] = useState(null);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [corsEditGhii, setCorsEditGhii] = useState(null); // null = not editing, string = textarea value
+  const [corsEditAgent, setCorsEditAgent] = useState(null); // null or {name, value}
 
   // UI state
   const [toast, setToast] = useState(null);
@@ -812,6 +819,67 @@ export default function Profile({ navigate, locale }) {
       if (data?.data) { setNodeStatsData(data.data); setNodeStatsError(false); }
       else { setNodeStatsError(true); }
     } catch { setNodeStatsError(true); }
+  }
+
+  async function loadSecurityData() {
+    setSecurityLoading(true);
+    try {
+      const s = getSession();
+      if (!s?.fetch) return;
+      // Fetch GHII CORS
+      const ghiiResp = await s.fetch('/v1/ghii/cors');
+      const ghiiData = await ghiiResp.json();
+      const ghiiCors = ghiiData?.data || {};
+      // Fetch per-agent CORS
+      const agentsCors = [];
+      if (agents) {
+        for (const ag of agents) {
+          try {
+            const r = await s.fetch('/v1/agents/' + encodeURIComponent(ag.name) + '/cors');
+            const d = await r.json();
+            if (d?.data) agentsCors.push(d.data);
+          } catch { /* skip */ }
+        }
+      }
+      setSecurityData({ ghii: ghiiCors, agents: agentsCors });
+    } catch { setSecurityData({ ghii: {}, agents: [] }); }
+    setSecurityLoading(false);
+  }
+
+  async function saveGhiiCors(originsText) {
+    const s = getSession();
+    if (!s?.fetch) return;
+    const origins = originsText.trim()
+      ? originsText.split(/[,\n]/).map(o => o.trim()).filter(Boolean)
+      : null;
+    try {
+      await s.fetch('/v1/ghii/cors', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowed_origins: origins }),
+      });
+      showToast(t('profile.security.saved'));
+      setCorsEditGhii(null);
+      loadSecurityData();
+    } catch { showToast(t('profile.error'), true); }
+  }
+
+  async function saveAgentCors(agentName, originsText) {
+    const s = getSession();
+    if (!s?.fetch) return;
+    const origins = originsText.trim()
+      ? originsText.split(/[,\n]/).map(o => o.trim()).filter(Boolean)
+      : null;
+    try {
+      await s.fetch('/v1/agents/' + encodeURIComponent(agentName) + '/cors', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowed_origins: origins }),
+      });
+      showToast(t('profile.security.saved'));
+      setCorsEditAgent(null);
+      loadSecurityData();
+    } catch { showToast(t('profile.error'), true); }
   }
 
   // ── Extensions loaders ──
@@ -1306,6 +1374,7 @@ export default function Profile({ navigate, locale }) {
     if (tabId === 'boards' && brdSubTab === 'mine' && !myBoards) loadMyBoardsData();
     if (tabId === 'boards' && brdSubTab === 'browse' && !allBoards) loadAllBoardsData();
     if (tabId === 'nodeStats' && !nodeStatsData && !nodeStatsError) loadNodeStatsData();
+    if (tabId === 'security' && !securityData && !securityLoading) loadSecurityData();
     if (tabId === 'extensions' && !extensions) loadExtensions();
   }
 
@@ -2461,6 +2530,97 @@ export default function Profile({ navigate, locale }) {
         </div>` : null}`;
   };
 
+  // ── Security / CORS tab ──
+  const renderSecurity = () => {
+    if (securityLoading || !securityData) return html`<${Spinner} text=${t('profile.security.loading')} />`;
+    const ghii = securityData.ghii || {};
+    const agentsCors = securityData.agents || [];
+    const isInherited = ghii.inherited !== false;
+    const effectiveOrigins = ghii.effective || [];
+
+    return html`
+      <div class="section-title">\u{1F512} ${t('profile.security.title')}</div>
+      <div class="section-desc">${t('profile.security.desc')}</div>
+
+      <!-- GHII-level CORS -->
+      <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.ghiiTitle')}</h3>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${t('profile.security.ghiiDesc')}</p>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <span style="font-weight:600">${t('profile.security.allowedOrigins')}</span>
+          <span class="badge ${isInherited ? 'badge-muted' : 'badge-success'}">${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}</span>
+        </div>
+        <div style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem">
+          ${t('profile.security.effective')}: ${effectiveOrigins.includes('*') ? t('profile.security.wildcard') : effectiveOrigins.join(', ') || '-'}
+        </div>
+        ${corsEditGhii !== null ? html`
+          <textarea style="width:100%;min-height:60px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;font-family:monospace;font-size:.85rem;margin-bottom:.5rem"
+            placeholder=${t('profile.security.originsPlaceholder')}
+            value=${corsEditGhii}
+            onInput=${e => setCorsEditGhii(e.target.value)}></textarea>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn-primary" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
+            <button class="revoke-btn" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
+            <button style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 12px;border-radius:4px;cursor:pointer" onClick=${() => setCorsEditGhii(null)}>${t('wallet.consents.revoke') === 'Revoke' ? 'Cancel' : t('profile.security.save').replace(/save|tallenna/i, 'Cancel')}</button>
+          </div>
+        ` : html`
+          <button class="btn-primary" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
+        `}
+      </div>
+
+      <!-- Agent-level CORS overrides -->
+      <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.agentsTitle')}</h3>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${t('profile.security.agentsDesc')}</p>
+      ${agentsCors.length === 0
+        ? html`<div class="empty">${t('profile.security.noAgents')}</div>`
+        : html`<div class="card" style="overflow-x:auto">
+            <table class="consent-table"><thead><tr>
+              <th>${t('profile.security.agent')}</th>
+              <th>${t('profile.security.origins')}</th>
+              <th>${t('profile.security.status')}</th>
+              <th></th>
+            </tr></thead><tbody>
+              ${agentsCors.map(ac => {
+                const agentName = (ac.gaii || '').split('#')[0] || ac.gaii;
+                const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
+                const isEditing = corsEditAgent && corsEditAgent.name === agentName;
+                return html`<tr>
+                  <td><span style="font-family:monospace;font-size:.8rem;color:var(--love3)">${escHtml(agentName)}</span></td>
+                  <td style="font-size:.8rem">${isEditing
+                    ? html`<textarea style="width:200px;min-height:40px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-family:monospace;font-size:.8rem"
+                        value=${corsEditAgent.value}
+                        onInput=${e => setCorsEditAgent({name: agentName, value: e.target.value})}></textarea>`
+                    : html`${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}`
+                  }</td>
+                  <td>${hasCustom
+                    ? html`<span class="badge badge-success">${t('profile.security.custom')}</span>`
+                    : html`<span class="badge badge-muted">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`
+                  }</td>
+                  <td>${isEditing
+                    ? html`<div style="display:flex;gap:.25rem">
+                        <button class="btn-primary" style="font-size:.75rem;padding:2px 8px" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
+                        <button class="revoke-btn" style="font-size:.75rem" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
+                        <button style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:4px;cursor:pointer;font-size:.75rem" onClick=${() => setCorsEditAgent(null)}>\u2715</button>
+                      </div>`
+                    : html`<button class="revoke-btn" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`
+                  }</td>
+                </tr>`;
+              })}
+            </tbody></table>
+          </div>`
+      }
+
+      <!-- Inheritance explanation -->
+      <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.inheritanceTitle')}</h3>
+      <div class="card">
+        <p style="font-size:.85rem;color:var(--muted)">${t('profile.security.inheritanceDesc')}</p>
+        <div style="margin-top:.75rem;font-size:.8rem;font-family:monospace;color:var(--love3)">
+          Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
+        </div>
+      </div>
+    `;
+  };
+
   // ── Tab panel map ──
   const tabContent = {
     agents: renderAgents,
@@ -2477,6 +2637,7 @@ export default function Profile({ navigate, locale }) {
     access: renderAccess,
     dataWallet: renderDataWallet,
     nodeStats: renderNodeStats,
+    security: renderSecurity,
   };
 
   // ── Main render ──

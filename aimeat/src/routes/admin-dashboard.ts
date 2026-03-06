@@ -311,6 +311,7 @@ tr:hover td{background:#ffffff06}
   <button class="nav-item active" data-page="overview" onclick="nav('overview')"><span class="icon">&#x1F4CA;</span><span class="label">${t('dashboard.overview')}</span></button>
   <button class="nav-item" data-page="economy" onclick="nav('economy')"><span class="icon">&#x1FA99;</span><span class="label">${t('dashboard.economy')}</span></button>
   <button class="nav-item" data-page="config" onclick="nav('config')"><span class="icon">&#x2699;</span><span class="label">${t('dashboard.config')}</span></button>
+  <button class="nav-item" data-page="cors" onclick="nav('cors')"><span class="icon">&#x1F512;</span><span class="label">${t('dashboard.cors')}</span></button>
   <button class="nav-item" data-page="maintenance" onclick="nav('maintenance')"><span class="icon">&#x1F6A7;</span><span class="label">${t('dashboard.maintenance')}</span></button>
   <button class="nav-item" data-page="hooks" onclick="nav('hooks')"><span class="icon">&#x1F517;</span><span class="label">${t('dashboard.hooks')}</span></button>
   <button class="nav-item" data-page="portal" onclick="nav('portal')"><span class="icon">&#x1F310;</span><span class="label">${t('dashboard.portal')}</span></button>
@@ -511,7 +512,7 @@ function nav(page){
   var baseP=page.indexOf(':')>0?page.split(':')[0]:page;
   var btn=document.querySelector('[data-page="'+baseP+'"]');
   if(btn)btn.classList.add('active');
-  var titles={overview:'\\u{1F4CA} '+__t.overview,economy:'\\u{1FA99} '+__t.economy,config:'\\u2699 '+__t.config,maintenance:'\\u{1F6A7} '+__t.maintenance,hooks:'\\u{1F517} '+__t.extensionHooks,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,ghii:'\\u{1F511} '+__t.ghiiLabel,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,email:'\\u2709 '+__t.emailLabel,push:'\\u{1F514} '+__t.pushLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,csm:'\\u{1F4E6} '+__t.csmManagement,msm:'\\u{1F50C} '+__t.msmManagement,federation:'\\u{1F310} '+__t.federation,genesis:'\\u{1F30D} '+__t.genesisLabel,portal:'\\u{1F310} '+__t.portal,stats:'\\u{1F4C8} '+__t.stats};
+  var titles={overview:'\\u{1F4CA} '+__t.overview,economy:'\\u{1FA99} '+__t.economy,config:'\\u2699 '+__t.config,cors:'\\u{1F512} '+__t.corsTitle,maintenance:'\\u{1F6A7} '+__t.maintenance,hooks:'\\u{1F517} '+__t.extensionHooks,owners:'\\u{1F464} '+__t.owners,agents:'\\u{1F916} '+__t.agents,ghii:'\\u{1F511} '+__t.ghiiLabel,actions:'\\u26A1 '+__t.actions,boards:'\\u{1F4CB} '+__t.boards,chatInstances:'\\u{1F4AC} '+__t.chatInstances,realtime:'\\u{1F4E1} '+__t.realtime,work:'\\u{1F4E6} '+__t.work,email:'\\u2709 '+__t.emailLabel,push:'\\u{1F514} '+__t.pushLabel,directory:'\\u{1F4D6} '+__t.directoryLabel,matching:'\\u{1F91D} '+__t.matchingLabel,marketplace:'\\u{1F6D2} '+__t.marketplaceLabel,csm:'\\u{1F4E6} '+__t.csmManagement,msm:'\\u{1F50C} '+__t.msmManagement,federation:'\\u{1F310} '+__t.federation,genesis:'\\u{1F30D} '+__t.genesisLabel,portal:'\\u{1F310} '+__t.portal,stats:'\\u{1F4C8} '+__t.stats};
   var namepart=page.indexOf(':')>0?page.split(':').slice(1).join(':'):'';
   document.getElementById('pageTitle').innerHTML=titles[baseP]||(baseP==='csmDetail'?'\\u{1F4E6} '+namepart:baseP==='msmDetail'?'\\u{1F50C} '+namepart:page);
   render();
@@ -648,6 +649,7 @@ function render(){
     case 'hooks':app.innerHTML=renderHooks();break;
     case 'maintenance':app.innerHTML=renderMaintenance();break;
     case 'config':app.innerHTML=renderConfig();break;
+    case 'cors':app.innerHTML=renderCors();break;
     case 'ghii':app.innerHTML=renderGhii();break;
     case 'email':app.innerHTML=renderEmail();break;
     case 'directory':app.innerHTML=renderDirectory();break;
@@ -1061,6 +1063,88 @@ function cancelConfig(){
   window.__pendingConfig={};
   document.getElementById('configChanges').style.display='none';
   render();
+}
+
+/* ── CORS ── */
+function renderCors(){
+  var o='';
+  // Node default
+  var nodeOrigins=(D.configSchema&&D.configSchema.schema&&D.configSchema.schema['cors.allowedOrigins'])?D.configSchema.schema['cors.allowedOrigins'].value:(D.dash?D.dash.cors_allowed_origins:null);
+  o+='<div class="card"><h2>'+__t.corsNodeDefault+'</h2>';
+  o+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:.75rem">'+__t.corsNodeDefaultDesc+'</p>';
+  o+='<code style="font-size:.85rem">'+(nodeOrigins?esc(Array.isArray(nodeOrigins)?nodeOrigins.join(', '):String(nodeOrigins)):'*')+'</code>';
+  o+='</div>';
+  // GHII overrides
+  o+='<div class="card"><h2>'+__t.corsGhiiOverrides+'</h2>';
+  o+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:.75rem">'+__t.corsGhiiOverridesDesc+'</p>';
+  o+='<div id="corsGhiiList"><span class="loading">'+__t.loading+'</span></div></div>';
+  // Agent overrides
+  o+='<div class="card"><h2>'+__t.corsAgentOverrides+'</h2>';
+  o+='<p style="color:var(--muted);font-size:.85rem;margin-bottom:.75rem">'+__t.corsAgentOverridesDesc+'</p>';
+  o+='<div id="corsAgentList"><span class="loading">'+__t.loading+'</span></div></div>';
+  setTimeout(loadCorsOverrides,0);
+  return o;
+}
+async function loadCorsOverrides(){
+  // Load GHII overrides — filter from already-loaded D.ghiiUsers (includes allowed_origins)
+  var ghiiEl=document.getElementById('corsGhiiList');
+  try{
+    var ghiiUsers=D.ghiiUsers||[];
+    var ghiiRows=[];
+    for(var i=0;i<ghiiUsers.length;i++){
+      if(ghiiUsers[i].allowed_origins&&ghiiUsers[i].allowed_origins.length>0){
+        ghiiRows.push({ghii:ghiiUsers[i].ghii,name:ghiiUsers[i].owner_name||ghiiUsers[i].ghii,origins:ghiiUsers[i].allowed_origins});
+      }
+    }
+    if(ghiiRows.length===0){ghiiEl.innerHTML='<div style="color:var(--muted);font-size:.85rem">'+__t.corsNoOverrides+'</div>';}
+    else{
+      var h='<table class="data-table"><thead><tr><th>'+__t.owner+'</th><th>'+__t.corsOrigins+'</th><th></th></tr></thead><tbody>';
+      for(var j=0;j<ghiiRows.length;j++){
+        h+='<tr><td>'+esc(ghiiRows[j].name)+'</td><td style="font-family:monospace;font-size:.8rem">'+esc(ghiiRows[j].origins.join(', '))+'</td>';
+        h+='<td><button class="action-btn" onclick="clearGhiiCors(\''+esc(ghiiRows[j].ghii)+'\')">'+(ghiiEl?__t.corsClear:'Clear')+'</button></td></tr>';
+      }
+      h+='</tbody></table>';
+      ghiiEl.innerHTML=h;
+    }
+  }catch(e){ghiiEl.innerHTML='<div style="color:var(--red)">'+esc(e.message)+'</div>';}
+  // Load agent overrides — filter from already-loaded D.agents (includes allowed_origins)
+  var agentEl=document.getElementById('corsAgentList');
+  try{
+    var agents=(D.agents&&D.agents.agents)||[];
+    var agentRows=[];
+    for(var k=0;k<agents.length;k++){
+      if(agents[k].allowed_origins&&agents[k].allowed_origins.length>0){
+        agentRows.push({gaii:agents[k].gaii,owner:agents[k].owner,origins:agents[k].allowed_origins});
+      }
+    }
+    if(agentRows.length===0){agentEl.innerHTML='<div style="color:var(--muted);font-size:.85rem">'+__t.corsNoOverrides+'</div>';}
+    else{
+      var ah='<table class="data-table"><thead><tr><th>GAII</th><th>'+__t.owner+'</th><th>'+__t.corsOrigins+'</th><th></th></tr></thead><tbody>';
+      for(var l=0;l<agentRows.length;l++){
+        ah+='<tr><td style="font-family:monospace;font-size:.8rem">'+esc(agentRows[l].gaii)+'</td><td>'+esc(agentRows[l].owner)+'</td>';
+        ah+='<td style="font-family:monospace;font-size:.8rem">'+esc(agentRows[l].origins.join(', '))+'</td>';
+        ah+='<td><button class="action-btn" onclick="clearAgentCors(\''+esc(agentRows[l].gaii)+'\')">'+(agentEl?__t.corsClear:'Clear')+'</button></td></tr>';
+      }
+      ah+='</tbody></table>';
+      agentEl.innerHTML=ah;
+    }
+  }catch(e){agentEl.innerHTML='<div style="color:var(--red)">'+esc(e.message)+'</div>';}
+}
+async function clearGhiiCors(ghii){
+  if(!confirm(__t.corsClearConfirm))return;
+  try{
+    await api('/v1/admin/ghii/'+encodeURIComponent(ghii)+'/cors',{method:'PUT',body:{allowed_origins:null}});
+    await loadAll();
+    loadCorsOverrides();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
+}
+async function clearAgentCors(gaii){
+  if(!confirm(__t.corsClearConfirm))return;
+  try{
+    await api('/v1/admin/agents/'+encodeURIComponent(gaii)+'/cors',{method:'PUT',body:{allowed_origins:null}});
+    await loadAll();
+    loadCorsOverrides();
+  }catch(e){alert(__t.errorLabel+': '+e.message);}
 }
 
 /* ── Detail loaders ── */

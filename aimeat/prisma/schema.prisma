@@ -30,6 +30,7 @@ model Agent {
   publicKey     String
   trustScore    Int      @default(50)
   morselBalance Int      @default(0)
+  allowedOrigins String[]
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
@@ -46,6 +47,7 @@ model Memory {
   ttlHours   Int?
   version    Int      @default(1)
   flagCount  Int      @default(0)
+  allowedOrigins String[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -289,6 +291,7 @@ model Ghii {
   ftnVerified                Boolean  @default(false)
   trustScore                 Int?
   morselBalance              Int?
+  allowedOrigins             String[]
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 
