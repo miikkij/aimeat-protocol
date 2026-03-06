@@ -2826,19 +2826,25 @@
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, ''); // strip trailing slash
     closeModal();
 
-    fetch(aimeatUrl + '/v1/apps')
+    fetch(aimeatUrl + '/v1/apps?include_peers=true')
       .then(function (resp) {
         if (!resp.ok) throw new Error('Server returned ' + resp.status);
         return resp.json();
       })
       .then(function (json) {
         var apps = json.data && json.data.apps ? json.data.apps : [];
-        if (apps.length === 0) {
+        var peerApps = json.data && json.data.peer_apps ? json.data.peer_apps : [];
+        // Merge local and peer apps; tag peer apps with source info
+        for (var p = 0; p < peerApps.length; p++) {
+          peerApps[p]._from_peer = true;
+        }
+        var allFetched = apps.concat(peerApps);
+        if (allFetched.length === 0) {
           alert('No apps found on the AIMEAT server');
           return;
         }
-        aimeatAppsCache = apps;
-        showAimeatImportDialog(apps, aimeatUrl);
+        aimeatAppsCache = allFetched;
+        showAimeatImportDialog(allFetched, aimeatUrl);
       })
       .catch(function (err) {
         var msg = 'Failed to fetch apps from AIMEAT server.\n\n' + (err.message || err);
@@ -2859,12 +2865,13 @@
       var displayDesc = (app.manifest && app.manifest.description) ? app.manifest.description : '';
       var displayVer = app.version_number ? 'v' + app.version_number : '';
       var displayCat = (app.manifest && app.manifest.category) ? app.manifest.category : '';
+      var peerLabel = app._from_peer && app._peer_node ? ' \u00B7 \uD83C\uDF10 ' + escapeHtml(app._peer_node) : '';
       html +=
         '<div class="aimeat-app-item">' +
           '<input type="checkbox" data-index="' + i + '" checked/>' +
           '<div class="aimeat-app-info">' +
             '<div class="aimeat-app-name">' + escapeHtml(displayName) + (displayVer ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(displayVer) + '</span>' : '') + '</div>' +
-            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? ' \u00B7 ' + escapeHtml(displayAuthor) : '') + (displayCat ? ' \u00B7 ' + escapeHtml(displayCat) : '') + '</div>' +
+            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? ' \u00B7 ' + escapeHtml(displayAuthor) : '') + (displayCat ? ' \u00B7 ' + escapeHtml(displayCat) : '') + peerLabel + '</div>' +
             (displayDesc ? '<div class="aimeat-app-size" style="opacity:.6">' + escapeHtml(displayDesc.substring(0, 100)) + '</div>' : '') +
           '</div>' +
           '<select data-index="' + i + '">' +
@@ -2907,14 +2914,16 @@
         var app = item.app;
         var name = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename.replace(/\.html?$/i, '');
         var importedVersion = app.version_number || 1;
+        // For peer apps, use the peer's URL as the base
+        var baseUrl = (app._from_peer && app._peer_url) ? app._peer_url.replace(/\/+$/, '') : aimeatUrl;
 
         if (item.mode === 'link') {
           // Link mode: store URL with ?mode=inline, pinned to latest
-          var inlineUrl = aimeatUrl + app.download_url + '?mode=inline';
+          var inlineUrl = baseUrl + app.download_url + '?mode=inline';
           promises.push(addAppFromUrl(name, inlineUrl, '\u{1F4E6}', ['aimeat'], defaultOpenMode));
         } else {
           // Download mode: fetch content and store blob (pinned to current version)
-          var downloadUrl = aimeatUrl + app.download_url;
+          var downloadUrl = baseUrl + app.download_url;
           promises.push(
             fetch(downloadUrl)
               .then(function (resp) {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
+import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
@@ -13,7 +14,7 @@ import { randomBytes } from 'node:crypto';
  * Old versions are preserved. Download counter is tracked separately.
  * Screenshots use the existing storage system with key prefix "apps/screenshots/".
  */
-export function appsRouter(config: AimeatConfig, storage: Storage): Router {
+export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
 
     // GET /v1/apps — Catalogue listing with search/filter/pagination
@@ -50,11 +51,43 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
             };
         }));
 
+        // Federated peer apps (H1 + H2)
+        let peerApps: Record<string, unknown>[] = [];
+        if (req.query.include_peers === 'true' && peers.size > 0) {
+            const activePeers = Array.from(peers.values()).filter(p => p.status === 'active');
+            const queryParams = new URLSearchParams();
+            if (opts.category) queryParams.set('category', opts.category);
+            if (opts.q) queryParams.set('q', opts.q);
+            if (opts.tag) queryParams.set('tag', opts.tag);
+            if (opts.sort) queryParams.set('sort', opts.sort);
+            if (opts.freeOnly) queryParams.set('free_only', 'true');
+            queryParams.set('limit', String(opts.limit));
+            queryParams.set('offset', '0');
+            const qs = queryParams.toString();
+
+            const peerResults = await Promise.allSettled(
+                activePeers.map(async (peer) => {
+                    const resp = await fetch(`${peer.url}/v1/apps?${qs}`, {
+                        signal: AbortSignal.timeout(5_000),
+                    });
+                    if (!resp.ok) return [];
+                    const json = await resp.json() as { data?: { apps?: Record<string, unknown>[] } };
+                    const apps = json.data?.apps ?? [];
+                    return apps.map(a => ({ ...a, _peer_node: peer.nodeId, _peer_url: peer.url }));
+                })
+            );
+
+            for (const r of peerResults) {
+                if (r.status === 'fulfilled') peerApps.push(...r.value);
+            }
+        }
+
         res.json(success(config.nodeId, {
             apps: result,
             total,
             offset: opts.offset,
             limit: opts.limit,
+            ...(peerApps.length > 0 ? { peer_apps: peerApps } : {}),
         }));
     });
 

@@ -569,7 +569,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange));
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
-  app.use(appsRouter(config, storage));
+  app.use(appsRouter(config, storage, peers));
   app.use(appMarketplaceRouter(config, storage));
   // Node Extensions (V8 Isolates)
   if (config.extensionsEnabled) {
