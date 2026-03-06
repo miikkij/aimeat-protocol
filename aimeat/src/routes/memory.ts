@@ -8,6 +8,11 @@ import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
+
+/** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." */
+function isAnonymousGaii(gaii: string): boolean {
+  return gaii.includes('#anonymous@');
+}
 import type { StatsCollector } from '../services/stats.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 
@@ -48,6 +53,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     const now = new Date().toISOString();
     const gaii = req.auth!.sub;
+
+    // Anonymous namespace enforcement: anonymous agents can only write to anonymous.* keys
+    if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only write to keys prefixed with "anonymous."'));
+      return;
+    }
 
     // Validate storage_ref type: if value._type === 'storage_ref', verify storage_key exists
     if (value && typeof value === 'object' && value._type === 'storage_ref') {
@@ -276,6 +287,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
 
+    // Anonymous namespace enforcement
+    if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only delete keys prefixed with "anonymous."'));
+      return;
+    }
+
     const deleted = await storage.deleteMemory(gaii, key);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
@@ -299,6 +316,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const gaii = req.auth!.sub;
     const key = decodeURIComponent(req.params.key as string);
     const { value, visibility, tags, ttl_hours, version } = req.body ?? {};
+
+    // Anonymous namespace enforcement
+    if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only update keys prefixed with "anonymous."'));
+      return;
+    }
 
     const existing = await storage.getMemory(gaii, key);
     if (!existing) {
