@@ -11,56 +11,56 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 
 export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage | null): RequestHandler {
-  return async (req, res, next) => {
-    const origin = req.headers.origin;
+    return async (req, res, next) => {
+        const origin = req.headers.origin;
 
-    // No Origin header = same-origin or non-browser client → allow
-    if (!origin) {
-      next();
-      return;
-    }
+        // No Origin header = same-origin or non-browser client → allow
+        if (!origin) {
+            next();
+            return;
+        }
 
-    // Anonymous mode: when enabled and no JWT present, skip origin checks.
-    // All anonymous users share one identity and memory space — CORS adds no value.
-    if (config.anonymousMode && !req.headers.authorization) {
-      setCorsHeaders(res, '*');
-      if (req.method === 'OPTIONS') {
-        res.status(204).end();
-        return;
-      }
-      next();
-      return;
-    }
+        // Anonymous mode: when enabled and no JWT present, skip origin checks.
+        // All anonymous users share one identity and memory space — CORS adds no value.
+        if (config.anonymousMode && !req.headers.authorization) {
+            setCorsHeaders(res, '*');
+            if (req.method === 'OPTIONS') {
+                res.status(204).end();
+                return;
+            }
+            next();
+            return;
+        }
 
-    // Resolve the most specific allowedOrigins for this request
-    const storage = getStorage?.() ?? null;
-    const allowed = await resolveAllowedOrigins(req, config, storage);
+        // Resolve the most specific allowedOrigins for this request
+        const storage = getStorage?.() ?? null;
+        const allowed = await resolveAllowedOrigins(req, config, storage);
 
-    if (allowed.includes('*') || allowed.includes(origin)) {
-      setCorsHeaders(res, origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Vary', 'Origin');
-    }
-    // If origin not allowed, we omit CORS headers — browser will block the response
+        if (allowed.includes('*') || allowed.includes(origin)) {
+            setCorsHeaders(res, origin);
+            res.setHeader('Access-Control-Allow-Credentials', 'true');
+            res.setHeader('Vary', 'Origin');
+        }
+        // If origin not allowed, we omit CORS headers — browser will block the response
 
-    if (req.method === 'OPTIONS') {
-      if (allowed.includes('*') || allowed.includes(origin)) {
-        res.setHeader('Access-Control-Max-Age', '3600');
-        res.status(204).end();
-      } else {
-        res.status(403).end();
-      }
-      return;
-    }
+        if (req.method === 'OPTIONS') {
+            if (allowed.includes('*') || allowed.includes(origin)) {
+                res.setHeader('Access-Control-Max-Age', '3600');
+                res.status(204).end();
+            } else {
+                res.status(403).end();
+            }
+            return;
+        }
 
-    next();
-  };
+        next();
+    };
 }
 
 function setCorsHeaders(res: { setHeader(name: string, value: string): void }, origin: string): void {
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
 }
 
 /**
@@ -71,46 +71,46 @@ function setCorsHeaders(res: { setHeader(name: string, value: string): void }, o
  *   memory key → agent → GHII → node default
  */
 async function resolveAllowedOrigins(
-  req: Request,
-  config: AimeatConfig,
-  storage: Storage | null,
+    req: Request,
+    config: AimeatConfig,
+    storage: Storage | null,
 ): Promise<string[]> {
-  if (!req.auth?.owner || !storage) {
+    if (!req.auth?.owner || !storage) {
+        return config.corsAllowedOrigins;
+    }
+
+    try {
+        const sub = req.auth.sub;     // GAII (agent) or owner name
+        const owner = req.auth.owner;
+
+        // Phase 4: Memory-level — check if this is a memory request with a key
+        const memoryKey = extractMemoryKey(req);
+        if (memoryKey) {
+            const record = await storage.getMemory(sub, memoryKey);
+            if (record?.allowedOrigins?.length) {
+                return record.allowedOrigins;
+            }
+        }
+
+        // Phase 3: Agent-level — check agent's allowedOrigins
+        if (sub !== owner) {
+            const agent = await storage.getAgent(sub);
+            if (agent?.allowedOrigins?.length) {
+                return agent.allowedOrigins;
+            }
+        }
+
+        // Phase 2: GHII-level — check owner's GHII allowedOrigins
+        const ghii = await storage.getGHIIByOwner(owner);
+        if (ghii?.allowedOrigins?.length) {
+            return ghii.allowedOrigins;
+        }
+    } catch {
+        // Storage error — fall through to node default
+    }
+
+    // Node-level default
     return config.corsAllowedOrigins;
-  }
-
-  try {
-    const sub = req.auth.sub;     // GAII (agent) or owner name
-    const owner = req.auth.owner;
-
-    // Phase 4: Memory-level — check if this is a memory request with a key
-    const memoryKey = extractMemoryKey(req);
-    if (memoryKey) {
-      const record = await storage.getMemory(sub, memoryKey);
-      if (record?.allowedOrigins?.length) {
-        return record.allowedOrigins;
-      }
-    }
-
-    // Phase 3: Agent-level — check agent's allowedOrigins
-    if (sub !== owner) {
-      const agent = await storage.getAgent(sub);
-      if (agent?.allowedOrigins?.length) {
-        return agent.allowedOrigins;
-      }
-    }
-
-    // Phase 2: GHII-level — check owner's GHII allowedOrigins
-    const ghii = await storage.getGHIIByOwner(owner);
-    if (ghii?.allowedOrigins?.length) {
-      return ghii.allowedOrigins;
-    }
-  } catch {
-    // Storage error — fall through to node default
-  }
-
-  // Node-level default
-  return config.corsAllowedOrigins;
 }
 
 /**
@@ -118,12 +118,12 @@ async function resolveAllowedOrigins(
  * Matches: /v1/memory/:key, /v1/memory/cors/:key
  */
 function extractMemoryKey(req: Request): string | null {
-  const path = req.path;
-  // /v1/memory/cors/:key
-  const corsMatch = path.match(/^\/v1\/memory\/cors\/(.+)$/);
-  if (corsMatch) return decodeURIComponent(corsMatch[1]);
-  // /v1/memory/:key (but not /v1/memory/search, /v1/memory/:gaii/:key)
-  const keyMatch = path.match(/^\/v1\/memory\/([^/]+)$/);
-  if (keyMatch && keyMatch[1] !== 'search') return decodeURIComponent(keyMatch[1]);
-  return null;
+    const path = req.path;
+    // /v1/memory/cors/:key
+    const corsMatch = path.match(/^\/v1\/memory\/cors\/(.+)$/);
+    if (corsMatch) return decodeURIComponent(corsMatch[1]);
+    // /v1/memory/:key (but not /v1/memory/search, /v1/memory/:gaii/:key)
+    const keyMatch = path.match(/^\/v1\/memory\/([^/]+)$/);
+    if (keyMatch && keyMatch[1] !== 'search') return decodeURIComponent(keyMatch[1]);
+    return null;
 }

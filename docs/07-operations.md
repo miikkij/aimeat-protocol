@@ -243,5 +243,35 @@ See Section 6.6. Prevents abuse of all endpoints.
 
 Total morsels minted per node is public data via `GET /v1/stats`. Peered operators can audit each other's mint rates. Excessive minting relative to network activity is a de-peering signal — operators that inflate their local economy lose federation trust.
 
+### 18.8 Cross-Origin Resource Sharing (CORS)
+
+AIMEAT implements a 4-level CORS policy chain with inheritance. Each level can set custom `allowedOrigins`; if unset, origins are inherited from the next level up.
+
+**Resolution chain:** memory key → agent → GHII owner → node default
+
+| Level | Config Source | Managed By | API Endpoint |
+|-------|-------------|------------|---------------|
+| Node default | `AIMEAT_CORS_ALLOWED_ORIGINS` env var | Operator | `aimeat init` / `.env` |
+| GHII (owner) | `GHIIRecord.allowedOrigins` | Owner | `PUT /v1/ghii/cors` |
+| Agent | `AgentRecord.allowedOrigins` | Owner | `PUT /v1/agents/{name}/cors` |
+| Memory key | `MemoryRecord.allowedOrigins` | Agent | `PUT /v1/memory/cors/{key}` |
+
+Operators can view and clear per-entity overrides via admin endpoints:
+- `PUT /v1/admin/ghii/{ghii}/cors` — set/clear any GHII user's CORS
+- `PUT /v1/admin/agents/{gaii}/cors` — set/clear any agent's CORS
+
+**Behavior:**
+- No `Origin` header (non-browser clients) → allowed unconditionally
+- Anonymous mode → `Access-Control-Allow-Origin: *`
+- Authenticated → resolved origins from the 4-level chain
+- `Access-Control-Allow-Credentials: true` + `Vary: Origin` when using specific origins
+- Preflight (`OPTIONS`) denied origins return HTTP 403
+- Non-preflight denied requests continue without CORS headers (browser blocks the response)
+
+Default `['*']` preserves backward compatibility. Operators can tighten for production with:
+```
+AIMEAT_CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
+```
+
 ---
 

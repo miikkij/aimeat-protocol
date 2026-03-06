@@ -792,4 +792,4 @@ export interface Storage extends
   MicroMemoryRepository, FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
-  FederationRepository, NodeRepository, NotificationRepository {}
+  FederationRepository, NodeRepository, NotificationRepository { }

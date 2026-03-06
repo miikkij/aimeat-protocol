@@ -104,8 +104,8 @@ Default `['*']` preserves current behavior. Operators can tighten via env var.
 ## Phase 5: Tests & Docs
 
 - [x] Unit tests: 15 tests covering all 4 CORS levels (`test/unit/cors.test.ts`)
-- [ ] OpenAPI spec updates (`openapi.yaml`) *(future)*
-- [ ] Documentation updates *(future)*
+- [x] OpenAPI spec updates (`openapi.yaml`) — 8 CORS endpoints + CORS tag
+- [x] Documentation updates — RFC §18.8, Appendix A, Appendix B
 
 ---
 

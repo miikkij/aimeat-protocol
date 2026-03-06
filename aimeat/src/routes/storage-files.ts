@@ -10,7 +10,7 @@ import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
-  return gaii.includes('#anonymous@');
+    return gaii.includes('#anonymous@');
 }
 
 /**

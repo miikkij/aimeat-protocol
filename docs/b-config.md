@@ -68,6 +68,10 @@
     "mcp_enabled": true,
     "mcp_oauth_dcr_enabled": true
   },
+  "cors": {
+    "allowed_origins": ["*"],
+    "note": "4-level inheritance: node → GHII → agent → memory. Set via AIMEAT_CORS_ALLOWED_ORIGINS env var. Per-entity overrides via API."
+  },
   "micro_memory": {
     "enabled": true,
     "max_sets_per_agent": 50,

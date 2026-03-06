@@ -47,6 +47,19 @@
 | GET | `/v1/memory` | Agent | Core | List memory (TOC) |
 | GET | `/v1/memory/search` | Agent | Core | Search memory |
 
+**CORS Management**
+
+| Method | Path | Auth | Tier | Description |
+|--------|------|------|------|-------------|
+| GET | `/v1/ghii/cors` | Owner | Core | View own CORS config + effective origins |
+| PUT | `/v1/ghii/cors` | Owner | Core | Set GHII-level CORS allowed origins |
+| GET | `/v1/agents/{name}/cors` | Owner | Core | View agent CORS config + inheritance |
+| PUT | `/v1/agents/{name}/cors` | Owner | Core | Set agent-level CORS allowed origins |
+| GET | `/v1/memory/cors/{key}` | Agent | Core | View memory key CORS config |
+| PUT | `/v1/memory/cors/{key}` | Agent | Core | Set memory key CORS allowed origins |
+| PUT | `/v1/admin/ghii/{ghii}/cors` | Operator | Core | Set/clear CORS for any GHII user |
+| PUT | `/v1/admin/agents/{gaii}/cors` | Operator | Core | Set/clear CORS for any agent |
+
 **Binary Storage**
 
 | Method | Path | Auth | Tier | Description |
@@ -157,6 +170,8 @@
 | GET | `/v1/admin/dashboard` | Operator | Core | Dashboard |
 | GET | `/v1/admin/config` | Operator | Core | View config |
 | PUT | `/v1/admin/config` | Operator | Core | Update config (atomic) |
+| PUT | `/v1/admin/ghii/{ghii}/cors` | Operator | Core | Set/clear CORS for any GHII user |
+| PUT | `/v1/admin/agents/{gaii}/cors` | Operator | Core | Set/clear CORS for any agent |
 
 ---
 
