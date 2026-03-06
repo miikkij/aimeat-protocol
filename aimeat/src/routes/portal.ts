@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
+import { requireAuth } from '../auth/middleware.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 
@@ -637,6 +638,22 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // Portfolio /me redirect — lookup authenticated user's username
+  router.get('/v1/portfolio/me', requireAuth(), async (req, res) => {
+    const ownerName = req.auth!.owner;
+    res.redirect(302, `/v1/portfolio/${encodeURIComponent(ownerName)}`);
+  });
+
+  // Portfolio public view — /v1/portfolio/:username (parameterized, serves SPA)
+  router.get('/v1/portfolio/:username', (_req, res) => {
+    const spaPath = resolvePublicFile('spa.html');
+    if (spaPath) {
+      serveSpa(res, spaPath);
+    } else {
+      res.redirect(302, '/spa.html');
+    }
+  });
+
   // ── SPA routes — serve spa.html for all portal pages ──
   // The Preact SPA handles client-side routing for all /v1/ portal URLs.
 
@@ -648,6 +665,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/marketplace',
     '/v1/openclaw',
     '/v1/classic',
+    '/v1/portfolio',
   ];
 
   for (const path of spaRoutes) {
