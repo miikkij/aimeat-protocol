@@ -105,8 +105,8 @@ export function parseCortexManifest(
     errors.push('spec.version is required and must be a string');
   }
 
-  const description = (spec.description as string) ?? '';
-  const author = (spec.author as string) ?? '';
+  const description = (metadata.description as string) ?? (spec.description as string) ?? '';
+  const author = (metadata.author as string) ?? (spec.author as string) ?? '';
   const license = spec.license as string | undefined;
   const aimeatCompat = spec.aimeatCompat as string | undefined;
 

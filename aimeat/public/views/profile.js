@@ -1023,7 +1023,13 @@ export default function Profile({ navigate, locale }) {
     try {
       const yamlResp = await fetch(NODE_URL + '/cortex-bundled/' + name + '.yaml');
       if (!yamlResp.ok) throw new Error('Could not fetch manifest');
-      const manifest = await yamlResp.text();
+      let manifest = await yamlResp.text();
+
+      // Replace the bundled namespace with the user's own namespace
+      const owner = s?.owner;
+      if (owner) {
+        manifest = manifest.replace(/^(\s*namespace:\s*).+$/m, `$1${owner}`);
+      }
 
       const libs = {};
       try {
@@ -1043,7 +1049,15 @@ export default function Profile({ navigate, locale }) {
         body: JSON.stringify(body),
       });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error?.message || 'Install failed');
+      if (!resp.ok) {
+        // If already installed, just refresh the list and show success
+        if (data.error?.code === 'CONFLICT') {
+          showToast(t('profile.extensions.success.installed'));
+          loadExtensions();
+          return;
+        }
+        throw new Error(data.error?.message || 'Install failed');
+      }
 
       showToast(t('profile.extensions.success.installed'));
       loadExtensions();
@@ -2334,41 +2348,41 @@ export default function Profile({ navigate, locale }) {
     // Detail view (when viewing a specific extension)
     if (extDetailName) {
       if (!extDetail) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><br/><${Spinner} text=${t('profile.extensions.loading')} /></div>`;
-      if (extDetail.error) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><div class="empty">Error: ${escHtml(extDetail.error)}</div></div>`;
+      if (extDetail.error) return html`<div><button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button><div class="empty">Error: ${extDetail.error}</div></div>`;
 
       const ext = extDetail;
       const comps = ext.components || [];
       const isActive = ext.status === 'active';
       const vis = ext.visibility || 'private';
 
-      return html`
+      return html`<div>
         <button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button>
         <div style="margin:1.5rem 0">
           <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">
-            ${escHtml(ext.name)}
-            <span style="font-size:.8rem;font-weight:400;color:var(--muted)">${'v' + escHtml(ext.version || '?')}</span>
+            ${ext.name}
+            <span style="font-size:.8rem;font-weight:400;color:var(--muted)">v${ext.version || '?'}</span>
             <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'} ${t('profile.extensions.visibility.' + vis)}</span>
           </div>
-          <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${escHtml(ext.description || '')}</div>
+          <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${ext.description || ''}</div>
           <div style="display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);margin-bottom:1.5rem;flex-wrap:wrap">
-            <span>${t('profile.extensions.detail.author')}: ${escHtml(ext.author || '?')}</span>
-            ${ext.license ? html`<span>${t('profile.extensions.detail.license')}: ${escHtml(ext.license)}</span>` : null}
+            <span>${t('profile.extensions.detail.author')}: ${ext.author || '?'}</span>
+            ${ext.license ? html`<span>${t('profile.extensions.detail.license')}: ${ext.license}</span>` : null}
             <span><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
-            <span>${t('profile.extensions.detail.tags')}: ${escHtml((ext.tags || []).join(', '))}</span>
+            <span>${t('profile.extensions.detail.tags')}: ${(ext.tags || []).join(', ')}</span>
           </div>
         </div>
 
         <div class="ext-detail-section">
           <div class="ext-detail-section-title">${t('profile.extensions.detail.whatsIncluded')}</div>
-          ${comps.map(c => html`<div>${COMP_ICONS[c.type] || '\u{1F4C4}'} ${t('profile.extensions.components.' + c.type) || escHtml(c.type)}: ${escHtml(c.type === 'schema' ? c.key_pattern : (c.name || c.filename || ''))}</div>`)}
+          ${comps.map(c => html`<div>${COMP_ICONS[c.type] || '\u{1F4C4}'} ${t('profile.extensions.components.' + c.type) || c.type}: ${c.type === 'schema' ? c.key_pattern : (c.name || c.filename || '')}</div>`)}
         </div>
 
         ${comps.filter(c => c.type === 'prompt').map(p => {
           const content = p._content || p.content || '';
           return html`
             <div class="ext-detail-section">
-              <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${escHtml(p.name)} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(content); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyPrompt')}</button></div>
-              <div class="ext-detail-code">${escHtml(content.substring(0, 500))}${content.length > 500 ? '...' : ''}</div>
+              <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(content); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyPrompt')}</button></div>
+              <div class="ext-detail-code">${content.substring(0, 500)}${content.length > 500 ? '...' : ''}</div>
             </div>`;
         })}
 
@@ -2377,26 +2391,27 @@ export default function Profile({ navigate, locale }) {
           const scriptTag = '<script src="' + scriptUrl + '"><\/script>';
           return html`
             <div class="ext-detail-section">
-              <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${escHtml(lib.filename)}</div>
-              <div style="margin-bottom:.5rem;font-size:.85rem;color:var(--muted)">${t('profile.extensions.detail.exports')}: ${escHtml((lib.exports || []).join(', '))}</div>
+              <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${lib.filename}</div>
+              <div style="margin-bottom:.5rem;font-size:.85rem;color:var(--muted)">${t('profile.extensions.detail.exports')}: ${(lib.exports || []).join(', ')}</div>
               <div style="font-size:.85rem;font-weight:600;margin-bottom:4px">${t('profile.extensions.detail.scriptTag')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
-              <div class="ext-detail-code">${escHtml(scriptTag)}</div>
-              ${lib.api_surface ? html`
+              <div class="ext-detail-code">${scriptTag}</div>
+              ${lib.api_surface ? html`<div>
                 <div style="font-size:.85rem;font-weight:600;margin-top:.75rem;margin-bottom:4px">${t('profile.extensions.detail.apiSurface')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
-                <div class="ext-detail-code">${escHtml(lib.api_surface)}</div>` : null}
+                <div class="ext-detail-code">${lib.api_surface}</div>
+              </div>` : null}
             </div>`;
         })}
 
         ${comps.filter(c => c.type === 'schema').length > 0 ? html`
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">${'\u{1F4D0}'} Schemas</div>
-            ${comps.filter(c => c.type === 'schema').map(s => html`<div style="font-size:.85rem;color:var(--muted);margin-bottom:.25rem">${escHtml(s.key_pattern)} (${escHtml(s.apply_to || '')})</div>`)}
+            ${comps.filter(c => c.type === 'schema').map(s => html`<div style="font-size:.85rem;color:var(--muted);margin-bottom:.25rem">${s.key_pattern} (${s.apply_to || ''})</div>`)}
           </div>` : null}
 
         ${(ext._ontologies || []).map(ont => html`
           <div class="ext-detail-section">
-            <div class="ext-detail-section-title">${'\u{1F9EC}'} Ontology: ${escHtml(ont.name)}</div>
-            <div style="font-size:.85rem;color:var(--muted)">${Object.entries(ont.concepts || {}).map(([k, c]) => escHtml(k) + ' (' + escHtml(c.label?.en || k) + ')').join(', ')}</div>
+            <div class="ext-detail-section-title">${'\u{1F9EC}'} Ontology: ${ont.name}</div>
+            <div style="font-size:.85rem;color:var(--muted)">${Object.entries(ont.concepts || {}).map(([k, c]) => k + ' (' + (c.label?.en || k) + ')').join(', ')}</div>
           </div>`)}
 
         <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap">
@@ -2407,7 +2422,8 @@ export default function Profile({ navigate, locale }) {
             ${vis === 'public' ? t('profile.extensions.unpublish') : t('profile.extensions.publish')}
           </button>
           <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
-        </div>`;
+        </div>
+      </div>`;
     }
 
     // ── Grid view (main extensions page) ──
@@ -2419,8 +2435,7 @@ export default function Profile({ navigate, locale }) {
     ];
     const unbundled = BUNDLED.filter(b => !installedNames.includes(b.id));
 
-    return html`
-      <!-- Hero section -->
+    return html`<div>
       <div class="ext-hero">
         <div class="section-title">${'\u{1F9E9}'} ${t('profile.extensions.title')}</div>
         ${!hasExtensions
@@ -2432,10 +2447,10 @@ export default function Profile({ navigate, locale }) {
         </div>
       </div>
 
-      <!-- Installed extensions grid -->
       ${!extensions ? html`<${Spinner} text=${t('profile.extensions.loading')} />`
-        : !hasExtensions ? null
-        : html`<div class="ext-grid">
+        : hasExtensions ? html`<div>
+          <div style="font-size:.95rem;font-weight:600;margin-bottom:.75rem;margin-top:1.5rem;color:var(--muted)">${t('profile.extensions.installed')} (${extensions.length})</div>
+          <div class="ext-grid">
             ${extensions.map(ext => {
               const types = ext.component_types || [];
               const isActive = ext.status === 'active';
@@ -2443,13 +2458,13 @@ export default function Profile({ navigate, locale }) {
               return html`
                 <div class="ext-card" onClick=${() => loadExtDetail(ext.name)}>
                   <div class="ext-card-header">
-                    <span class="ext-card-name">${escHtml(ext.name)}</span>
-                    <span class="ext-card-version">${'v' + escHtml(ext.version || '?')}</span>
+                    <span class="ext-card-name">${ext.name}</span>
+                    <span class="ext-card-version">v${ext.version || '?'}</span>
                     <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'}</span>
                   </div>
-                  <div class="ext-card-desc">${escHtml(ext.description || '')}</div>
+                  <div class="ext-card-desc">${ext.description || ''}</div>
                   <div class="ext-card-tags">
-                    ${types.map(ct => html`<span class="ext-comp-tag" style="color:${COMP_COLORS[ct] || 'var(--muted)'}">${t('profile.extensions.components.' + ct) || escHtml(ct)}</span>`)}
+                    ${types.map(ct => html`<span class="ext-comp-tag" style="color:${COMP_COLORS[ct] || 'var(--muted)'}">${t('profile.extensions.components.' + ct) || ct}</span>`)}
                   </div>
                   <div class="ext-card-footer">
                     <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
@@ -2462,13 +2477,12 @@ export default function Profile({ navigate, locale }) {
                   </div>
                 </div>`;
             })}
-          </div>`}
+          </div>
+        </div>` : null}
 
-      <!-- Empty state message (only when no extensions AND no bundled to show) -->
       ${!hasExtensions && unbundled.length === 0 ? html`<div class="empty">${t('profile.extensions.empty')}</div>` : null}
 
-      <!-- Bundled extensions (only show uninstalled ones) -->
-      ${unbundled.length > 0 ? html`
+      ${extensions && unbundled.length > 0 ? html`
         <div style="margin-top:${hasExtensions ? '2rem' : '0'}">
           <div style="font-size:.95rem;font-weight:600;margin-bottom:.75rem;color:var(--muted)">${t('profile.extensions.readyExtensions')}</div>
           <div class="ext-bundled-grid">
@@ -2486,7 +2500,6 @@ export default function Profile({ navigate, locale }) {
           </div>
         </div>` : null}
 
-      <!-- Install modal (unchanged) -->
       ${showExtInstall ? html`
         <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowExtInstall(false); }}>
           <div class="modal" style="max-width:600px">
@@ -2527,7 +2540,8 @@ export default function Profile({ navigate, locale }) {
               </div>
             </form>
           </div>
-        </div>` : null}`;
+        </div>` : null}
+    </div>`;
   };
 
   // ── Security / CORS tab ──

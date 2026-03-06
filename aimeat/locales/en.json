@@ -650,6 +650,7 @@
       "createWithAi": "Create with AI",
       "promptCopied": "Prompt copied! Paste it into AI Chat.",
       "readyExtensions": "Ready-made extensions:",
+      "installed": "Your extensions",
       "addThis": "Add this",
       "heroDesc": "Get more done with less. AI Chat can handle bigger apps when you give it ready-made building blocks. Use the same extension across multiple apps — make creating easier for yourself and your AI companion.",
       "visibility": {

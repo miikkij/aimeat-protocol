@@ -649,6 +649,7 @@
       "createWithAi": "Luo AI:lla",
       "promptCopied": "Prompt kopioitu! Liitä se AI Chatiin.",
       "readyExtensions": "Valmiita laajennuksia:",
+      "installed": "Omat laajennukset",
       "addThis": "Lisää tämä",
       "heroDesc": "Laajennuksilla saat enemmän aikaiseksi vähemmällä. AI Chat pystyy suoriutumaan isommista sovelluksista kun annat sille valmiita rakennuspalikoita. Voit käyttää samaa laajennetta useassa sovelluksessasi — teet luomisen helpommaksi itsellesi ja tekoälykaveerillesi.",
       "visibility": {
