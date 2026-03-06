@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/css/views/marketplace.css">
   <link rel="stylesheet" href="/css/views/aimeat-os.css">
   <link rel="stylesheet" href="/css/views/openclaw.css">
+  <link rel="stylesheet" href="/css/views/portfolio.css">
   <script type="importmap">
   {
     "imports": {
@@ -93,6 +94,7 @@
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
       '/v1/openclaw':    () => import('/views/openclaw.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
+      '/v1/portfolio':   () => import('/views/portfolio.js' + B),
     };
 
     // Match route, handling query params for special views
@@ -100,6 +102,10 @@
       // Dev portal is ?view=dev on /v1/portal
       if (pathname === '/v1/portal' && search.includes('view=dev')) {
         return () => import('/views/portal-dev.js' + B);
+      }
+      // Portfolio public view: /v1/portfolio/<username>
+      if (pathname.startsWith('/v1/portfolio/') && pathname !== '/v1/portfolio/') {
+        return () => import('/views/portfolio.js' + B);
       }
       return ROUTES[pathname] || ROUTES['/v1/portal'];
     }

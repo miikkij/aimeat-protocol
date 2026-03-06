@@ -544,6 +544,7 @@ const PLATFORM_KEYS = ['windows','mac','linux','wsl2','android','aws'];
 const PLATFORM_LABELS = { windows:'profile.platforms.windows', mac:'profile.platforms.mac', linux:'profile.platforms.linux', wsl2:'profile.platforms.wsl2', android:'profile.platforms.android', aws:'profile.platforms.aws' };
 const SERVICE_CATEGORIES = ['language','translation','analysis','generation','coding','data','image','audio','video','search','utility','other'];
 const TABS = [
+  { id:'portfolio', key:'portfolio.tabLabel' },
   { id:'agents', key:'profile.tabs.agents' },
   { id:'chatsessions', key:'profile.tabs.chatSessions' },
   { id:'wallet', key:'profile.tabs.wallet' },
@@ -2635,8 +2636,28 @@ export default function Profile({ navigate, locale }) {
     `;
   };
 
+  // ── Portfolio tab ──
+  const renderPortfolio = () => html`
+    <div class="tab-content">
+      <div style="text-align:center; padding:2rem;">
+        <h3>${t('portfolio.builder.heading')}</h3>
+        <p style="color:var(--text-dim); margin-bottom:1.5rem;">${t('portfolio.builder.subtitle')}</p>
+        <button class="btn btn-primary" onClick=${() => navigate('/v1/portfolio')}>
+          ${t('portfolio.builder.heading')}
+        </button>
+        <br/><br/>
+        ${session && html`
+          <a href="/v1/portfolio/${encodeURIComponent(session.owner)}" class="btn btn-ghost" target="_blank">
+            ${t('portfolio.builder.viewPublic')}
+          </a>
+        `}
+      </div>
+    </div>
+  `;
+
   // ── Tab panel map ──
   const tabContent = {
+    portfolio: renderPortfolio,
     agents: renderAgents,
     chatsessions: renderChatSessions,
     wallet: renderWallet,

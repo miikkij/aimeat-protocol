@@ -225,6 +225,11 @@ export interface AimeatConfig {
   cortexMaxInstalled: number;
   cortexMaxLibSizeKb: number;
 
+  // Portfolio
+  portfolioEnabled: boolean;
+  portfolioMaxSizeKb: number;
+  portfolioMaxImages: number;
+
   // CORS
   corsAllowedOrigins: string[];
 }
@@ -403,6 +408,11 @@ export function loadConfig(): AimeatConfig {
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
     cortexMaxInstalled: parseInt(process.env.AIMEAT_CORTEX_MAX_INSTALLED ?? '50', 10),
     cortexMaxLibSizeKb: parseInt(process.env.AIMEAT_CORTEX_MAX_LIB_SIZE_KB ?? '512', 10),
+
+    // Portfolio
+    portfolioEnabled: process.env.AIMEAT_PORTFOLIO !== 'false',
+    portfolioMaxSizeKb: parseInt(process.env.AIMEAT_PORTFOLIO_MAX_SIZE_KB ?? '512', 10),
+    portfolioMaxImages: parseInt(process.env.AIMEAT_PORTFOLIO_MAX_IMAGES ?? '20', 10),
 
     // CORS
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),

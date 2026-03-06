@@ -37,6 +37,7 @@ import { storageFilesRouter } from './routes/storage-files.js';
 import { validateRouter } from './routes/validate.js';
 import { mcpRouter } from './routes/mcp.js';
 import { portalRouter } from './routes/portal.js';
+import { portfolioRouter } from './routes/portfolio.js';
 import { portalApiRouter } from './routes/portal-api.js';
 import { csmRouter } from './routes/csm.js';
 import { msmRouter } from './routes/msm.js';
@@ -527,6 +528,9 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     startSiteSyncJob(config, storage, siteService);
   }
   app.use(portalRouter(config, storage));
+  if (config.portfolioEnabled) {
+    app.use(portfolioRouter(config, storage));
+  }
   app.use(portalApiRouter(config, storage));
   // Phase 1.1 — Email service for verification and magic links
   const emailService = createEmailService(config);

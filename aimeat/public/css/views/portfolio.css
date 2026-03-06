@@ -1,0 +1,235 @@
+/* ── Portfolio View ────────────────────────────────────── */
+
+.portfolio-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ── Builder Wizard ── */
+.portfolio-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.portfolio-step {
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.portfolio-step h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  color: var(--text-bright, #fff);
+}
+
+.portfolio-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent, #7c5cff);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+/* ── Content Checkboxes ── */
+.portfolio-source-group {
+  margin-bottom: 1.5rem;
+}
+
+.portfolio-source-group summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-bright, #fff);
+  padding: 0.5rem 0;
+  user-select: none;
+}
+
+.portfolio-source-group summary::marker {
+  color: var(--accent, #7c5cff);
+}
+
+.portfolio-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+}
+
+.portfolio-source-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.portfolio-source-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.portfolio-source-item label {
+  cursor: pointer;
+  color: var(--text-dim, #aaa);
+  font-size: 0.9rem;
+}
+
+.portfolio-source-item input[type="checkbox"] {
+  accent-color: var(--accent, #7c5cff);
+  width: 16px;
+  height: 16px;
+}
+
+.portfolio-source-meta {
+  font-size: 0.75rem;
+  color: var(--text-dim, #666);
+  margin-left: auto;
+}
+
+/* ── Style Selector ── */
+.portfolio-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.portfolio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.portfolio-option:hover {
+  border-color: var(--accent, #7c5cff);
+}
+
+.portfolio-option.selected {
+  border-color: var(--accent, #7c5cff);
+  background: rgba(124,92,255,0.08);
+}
+
+.portfolio-option input[type="radio"] {
+  accent-color: var(--accent, #7c5cff);
+}
+
+/* ── Auth Gate Section ── */
+.portfolio-auth-gates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+/* ── Prompt Output ── */
+.portfolio-prompt-output {
+  position: relative;
+  background: var(--code-bg, rgba(0,0,0,0.3));
+  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  padding: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--text-dim, #aaa);
+}
+
+.portfolio-prompt-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ── Instructions ── */
+.portfolio-instructions {
+  background: rgba(124,92,255,0.06);
+  border: 1px solid rgba(124,92,255,0.15);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+}
+
+.portfolio-instructions ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.portfolio-instructions li {
+  margin-bottom: 0.4rem;
+  color: var(--text-dim, #aaa);
+  font-size: 0.9rem;
+}
+
+/* ── Public Viewer ── */
+.portfolio-viewer {
+  min-height: 60vh;
+}
+
+.portfolio-viewer-frame {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  min-height: 70vh;
+  background: #fff;
+}
+
+.portfolio-not-found {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-dim, #888);
+}
+
+.portfolio-not-found h2 {
+  color: var(--text-bright, #fff);
+  margin-bottom: 0.5rem;
+}
+
+/* ── Upload Section ── */
+.portfolio-upload-zone {
+  border: 2px dashed var(--border, rgba(255,255,255,0.15));
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.portfolio-upload-zone:hover,
+.portfolio-upload-zone.dragover {
+  border-color: var(--accent, #7c5cff);
+  background: rgba(124,92,255,0.04);
+}
+
+.portfolio-upload-zone input[type="file"] {
+  display: none;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .portfolio-container {
+    padding: 1rem;
+  }
+  .portfolio-options {
+    grid-template-columns: 1fr;
+  }
+  .portfolio-prompt-actions {
+    flex-direction: column;
+  }
+}
