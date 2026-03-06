@@ -407,6 +407,38 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
+  // ── GET /v1/cortex/:name/export — export manifest + lib files for editing ──
+  router.get('/v1/cortex/:name/export', requireAuth(), requireRole('owner'), async (req, res) => {
+    const name = decodeURIComponent(req.params.name as string);
+    const ext = await storage.getCortexExtension(name);
+
+    if (!ext) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+      return;
+    }
+
+    // Collect lib file contents
+    const libs: Record<string, string> = {};
+    for (const comp of ext.components) {
+      if (comp.type === 'lib') {
+        const content = await storage.getCortexLibFile(name, comp.filename);
+        if (content) {
+          libs[comp.filename] = content;
+        }
+      }
+    }
+
+    res.json(success(config.nodeId, {
+      name: ext.name,
+      status: ext.status,
+      manifest: ext.manifest,
+      libs,
+    }, [
+      { description: 'Re-install after editing', method: 'POST', url: '/v1/cortex' },
+      { description: 'Uninstall this extension', method: 'DELETE', url: `/v1/cortex/${encodeURIComponent(name)}` },
+    ]));
+  });
+
   // ── GET /v1/cortex/:name/libs/:libName.js — serve JS lib file (public, cacheable) ──
   router.get('/v1/cortex/:name/libs/:libFile', async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);

@@ -1248,6 +1248,28 @@
     </div>
   </div>
 
+  <!-- Cortex Extension Editor Overlay -->
+  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(10,10,18,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:rgba(22,33,62,.96);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto">
+      <h2 style="margin-top:0;font-size:1.1rem">&#x1F6E0;&#xFE0F; Extension Editor</h2>
+      <p id="cortex-editor-name" style="color:var(--text-muted,#889);font-size:.85rem;margin-top:-.5rem"></p>
+      <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
+      <div style="margin-bottom:1rem">
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem">Manifest (YAML)</label>
+        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
+      </div>
+      <div id="cortex-editor-libs"></div>
+      <div style="margin-bottom:1.5rem">
+        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">+ Add Lib File</button>
+      </div>
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
+        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">&#x1F4E5; Export Files</button>
+        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:var(--accent,#34d399);color:#000;font-weight:600;cursor:pointer">Save &amp; Re-install</button>
+        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Published Apps Section -->
   <div id="published-section" style="display:none">
     <div class="published-header" onclick="window._launcher.togglePublished()">
@@ -3285,6 +3307,15 @@
             + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy Prompt</button>'
             + '</div>';
         });
+
+        // Edit button (only if owner session available)
+        var hasSession = false;
+        try { hasSession = !!getCortexOwnerToken(); } catch(e) {}
+        if (hasSession) {
+          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.08)">'
+            + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
+            + '</div>';
+        }
 
         el.innerHTML = html;
       })
