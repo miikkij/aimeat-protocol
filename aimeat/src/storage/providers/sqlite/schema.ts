@@ -29,7 +29,8 @@ export function initializeSchema(db: Database.Database): void {
       morselBalance  REAL NOT NULL DEFAULT 0,
       createdAt      TEXT NOT NULL,
       lastSeen       TEXT NOT NULL,
-      semantic       TEXT
+      semantic       TEXT,
+      allowedOrigins TEXT
     );
 
     -- ── Memory ──
@@ -44,6 +45,7 @@ export function initializeSchema(db: Database.Database): void {
       createdAt      TEXT NOT NULL,
       updatedAt      TEXT NOT NULL,
       flagCount      INTEGER DEFAULT 0,
+      allowedOrigins TEXT,
       PRIMARY KEY (ownerGaii, key)
     );
 
@@ -245,7 +247,8 @@ export function initializeSchema(db: Database.Database): void {
       verificationCredentialHash TEXT,
       ftnVerified                INTEGER DEFAULT 0,
       trustScore                 REAL,
-      morselBalance              REAL
+      morselBalance              REAL,
+      allowedOrigins             TEXT
     );
 
     -- ── Chat Instances ──
@@ -703,4 +706,20 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_pps_ownerName ON personal_push_subscriptions(ownerName);
 
   `);
+
+  // ── Schema migrations for existing databases ──
+  // ALTER TABLE ADD COLUMN is idempotent-safe: if the column exists, it throws
+  // "duplicate column name" which we catch and ignore.
+  const safeAddColumn = (table: string, column: string, type: string) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); } catch { /* column already exists */ }
+  };
+
+  // Phase 2 CORS — GHII-level allowed origins
+  safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');
+
+  // Phase 3 CORS — Agent-level allowed origins
+  safeAddColumn('agents', 'allowedOrigins', 'TEXT');
+
+  // Phase 4 CORS — Memory-level allowed origins
+  safeAddColumn('memory', 'allowedOrigins', 'TEXT');
 }

@@ -8,6 +8,11 @@ import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 
+/** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
+function isAnonymousGaii(gaii: string): boolean {
+  return gaii.includes('#anonymous@');
+}
+
 /**
  * Extract storage key from Express 5 wildcard {*key} param.
  * path-to-regexp v8 returns an array of path segments and auto-decodes %xx.
@@ -55,6 +60,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             }
             fileData = Buffer.concat(chunks);
             mimeType = contentType || 'application/octet-stream';
+        }
+
+        // Anonymous namespace enforcement: anonymous agents can only upload to anonymous/* keys
+        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only upload to keys prefixed with "anonymous/"'));
+            return;
         }
 
         // Per-file size limit (configurable)
@@ -128,6 +139,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     router.post('/v1/storage/upload/init', requireAuth(), requireRole('agent'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
         const gaii = req.auth!.sub;
         const { key, mime_type, visibility, chunk_size, total_chunks } = req.body ?? {};
+
+        // Anonymous namespace enforcement
+        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only upload to keys prefixed with "anonymous/"'));
+            return;
+        }
+
         const uploadId = `upload-${randomBytes(12).toString('hex')}`;
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 6 * 3600_000).toISOString(); // 6 hours
@@ -394,6 +412,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     router.delete('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
         const gaii = req.auth!.sub;
         const key = extractKey(req.params);
+
+        // Anonymous namespace enforcement
+        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only delete keys prefixed with "anonymous/"'));
+            return;
+        }
+
         const deleted = await storage.deleteStorageFile(gaii, key);
         if (!deleted) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));

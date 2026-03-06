@@ -50,6 +50,7 @@ export function adminFeaturesRouter(
                 totp_enabled: u.totpEnabled,
                 email_hash: u.emailHash ?? null,
                 owner_name: u.ownerName,
+                allowed_origins: u.allowedOrigins ?? null,
                 created_at: u.createdAt,
                 updated_at: u.updatedAt,
             })),
@@ -83,6 +84,42 @@ export function adminFeaturesRouter(
             return;
         }
         res.json(success(config.nodeId, { deleted: true, ghii }));
+    }));
+
+    // PUT /v1/admin/ghii/:ghii/cors — Operator sets/clears CORS for any GHII user
+    router.put('/v1/admin/ghii/:ghii/cors', ...auth, handle(async (req, res) => {
+        const ghii = param(req.params.ghii);
+        const record = await storage.getGHII(ghii);
+        if (!record) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
+            return;
+        }
+
+        const { allowed_origins } = req.body ?? {};
+        if (allowed_origins !== null && !Array.isArray(allowed_origins)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_origins must be an array of origin URLs or null to clear'));
+            return;
+        }
+        if (Array.isArray(allowed_origins)) {
+            for (const origin of allowed_origins) {
+                if (typeof origin !== 'string' || (origin !== '*' && !/^https?:\/\//.test(origin))) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid origin: ${origin}. Must be an http(s) URL or '*'`));
+                    return;
+                }
+            }
+        }
+
+        const updated = await storage.updateGHII(ghii, {
+            allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
+        });
+        if (!updated) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update CORS settings'));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            ghii: updated.ghii,
+            allowed_origins: updated.allowedOrigins ?? null,
+        }));
     }));
 
     // ── Email Status ────────────────────────────────────────

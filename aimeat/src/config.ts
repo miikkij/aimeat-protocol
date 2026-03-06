@@ -224,6 +224,9 @@ export interface AimeatConfig {
   cortexEnabled: boolean;
   cortexMaxInstalled: number;
   cortexMaxLibSizeKb: number;
+
+  // CORS
+  corsAllowedOrigins: string[];
 }
 
 export function loadConfig(): AimeatConfig {
@@ -400,6 +403,10 @@ export function loadConfig(): AimeatConfig {
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
     cortexMaxInstalled: parseInt(process.env.AIMEAT_CORTEX_MAX_INSTALLED ?? '50', 10),
     cortexMaxLibSizeKb: parseInt(process.env.AIMEAT_CORTEX_MAX_LIB_SIZE_KB ?? '512', 10),
+
+    // CORS
+    corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
+
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },

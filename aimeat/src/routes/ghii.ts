@@ -760,6 +760,69 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         res.redirect(301, `/v1/ghii/list${qs}`);
     });
 
+    // ── CORS per-GHII management ──
+
+    // GET /v1/ghii/cors — Get your CORS allowed origins
+    router.get('/v1/ghii/cors', requireAuth(), async (req, res) => {
+        const ownerName = req.auth!.owner;
+        const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+        if (!ghiiRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found'));
+            return;
+        }
+
+        res.json(success(config.nodeId, {
+            ghii: ghiiRecord.ghii,
+            allowed_origins: ghiiRecord.allowedOrigins ?? null,
+            effective: ghiiRecord.allowedOrigins ?? config.corsAllowedOrigins,
+            inherited: !ghiiRecord.allowedOrigins,
+        }));
+    });
+
+    // PUT /v1/ghii/cors — Set your CORS allowed origins
+    router.put('/v1/ghii/cors', requireAuth(), async (req, res) => {
+        const ownerName = req.auth!.owner;
+        const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+        if (!ghiiRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found'));
+            return;
+        }
+
+        const { allowed_origins } = req.body ?? {};
+
+        // null = inherit from node default, array = explicit origins
+        if (allowed_origins !== null && !Array.isArray(allowed_origins)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_origins must be an array of origin URLs or null to inherit'));
+            return;
+        }
+
+        if (Array.isArray(allowed_origins)) {
+            for (const origin of allowed_origins) {
+                if (typeof origin !== 'string' || (origin !== '*' && !/^https?:\/\//.test(origin))) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid origin: ${origin}. Must be an http(s) URL or '*'`));
+                    return;
+                }
+            }
+        }
+
+        const updates: Record<string, unknown> = {
+            allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
+        };
+
+        const updated = await storage.updateGHII(ghiiRecord.ghii, updates);
+        if (!updated) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update CORS settings'));
+            return;
+        }
+
+        res.json(success(config.nodeId, {
+            ghii: updated.ghii,
+            allowed_origins: updated.allowedOrigins ?? null,
+            effective: updated.allowedOrigins ?? config.corsAllowedOrigins,
+            inherited: !updated.allowedOrigins,
+        }));
+    });
+
     // GET /v1/ghii/:ghii — Public profile (Tier 0, no auth)
     router.get('/v1/ghii/:ghii', async (req, res) => {
         const ghii = req.params.ghii as string;

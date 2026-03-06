@@ -105,6 +105,20 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'info', variable: 'AIMEAT_ADMIN_PASSWORD', message: 'Not set. A random password will be generated at startup.' });
   }
 
+  // ── CORS ──
+  const corsOrigins = env.AIMEAT_CORS_ALLOWED_ORIGINS;
+  if (corsOrigins && corsOrigins !== '*') {
+    const origins = corsOrigins.split(',').map(s => s.trim()).filter(Boolean);
+    for (const origin of origins) {
+      if (origin !== '*' && !origin.startsWith('https://') && !origin.startsWith('http://')) {
+        results.push({ level: 'warning', variable: 'AIMEAT_CORS_ALLOWED_ORIGINS', message: `Origin "${origin}" doesn't look like a URL. Expected format: https://example.com` });
+      }
+    }
+    if (origins.length === 0) {
+      results.push({ level: 'warning', variable: 'AIMEAT_CORS_ALLOWED_ORIGINS', message: 'Empty value. This will block all cross-origin browser requests. Use * to allow all.' });
+    }
+  }
+
   // ── Numeric fields ──
   const numericFields: Array<{ key: string; name: string; defaultVal: string; min?: number; max?: number }> = [
     { key: 'AIMEAT_JWT_TTL', name: 'JWT TTL', defaultVal: '3600', min: 60 },

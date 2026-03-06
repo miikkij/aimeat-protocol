@@ -132,6 +132,12 @@ export function formatConfig(config: AimeatConfig): string {
           value: config.anonymousMode ? 'true' : 'false',
           defaultVal: 'false',
         },
+        {
+          envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS',
+          description: 'Allowed CORS origins (comma-separated, or * for all)',
+          value: config.corsAllowedOrigins.join(', '),
+          defaultVal: '*',
+        },
       ],
     },
     {

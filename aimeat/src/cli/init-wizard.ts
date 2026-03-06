@@ -1112,6 +1112,16 @@ async function askAllAdvancedSettings(
   );
   if (relayHops !== '3') settings.AIMEAT_MAX_RELAY_HOPS = relayHops;
 
+  const corsOrigins = checkCancel(
+    await p.text({
+      message: t('init.corsOrigins'),
+      defaultValue: cfg.corsAllowedOrigins.join(', '),
+      placeholder: '* or https://example.com, https://app.example.com',
+    }),
+    t,
+  );
+  if (corsOrigins !== '*') settings.AIMEAT_CORS_ALLOWED_ORIGINS = corsOrigins;
+
   return settings;
 }
 
