@@ -1101,7 +1101,7 @@ async function loadCorsOverrides(){
       var h='<table class="data-table"><thead><tr><th>'+__t.owner+'</th><th>'+__t.corsOrigins+'</th><th></th></tr></thead><tbody>';
       for(var j=0;j<ghiiRows.length;j++){
         h+='<tr><td>'+esc(ghiiRows[j].name)+'</td><td style="font-family:monospace;font-size:.8rem">'+esc(ghiiRows[j].origins.join(', '))+'</td>';
-        h+='<td><button class="action-btn" onclick="clearGhiiCors(\''+esc(ghiiRows[j].ghii)+'\')">'+(ghiiEl?__t.corsClear:'Clear')+'</button></td></tr>';
+        h+='<td><button class="action-btn" onclick="clearGhiiCors(\\''+esc(ghiiRows[j].ghii)+'\\')">'+(ghiiEl?__t.corsClear:'Clear')+'</button></td></tr>';
       }
       h+='</tbody></table>';
       ghiiEl.innerHTML=h;
@@ -1123,7 +1123,7 @@ async function loadCorsOverrides(){
       for(var l=0;l<agentRows.length;l++){
         ah+='<tr><td style="font-family:monospace;font-size:.8rem">'+esc(agentRows[l].gaii)+'</td><td>'+esc(agentRows[l].owner)+'</td>';
         ah+='<td style="font-family:monospace;font-size:.8rem">'+esc(agentRows[l].origins.join(', '))+'</td>';
-        ah+='<td><button class="action-btn" onclick="clearAgentCors(\''+esc(agentRows[l].gaii)+'\')">'+(agentEl?__t.corsClear:'Clear')+'</button></td></tr>';
+        ah+='<td><button class="action-btn" onclick="clearAgentCors(\\''+esc(agentRows[l].gaii)+'\\')">'+(agentEl?__t.corsClear:'Clear')+'</button></td></tr>';
       }
       ah+='</tbody></table>';
       agentEl.innerHTML=ah;

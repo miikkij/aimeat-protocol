@@ -3332,6 +3332,209 @@
     });
   }
 
+  // ── Cortex Extension Editor ───────────────────────
+
+  var cortexEditorExtName = null; // name of extension being edited
+  var cortexEditorWasActive = false; // was it active before editing?
+  var cortexEditorLibCounter = 0; // counter for unique lib section IDs
+
+  function getCortexOwnerToken() {
+    try {
+      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+        return window.AIMEAT.auth.getSession().jwt;
+      }
+      var stored = localStorage.getItem('aimeat_session');
+      if (stored) {
+        var parsed = JSON.parse(stored);
+        return parsed.jwt || null;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function openCortexEditor(encodedName) {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in as an owner to edit extensions.'); return; }
+
+    var statusEl = document.getElementById('cortex-editor-status');
+    statusEl.textContent = 'Loading extension data...';
+    statusEl.style.color = '#34d399';
+    document.getElementById('cortex-editor-manifest').value = '';
+    document.getElementById('cortex-editor-libs').innerHTML = '';
+    document.getElementById('cortex-editor-name').textContent = '';
+    cortexEditorLibCounter = 0;
+
+    // Close the detail popup
+    document.getElementById('cortex-popup-overlay').style.display = 'none';
+    document.getElementById('cortex-editor-overlay').style.display = 'flex';
+
+    fetch(url + '/v1/cortex/' + encodedName + '/export', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.data) { statusEl.textContent = 'Error: ' + (data.error || 'Unknown error'); statusEl.style.color = 'var(--accent,#e74c6f)'; return; }
+        var ext = data.data;
+        cortexEditorExtName = ext.name;
+        cortexEditorWasActive = (ext.status === 'active');
+        document.getElementById('cortex-editor-name').textContent = ext.name + (cortexEditorWasActive ? ' (active)' : ' (inactive)');
+        document.getElementById('cortex-editor-manifest').value = ext.manifest || '';
+
+        // Render lib editors
+        var libsHtml = '';
+        var libs = ext.libs || {};
+        var filenames = Object.keys(libs);
+        for (var i = 0; i < filenames.length; i++) {
+          cortexEditorLibCounter++;
+          var fname = filenames[i];
+          libsHtml += cortexEditorLibSection(cortexEditorLibCounter, fname, libs[fname]);
+        }
+        document.getElementById('cortex-editor-libs').innerHTML = libsHtml;
+        statusEl.textContent = 'Loaded. ' + filenames.length + ' lib file' + (filenames.length !== 1 ? 's' : '') + '.';
+      })
+      .catch(function(e) {
+        statusEl.textContent = 'Error loading: ' + e.message;
+        statusEl.style.color = 'var(--accent,#e74c6f)';
+      });
+  }
+
+  function cortexEditorLibSection(id, filename, content) {
+    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
+      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 6px;color:#e0e0e0;font-family:monospace;font-size:.8rem;width:200px" /></label>'
+      + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,100,100,.3);background:transparent;color:#f87171;cursor:pointer">Remove</button>'
+      + '</div>'
+      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
+      + '</div>';
+  }
+
+  function cortexEditorAddLib() {
+    cortexEditorLibCounter++;
+    var container = document.getElementById('cortex-editor-libs');
+    container.insertAdjacentHTML('beforeend', cortexEditorLibSection(cortexEditorLibCounter, 'new-lib.js', ''));
+  }
+
+  function cortexEditorCollectLibs() {
+    var libs = {};
+    var container = document.getElementById('cortex-editor-libs');
+    var nameInputs = container.querySelectorAll('input[data-lib-name]');
+    for (var i = 0; i < nameInputs.length; i++) {
+      var id = nameInputs[i].getAttribute('data-lib-name');
+      var fname = nameInputs[i].value.trim();
+      var contentEl = container.querySelector('textarea[data-lib-content="' + id + '"]');
+      if (fname && contentEl) {
+        libs[fname] = contentEl.value;
+      }
+    }
+    return libs;
+  }
+
+  function cortexEditorSave() {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert('No auth token available.'); return; }
+
+    var manifest = document.getElementById('cortex-editor-manifest').value;
+    if (!manifest.trim()) { alert('Manifest cannot be empty.'); return; }
+
+    var libs = cortexEditorCollectLibs();
+    var statusEl = document.getElementById('cortex-editor-status');
+    var saveBtn = document.getElementById('cortex-editor-save-btn');
+    var oldName = cortexEditorExtName;
+    var wasActive = cortexEditorWasActive;
+
+    statusEl.textContent = 'Deleting old extension...';
+    statusEl.style.color = '#34d399';
+    saveBtn.disabled = true;
+
+    // Step 1: Delete old extension
+    fetch(url + '/v1/cortex/' + encodeURIComponent(oldName), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) {
+      if (!r.ok && r.status !== 404) throw new Error('Delete failed: ' + r.status);
+      statusEl.textContent = 'Installing updated extension...';
+      // Step 2: Install new
+      return fetch(url + '/v1/cortex', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manifest: manifest, libs: libs })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok') {
+        var errMsg = data.error || 'Install failed';
+        if (data.details && data.details.errors) errMsg += ': ' + data.details.errors.join('; ');
+        throw new Error(errMsg);
+      }
+      var newName = data.data.name;
+      cortexEditorExtName = newName;
+
+      // Step 3: Activate if was active before
+      if (wasActive) {
+        statusEl.textContent = 'Activating...';
+        return fetch(url + '/v1/cortex/' + encodeURIComponent(newName) + '/activate', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) { return r.json(); });
+      }
+      return null;
+    })
+    .then(function(activateData) {
+      saveBtn.disabled = false;
+      if (activateData && activateData.status !== 'ok') {
+        statusEl.textContent = 'Installed but activation failed: ' + (activateData.error || 'unknown');
+        statusEl.style.color = 'orange';
+      } else {
+        statusEl.textContent = 'Saved and re-installed successfully!';
+        statusEl.style.color = '#34d399';
+        cortexEditorWasActive = wasActive; // preserve
+        // Refresh the cortex bar
+        loadCortexExtensions();
+      }
+    })
+    .catch(function(e) {
+      saveBtn.disabled = false;
+      statusEl.textContent = 'Error: ' + e.message;
+      statusEl.style.color = 'var(--accent,#e74c6f)';
+    });
+  }
+
+  function cortexEditorExport() {
+    var manifest = document.getElementById('cortex-editor-manifest').value;
+    var libs = cortexEditorCollectLibs();
+    var name = (cortexEditorExtName || 'extension').replace(/\//g, '-');
+
+    // Download manifest
+    var manifestBlob = new Blob([manifest], { type: 'text/yaml' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(manifestBlob);
+    a.download = name + '.yaml';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    // Download each lib file
+    var filenames = Object.keys(libs);
+    for (var i = 0; i < filenames.length; i++) {
+      var libBlob = new Blob([libs[filenames[i]]], { type: 'application/javascript' });
+      var b = document.createElement('a');
+      b.href = URL.createObjectURL(libBlob);
+      b.download = filenames[i];
+      b.click();
+      URL.revokeObjectURL(b.href);
+    }
+  }
+
+  function closeCortexEditor() {
+    document.getElementById('cortex-editor-overlay').style.display = 'none';
+    cortexEditorExtName = null;
+  }
+
   // ── Prompt Builder Panel ──────────────────────────
 
   var pbExtensionsCache = null; // cached cortex extension list
@@ -3743,6 +3946,11 @@
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,
     cortexCopy: cortexCopy,
+    openCortexEditor: openCortexEditor,
+    closeCortexEditor: closeCortexEditor,
+    cortexEditorAddLib: cortexEditorAddLib,
+    cortexEditorSave: cortexEditorSave,
+    cortexEditorExport: cortexEditorExport,
     openPromptBuilder: openPromptBuilder,
     closePbPanel: closePbPanel,
     onCardDragStart: onCardDragStart,
@@ -3831,6 +4039,13 @@
     document.getElementById('cortex-popup-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.style.display = 'none';
+      }
+    });
+
+    // ── Click cortex editor overlay to close ────────
+    document.getElementById('cortex-editor-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeCortexEditor();
       }
     });
 
@@ -3948,7 +4163,9 @@
     document.addEventListener('keydown', function (e) {
       // Escape — close modals / overlays (source-overlay first in cascade)
       if (e.key === 'Escape') {
-        if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
+        if (document.getElementById('cortex-editor-overlay').style.display === 'flex') {
+          closeCortexEditor();
+        } else if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
           closePbPanel();
         } else if (!document.getElementById('source-overlay').hidden) {
           document.getElementById('source-overlay').hidden = true;
