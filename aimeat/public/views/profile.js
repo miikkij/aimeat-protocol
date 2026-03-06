@@ -889,7 +889,7 @@ export default function Profile({ navigate, locale }) {
     if (!s?.fetch) return;
     try {
       const resp = await s.fetch('/v1/cortex');
-      const data = await resp.json();
+      const data = resp.json ? await resp.json() : resp;
       setExtensions(data?.data?.extensions || []);
     } catch(e) {
       setExtensions([]);
@@ -902,7 +902,7 @@ export default function Profile({ navigate, locale }) {
     const s = getSession();
     try {
       const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name));
-      const data = await resp.json();
+      const data = resp.json ? await resp.json() : resp;
       const ext = data.data;
 
       // Also fetch prompt content
@@ -910,7 +910,7 @@ export default function Profile({ navigate, locale }) {
       for (const p of prompts) {
         try {
           const pr = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/prompts/' + encodeURIComponent(p.name));
-          const pd = await pr.json();
+          const pd = pr.json ? await pr.json() : pr;
           if (pd.data?.content) p._content = pd.data.content;
         } catch(e) {}
       }
@@ -918,7 +918,7 @@ export default function Profile({ navigate, locale }) {
       // Fetch ontology
       try {
         const ontResp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/ontology');
-        const ontData = await ontResp.json();
+        const ontData = ontResp.json ? await ontResp.json() : ontResp;
         ext._ontologies = ontData.data?.ontologies || [];
       } catch(e) { ext._ontologies = []; }
 
@@ -932,7 +932,8 @@ export default function Profile({ navigate, locale }) {
     const s = getSession();
     try {
       const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/activate', { method: 'POST' });
-      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      const data = resp.json ? await resp.json() : resp;
+      if (data.ok === false) throw new Error(data.error?.message || 'Failed');
       showToast(t('profile.extensions.success.activated'));
       loadExtensions();
       setExtDetailName(null);
@@ -943,7 +944,8 @@ export default function Profile({ navigate, locale }) {
     const s = getSession();
     try {
       const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name) + '/deactivate', { method: 'POST' });
-      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      const data = resp.json ? await resp.json() : resp;
+      if (data.ok === false) throw new Error(data.error?.message || 'Failed');
       showToast(t('profile.extensions.success.deactivated'));
       loadExtensions();
       setExtDetailName(null);
@@ -955,7 +957,8 @@ export default function Profile({ navigate, locale }) {
     const s = getSession();
     try {
       const resp = await s.fetch('/v1/cortex/' + encodeURIComponent(name), { method: 'DELETE' });
-      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      const data = resp.json ? await resp.json() : resp;
+      if (data.ok === false) throw new Error(data.error?.message || 'Failed');
       showToast(t('profile.extensions.success.uninstalled'));
       loadExtensions();
       setExtDetailName(null);
@@ -1004,8 +1007,8 @@ export default function Profile({ navigate, locale }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error?.message || 'Install failed');
+      const data = resp.json ? await resp.json() : resp;
+      if (data.ok === false) throw new Error(data.error?.message || 'Install failed');
 
       showToast(t('profile.extensions.success.installed'));
       setShowExtInstall(false);
@@ -1049,8 +1052,8 @@ export default function Profile({ navigate, locale }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
+      const data = resp.json ? await resp.json() : resp;
+      if (data.ok === false) {
         // If already installed, just refresh the list and show success
         if (data.error?.code === 'CONFLICT') {
           showToast(t('profile.extensions.success.installed'));
@@ -1085,7 +1088,8 @@ export default function Profile({ navigate, locale }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visibility: newVis }),
       });
-      if (!resp.ok) { const d = await resp.json(); throw new Error(d.error?.message || 'Failed'); }
+      const visData = resp.json ? await resp.json() : resp;
+      if (visData.ok === false) throw new Error(visData.error?.message || 'Failed');
       showToast(newVis === 'public' ? t('profile.extensions.publish') : t('profile.extensions.unpublish'));
       loadExtensions();
       if (extDetailName === name) loadExtDetail(name);

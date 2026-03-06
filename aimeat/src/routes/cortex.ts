@@ -166,10 +166,16 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       installed_at: ext.installedAt,
       activated_at: ext.activatedAt,
       installed_by: ext.installedBy,
-      components: ext.components.map(c => ({
-        type: c.type,
-        name: 'name' in c ? c.name : undefined,
-      })),
+      components: ext.components.map(c => {
+        const base: Record<string, unknown> = { type: c.type };
+        if ('name' in c) base.name = c.name;
+        if ('filename' in c) base.filename = c.filename;
+        if ('exports' in c) base.exports = c.exports;
+        if ('api_surface' in c) base.api_surface = c.api_surface;
+        if ('key_pattern' in c) base.key_pattern = c.key_pattern;
+        if ('apply_to' in c) base.apply_to = c.apply_to;
+        return base;
+      }),
       activation_artifacts: ext.activationArtifacts,
     }, [
       ...(ext.status === 'inactive'
