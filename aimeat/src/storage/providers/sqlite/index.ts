@@ -18,6 +18,7 @@ import type {
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
+  AppRecord, AppListOptions,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -3352,5 +3353,159 @@ export class SqliteStorage implements Storage {
       quietHoursUtc: row.quietHoursUtc ? JSON.parse(row.quietHoursUtc as string) : null,
       email: (row.email as string) ?? null,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── App Catalog ──
+  // ══════════════════════════════════════════════════════════
+
+  async createApp(record: AppRecord): Promise<AppRecord> {
+    this.db.prepare(
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
+      JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
+      record.accessCode ?? null, record.createdAt,
+    );
+    return record;
+  }
+
+  async getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {
+    let row: Record<string, unknown> | undefined;
+    if (version !== undefined) {
+      row = this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?')
+        .get(ownerGaii, filename, version) as Record<string, unknown> | undefined;
+    } else {
+      row = this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC LIMIT 1')
+        .get(ownerGaii, filename) as Record<string, unknown> | undefined;
+    }
+    return row ? this.deserializeApp(row) : null;
+  }
+
+  async getAppByOwnerName(ownerName: string, filename: string, version?: number): Promise<AppRecord | null> {
+    let row: Record<string, unknown> | undefined;
+    if (version !== undefined) {
+      row = this.db.prepare('SELECT * FROM apps WHERE ownerName = ? AND filename = ? AND versionNumber = ?')
+        .get(ownerName, filename, version) as Record<string, unknown> | undefined;
+    } else {
+      row = this.db.prepare('SELECT * FROM apps WHERE ownerName = ? AND filename = ? ORDER BY versionNumber DESC LIMIT 1')
+        .get(ownerName, filename) as Record<string, unknown> | undefined;
+    }
+    return row ? this.deserializeApp(row) : null;
+  }
+
+  async listApps(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
+    // Get latest version of each app
+    let query = `SELECT a.* FROM apps a
+      INNER JOIN (SELECT ownerGaii, filename, MAX(versionNumber) as maxVer FROM apps GROUP BY ownerGaii, filename) latest
+      ON a.ownerGaii = latest.ownerGaii AND a.filename = latest.filename AND a.versionNumber = latest.maxVer`;
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (opts?.category) {
+      conditions.push(`json_extract(a.manifest, '$.category') = ?`);
+      params.push(opts.category);
+    }
+    if (opts?.tag) {
+      conditions.push(`a.manifest LIKE ?`);
+      params.push(`%"${opts.tag}"%`);
+    }
+    if (opts?.q) {
+      conditions.push(`(a.filename LIKE ? OR json_extract(a.manifest, '$.name') LIKE ? OR json_extract(a.manifest, '$.description') LIKE ?)`);
+      const like = `%${opts.q}%`;
+      params.push(like, like, like);
+    }
+    if (opts?.freeOnly) {
+      conditions.push(`(json_extract(a.manifest, '$.priceMorsels') IS NULL OR json_extract(a.manifest, '$.priceMorsels') = 0)`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    // Count total before pagination
+    const countQuery = query.replace('SELECT a.*', 'SELECT COUNT(*) as cnt');
+    const countRow = this.db.prepare(countQuery).get(...params) as { cnt: number };
+    const total = countRow.cnt;
+
+    // Sort
+    if (opts?.sort === 'popular') {
+      query += ` ORDER BY (SELECT COALESCE(d.downloads, 0) FROM app_downloads d WHERE d.ownerGaii = a.ownerGaii AND d.filename = a.filename) DESC, a.createdAt DESC`;
+    } else {
+      query += ' ORDER BY a.createdAt DESC';
+    }
+
+    // Pagination
+    const limit = opts?.limit ?? 50;
+    const offset = opts?.offset ?? 0;
+    query += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const rows = this.db.prepare(query).all(...params) as Record<string, unknown>[];
+    return { apps: rows.map(r => this.deserializeApp(r)), total };
+  }
+
+  async listAppVersions(ownerGaii: string, filename: string): Promise<AppRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC')
+      .all(ownerGaii, filename) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeApp(r));
+  }
+
+  async getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number> {
+    const row = this.db.prepare('SELECT MAX(versionNumber) as maxVer FROM apps WHERE ownerGaii = ? AND filename = ?')
+      .get(ownerGaii, filename) as { maxVer: number | null } | undefined;
+    return row?.maxVer ?? 0;
+  }
+
+  async deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean> {
+    if (version !== undefined) {
+      const result = this.db.prepare('DELETE FROM apps WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?')
+        .run(ownerGaii, filename, version);
+      return result.changes > 0;
+    }
+    // Delete all versions
+    const result = this.db.prepare('DELETE FROM apps WHERE ownerGaii = ? AND filename = ?')
+      .run(ownerGaii, filename);
+    // Also delete download counter
+    this.db.prepare('DELETE FROM app_downloads WHERE ownerGaii = ? AND filename = ?')
+      .run(ownerGaii, filename);
+    return result.changes > 0;
+  }
+
+  async updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean> {
+    // Update access code on all versions
+    const result = this.db.prepare('UPDATE apps SET accessCode = ? WHERE ownerGaii = ? AND filename = ?')
+      .run(accessCode ?? null, ownerGaii, filename);
+    return result.changes > 0;
+  }
+
+  async getAppDownloads(ownerGaii: string, filename: string): Promise<number> {
+    const row = this.db.prepare('SELECT downloads FROM app_downloads WHERE ownerGaii = ? AND filename = ?')
+      .get(ownerGaii, filename) as { downloads: number } | undefined;
+    return row?.downloads ?? 0;
+  }
+
+  async incrementAppDownloads(ownerGaii: string, filename: string): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO app_downloads (ownerGaii, filename, downloads) VALUES (?, ?, 1)
+       ON CONFLICT(ownerGaii, filename) DO UPDATE SET downloads = downloads + 1`
+    ).run(ownerGaii, filename);
+  }
+
+  private deserializeApp(row: Record<string, unknown>): AppRecord {
+    const record: AppRecord = {
+      ownerGaii: row.ownerGaii as string,
+      ownerName: row.ownerName as string,
+      filename: row.filename as string,
+      versionNumber: row.versionNumber as number,
+      manifest: JSON.parse((row.manifest as string) || '{}'),
+      mimeType: row.mimeType as string,
+      size: row.size as number,
+      data: row.data as Buffer,
+      createdAt: row.createdAt as string,
+    };
+    if (row.accessCode) record.accessCode = row.accessCode as string;
+    return record;
   }
 }

@@ -546,31 +546,31 @@ Forward search queries to peered nodes and aggregate results.
 
 ## Implementation Roadmap
 
-### Phase A — Quick Wins (UX + API)
+### Phase A — Quick Wins (UX + API) ✅ COMPLETED
 
-| Task | Items |
-|------|-------|
-| A1 | Keyboard shortcuts (3.1) |
-| A2 | "Recently Opened" section (3.3) |
-| A3 | Download counter (4.3) |
-| A4 | App changelog integration (4.5) |
-| A5 | Security audit of iframe sandbox (7.1) |
+| Task | Items | Status |
+|------|-------|--------|
+| A1 | Keyboard shortcuts (3.1) | ✅ Done |
+| A2 | "Recently Opened" section (3.3) | ✅ Done |
+| A3 | Download counter (4.3) | ✅ Done |
+| A4 | App changelog integration (4.5) | ✅ Done |
+| A5 | Security audit of iframe sandbox (7.1) | ✅ Done — blob URL launch, CSP hardened |
 
-### Phase B — Cortex ↔ Catalog Integration
+### Phase B — Cortex ↔ Catalog Integration ✅ COMPLETED
 
-| Task | Items |
-|------|-------|
-| B1 | Cortex picker in prompt generation panel (1.1) |
-| B2 | Improvement/iteration prompt buttons using the picker (3.5) |
+| Task | Items | Status |
+|------|-------|--------|
+| B1 | Cortex picker in prompt generation panel (1.1) | ✅ Done — full Prompt Builder overlay |
+| B2 | Improvement/iteration prompt buttons using the picker (3.5) | ✅ Done — ✨ Generate with AI, Improve with AI |
 
-### Phase C — Versioning & Manifest
+### Phase C — Versioning & Manifest ✅ COMPLETED
 
-| Task | Items |
-|------|-------|
-| C1 | App manifest support (4.1) |
-| C2 | Version history — same filename, version number (2.1) |
-| C3 | Catalogue search/filter API (4.2) |
-| C4 | Version pinning on import (2.2) |
+| Task | Items | Status |
+|------|-------|--------|
+| C1 | App manifest support (4.1) | ✅ Done — AppManifest type, storage, routes |
+| C2 | Version history — same filename, version number (2.1) | ✅ Done — apps table, auto-increment, /versions endpoint |
+| C3 | Catalogue search/filter API (4.2) | ✅ Done — category, q, tag, sort, limit, offset, free_only |
+| C4 | Version pinning on import (2.2) | ✅ Done — aimeatOwner, aimeatFilename, aimeatVersion stored in IndexedDB |
 
 ### Phase D — UX Polish
 

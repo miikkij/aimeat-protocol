@@ -2712,12 +2712,18 @@
     var html = '';
     for (var i = 0; i < apps.length; i++) {
       var app = apps[i];
+      var displayName = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename;
+      var displayAuthor = (app.manifest && app.manifest.authorDisplay) ? app.manifest.authorDisplay : (app.owner || '');
+      var displayDesc = (app.manifest && app.manifest.description) ? app.manifest.description : '';
+      var displayVer = app.version_number ? 'v' + app.version_number : '';
+      var displayCat = (app.manifest && app.manifest.category) ? app.manifest.category : '';
       html +=
         '<div class="aimeat-app-item">' +
           '<input type="checkbox" data-index="' + i + '" checked/>' +
           '<div class="aimeat-app-info">' +
-            '<div class="aimeat-app-name">' + escapeHtml(app.filename) + '</div>' +
-            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (app.owner ? ' \u00B7 ' + escapeHtml(app.owner) : '') + '</div>' +
+            '<div class="aimeat-app-name">' + escapeHtml(displayName) + (displayVer ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(displayVer) + '</span>' : '') + '</div>' +
+            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? ' \u00B7 ' + escapeHtml(displayAuthor) : '') + (displayCat ? ' \u00B7 ' + escapeHtml(displayCat) : '') + '</div>' +
+            (displayDesc ? '<div class="aimeat-app-size" style="opacity:.6">' + escapeHtml(displayDesc.substring(0, 100)) + '</div>' : '') +
           '</div>' +
           '<select data-index="' + i + '">' +
             '<option value="link">Link (online only)</option>' +
@@ -2757,14 +2763,15 @@
     for (var j = 0; j < toImport.length; j++) {
       (function (item) {
         var app = item.app;
-        var name = app.filename.replace(/\.html?$/i, '');
+        var name = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename.replace(/\.html?$/i, '');
+        var importedVersion = app.version_number || 1;
 
         if (item.mode === 'link') {
-          // Link mode: store URL with ?mode=inline
+          // Link mode: store URL with ?mode=inline, pinned to latest
           var inlineUrl = aimeatUrl + app.download_url + '?mode=inline';
           promises.push(addAppFromUrl(name, inlineUrl, '\u{1F4E6}', ['aimeat'], defaultOpenMode));
         } else {
-          // Download mode: fetch content and store blob
+          // Download mode: fetch content and store blob (pinned to current version)
           var downloadUrl = aimeatUrl + app.download_url;
           promises.push(
             fetch(downloadUrl)
@@ -2777,8 +2784,11 @@
                 var record = {
                   id: generateId(),
                   name: name,
-                  description: '',
+                  description: (app.manifest && app.manifest.description) ? app.manifest.description : '',
                   source: 'aimeat',
+                  aimeatOwner: app.owner || null,
+                  aimeatFilename: app.filename || null,
+                  aimeatVersion: importedVersion,
                   url: null,
                   blob: encoded,
                   tags: ['aimeat'],
@@ -2887,7 +2897,12 @@
         var body = {
           filename: filename,
           content: htmlContent,
-          mime_type: 'text/html'
+          mime_type: 'text/html',
+          name: app.name || filename.replace(/\.html?$/i, ''),
+          description: app.description || '',
+          category: 'utility',
+          tags: app.tags || [],
+          uses_cortex: []
         };
         if (accessCode) body.access_code = accessCode;
 
@@ -2910,6 +2925,8 @@
           app.publishedFilename = filename;
           app.publishedAt = new Date().toISOString();
           app.publishedUrl = json.data.download_url || null;
+          app.publishedVersionNumber = json.data.version_number || 1;
+          app.publishedVersionsUrl = json.data.versions_url || null;
           saveApp(app).then(function() {
             loadPublishedApps();
           });
@@ -2961,7 +2978,7 @@
         var url = app.publishedUrl ? (aimeatUrl + app.publishedUrl) : '';
         html +=
           '<div class="published-card">' +
-            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + '</div>' +
+            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + (app.publishedVersionNumber ? ' <span style="opacity:.5;font-size:.85em">v' + app.publishedVersionNumber + '</span>' : '') + '</div>' +
             '<div class="published-card-meta">' +
               '<span>' + escapeHtml(app.publishedFilename || '') + '</span>' +
               '<span>' + (app.publishedAt ? new Date(app.publishedAt).toLocaleDateString() : '') + '</span>' +
@@ -3006,6 +3023,8 @@
           delete app.publishedFilename;
           delete app.publishedAt;
           delete app.publishedUrl;
+          delete app.publishedVersionNumber;
+          delete app.publishedVersionsUrl;
           saveApp(app).then(function() {
             loadPublishedApps();
           });
@@ -3133,7 +3152,8 @@
 
   // ── Prompt Builder Panel ──────────────────────────
 
-  var pbExtensionsCache = null; // cached cortex extension details
+  var pbExtensionsCache = null; // cached cortex extension list
+  var pbExtDetailCache = {};   // cached extension details (name → detail object)
   var pbSourceApp = null; // app being improved (null = new app mode)
 
   function openPromptBuilder(app) {
@@ -3243,7 +3263,11 @@
     list.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
       cb.addEventListener('change', function() {
         this.closest('.pb-ext-chip').classList.toggle('selected', this.checked);
-        updatePbPreview();
+        if (this.checked) {
+          fetchExtDetail(this.getAttribute('data-ext-name'));
+        } else {
+          updatePbPreview();
+        }
       });
     });
   }
@@ -3253,7 +3277,10 @@
     var checkboxes = document.querySelectorAll('#pb-ext-list input[type="checkbox"]:checked');
     checkboxes.forEach(function(cb) {
       var name = cb.getAttribute('data-ext-name');
-      if (pbExtensionsCache) {
+      // Prefer detail cache, fall back to list data
+      if (pbExtDetailCache[name]) {
+        selected.push(pbExtDetailCache[name]);
+      } else if (pbExtensionsCache) {
         for (var i = 0; i < pbExtensionsCache.length; i++) {
           if (pbExtensionsCache[i].name === name) {
             selected.push(pbExtensionsCache[i]);
@@ -3263,6 +3290,25 @@
       }
     });
     return selected;
+  }
+
+  function fetchExtDetail(extName) {
+    // Already cached
+    if (pbExtDetailCache[extName]) { updatePbPreview(); return; }
+    var config = loadConfig();
+    if (!config.aimeatUrl || !cortexToken) { updatePbPreview(); return; }
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(url + '/v1/cortex/' + encodeURIComponent(extName), {
+      headers: { 'Authorization': 'Bearer ' + cortexToken }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.data) {
+          pbExtDetailCache[extName] = data.data;
+        }
+        updatePbPreview();
+      })
+      .catch(function() { updatePbPreview(); });
   }
 
   function buildPromptFromBuilder() {
@@ -3304,17 +3350,36 @@
       selectedExts.forEach(function(ext) {
         prompt += '#### ' + ext.name + '\n';
         prompt += ext.description ? ext.description + '\n' : '';
-        var types = ext.component_types || [];
-        if (types.indexOf('lib') !== -1) {
-          prompt += 'Load the library:\n```html\n';
-          prompt += '<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + (ext.short_name || ext.name).replace(/\s+/g, '-').toLowerCase() + '.js"></' + 'script>\n';
-          prompt += '```\n';
-        }
-        if (types.indexOf('schema') !== -1) {
-          prompt += 'This extension provides validated data schemas.\n';
-        }
-        if (types.indexOf('prompt') !== -1) {
-          prompt += 'This extension includes prompt templates.\n';
+
+        // Use detailed components if available
+        var comps = ext.components;
+        if (comps && comps.length) {
+          comps.forEach(function(c) {
+            if (c.type === 'lib' && c.filename) {
+              prompt += 'Load the library:\n```html\n';
+              prompt += '<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + encodeURIComponent(c.filename) + '"></' + 'script>\n';
+              prompt += '```\n';
+              if (c.api_surface) {
+                prompt += 'API Surface:\n```\n' + c.api_surface + '\n```\n';
+              }
+            } else if (c.type === 'schema') {
+              prompt += 'Data schema: `' + (c.key_pattern || '') + '` — data is validated automatically.\n';
+            } else if (c.type === 'prompt') {
+              prompt += 'Prompt template: ' + (c.name || '') + '\n';
+            }
+          });
+        } else {
+          // Fallback: only list-level type info
+          var types = ext.component_types || [];
+          if (types.indexOf('lib') !== -1) {
+            prompt += 'Includes a JS library (load via `<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/...">`).\n';
+          }
+          if (types.indexOf('schema') !== -1) {
+            prompt += 'Provides validated data schemas.\n';
+          }
+          if (types.indexOf('prompt') !== -1) {
+            prompt += 'Includes prompt templates.\n';
+          }
         }
         prompt += '\n';
       });

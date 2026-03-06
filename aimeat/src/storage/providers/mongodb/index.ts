@@ -42,6 +42,7 @@ import type {
     EscrowHoldRecord,
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
+    AppRecord, AppListOptions,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -2498,6 +2499,112 @@ export class MongoStorage implements Storage {
 
     async deleteNotificationPreferences(personalNodeId: string): Promise<boolean> {
         return this.notificationPreferences.delete(personalNodeId);
+    }
+
+    // ── App Catalog (TODO: full Prisma implementation) ──
+
+    private appStore = new Map<string, AppRecord>();
+    private appDownloads = new Map<string, number>();
+
+    async createApp(record: AppRecord): Promise<AppRecord> {
+        const key = `${record.ownerGaii}:${record.filename}:${record.versionNumber}`;
+        this.appStore.set(key, record);
+        return record;
+    }
+
+    async getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {
+        if (version !== undefined) {
+            return this.appStore.get(`${ownerGaii}:${filename}:${version}`) ?? null;
+        }
+        let latest: AppRecord | null = null;
+        for (const r of this.appStore.values()) {
+            if (r.ownerGaii === ownerGaii && r.filename === filename) {
+                if (!latest || r.versionNumber > latest.versionNumber) latest = r;
+            }
+        }
+        return latest;
+    }
+
+    async getAppByOwnerName(ownerName: string, filename: string, version?: number): Promise<AppRecord | null> {
+        let latest: AppRecord | null = null;
+        for (const r of this.appStore.values()) {
+            if (r.ownerName === ownerName && r.filename === filename) {
+                if (version !== undefined) {
+                    if (r.versionNumber === version) return r;
+                } else if (!latest || r.versionNumber > latest.versionNumber) {
+                    latest = r;
+                }
+            }
+        }
+        return latest;
+    }
+
+    async listApps(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
+        const latestMap = new Map<string, AppRecord>();
+        for (const r of this.appStore.values()) {
+            const key = `${r.ownerGaii}:${r.filename}`;
+            const existing = latestMap.get(key);
+            if (!existing || r.versionNumber > existing.versionNumber) latestMap.set(key, r);
+        }
+        let apps = Array.from(latestMap.values());
+        if (opts?.category) apps = apps.filter(a => a.manifest.category === opts.category);
+        if (opts?.tag) apps = apps.filter(a => a.manifest.tags.includes(opts.tag!));
+        if (opts?.q) {
+            const q = opts.q.toLowerCase();
+            apps = apps.filter(a => a.filename.toLowerCase().includes(q) || a.manifest.name.toLowerCase().includes(q) || a.manifest.description.toLowerCase().includes(q));
+        }
+        if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.priceMorsels);
+        const total = apps.length;
+        apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const offset = opts?.offset ?? 0;
+        const limit = opts?.limit ?? 50;
+        return { apps: apps.slice(offset, offset + limit), total };
+    }
+
+    async listAppVersions(ownerGaii: string, filename: string): Promise<AppRecord[]> {
+        const versions: AppRecord[] = [];
+        for (const r of this.appStore.values()) {
+            if (r.ownerGaii === ownerGaii && r.filename === filename) versions.push(r);
+        }
+        return versions.sort((a, b) => b.versionNumber - a.versionNumber);
+    }
+
+    async getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number> {
+        let max = 0;
+        for (const r of this.appStore.values()) {
+            if (r.ownerGaii === ownerGaii && r.filename === filename && r.versionNumber > max) max = r.versionNumber;
+        }
+        return max;
+    }
+
+    async deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean> {
+        let deleted = false;
+        if (version !== undefined) {
+            deleted = this.appStore.delete(`${ownerGaii}:${filename}:${version}`);
+        } else {
+            for (const [key, r] of this.appStore) {
+                if (r.ownerGaii === ownerGaii && r.filename === filename) { this.appStore.delete(key); deleted = true; }
+            }
+            this.appDownloads.delete(`${ownerGaii}:${filename}`);
+        }
+        return deleted;
+    }
+
+    async updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean> {
+        let updated = false;
+        for (const r of this.appStore.values()) {
+            if (r.ownerGaii === ownerGaii && r.filename === filename) { r.accessCode = accessCode; updated = true; }
+        }
+        return updated;
+    }
+
+    async getAppDownloads(ownerGaii: string, filename: string): Promise<number> {
+        return this.appDownloads.get(`${ownerGaii}:${filename}`) ?? 0;
+    }
+
+    async incrementAppDownloads(ownerGaii: string, filename: string): Promise<void> {
+        const key = `${ownerGaii}:${filename}`;
+        this.appDownloads.set(key, (this.appDownloads.get(key) ?? 0) + 1);
     }
 }
 

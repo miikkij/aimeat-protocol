@@ -168,6 +168,42 @@ export interface StorageFileRecord {
   createdAt: string;
 }
 
+export interface AppManifest {
+  name: string;
+  description: string;
+  version: string;              // semver string (display-only)
+  category: string;
+  tags: string[];
+  icon?: string;
+  authorDisplay: string;
+  usesCortex: string[];         // cortex extension names used
+  priceMorsels?: number;        // 0 or absent = free
+  licenseType?: 'single' | 'lifetime';
+}
+
+export interface AppRecord {
+  ownerGaii: string;
+  ownerName: string;
+  filename: string;
+  versionNumber: number;        // auto-incremented per filename+owner
+  manifest: AppManifest;
+  mimeType: string;
+  size: number;
+  data: Buffer;
+  accessCode?: string;
+  createdAt: string;
+}
+
+export interface AppListOptions {
+  category?: string;
+  q?: string;
+  tag?: string;
+  sort?: 'newest' | 'popular';
+  limit?: number;
+  offset?: number;
+  freeOnly?: boolean;
+}
+
 export interface PeeringRequestRecord {
   id: string;
   fromNodeUrl: string;
@@ -784,6 +820,7 @@ import type { MarketplaceRepository } from './repositories/marketplace.repositor
 import type { FederationRepository } from './repositories/federation.repository.js';
 import type { NodeRepository } from './repositories/node.repository.js';
 import type { NotificationRepository } from './repositories/notification.repository.js';
+import type { AppRepository } from './repositories/app.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -792,4 +829,5 @@ export interface Storage extends
   MicroMemoryRepository, FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
-  FederationRepository, NodeRepository, NotificationRepository { }
+  FederationRepository, NodeRepository, NotificationRepository,
+  AppRepository { }

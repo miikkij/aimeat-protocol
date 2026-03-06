@@ -666,6 +666,28 @@ export function initializeSchema(db: Database.Database): void {
       email           TEXT
     );
 
+    -- ── App Catalog (versioned apps with manifest) ──
+    CREATE TABLE IF NOT EXISTS apps (
+      ownerGaii      TEXT NOT NULL,
+      ownerName      TEXT NOT NULL,
+      filename       TEXT NOT NULL,
+      versionNumber  INTEGER NOT NULL DEFAULT 1,
+      manifest       TEXT NOT NULL DEFAULT '{}',
+      mimeType       TEXT NOT NULL DEFAULT 'text/html',
+      size           INTEGER NOT NULL DEFAULT 0,
+      data           BLOB,
+      accessCode     TEXT,
+      createdAt      TEXT NOT NULL,
+      PRIMARY KEY (ownerGaii, filename, versionNumber)
+    );
+
+    CREATE TABLE IF NOT EXISTS app_downloads (
+      ownerGaii      TEXT NOT NULL,
+      filename       TEXT NOT NULL,
+      downloads      INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (ownerGaii, filename)
+    );
+
     -- ═══════════════════════════════════════════════════════
     -- Indexes
     -- ═══════════════════════════════════════════════════════
@@ -704,6 +726,8 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_escrow_fromGaii ON escrow_holds(fromGaii);
     CREATE INDEX IF NOT EXISTS idx_pps_nodeId ON personal_push_subscriptions(personalNodeId);
     CREATE INDEX IF NOT EXISTS idx_pps_ownerName ON personal_push_subscriptions(ownerName);
+    CREATE INDEX IF NOT EXISTS idx_apps_ownerName ON apps(ownerName);
+    CREATE INDEX IF NOT EXISTS idx_apps_filename ON apps(filename);
 
   `);
 
