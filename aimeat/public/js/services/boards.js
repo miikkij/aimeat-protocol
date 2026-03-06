@@ -7,7 +7,7 @@ import { api, apiGet, apiPost } from '/js/api.js';
 /** List boards the user is subscribed to. Returns array. */
 export async function listSubscriptions() {
   const data = await apiGet('/v1/boards/subscriptions');
-  return data?.data?.boards || data?.data || [];
+  return data?.data?.subscriptions || data?.data?.boards || (Array.isArray(data?.data) ? data.data : []);
 }
 
 /** List all public boards. Returns array. */

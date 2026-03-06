@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { randomBytes } from 'node:crypto';
 
 /**
  * App file download routes.
@@ -27,6 +28,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
             mime_type: string;
             protected: boolean;
             has_screenshot: boolean;
+            downloads: number;
             download_url: string;
             screenshot_url: string | null;
             created_at: string;
@@ -40,6 +42,12 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
                     // Check if a screenshot exists for this app
                     const screenshotFile = await storage.getStorageFile(agent.gaii, `apps/screenshots/${filename}`);
                     const hasScreenshot = !!screenshotFile;
+                    // Read download counter from memory (best-effort)
+                    let downloads = 0;
+                    try {
+                        const counterEntry = await storage.getMemory(agent.gaii, `__stats__/app_downloads/${filename}`);
+                        if (counterEntry) downloads = parseInt(String(counterEntry.value), 10) || 0;
+                    } catch { /* ignore */ }
                     apps.push({
                         owner: agent.owner,
                         filename,
@@ -47,6 +55,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
                         mime_type: file.mimeType,
                         protected: !!file.accessCode,
                         has_screenshot: hasScreenshot,
+                        downloads,
                         download_url: `/v1/apps/${encodeURIComponent(agent.owner)}/${encodeURIComponent(filename)}`,
                         screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(agent.owner)}/${encodeURIComponent(filename)}/screenshot` : null,
                         created_at: file.createdAt,
@@ -119,12 +128,19 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
                 const mode = req.query.mode as string | undefined;
                 if (mode === 'inline') {
                     // Inline mode: serve without attachment disposition for iframe/tab viewing
-                    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline' data: blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; frame-ancestors 'self'");
+                    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; worker-src 'none'; object-src 'none'; frame-ancestors 'self'");
                 } else {
                     // Default: serve as attachment download — never render as page
                     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
                 }
                 res.setHeader('X-Content-Type-Options', 'nosniff');
+                // Increment download counter (best-effort, non-blocking)
+                const counterKey = `__stats__/app_downloads/${filename}`;
+                storage.getMemory(agent.gaii, counterKey).then(entry => {
+                    const count = entry ? (parseInt(String(entry.value), 10) || 0) + 1 : 1;
+                    const now = new Date().toISOString();
+                    storage.setMemory({ ownerGaii: agent.gaii, key: counterKey, value: String(count), visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now }).catch(() => {});
+                }).catch(() => {});
                 res.send(file.data);
                 return;
             }
@@ -164,6 +180,10 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
 
         const storageKey = `apps/${filename}`;
         const mimeType = typeof mime_type === 'string' ? mime_type : 'text/html';
+
+        // Check if this is an update (file already exists) before overwriting
+        const existingFile = await storage.getStorageFile(gaii, storageKey);
+        const isUpdate = !!existingFile;
 
         // Validate access_code if provided
         const accessCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
@@ -207,6 +227,17 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
 
         const owner = req.auth!.owner;
         const downloadUrl = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`;
+
+        // Log to site changelog
+        const changeAction = isUpdate ? 'app_update' as const : 'app_publish' as const;
+        await storage.addSiteChangeLog({
+            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+            action: changeAction,
+            summary: `${changeAction === 'app_update' ? 'Updated' : 'Published'} app "${filename}" (${(data.length / 1024).toFixed(1)} KB)`,
+            changedBy: owner,
+            changedAt: new Date().toISOString(),
+        });
+
         res.status(201).json(success(config.nodeId, {
             filename,
             size: data.length,
@@ -271,6 +302,16 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         await storage.deleteStorageFile(gaii, storageKey);
         // Also delete screenshot if exists
         await storage.deleteStorageFile(gaii, `apps/screenshots/${filename}`);
+
+        // Log to site changelog
+        const owner = req.auth!.owner;
+        await storage.addSiteChangeLog({
+            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
+            action: 'app_delete',
+            summary: `Deleted app "${filename}"`,
+            changedBy: owner,
+            changedAt: new Date().toISOString(),
+        });
 
         res.json(success(config.nodeId, {
             filename,

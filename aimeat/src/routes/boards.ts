@@ -104,15 +104,22 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/boards/subscriptions', requireAuth(), requireRole('agent'), async (req, res) => {
     const gaii = req.auth!.sub;
     const subs = await storage.listSubscriptionsByAgent(gaii);
-    res.json(success(config.nodeId, {
-      subscriptions: subs.map(s => ({
+    const enriched = await Promise.all(subs.map(async s => {
+      const board = await storage.getBoard(s.boardId);
+      return {
         id: s.id,
         board_id: s.boardId,
+        name: board?.name ?? s.boardId,
+        description: board?.description ?? '',
+        visibility: board?.visibility ?? 'private',
         callback_url: s.callbackUrl,
         filters: s.filters,
         created_at: s.createdAt,
-      })),
-      total: subs.length,
+      };
+    }));
+    res.json(success(config.nodeId, {
+      subscriptions: enriched,
+      total: enriched.length,
     }));
   });
 

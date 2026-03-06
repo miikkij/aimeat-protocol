@@ -102,51 +102,124 @@ The Cortex extensions backend is **fully implemented** with 11 endpoints, 7 comp
 
 ## What's NOT Implemented
 
-### Priority 1 — Cortex ↔ App Catalog Integration (Deeper)
+### Priority 1 — Cortex ↔ App Catalog Prompt Integration
 
-The Cortex bar in app-catalog.html currently shows active extensions and lets users copy `<script>` tags, API surfaces, and prompts. But the integration can go deeper.
+The Cortex bar in app-catalog.html shows active extensions and lets users copy `<script>` tags, API surfaces, and prompts. The missing piece is making Cortex extensions flow into app creation/improvement prompts automatically.
 
-#### 1.1 Auto-Include Cortex Prompts in "New App" / "Improve App" Flows
+Cortex extensions are **server-side** — already installed on the node via `POST /v1/cortex`. The app catalog queries `GET /v1/cortex?status=active` and lets the user **pick which extensions to include** in each prompt generation. No client-side "install" flag needed.
 
-**What "install" means:** When a user "installs" a Cortex extension in the app catalog context, it means the extension's **prompt instructions** are automatically included when generating a "New App" or "Improve App" prompt. The user doesn't download the extension code — they get the prompt snippets that tell the AI to use the extension's libraries, schemas, and patterns.
+#### 1.1 Cortex Picker in Prompt Generation Panel
 
-Implementation:
-- Add an "installed" flag per Cortex extension in the app catalog's IndexedDB config
-- When "Copy with AI Prompt" is used from View Source, or when generating a new app idea, automatically append the installed extensions' prompt components and lib `<script>` tags
-- Cortex popup should have an "Install" toggle (not download — just marks it as active for prompt generation)
+When user triggers "New App", "Improve This App", or "Copy with AI Prompt", a **prompt generation panel** appears with:
+
+1. **App description** text input (for new apps: what do you want the app to do? For improve: what to change?)
+2. **"Include Cortex Extensions" checkbox** — when checked, shows the list of active extensions from the server
+3. **Extension checkboxes** — user picks which extensions to include (e.g., "📊 Charts", "🎨 Canvas", "🧪 My Custom Extension")
+4. **Live preview** — shows the generated prompt updating in real-time as user checks/unchecks extensions
+
+Selected extensions inject: their prompt components (fetched via `GET /v1/cortex/:name/prompts`), `<script src>` tags for libs, and API surface documentation. The prompt tells the AI how to load and use each extension.
+
+For "Improve This App", the current app's HTML source is also included in the prompt.
+
+```
+┌─ Generate Prompt ─────────────────────────────┐
+│                                                │
+│  App: tic-tac-toe.html                        │
+│  Action: ○ New App  ● Improve This App        │
+│                                                │
+│  Description / Requirements:                   │
+│  ┌──────────────────────────────────────────┐ │
+│  │ Add a score tracker and sound effects    │ │
+│  └──────────────────────────────────────────┘ │
+│                                                │
+│  ☐ Include Cortex Extensions                  │
+│  ┌──────────────────────────────────────────┐ │
+│  │ ☑ 📊 Charts (aimeat-charts)             │ │
+│  │ ☑ 🎨 Canvas (aimeat-canvas)             │ │
+│  │ ☐ 🧪 My Custom Extension                │ │
+│  └──────────────────────────────────────────┘ │
+│                                                │
+│  Preview:                                      │
+│  ┌──────────────────────────────────────────┐ │
+│  │ You are improving an AIMEAT app...       │ │
+│  │ Node URL: http://localhost:40050         │ │
+│  │                                          │ │
+│  │ ## User Requirements                     │ │
+│  │ Add a score tracker and sound effects    │ │
+│  │                                          │ │
+│  │ ## Available Extensions                  │ │
+│  │ <script src=".../aimeat-charts.js">      │ │
+│  │ API: AIMEAT.charts.ChartBuilder(...)     │ │
+│  │ <script src=".../aimeat-canvas.js">      │ │
+│  │ API: AIMEAT.canvas.DrawingCanvas(...)    │ │
+│  │                                          │ │
+│  │ ## Current App Source                    │ │
+│  │ <!DOCTYPE html>...                       │ │
+│  └──────────────────────────────────────────┘ │
+│                                                │
+│  [📋 Copy Prompt]                [Cancel]      │
+└────────────────────────────────────────────────┘
+```
+
+**How Cortex extensions are used** (reference: `aimeat-charts.js`):
+- Extension lib served from `/v1/cortex/:name/libs/:file` (cached)
+- App loads it via `<script src>` tag
+- JS exposes API on `AIMEAT.charts.*` (or `AIMEAT.canvas.*` etc.)
+- Extension prompt explains the API surface so the AI knows how to use it
+- Apps compose multiple extensions — e.g., a dashboard app uses Charts + Canvas + a custom data extension
 
 **Complexity:** Medium  
 **Files:** `src/static/app-catalog.html`
 
-#### 1.2 Cortex Extension as Prompt Add-On for App Creation
+#### 1.2 Developing/Customizing a Cortex Extension
 
-When creating a new app (via the AI prompt flow), the catalog should let the user pick which Cortex extensions to include. Selected extensions' prompts + lib references are appended to the generated prompt automatically.
+For users who want to **develop their own version** of a Cortex extension: export the extension's YAML manifest + lib files as editable files, modify them, and re-install via `POST /v1/cortex`.
 
-Example flow:
-1. User clicks "Generate new app" or "Improve this app"
-2. Catalog shows checkboxes for installed Cortex extensions (e.g., "📊 Charts", "🎨 Canvas")
-3. Checked extensions' prompt components + `<script src="...">` tags are injected into the prompt
-4. User pastes prompt into AI → AI uses the extension libraries
-
-**Complexity:** Medium  
-**Files:** `src/static/app-catalog.html`
-
-#### 1.3 Developing/Customizing a Cortex Extension
-
-For users who want to **develop their own version** of a Cortex extension (not just use it): provide a download flow that exports the extension's manifest + libs as editable files, and a re-upload flow to install the modified version.
-
-This is a separate workflow from "install for prompt use" — it's for extension developers.
+This is a separate developer workflow — most users just use extensions via the picker.
 
 **Complexity:** High  
 **Files:** `src/static/app-catalog.html`, `src/routes/cortex.ts`
 
 ---
 
-### Priority 2 — Client-Side UX Gaps
+### Priority 2 — App Versioning
+
+#### 2.1 Version History (Same Filename)
+
+When a user re-publishes an app with the same filename, the previous version is kept as a version entry. The URL always serves the latest version by default.
+
+```
+GET /v1/apps/:owner/:filename                — latest version
+GET /v1/apps/:owner/:filename?version=2      — specific version
+GET /v1/apps/:owner/:filename/versions       — list all versions
+DELETE /v1/apps/:owner/:filename?version=2   — delete specific version (owner only)
+```
+
+- Version number auto-increments on each publish (1, 2, 3, ...)
+- Manifest's `version` field (semver) is display-only metadata
+- Old versions are kept indefinitely — someone else might still be using them (especially if they purchased that version)
+- Only the owner can delete specific old versions
+- When an app is fully deleted (all versions), users who imported it or purchased it still have their copy (in their IndexedDB or marketplace transaction)
+
+**Storage:** Each version is a separate blob in the apps storage table with a version number. The `apps` listing endpoint returns only the latest version's metadata.
+
+**Complexity:** Medium  
+**Files:** `src/routes/apps.ts`, storage layer
+
+#### 2.2 Version Pinning on Import
+
+When a user imports an app from another node's catalogue (via the AIMEAT tab in app-catalog.html), store the version number alongside the app in IndexedDB. Enable "Check for updates" that compares the local version with the latest on the source node.
+
+**Complexity:** Easy  
+**Files:** `src/static/app-catalog.html`
+
+---
+
+### Priority 3 — Client-Side UX Gaps
 
 Missing features in `app-catalog.html` from the original design.
 
-#### 2.1 Keyboard Shortcuts
+#### 3.1 Keyboard Shortcuts
 
 Add global keyboard shortcuts:
 - `Ctrl+N` / `Cmd+N` — Open "Add App" dialog
@@ -156,21 +229,21 @@ Add global keyboard shortcuts:
 **Complexity:** Easy  
 **Files:** `src/static/app-catalog.html`
 
-#### 2.2 Drag & Drop Reordering
+#### 3.2 Drag & Drop Reordering
 
 Allow users to drag app cards to custom positions. Persist order in IndexedDB (add `sortOrder` field to app records).
 
 **Complexity:** Medium  
 **Files:** `src/static/app-catalog.html`
 
-#### 2.3 "Recently Opened" Section
+#### 3.3 "Recently Opened" Section
 
 Show a horizontal strip of recently launched apps at the top of the grid. Uses existing `lastOpenedAt` field — just needs a UI section showing the 5 most recent.
 
 **Complexity:** Easy  
 **Files:** `src/static/app-catalog.html`
 
-#### 2.4 AIMEAT Memory Sync
+#### 3.4 AIMEAT Memory Sync
 
 Sync launcher config to AIMEAT Memory key `app-launcher/config` so preferences persist across devices/browsers. When AIMEAT URL is configured and user is authenticated:
 - On settings save → `PUT /v1/memory/app-launcher/config`
@@ -179,26 +252,58 @@ Sync launcher config to AIMEAT Memory key `app-launcher/config` so preferences p
 **Complexity:** Medium  
 **Files:** `src/static/app-catalog.html`
 
-#### 2.5 Improvement/Iteration Prompts
+#### 3.5 Improvement/Iteration Prompts
 
-**Source:** `jounis_ideas.md` lines 195–196
+Two prompt buttons in the app catalog that open the Cortex picker panel (1.1):
+1. **"Improve this app"** — pre-fills the panel with "Improve" mode and the app's source
+2. **"Generate new app idea"** — pre-fills the panel with "New App" mode and empty description
 
-Two prompt buttons in the app catalog:
-1. **"Improve this app"** — generates a prompt users can paste into any AI to enhance an existing app (includes the app's current HTML + any installed Cortex extension prompts as context)
-2. **"Generate new app idea"** — generates a brainstorming prompt that produces fresh app concepts based on existing apps and user interests
+These directly use the Cortex picker panel from 1.1, so they automatically include the user's description, selected extensions, and live preview.
 
-Note: "Copy with AI Prompt" already exists in View Source, but it needs to integrate with Cortex extension prompts (see 1.1).
-
-**Complexity:** Medium  
+**Complexity:** Medium (builds on 1.1)  
 **Files:** `src/static/app-catalog.html`
 
 ---
 
-### Priority 3 — API Enhancements
+### Priority 4 — API Enhancements
 
 Server-side features from the AppStore plan.
 
-#### 3.1 Catalogue Search & Filter API
+#### 4.1 App Manifest
+
+Add a structured manifest alongside each app file. The manifest is required for search, categories, marketplace pricing, and version display.
+
+```typescript
+interface AppManifest {
+  app_id: string;              // URL-safe slug (= filename without .html)
+  name: string;                // Human-readable name
+  description: string;         // 1–2 sentence description
+  version: string;             // Semver (display-only, version number auto-increments)
+  category: string;            // game, productivity, social, dashboard, utility, etc.
+  tags: string[];              // Freeform tags
+  icon?: string;               // Emoji or URL
+  author_display: string;      // Display name
+  author_gaii: string;         // Agent GAII
+  uses_memory: boolean;        // AIMEAT feature flags
+  uses_boards: boolean;
+  uses_storage: boolean;
+  uses_wallet: boolean;
+  uses_cortex: string[];       // Cortex extensions used (e.g., ["aimeat-charts", "aimeat-canvas"])
+  published_at: string;        // ISO timestamp
+  updated_at: string;          // ISO timestamp of latest version
+  version_number: number;      // Auto-incremented version (1, 2, 3, ...)
+  downloads: number;           // Counter
+  price_morsels?: number;      // Marketplace price (0 or absent = free)
+  license_type?: 'single' | 'lifetime';  // Marketplace license type
+}
+```
+
+Manifest is submitted as part of `POST /v1/apps` body alongside the HTML content.
+
+**Complexity:** High  
+**Files:** `src/routes/apps.ts`, storage layer
+
+#### 4.2 Catalogue Search & Filter API
 
 The current `GET /v1/apps` returns a flat list. Add query parameters:
 
@@ -209,57 +314,30 @@ GET /v1/apps
   ?tag=multiplayer        — filter by tag
   ?sort=newest|popular    — sort order
   ?limit=20&offset=0      — pagination
+  ?free_only=true         — exclude paid apps
 ```
 
-This requires storing app metadata (category, tags, description, download count) server-side. Currently only filename, owner, size, and mime_type are available.
+Requires manifest data (4.1) to be stored server-side.
 
 **Complexity:** Medium  
-**Files:** `src/routes/apps.ts`, `src/storage/repositories/node.repository.ts`
+**Files:** `src/routes/apps.ts`, storage layer  
+**Dependencies:** 4.1 (manifest)
 
-#### 3.2 App Manifest Support
+#### 4.3 Download Counter
 
-**Design ref:** `aimeat-appstore-plan.md` §5
-
-Add a structured manifest alongside each app file:
-
-```typescript
-interface AppManifest {
-  app_id: string;              // URL-safe slug
-  name: string;                // Human-readable name
-  description: string;         // 1–2 sentence description
-  version: string;             // Semver
-  category: string;            // game, productivity, social, dashboard, utility, etc.
-  tags: string[];              // Freeform tags
-  icon?: string;               // Emoji or URL
-  author_display: string;      // Display name
-  author_gaii: string;         // Agent GAII
-  uses_memory: boolean;        // AIMEAT feature flags
-  uses_boards: boolean;
-  uses_storage: boolean;
-  uses_wallet: boolean;
-  published_at: string;        // ISO timestamp
-  downloads: number;           // Counter
-}
-```
-
-**Complexity:** High  
-**Files:** `src/routes/apps.ts`, storage layer
-
-#### 3.3 Download Counter
-
-Increment a download counter each time `GET /v1/apps/:owner/:filename` is called. Surface it in `GET /v1/apps` listing.
+Increment a download counter each time `GET /v1/apps/:owner/:filename` is called. Surface it in `GET /v1/apps` listing and in the manifest.
 
 **Complexity:** Easy  
 **Files:** `src/routes/apps.ts`, storage layer
 
-#### 3.4 Board Announcement on Publish
+#### 4.4 Board Announcement on Publish
 
-When an app is published via `POST /v1/apps`, optionally auto-post an announcement to the `apps` board. Could be an opt-in `announce: true` flag in the POST body.
+When an app is published via `POST /v1/apps`, optionally auto-post an announcement to the `apps` board. Opt-in via `announce: true` flag in the POST body.
 
 **Complexity:** Medium  
 **Files:** `src/routes/apps.ts`
 
-#### 3.5 App Changelog Integration
+#### 4.5 App Changelog Integration
 
 Extend the existing `SiteChangeLogEntry` system (currently used for portal template operations) to also log app publish/unpublish/update events. The infrastructure already exists in `src/services/site.ts`.
 
@@ -268,53 +346,161 @@ Extend the existing `SiteChangeLogEntry` system (currently used for portal templ
 
 ---
 
-### Priority 4 — Documentation & Prompts
+### Priority 5 — Marketplace (Morsel Economy)
 
-#### 4.1 In-App Publish Button Documentation
+App marketplace with morsel-based payments. Enabled via `AIMEAT_APP_MARKETPLACE_PAYMENTS` config flag. When disabled, all apps are free to browse/download. When enabled, apps CAN have a price and the payment flow kicks in.
+
+#### 5.1 Marketplace Config Flag
+
+```env
+AIMEAT_APP_MARKETPLACE_PAYMENTS=false   # default: disabled
+```
+
+When `false`: all marketplace-related fields in manifest are ignored. `GET /v1/apps` returns all apps freely. No payment UI.
+
+When `true`: apps with `price_morsels > 0` require payment before download. Free apps are unaffected.
+
+**Complexity:** Easy  
+**Files:** `src/config.ts`, `.env.example`, `src/routes/apps.ts`
+
+#### 5.2 License Types
+
+Two license models (kept simple):
+
+| Type | Behavior |
+|------|----------|
+| `single` | Buyer pays once, gets the **specific version** at time of purchase forever. New versions require a new purchase. |
+| `lifetime` | Buyer pays once, gets **all future versions** for free. The cryptographic transaction event records the license type. |
+
+Default: `single` (if not specified in manifest).
+
+**Complexity:** Easy  
+**Files:** `src/routes/apps.ts`, manifest schema
+
+#### 5.3 Marketplace Transaction Storage
+
+**Domain separation:**
+
+| Domain | Responsibility | Storage |
+|--------|----------------|---------|
+| **Wallet** (`src/services/morsel.ts`) | Balance tracking, morsel transfers, transaction history (amounts, from/to, reason) | Existing wallet tables |
+| **Marketplace** (`src/routes/marketplace.ts`) | Purchase records, license verification, app content snapshots, cryptographic proofs | New `marketplace_transactions` table |
+
+The wallet transaction references the marketplace transaction ID (e.g., `reason: "app_purchase"`, `reference: "mktx_abc123"`). The marketplace transaction contains the full data.
+
+```typescript
+interface MarketplaceTransaction {
+  transaction_id: string;           // unique ID (e.g., "mktx_...")
+  buyer_ghii: string;               // purchaser GHII identity
+  seller_ghii: string;              // publisher GHII identity
+  app_filename: string;             // original filename
+  app_name: string;                 // display name from manifest
+  app_version_number: number;       // version at time of purchase
+  license_type: 'single' | 'lifetime';
+  price_morsels: number;            // what was paid
+  purchased_at: string;             // ISO timestamp
+
+  // FULL CONTENT — not references. Self-contained so the purchase
+  // survives even if the app is deleted, unpublished, or the seller's node goes offline.
+  app_content: string;              // complete HTML (base64)
+  app_manifest: object;             // full manifest snapshot
+  app_screenshot?: string;          // screenshot if any (base64)
+
+  // Cryptographic proof
+  signature: string;                // Ed25519 signature over the above fields
+  node_id: string;                  // originating node ID
+  node_public_key: string;          // node's public key for verification
+}
+```
+
+**Key principle:** The marketplace transaction is a **self-contained immutable receipt**. It contains the complete app content, not just a reference. Even if the seller unpublishes the app or the seller's node goes offline, the buyer still has their purchased version with cryptographic proof of legitimate purchase.
+
+**Complexity:** High  
+**Files:** new `src/routes/marketplace.ts`, `src/storage/interface.ts`, storage implementations, `src/services/morsel.ts` (wallet reference)
+
+#### 5.4 Purchase Flow
+
+```
+POST /v1/marketplace/purchase
+{
+  "app_filename": "cool-game.html",
+  "app_owner": "seller-name"
+}
+```
+
+Server-side flow:
+1. Verify `AIMEAT_APP_MARKETPLACE_PAYMENTS` is enabled
+2. Look up app manifest → get `price_morsels` and `license_type`
+3. Check if buyer already has a valid license (lifetime license = skip payment for updates)
+4. Debit buyer's wallet (`morselBalance -= price_morsels`)
+5. Credit seller's wallet (`morselBalance += price_morsels`)
+6. Create marketplace transaction with full app content snapshot
+7. Create wallet transaction referencing the marketplace transaction
+8. Return the marketplace transaction (buyer receives their copy)
+
+```
+GET /v1/marketplace/purchases              — list buyer's purchases
+GET /v1/marketplace/purchases/:txId        — get specific purchase (includes full content)
+GET /v1/marketplace/sales                  — list seller's sales
+```
+
+**Complexity:** High  
+**Files:** `src/routes/marketplace.ts`, `src/services/morsel.ts`
+
+---
+
+### Priority 6 — Documentation & Prompts
+
+#### 6.1 In-App Publish Button Documentation
 
 Document in AIMEAT-OS.md that AI-generated apps should include a "Publish" button using `document.documentElement.outerHTML` self-capture → `POST /v1/apps`. The API already supports this.
 
 **Complexity:** Easy (documentation)  
 **Files:** `public/aimeat-os.md`
 
-#### 4.2 Purpose-Specific Prompt Packages
+#### 6.2 Purpose-Specific Prompt Packages (Dynamic API)
 
-**Design ref:** `aimeat-appstore-plan.md` §10
+Serve pre-built prompt packages via API. The server dynamically fills in the user's node URL, available Cortex extensions, owner name, etc. before returning the prompt. Base templates also ship in AIMEAT-OS.md.
 
-Serve pre-built prompt packages for common app types:
+```
+GET /v1/portal/prompts                     — list available prompt packages
+GET /v1/portal/prompts/:promptId           — get prompt (node values auto-filled)
+```
 
 | Prompt ID | Purpose | Output |
 |-----------|---------|--------|
 | `app-builder-general` | Custom app | User interview → bespoke app |
 | `app-builder-game` | Multiplayer game | Game with lobby, turns, scoreboard |
 | `app-builder-notes` | Note-taking app | Notes with folders, tags, search |
-| `app-builder-dashboard` | Data dashboard | Charts, tables, live data |
+| `app-builder-dashboard` | Data dashboard | Charts + tables + live data (uses Cortex) |
 | `app-builder-chat` | Chat room | Real-time messaging via boards |
 
+Prompt packages can reference multiple Cortex extensions. A "dashboard builder" prompt would tell the AI to use aimeat-charts for data visualization and aimeat-canvas for annotations. Apps are compositions of Cortex building blocks.
+
 **Complexity:** Medium  
-**Files:** `src/routes/portal.ts` or new `src/routes/prompts.ts`
+**Files:** `src/routes/portal.ts` or new `src/routes/prompts.ts`, `public/aimeat-os.md`
 
-#### 4.3 "Share This App" Prompt Generation
+#### 6.3 "Share This App" Prompt Generation
 
-A button in apps that generates a prompt describing the app, so another user can paste it into any AI and get a functionally equivalent app regenerated. Enables prompt-based app distribution.
+A button in apps that generates a prompt describing the app, so another user can paste it into any AI and get a functionally equivalent app regenerated. Enables prompt-based app distribution as an alternative to file sharing.
 
 **Complexity:** Easy (prompt/documentation)  
 **Files:** AIMEAT-OS.md, prompt templates
 
 ---
 
-### Priority 5 — Security Hardening
+### Priority 7 — Security Hardening
 
 For multi-user / public-facing nodes.
 
-#### 5.1 Sandbox Iframe Serving
+#### 7.1 Sandbox Iframe Serving
 
 Current state: iframe uses `sandbox="allow-scripts allow-forms allow-popups"` (no `allow-same-origin` — already more secure than originally documented). Verify this is sufficient and document the security model.
 
 **Complexity:** Easy (audit + documentation)  
 **Files:** `src/static/app-catalog.html`
 
-#### 5.2 PostMessage Auth Protocol
+#### 7.2 PostMessage Auth Protocol
 
 For sandbox iframe mode, apps can't access the parent's JWT from localStorage. Define a `postMessage` protocol:
 - App iframe sends: `{ type: 'aimeat-request-auth' }`
@@ -323,7 +509,7 @@ For sandbox iframe mode, apps can't access the parent's JWT from localStorage. D
 **Complexity:** Medium  
 **Files:** `src/static/app-catalog.html`, AIMEAT-OS.md
 
-#### 5.3 Per-App Storage Quota
+#### 7.3 Per-App Storage Quota
 
 Add a limit on number of apps per agent. The global `appMaxSizeMb` config already limits per-upload size, but there's no limit on count.
 
@@ -332,15 +518,13 @@ Add a limit on number of apps per agent. The global `appMaxSizeMb` config alread
 
 ---
 
-### Priority 6 — Federated App Catalogue
+### Priority 8 — Federated App Catalogue
 
 Cross-node app discovery when nodes are peered.
 
-#### 6.1 Federated App Listing
+#### 8.1 Federated App Listing
 
-**Design ref:** `docs/ghii-identity-and-network-plan.md` §9.1
-
-When two nodes peer with `catalogue.includeApps: true`, browsing `/v1/apps` on Node B should also show apps from Node A. Apps are always served from their home node.
+When two nodes peer with `catalogue.includeApps: true`, browsing `/v1/apps` on Node B also shows apps from Node A. Apps are always served from their home node.
 
 ```
 GET /v1/apps?include_peers=true
@@ -350,13 +534,13 @@ GET /v1/apps?include_peers=true
 **Files:** `src/routes/apps.ts`, peering configuration, federation layer  
 **Dependencies:** Node peering must be implemented first
 
-#### 6.2 Cross-Node App Search
+#### 8.2 Cross-Node App Search
 
 Forward search queries to peered nodes and aggregate results.
 
 **Complexity:** High  
 **Files:** `src/routes/apps.ts`, federation layer  
-**Dependencies:** 6.1, node peering
+**Dependencies:** 8.1, node peering
 
 ---
 
@@ -366,58 +550,88 @@ Forward search queries to peered nodes and aggregate results.
 
 | Task | Items |
 |------|-------|
-| A1 | Keyboard shortcuts (2.1) |
-| A2 | "Recently Opened" section (2.3) |
-| A3 | Download counter (3.3) |
-| A4 | App changelog integration (3.5) |
-| A5 | Security audit of iframe sandbox (5.1) |
+| A1 | Keyboard shortcuts (3.1) |
+| A2 | "Recently Opened" section (3.3) |
+| A3 | Download counter (4.3) |
+| A4 | App changelog integration (4.5) |
+| A5 | Security audit of iframe sandbox (7.1) |
 
 ### Phase B — Cortex ↔ Catalog Integration
 
 | Task | Items |
 |------|-------|
-| B1 | Auto-include Cortex prompts in app creation flows (1.1) |
-| B2 | Cortex extension picker in new/improve app prompt (1.2) |
-| B3 | Improvement/iteration prompt buttons with Cortex support (2.5) |
+| B1 | Cortex picker in prompt generation panel (1.1) |
+| B2 | Improvement/iteration prompt buttons using the picker (3.5) |
 
-### Phase C — API & Publishing
+### Phase C — Versioning & Manifest
 
 | Task | Items |
 |------|-------|
-| C1 | Catalogue search/filter API (3.1) |
-| C2 | App manifest support (3.2) |
-| C3 | Board announcement on publish (3.4) |
-| C4 | In-app publish button docs (4.1) |
+| C1 | App manifest support (4.1) |
+| C2 | Version history — same filename, version number (2.1) |
+| C3 | Catalogue search/filter API (4.2) |
+| C4 | Version pinning on import (2.2) |
 
 ### Phase D — UX Polish
 
 | Task | Items |
 |------|-------|
-| D1 | Drag & drop reordering (2.2) |
-| D2 | AIMEAT Memory sync (2.4) |
+| D1 | Drag & drop reordering (3.2) |
+| D2 | AIMEAT Memory sync (3.4) |
 
-### Phase E — Security
-
-| Task | Items |
-|------|-------|
-| E1 | PostMessage auth protocol (5.2) |
-| E2 | Per-app storage quota (5.3) |
-
-### Phase F — Prompts & Ecosystem
+### Phase E — Marketplace
 
 | Task | Items |
 |------|-------|
-| F1 | Purpose-specific prompt packages (4.2) |
-| F2 | "Share This App" prompt generation (4.3) |
+| E1 | Marketplace config flag `AIMEAT_APP_MARKETPLACE_PAYMENTS` (5.1) |
+| E2 | License types — single + lifetime (5.2) |
+| E3 | Marketplace transaction storage — dedicated table (5.3) |
+| E4 | Purchase flow + wallet integration (5.4) |
 
-### Phase G — Federation
+### Phase F — Documentation & Prompts
 
 | Task | Items |
 |------|-------|
-| G1 | Federated app listing (6.1) |
-| G2 | Cross-node app search (6.2) |
+| F1 | In-app publish button docs (6.1) |
+| F2 | Purpose-specific prompt packages — dynamic API (6.2) |
+| F3 | "Share This App" prompt generation (6.3) |
+| F4 | Board announcement on publish (4.4) |
 
-**Dependencies:** Phase G requires node peering to be implemented. Cortex extension developer workflow (1.3) is lower priority and can be done alongside phase F.
+### Phase G — Security
+
+| Task | Items |
+|------|-------|
+| G1 | PostMessage auth protocol (7.2) |
+| G2 | Per-app storage quota (7.3) |
+
+### Phase H — Federation
+
+| Task | Items |
+|------|-------|
+| H1 | Federated app listing (8.1) |
+| H2 | Cross-node app search (8.2) |
+
+### Phase X — Lower Priority
+
+| Task | Items |
+|------|-------|
+| X1 | Cortex extension developer workflow — export/modify/re-install (1.2) |
+
+**Dependencies:**
+- Phase C (versioning) should come before Phase E (marketplace) — marketplace needs version numbers for license tracking
+- Phase H requires node peering to be implemented
+- Phase B (Cortex picker) should come before Phase F (prompt packages) — packages use the same picker infrastructure
+
+---
+
+## Domain Responsibilities
+
+| Domain | Owns | Doesn't Own |
+|--------|------|-------------|
+| **Wallet** (`morsel.ts`) | Balance tracking, morsel transfers between agents, transaction history (amounts, from/to, reason, reference ID) | App content, license verification, purchase proofs |
+| **Marketplace** (`marketplace.ts`) | Purchase records, license verification (has buyer purchased this app?), full app content snapshots, cryptographic proofs, seller sales history | Balance changes — delegates to wallet for actual morsel transfer |
+| **Apps** (`apps.ts`) | App storage, versioning, manifest, search, publish/unpublish | Payment — delegates to marketplace when price > 0 |
+| **Cortex** (`cortex.ts`) | Extension lifecycle, prompts, libs, schemas | App creation — only provides building blocks for apps |
 
 ---
 
@@ -426,12 +640,15 @@ Forward search queries to peered nodes and aggregate results.
 | File | Role |
 |------|------|
 | `aimeat/src/static/app-catalog.html` | Client-side app catalog (standalone HTML, 3,049 lines) |
-| `aimeat/src/routes/apps.ts` | Server-side app API routes (6 endpoints) |
+| `aimeat/src/routes/apps.ts` | Server-side app API routes (6 endpoints + versioning) |
 | `aimeat/src/routes/cortex.ts` | Cortex extensions backend (11 endpoints, fully implemented) |
+| `aimeat/src/routes/marketplace.ts` | Marketplace transactions (NEW — to be created) |
 | `aimeat/src/routes/profile.ts` | Profile "Apps" tab integration |
 | `aimeat/src/routes/portal-human.ts` | Portal app creation flow |
 | `aimeat/src/services/site.ts` | Site changelog service |
+| `aimeat/src/services/morsel.ts` | Morsel economy / wallet service |
 | `aimeat/src/storage/repositories/node.repository.ts` | Storage (SQLite/MongoDB) |
+| `aimeat/src/config.ts` | Config (add `AIMEAT_APP_MARKETPLACE_PAYMENTS`) |
 | `aimeat/locales/en.json` | English translations |
 | `aimeat/locales/fi.json` | Finnish translations |
 | `aimeat/public/aimeat-os.md` | App development guide (prompt reference) |
