@@ -203,6 +203,15 @@ export function buildDashboardTranslations(t: TFunction): Record<string, string>
     messages: t('dashboard.messages'),
     latency: t('dashboard.latency'),
     tunnelActivity: t('dashboard.tunnelActivity'),
+    consentPermStats: t('dashboard.consentPermStats'),
+    consentActiveRules: t('dashboard.consentActiveRules'),
+    consentByGaii: t('dashboard.consentByGaii'),
+    consentByGhii: t('dashboard.consentByGhii'),
+    consentByOrganism: t('dashboard.consentByOrganism'),
+    consentByDomain: t('dashboard.consentByDomain'),
+    consentByNode: t('dashboard.consentByNode'),
+    consentByWildcard: t('dashboard.consentByWildcard'),
+    consentDataPatterns: t('dashboard.consentDataPatterns'),
   };
 }
 
@@ -1641,6 +1650,22 @@ function renderStats(){
   h+=sc(__t.mailboxExpired,ms.expired_total||0,'',ms.expired_total>0?'var(--yellow)':'var(--green)');
   h+=sc(__t.mailboxQuotaRejects,ms.quota_rejections_total||0,'',ms.quota_rejections_total>0?'var(--red)':'var(--green)');
   h+=sc(__t.mailboxOldestAge,fmtUp(ms.oldest_item_age_seconds||0),'','var(--muted)');
+  h+='</div>';
+
+  // ── Consent Permission Stats ──
+  var cs=sd.consent_permissions||{};
+  h+='<h3 style="margin-top:24px;font-size:.9rem;color:var(--purple)">'+__t.consentPermStats+'</h3>';
+  h+='<div class="grid grid-4" style="margin-top:12px">';
+  h+=sc(__t.consentActiveRules,cs.active_rules||0,'','var(--purple)');
+  h+=sc(__t.consentByGaii,cs.by_gaii||0,'','var(--blue)');
+  h+=sc(__t.consentByGhii,cs.by_ghii||0,'','var(--purple)');
+  h+=sc(__t.consentByOrganism,cs.by_organism||0,'','var(--green)');
+  h+='</div>';
+  h+='<div class="grid grid-4">';
+  h+=sc(__t.consentByDomain,cs.by_domain||0,'','var(--yellow)');
+  h+=sc(__t.consentByNode,cs.by_node||0,'','var(--muted)');
+  h+=sc(__t.consentByWildcard,cs.by_wildcard||0,'',cs.by_wildcard>0?'var(--red)':'var(--green)');
+  h+=sc(__t.consentDataPatterns,cs.unique_patterns||0,'','var(--cyan)');
   h+='</div>';
 
   // ── Security Stats ──

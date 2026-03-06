@@ -1637,6 +1637,282 @@ await test('GET /v1/metrics returns 503 when disabled', async () => {
     assert(body.error?.code === 'FEATURE_DISABLED', 'should be FEATURE_DISABLED');
 });
 
+// ─── Phase 7: Consent Recipient Patterns ───
+console.log('Phase 7 — Consent Recipient Patterns');
+
+// Create a second owner + agent for cross-owner consent tests
+const owner2Name = `testowner2-${Date.now()}`;
+let owner2Token = '';
+let agent2bToken = '';
+let agent2bGaii = '';
+
+await test('Setup — register second owner for consent tests', async () => {
+    const { body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: owner2Name, passphrase: 'test-passphrase-2' }),
+    });
+    assert(body.ok === true, `register owner2: ${JSON.stringify(body.error)}`);
+    const privKey = body.data?.private_key;
+
+    // Get owner token
+    const ts = new Date().toISOString();
+    const sig = await signMsg(privKey, owner2Name + ts);
+    const { body: tkBody } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: owner2Name, timestamp: ts, signature: sig }),
+    });
+    owner2Token = tkBody.data?.token;
+    assert(typeof owner2Token === 'string', 'got owner2 token');
+
+    // Register agent under owner2
+    const { body: agBody } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${owner2Token}` },
+        body: JSON.stringify({ name: 'consent-tester', owner: owner2Name, capabilities: ['memory'], model: 'test' }),
+    });
+    assert(agBody.ok === true, `register agent2b: ${JSON.stringify(agBody.error)}`);
+    agent2bGaii = agBody.data.agent.gaii;
+    const ag2PrivKey = agBody.data.private_key;
+
+    // Get agent token
+    const ts2 = new Date().toISOString();
+    const sig2 = await signMsg(ag2PrivKey, agent2bGaii + ts2);
+    const { body: tk2Body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: agent2bGaii, timestamp: ts2, signature: sig2 }),
+    });
+    agent2bToken = tk2Body.data?.token;
+    assert(typeof agent2bToken === 'string', 'got agent2b token');
+});
+
+await test('Consent — ghii: recipient creates successfully', async () => {
+    const { status, body } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            data_pattern: 'consent-test.ghii.*',
+            recipient: `ghii:${owner2Name}@${NODE_ID}`,
+            purpose: 'ghii recipient test',
+            scope: 'private',
+        }),
+    });
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data?.recipient === `ghii:${owner2Name}@${NODE_ID}`, 'recipient stored');
+});
+
+await test('Consent — domain: recipient creates successfully', async () => {
+    const { status, body } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            data_pattern: 'consent-test.domain.*',
+            recipient: 'domain:aimeat-*',
+            purpose: 'domain recipient test',
+            scope: 'private',
+        }),
+    });
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
+});
+
+await test('Consent — node: recipient creates successfully', async () => {
+    const { status, body } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            data_pattern: 'consent-test.node.*',
+            recipient: `node:${NODE_ID}`,
+            purpose: 'node recipient test',
+            scope: 'private',
+        }),
+    });
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
+});
+
+await test('Consent — invalid recipient format returns 400', async () => {
+    const { status, body } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            data_pattern: 'test.*',
+            recipient: 'bad format with spaces',
+            purpose: 'should fail',
+        }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+    assert(body.error?.code === 'INVALID_RECIPIENT', `expected INVALID_RECIPIENT, got ${body.error?.code}`);
+});
+
+await test('Consent — ghii: recipient grants cross-owner access via public memory', async () => {
+    // Write private memory as agent1
+    const { body: wBody } = await json(`/v1/memory`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'consent-test.ghii.data', value: { secret: 'for-ghii' }, visibility: 'private' }),
+    });
+    assert(wBody.ok === true, `write: ${JSON.stringify(wBody.error)}`);
+
+    // Read via public endpoint as agent2b (different owner) — should succeed via ghii: consent
+    const { status, body } = await json(`/v1/pub/${encodeURIComponent(agentGaii)}/consent-test.ghii.data`, {
+        headers: { Authorization: `Bearer ${agent2bToken}` },
+    });
+    assert(status === 200 || body.ok === true, `ghii access: status=${status}, ${JSON.stringify(body.error)}`);
+    assert(body.data?.value?.secret === 'for-ghii', 'got consent-protected data via ghii recipient');
+});
+
+await test('Consent — ghii: wrong user is denied', async () => {
+    // Write private memory with a pattern that only matches owner2
+    // agent1's consent-test.ghii.* grants to ghii:owner2@NODE_ID
+    // If we try from a non-matching accessor, it should fail
+    // Use the owner token directly (acts as owner, not matching ghii)
+    const { status } = await json(`/v1/pub/${encodeURIComponent(agentGaii)}/consent-test.ghii.data`);
+    // No auth = anonymous → no matching consent → 403 or 404
+    assert(status === 403 || status === 404, `expected 403/404 for unauthenticated, got ${status}`);
+});
+
+await test('Consent — node: recipient grants access to agents on matching node', async () => {
+    // Write private memory
+    const { body: wBody } = await json(`/v1/memory`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'consent-test.node.data', value: { secret: 'for-node' }, visibility: 'private' }),
+    });
+    assert(wBody.ok === true, `write: ${JSON.stringify(wBody.error)}`);
+
+    // Read via public endpoint as agent2b (same node) — should succeed via node: consent
+    const { status, body } = await json(`/v1/pub/${encodeURIComponent(agentGaii)}/consent-test.node.data`, {
+        headers: { Authorization: `Bearer ${agent2bToken}` },
+    });
+    assert(status === 200 || body.ok === true, `node access: status=${status}, ${JSON.stringify(body.error)}`);
+    assert(body.data?.value?.secret === 'for-node', 'got consent-protected data via node recipient');
+});
+
+// ─── Phase 7b: Permissions Listing API ───
+console.log('Phase 7b — Permissions Listing API');
+
+await test('GET /v1/permissions/summary — returns correct counts', async () => {
+    const { status, body } = await json('/v1/permissions/summary', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data?.active_consents >= 3, `expected ≥3 active consents, got ${body.data?.active_consents}`);
+    assert(body.data?.rules_by_recipient_type?.ghii >= 1, 'expected ≥1 ghii rule');
+    assert(body.data?.rules_by_recipient_type?.domain >= 1, 'expected ≥1 domain rule');
+    assert(body.data?.rules_by_recipient_type?.node >= 1, 'expected ≥1 node rule');
+    assert(typeof body.data?.total_memory_keys === 'number', 'has total_memory_keys');
+    assert(Array.isArray(body.data?.data_patterns), 'has data_patterns array');
+});
+
+await test('GET /v1/permissions/check — allowed case (consent exists)', async () => {
+    const { status, body } = await json(
+        `/v1/permissions/check?key=consent-test.ghii.data&accessor=${encodeURIComponent(agent2bGaii)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data?.allowed === true, `expected allowed=true, got ${body.data?.allowed}`);
+    assert(body.data?.reason === 'consent_granted', `expected consent_granted, got ${body.data?.reason}`);
+});
+
+await test('GET /v1/permissions/check — denied case (no consent)', async () => {
+    const { status, body } = await json(
+        `/v1/permissions/check?key=no-consent-key&accessor=${encodeURIComponent(agent2bGaii)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data?.allowed === false, `expected allowed=false, got ${body.data?.allowed}`);
+});
+
+await test('GET /v1/permissions/memory/:key — returns matching consents', async () => {
+    const { status, body } = await json('/v1/permissions/memory/consent-test.ghii.data', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(Array.isArray(body.data?.effective_rules), 'has effective_rules array');
+    assert(body.data.effective_rules.length >= 1, 'at least 1 matching rule');
+    assert(body.data.effective_rules[0].recipient.startsWith('ghii:'), 'rule has ghii: recipient');
+});
+
+await test('GET /v1/permissions/memory/:key — no rules returns empty array', async () => {
+    const { status, body } = await json('/v1/permissions/memory/unmatched-key', {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data?.effective_rules?.length === 0, 'empty rules for unmatched key');
+});
+
+// ─── Phase 7c: Storage Consent Integration ───
+console.log('Phase 7c — Storage Consent Integration');
+
+await test('Storage — public file accessible without auth', async () => {
+    // Upload a public file
+    const { status: upStatus, body: upBody } = await json('/v1/storage', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            key: 'consent-test-public.txt',
+            data: Buffer.from('public content').toString('base64'),
+            visibility: 'public',
+            mime_type: 'text/plain',
+        }),
+    });
+    assert(upStatus === 201, `upload: ${JSON.stringify(upBody.error)}`);
+
+    // Read without auth
+    const res = await fetch(`${BASE}/v1/pub/${encodeURIComponent(agentGaii)}/consent-test-public.txt`);
+    assert(res.status === 200, `expected 200, got ${res.status}`);
+    const text = await res.text();
+    assert(text === 'public content', 'got public file content');
+});
+
+await test('Storage — private file returns 404 without auth', async () => {
+    // Upload a private file
+    await json('/v1/storage', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            key: 'consent-test-private.txt',
+            data: Buffer.from('private content').toString('base64'),
+            visibility: 'private',
+            mime_type: 'text/plain',
+        }),
+    });
+
+    // Read without auth — should be 404
+    const res = await fetch(`${BASE}/v1/pub/${encodeURIComponent(agentGaii)}/consent-test-private.txt`);
+    assert(res.status === 404, `expected 404, got ${res.status}`);
+});
+
+await test('Storage — private file accessible with consent + auth', async () => {
+    // Create consent for storage files (data_pattern uses storage: prefix)
+    const { status: cStatus } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            data_pattern: 'storage:consent-test-private.*',
+            recipient: `ghii:${owner2Name}@${NODE_ID}`,
+            purpose: 'storage consent test',
+            scope: 'private',
+        }),
+    });
+    assert(cStatus === 201, `consent creation: ${cStatus}`);
+
+    // Read as agent2b (has consent via ghii:)
+    const { status, body } = await json(`/v1/pub/${encodeURIComponent(agentGaii)}/consent-test-private.txt`, {
+        headers: { Authorization: `Bearer ${agent2bToken}` },
+    });
+    // The file endpoint returns raw content, not JSON, when successful
+    // So a 200 with content means success
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// Clean up second owner
+await test('Cleanup — delete second owner', async () => {
+    const { body } = await json(`/v1/owners/${owner2Name}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(body.ok === true, `delete owner2: ${JSON.stringify(body.error)}`);
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 

@@ -22,6 +22,8 @@ import type {
 import { initializeSchema } from './schema.js';
 
 import { matchWildcardPattern, consentMatchPattern } from '../../pattern-utils.js';
+import { matchesRecipient } from '../../../services/consent.js';
+import { parseGaiiLoose } from '../../../utils/gaii.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;
@@ -1725,8 +1727,9 @@ export class SqliteStorage implements Storage {
         this.db.prepare('UPDATE consents SET status = ? WHERE id = ?').run('expired', consent.id);
         continue;
       }
-      // Check recipient
-      if (consent.recipient !== '*' && consent.recipient !== accessorGaii) continue;
+      // Check recipient (supports *, exact GAII, ghii:, domain:, node:)
+      const accessor = parseGaiiLoose(accessorGaii);
+      if (!matchesRecipient(consent.recipient, accessorGaii, accessor.owner, accessor.node)) continue;
       // Check data_pattern (glob match)
       if (!consentMatchPattern(consent.dataPattern, memoryKey)) continue;
       results.push(consent);

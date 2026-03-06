@@ -52,6 +52,22 @@ export function isValidGAII(gaii: string): boolean {
   return GAII_RE.test(gaii);
 }
 
+/**
+ * Lenient GAII parser — extracts owner and node without strict validation.
+ * Handles both `agent#owner@node` and `owner@node` formats.
+ * Returns empty strings for missing parts instead of null.
+ */
+export function parseGaiiLoose(gaii: string): { agent: string; owner: string; node: string } {
+  const hashIdx = gaii.indexOf('#');
+  const atIdx = gaii.lastIndexOf('@');
+  if (atIdx < 0) return { agent: '', owner: '', node: '' };
+  return {
+    agent: hashIdx >= 0 ? gaii.slice(0, hashIdx) : '',
+    owner: hashIdx >= 0 ? gaii.slice(hashIdx + 1, atIdx) : gaii.slice(0, atIdx),
+    node: gaii.slice(atIdx + 1),
+  };
+}
+
 // Chat Instance ID format: platform-appname#owner@node
 // Same syntax as GAII but semantically different — represents a human-operated AI session
 // Examples:

@@ -101,6 +101,9 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_FEDERATION_ROLE: 'standalone',
   AIMEAT_GENESIS_URL: '',
   AIMEAT_INDEXNOW_KEY: '',
+  AIMEAT_CONSENT_ENABLED: 'true',
+  AIMEAT_CONSENT_MAX_PER_USER: '100',
+  AIMEAT_CONSENT_AUDIT_RETENTION_DAYS: '365',
   AIMEAT_COOKIE_CONSENT_ENABLED: 'false',
   AIMEAT_COOKIE_CONSENT_CATEGORIES: 'necessary',
   AIMEAT_COOKIE_CONSENT_POLICY_URL: '',
@@ -1111,6 +1114,38 @@ async function askAllAdvancedSettings(
     t,
   );
   if (relayHops !== '3') settings.AIMEAT_MAX_RELAY_HOPS = relayHops;
+
+  // ── Consent Layer ──
+  const consentEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.consentEnabled'),
+      initialValue: cfg.consentEnabled,
+    }),
+    t,
+  );
+  if (!consentEnabled) settings.AIMEAT_CONSENT_ENABLED = 'false';
+
+  if (consentEnabled) {
+    const consentMaxPerUser = checkCancel(
+      await p.text({
+        message: t('init.consentMaxPerUser'),
+        defaultValue: String(cfg.consentMaxPerUser),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (consentMaxPerUser !== '100') settings.AIMEAT_CONSENT_MAX_PER_USER = consentMaxPerUser;
+
+    const consentAuditDays = checkCancel(
+      await p.text({
+        message: t('init.consentAuditDays'),
+        defaultValue: String(cfg.consentAuditRetentionDays),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (consentAuditDays !== '365') settings.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS = consentAuditDays;
+  }
 
   return settings;
 }

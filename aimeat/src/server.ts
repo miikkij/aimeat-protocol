@@ -19,6 +19,7 @@ import { ownersRouter } from './routes/owners.js';
 import { agentsRouter } from './routes/agents.js';
 import { schemaRouter } from './routes/schemas.js';
 import { consentRouter } from './routes/consent.js';
+import { permissionsRouter } from './routes/permissions.js';
 import { memoryRouter } from './routes/memory.js';
 import { actionsRouter } from './routes/actions.js';
 import { catalogueRouter } from './routes/catalogue.js';
@@ -459,6 +460,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(agentsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();
   app.use(consentRouter(config, storage, stats, notifyDirectoryChange));  // Phase 0.3
+  app.use(permissionsRouter(config, storage));  // Phase 0.3 — permission listing API
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange));

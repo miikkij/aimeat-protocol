@@ -28,6 +28,19 @@ export function matchWildcardPattern(pattern: string, key: string): boolean {
 }
 
 /**
+ * Simple glob matching for plain strings (e.g. node IDs, domain names).
+ * Supports '*' as a wildcard matching any characters.
+ * Example: '*.health-network.fi' matches 'clinic.health-network.fi'
+ *          'aimeat-*-001-*' matches 'aimeat-fi-001-genesis'
+ */
+export function globMatchSimple(pattern: string, value: string): boolean {
+  const regex = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*');
+  return new RegExp(`^${regex}$`).test(value);
+}
+
+/**
  * Glob pattern matching for consent data patterns.
  * Supports '*' (one segment) and '**' (multiple segments).
  */

@@ -438,6 +438,29 @@ export function formatConfig(config: AimeatConfig): string {
       ],
     },
     {
+      title: 'Consent Layer',
+      entries: [
+        {
+          envVar: 'AIMEAT_CONSENT_ENABLED',
+          description: 'Enable consent-based data sharing permissions',
+          value: String(config.consentEnabled),
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_CONSENT_MAX_PER_USER',
+          description: 'Maximum consent rules per user',
+          value: String(config.consentMaxPerUser),
+          defaultVal: '100',
+        },
+        {
+          envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS',
+          description: 'How long to keep audit logs (days)',
+          value: String(config.consentAuditRetentionDays),
+          defaultVal: '365',
+        },
+      ],
+    },
+    {
       title: 'Cookie Consent',
       entries: [
         {

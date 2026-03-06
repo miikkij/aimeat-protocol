@@ -1,5 +1,61 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
+import { globMatchSimple } from '../storage/pattern-utils.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
+
+/**
+ * Check whether a consent record's recipient field matches a given accessor.
+ *
+ * Supported recipient patterns:
+ * - `*`                      — wildcard, matches any accessor
+ * - exact GAII               — matches only that specific GAII
+ * - `ghii:username@node`     — matches all agents owned by that GHII user on that node
+ * - `domain:*.pattern`       — matches all agents whose home node matches the glob
+ * - `node:node-id`           — matches all agents on a specific node
+ * - `organism.{id}`          — placeholder (requires async lookup, handled separately)
+ */
+export function matchesRecipient(
+  recipient: string,
+  accessorGaii: string,
+  accessorOwner: string,
+  accessorNode: string,
+): boolean {
+  // Wildcard — everyone
+  if (recipient === '*') return true;
+
+  // Exact GAII match
+  if (recipient === accessorGaii) return true;
+
+  // GHII user — all agents under this human identity on a specific node
+  if (recipient.startsWith('ghii:')) {
+    const ghii = recipient.slice(5); // "username@node"
+    const atIdx = ghii.lastIndexOf('@');
+    if (atIdx === -1) return false;
+    const username = ghii.slice(0, atIdx);
+    const node = ghii.slice(atIdx + 1);
+    return accessorOwner === username && accessorNode === node;
+  }
+
+  // Domain glob — match accessor's home node ID
+  if (recipient.startsWith('domain:')) {
+    const pattern = recipient.slice(7); // "*.health-network.fi"
+    return globMatchSimple(pattern, accessorNode);
+  }
+
+  // Specific node — all agents on that node
+  if (recipient.startsWith('node:')) {
+    const nodeId = recipient.slice(5);
+    return accessorNode === nodeId;
+  }
+
+  // Organism membership — not handled here (requires async storage lookup)
+  // The storage layer should handle organism.{id} patterns separately
+  if (recipient.startsWith('organism.')) {
+    return false; // Placeholder — resolved at storage layer
+  }
+
+  return false;
+}
 
 /**
  * Check if an accessor has consent to read a specific memory key.

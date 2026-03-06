@@ -44,6 +44,9 @@ import type {
     PersonalPushSubscriptionRecord, NotificationPreferences,
 } from '../../interface.js';
 
+import { matchesRecipient } from '../../../services/consent.js';
+import { parseGaiiLoose } from '../../../utils/gaii.js';
+
 // Prisma client will be imported dynamically at runtime
 // import { PrismaClient } from '@prisma/client';
 
@@ -1488,8 +1491,9 @@ export class MongoStorage implements Storage {
                 continue;
             }
 
-            // Check recipient
-            if (consent.recipient !== '*' && consent.recipient !== accessorGaii) continue;
+            // Check recipient (supports *, exact GAII, ghii:, domain:, node:)
+            const accessor = parseGaiiLoose(accessorGaii);
+            if (!matchesRecipient(consent.recipient, accessorGaii, accessor.owner, accessor.node)) continue;
 
             // Check data_pattern (glob match)
             if (!mongoConsentMatchPattern(consent.dataPattern, memoryKey)) continue;

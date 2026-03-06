@@ -52,10 +52,13 @@
 .pf .tx-amount.debit{color:var(--danger,#ef4444)}
 .pf .tx-type{font-size:.75rem;color:var(--muted,#c4a6d0)}
 .pf .tx-date{font-size:.75rem;color:var(--muted,#c4a6d0)}
-.pf .mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(255,107,157,.08);font-size:.85rem;cursor:pointer}
+.pf .mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(255,107,157,.08);font-size:.85rem;cursor:pointer;gap:.5rem}
 .pf .mem-item:hover{background:rgba(255,107,157,.05)}
-.pf .mem-key{font-family:monospace;color:var(--love3,#ff8a80);font-weight:500}
+.pf .mem-key{font-family:monospace;color:var(--love3,#ff8a80);font-weight:500;flex:1}
 .pf .mem-vis{font-size:.7rem}
+.pf .shield-icon{font-size:.85rem;cursor:pointer;opacity:.6;transition:opacity .2s}
+.pf .shield-icon:hover{opacity:1}
+.pf .key-rules-box{background:rgba(15,10,20,.8);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}
 .pf .mem-detail{background:rgba(15,10,20,.6);border:1px solid rgba(255,107,157,.1);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
 .pf .mem-detail pre{white-space:pre-wrap;word-break:break-all;font-family:monospace;color:var(--text,#f0e6f6);font-size:.8rem}
 .pf .mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem}

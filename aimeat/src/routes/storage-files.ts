@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { randomBytes } from 'node:crypto';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
@@ -315,19 +316,51 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // Registered BEFORE wildcard {*key} routes to take priority.
     // -----------------------------------------------
 
-    // GET /v1/pub/:gaii/{*key} — public file download (no auth)
+    // GET /v1/pub/:gaii/{*key} — public file download (optional auth for consent-based access)
     // Enables <img src="..."> and direct links for public files.
-    router.get('/v1/pub/:gaii/{*key}', async (req, res) => {
+    // Non-public files can be accessed if caller has consent grant.
+    router.get('/v1/pub/:gaii/{*key}', optionalAuth(), async (req, res) => {
         const gaii = req.params.gaii as string;
         const key = extractKey(req.params);
         const file = await storage.getStorageFile(gaii, key);
-        if (!file || file.visibility !== 'public') {
+        if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
         }
 
-        // Cache public files for 5 minutes
-        res.setHeader('Cache-Control', 'public, max-age=300');
+        // Public files are always accessible
+        if (file.visibility === 'public') {
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Length', file.size);
+            res.end(file.data);
+            return;
+        }
+
+        // Non-public files: attempt consent check if authenticated
+        if (!req.auth?.sub) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            return;
+        }
+
+        if (!config.consentEnabled) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            return;
+        }
+
+        const result = await checkConsentForRead(
+            storage, `storage:${key}`, gaii, req.auth.sub, file.visibility,
+        );
+
+        // Audit the access attempt
+        await auditDataAccess(storage, result.consentId ?? null,
+            gaii, req.auth.sub, `storage:${key}`, 'read', result.allowed);
+
+        if (!result.allowed) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            return;
+        }
+
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);

@@ -26,6 +26,22 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             return;
         }
 
+        // Validate recipient format
+        const validRecipientPatterns = [
+            /^\*$/,                           // Wildcard
+            /^organism\.\S+$/,                // Organism
+            /^ghii:\S+@\S+$/,                // GHII user
+            /^domain:\S+$/,                   // Domain glob
+            /^node:\S+$/,                     // Specific node
+            /^[^*][^:]*#[^@]+@.+$/,          // Specific GAII (agent#owner@node)
+            /^[^#@*:]+@[^@]+$/,              // Short GAII (owner@node)
+        ];
+        if (!validRecipientPatterns.some(p => p.test(recipient))) {
+            res.status(400).json(error(config.nodeId, 'INVALID_RECIPIENT',
+                'recipient must be "*", a GAII, or prefixed with "organism.", "ghii:", "domain:", or "node:"'));
+            return;
+        }
+
         // Quota check: max 100 consents per owner
         const existing = await storage.listConsents(ownerGaii);
         if (existing.length >= 100) {

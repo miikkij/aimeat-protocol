@@ -37,6 +37,26 @@ export function statsRouter(
     const owners = await storage.listOwners();
     const agents = await storage.listAgents();
 
+    // Consent permission breakdown (for admin dashboard)
+    const permStats = { active_rules: 0, by_gaii: 0, by_ghii: 0, by_organism: 0, by_domain: 0, by_node: 0, by_wildcard: 0, unique_patterns: new Set<string>() };
+    for (const o of owners) {
+      const gaii = (o as { gaii?: string }).gaii || `${(o as { name?: string }).name || ''}@${config.nodeId}`;
+      try {
+        const consents = await storage.listConsents(gaii, { status: 'active' });
+        for (const c of consents) {
+          permStats.active_rules++;
+          const r = c.recipient || '';
+          if (r === '*') permStats.by_wildcard++;
+          else if (r.startsWith('ghii:')) permStats.by_ghii++;
+          else if (r.startsWith('organism.')) permStats.by_organism++;
+          else if (r.startsWith('domain:')) permStats.by_domain++;
+          else if (r.startsWith('node:')) permStats.by_node++;
+          else permStats.by_gaii++;
+          permStats.unique_patterns.add(c.dataPattern);
+        }
+      } catch { /* skip owners without consents */ }
+    }
+
     res.json(success(config.nodeId, {
       ...snap,
       active_owners: owners.length,
@@ -45,6 +65,16 @@ export function statsRouter(
       push_notifications: {
         enabled: config.pushEnabled && !!config.vapidPublicKey,
         personal_node_support: config.personalNodesEnabled,
+      },
+      consent_permissions: {
+        active_rules: permStats.active_rules,
+        by_gaii: permStats.by_gaii,
+        by_ghii: permStats.by_ghii,
+        by_organism: permStats.by_organism,
+        by_domain: permStats.by_domain,
+        by_node: permStats.by_node,
+        by_wildcard: permStats.by_wildcard,
+        unique_patterns: permStats.unique_patterns.size,
       },
     }));
   });

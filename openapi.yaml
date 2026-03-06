@@ -1048,6 +1048,21 @@ components:
         recipient:
           type: string
           maxLength: 256
+          description: |
+            Who receives access. Supported patterns:
+            - `*` — any accessor (wildcard)
+            - `agent#owner@node` — specific agent GAII
+            - `organism.{id}` — all members of an organism
+            - `ghii:username@node` — all agents of a GHII user
+            - `domain:*.example.com` — all agents on matching node domains
+            - `node:node-id` — all agents on a specific node
+          examples:
+            - "*"
+            - "doctor#clinic@health-node"
+            - "organism.hobby-club"
+            - "ghii:alice@aimeat-finland-001"
+            - "domain:*.health-network.fi"
+            - "node:aimeat-clinic-001"
         purpose:
           type: string
           maxLength: 512
@@ -5880,6 +5895,173 @@ paths:
                               format: date-time
                             details:
                               type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # --- Phase 0.3: Permission Listing API ---
+
+  /v1/permissions/summary:
+    get:
+      operationId: permissionsSummary
+      summary: Overview of permission rules
+      description: |
+        Returns aggregate stats about the authenticated agent's permission rules,
+        including total memory keys, storage files, active consents, and breakdown
+        by recipient type.
+      tags: [Permissions]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Permission summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total_memory_keys:
+                        type: integer
+                      total_storage_files:
+                        type: integer
+                      active_consents:
+                        type: integer
+                      rules_by_recipient_type:
+                        type: object
+                        properties:
+                          wildcard:
+                            type: integer
+                          gaii:
+                            type: integer
+                          ghii:
+                            type: integer
+                          organism:
+                            type: integer
+                          domain:
+                            type: integer
+                          node:
+                            type: integer
+                      data_patterns:
+                        type: array
+                        items:
+                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/permissions/check:
+    get:
+      operationId: permissionsCheck
+      summary: Simulate an access check
+      description: |
+        Simulate whether a specific accessor would be allowed to read a specific
+        memory key owned by the authenticated agent.
+      tags: [Permissions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Memory key to check
+        - name: accessor
+          in: query
+          required: true
+          schema:
+            type: string
+          description: GAII of the accessor to simulate
+      responses:
+        '200':
+          description: Access check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      accessor:
+                        type: string
+                      visibility:
+                        type: string
+                      allowed:
+                        type: boolean
+                      reason:
+                        type: string
+                      consent_id:
+                        type: string
+                        nullable: true
+        '400':
+          description: Missing key or accessor parameter
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/permissions/memory/{key}:
+    get:
+      operationId: permissionsMemoryKey
+      summary: List rules affecting a specific memory key
+      description: |
+        Lists all active consent records whose data_pattern glob matches the
+        given memory key.
+      tags: [Permissions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Memory key to inspect
+      responses:
+        '200':
+          description: Matching permission rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      visibility:
+                        type: string
+                      effective_rules:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            consent_id:
+                              type: string
+                            recipient:
+                              type: string
+                            data_pattern:
+                              type: string
+                            purpose:
+                              type: string
+                            scope:
+                              type: string
+                            expires:
+                              type: string
+                              nullable: true
+                            status:
+                              type: string
+                            granted_at:
+                              type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
 
