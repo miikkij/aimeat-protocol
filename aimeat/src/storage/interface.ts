@@ -195,6 +195,7 @@ export interface AppRecord {
 }
 
 export interface AppListOptions {
+  ownerGaii?: string;
   category?: string;
   q?: string;
   tag?: string;
@@ -202,6 +203,28 @@ export interface AppListOptions {
   limit?: number;
   offset?: number;
   freeOnly?: boolean;
+}
+
+// Phase E — App Marketplace purchase receipts (immutable, self-contained)
+export interface AppPurchaseRecord {
+  transactionId: string;          // "mktx_..."
+  buyerGaii: string;
+  buyerOwner: string;
+  sellerGaii: string;
+  sellerOwner: string;
+  appFilename: string;
+  appName: string;                // from manifest at purchase time
+  appVersionNumber: number;
+  licenseType: 'single' | 'lifetime';
+  priceMorsels: number;
+  transactionFeeMorsels: number;
+  purchasedAt: string;            // ISO timestamp
+  appContent: string;             // base64-encoded full app content
+  appManifest: AppManifest;       // manifest snapshot at purchase time
+  appScreenshot?: string;         // base64-encoded screenshot if any
+  signature: string;              // Ed25519 signature over transaction fields
+  nodeId: string;                 // originating node
+  nodePublicKey: string;          // node public key for verification
 }
 
 export interface PeeringRequestRecord {
@@ -821,6 +844,7 @@ import type { FederationRepository } from './repositories/federation.repository.
 import type { NodeRepository } from './repositories/node.repository.js';
 import type { NotificationRepository } from './repositories/notification.repository.js';
 import type { AppRepository } from './repositories/app.repository.js';
+import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -830,4 +854,4 @@ export interface Storage extends
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
-  AppRepository { }
+  AppRepository, AppMarketplaceRepository { }

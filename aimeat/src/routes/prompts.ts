@@ -567,5 +567,205 @@ Full docs: GET ${baseUrl}/v1/docs`;
     ]));
   });
 
+  // ── Prompt Packages (dynamic API) ──────────────────────────
+
+  const PROMPT_PACKAGES: Record<string, { name: string; description: string; category: string; cortexHints: string[]; template: (nodeUrl: string, ownerName: string, cortexExtensions: string[]) => string }> = {
+    'app-builder-general': {
+      name: 'Custom App Builder',
+      description: 'User interview → bespoke single-file HTML app',
+      category: 'builder',
+      cortexHints: [],
+      template: (nodeUrl, ownerName, cortexExts) => `You are building a custom single-file HTML app for user "${ownerName}" on AIMEAT node ${nodeUrl}.
+
+Ask the user what their app should do. Then build a complete, self-contained HTML file.
+
+## AIMEAT Platform
+- Load client libraries from ${nodeUrl}/v1/libs/ (aimeat-auth.js, aimeat-data.js, aimeat-storage.js, aimeat-social.js, aimeat-wallet.js, aimeat-work.js)
+- Auth: AIMEAT.auth.mountLoginButton("#login", { onLogin: fn, onLogout: fn })
+- Data: AIMEAT.data.set(key, value), AIMEAT.data.get(key), AIMEAT.data.search(q)
+- Dark theme: --bg:#0f0a14; --text:#f0e6f6; --accent:#ff6b9d
+${cortexExts.length ? '\n## Available Cortex Extensions\n' + cortexExts.join('\n') : ''}
+
+## Rules
+- Return COMPLETE HTML file, not fragments
+- Mobile-first responsive design
+- Include error handling and loading states
+- Include a self-publish button using POST ${nodeUrl}/v1/apps`,
+    },
+    'app-builder-game': {
+      name: 'Multiplayer Game Builder',
+      description: 'Game with lobby, turns, scoreboard using AIMEAT boards',
+      category: 'builder',
+      cortexHints: [],
+      template: (nodeUrl, ownerName, cortexExts) => `Build a multiplayer HTML game for "${ownerName}" on AIMEAT node ${nodeUrl}.
+
+## Game Architecture
+- Use AIMEAT boards for real-time game state (POST/GET /v1/boards/{id}/posts)
+- Use AIMEAT memory for persistent scores and player profiles
+- Use AIMEAT auth for player identity
+
+## Required Features
+- Game lobby (create/join using a board as the lobby channel)
+- Turn-based or real-time gameplay via board posts
+- Scoreboard stored in AIMEAT memory (key: games.{gamename}.scores)
+- Player profiles with wins/losses
+
+## Libraries
+Load from ${nodeUrl}/v1/libs/:
+- aimeat-auth.js — Login/identity
+- aimeat-data.js — Score persistence
+- aimeat-social.js — Game state via boards
+${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
+
+## Design
+Dark theme (--bg:#0f0a14; --accent:#ff6b9d), mobile-first, smooth animations.
+Return a COMPLETE single HTML file.`,
+    },
+    'app-builder-notes': {
+      name: 'Note-Taking App Builder',
+      description: 'Notes app with folders, tags, search using AIMEAT memory',
+      category: 'builder',
+      cortexHints: [],
+      template: (nodeUrl, ownerName, cortexExts) => `Build a note-taking app for "${ownerName}" on AIMEAT node ${nodeUrl}.
+
+## Features
+- Create, edit, delete notes
+- Organize with folders/categories and tags
+- Full-text search via AIMEAT memory search
+- Set visibility (private/public) per note
+- Markdown support in note body
+
+## Data Storage
+- Notes stored as AIMEAT memory keys: notes.{id}
+- Value: { title, body, folder, tags, createdAt, updatedAt }
+- Use AIMEAT.data.search("notes.") to list all notes
+- Use AIMEAT.data.set() / .get() / .delete()
+
+## Libraries
+Load from ${nodeUrl}/v1/libs/:
+- aimeat-auth.js — Login
+- aimeat-data.js — Note CRUD
+${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
+
+## Design
+Dark theme, mobile-first, sidebar + editor layout. Return COMPLETE HTML file.`,
+    },
+    'app-builder-dashboard': {
+      name: 'Data Dashboard Builder',
+      description: 'Charts, tables, and live data from AIMEAT memory',
+      category: 'builder',
+      cortexHints: ['aimeat-charts'],
+      template: (nodeUrl, ownerName, cortexExts) => `Build a data dashboard for "${ownerName}" on AIMEAT node ${nodeUrl}.
+
+## Features
+- Read structured data from AIMEAT memory keys
+- Display as charts (bar, line, pie) and data tables
+- Auto-refresh interval for live data
+- Configurable data sources (user picks which memory keys to visualize)
+- Summary cards with key metrics
+
+## Libraries
+Load from ${nodeUrl}/v1/libs/:
+- aimeat-auth.js — Login
+- aimeat-data.js — Read data
+${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
+
+## Chart Implementation
+Use Canvas API or inline SVG for charts (no external dependencies).
+Dashboard should be fully self-contained in one HTML file.
+
+## Design
+Dark theme, grid layout, responsive cards. Return COMPLETE HTML file.`,
+    },
+    'app-builder-chat': {
+      name: 'Chat Room Builder',
+      description: 'Real-time messaging using AIMEAT boards',
+      category: 'builder',
+      cortexHints: [],
+      template: (nodeUrl, ownerName, cortexExts) => `Build a chat room app for "${ownerName}" on AIMEAT node ${nodeUrl}.
+
+## Features
+- Channel sidebar (list boards as channels)
+- Message display with author, timestamp, reactions
+- Send message (POST to board)
+- Reply threading
+- Emoji reactions
+- Auto-poll for new messages (every 3 seconds)
+- Create new channels (create board)
+
+## Architecture
+- Each channel = one AIMEAT board
+- Messages = board posts
+- Replies = posts with replyTo field
+- Reactions = post reaction API
+
+## Libraries
+Load from ${nodeUrl}/v1/libs/:
+- aimeat-auth.js — Login/identity
+- aimeat-social.js — Boards, posts, reactions
+${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
+
+## Design
+Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
+    },
+  };
+
+  // GET /v1/portal/prompts — List available prompt packages
+  router.get('/v1/portal/prompts', async (req, res) => {
+    const packages = Object.entries(PROMPT_PACKAGES).map(([id, pkg]) => ({
+      id,
+      name: pkg.name,
+      description: pkg.description,
+      category: pkg.category,
+      cortex_hints: pkg.cortexHints,
+    }));
+
+    res.json(success(config.nodeId, {
+      packages,
+      total: packages.length,
+    }, [
+      { description: 'Get a specific prompt package', method: 'GET', url: '/v1/portal/prompts/{promptId}' },
+    ]));
+  });
+
+  // GET /v1/portal/prompts/:promptId — Get prompt with node values auto-filled
+  router.get('/v1/portal/prompts/:promptId', async (req, res) => {
+    const promptId = req.params.promptId as string;
+    const pkg = PROMPT_PACKAGES[promptId];
+
+    if (!pkg) {
+      const validIds = Object.keys(PROMPT_PACKAGES).join(', ');
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Prompt package "${promptId}" not found. Available: ${validIds}`));
+      return;
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const ownerName = req.auth?.owner ?? req.query.owner as string ?? 'user';
+
+    // Auto-detect active cortex extensions
+    let cortexExtDescriptions: string[] = [];
+    try {
+      const extensions = await storage.listCortexExtensions({ status: 'active' });
+      if (extensions && extensions.length > 0) {
+        cortexExtDescriptions = extensions.map((ext) =>
+          `- ${ext.name}: ${ext.description}`
+        );
+      }
+    } catch { /* cortex not available */ }
+
+    const prompt = pkg.template(baseUrl, ownerName, cortexExtDescriptions);
+
+    res.json(success(config.nodeId, {
+      id: promptId,
+      name: pkg.name,
+      description: pkg.description,
+      category: pkg.category,
+      prompt,
+      node_url: baseUrl,
+      owner: ownerName,
+      cortex_extensions_available: cortexExtDescriptions.length,
+    }));
+  });
+
   return router;
 }

@@ -237,6 +237,18 @@
       transform: translateY(-1px);
     }
 
+    .app-card.dragging {
+      opacity: .35;
+      transform: scale(.95);
+      box-shadow: none;
+    }
+
+    .app-card.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent);
+      transform: translateY(-2px);
+    }
+
     .app-card .app-icon {
       width: 56px;
       height: 56px;
@@ -1353,6 +1365,7 @@
     <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
     <button data-action="view-source">&#x1F441; View / Edit Source</button>
     <button data-action="improve-ai">&#x2728; Improve with AI</button>
+    <button data-action="share-prompt">&#x1F4E4; Share as Prompt</button>
     <hr>
     <button data-action="publish">&#x1F680; Publish to server</button>
     <hr>
@@ -1492,7 +1505,7 @@
   // ── IndexedDB wrapper ──────────────────────────────
 
   const DB_NAME = 'AppLauncherDB';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_NAME = 'apps';
 
   let dbInstance = null;
@@ -1504,11 +1517,18 @@
 
       request.onupgradeneeded = function (event) {
         const db = event.target.result;
+        var store;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
-          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
           store.createIndex('tags', 'tags', { multiEntry: true });
           store.createIndex('source', 'source', { unique: false });
           store.createIndex('favorite', 'favorite', { unique: false });
+          store.createIndex('sortOrder', 'sortOrder', { unique: false });
+        } else {
+          store = event.target.transaction.objectStore(STORE_NAME);
+          if (!store.indexNames.contains('sortOrder')) {
+            store.createIndex('sortOrder', 'sortOrder', { unique: false });
+          }
         }
       };
 
@@ -2224,11 +2244,15 @@
     getAllApps().then(function (apps) {
       allApps = apps;
 
-      // Sort: favorites first, then by lastOpenedAt or addedAt (newest first)
+      // Sort: favorites first, then by sortOrder (if set), then by date
       allApps.sort(function (a, b) {
         // Favorites first
         if (a.favorite && !b.favorite) return -1;
         if (!a.favorite && b.favorite) return 1;
+        // Then by explicit sortOrder if present
+        var oA = typeof a.sortOrder === 'number' ? a.sortOrder : Infinity;
+        var oB = typeof b.sortOrder === 'number' ? b.sortOrder : Infinity;
+        if (oA !== oB) return oA - oB;
         // Then by most recently used/added
         var dateA = a.lastOpenedAt || a.addedAt || '';
         var dateB = b.lastOpenedAt || b.addedAt || '';
@@ -2288,7 +2312,7 @@
           var app = filtered[i];
           var iconDisplay = app.icon || '\u{1F4DD}';
           html +=
-            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" style="animation-delay:' + (i * 0.04) + 's">' +
+            '<div class="app-card" draggable="true" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)" style="animation-delay:' + (i * 0.04) + 's">' +
               '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
@@ -2473,6 +2497,10 @@
       case 'improve-ai':
         openPromptBuilder(app);
         break;
+
+      case 'share-prompt':
+        generateSharePrompt(app);
+        break;
     }
   }
 
@@ -2503,6 +2531,42 @@
     overlay.dataset.appName = app.name || 'App';
     overlay.dataset.appId = app.id || '';
     overlay.dataset.originalSource = textarea.value;
+  }
+
+  // ── Share as Prompt ────────────────────────────
+
+  function generateSharePrompt(app) {
+    if (!app || !app.blob) {
+      alert('Only local HTML apps can be shared as prompts.');
+      return;
+    }
+
+    var source = decodeURIComponent(escape(atob(app.blob)));
+    var prompt = 'Recreate this HTML app exactly as provided.\n\n';
+    prompt += 'App name: ' + (app.name || 'Untitled') + '\n';
+    if (app.tags && app.tags.length) {
+      prompt += 'Tags: ' + app.tags.join(', ') + '\n';
+    }
+    prompt += '\nReturn the COMPLETE HTML file below without modifications.\n';
+    prompt += 'If the user asks for changes, apply them to this source.\n\n';
+    prompt += '--- Source Code ---\n' + source;
+
+    navigator.clipboard.writeText(prompt).then(function() {
+      alert('Share prompt copied! Paste it into any AI chat to recreate this app.');
+    }).catch(function() {
+      // Fallback: show in source overlay
+      var overlay = document.getElementById('source-overlay');
+      var textarea = document.getElementById('source-code');
+      var title = document.getElementById('source-title');
+      var saveBtn = document.getElementById('save-source-btn');
+      title.textContent = 'Share Prompt: ' + (app.name || 'App');
+      textarea.value = prompt;
+      textarea.readOnly = true;
+      saveBtn.style.display = 'none';
+      overlay.hidden = false;
+      overlay.dataset.appId = '';
+      overlay.dataset.originalSource = '';
+    });
   }
 
   // ── Generate Homepage Prompt ──────────────────────
@@ -2577,6 +2641,84 @@
     saveConfig(config);
     applyTheme(config.theme);
     document.getElementById('settings-overlay').hidden = true;
+    // Sync config to server (best-effort)
+    syncConfigToServer(config);
+  }
+
+  function syncConfigToServer(config) {
+    var url = config.aimeatUrl;
+    if (!url) return;
+    url = url.replace(/\/+$/, '');
+    // Only sync safe fields, not the URL itself
+    var syncPayload = {
+      theme: config.theme,
+      defaultOpenMode: config.defaultOpenMode,
+      language: config.language || 'en'
+    };
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (auth) {
+        var token = auth.data && auth.data.token;
+        if (!token) return;
+        return fetch(url + '/v1/memory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            key: 'app-launcher/config',
+            value: syncPayload,
+            visibility: 'private'
+          })
+        });
+      })
+      .catch(function () { /* best-effort */ });
+  }
+
+  function loadConfigFromServer() {
+    var config = loadConfig();
+    var url = config.aimeatUrl;
+    if (!url) return;
+    url = url.replace(/\/+$/, '');
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (auth) {
+        var token = auth.data && auth.data.token;
+        if (!token) return;
+        var gaii = auth.data.gaii || auth.data.sub || '';
+        if (!gaii) return;
+        return fetch(url + '/v1/memory/app-launcher%2Fconfig', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function (r) {
+          if (!r.ok) return null;
+          return r.json();
+        });
+      })
+      .then(function (json) {
+        if (!json || !json.data || !json.data.value) return;
+        var remote = json.data.value;
+        var local = loadConfig();
+        var changed = false;
+        // Merge remote into local (remote wins for preferences, but don't overwrite aimeatUrl)
+        if (remote.theme && remote.theme !== local.theme) {
+          local.theme = remote.theme;
+          changed = true;
+        }
+        if (remote.defaultOpenMode && remote.defaultOpenMode !== local.defaultOpenMode) {
+          local.defaultOpenMode = remote.defaultOpenMode;
+          changed = true;
+        }
+        if (remote.language && remote.language !== local.language) {
+          local.language = remote.language;
+          changed = true;
+        }
+        if (changed) {
+          saveConfig(local);
+          applyTheme(local.theme);
+        }
+      })
+      .catch(function () { /* best-effort */ });
   }
 
   function closeSettings() {
@@ -3442,6 +3584,77 @@
     }
   }
 
+  // ── Drag & Drop Reordering ─────────────────────
+
+  var dragSourceId = null;
+
+  function onCardDragStart(e) {
+    var card = e.target.closest('.app-card');
+    if (!card) return;
+    dragSourceId = card.dataset.id;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSourceId);
+  }
+
+  function onCardDragEnd(e) {
+    var card = e.target.closest('.app-card');
+    if (card) card.classList.remove('dragging');
+    // Remove all drag-over highlights
+    var cards = document.querySelectorAll('.app-card.drag-over');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+    dragSourceId = null;
+  }
+
+  function onCardDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var card = e.target.closest('.app-card');
+    if (!card || card.dataset.id === dragSourceId) return;
+    // Remove highlight from others
+    var cards = document.querySelectorAll('.app-card.drag-over');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+    card.classList.add('drag-over');
+  }
+
+  function onCardDrop(e) {
+    e.preventDefault();
+    var targetCard = e.target.closest('.app-card');
+    if (!targetCard) return;
+    var targetId = targetCard.dataset.id;
+    if (!dragSourceId || dragSourceId === targetId) return;
+
+    // Find indexes in the currently rendered/sorted allApps
+    var srcIdx = -1, tgtIdx = -1;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === dragSourceId) srcIdx = i;
+      if (allApps[i].id === targetId) tgtIdx = i;
+    }
+    if (srcIdx === -1 || tgtIdx === -1) return;
+
+    // Move the source app to the target position
+    var moved = allApps.splice(srcIdx, 1)[0];
+    allApps.splice(tgtIdx, 0, moved);
+
+    // Assign sortOrder values based on new positions
+    var saves = [];
+    for (var j = 0; j < allApps.length; j++) {
+      allApps[j].sortOrder = j;
+      saves.push(saveApp(allApps[j]));
+    }
+
+    // Re-render immediately (no animation delay for reorder)
+    var grid = document.getElementById('app-grid');
+    var cards = grid.querySelectorAll('.app-card');
+    for (var k = 0; k < cards.length; k++) {
+      cards[k].classList.remove('drag-over', 'dragging');
+    }
+
+    Promise.all(saves).then(function () {
+      renderApps();
+    });
+  }
+
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
@@ -3491,7 +3704,13 @@
     showCortexPopup: showCortexPopup,
     cortexCopy: cortexCopy,
     openPromptBuilder: openPromptBuilder,
-    closePbPanel: closePbPanel
+    closePbPanel: closePbPanel,
+    onCardDragStart: onCardDragStart,
+    onCardDragEnd: onCardDragEnd,
+    onCardDragOver: onCardDragOver,
+    onCardDrop: onCardDrop,
+    syncConfigToServer: syncConfigToServer,
+    loadConfigFromServer: loadConfigFromServer
   };
 
   // Expose cortex functions globally for inline onclick handlers
@@ -3507,6 +3726,7 @@
     renderApps();
     loadPublishedApps();
     loadCortexExtensions();
+    loadConfigFromServer();
 
     // ── Search input ─────────────────────────────────
     document.getElementById('search-input').addEventListener('input', function (e) {
@@ -3643,6 +3863,40 @@
         e.stopPropagation();
         handleContextAction(btn.getAttribute('data-action'));
       });
+    });
+
+    // ── PostMessage auth protocol for sandboxed iframes ──
+    window.addEventListener('message', function(e) {
+      var iframe = document.getElementById('app-iframe');
+      if (!iframe || !iframe.contentWindow) return;
+      // Only respond to messages from our iframe
+      if (e.source !== iframe.contentWindow) return;
+      if (!e.data || e.data.type !== 'aimeat-request-auth') return;
+
+      // Get JWT from aimeat-auth library if available, else from localStorage
+      var jwt = null;
+      var nodeUrl = '';
+      try {
+        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+          var session = window.AIMEAT.auth.getSession();
+          jwt = session.jwt;
+          nodeUrl = session.nodeUrl || '';
+        } else {
+          var stored = localStorage.getItem('aimeat_session');
+          if (stored) {
+            var parsed = JSON.parse(stored);
+            jwt = parsed.jwt || null;
+          }
+          var config = loadConfig();
+          nodeUrl = config.aimeatUrl || '';
+        }
+      } catch(err) { /* ignore parse errors */ }
+
+      iframe.contentWindow.postMessage({
+        type: 'aimeat-auth',
+        jwt: jwt,
+        nodeUrl: nodeUrl
+      }, '*');
     });
 
     // ── Click anywhere to close context menu ────────

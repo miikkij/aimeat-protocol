@@ -19,3 +19,4 @@ export type { MarketplaceRepository } from './marketplace.repository.js';
 export type { FederationRepository } from './federation.repository.js';
 export type { NodeRepository } from './node.repository.js';
 export type { AppRepository } from './app.repository.js';
+export type { AppMarketplaceRepository } from './app-marketplace.repository.js';

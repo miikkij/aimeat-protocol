@@ -42,7 +42,7 @@ import type {
     EscrowHoldRecord,
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
-    AppRecord, AppListOptions,
+    AppRecord, AppListOptions, AppPurchaseRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -2547,6 +2547,7 @@ export class MongoStorage implements Storage {
             if (!existing || r.versionNumber > existing.versionNumber) latestMap.set(key, r);
         }
         let apps = Array.from(latestMap.values());
+        if (opts?.ownerGaii) apps = apps.filter(a => a.ownerGaii === opts.ownerGaii);
         if (opts?.category) apps = apps.filter(a => a.manifest.category === opts.category);
         if (opts?.tag) apps = apps.filter(a => a.manifest.tags.includes(opts.tag!));
         if (opts?.q) {
@@ -2605,6 +2606,45 @@ export class MongoStorage implements Storage {
     async incrementAppDownloads(ownerGaii: string, filename: string): Promise<void> {
         const key = `${ownerGaii}:${filename}`;
         this.appDownloads.set(key, (this.appDownloads.get(key) ?? 0) + 1);
+    }
+
+    // ── App Marketplace (in-memory purchase receipts) ──
+
+    private appPurchases = new Map<string, AppPurchaseRecord>();
+
+    async createAppPurchase(record: AppPurchaseRecord): Promise<AppPurchaseRecord> {
+        this.appPurchases.set(record.transactionId, record);
+        return record;
+    }
+
+    async getAppPurchase(transactionId: string): Promise<AppPurchaseRecord | null> {
+        return this.appPurchases.get(transactionId) ?? null;
+    }
+
+    async listAppPurchasesByBuyer(buyerGaii: string): Promise<AppPurchaseRecord[]> {
+        const results: AppPurchaseRecord[] = [];
+        for (const r of this.appPurchases.values()) {
+            if (r.buyerGaii === buyerGaii) results.push(r);
+        }
+        return results.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
+    }
+
+    async listAppPurchasesBySeller(sellerGaii: string): Promise<AppPurchaseRecord[]> {
+        const results: AppPurchaseRecord[] = [];
+        for (const r of this.appPurchases.values()) {
+            if (r.sellerGaii === sellerGaii) results.push(r);
+        }
+        return results.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
+    }
+
+    async hasValidLicense(buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime'): Promise<boolean> {
+        for (const r of this.appPurchases.values()) {
+            if (r.buyerGaii === buyerGaii && r.sellerGaii === sellerGaii && r.appFilename === filename) {
+                if (r.licenseType === 'lifetime') return true;
+                if (!licenseType || licenseType === 'single') return true;
+            }
+        }
+        return false;
     }
 }
 

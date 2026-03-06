@@ -572,21 +572,21 @@ Forward search queries to peered nodes and aggregate results.
 | C3 | Catalogue search/filter API (4.2) | ✅ Done — category, q, tag, sort, limit, offset, free_only |
 | C4 | Version pinning on import (2.2) | ✅ Done — aimeatOwner, aimeatFilename, aimeatVersion stored in IndexedDB |
 
-### Phase D — UX Polish
+### Phase D — UX Polish ✅ COMPLETED
 
-| Task | Items |
-|------|-------|
-| D1 | Drag & drop reordering (3.2) |
-| D2 | AIMEAT Memory sync (3.4) |
+| Task | Items | Status |
+|------|-------|--------|
+| D1 | Drag & drop reordering (3.2) | ✅ Done — draggable cards, sortOrder persisted in IndexedDB |
+| D2 | AIMEAT Memory sync (3.4) | ✅ Done — config syncs to/from server on save/load |
 
 ### Phase E — Marketplace
 
 | Task | Items |
 |------|-------|
-| E1 | Marketplace config flag `AIMEAT_APP_MARKETPLACE_PAYMENTS` (5.1) |
-| E2 | License types — single + lifetime (5.2) |
-| E3 | Marketplace transaction storage — dedicated table (5.3) |
-| E4 | Purchase flow + wallet integration (5.4) |
+| E1 | Marketplace config flag `AIMEAT_APP_MARKETPLACE_PAYMENTS` (5.1) — ✅ Already exists (`marketplaceEnabled` in config.ts) |
+| E2 | License types — single + lifetime (5.2) — ✅ Already in `AppManifest` (`licenseType?: 'single' \| 'lifetime'`) |
+| E3 | Marketplace transaction storage — dedicated table (5.3) — ✅ Done: `AppPurchaseRecord` type, `AppMarketplaceRepository`, `app_purchases` SQLite table, SQLite + MongoDB implementations |
+| E4 | Purchase flow + wallet integration (5.4) — ✅ Done: `POST /v1/marketplace/purchase`, `GET /v1/marketplace/purchases`, `GET /v1/marketplace/purchases/:txId`, `GET /v1/marketplace/sales`, `GET /v1/marketplace/license-check`, paid app download gate in apps.ts |
 
 ### Phase F — Documentation & Prompts
 

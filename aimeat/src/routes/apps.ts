@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
 
@@ -117,7 +117,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/apps/:owner/:filename — Download app (supports ?version=N)
-    router.get('/v1/apps/:owner/:filename', async (req, res) => {
+    router.get('/v1/apps/:owner/:filename', optionalAuth(), async (req, res) => {
         const owner = req.params.owner as string;
         const filename = req.params.filename as string;
         const code = (req.query.code as string) || req.headers['x-access-code'] as string | undefined;
@@ -136,6 +136,24 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
+        // Paid app check: if marketplace enabled and app has a price, require valid license
+        if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) {
+            if (!req.auth) {
+                res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED',
+                    'This is a paid app. Authenticate and purchase it first via POST /v1/marketplace/purchase'));
+                return;
+            }
+            // Seller can always download their own app
+            if (req.auth.sub !== app.ownerGaii) {
+                const hasLicense = await storage.hasValidLicense(req.auth.sub, app.ownerGaii, filename);
+                if (!hasLicense) {
+                    res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED',
+                        `This app costs ${app.manifest.priceMorsels} morsels. Purchase it first via POST /v1/marketplace/purchase`));
+                    return;
+                }
+            }
+        }
+
         res.setHeader('Content-Type', app.mimeType);
         res.setHeader('Content-Length', app.size.toString());
 
@@ -147,7 +165,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         }
         res.setHeader('X-Content-Type-Options', 'nosniff');
 
-        storage.incrementAppDownloads(app.ownerGaii, filename).catch(() => {});
+        storage.incrementAppDownloads(app.ownerGaii, filename).catch(() => { });
 
         res.send(app.data);
     });
@@ -185,6 +203,16 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
+        // Per-agent app count quota (only check for new apps, not updates)
+        const existingVersion = await storage.getLatestVersionNumber(gaii, filename);
+        if (existingVersion === 0 && config.maxAppsPerAgent > 0) {
+            const { total } = await storage.listApps({ ownerGaii: gaii, limit: 1 });
+            if (total >= config.maxAppsPerAgent) {
+                res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `You have reached the maximum of ${config.maxAppsPerAgent} published apps`));
+                return;
+            }
+        }
+
         const mimeType = typeof mime_type === 'string' ? mime_type : 'text/html';
 
         const accessCode = typeof access_code === 'string' && access_code.length > 0 ? access_code : undefined;
@@ -194,9 +222,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         // Auto-increment version number
-        const latestVersion = await storage.getLatestVersionNumber(gaii, filename);
-        const newVersion = latestVersion + 1;
-        const isUpdate = latestVersion > 0;
+        const newVersion = existingVersion + 1;
+        const isUpdate = existingVersion > 0;
 
         const now = new Date().toISOString();
         const manifest: AppManifest = {
@@ -258,6 +285,23 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
             changedAt: now,
         });
 
+        // Board announcement (best-effort, don't fail the publish if posting fails)
+        if (config.appAnnouncementBoardId) {
+            try {
+                const tags = Array.isArray(manifest.tags) ? manifest.tags : [];
+                await storage.createPost({
+                    id: `post-${Date.now()}-${randomBytes(4).toString('hex')}`,
+                    boardId: config.appAnnouncementBoardId,
+                    authorGaii: gaii,
+                    title: `${isUpdate ? '🔄' : '🚀'} ${manifest.name || filename} v${newVersion}`,
+                    body: `${manifest.description || 'A new app has been published.'}\n\nDownload: ${downloadUrl}`,
+                    tags,
+                    reactions: {},
+                    createdAt: now,
+                });
+            } catch { /* non-critical */ }
+        }
+
         res.status(201).json(success(config.nodeId, {
             filename,
             version_number: newVersion,
@@ -270,7 +314,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
             versions_url: `${downloadUrl}/versions`,
             screenshot_url: hasScreenshot ? `${downloadUrl}/screenshot` : null,
             note: isUpdate
-                ? `App updated to version ${newVersion}. Previous version${latestVersion > 1 ? 's are' : ' is'} preserved.`
+                ? `App updated to version ${newVersion}. Previous version${existingVersion > 1 ? 's are' : ' is'} preserved.`
                 : 'App published. Others can download this file and open it locally.',
         }, [
             { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
