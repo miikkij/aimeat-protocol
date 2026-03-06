@@ -655,14 +655,18 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Toast ── */
 .toast {
-  position: fixed; top: 1rem; right: 1rem; z-index: 9999;
+  position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+  z-index: 9999; max-width: min(90vw, 420px); width: fit-content;
   padding: 0.75rem 1.25rem; border-radius: var(--radius-xs);
   font-size: 0.85rem; font-weight: 600;
-  animation: fadeInUp 0.3s ease;
-  pointer-events: auto;
+  background: rgba(34, 197, 94, 0.95); color: #fff;
+  animation: toastIn 0.3s ease, toastOut 0.4s ease 2.4s forwards;
+  pointer-events: auto; box-sizing: border-box;
 }
-.toast-success { background: rgba(34, 197, 94, 0.9); color: #fff; }
-.toast-error { background: rgba(239, 68, 68, 0.9); color: #fff; }
+.toast.error, .toast-error { background: rgba(239, 68, 68, 0.95); color: #fff; }
+.toast-success { background: rgba(34, 197, 94, 0.95); color: #fff; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
 
 /* ── Modal ── */
 .modal-overlay {

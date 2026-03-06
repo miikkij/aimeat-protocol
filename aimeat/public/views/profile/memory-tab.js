@@ -1,0 +1,262 @@
+import { h } from 'preact';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import htm from 'htm';
+const html = htm.bind(h);
+import { t } from '/js/i18n.js';
+import { escHtml } from '/js/utils.js';
+import { Spinner, recipientBadge } from './shared.js';
+import * as memoryService from '/js/services/memory.js';
+import { getKeyPermissions } from '/js/services/consent.js';
+import { getNodeUrl } from '/js/services/auth.js';
+
+export default function MemoryTab({ session, showToast, onStats }) {
+  const NODE_URL = getNodeUrl();
+  const [memories, setMemories] = useState(null);
+  const [files, setFiles] = useState(null);
+  const [memSubTab, setMemSubTab] = useState('entries');
+  const [showMemForm, setShowMemForm] = useState(false);
+  const [showFileForm, setShowFileForm] = useState(false);
+  const [expandedMem, setExpandedMem] = useState(null);
+  const [editModal, setEditModal] = useState(null);
+  const [keyRulesPopover, setKeyRulesPopover] = useState(null);
+
+  useEffect(() => {
+    if (session) { loadMemories(); loadFiles(); }
+  }, [session]);
+
+  async function loadMemories() {
+    try {
+      const list = await memoryService.listMemories();
+      setMemories(Array.isArray(list) ? list : []);
+      onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
+    } catch { setMemories([]); }
+  }
+
+  async function loadFiles() {
+    try {
+      const list = await memoryService.listFiles();
+      setFiles(Array.isArray(list) ? list : []);
+      onStats?.({ files: Array.isArray(list) ? list.length : 0 });
+    } catch { setFiles([]); }
+  }
+
+  async function handleCreateMemory(key, value, visibility, tags) {
+    const resp = await memoryService.createMemory(key, value, visibility, tags);
+    if (resp.ok !== false) { showToast(t('profile.memory.saved')); setShowMemForm(false); loadMemories(); }
+    else showToast(t('profile.memory.saveFailed'), true);
+  }
+
+  async function handleDeleteMemory(key) {
+    if (!confirm(t('profile.memory.deleteConfirm') + ': ' + key + '?')) return;
+    const resp = await memoryService.deleteMemory(key);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    showToast(t('profile.memory.deleted'));
+    setExpandedMem(null);
+    loadMemories();
+  }
+
+  async function handleSaveEdit(key, value) {
+    const resp = await memoryService.updateMemory(key, value);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    showToast(t('profile.memory.updated'));
+    setEditModal(null);
+    loadMemories();
+  }
+
+  async function handleSearch(query) {
+    if (!query) { loadMemories(); return; }
+    try {
+      const list = await memoryService.searchMemory(query);
+      setMemories(Array.isArray(list) ? list : []);
+    } catch { showToast(t('profile.memory.searchFailed'), true); }
+  }
+
+  async function handleUploadFile(key, file, visibility) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result.split(',')[1];
+      const resp = await memoryService.uploadFile(key || file.name, base64, file.type || 'application/octet-stream', visibility);
+      if (resp.ok !== false) { showToast(t('profile.files.uploaded')); setShowFileForm(false); loadFiles(); }
+      else showToast(t('profile.files.uploadFailed'), true);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleDeleteFile(key) {
+    if (!confirm(t('profile.files.deleteConfirm'))) return;
+    const resp = await memoryService.deleteFile(key);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    showToast(t('profile.files.deleted'));
+    loadFiles();
+  }
+
+  async function loadKeyPerms(key) {
+    try {
+      const result = await getKeyPermissions(key);
+      setKeyRulesPopover({ key, rules: result.rules, visibility: result.visibility });
+    } catch { setKeyRulesPopover(null); }
+  }
+
+  const renderEntries = () => {
+    const searchRef = useRef(null);
+    if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
+    return html`
+      <div class="action-bar">
+        <div class="search-bar">
+          <input type="text" ref=${searchRef} class="input-field" placeholder=${t('profile.memory.search')} onKeyDown=${e => e.key === 'Enter' && handleSearch(e.target.value)} />
+          <button class="btn-sm" onClick=${() => handleSearch(searchRef.current?.value)}>${t('profile.memory.searchBtn')}</button>
+          <button class="btn-sm btn-outline" onClick=${() => { if (searchRef.current) searchRef.current.value = ''; loadMemories(); }}>${t('profile.memory.clearBtn')}</button>
+        </div>
+        <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
+      </div>
+      ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} />`}
+      ${memories.length === 0
+        ? html`<div class="empty">${t('profile.memory.empty')}</div>`
+        : memories.map(m => html`
+          <div>
+            <div class="mem-item" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
+              <span class="mem-key">${escHtml(m.key)}</span>
+              <span class="mem-vis badge ${m.visibility === 'public' ? 'badge-success' : m.visibility === 'shared' ? 'badge-info' : 'badge-muted'}">${m.visibility || 'private'}</span>
+              <span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}\uFE0F</span>
+            </div>
+            ${expandedMem === m.key && html`
+              <div class="mem-detail">
+                <pre>${escHtml(typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''))}</pre>
+                ${m.tags?.length > 0 && html`<div style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${m.tags.join(', ')}</div>`}
+                ${keyRulesPopover && keyRulesPopover.key === m.key && html`
+                  <div class="key-rules-box">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+                      <strong style="font-size:.85rem">\u{1F6E1}\uFE0F ${t('permissions.sharingRules')}</strong>
+                      <button class="btn-sm btn-outline" onClick=${() => setKeyRulesPopover(null)}>\u2715</button>
+                    </div>
+                    <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem">Visibility: ${keyRulesPopover.visibility}</div>
+                    ${keyRulesPopover.rules.length === 0
+                      ? html`<div style="font-size:.8rem;color:var(--muted);font-style:italic">${t('permissions.noRules')}</div>`
+                      : keyRulesPopover.rules.map(r => html`
+                        <div style="display:flex;gap:.5rem;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+                          ${recipientBadge(r.recipient)}
+                          <span style="font-family:monospace;font-size:.75rem">${escHtml(r.data_pattern)}</span>
+                          <span style="font-size:.75rem;color:var(--muted);margin-left:auto">${escHtml(r.scope || '-')}</span>
+                        </div>`)
+                    }
+                  </div>
+                `}
+                <div class="mem-actions">
+                  <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '') })}>${t('profile.memory.editBtn')}</button>
+                  <button class="btn-danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
+                </div>
+              </div>
+            `}
+          </div>
+        `)
+      }`;
+  };
+
+  const renderFilesList = () => {
+    if (!files) return html`<${Spinner} text=${t('profile.files.loading')} />`;
+    return html`
+      <div class="action-bar">
+        <button class="btn-primary" onClick=${() => setShowFileForm(!showFileForm)}>${t('profile.files.uploadBtn')}</button>
+        <span style="font-size:.75rem;color:var(--muted)">${t('profile.files.sizeLimit')}</span>
+      </div>
+      ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFile} onCancel=${() => setShowFileForm(false)} />`}
+      ${files.length === 0
+        ? html`<div class="empty">${t('profile.files.empty')}</div>`
+        : html`<div class="file-grid">
+            ${files.map(f => {
+              const icon = f.mime_type?.startsWith('image') ? '\u{1F5BC}\uFE0F' : f.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}';
+              return html`
+                <div class="file-card">
+                  <div class="file-icon">${icon}</div>
+                  <div class="file-info">
+                    <div class="file-name">${escHtml(f.key || f.name)}</div>
+                    <div class="file-meta">${f.size ? Math.round(f.size / 1024) + ' KB' : ''} \u2502 ${f.visibility || 'private'}</div>
+                  </div>
+                  <div class="file-actions">
+                    <a class="btn-sm" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}" target="_blank" style="text-decoration:none">${t('profile.files.download')}</a>
+                    <button class="btn-danger" onClick=${() => handleDeleteFile(f.key || f.name)}>${t('profile.files.delete')}</button>
+                  </div>
+                </div>`;
+            })}
+          </div>`
+      }`;
+  };
+
+  return html`
+    <div class="section-title">${t('profile.memory.title')}</div>
+    <div class="section-desc">${t('profile.memory.desc')}</div>
+    <div class="sub-tabs">
+      <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>
+      <button class="sub-tab ${memSubTab === 'files' ? 'active' : ''}" onClick=${() => setMemSubTab('files')}>${t('profile.memory.files')}</button>
+    </div>
+    ${memSubTab === 'entries' ? renderEntries() : renderFilesList()}
+
+    ${editModal && html`<${EditMemoryModal}
+      memKey=${editModal.key}
+      initialValue=${editModal.value}
+      onSave=${(v) => handleSaveEdit(editModal.key, v)}
+      onCancel=${() => setEditModal(null)} />`}
+  `;
+}
+
+function MemoryForm({ onSave, onCancel }) {
+  const [key, setKey] = useState('');
+  const [value, setValue] = useState('');
+  const [vis, setVis] = useState('private');
+  const [tags, setTags] = useState('');
+  return html`
+    <div class="create-form">
+      <div class="form-row"><label>${t('profile.memory.keyLabel')}</label><input class="input-field" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
+      <div class="form-row"><label>${t('profile.memory.valueLabel')}</label><textarea class="input-field" rows="3" placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)}></textarea></div>
+      <div class="form-row"><label>${t('profile.memory.visLabel')}</label>
+        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+          <option value="private">${t('profile.memory.visPrivate')}</option>
+          <option value="shared">${t('profile.memory.visShared')}</option>
+          <option value="public">${t('profile.memory.visPublic')}</option>
+        </select>
+      </div>
+      <div class="form-row"><label>${t('profile.memory.tagsLabel')}</label><input class="input-field" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
+      <div class="form-actions">
+        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags); }}>${t('profile.memory.saveBtn')}</button>
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.memory.cancelBtn')}</button>
+      </div>
+    </div>`;
+}
+
+function FileUploadForm({ onUpload, onCancel }) {
+  const [key, setKey] = useState('');
+  const [vis, setVis] = useState('private');
+  const fileRef = useRef(null);
+  return html`
+    <div class="create-form">
+      <div class="form-row"><label>${t('profile.files.keyLabel')} <span style="font-weight:normal;font-size:.75rem;color:var(--muted)">${t('profile.files.nameNote')}</span></label><input class="input-field" placeholder=${t('profile.files.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
+      <div class="form-row"><label>${t('profile.files.fileLabel')}</label><input type="file" ref=${fileRef} class="input-field" onChange=${e => { if (e.target.files[0] && !key) setKey(e.target.files[0].name); }} /></div>
+      <div class="form-row"><label>${t('profile.files.visLabel')}</label>
+        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+          <option value="private">${t('profile.files.visPrivate')}</option>
+          <option value="owner">${t('profile.files.visOwner')}</option>
+          <option value="public">${t('profile.files.visPublic')}</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" onClick=${() => { const f = fileRef.current?.files?.[0]; if (!f) return; onUpload(key || f.name, f, vis); }}>${t('profile.files.uploadSaveBtn')}</button>
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.files.cancelBtn')}</button>
+      </div>
+    </div>`;
+}
+
+function EditMemoryModal({ memKey, initialValue, onSave, onCancel }) {
+  const [value, setValue] = useState(initialValue);
+  return html`
+    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
+      <div class="modal">
+        <h3>${t('profile.memory.editTitle')}: ${escHtml(memKey)}</h3>
+        <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
+        <div class="form-actions" style="margin-top:1rem">
+          <button class="btn-primary" onClick=${() => onSave(value)}>${t('profile.save')}</button>
+          <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
+        </div>
+      </div>
+    </div>`;
+}

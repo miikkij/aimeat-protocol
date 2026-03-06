@@ -169,10 +169,6 @@
 .pf .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
 .pf .modal{background:var(--bg,#0f0a14);border:1px solid var(--border,rgba(255,107,157,.25));border-radius:var(--radius,12px);padding:2rem;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
 .pf .modal h3{color:var(--love1,#ff6b9d);margin-bottom:1rem}
-.pf .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--success,#22c55e);color:#fff;padding:.75rem 1.5rem;border-radius:8px;font-weight:600;font-size:.85rem;z-index:2000;max-width:90vw;box-sizing:border-box;animation:pfToastIn .3s ease,pfToastOut .3s ease 2.5s forwards}
-.pf .toast.error{background:var(--danger,#ef4444)}
-@keyframes pfToastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@keyframes pfToastOut{from{opacity:1}to{opacity:0}}
 .pf .star-rating{display:flex;gap:.25rem}
 .pf .star{font-size:1.5rem;cursor:pointer;color:var(--muted,#c4a6d0);transition:color .15s}
 .pf .star:hover,.pf .star.active{color:var(--warn,#f59e0b)}
