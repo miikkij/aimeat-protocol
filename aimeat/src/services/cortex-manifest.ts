@@ -335,8 +335,8 @@ function validateBoardTemplateComponent(
     visibility: (visibility ?? 'public') as 'public' | 'private' | 'shared',
     seed_posts: Array.isArray(raw.seed_posts)
       ? (raw.seed_posts as Array<{ title: string; body: string }>).filter(
-          p => typeof p.title === 'string' && typeof p.body === 'string'
-        )
+        p => typeof p.title === 'string' && typeof p.body === 'string'
+      )
       : undefined,
   };
   components.push(comp);
