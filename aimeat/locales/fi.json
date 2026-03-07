@@ -947,6 +947,7 @@
     "appMaxSize": "Sovellustiedoston enimmäiskoko (Mt)",
     "agentPortingFee": "Agenttisiirtomaksu (murusia)",
     "maxRelayHops": "Federaation välitysrajat",
+    "rateLimitGlobal": "Yleinen pyyntöraja (pyyntöä/sekunti)",
     "corsOrigins": "Sallitut CORS-alkuperät (pilkulla erotettuna, * kaikille)",
     "numInvalid": "Pitää olla positiivinen luku",
     "outputPrompt": "Minne tallennetaan?",
@@ -1457,6 +1458,7 @@
     "csmManagement": "CSM-hallinta",
     "msmManagement": "MSM-hallinta",
     "portal": "Portaali",
+    "portalDesc": "Hallitse solmusi julkista portaalia — aloitussivua, jonka vierailijat näkevät. Mukauta HTML-mallipohjaa, aseta dynaamista sisältöä muistiavaimilla ja KV-pareilla, esikatsele muutoksia reaaliajassa ja luo tekoälyystävällinen kehotekooste portaalistasi chat-integraatioita varten.",
     "portalTemplate": "Mallipohjan muokkaus",
     "portalPreview": "Portaalin esikatselu",
     "portalMemoryKeys": "Portaalin muistiavaimet",
@@ -1606,6 +1608,13 @@
     "boardPrivate": "Yksityinen",
     "boardCreateConfirm": "Taulu luotu onnistuneesti",
     "chatExplain": "Chat-instanssit luodaan kun käyttäjät käyttävät tekoälypohjaisia chat-sovelluksia tässä solmussa. Järjestelmänvalvojat voivat luoda solmun laajuisia chat-kanavia operaattorien viestintään.",
+    "chatCreateChannel": "Luo kanava",
+    "chatChannelName": "Kanavan nimi",
+    "chatChannelNamePlaceholder": "esim. ops-hälytykset, tiimi-yleinen",
+    "chatChannelPlatform": "Alusta",
+    "chatChannelPlatformPlaceholder": "esim. admin, slack, discord",
+    "chatChannelCreated": "Kanava luotu onnistuneesti",
+    "chatDeleteConfirm": "Poista chat-instanssi \"{id}\"?",
 
     "emailNotConfigured": "Sähköposti ei ole määritetty. Aseta SMTP-asetukset .env-tiedostossa.",
     "host": "Palvelin",
@@ -1732,6 +1741,8 @@
     "cfgGroup_cross_federation": "Ristinfederaatio",
     "cfgGroup_personal_nodes": "Henkilökohtaiset solmut",
     "cfgGroup_match_notifications": "Match-ilmoitukset",
+    "cfgGroup_consul": "Consul",
+
     "cfg_node_id": "Solmun tunnus",
     "cfg_node_port": "Portti",
     "cfg_node_type": "Solmun tyyppi",
@@ -1789,7 +1800,13 @@
     "cfg_personal_nodes_enabled": "Henkilökohtaiset solmut käytössä",
     "cfg_personal_nodes_max_slots": "Maks. paikat",
     "cfg_match_notifications_enabled": "Match-ilmoitukset käytössä",
-    "cfg_match_notifications_interval_hours": "Ilmoitusväli (tuntia)"
+    "cfg_match_notifications_interval_hours": "Ilmoitusväli (tuntia)",
+    "cfg_consul_enabled": "Consul käytössä",
+    "cfg_consul_url": "Consul-osoite",
+    "cfg_consul_prefix": "KV-etuliite",
+    "cfg_consul_token": "ACL-avain",
+    "cfg_consul_watch_interval_seconds": "Tarkkailuväli (sekuntia)",
+    "cfg_consul_datacenter": "Datakeskus"
   },
   "launcher": {
     "title": "Omat Sovellukset",

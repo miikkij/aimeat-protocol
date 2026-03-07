@@ -260,15 +260,15 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   app.use('/v1/memory', rateLimit(config.rateLimits.memory, config.rateLimits.roleMultipliers));
   app.use('/v1/boards', rateLimit(config.rateLimits.boards, config.rateLimits.roleMultipliers));
 
-  // Per-endpoint rate limits (300/s — matching global default)
-  app.use('/v1/auth/challenge', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/owners', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/ghii', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/flags', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/appeals', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/admin/setup', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/federation/peer/introduce', rateLimit({ windowMs: 1_000, max: 300 }));
-  app.use('/v1/catalogue', rateLimit({ windowMs: 1_000, max: 300 }));
+  // Per-endpoint rate limits (configurable, fall back to global)
+  app.use('/v1/auth/challenge', rateLimit(config.rateLimits.authChallenge, config.rateLimits.roleMultipliers));
+  app.use('/v1/owners', rateLimit(config.rateLimits.owners, config.rateLimits.roleMultipliers));
+  app.use('/v1/ghii', rateLimit(config.rateLimits.ghii, config.rateLimits.roleMultipliers));
+  app.use('/v1/flags', rateLimit(config.rateLimits.flags, config.rateLimits.roleMultipliers));
+  app.use('/v1/appeals', rateLimit(config.rateLimits.appeals, config.rateLimits.roleMultipliers));
+  app.use('/v1/admin/setup', rateLimit(config.rateLimits.adminSetup, config.rateLimits.roleMultipliers));
+  app.use('/v1/federation/peer/introduce', rateLimit(config.rateLimits.federation, config.rateLimits.roleMultipliers));
+  app.use('/v1/catalogue', rateLimit(config.rateLimits.catalogue, config.rateLimits.roleMultipliers));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency());

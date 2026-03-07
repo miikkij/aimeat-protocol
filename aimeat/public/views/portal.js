@@ -62,16 +62,22 @@ The GENESIS 001 server is at: ${n}
 
 ## Then build a STUNNING single HTML file.
 
-## HOW THE ONELINERS FEED WORKS (this is the ONLY API you need):
-The shared feed is stored at a single memory key called "oneliners" on the GENESIS 001 server.
+## HOW THE ONELINERS FEED WORKS:
+The shared feed is stored at a memory key called "anonymous.oneliners" on the GENESIS 001 server.
 It is a JSON object: { "messages": [{ "msg": "Hello!", "t": "2026-03-04T12:00:00Z" }, ...] }
 Maximum 20 messages. When posting, keep only the latest 20.
 
-This server runs in anonymous mode \u2014 no auth, no registration, no tokens needed.
-Just use plain fetch() calls. That's it.
+This server runs in anonymous mode. Reading is free (no auth). Writing requires a one-time anonymous token.
 
-### READ messages:
-const res = await fetch("${n}/v1/memory/oneliners");
+### Step 0: Get an anonymous token + GAII (once, on page load):
+const authRes = await fetch("${n}/v1/auth/anonymous", { method: "POST" });
+const authJson = await authRes.json();
+const token = authJson.data.token; // JWT valid for 24h
+const gaii = authJson.data.gaii;   // e.g. "shared#anonymous@node-id"
+// Store token and gaii — reuse for all reads and writes.
+
+### READ messages (no auth needed, uses public memory route):
+const res = await fetch("${n}/v1/memory/" + encodeURIComponent(gaii) + "/anonymous.oneliners");
 const json = await res.json();
 if (json.ok && json.data && json.data.value) {
   const messages = json.data.value.messages; // [{msg, t}, ...]
@@ -81,20 +87,20 @@ if (json.ok && json.data && json.data.value) {
 }
 
 ### WRITE messages (post a new one):
-// 1. Read current messages
-const res = await fetch("${n}/v1/memory/oneliners");
+// 1. Read current messages (same public read as above)
+const res = await fetch("${n}/v1/memory/" + encodeURIComponent(gaii) + "/anonymous.oneliners");
 const json = await res.json();
 const existing = (json.ok && json.data?.value?.messages) || [];
 // 2. Append new message, keep max 20
 const updated = [...existing, { msg: displayName + ": " + text, t: new Date().toISOString() }].slice(-20);
-// 3. Write back
+// 3. Write back (requires anonymous token)
 await fetch("${n}/v1/memory", {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ key: "oneliners", value: { messages: updated }, visibility: "public" })
+  headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+  body: JSON.stringify({ key: "anonymous.oneliners", value: { messages: updated }, visibility: "public" })
 });
 
-That's the ENTIRE API. Read, append, write back. No libraries needed. No auth. No registration.
+That's the ENTIRE API. Get anon token once, read publicly via GAII, write with token. No registration needed.
 
 ### Design Requirements (IMPORTANT \u2014 make it beautiful):
 - Use cutting-edge CSS: glassmorphism, gradients, animations, blur effects, glow
@@ -115,7 +121,7 @@ That's the ENTIRE API. Read, append, write back. No libraries needed. No auth. N
 
 ## General Requirements:
 - Single HTML file \u2014 all CSS and JS inline, NO external libraries or scripts
-- Just plain fetch() to ${n}/v1/memory/oneliners \u2014 that's all
+- POST ${n}/v1/auth/anonymous once to get token + GAII, then read via ${n}/v1/memory/{gaii}/anonymous.oneliners, write via POST ${n}/v1/memory with token
 - Mobile-friendly, works on any screen size
 - Works immediately when opened in a browser
 - Make the HTML a downloadable file
@@ -995,19 +1001,26 @@ function OnelinersFeed({ locale }) {
   const [provocation] = useState(() => pickProvocation());
 
   useEffect(() => {
-    function load() {
-      fetch('/v1/memory/oneliners')
-        .then(r => r.ok ? r.json() : null)
-        .then(d => {
-          if (d && d.ok && d.data && d.data.value && d.data.value.messages) {
-            setMessages(d.data.value.messages.slice(-20).reverse());
-          }
-        })
-        .catch(() => {});
-    }
-    load();
-    const iv = setInterval(load, 15000);
-    return () => clearInterval(iv);
+    let iv;
+    // Resolve the anonymous GAII from node metadata, then poll
+    fetch('/v1/site').then(r => r.json()).then(site => {
+      const nodeId = site?.data?.node_id;
+      if (!nodeId) return;
+      const anonGaii = encodeURIComponent('shared#anonymous@' + nodeId);
+      function load() {
+        fetch('/v1/memory/' + anonGaii + '/anonymous.oneliners')
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (d && d.ok && d.data && d.data.value && d.data.value.messages) {
+              setMessages(d.data.value.messages.slice(-20).reverse());
+            }
+          })
+          .catch(() => {});
+      }
+      load();
+      iv = setInterval(load, 15000);
+    }).catch(() => {});
+    return () => { if (iv) clearInterval(iv); };
   }, []);
 
   return html`

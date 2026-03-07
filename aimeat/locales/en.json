@@ -948,6 +948,7 @@
     "appMaxSize": "Max app file size (MB)",
     "agentPortingFee": "Agent porting fee (morsels)",
     "maxRelayHops": "Max federation relay hops",
+    "rateLimitGlobal": "Global rate limit (requests/second)",
     "corsOrigins": "Allowed CORS origins (comma-separated, * for all)",
     "numInvalid": "Must be a positive number",
     "outputPrompt": "Where to save?",
@@ -1458,6 +1459,7 @@
     "csmManagement": "CSM Management",
     "msmManagement": "MSM Management",
     "portal": "Portal",
+    "portalDesc": "Manage your node's public portal — the landing page visitors see. Customize the HTML template, set dynamic content via memory keys and KV pairs, preview changes live, and generate an AI-friendly prompt summary of your portal for chat integrations.",
     "portalTemplate": "Template Editor",
     "portalPreview": "Portal Preview",
     "portalMemoryKeys": "Portal Memory Keys",
@@ -1607,6 +1609,13 @@
     "boardPrivate": "Private",
     "boardCreateConfirm": "Board created successfully",
     "chatExplain": "Chat instances are created when users interact with AI-powered chat applications on this node. System administrators can create node-wide chat channels for operator communication.",
+    "chatCreateChannel": "Create Channel",
+    "chatChannelName": "Channel name",
+    "chatChannelNamePlaceholder": "e.g. ops-alerts, team-general",
+    "chatChannelPlatform": "Platform",
+    "chatChannelPlatformPlaceholder": "e.g. admin, slack, discord",
+    "chatChannelCreated": "Channel created successfully",
+    "chatDeleteConfirm": "Delete chat instance \"{id}\"?",
 
     "emailNotConfigured": "Email is not configured. Set SMTP settings in your .env file.",
     "host": "Host",
@@ -1733,6 +1742,7 @@
     "cfgGroup_cross_federation": "Cross-Federation",
     "cfgGroup_personal_nodes": "Personal Nodes",
     "cfgGroup_match_notifications": "Match Notifications",
+    "cfgGroup_consul": "Consul",
 
     "cfg_node_id": "Node ID",
     "cfg_node_port": "Port",
@@ -1791,7 +1801,13 @@
     "cfg_personal_nodes_enabled": "Personal Nodes Enabled",
     "cfg_personal_nodes_max_slots": "Max Slots",
     "cfg_match_notifications_enabled": "Match Notifications Enabled",
-    "cfg_match_notifications_interval_hours": "Notification Interval (hours)"
+    "cfg_match_notifications_interval_hours": "Notification Interval (hours)",
+    "cfg_consul_enabled": "Consul Enabled",
+    "cfg_consul_url": "Consul URL",
+    "cfg_consul_prefix": "KV Prefix",
+    "cfg_consul_token": "ACL Token",
+    "cfg_consul_watch_interval_seconds": "Watch Interval (seconds)",
+    "cfg_consul_datacenter": "Datacenter"
   },
   "launcher": {
     "title": "My Apps",

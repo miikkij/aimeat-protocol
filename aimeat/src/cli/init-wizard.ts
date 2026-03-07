@@ -1134,6 +1134,19 @@ async function askAllAdvancedSettings(
   );
   if (relayHops !== '3') settings.AIMEAT_MAX_RELAY_HOPS = relayHops;
 
+  const rateLimitGlobal = checkCancel(
+    await p.text({
+      message: t('init.rateLimitGlobal'),
+      defaultValue: String(cfg.rlGlobal),
+      validate: (val: string | undefined) => {
+        const n = parseInt(val ?? '', 10);
+        if (isNaN(n) || n < 1) return t('init.numInvalid');
+      },
+    }),
+    t,
+  );
+  if (rateLimitGlobal !== '300') settings.AIMEAT_RL_GLOBAL = rateLimitGlobal;
+
   // ── Consent Layer ──
   const consentEnabled = checkCancel(
     await p.confirm({

@@ -87,6 +87,8 @@ export default function PortalTab({ data, reload }) {
   const kvKeys = Object.keys(kv);
 
   return html`
+    <p style="color:var(--text-dim);margin-bottom:16px">${t('dashboard.portalDesc')}</p>
+
     <!-- LB mode banner -->
     ${isLb && html`
       <div class="adm-card" style="border:1px solid #eab308;margin-bottom:16px">
@@ -102,7 +104,7 @@ export default function PortalTab({ data, reload }) {
     <!-- Preview -->
     <div class="adm-card">
       <h3>${t('dashboard.portalPreview')}</h3>
-      <iframe src="/" style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin"></iframe>
+      <iframe src="/" style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
       <div style="margin-top:8px;display:flex;gap:8px">
         <button class="adm-btn-action" onClick=${doClearCache}>\u{1F6AB} ${t('dashboard.portalClearCache')}</button>
       </div>
