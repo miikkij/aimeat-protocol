@@ -710,6 +710,14 @@ export function initializeSchema(db: Database.Database): void {
       nodePublicKey           TEXT NOT NULL
     );
 
+    -- ── System Settings (config persistence) ──
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key            TEXT PRIMARY KEY,
+      value          TEXT NOT NULL,
+      createdAt      TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- ═══════════════════════════════════════════════════════
     -- Indexes
     -- ═══════════════════════════════════════════════════════

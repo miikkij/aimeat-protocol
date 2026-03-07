@@ -14,6 +14,7 @@ import { generateOtk } from '../utils/otk.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
 import { hashPassword } from '../services/password.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP } from '../services/config-schema.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -436,86 +437,45 @@ export function adminRouter(
     });
 
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
+    // Schema is built dynamically from the shared CONFIG_FIELDS definitions
     router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
-        const schema: Record<string, { value: unknown; type: string; description: string; range?: string; mutable: boolean; path: string }> = {
-            'node.id': { value: config.nodeId, type: 'string', description: 'Unique node identifier', mutable: false, path: 'node.id' },
-            'node.port': { value: config.port, type: 'integer', description: 'HTTP listen port', range: '1-65535', mutable: false, path: 'node.port' },
-            'node.type': { value: config.nodeType, type: 'string', description: 'Node type: full, relay, or mirror', mutable: false, path: 'node.type' },
-            'storage.type': { value: config.dbUrl ? 'mongodb' : 'in-memory', type: 'string', description: 'Storage backend type', mutable: false, path: 'storage.type' },
-            'morsel_policy.welcome_bonus': { value: config.welcomeBonus, type: 'integer', description: 'Morsels granted to new agents', range: '0-10000', mutable: true, path: 'morsel_policy.welcome_bonus' },
-            'morsel_policy.daily_allowance': { value: config.dailyAllowance, type: 'integer', description: 'Daily morsel allowance per agent', range: '0-10000', mutable: true, path: 'morsel_policy.daily_allowance' },
-            'morsel_policy.daily_allowance_cap': { value: config.dailyAllowanceCap, type: 'integer', description: 'Max balance for daily allowance eligibility', range: '0-100000', mutable: true, path: 'morsel_policy.daily_allowance_cap' },
-            'morsel_policy.burn_rate': { value: config.burnRate, type: 'float', description: 'Fraction of network fees burned', range: '0.0-1.0', mutable: true, path: 'morsel_policy.burn_rate' },
-            'morsel_policy.max_operator_mint_per_day': { value: config.maxOperatorMintPerDay, type: 'integer', description: 'Max morsels operator can mint per day', range: '0-1000000', mutable: true, path: 'morsel_policy.max_operator_mint_per_day' },
-            'morsel_policy.board_post_base_cost': { value: config.boardPostBaseCost, type: 'integer', description: 'Base morsel cost for public board posts', range: '0-1000', mutable: true, path: 'morsel_policy.board_post_base_cost' },
-            'morsel_policy.board_post_cost_per_kb': { value: config.boardPostCostPerKb, type: 'integer', description: 'Additional morsel cost per KB of post body', range: '0-100', mutable: true, path: 'morsel_policy.board_post_cost_per_kb' },
-            'auth.jwt_ttl_seconds': { value: config.jwtTtlSeconds, type: 'integer', description: 'JWT token time-to-live in seconds', range: '60-86400', mutable: true, path: 'auth.jwt_ttl_seconds' },
-            'features.keyed_browse_enabled': { value: config.keyedBrowseEnabled, type: 'boolean', description: 'Allow browsing with API keys', mutable: true, path: 'features.keyed_browse_enabled' },
-            'features.extended_features_enabled': { value: config.extendedFeaturesEnabled, type: 'boolean', description: 'Enable extended feature set', mutable: true, path: 'features.extended_features_enabled' },
-            'work.queue_max_pending': { value: config.workQueueMaxPending, type: 'integer', description: 'Max pending work items per provider', range: '1-1000', mutable: true, path: 'work.queue_max_pending' },
-            'work.webhook_max_retries': { value: config.webhookMaxRetries, type: 'integer', description: 'Max webhook delivery retry attempts', range: '0-10', mutable: true, path: 'work.webhook_max_retries' },
-            'quota.memory_mb': { value: config.memoryQuotaMb, type: 'integer', description: 'Memory quota per agent in MB', range: '1-10000', mutable: true, path: 'quota.memory_mb' },
-            'quota.storage_mb': { value: config.storageQuotaMb, type: 'integer', description: 'Storage quota per agent in MB', range: '1-100000', mutable: true, path: 'quota.storage_mb' },
-            'quota.micro_memory_kb': { value: config.microMemoryQuotaKb, type: 'integer', description: 'Micro-memory quota per agent in KB', range: '1-10000', mutable: true, path: 'quota.micro_memory_kb' },
-            'federation.max_relay_hops': { value: config.maxRelayHops, type: 'integer', description: 'Max relay hops for federated requests', range: '1-10', mutable: true, path: 'federation.max_relay_hops' },
-            'rate_limits': { value: config.rateLimits, type: 'object', description: 'Rate limiting configuration per endpoint category', mutable: true, path: 'rate_limits' },
+        const schema: Record<string, { value: unknown; type: string; description: string; range?: string; mutable: boolean; path: string }> = {};
 
-            // Email (Phase 1.1)
-            'email.enabled': { value: config.emailEnabled, type: 'boolean', description: 'Email service enabled (requires SMTP host)', mutable: true, path: 'email.enabled' },
-            'email.confirmation_required': { value: config.emailConfirmationRequired, type: 'boolean', description: 'Require email confirmation for registration', mutable: true, path: 'email.confirmation_required' },
-            'email.smtp_host': { value: config.smtpHost, type: 'string', description: 'SMTP server hostname', mutable: true, path: 'email.smtp_host' },
-            'email.smtp_port': { value: config.smtpPort, type: 'integer', description: 'SMTP server port', range: '1-65535', mutable: true, path: 'email.smtp_port' },
-            'email.smtp_from': { value: config.smtpFrom, type: 'string', description: 'SMTP From address', mutable: true, path: 'email.smtp_from' },
-            'email.smtp_user_configured': { value: !!config.smtpUser, type: 'boolean', description: 'Whether SMTP user is configured (read-only secret)', mutable: false, path: 'email.smtp_user_configured' },
-            'email.smtp_pass_configured': { value: !!config.smtpPass, type: 'boolean', description: 'Whether SMTP password is configured (read-only secret)', mutable: false, path: 'email.smtp_pass_configured' },
+        for (const field of CONFIG_FIELDS) {
+            if (field.adminDisplay === 'hidden') continue;
 
-            // Consent (Phase 0.3)
-            'consent.enabled': { value: config.consentEnabled, type: 'boolean', description: 'Consent layer enabled', mutable: true, path: 'consent.enabled' },
-            'consent.audit_retention_days': { value: config.consentAuditRetentionDays, type: 'integer', description: 'Consent audit log retention in days', range: '1-3650', mutable: true, path: 'consent.audit_retention_days' },
-            'consent.max_per_user': { value: config.consentMaxPerUser, type: 'integer', description: 'Max consent records per user', range: '1-10000', mutable: true, path: 'consent.max_per_user' },
+            if (field.adminDisplay === 'configured') {
+                // Secret fields — show as boolean indicating whether configured
+                const configuredPath = `${field.dotPath}_configured`;
+                schema[configuredPath] = {
+                    value: !!config[field.key],
+                    type: 'boolean',
+                    description: `Whether ${field.description.toLowerCase().replace(' (secret)', '')} is configured (read-only secret)`,
+                    mutable: false,
+                    path: configuredPath,
+                };
+                continue;
+            }
 
-            // TOTP (Phase 0.5)
-            'totp.enabled': { value: config.totpEnabled, type: 'boolean', description: 'TOTP two-factor authentication enabled', mutable: true, path: 'totp.enabled' },
-            'totp.period': { value: config.totpPeriod, type: 'integer', description: 'TOTP code rotation period in seconds', range: '15-120', mutable: true, path: 'totp.period' },
-            'totp.window': { value: config.totpWindow, type: 'integer', description: 'TOTP validation window (codes before/after)', range: '0-5', mutable: true, path: 'totp.window' },
-            'totp.max_failed_attempts': { value: config.totpMaxFailedAttempts, type: 'integer', description: 'Max failed TOTP attempts before lockout', range: '1-20', mutable: true, path: 'totp.max_failed_attempts' },
-            'totp.lockout_seconds': { value: config.totpLockoutSeconds, type: 'integer', description: 'TOTP lockout duration in seconds', range: '30-3600', mutable: true, path: 'totp.lockout_seconds' },
-            'totp.encryption_key_configured': { value: !!config.totpSecretEncryptionKey, type: 'boolean', description: 'Whether TOTP encryption key is configured (read-only secret)', mutable: false, path: 'totp.encryption_key_configured' },
+            // Normal field — show actual value
+            const typeStr = field.type === 'number' ? 'integer' : field.type;
+            schema[field.dotPath] = {
+                value: config[field.key],
+                type: typeStr,
+                description: field.description,
+                ...(field.range ? { range: field.range } : {}),
+                mutable: !field.immutable,
+                path: field.dotPath,
+            };
+        }
 
-            // Matching (Phase 2.1)
-            'matching.enabled': { value: config.matchingEnabled, type: 'boolean', description: 'AI matching engine enabled', mutable: true, path: 'matching.enabled' },
-            'matching.interval_hours': { value: config.matchIntervalHours, type: 'integer', description: 'Hours between matching rounds', range: '1-168', mutable: true, path: 'matching.interval_hours' },
-            'matching.threshold': { value: config.matchThreshold, type: 'float', description: 'Minimum match score threshold', range: '0.0-1.0', mutable: true, path: 'matching.threshold' },
-            'matching.max_suggestions': { value: config.matchMaxSuggestions, type: 'integer', description: 'Max match suggestions per user', range: '1-50', mutable: true, path: 'matching.max_suggestions' },
-            'matching.max_distance_km': { value: config.matchMaxDistanceKm, type: 'integer', description: 'Max geographic distance for matches in km', range: '1-50000', mutable: true, path: 'matching.max_distance_km' },
-            'matching.cooldown_days': { value: config.matchCooldownDays, type: 'integer', description: 'Days before re-matching same pair', range: '1-365', mutable: true, path: 'matching.cooldown_days' },
-
-            // Marketplace (Phase 2.6)
-            'marketplace.enabled': { value: config.marketplaceEnabled, type: 'boolean', description: 'Marketplace feature enabled', mutable: true, path: 'marketplace.enabled' },
-            'marketplace.listing_fee': { value: config.marketplaceListingFeeMorsels, type: 'integer', description: 'Morsel fee for creating a listing', range: '0-10000', mutable: true, path: 'marketplace.listing_fee' },
-            'marketplace.tx_fee_percent': { value: config.marketplaceTransactionFeePercent, type: 'integer', description: 'Transaction fee percentage', range: '0-50', mutable: true, path: 'marketplace.tx_fee_percent' },
-            'marketplace.escrow_enabled': { value: config.marketplaceEscrowEnabled, type: 'boolean', description: 'Escrow for marketplace transactions', mutable: true, path: 'marketplace.escrow_enabled' },
-
-            // Push Notifications (Phase 3.1)
-            'push.enabled': { value: config.pushEnabled, type: 'boolean', description: 'Web push notifications enabled', mutable: true, path: 'push.enabled' },
-            'push.vapid_configured': { value: !!config.vapidPublicKey && !!config.vapidPrivateKey, type: 'boolean', description: 'Whether VAPID keys are configured (read-only secret)', mutable: false, path: 'push.vapid_configured' },
-
-            // EUDIW / Identity (Phase 3.3)
-            'eudiw.enabled': { value: config.eudiwEnabled, type: 'boolean', description: 'EUDIW identity verification enabled', mutable: true, path: 'eudiw.enabled' },
-            'eudiw.ftn_enabled': { value: config.ftnEnabled, type: 'boolean', description: 'Finnish Trust Network enabled', mutable: true, path: 'eudiw.ftn_enabled' },
-
-            // Cross-Federation (Phase 3.4)
-            'cross_federation.enabled': { value: config.crossFederationEnabled, type: 'boolean', description: 'Cross-federation peering enabled', mutable: true, path: 'cross_federation.enabled' },
-            'cross_federation.max_genesis_peers': { value: config.maxGenesisPeers, type: 'integer', description: 'Max genesis peers for cross-federation', range: '1-100', mutable: true, path: 'cross_federation.max_genesis_peers' },
-            'cross_federation.sync_interval_hours': { value: config.genesisSyncIntervalHours, type: 'integer', description: 'Hours between genesis sync rounds', range: '1-168', mutable: true, path: 'cross_federation.sync_interval_hours' },
-
-            // Personal Nodes
-            'personal_nodes.enabled': { value: config.personalNodesEnabled, type: 'boolean', description: 'Personal node hosting enabled', mutable: true, path: 'personal_nodes.enabled' },
-            'personal_nodes.max_slots': { value: config.personalNodeMaxSlots, type: 'integer', description: 'Max personal node slots', range: '1-10000', mutable: true, path: 'personal_nodes.max_slots' },
-
-            // Match Notifications (Phase 1.6)
-            'match_notifications.enabled': { value: config.matchNotificationEnabled, type: 'boolean', description: 'Match notification emails enabled', mutable: true, path: 'match_notifications.enabled' },
-            'match_notifications.interval_hours': { value: config.matchNotificationIntervalHours, type: 'integer', description: 'Hours between match notification batches', range: '1-168', mutable: true, path: 'match_notifications.interval_hours' },
+        // Combined virtual field: VAPID keys configured
+        schema['push.vapid_configured'] = {
+            value: !!config.vapidPublicKey && !!config.vapidPrivateKey,
+            type: 'boolean',
+            description: 'Whether VAPID keys are configured (read-only secret)',
+            mutable: false,
+            path: 'push.vapid_configured',
         };
 
         res.json(success(config.nodeId, { schema }));
@@ -523,6 +483,7 @@ export function adminRouter(
 
     // PUT /v1/admin/config — atomic config update with dot-path addressing (§14.2, Appendix B)
     // Body format: {"changes": [{"path": "morsel_policy.daily_allowance", "value": 75}, ...]}
+    // Mutable field lookup comes from the shared config-schema module (single source of truth)
     router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
         const { changes } = req.body ?? {};
 
@@ -531,80 +492,6 @@ export function adminRouter(
                 'Body must contain "changes" array with [{path, value}] entries'));
             return;
         }
-
-        // Map dot-paths to config keys with validation
-        const pathMap: Record<string, { key: keyof AimeatConfig; validate: (v: unknown) => boolean }> = {
-            'morsel_policy.welcome_bonus': { key: 'welcomeBonus', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'morsel_policy.daily_allowance': { key: 'dailyAllowance', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'morsel_policy.daily_allowance_cap': { key: 'dailyAllowanceCap', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'morsel_policy.burn_rate': { key: 'burnRate', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1 },
-            'morsel_policy.max_operator_mint_per_day': { key: 'maxOperatorMintPerDay', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'morsel_policy.board_post_base_cost': { key: 'boardPostBaseCost', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'morsel_policy.board_post_cost_per_kb': { key: 'boardPostCostPerKb', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'auth.jwt_ttl_seconds': { key: 'jwtTtlSeconds', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 },
-            'features.keyed_browse_enabled': { key: 'keyedBrowseEnabled', validate: v => typeof v === 'boolean' },
-            'features.extended_features_enabled': { key: 'extendedFeaturesEnabled', validate: v => typeof v === 'boolean' },
-            'work.queue_max_pending': { key: 'workQueueMaxPending', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
-            'work.webhook_max_retries': { key: 'webhookMaxRetries', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 },
-            'quota.memory_mb': { key: 'memoryQuotaMb', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
-            'quota.storage_mb': { key: 'storageQuotaMb', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
-            'quota.micro_memory_kb': { key: 'microMemoryQuotaKb', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
-            'federation.max_relay_hops': { key: 'maxRelayHops', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 },
-            'rate_limits': { key: 'rateLimits', validate: v => typeof v === 'object' && v !== null },
-
-            // Email (Phase 1.1)
-            'email.enabled': { key: 'emailEnabled', validate: v => typeof v === 'boolean' },
-            'email.confirmation_required': { key: 'emailConfirmationRequired', validate: v => typeof v === 'boolean' },
-            'email.smtp_host': { key: 'smtpHost', validate: v => v === null || typeof v === 'string' },
-            'email.smtp_port': { key: 'smtpPort', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 65535 },
-            'email.smtp_from': { key: 'smtpFrom', validate: v => typeof v === 'string' && (v as string).length > 0 },
-
-            // Consent (Phase 0.3)
-            'consent.enabled': { key: 'consentEnabled', validate: v => typeof v === 'boolean' },
-            'consent.audit_retention_days': { key: 'consentAuditRetentionDays', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650 },
-            'consent.max_per_user': { key: 'consentMaxPerUser', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000 },
-
-            // TOTP (Phase 0.5)
-            'totp.enabled': { key: 'totpEnabled', validate: v => typeof v === 'boolean' },
-            'totp.period': { key: 'totpPeriod', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 15 && (v as number) <= 120 },
-            'totp.window': { key: 'totpWindow', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5 },
-            'totp.max_failed_attempts': { key: 'totpMaxFailedAttempts', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20 },
-            'totp.lockout_seconds': { key: 'totpLockoutSeconds', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 30 && (v as number) <= 3600 },
-
-            // Matching (Phase 2.1)
-            'matching.enabled': { key: 'matchingEnabled', validate: v => typeof v === 'boolean' },
-            'matching.interval_hours': { key: 'matchIntervalHours', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168 },
-            'matching.threshold': { key: 'matchThreshold', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1 },
-            'matching.max_suggestions': { key: 'matchMaxSuggestions', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50 },
-            'matching.max_distance_km': { key: 'matchMaxDistanceKm', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50000 },
-            'matching.cooldown_days': { key: 'matchCooldownDays', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 365 },
-
-            // Marketplace (Phase 2.6)
-            'marketplace.enabled': { key: 'marketplaceEnabled', validate: v => typeof v === 'boolean' },
-            'marketplace.listing_fee': { key: 'marketplaceListingFeeMorsels', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000 },
-            'marketplace.tx_fee_percent': { key: 'marketplaceTransactionFeePercent', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50 },
-            'marketplace.escrow_enabled': { key: 'marketplaceEscrowEnabled', validate: v => typeof v === 'boolean' },
-
-            // Push Notifications (Phase 3.1)
-            'push.enabled': { key: 'pushEnabled', validate: v => typeof v === 'boolean' },
-
-            // EUDIW / Identity (Phase 3.3)
-            'eudiw.enabled': { key: 'eudiwEnabled', validate: v => typeof v === 'boolean' },
-            'eudiw.ftn_enabled': { key: 'ftnEnabled', validate: v => typeof v === 'boolean' },
-
-            // Cross-Federation (Phase 3.4)
-            'cross_federation.enabled': { key: 'crossFederationEnabled', validate: v => typeof v === 'boolean' },
-            'cross_federation.max_genesis_peers': { key: 'maxGenesisPeers', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100 },
-            'cross_federation.sync_interval_hours': { key: 'genesisSyncIntervalHours', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168 },
-
-            // Personal Nodes
-            'personal_nodes.enabled': { key: 'personalNodesEnabled', validate: v => typeof v === 'boolean' },
-            'personal_nodes.max_slots': { key: 'personalNodeMaxSlots', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000 },
-
-            // Match Notifications (Phase 1.6)
-            'match_notifications.enabled': { key: 'matchNotificationEnabled', validate: v => typeof v === 'boolean' },
-            'match_notifications.interval_hours': { key: 'matchNotificationIntervalHours', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168 },
-        };
 
         const applied: { path: string; old_value: unknown; new_value: unknown }[] = [];
         const errors: { path: string; reason: string }[] = [];
@@ -615,9 +502,9 @@ export function adminRouter(
                 errors.push({ path: path ?? '(missing)', reason: 'Each change must have "path" (string) and "value"' });
                 continue;
             }
-            const mapping = pathMap[path];
+            const mapping = MUTABLE_CONFIG_MAP[path];
             if (!mapping) {
-                errors.push({ path, reason: `Unknown config path. Valid paths: ${Object.keys(pathMap).join(', ')}` });
+                errors.push({ path, reason: `Unknown or immutable config path. Valid mutable paths: ${Object.keys(MUTABLE_CONFIG_MAP).join(', ')}` });
                 continue;
             }
             if (!mapping.validate(value)) {
