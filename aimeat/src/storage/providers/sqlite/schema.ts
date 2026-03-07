@@ -781,6 +781,33 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_app_purchases_seller ON app_purchases(sellerGaii);
     CREATE INDEX IF NOT EXISTS idx_app_purchases_app ON app_purchases(sellerGaii, appFilename);
 
+    -- ── Knowledge System: Memory Links ──
+    CREATE TABLE IF NOT EXISTS knowledge_links (
+      source      TEXT NOT NULL,
+      target      TEXT NOT NULL,
+      relation    TEXT NOT NULL,
+      description TEXT NOT NULL,
+      linked_at   TEXT NOT NULL,
+      linked_by   TEXT NOT NULL,
+      PRIMARY KEY (source, target)
+    );
+    CREATE INDEX IF NOT EXISTS idx_klinks_source ON knowledge_links(source);
+    CREATE INDEX IF NOT EXISTS idx_klinks_target ON knowledge_links(target);
+    CREATE INDEX IF NOT EXISTS idx_klinks_linked_by ON knowledge_links(linked_by);
+
+    -- ── Knowledge System: Operator Reviews ──
+    CREATE TABLE IF NOT EXISTS knowledge_reviews (
+      id             TEXT PRIMARY KEY,
+      packageId      TEXT NOT NULL,
+      operatorGaii   TEXT NOT NULL,
+      reason         TEXT NOT NULL,
+      customText     TEXT,
+      action         TEXT NOT NULL,
+      timestamp      TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_kreviews_package ON knowledge_reviews(packageId);
+    CREATE INDEX IF NOT EXISTS idx_kreviews_timestamp ON knowledge_reviews(timestamp);
+
   `);
 
   // ── Schema migrations for existing databases ──
