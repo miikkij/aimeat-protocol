@@ -60,6 +60,7 @@ import { personalRouter } from './routes/personal.js';
 import { pushRouter } from './routes/push.js';
 import { createPushService } from './services/push.js';
 import { verificationRouter } from './routes/verification.js';
+import { knowledgeRouter } from './routes/knowledge.js';
 import { createEudiwService } from './services/eudiw.js';
 import { createVcIssuerService } from './services/vc-issuer.js';
 import { createMyDataReceiptService } from './services/mydata-receipt.js';
@@ -575,6 +576,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   app.use(catalogueRouter(config, storage, directoryService, () => realtimeManager?.getStats() ?? null));
   app.use(workRouter(config, storage, peers, mailboxNotificationService));
   app.use(walletRouter(config, storage));
+  app.use(knowledgeRouter(config, storage));
 
   // Extended features guard — returns 503 when extended features are disabled
   const requireExtended: express.RequestHandler = (_req, res, next) => {
