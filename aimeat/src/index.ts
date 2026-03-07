@@ -351,6 +351,34 @@ if (subcommand === 'config') {
     }
     logger.info(`──────────────────────────────────────────────────────────`);
 
+    // Log active service extensions and their instances
+    storage.listExtensions().then(async (extensions) => {
+      const active = extensions.filter(e => e.status === 'active');
+      if (active.length === 0) return;
+
+      logger.info('');
+      for (const ext of active) {
+        const instances = ext.instances?.supported
+          ? await storage.listExtensionInstances(ext.name).catch(() => [])
+          : [];
+        const activeInstances = instances.filter(i => i.status === 'active');
+        const actionIds = ext.actions.map(a => a.id).join(', ');
+
+        logger.info(`   ────────────────────────────────────────────────────`);
+        logger.info(`   Extension: ${ext.name} v${ext.version} [active]`);
+        logger.info(`   Actions:   ${actionIds}`);
+        if (ext.instances?.supported) {
+          logger.info(`   Instances:  ${activeInstances.length} active / ${instances.length} total`);
+          for (const inst of activeInstances) {
+            const vis = (inst.config as Record<string, unknown>)?.visibility || 'public';
+            logger.info(`     - ${inst.id} (${vis})`);
+          }
+        }
+      }
+      logger.info(`   ────────────────────────────────────────────────────`);
+      logger.info('');
+    }).catch(() => { /* ignore */ });
+
     // Check and display maintenance mode warning
     storage.getMaintenanceMode().then(state => {
       if (state?.enabled) {
