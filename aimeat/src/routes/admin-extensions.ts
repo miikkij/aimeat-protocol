@@ -35,6 +35,7 @@ interface BundledExtensionInfo {
   description: string;
   author: string;
   actionsCount: number;
+  actions: { id: string; method: string }[];
   instancesSupported: boolean;
   requiredApis: string[];
 }
@@ -65,12 +66,17 @@ function readBundledExtensions(): BundledExtensionInfo[] {
       const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
       const instances = manifest.instances as Record<string, unknown> | undefined;
 
+      const actionList = Array.isArray(actions)
+        ? actions.map(a => ({ id: a.id as string, method: (a.method as string) || 'POST' }))
+        : [];
+
       results.push({
         name: metadata.name as string,
         version: (metadata.version as string) || '1.0.0',
         description: (metadata.description as string) || '',
         author: (metadata.author as string) || 'aimeat-core',
-        actionsCount: Array.isArray(actions) ? actions.length : 0,
+        actionsCount: actionList.length,
+        actions: actionList,
         instancesSupported: !!(instances?.supported),
         requiredApis: Array.isArray(manifest.required_apis) ? manifest.required_apis as string[] : [],
       });

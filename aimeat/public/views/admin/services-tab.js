@@ -540,10 +540,12 @@ function ExtensionPanel({ ext, onUninstall }) {
             <button class="adm-btn-sm" onClick=${() => setShowCreate(!showCreate)}>
               + ${t('dashboard.servicesCreateInstance')}
             </button>
-            <button class="adm-btn-sm" onClick=${() => setShowScripts(!showScripts)}
-              style="font-size:.8rem${showScripts ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-              \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
-            </button>
+            ${(ext.actions || []).length > 0 && html`
+              <button class="adm-btn-sm" onClick=${() => setShowScripts(!showScripts)}
+                style="font-size:.8rem${showScripts ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+                \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+              </button>
+            `}
             <button class="adm-btn-sm" onClick=${loadInstances} style="font-size:.8rem">
               \u21BB
             </button>
@@ -656,18 +658,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  // Derive action IDs from actionsCount + common patterns
-  // We'll try to load based on the action ID
-  const [actionIds, setActionIds] = useState([]);
-
-  useEffect(() => {
-    if (showEditor && actionIds.length === 0) {
-      // Try reading extension.yaml to get action IDs — for now, use a convention-based approach
-      // The available ext info doesn't include action IDs, so we infer from common patterns
-      // or just let the user type the action name
-      setActionIds([]); // Will be populated by the manifest endpoint in the future
-    }
-  }, [showEditor]);
+  const actions = ext.actions || [];
 
   async function loadScript(actionId) {
     if (selectedAction === actionId) { setSelectedAction(null); return; }
@@ -709,7 +700,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
         <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
           ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
         </span>
-        <span style="color:var(--text-dim)">${ext.actionsCount} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
+        <span style="color:var(--text-dim)">${actions.length} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
       </div>
       <div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${isInstalled
@@ -723,24 +714,25 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
               ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
             </button>`
         }
-        <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
-          style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-          \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
-        </button>
+        ${actions.length > 0 && html`
+          <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
+            style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+            \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+          </button>
+        `}
         ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
 
       ${showEditor && html`
         <div style="margin-top:4px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-            <label style="font-size:.8rem;color:var(--text-dim)">${t('dashboard.servicesScriptAction')}:</label>
-            <input type="text" id="disk-action-${ext.name}" style=${inputStyle + ';width:160px;padding:4px 8px;font-size:.85rem'}
-              placeholder="create-listing"
-              onKeyDown=${e => { if (e.key === 'Enter') loadScript(e.target.value.trim()); }} />
-            <button class="adm-btn-sm" style="font-size:.8rem"
-              onClick=${() => { const el = document.getElementById('disk-action-' + ext.name); if (el?.value) loadScript(el.value.trim()); }}>
-              ${t('dashboard.loading').replace('...', '')}
-            </button>
+            <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
+            ${actions.map(a => html`
+              <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
+                style="font-size:.75rem${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+                ${a.method} ${escHtml(a.id)}
+              </button>
+            `)}
           </div>
 
           ${loading && html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`}
