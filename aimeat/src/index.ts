@@ -21,6 +21,9 @@ const { values, positionals } = parseArgs({
     consul: { type: 'string' },
     'consul-prefix': { type: 'string' },
     'consul-token': { type: 'string' },
+    format: { type: 'string' },
+    file: { type: 'string' },
+    from: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -30,37 +33,51 @@ const HELP_TEXT = `
 aimeat — AI Memory Exchange and Action Transfer protocol node
 
 USAGE
-  aimeat start [options]      Start the node
-  aimeat serve [options]      Alias for start
-  aimeat config               Show all settings and their current values
-  aimeat validate             Validate .env configuration
-  aimeat check                Alias for validate
-  aimeat init                 Interactive config wizard
-  aimeat join [URL]            Join a federation network
-  aimeat maintenance on [MSG]  Enable maintenance mode (optional message)
-  aimeat maintenance off       Disable maintenance mode
-  aimeat maintenance           Show maintenance status
-  aimeat backup  [FILE]       Export all data to JSON
-  aimeat restore <FILE>       Import data from JSON backup
+  aimeat start [options]         Start the node
+  aimeat serve [options]         Alias for start
+  aimeat config                  Show all settings and their current values
+  aimeat config export [opts]    Export config (--format env|ini|json|consul)
+  aimeat config import [opts]    Import config to database (--file <path> | --from consul)
+  aimeat validate                Validate configuration (env, files, database)
+  aimeat check                   Alias for validate
+  aimeat init                    Interactive config wizard (generates .env, .ini, or .json)
+  aimeat join [URL]              Join a federation network
+  aimeat maintenance on [MSG]    Enable maintenance mode (optional message)
+  aimeat maintenance off         Disable maintenance mode
+  aimeat maintenance             Show maintenance status
+  aimeat backup  [FILE]          Export all data to JSON
+  aimeat restore <FILE>          Import data from JSON backup
 
-OPTIONS
-  -p, --port <port>          HTTP port (default: 40050)
-  --db <type>                Storage type: mongodb, sqlite, memory
-  --db-url <url>             Database connection URL (MongoDB)
-  --db-path <path>           SQLite database file path
-  --node-id <id>             Node identity string
-  --admin-password <pw>      Operator admin secret
-  -c, --config <path>        Config file path (aimeat.ini or .json)
-  --consul <url>             Enable Consul and set URL
-  --consul-prefix <prefix>   Consul KV prefix (default: aimeat/config)
-  --consul-token <token>     Consul ACL token
-  -h, --help                 Show this help
-  -v, --version              Show version
+START OPTIONS
+  --db <type>              Storage type: mongodb, sqlite, memory
+  --db-url <url>           Database connection URL (MongoDB)
+  --db-path <path>         SQLite database file path
+  -p, --port <port>        HTTP port (default: 40050)
+  --node-id <id>           Node identity string
+  --admin-password <pw>    Operator admin secret
+  -c, --config <path>      Config file path (JSON)
+  --consul <url>           Enable Consul and set URL (e.g., http://consul:8500)
+  --consul-prefix <prefix> Consul KV prefix (default: aimeat/config)
+  --consul-token <token>   Consul ACL token
+  -h, --help               Show this help
+  -v, --version            Show version
+
+CONFIG EXPORT OPTIONS
+  --format <fmt>           Output format: env, ini, json, consul
+
+CONFIG IMPORT OPTIONS
+  --file <path>            Import from file (.env, .ini, or .json)
+  --from consul            Import from Consul KV into database
 
 QUICK START
   1. Run "aimeat init" to create a config (interactive wizard)
   2. Run "aimeat validate" to check for problems
   3. Run "aimeat start" to launch the node
+
+MIGRATION: .env to database
+  1. aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
+  2. aimeat config import --file .env
+  3. Manage config via admin dashboard (changes persist to database)
 
 CONFIG SOURCES (highest priority first)
   1. CLI args (--port, --db, etc.)
@@ -70,11 +87,11 @@ CONFIG SOURCES (highest priority first)
   5. .env file / environment variables
   6. Built-in defaults
 
-EXAMPLES
-  aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
-  aimeat start --db sqlite --db-path ./data/aimeat.db
-  aimeat start --config production.ini
-  aimeat start --consul http://consul:8500
+MULTIPLE ENVIRONMENTS
+  aimeat init creates .env (default) or named config files.
+  Use config files to manage multiple environments on one machine:
+    aimeat start --config production.json
+    aimeat start --config staging.json
 `;
 
 if (values.help) {
@@ -144,6 +161,29 @@ const subcommand = positionals[0];
 
 // Handle subcommands
 if (subcommand === 'config') {
+  const configAction = positionals[1]; // export | import | undefined (show)
+
+  if (configAction === 'export') {
+    const format = (values.format as string) || 'env';
+    if (!['env', 'ini', 'json', 'consul'].includes(format)) {
+      console.error(`Unknown export format: ${format}. Use: env, ini, json, consul`);
+      process.exit(1);
+    }
+    const { runConfigExport } = await import('./cli/config-export.js');
+    await runConfigExport(config, format as 'env' | 'ini' | 'json' | 'consul');
+    process.exit(0);
+  }
+
+  if (configAction === 'import') {
+    const { runConfigImport } = await import('./cli/config-import.js');
+    await runConfigImport(config, {
+      file: values.file as string | undefined,
+      from: values.from as string | undefined,
+    });
+    process.exit(0);
+  }
+
+  // Default: show config
   const { formatConfig } = await import('./utils/env-config.js');
   const { ConfigProvenance } = await import('./services/config-provenance.js');
   const { ALL_CONFIG_MAP } = await import('./services/config-schema.js');

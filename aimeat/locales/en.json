@@ -2491,5 +2491,20 @@
       "loginToSeeMore": "Log in to see more content",
       "backToPortal": "Back to portal"
     }
+  },
+  "cli": {
+    "helpHeader": "aimeat — AI Memory Exchange and Action Transfer protocol node",
+    "startDesc": "Start the node",
+    "configDesc": "Show all settings and their current values",
+    "configExportDesc": "Export config to file or Consul",
+    "configImportDesc": "Import config from file or Consul into database",
+    "validateDesc": "Validate configuration (env, files, database)",
+    "initDesc": "Interactive config wizard",
+    "importSuccess": "Imported {count} values to database ({skipped} skipped)",
+    "importRequiresDb": "Config import requires a persistent database (MongoDB or SQLite). Current storage: {type}",
+    "importNoFile": "File not found: {path}",
+    "importConfirm": "Import {mutable} mutable values to database? ({immutable} immutable and {unknown} unknown will be skipped)",
+    "exportSuccess": "Exported {count} config values in {format} format",
+    "migrationHint": "Tip: To migrate .env to database, run: aimeat config import --file .env"
   }
 }

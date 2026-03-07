@@ -2489,5 +2489,20 @@
       "loginToSeeMore": "Kirjaudu sisään nähdäksesi lisää",
       "backToPortal": "Takaisin portaaliin"
     }
+  },
+  "cli": {
+    "helpHeader": "aimeat — AI-muistin vaihto- ja toiminnansiirtoprotokolla",
+    "startDesc": "Käynnistä solmu",
+    "configDesc": "Näytä kaikki asetukset ja niiden nykyiset arvot",
+    "configExportDesc": "Vie asetukset tiedostoon tai Consuliin",
+    "configImportDesc": "Tuo asetukset tiedostosta tai Consulista tietokantaan",
+    "validateDesc": "Tarkista asetukset (ympäristö, tiedostot, tietokanta)",
+    "initDesc": "Interaktiivinen asetustenvelho",
+    "importSuccess": "Tuotiin {count} arvoa tietokantaan ({skipped} ohitettiin)",
+    "importRequiresDb": "Asetusten tuonti vaatii pysyvän tietokannan (MongoDB tai SQLite). Nykyinen tallennus: {type}",
+    "importNoFile": "Tiedostoa ei löydy: {path}",
+    "importConfirm": "Tuodaanko {mutable} muutettavaa arvoa tietokantaan? ({immutable} muuttumatonta ja {unknown} tuntematonta ohitetaan)",
+    "exportSuccess": "Vietiin {count} asetusarvoa {format}-muodossa",
+    "migrationHint": "Vinkki: Siirrä .env tietokantaan komennolla: aimeat config import --file .env"
   }
 }
