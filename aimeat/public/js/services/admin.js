@@ -157,6 +157,7 @@ export const updateActionScript      = (name, actionId, scriptContent) => apiPat
 export const scaffoldExtension       = (body)           => apiPost('/v1/admin/extensions/scaffold', body);
 export const getDiskScript           = (name, actionId) => apiGet(`/v1/admin/extensions/available/${encodeURIComponent(name)}/scripts/${encodeURIComponent(actionId)}`);
 export const saveDiskScript          = (name, actionId, scriptContent) => apiPut(`/v1/admin/extensions/available/${encodeURIComponent(name)}/scripts/${encodeURIComponent(actionId)}`, { scriptContent });
+export const addDiskAction           = (name, body)      => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/actions`, body);
 export const reinstallExtension      = (name)           => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/reinstall`);
 
 // ── Scheduler ──

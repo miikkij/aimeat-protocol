@@ -14,7 +14,7 @@ import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance,
   deleteExtensionInstance, getAvailableExtensions, installBundledExtension,
   uninstallExtension, getActionScript, updateActionScript, scaffoldExtension,
-  getDiskScript, saveDiskScript, reinstallExtension,
+  getDiskScript, saveDiskScript, addDiskAction, reinstallExtension,
 } from '/js/services/admin.js';
 
 const inputStyle = 'background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px';
@@ -649,14 +649,19 @@ function ExtensionPanel({ ext, onUninstall }) {
   `;
 }
 
-// ── Available Extension Card (with disk script editor) ──
-function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, reload }) {
+// ── Available Extension Card (with disk script editor + add action) ──
+function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, reload, loadAvailable }) {
   const [showEditor, setShowEditor] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
   const [script, setScript] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [showAddAction, setShowAddAction] = useState(false);
+  const [newActionId, setNewActionId] = useState('');
+  const [newActionMethod, setNewActionMethod] = useState('POST');
+  const [newActionDesc, setNewActionDesc] = useState('');
+  const [adding, setAdding] = useState(false);
 
   const actions = ext.actions || [];
 
@@ -688,6 +693,18 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
     } catch (e) { setMsg({ ok: false, text: e.message }); }
   }
 
+  async function handleAddAction() {
+    if (!newActionId.trim()) return;
+    setAdding(true); setMsg(null);
+    try {
+      await addDiskAction(ext.name, { id: newActionId.trim(), method: newActionMethod, description: newActionDesc.trim() || undefined });
+      setMsg({ ok: true, text: t('dashboard.servicesActionAdded') });
+      setNewActionId(''); setNewActionDesc(''); setShowAddAction(false);
+      loadAvailable(); // refresh available list to get updated actions
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    setAdding(false);
+  }
+
   return html`
     <div class="adm-card" style="padding:16px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -714,12 +731,10 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
               ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
             </button>`
         }
-        ${actions.length > 0 && html`
-          <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
-            style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-            \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
-          </button>
-        `}
+        <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
+          style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+          \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+        </button>
         ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
 
@@ -733,7 +748,37 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
                 ${a.method} ${escHtml(a.id)}
               </button>
             `)}
+            <button class="adm-btn-sm" onClick=${() => setShowAddAction(!showAddAction)}
+              style="font-size:.75rem;color:var(--green, #22c55e)${showAddAction ? ';border-color:var(--green, #22c55e)' : ''}">
+              + ${t('dashboard.servicesAddAction')}
+            </button>
           </div>
+
+          ${showAddAction && html`
+            <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;padding:8px;border:1px solid var(--glass-border);border-radius:4px">
+              <div style=${fieldWrap}>
+                <label style=${labelStyle}>ID</label>
+                <input type="text" value=${newActionId} onInput=${e => setNewActionId(e.target.value)}
+                  style=${inputStyle + ';width:160px;padding:4px 8px;font-size:.85rem'} placeholder="my-action" />
+              </div>
+              <div style=${fieldWrap}>
+                <label style=${labelStyle}>Method</label>
+                <select style=${inputStyle + ';padding:4px 8px;font-size:.85rem'} value=${newActionMethod}
+                  onChange=${e => setNewActionMethod(e.target.value)}>
+                  <option value="POST">POST</option><option value="GET">GET</option>
+                  <option value="PUT">PUT</option><option value="DELETE">DELETE</option>
+                </select>
+              </div>
+              <div style=${fieldWrap + ';flex:1;min-width:120px'}>
+                <label style=${labelStyle}>${t('dashboard.servicesScaffoldDescLabel')}</label>
+                <input type="text" value=${newActionDesc} onInput=${e => setNewActionDesc(e.target.value)}
+                  style=${inputStyle + ';padding:4px 8px;font-size:.85rem'} placeholder="What does this action do?" />
+              </div>
+              <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleAddAction}
+                disabled=${adding || !newActionId.trim()}>
+                ${adding ? '...' : t('dashboard.servicesAddAction')}</button>
+            </div>
+          `}
 
           ${loading && html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`}
 
@@ -767,6 +812,10 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
               </div>
             </div>
           `}
+
+          ${actions.length === 0 && !showAddAction && html`
+            <p style="color:var(--text-dim);font-size:.85rem;margin:0">${t('dashboard.servicesNoActions')}</p>
+          `}
         </div>
       `}
     </div>
@@ -779,14 +828,16 @@ export default function ServicesTab({ data, reload }) {
   const [loadingAvailable, setLoadingAvailable] = useState(false);
   const [installingName, setInstallingName] = useState(null);
 
-  // Load available bundled extensions
-  useEffect(() => {
+  function loadAvailable() {
     setLoadingAvailable(true);
     getAvailableExtensions()
       .then(res => setAvailable(res.data?.extensions || []))
       .catch(() => setAvailable([]))
       .finally(() => setLoadingAvailable(false));
-  }, [extensions.length]);
+  }
+
+  // Load available bundled extensions
+  useEffect(() => { loadAvailable(); }, [extensions.length]);
 
   async function handleInstall(name) {
     setInstallingName(name);
@@ -864,10 +915,55 @@ export default function ServicesTab({ data, reload }) {
               const isInstalling = installingName === ext.name;
               return html`<${AvailableExtCard} ext=${ext} isInstalled=${isInstalled}
                 isInstalling=${isInstalling}
-                onInstall=${handleInstall} onReinstall=${handleReinstall} reload=${reload} />`;
+                onInstall=${handleInstall} onReinstall=${handleReinstall} reload=${reload}
+                loadAvailable=${loadAvailable} />`;
             })}
           </div>
         `
     }
+
+    <div style="margin-top:32px;padding:20px;border:1px solid var(--glass-border);border-radius:8px;background:rgba(0,0,0,0.1)">
+      <h3 style="margin:0 0 12px;font-size:1rem">${t('dashboard.servicesManualTitle')}</h3>
+
+      <div style="font-size:.85rem;color:var(--text-dim);line-height:1.6">
+        <p style="margin:0 0 12px"><strong style="color:var(--text-bright)">${t('dashboard.servicesManualWorkflow')}</strong></p>
+        <ol style="margin:0 0 16px;padding-left:20px">
+          <li>${t('dashboard.servicesManualStep1')}</li>
+          <li>${t('dashboard.servicesManualStep2')}</li>
+          <li>${t('dashboard.servicesManualStep3')}</li>
+          <li>${t('dashboard.servicesManualStep4')}</li>
+          <li>${t('dashboard.servicesManualStep5')}</li>
+        </ol>
+
+        <p style="margin:0 0 8px"><strong style="color:var(--text-bright)">${t('dashboard.servicesManualCtxTitle')}</strong></p>
+        <pre style="background:rgba(0,0,0,0.3);border-radius:4px;padding:10px;font-size:12px;line-height:1.5;overflow-x:auto;color:var(--text-bright);margin:0 0 16px"><code>// ${t('dashboard.servicesManualCtxAvailable')}
+const { input, memory, wallet, caller, config, instance, log } = ctx;
+
+// caller.gaii   — ${t('dashboard.servicesManualCtxCaller')}
+// caller.owner  — ${t('dashboard.servicesManualCtxOwner')}
+// input         — ${t('dashboard.servicesManualCtxInput')}
+// instance.id   — ${t('dashboard.servicesManualCtxInstance')}
+
+// memory.get(key)            — ${t('dashboard.servicesManualCtxMemGet')}
+// memory.set(key, value)     — ${t('dashboard.servicesManualCtxMemSet')}
+// memory.list(prefix)        — ${t('dashboard.servicesManualCtxMemList')}
+// memory.delete(key)         — ${t('dashboard.servicesManualCtxMemDel')}
+
+// wallet.balance(gaii)       — ${t('dashboard.servicesManualCtxWalBal')}
+// wallet.transfer(from, to, amount) — ${t('dashboard.servicesManualCtxWalTx')}
+
+// log(message)               — ${t('dashboard.servicesManualCtxLog')}
+
+return { ok: true, data: {} }; // ${t('dashboard.servicesManualCtxReturn')}</code></pre>
+
+        <p style="margin:0 0 8px"><strong style="color:var(--text-bright)">${t('dashboard.servicesManualTipsTitle')}</strong></p>
+        <ul style="margin:0;padding-left:20px">
+          <li>${t('dashboard.servicesManualTip1')}</li>
+          <li>${t('dashboard.servicesManualTip2')}</li>
+          <li>${t('dashboard.servicesManualTip3')}</li>
+          <li>${t('dashboard.servicesManualTip4')}</li>
+        </ul>
+      </div>
+    </div>
   `;
 }

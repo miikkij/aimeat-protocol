@@ -509,6 +509,88 @@ actions:
     }
   });
 
+  // ── POST /v1/admin/extensions/available/:name/actions — Add new action to disk extension ──
+  router.post('/v1/admin/extensions/available/:name/actions', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const { id, method, description } = req.body as { id?: string; method?: string; description?: string };
+
+      if (!id || typeof id !== 'string' || !/^[a-z0-9-]+$/.test(id)) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'id is required (lowercase, hyphens, digits only)'));
+        return;
+      }
+
+      const dir = getBundledExtensionsDir();
+      const extDir = join(dir, name);
+      const yamlPath = join(extDir, 'extension.yaml');
+
+      if (!existsSync(yamlPath)) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found on disk`));
+        return;
+      }
+
+      // Parse existing manifest
+      const yamlContent = readFileSync(yamlPath, 'utf-8');
+      const manifest = parseYaml(yamlContent) as Record<string, unknown>;
+      const actions = (manifest.actions as Array<Record<string, unknown>>) || [];
+
+      // Check for duplicate
+      if (actions.some(a => a.id === id)) {
+        res.status(409).json(error(config.nodeId, 'DUPLICATE', `Action "${id}" already exists`));
+        return;
+      }
+
+      const actionMethod = (method || 'POST').toUpperCase();
+      const instancesSupported = !!(manifest.instances as Record<string, unknown>)?.supported;
+      const pathPrefix = instancesSupported
+        ? `/v1/ext/${name}/:instanceId/${id}`
+        : `/v1/ext/${name}/${id}`;
+
+      // Add action to manifest
+      const newAction: Record<string, unknown> = {
+        id,
+        description: description || `Action: ${id}`,
+        method: actionMethod,
+        path: pathPrefix,
+        auth: 'required',
+        input: {},
+        output: {},
+        script: `actions/${id}.js`,
+      };
+      actions.push(newAction);
+      manifest.actions = actions;
+
+      // Write updated YAML
+      const { stringify: yamlStringify } = await import('yaml');
+      const { writeFileSync: wfs, mkdirSync } = await import('node:fs');
+      wfs(yamlPath, yamlStringify(manifest, { lineWidth: 120 }), 'utf-8');
+
+      // Create script file with template
+      const actionsDir = join(extDir, 'actions');
+      if (!existsSync(actionsDir)) mkdirSync(actionsDir, { recursive: true });
+
+      const scriptTemplate = `// Action: ${id}
+// Method: ${actionMethod}
+// Extension: ${name}
+
+const { input, memory, caller, instance, log } = ctx;
+
+log('${id} called by ' + caller.gaii);
+
+// TODO: implement action logic
+
+return { ok: true };
+`;
+      wfs(join(actionsDir, `${id}.js`), scriptTemplate, 'utf-8');
+
+      logger.info(`New action added: ${name}/${id}`, { by: req.auth!.sub });
+      res.json(success(config.nodeId, { id, method: actionMethod, created: true }));
+    } catch (err) {
+      logger.error('Failed to add action', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to add action'));
+    }
+  });
+
   // ── POST /v1/admin/extensions/available/:name/reinstall — Reinstall from disk (update) ──
   router.post('/v1/admin/extensions/available/:name/reinstall', requireAuth(), requireRole('operator'), async (req, res) => {
     try {
