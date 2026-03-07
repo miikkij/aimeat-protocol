@@ -1,0 +1,24 @@
+{
+    "$comment": "AIMEAT Node Configuration. Precedence: Database > Consul > this file > .env > defaults",
+    "node": {
+        "id": "aimeat-local-001-dev",
+        "port": 40050,
+        "type": "full"
+    },
+    "storage": {
+        "type": "mongodb"
+    },
+    "auth": {
+        "jwt_ttl_seconds": 3600
+    },
+    "morsel_policy": {
+        "welcome_bonus": 100,
+        "daily_allowance": 50,
+        "daily_allowance_cap": 500,
+        "burn_rate": 0.10
+    },
+    "features": {
+        "keyed_browse_enabled": true,
+        "extended_features_enabled": true
+    }
+}

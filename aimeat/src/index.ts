@@ -13,9 +13,14 @@ const { values, positionals } = parseArgs({
   options: {
     port: { type: 'string', short: 'p' },
     db: { type: 'string' },
+    'db-url': { type: 'string' },
+    'db-path': { type: 'string' },
     'node-id': { type: 'string' },
     'admin-password': { type: 'string' },
     config: { type: 'string', short: 'c' },
+    consul: { type: 'string' },
+    'consul-prefix': { type: 'string' },
+    'consul-token': { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -40,10 +45,15 @@ USAGE
 
 OPTIONS
   -p, --port <port>          HTTP port (default: 40050)
-  --db <url>                 MongoDB connection URL
+  --db <type>                Storage type: mongodb, sqlite, memory
+  --db-url <url>             Database connection URL (MongoDB)
+  --db-path <path>           SQLite database file path
   --node-id <id>             Node identity string
   --admin-password <pw>      Operator admin secret
-  -c, --config <path>        Config file path (JSON)
+  -c, --config <path>        Config file path (aimeat.ini or .json)
+  --consul <url>             Enable Consul and set URL
+  --consul-prefix <prefix>   Consul KV prefix (default: aimeat/config)
+  --consul-token <token>     Consul ACL token
   -h, --help                 Show this help
   -v, --version              Show version
 
@@ -52,11 +62,19 @@ QUICK START
   2. Run "aimeat validate" to check for problems
   3. Run "aimeat start" to launch the node
 
-MULTIPLE ENVIRONMENTS
-  aimeat init creates .env (default) or named JSON config files.
-  Use JSON configs to manage multiple environments on one machine:
-    aimeat start --config production.json
-    aimeat start --config staging.json
+CONFIG SOURCES (highest priority first)
+  1. CLI args (--port, --db, etc.)
+  2. Database (admin dashboard changes, persistent)
+  3. Consul KV (fleet management, live reload)
+  4. aimeat.ini / aimeat.json (in working directory)
+  5. .env file / environment variables
+  6. Built-in defaults
+
+EXAMPLES
+  aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
+  aimeat start --db sqlite --db-path ./data/aimeat.db
+  aimeat start --config production.ini
+  aimeat start --consul http://consul:8500
 `;
 
 if (values.help) {
@@ -103,44 +121,38 @@ if (envPath) {
   }
 }
 
-// Load config file: explicit --config flag, or auto-detect aimeat.config.json in CWD
-let fileConfig: Record<string, string> = {};
-const configPath = values.config ?? (existsSync('aimeat.config.json') ? 'aimeat.config.json' : null);
-if (configPath) {
-  try {
-    fileConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-  } catch (err) {
-    console.error(`Error reading config file: ${configPath}`);
-    process.exit(1);
-  }
+// Build CLI overrides from flags (dot-path keyed for unified config)
+const cliOverrides: Record<string, string> = {};
+if (values.port) cliOverrides['node.port'] = values.port;
+if (values.db) cliOverrides['storage.type'] = values.db;
+if (values['db-url']) cliOverrides['database_url'] = values['db-url'];
+if (values['db-path']) cliOverrides['sqlite_path'] = values['db-path'];
+if (values['node-id']) cliOverrides['node.id'] = values['node-id'];
+if (values['admin-password']) cliOverrides['admin_password'] = values['admin-password'];
+if (values.consul) {
+  cliOverrides['consul.enabled'] = 'true';
+  cliOverrides['consul.url'] = values.consul;
 }
+if (values['consul-prefix']) cliOverrides['consul.prefix'] = values['consul-prefix'];
+if (values['consul-token']) cliOverrides['consul.token'] = values['consul-token'];
 
-// CLI flags override config file override env vars
-if (values.port) process.env.AIMEAT_PORT = values.port;
-else if (fileConfig.port) process.env.AIMEAT_PORT = String(fileConfig.port);
-
-if (values.db) process.env.DATABASE_URL = values.db;
-else if (fileConfig.db) process.env.DATABASE_URL = fileConfig.db;
-
-if (values['node-id']) process.env.AIMEAT_NODE_ID = values['node-id'];
-else if (fileConfig.nodeId) process.env.AIMEAT_NODE_ID = fileConfig.nodeId;
-
-if (values['admin-password']) process.env.AIMEAT_ADMIN_PASSWORD = values['admin-password'];
-else if (fileConfig.adminPassword) process.env.AIMEAT_ADMIN_PASSWORD = fileConfig.adminPassword;
-
-if (fileConfig.jwtTtlSeconds) process.env.AIMEAT_JWT_TTL = String(fileConfig.jwtTtlSeconds);
-if (fileConfig.welcomeBonus) process.env.AIMEAT_WELCOME_BONUS = String(fileConfig.welcomeBonus);
-if (fileConfig.dailyAllowance) process.env.AIMEAT_DAILY_ALLOWANCE = String(fileConfig.dailyAllowance);
-if (fileConfig.dailyAllowanceCap) process.env.AIMEAT_DAILY_ALLOWANCE_CAP = String(fileConfig.dailyAllowanceCap);
-if (fileConfig.burnRate) process.env.AIMEAT_BURN_RATE = String(fileConfig.burnRate);
-
-const config = loadConfig();
+const { config, envKeys, fileKeys, cliKeys, fileName } = loadConfig({
+  configPath: values.config,
+  cliOverrides: Object.keys(cliOverrides).length > 0 ? cliOverrides : undefined,
+});
 const subcommand = positionals[0];
 
 // Handle subcommands
 if (subcommand === 'config') {
   const { formatConfig } = await import('./utils/env-config.js');
-  console.log(formatConfig(config));
+  const { ConfigProvenance } = await import('./services/config-provenance.js');
+  const { ALL_CONFIG_MAP } = await import('./services/config-schema.js');
+  const prov = new ConfigProvenance();
+  prov.initDefaults(Object.keys(ALL_CONFIG_MAP));
+  if (envKeys.length > 0) prov.markEnv(envKeys);
+  if (fileKeys.length > 0) prov.markFile(fileKeys);
+  if (cliKeys.length > 0) prov.markEnv(cliKeys); // CLI overrides show as 'env' in display
+  console.log(formatConfig(config, prov));
   process.exit(0);
 } else if (subcommand === 'init') {
   const { runInitWizard } = await import('./cli/init-wizard.js');
@@ -254,7 +266,7 @@ if (subcommand === 'config') {
   if (!config.adminPassword) {
     config.adminPassword = randomBytes(16).toString('base64url');
   }
-  const { app, tunnelManager, realtimeManager, storage } = await createServer(config);
+  const { app, tunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
   const server = app.listen(config.port, () => {
     // ── Node type banner ──
     const bannerLabel =

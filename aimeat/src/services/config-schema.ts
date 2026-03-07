@@ -47,7 +47,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'nodeId', dotPath: 'node.id', envVar: 'AIMEAT_NODE_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Unique node identifier' },
   { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
   { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'personal', 'relay'].includes(v as string), immutable: true, description: 'Node type: full, relay, or personal' },
-  { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE_PROVIDER', type: 'string', validate: v => ['mongodb', 'sqlite', 'memory'].includes(v as string), immutable: true, description: 'Storage backend type' },
+  { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['mongodb', 'sqlite', 'memory'].includes(v as string), immutable: true, description: 'Storage backend type' },
   { key: 'dbUrl', dotPath: 'database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'Database connection URL', adminDisplay: 'hidden' },
   { key: 'sqlitePath', dotPath: 'sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path', adminDisplay: 'hidden' },
   { key: 'adminPassword', dotPath: 'admin_password', envVar: 'AIMEAT_ADMIN_PASSWORD', type: 'string', validate: () => true, immutable: true, description: 'Operator admin password', adminDisplay: 'hidden' },
@@ -62,11 +62,11 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'boardPostCostPerKb', dotPath: 'morsel_policy.board_post_cost_per_kb', envVar: 'AIMEAT_BOARD_POST_COST_PER_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Additional morsel cost per KB of post body', range: '0-100' },
 
   // ── Auth (mutable) ──
-  { key: 'jwtTtlSeconds', dotPath: 'auth.jwt_ttl_seconds', envVar: 'AIMEAT_JWT_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60, immutable: false, description: 'JWT token time-to-live in seconds', range: '60-86400' },
+  { key: 'jwtTtlSeconds', dotPath: 'auth.jwt_ttl_seconds', envVar: 'AIMEAT_JWT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60, immutable: false, description: 'JWT token time-to-live in seconds', range: '60-86400' },
 
   // ── Features (mutable) ──
-  { key: 'keyedBrowseEnabled', dotPath: 'features.keyed_browse_enabled', envVar: 'AIMEAT_KEYED_BROWSE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow browsing with API keys' },
-  { key: 'extendedFeaturesEnabled', dotPath: 'features.extended_features_enabled', envVar: 'AIMEAT_EXTENDED_FEATURES_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable extended feature set' },
+  { key: 'keyedBrowseEnabled', dotPath: 'features.keyed_browse_enabled', envVar: 'AIMEAT_KEYED_BROWSE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow browsing with API keys' },
+  { key: 'extendedFeaturesEnabled', dotPath: 'features.extended_features_enabled', envVar: 'AIMEAT_EXTENDED_FEATURES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable extended feature set' },
 
   // ── Work (mutable) ──
   { key: 'workQueueMaxPending', dotPath: 'work.queue_max_pending', envVar: 'AIMEAT_WORK_QUEUE_MAX_PENDING', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max pending work items per provider', range: '1-1000' },
@@ -103,11 +103,11 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'totpEnabled', dotPath: 'totp.enabled', envVar: 'AIMEAT_TOTP_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'TOTP two-factor authentication enabled' },
   { key: 'totpPeriod', dotPath: 'totp.period', envVar: 'AIMEAT_TOTP_PERIOD', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 15 && (v as number) <= 120, immutable: false, description: 'TOTP code rotation period in seconds', range: '15-120' },
   { key: 'totpWindow', dotPath: 'totp.window', envVar: 'AIMEAT_TOTP_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5, immutable: false, description: 'TOTP validation window (codes before/after)', range: '0-5' },
-  { key: 'totpMaxFailedAttempts', dotPath: 'totp.max_failed_attempts', envVar: 'AIMEAT_TOTP_MAX_FAILED_ATTEMPTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: false, description: 'Max failed TOTP attempts before lockout', range: '1-20' },
+  { key: 'totpMaxFailedAttempts', dotPath: 'totp.max_failed_attempts', envVar: 'AIMEAT_TOTP_MAX_FAILED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: false, description: 'Max failed TOTP attempts before lockout', range: '1-20' },
   { key: 'totpLockoutSeconds', dotPath: 'totp.lockout_seconds', envVar: 'AIMEAT_TOTP_LOCKOUT_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 30 && (v as number) <= 3600, immutable: false, description: 'TOTP lockout duration in seconds', range: '30-3600' },
 
   // ── TOTP secrets (immutable) ──
-  { key: 'totpSecretEncryptionKey', dotPath: 'totp.encryption_key', envVar: 'AIMEAT_TOTP_SECRET_ENCRYPTION_KEY', type: 'string', validate: () => true, immutable: true, description: 'TOTP encryption key (secret)', adminDisplay: 'configured' },
+  { key: 'totpSecretEncryptionKey', dotPath: 'totp.encryption_key', envVar: 'AIMEAT_TOTP_ENCRYPTION_KEY', type: 'string', validate: () => true, immutable: true, description: 'TOTP encryption key (secret)', adminDisplay: 'configured' },
 
   // ── Matching (Phase 2.1, mutable) ──
   { key: 'matchingEnabled', dotPath: 'matching.enabled', envVar: 'AIMEAT_MATCHING_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'AI matching engine enabled' },
@@ -121,7 +121,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'marketplaceEnabled', dotPath: 'marketplace.enabled', envVar: 'AIMEAT_MARKETPLACE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Marketplace feature enabled' },
   { key: 'marketplaceListingFeeMorsels', dotPath: 'marketplace.listing_fee', envVar: 'AIMEAT_MARKETPLACE_LISTING_FEE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000, immutable: false, description: 'Morsel fee for creating a listing', range: '0-10000' },
   { key: 'marketplaceTransactionFeePercent', dotPath: 'marketplace.tx_fee_percent', envVar: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50, immutable: false, description: 'Transaction fee percentage', range: '0-50' },
-  { key: 'marketplaceEscrowEnabled', dotPath: 'marketplace.escrow_enabled', envVar: 'AIMEAT_MARKETPLACE_ESCROW_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Escrow for marketplace transactions' },
+  { key: 'marketplaceEscrowEnabled', dotPath: 'marketplace.escrow_enabled', envVar: 'AIMEAT_MARKETPLACE_ESCROW', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Escrow for marketplace transactions' },
 
   // ── Push Notifications (Phase 3.1, mutable) ──
   { key: 'pushEnabled', dotPath: 'push.enabled', envVar: 'AIMEAT_PUSH_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Web push notifications enabled' },

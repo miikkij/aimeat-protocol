@@ -101,7 +101,15 @@ export interface ServerResult {
   storage: Storage;
 }
 
-export async function createServer(config: AimeatConfig): Promise<ServerResult> {
+/** Optional metadata from loadConfig() for accurate provenance tracking */
+export interface ConfigSources {
+  envKeys: string[];
+  fileKeys: string[];
+  cliKeys: string[];
+  fileName: string | null;
+}
+
+export async function createServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
   const app = express();
 
   // Compress all responses (gzip/deflate based on Accept-Encoding)
@@ -251,12 +259,23 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   // Then apply any DB-persisted overrides (skipped for in-memory storage).
   const provenance = new ConfigProvenance();
   provenance.initDefaults(Object.keys(ALL_CONFIG_MAP));
-  // Mark fields that came from environment variables
-  const envOverrides: string[] = [];
-  for (const [envVar, dotPath] of Object.entries(ENV_TO_DOT_PATH)) {
-    if (process.env[envVar] !== undefined) envOverrides.push(dotPath);
+
+  if (configSources) {
+    // Accurate provenance from loadConfig() — distinguishes env/file/cli
+    if (configSources.fileKeys.length > 0) provenance.markFile(configSources.fileKeys);
+    if (configSources.envKeys.length > 0) provenance.markEnv(configSources.envKeys);
+    if (configSources.cliKeys.length > 0) provenance.markEnv(configSources.cliKeys);
+    if (configSources.fileName) {
+      logger.info(`Config file: ${configSources.fileName}`);
+    }
+  } else {
+    // Fallback: check process.env directly (backward compat for tests)
+    const envOverrides: string[] = [];
+    for (const [envVar, dotPath] of Object.entries(ENV_TO_DOT_PATH)) {
+      if (process.env[envVar] !== undefined) envOverrides.push(dotPath);
+    }
+    if (envOverrides.length > 0) provenance.markEnv(envOverrides);
   }
-  if (envOverrides.length > 0) provenance.markEnv(envOverrides);
 
   // Apply DB overrides (highest precedence — applied after env/file)
   const { applied: dbApplied, skipped: dbSkipped } = await applyConfigOverrides(config, storage, provenance);
