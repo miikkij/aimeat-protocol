@@ -33,7 +33,7 @@ import EmailTab        from './admin/email-tab.js';
 import PushTab         from './admin/push-tab.js';
 import DirectoryTab    from './admin/directory-tab.js';
 import MatchingTab     from './admin/matching-tab.js';
-import MarketplaceTab  from './admin/marketplace-tab.js';
+import ServicesTab     from './admin/services-tab.js';
 import CsmTab          from './admin/csm-tab.js';
 import MsmTab          from './admin/msm-tab.js';
 import FederationTab   from './admin/federation-tab.js';
@@ -75,7 +75,7 @@ const NAV_GROUPS = [
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   icon: '\u{1F4D6}', key: 'dashboard.directory',      component: DirectoryTab },
     { id: 'matching',    icon: '\u{1F91D}', key: 'dashboard.matching',       component: MatchingTab },
-    { id: 'marketplace', icon: '\u{1F6D2}', key: 'dashboard.marketplace',    component: MarketplaceTab },
+    { id: 'services',    icon: '\u{1F9E9}', key: 'dashboard.services',       component: ServicesTab },
     { id: 'csm',         icon: '\u{1F4E6}', key: 'dashboard.csmManagement',  component: CsmTab },
     { id: 'knowledge',   icon: '\u{1F9E0}', key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
   ]},
@@ -210,6 +210,7 @@ export default function Admin({ navigate, locale }) {
         api.getConfig(),
         api.getConsulStatus().catch(() => ({ data: null })),
         api.getSchedulerJobs().catch(() => ({ data: null })),
+        api.getExtensions().catch(() => ({ data: null })),
       ]);
       if (!mountRef.current) return;
 
@@ -217,7 +218,7 @@ export default function Admin({ navigate, locale }) {
       d.email           = features[1].status === 'fulfilled' ? features[1].value.data : null;
       d.directoryStats  = features[2].status === 'fulfilled' ? features[2].value.data : null;
       d.matchingStats   = features[3].status === 'fulfilled' ? features[3].value.data : null;
-      d.marketplaceStats= features[4].status === 'fulfilled' ? features[4].value.data : null;
+      d.marketplaceStats = features[4].status === 'fulfilled' ? features[4].value.data : null;
       d.push            = features[5].status === 'fulfilled' ? features[5].value.data : null;
       d.csmTemplates    = features[6].status === 'fulfilled' ? features[6].value.data : null;
       d.msmIntegrations = features[7].status === 'fulfilled' ? features[7].value.data : null;
@@ -225,6 +226,7 @@ export default function Admin({ navigate, locale }) {
       d.configSchema    = features[9].status === 'fulfilled' ? features[9].value.data : null;
       d.consul          = features[10].status === 'fulfilled' ? features[10].value.data : null;
       d.schedulerJobs   = features[11].status === 'fulfilled' ? features[11].value.data : null;
+      d.extensions      = features[12].status === 'fulfilled' ? features[12].value.data : null;
 
       // Phase 4: portal + stats + owners
       try {

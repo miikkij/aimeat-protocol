@@ -60,6 +60,11 @@ export function apiPut(path, body) {
   return api(path, { method: 'PUT', body: JSON.stringify(body) });
 }
 
+/** PATCH shorthand. */
+export function apiPatch(path, body) {
+  return api(path, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
 /** DELETE shorthand. */
 export function apiDelete(path) {
   return api(path, { method: 'DELETE' });

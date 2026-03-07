@@ -2,7 +2,7 @@
  * Admin API Service
  * All admin dashboard API calls go through this module.
  */
-import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 
 // ── Dashboard & Config ──
 export const getDashboard    = ()       => apiGet('/v1/admin/dashboard');
@@ -128,6 +128,13 @@ export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURI
 
 // ── Stats ──
 export const getStats        = ()       => apiGet('/v1/stats');
+
+// ── Extensions & Instances ──
+export const getExtensions            = ()              => apiGet('/v1/extensions');
+export const getExtensionInstances    = (name)          => apiGet(`/v1/extensions/${encodeURIComponent(name)}/instances`);
+export const createExtensionInstance  = (name, body)    => apiPost(`/v1/extensions/${encodeURIComponent(name)}/instances`, body);
+export const updateExtensionInstance  = (name, id, body)=> apiPatch(`/v1/extensions/${encodeURIComponent(name)}/instances/${encodeURIComponent(id)}`, body);
+export const deleteExtensionInstance  = (name, id)      => apiDelete(`/v1/extensions/${encodeURIComponent(name)}/instances/${encodeURIComponent(id)}`);
 
 // ── Scheduler ──
 export const getSchedulerJobs    = ()              => apiGet('/v1/admin/scheduler/jobs');
