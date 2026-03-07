@@ -14,7 +14,8 @@ import { generateOtk } from '../utils/otk.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
 import { hashPassword } from '../services/password.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP } from '../services/config-schema.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue } from '../services/config-schema.js';
+import type { ConfigProvenance } from '../services/config-provenance.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -23,6 +24,7 @@ export function adminRouter(
         get: () => import('../storage/interface.js').MaintenanceState;
         set: (state: import('../storage/interface.js').MaintenanceState) => void;
     },
+    provenance?: ConfigProvenance,
 ): Router {
     const router = Router();
 
@@ -530,6 +532,14 @@ export function adminRouter(
             const oldValue = config[mapping.key];
             (config as any)[mapping.key] = value;
             applied.push({ path, old_value: oldValue, new_value: value });
+
+            // Persist to database as raw string
+            try {
+                await storage.setConfigValue(path, serializeConfigValue(value));
+                if (provenance) provenance.markDatabase([path]);
+            } catch (e) {
+                console.warn(`[config] Failed to persist ${path} to DB:`, e);
+            }
         }
 
         if (applied.length === 0 && errors.length > 0) {
@@ -540,7 +550,40 @@ export function adminRouter(
         res.json(success(config.nodeId, {
             applied,
             errors: errors.length > 0 ? errors : undefined,
-            note: 'Runtime config updated. Changes lost on restart unless persisted to environment or config file.',
+            note: 'Config updated and persisted to database. Changes survive restart.',
+        }));
+    });
+
+    // DELETE /v1/admin/config/:path — remove a DB override (revert to file/env/default)
+    router.delete('/v1/admin/config/:path', requireAuth(), requireRole('operator'), async (req, res) => {
+        if (!storage.supportsConfigPersistence()) {
+            res.status(403).json(error(config.nodeId, 'READONLY_CONFIG',
+                'Config persistence not available with in-memory storage.'));
+            return;
+        }
+
+        const path = req.params.path as string;
+        const field = MUTABLE_CONFIG_MAP[path];
+        if (!field) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `Unknown or immutable config path: ${path}`));
+            return;
+        }
+
+        await storage.deleteConfigValue(path);
+
+        // Recalculate provenance for this field
+        if (provenance) {
+            const envVarName = DOT_PATH_TO_ENV[path];
+            const envExists = envVarName ? process.env[envVarName] !== undefined : false;
+            // File/consul checks are simplified — full detection added with file/consul wiring
+            provenance.revertSource(path, envExists, false, false);
+        }
+
+        res.json(success(config.nodeId, {
+            deleted: path,
+            newSource: provenance?.getSource(path) ?? 'default',
+            note: 'DB override removed. Value reverts to file/env/default on next restart.',
         }));
     });
 

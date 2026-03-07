@@ -431,3 +431,49 @@ export function loadConfig(): AimeatConfig {
     },
   };
 }
+
+// ── Database Config Overrides ──
+
+import type { Storage } from './storage/interface.js';
+import { MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
+import type { ConfigProvenance } from './services/config-provenance.js';
+
+/**
+ * Apply config overrides from database (called after storage is initialized).
+ * Only applies to mutable fields — immutable fields are ignored.
+ * Updates provenance registry.
+ */
+export async function applyConfigOverrides(
+  config: AimeatConfig,
+  storage: Storage,
+  provenance: ConfigProvenance,
+): Promise<{ applied: string[]; skipped: string[] }> {
+  if (!storage.supportsConfigPersistence()) {
+    return { applied: [], skipped: [] };
+  }
+
+  const dbValues = await storage.getAllConfigValues();
+  const applied: string[] = [];
+  const skipped: string[] = [];
+
+  for (const [dotPath, rawValue] of Object.entries(dbValues)) {
+    if (isImmutable(dotPath)) {
+      skipped.push(dotPath);
+      continue;
+    }
+    const field = MUTABLE_CONFIG_MAP[dotPath];
+    if (!field) { skipped.push(dotPath); continue; }
+
+    try {
+      const value = parseConfigValue(field, rawValue);
+      if (!field.validate(value)) { skipped.push(dotPath); continue; }
+      (config as any)[field.key] = value;
+      applied.push(dotPath);
+    } catch {
+      skipped.push(dotPath);
+    }
+  }
+
+  if (applied.length > 0) provenance.markDatabase(applied);
+  return { applied, skipped };
+}

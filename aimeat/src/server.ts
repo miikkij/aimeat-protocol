@@ -4,7 +4,10 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from './config.js';
+import { applyConfigOverrides } from './config.js';
 import { createStorage } from './storage/storage-factory.js';
+import { ConfigProvenance } from './services/config-provenance.js';
+import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from './services/config-schema.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
 import { corsMiddleware } from './middleware/cors.js';
@@ -242,6 +245,27 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     mongodb: `MongoDB (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
   };
   logger.info(`Using ${storageLabels[config.storageProvider]} storage`);
+
+  // ── Config Provenance & DB Overrides ──
+  // Build provenance registry tracking where each config value originated.
+  // Then apply any DB-persisted overrides (skipped for in-memory storage).
+  const provenance = new ConfigProvenance();
+  provenance.initDefaults(Object.keys(ALL_CONFIG_MAP));
+  // Mark fields that came from environment variables
+  const envOverrides: string[] = [];
+  for (const [envVar, dotPath] of Object.entries(ENV_TO_DOT_PATH)) {
+    if (process.env[envVar] !== undefined) envOverrides.push(dotPath);
+  }
+  if (envOverrides.length > 0) provenance.markEnv(envOverrides);
+
+  // Apply DB overrides (highest precedence — applied after env/file)
+  const { applied: dbApplied, skipped: dbSkipped } = await applyConfigOverrides(config, storage, provenance);
+  if (dbApplied.length > 0) {
+    logger.info(`Applied ${dbApplied.length} config override(s) from database: ${dbApplied.join(', ')}`);
+  }
+  if (dbSkipped.length > 0) {
+    logger.warn(`Skipped ${dbSkipped.length} invalid DB config value(s): ${dbSkipped.join(', ')}`);
+  }
 
   // Wire storage into CORS middleware (lazy reference, now populated)
   storageForCors = storage;
@@ -503,7 +527,7 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(adminRouter(config, storage, {
     get: () => maintenanceCache,
     set: (state: MaintenanceState) => { maintenanceCache = state; },
-  }));
+  }, provenance));
   app.use(federationRouter(config, storage, peers));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));
