@@ -8,6 +8,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parse as parseIni } from 'ini';
 import { ENV_TO_DOT_PATH, isImmutable } from './config-schema.js';
 
 /** Load env vars as raw string values keyed by dot-path */
@@ -41,7 +42,7 @@ export function loadFileSource(configPath?: string): { name: string; values: Rec
         return { name: `file:${resolved}`, values: flattenToStrings(JSON.parse(raw)) };
       }
       // Assume INI for all other extensions (.ini, .conf, etc.)
-      const parsed = parseSimpleIni(raw);
+      const parsed = parseIni(raw);
       return { name: `file:${resolved}`, values: flattenToStrings(parsed) };
     } catch { return null; }
   }
@@ -53,7 +54,7 @@ export function loadFileSource(configPath?: string): { name: string; values: Rec
   if (existsSync(iniPath)) {
     try {
       const raw = readFileSync(iniPath, 'utf8');
-      const parsed = parseSimpleIni(raw);
+      const parsed = parseIni(raw);
       return { name: `file:${iniPath}`, values: flattenToStrings(parsed) };
     } catch { /* ignore parse errors */ }
   }

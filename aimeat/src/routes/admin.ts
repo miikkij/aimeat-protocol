@@ -442,7 +442,12 @@ export function adminRouter(
     // Schema is built dynamically from the shared CONFIG_FIELDS definitions
     router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
         const editable = storage.supportsConfigPersistence();
-        const schema: Record<string, { value: unknown; type: string; description: string; range?: string; mutable: boolean; editable: boolean; path: string }> = {};
+        type SchemaEntry = {
+            value: unknown; type: string; description: string; range?: string;
+            mutable: boolean; editable: boolean; path: string;
+            source?: string; canReset?: boolean;
+        };
+        const schema: Record<string, SchemaEntry> = {};
 
         for (const field of CONFIG_FIELDS) {
             if (field.adminDisplay === 'hidden') continue;
@@ -450,6 +455,7 @@ export function adminRouter(
             if (field.adminDisplay === 'configured') {
                 // Secret fields — show as boolean indicating whether configured
                 const configuredPath = `${field.dotPath}_configured`;
+                const src = provenance?.getSource(field.dotPath);
                 schema[configuredPath] = {
                     value: !!config[field.key],
                     type: 'boolean',
@@ -457,12 +463,15 @@ export function adminRouter(
                     mutable: false,
                     editable: false,
                     path: configuredPath,
+                    source: src ?? 'default',
+                    canReset: false,
                 };
                 continue;
             }
 
             // Normal field — show actual value
             const typeStr = field.type === 'number' ? 'integer' : field.type;
+            const src = provenance?.getSource(field.dotPath) ?? 'default';
             schema[field.dotPath] = {
                 value: config[field.key],
                 type: typeStr,
@@ -471,6 +480,8 @@ export function adminRouter(
                 mutable: !field.immutable,
                 editable: editable && !field.immutable,
                 path: field.dotPath,
+                source: src,
+                canReset: src === 'database',
             };
         }
 
@@ -482,6 +493,8 @@ export function adminRouter(
             mutable: false,
             editable: false,
             path: 'push.vapid_configured',
+            source: 'default',
+            canReset: false,
         };
 
         res.json(success(config.nodeId, {

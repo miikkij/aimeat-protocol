@@ -5,6 +5,8 @@
 
 import { existsSync } from 'node:fs';
 import type { AimeatConfig } from '../config.js';
+import type { ConfigProvenance } from '../services/config-provenance.js';
+import { ENV_TO_DOT_PATH } from '../services/config-schema.js';
 
 interface ConfigEntry {
   envVar: string;
@@ -28,7 +30,7 @@ function maskUrl(url: string): string {
   return url.replace(/\/\/([^@]+)@/, '//*****@');
 }
 
-export function formatConfig(config: AimeatConfig): string {
+export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance): string {
   const env = process.env;
 
   const sections: ConfigSection[] = [
@@ -629,11 +631,19 @@ export function formatConfig(config: AimeatConfig): string {
   lines.push('  ══════════════════════════════════════════════════════');
 
   const envFile = existsSync('.env');
-  if (envFile) {
-    lines.push('  Source: .env file in current directory');
+  const iniFile = existsSync('aimeat.ini');
+  const jsonFile = existsSync('aimeat.json');
+  const sources: string[] = [];
+  if (envFile) sources.push('.env');
+  if (iniFile) sources.push('aimeat.ini');
+  if (jsonFile) sources.push('aimeat.json');
+  if (provenance) sources.push('database');
+  if (sources.length > 0) {
+    lines.push(`  Sources: ${sources.join(', ')}`);
   } else {
-    lines.push('  Source: environment variables only (no .env file found)');
+    lines.push('  Sources: environment variables only (no .env or config file found)');
   }
+  lines.push(`  Precedence: database > consul > file > .env > defaults`);
   lines.push('');
 
   for (const section of sections) {
@@ -641,14 +651,17 @@ export function formatConfig(config: AimeatConfig): string {
     lines.push('  ' + '─'.repeat(52));
 
     for (const entry of section.entries) {
-      const isDefault = !entry.secret && entry.value === entry.defaultVal;
-      const isExplicit = !isDefault && env[entry.envVar] !== undefined;
-
-      const tag = entry.secret
-        ? ''
-        : isExplicit
-          ? ' (set)'
-          : ' (default)';
+      // Determine source tag
+      let tag: string;
+      if (provenance) {
+        const dotPath = ENV_TO_DOT_PATH[entry.envVar];
+        const src = dotPath ? provenance.getSource(dotPath) : 'default';
+        tag = entry.secret ? '' : ` [${src}]`;
+      } else {
+        const isDefault = !entry.secret && entry.value === entry.defaultVal;
+        const isExplicit = !isDefault && env[entry.envVar] !== undefined;
+        tag = entry.secret ? '' : isExplicit ? ' (set)' : ' (default)';
+      }
 
       lines.push(`    ${entry.envVar}${tag}`);
       lines.push(`      ${entry.description}`);
@@ -658,7 +671,10 @@ export function formatConfig(config: AimeatConfig): string {
   }
 
   lines.push('  ══════════════════════════════════════════════════════');
-  lines.push('  To change a setting, edit the .env file in your node directory.');
+  lines.push('  To change a setting, use one of these methods:');
+  lines.push('    1. Admin dashboard (persisted to database)');
+  lines.push('    2. Edit aimeat.ini or aimeat.json in your node directory');
+  lines.push('    3. Edit the .env file');
   lines.push('  Run "aimeat validate" to check for problems.');
   lines.push('');
 
