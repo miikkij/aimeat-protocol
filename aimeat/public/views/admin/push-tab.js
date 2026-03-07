@@ -69,32 +69,31 @@ export default function PushTab({ data, reload }) {
     <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.pushExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
 
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap">
       <${StatsGrid} items=${[
         { label: t('dashboard.totalSubscriptions'), value: push.total_subscriptions || subs.length, color: '#06b6d4' },
         { label: t('dashboard.activeSubscriptions'), value: subs.filter(s => s.active !== false).length, color: '#22c55e' },
       ]} />
-      <button
-        class="adm-btn"
-        style="margin-left:auto;white-space:nowrap"
-        onClick=${handleTest}
-        disabled=${testStatus === 'sending'}
-      >
-        ${testStatus === 'sending' ? (t('dashboard.pushTestSending') || 'Sending...') :
-          testStatus === 'sent' ? (t('dashboard.pushTestSent') || 'Sent!') :
-          testStatus === 'error' ? (t('dashboard.pushTestError') || 'Failed') :
-          (t('dashboard.pushTestBtn') || 'Send Test Push')}
-      </button>
+      <div style="margin-left:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <button
+          class="adm-btn"
+          style="white-space:nowrap"
+          onClick=${handleTest}
+          disabled=${testStatus === 'sending'}
+        >
+          ${testStatus === 'sending' ? (t('dashboard.pushTestSending') || 'Sending...') :
+            testStatus === 'sent' ? (t('dashboard.pushTestSent') || 'Sent!') :
+            testStatus === 'error' ? (t('dashboard.pushTestError') || 'Failed') :
+            (t('dashboard.pushTestBtn') || 'Send Test Push')}
+        </button>
+      </div>
     </div>
 
     <!-- Locale Tabs -->
     <div style="display:flex;gap:4px;margin-bottom:16px">
       ${locales.map(loc => html`
-        <button
-          class="adm-btn ${activeLocale === loc ? 'active' : ''}"
-          style="padding:4px 16px;font-size:.85rem;text-transform:uppercase;${activeLocale === loc ? 'background:var(--accent);color:#fff' : ''}"
-          onClick=${() => setActiveLocale(loc)}
-        >${loc}</button>
+        <button class=${activeLocale === loc ? 'adm-btn' : 'adm-btn-action'} style="padding:4px 10px;font-size:.75rem"
+          onClick=${() => setActiveLocale(loc)}>${loc.toUpperCase()}</button>
       `)}
     </div>
 
@@ -122,7 +121,7 @@ export default function PushTab({ data, reload }) {
 
               <div style="display:flex;flex-direction:column;gap:8px">
                 ${isWebPush ? html`
-                  <label style="font-size:.75rem;color:var(--text-dim)">Title</label>
+                  <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldTitle')}</label>
                   <input
                     class="adm-input"
                     style="font-size:.85rem;font-family:monospace"
@@ -130,7 +129,7 @@ export default function PushTab({ data, reload }) {
                     onInput=${(e) => updateField(tpl.id, 'title', e.target.value)}
                   />
                 ` : html`
-                  <label style="font-size:.75rem;color:var(--text-dim)">Subject</label>
+                  <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldSubject')}</label>
                   <input
                     class="adm-input"
                     style="font-size:.85rem;font-family:monospace"
@@ -139,7 +138,7 @@ export default function PushTab({ data, reload }) {
                   />
                 `}
 
-                <label style="font-size:.75rem;color:var(--text-dim)">Body</label>
+                <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldBody')}</label>
                 <textarea
                   class="adm-input"
                   style="font-size:.85rem;font-family:monospace;min-height:${isWebPush ? '40px' : '100px'};resize:vertical"
@@ -159,7 +158,7 @@ export default function PushTab({ data, reload }) {
                     style="font-size:.8rem"
                     onClick=${() => handleSave(tpl)}
                     disabled=${isSaving}
-                  >${isSaving ? (t('dashboard.saving') || 'Saving...') : (t('dashboard.save') || 'Save')}</button>
+                  >${isSaving ? t('dashboard.saving') : t('dashboard.save')}</button>
                 </div>
               </div>
             </div>
