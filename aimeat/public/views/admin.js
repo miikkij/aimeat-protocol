@@ -209,7 +209,7 @@ export default function Admin({ navigate, locale }) {
       if (!mountRef.current) return;
 
       d.ghiiUsers       = features[0].status === 'fulfilled' ? (features[0].value.data.ghii_users || []) : [];
-      d.emailStatus     = features[1].status === 'fulfilled' ? features[1].value.data : null;
+      d.email           = features[1].status === 'fulfilled' ? features[1].value.data : null;
       d.directoryStats  = features[2].status === 'fulfilled' ? features[2].value.data : null;
       d.matchingStats   = features[3].status === 'fulfilled' ? features[3].value.data : null;
       d.marketplaceStats= features[4].status === 'fulfilled' ? features[4].value.data : null;

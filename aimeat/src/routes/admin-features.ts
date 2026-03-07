@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { EmailService } from '../services/email.js';
+import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml, matchSuggestionEmailHtml } from '../services/email-templates.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { MatchingEngine } from '../services/matching.js';
 import type { PushService } from '../services/push.js';
@@ -138,7 +139,7 @@ export function adminFeaturesRouter(
     }));
 
     router.post('/v1/admin/email/test', ...auth, handle(async (req, res) => {
-        const { to } = req.body ?? {};
+        const { to, template, locale: loc } = req.body ?? {};
         if (!to || typeof to !== 'string') {
             res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'to (email address) is required'));
             return;
@@ -147,8 +148,161 @@ export function adminFeaturesRouter(
             res.status(400).json(error(config.nodeId, 'EMAIL_DISABLED', 'Email service is not configured'));
             return;
         }
-        const sent = await services.emailService.sendNotification(to, 'AIMEAT Test Email', 'This is a test email from your AIMEAT node.');
-        res.json(success(config.nodeId, { sent }));
+        const tplLocale = loc || 'en';
+        let subject: string;
+        let html: string;
+        let text: string;
+        switch (template) {
+            case 'verification': {
+                const r = verificationEmailHtml('123456', tplLocale);
+                subject = 'AIMEAT Test — Verification Code'; html = r.html; text = r.text; break;
+            }
+            case 'magic_link': {
+                const r = magicLinkEmailHtml('https://example.com/login?token=sample', tplLocale);
+                subject = 'AIMEAT Test — Magic Link'; html = r.html; text = r.text; break;
+            }
+            case 'match_suggestion': {
+                const r = matchSuggestionEmailHtml([
+                    { ghii: 'gaii:example:alice', displayName: 'Alice', sharedInterests: ['hiking', 'photography'], distance: '12 km' },
+                ], tplLocale);
+                subject = 'AIMEAT Test — Match Suggestion'; html = r.html; text = r.text; break;
+            }
+            default: {
+                const r = notificationEmailHtml('AIMEAT Test Email', 'This is a test email from your AIMEAT node.', tplLocale);
+                subject = 'AIMEAT Test Email'; html = r.html; text = r.text; break;
+            }
+        }
+        const sent = await services.emailService.sendRaw(to, subject, html, text);
+        res.json(success(config.nodeId, { sent, template: template || 'notification' }));
+    }));
+
+    router.post('/v1/admin/email/send-group', ...auth, handle(async (req, res) => {
+        const { group, subject, body } = req.body ?? {};
+        if (!subject || !body) {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'subject and body are required'));
+            return;
+        }
+        if (!services.emailService.enabled) {
+            res.status(400).json(error(config.nodeId, 'EMAIL_DISABLED', 'Email service is not configured'));
+            return;
+        }
+        const recipients: string[] = [];
+        if (group === 'operators') {
+            const owners = await storage.listOwners();
+            const ghiis = await storage.listGHIIs();
+            const operatorNames = new Set(owners.filter(o => o.roles.includes('operator')).map(o => o.name));
+            for (const g of ghiis) {
+                if (g.notificationEmail && operatorNames.has(g.ownerName ?? '')) {
+                    recipients.push(g.notificationEmail);
+                }
+            }
+        } else if (group === 'all') {
+            const ghiis = await storage.listGHIIs();
+            for (const g of ghiis) {
+                if (g.notificationEmail) recipients.push(g.notificationEmail);
+            }
+        } else {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'group must be "operators" or "all"'));
+            return;
+        }
+        const { html: mailHtml, text: mailText } = notificationEmailHtml(subject as string, body as string);
+        let sent = 0;
+        for (const addr of recipients) {
+            const ok = await services.emailService.sendRaw(addr, subject as string, mailHtml, mailText);
+            if (ok) sent++;
+        }
+        res.json(success(config.nodeId, { sent, total: recipients.length, group }));
+    }));
+
+    router.get('/v1/admin/email/templates', ...auth, handle(async (req, res) => {
+        const locale = (req.query.locale as string) || 'en';
+
+        const defaults = [
+            { id: 'verification', usedIn: 'ghii', ...verificationEmailHtml('123456', locale),
+              params: ['{{code}}'], paramDescriptions: { '{{code}}': 'Verification code (e.g. 123456)' } },
+            { id: 'magic_link', usedIn: 'ghii', ...magicLinkEmailHtml('https://example.com/login?token=sample', locale),
+              params: ['{{url}}'], paramDescriptions: { '{{url}}': 'Magic login URL' } },
+            { id: 'notification', usedIn: 'system', ...notificationEmailHtml('AIMEAT Notification', 'This is a sample notification message.', locale),
+              params: ['{{subject}}', '{{body}}'], paramDescriptions: { '{{subject}}': 'Notification subject', '{{body}}': 'Notification body text' } },
+            { id: 'match_suggestion', usedIn: 'matching', ...matchSuggestionEmailHtml([
+                { ghii: 'gaii:example:alice', displayName: 'Alice', sharedInterests: ['hiking', 'photography'], distance: '12 km' },
+                { ghii: 'gaii:example:bob', displayName: 'Bob', sharedInterests: ['cooking'], distance: '5 km' },
+            ], locale),
+              params: ['{{matches}}'], paramDescriptions: { '{{matches}}': 'Array of match cards (name, GHII, interests, distance)' } },
+        ];
+
+        // Check for custom overrides stored in memory
+        const templates = [];
+        for (const tpl of defaults) {
+            const customHtmlRec = await storage.getMemory('__site__', `_email_tpl/${tpl.id}/${locale}/html`);
+            const customTextRec = await storage.getMemory('__site__', `_email_tpl/${tpl.id}/${locale}/text`);
+            templates.push({
+                id: tpl.id,
+                usedIn: tpl.usedIn,
+                preview: (customHtmlRec?.value as string | undefined) ?? tpl.html,
+                text: (customTextRec?.value as string | undefined) ?? tpl.text,
+                defaultHtml: tpl.html,
+                defaultText: tpl.text,
+                isCustom: !!(customHtmlRec || customTextRec),
+                params: tpl.params,
+                paramDescriptions: tpl.paramDescriptions,
+            });
+        }
+        res.json(success(config.nodeId, { templates, locale }));
+    }));
+
+    // PUT /v1/admin/email/templates/:id — Save custom template override
+    router.put('/v1/admin/email/templates/:id', ...auth, handle(async (req, res) => {
+        const id = req.params.id as string;
+        const locale = (req.body.locale as string) || 'en';
+        const { html: htmlContent, text: textContent } = req.body;
+
+        const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
+        if (!validIds.includes(id)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid template id: ${id}`));
+            return;
+        }
+
+        const now = new Date().toISOString();
+        if (typeof htmlContent === 'string') {
+            await storage.setMemory({
+                ownerGaii: '__site__',
+                key: `_email_tpl/${id}/${locale}/html`,
+                value: htmlContent,
+                visibility: 'private',
+                tags: [],
+                ttlHours: null,
+                version: 1,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+        if (typeof textContent === 'string') {
+            await storage.setMemory({
+                ownerGaii: '__site__',
+                key: `_email_tpl/${id}/${locale}/text`,
+                value: textContent,
+                visibility: 'private',
+                tags: [],
+                ttlHours: null,
+                version: 1,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
+
+        res.json(success(config.nodeId, { saved: true, id, locale }));
+    }));
+
+    // DELETE /v1/admin/email/templates/:id — Reset template to default
+    router.delete('/v1/admin/email/templates/:id', ...auth, handle(async (req, res) => {
+        const id = req.params.id as string;
+        const locale = (req.query.locale as string) || 'en';
+
+        await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/html`);
+        await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/text`);
+
+        res.json(success(config.nodeId, { reset: true, id, locale }));
     }));
 
     // ── Directory Stats ─────────────────────────────────────

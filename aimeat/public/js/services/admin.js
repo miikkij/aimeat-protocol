@@ -67,7 +67,11 @@ export const clearGhiiCors   = (ghii)   => apiPut(`/v1/admin/ghii/${encodeURICom
 
 // ── Email ──
 export const getEmailStatus  = ()       => apiGet('/v1/admin/email/status');
-export const sendTestEmail   = (to)     => apiPost('/v1/admin/email/test', { to });
+export const sendTestEmail   = (to, template, locale) => apiPost('/v1/admin/email/test', { to, template, locale });
+export const getEmailTemplates = (locale) => apiGet(`/v1/admin/email/templates?locale=${locale || 'en'}`);
+export const saveEmailTemplate = (id, locale, htmlContent, textContent) => apiPut(`/v1/admin/email/templates/${id}`, { locale, html: htmlContent, text: textContent });
+export const resetEmailTemplate = (id, locale) => apiDelete(`/v1/admin/email/templates/${id}?locale=${locale || 'en'}`);
+export const sendGroupEmail  = (group, subject, body) => apiPost('/v1/admin/email/send-group', { group, subject, body });
 
 // ── Directory ──
 export const getDirectoryStats = ()     => apiGet('/v1/admin/directory/stats');

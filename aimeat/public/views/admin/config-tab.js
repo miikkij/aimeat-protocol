@@ -106,11 +106,16 @@ export default function ConfigTab({ data, reload }) {
       </div>
     `}
 
-    ${Object.entries(groups).map(([g, items]) => html`
+    ${Object.entries(groups).map(([g, items]) => {
+      const helpKey = 'dashboard.cfgHelp_' + g;
+      const helpText = t(helpKey);
+      const hasHelp = helpText !== helpKey;
+      return html`
       <details class="adm-card" style="margin-bottom:8px" open>
         <summary style="cursor:pointer;font-weight:600;font-size:.95rem;padding:8px 0">
           ${groupLabel(g)}
         </summary>
+        ${hasHelp && html`<${ExpandableHelp} title=${t('dashboard.cfgHelpTitle')}><p>${helpText}</p></${ExpandableHelp}>`}
         <div class=${!editable ? 'adm-config-readonly' : ''} style="padding:8px 0">
           ${items.map(({ path: p, entry: e }) => html`
             <div class="adm-hrow">
@@ -141,6 +146,6 @@ export default function ConfigTab({ data, reload }) {
           `)}
         </div>
       </details>
-    `)}
+    `})}
   `;
 }

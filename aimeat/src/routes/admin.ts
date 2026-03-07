@@ -1301,6 +1301,8 @@ async function doPasswordLogin(){
       document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';return;
     }
     var d=r.data;
+    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load
+    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:d.owner.name,gaii:d.agent.gaii,ghii:d.ghii.ghii,jwt:d.token,publicKey:'',privateKey:d.agent_private_key}));}catch(e){}
     showLoginSuccess(d.token,['owner','operator'],'/v1/admin');
     document.getElementById('btnPwLogin').textContent='Login';
     document.getElementById('btnPwLogin').disabled=false;
@@ -1318,6 +1320,8 @@ async function doLogin(){
   try{
     const r=await api('POST','/v1/admin/setup/token',{owner:owner,private_key:key});
     if(!r.ok){show('loginResult',esc((r.error&&r.error.message)||r.error||'Login failed'),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';return;}
+    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load
+    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:owner,jwt:r.token,publicKey:''}));}catch(e){}
     showLoginSuccess(r.token,r.roles,r.dashboard_url);
     document.getElementById('btnLogin').textContent='Login';
     document.getElementById('btnLogin').disabled=false;
@@ -1354,6 +1358,8 @@ async function doRegToken(){
   try{
     const r=await api('POST','/v1/admin/setup/token',{owner:regOwner,private_key:regKey});
     if(!r.ok){show('regTokenResult',esc((r.error&&r.error.message)||r.error||'Token request failed'),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';return;}
+    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load
+    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:regOwner,jwt:r.token,publicKey:''}));}catch(e){}
     document.getElementById('regTokenResult').classList.add('hidden');
     document.getElementById('regRoles').textContent='Roles: '+r.roles.join(', ');
     document.getElementById('regDashLink').href=r.dashboard_url;

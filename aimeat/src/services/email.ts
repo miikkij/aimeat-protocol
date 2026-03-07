@@ -23,6 +23,7 @@ export interface EmailService {
   sendMagicLink(to: string, loginUrl: string, locale?: string): Promise<boolean>;
   sendNotification(to: string, subject: string, body: string): Promise<boolean>;
   sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean>;
+  sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
 }
 
 // ── Retry helper ─────────────────────────────────────────
@@ -59,6 +60,7 @@ function createDisabledService(): EmailService {
     sendMagicLink: () => warn('sendMagicLink'),
     sendNotification: () => warn('sendNotification'),
     sendMatchSuggestion: () => warn('sendMatchSuggestion'),
+    sendRaw: () => warn('sendRaw'),
   };
 }
 
@@ -122,6 +124,10 @@ export function createEmailService(config: AimeatConfig): EmailService {
       const { html, text } = matchSuggestionEmailHtml(matches, locale);
       const subject = locale === 'fi' ? 'Uusia ehdotuksia AIMEAT:ssa' : 'New Match Suggestions on AIMEAT';
       return send(to, subject, html, text);
+    },
+
+    async sendRaw(to: string, subject: string, rawHtml: string, rawText: string): Promise<boolean> {
+      return send(to, subject, rawHtml, rawText);
     },
   };
 }
