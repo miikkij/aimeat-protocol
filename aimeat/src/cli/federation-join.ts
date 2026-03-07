@@ -46,7 +46,7 @@ interface PendingJoin {
 function loadPendingJoin(): PendingJoin | null {
   const path = existsSync(PENDING_JOIN_FILE) ? PENDING_JOIN_FILE
     : existsSync(join(__pkgRoot, PENDING_JOIN_FILE)) ? join(__pkgRoot, PENDING_JOIN_FILE)
-    : null;
+      : null;
   if (!path) return null;
   try {
     return JSON.parse(readFileSync(path, 'utf-8')) as PendingJoin;
@@ -63,7 +63,7 @@ function clearPendingJoin(): void {
   try {
     const filePath = existsSync(PENDING_JOIN_FILE) ? PENDING_JOIN_FILE
       : existsSync(join(__pkgRoot, PENDING_JOIN_FILE)) ? join(__pkgRoot, PENDING_JOIN_FILE)
-      : null;
+        : null;
     if (filePath) unlinkSync(filePath);
   } catch {
     // Ignore cleanup errors
