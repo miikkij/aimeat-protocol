@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
+import type { Scheduler } from '../services/scheduler.js';
 import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
 
-export function extensionsRouter(config: AimeatConfig, storage: Storage): Router {
+export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler): Router {
   const router = Router();
 
   // ── GET /v1/extensions — List installed extensions ────────────
@@ -124,6 +125,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
       const manifestConfig = manifest.config as Record<string, unknown> | undefined;
       const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
       const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
+      const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
 
       const record: ExtensionRecord = {
         name,
@@ -140,17 +142,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
           outputSchema: (a.output as Record<string, unknown>) ?? {},
           scriptContent: scripts[a.script as string],
         })),
-        config: manifestConfig
-          ? Object.fromEntries(
-              Object.entries(manifestConfig).map(([k, v]) => {
-                // If value is a schema object with a `.default`, extract just the default
-                if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                  return [k, (v as Record<string, unknown>).default];
-                }
-                return [k, v];
-              }),
-            )
-          : {},
+        config: {
+          ...(manifestConfig
+            ? Object.fromEntries(
+                Object.entries(manifestConfig).map(([k, v]) => {
+                  if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                    return [k, (v as Record<string, unknown>).default];
+                  }
+                  return [k, v];
+                }),
+              )
+            : {}),
+          ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+        },
         limits: {
           memoryMb: Math.min(
             (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
@@ -256,6 +260,33 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
         activatedAt: new Date().toISOString(),
       });
 
+      // Register scheduled jobs from manifest if scheduler is available
+      if (scheduler && ext.config.__schedules) {
+        const schedules = ext.config.__schedules as Array<Record<string, unknown>>;
+        for (const sched of schedules) {
+          const jobId = `ext:${name}:${sched.id as string}`;
+          const existing = await storage.getScheduledJob(jobId);
+          if (!existing) {
+            const jobRecord: ScheduledJobRecord = {
+              id: jobId,
+              name: (sched.description as string) ?? `${name}/${sched.id as string}`,
+              type: 'extension',
+              extensionName: name,
+              actionId: sched.action as string,
+              cron: sched.cron as string,
+              enabled: true,
+              input: (sched.input as Record<string, unknown>) ?? undefined,
+              createdBy: req.auth!.sub,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            await storage.createScheduledJob(jobRecord);
+            scheduler.addJob(jobRecord);
+            logger.info(`Registered scheduled job: ${jobId}`, { cron: sched.cron });
+          }
+        }
+      }
+
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
 
       res.json(success(config.nodeId, { extension: updated }, [
@@ -281,6 +312,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
       const updated = await storage.updateExtension(name, {
         status: 'inactive',
       });
+
+      // Remove scheduled jobs for this extension
+      if (scheduler) {
+        const jobs = await storage.listScheduledJobs({ extensionName: name });
+        for (const job of jobs) {
+          scheduler.removeJob(job.id);
+          await storage.deleteScheduledJob(job.id);
+        }
+        if (jobs.length > 0) {
+          logger.info(`Removed ${jobs.length} scheduled jobs for extension: ${name}`);
+        }
+      }
 
       logger.info(`Extension deactivated: ${name}`, { by: req.auth!.sub });
 

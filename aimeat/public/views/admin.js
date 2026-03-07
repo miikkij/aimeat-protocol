@@ -39,6 +39,7 @@ import MsmTab          from './admin/msm-tab.js';
 import FederationTab   from './admin/federation-tab.js';
 import GenesisTab      from './admin/genesis-tab.js';
 import ConsulTab       from './admin/consul-tab.js';
+import SchedulerTab      from './admin/scheduler-tab.js';
 import KnowledgeAdminTab from './admin/knowledge-tab.js';
 
 // ── Sidebar nav structure ──
@@ -68,7 +69,8 @@ const NAV_GROUPS = [
   { key: 'dashboard.navInfrastructure', items: [
     { id: 'email',  icon: '\u2709',     key: 'dashboard.email',  component: EmailTab },
     { id: 'push',   icon: '\u{1F514}',  key: 'dashboard.push',   component: PushTab },
-    { id: 'consul', icon: '\u{1F5C4}',  key: 'dashboard.consul', component: ConsulTab },
+    { id: 'consul',    icon: '\u{1F5C4}',  key: 'dashboard.consul',    component: ConsulTab },
+    { id: 'scheduler', icon: '\u{23F0}',   key: 'dashboard.scheduler', component: SchedulerTab },
   ]},
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   icon: '\u{1F4D6}', key: 'dashboard.directory',      component: DirectoryTab },
@@ -207,6 +209,7 @@ export default function Admin({ navigate, locale }) {
         api.getCsmTemplates(), api.getMsmIntegrations(), api.getGenesisPeers(),
         api.getConfig(),
         api.getConsulStatus().catch(() => ({ data: null })),
+        api.getSchedulerJobs().catch(() => ({ data: null })),
       ]);
       if (!mountRef.current) return;
 
@@ -221,6 +224,7 @@ export default function Admin({ navigate, locale }) {
       d.genesisPeers    = features[8].status === 'fulfilled' ? features[8].value.data : null;
       d.configSchema    = features[9].status === 'fulfilled' ? features[9].value.data : null;
       d.consul          = features[10].status === 'fulfilled' ? features[10].value.data : null;
+      d.schedulerJobs   = features[11].status === 'fulfilled' ? features[11].value.data : null;
 
       // Phase 4: portal + stats + owners
       try {

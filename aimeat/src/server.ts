@@ -98,11 +98,14 @@ import { metricsMiddleware } from './middleware/metrics.js';
 import { extensionsRouter } from './routes/extensions.js';
 import { cortexRouter } from './routes/cortex.js';
 import { MailboxNotificationService } from './services/mailbox-notification.js';
+import { Scheduler } from './services/scheduler.js';
+import { adminSchedulerRouter } from './routes/admin-scheduler.js';
 
 export interface ServerResult {
   app: express.Express;
   tunnelManager: TunnelManager | null;
   realtimeManager: RealtimeManager | null;
+  scheduler: Scheduler;
   storage: Storage;
 }
 
@@ -364,25 +367,17 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     await setupAnonymousIdentity(config, storage);
   }
 
-  // Start daily allowance background job
-  startDailyAllowanceJob(config, storage);
+  // Internal Scheduler System — centralized cron-based job scheduler
+  const scheduler = new Scheduler(config, storage);
 
-  // Start work timeout expiry job
-  startWorkTimeoutJob(config, storage);
-
-  // Start memory TTL cleanup job (every 5m)
-  startMemoryTtlCleanupJob(storage);
-
-  // Start board post TTL cleanup job (every 10m)
-  startBoardPostTtlCleanupJob(storage);
-
-  // Start dispute auto-escalation job
-  startDisputeTimeoutJob(config, storage);
-
-  // Start consent expiry background job (every 10m) — Phase 0.3
+  // Register core job handlers
+  scheduler.registerCoreHandler('daily-allowance', () => runDailyAllowanceJob(config, storage));
+  scheduler.registerCoreHandler('work-timeout', () => runWorkTimeoutJob(config, storage));
+  scheduler.registerCoreHandler('memory-ttl-cleanup', () => runMemoryTtlCleanupJob(storage));
+  scheduler.registerCoreHandler('board-post-ttl-cleanup', () => runBoardPostTtlCleanupJob(storage));
+  scheduler.registerCoreHandler('dispute-timeout', () => runDisputeTimeoutJob(config, storage));
   if (config.consentEnabled) {
-    startConsentExpiryJob(storage);
-    logger.info('Consent expiry job scheduled (every 10m)');
+    scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
   }
 
   // Seed standardized profile schemas — Phase 0.4
@@ -683,7 +678,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   app.use(appMarketplaceRouter(config, storage));
   // Node Extensions (V8 Isolates)
   if (config.extensionsEnabled) {
-    app.use(extensionsRouter(config, storage));
+    app.use(extensionsRouter(config, storage, scheduler));
     logger.info('Extension system enabled');
   }
 
@@ -692,6 +687,16 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     app.use(cortexRouter(config, storage));
     logger.info('Cortex extension system enabled');
   }
+
+  // Scheduler admin routes
+  app.use(adminSchedulerRouter(config, storage, scheduler));
+
+  // Seed core scheduled jobs (idempotent — only creates if not already present)
+  seedCoreScheduledJobs(config, storage).catch(err =>
+    logger.error('Failed to seed core scheduled jobs', { error: String(err) }));
+
+  // Start the scheduler (loads enabled jobs from storage)
+  scheduler.start().catch(err => logger.error('Scheduler start failed', { error: String(err) }));
 
   // Genesis Sync Scheduler (Phase 3.4)
   const genesisSyncService = createGenesisSyncService(config, storage);
@@ -739,7 +744,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     });
   });
 
-  return { app, tunnelManager, realtimeManager, storage };
+  return { app, tunnelManager, realtimeManager, scheduler, storage };
 }
 
 // Daily allowance: credit all agents every 24 hours (or on first activity)
