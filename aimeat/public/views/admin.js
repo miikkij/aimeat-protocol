@@ -213,7 +213,7 @@ export default function Admin({ navigate, locale }) {
       d.directoryStats  = features[2].status === 'fulfilled' ? features[2].value.data : null;
       d.matchingStats   = features[3].status === 'fulfilled' ? features[3].value.data : null;
       d.marketplaceStats= features[4].status === 'fulfilled' ? features[4].value.data : null;
-      d.pushStats       = features[5].status === 'fulfilled' ? features[5].value.data : null;
+      d.push            = features[5].status === 'fulfilled' ? features[5].value.data : null;
       d.csmTemplates    = features[6].status === 'fulfilled' ? features[6].value.data : null;
       d.msmIntegrations = features[7].status === 'fulfilled' ? features[7].value.data : null;
       d.genesisPeers    = features[8].status === 'fulfilled' ? features[8].value.data : null;

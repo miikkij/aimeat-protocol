@@ -379,6 +379,7 @@ export function adminFeaturesRouter(
             total_subscriptions: subs.length,
             subscriptions: subs.map(s => ({
                 owner_name: s.ownerName,
+                endpoint: s.endpoint?.substring(0, 60) ?? '—',
                 created_at: s.createdAt,
                 last_used_at: s.lastUsedAt,
             })),

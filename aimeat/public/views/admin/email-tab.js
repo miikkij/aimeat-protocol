@@ -20,7 +20,8 @@ const USED_IN_LABELS = {
 };
 
 /* ── AI Prompt builder ── */
-function buildAiPrompt(tpl) {
+function buildAiPrompt(tpl, locale) {
+  const langName = locale === 'fi' ? 'Finnish (suomi)' : 'English';
   const paramList = (tpl.params || []).map(p =>
     `  ${p} — ${(tpl.paramDescriptions || {})[p] || 'system parameter'}`
   ).join('\n');
@@ -29,11 +30,12 @@ function buildAiPrompt(tpl) {
 
 Template type: ${t(TEMPLATE_LABELS[tpl.id] || tpl.id)}
 Purpose: ${t(USED_IN_LABELS[tpl.usedIn] || tpl.usedIn)}
+Language: ${langName} — ALL user-facing text in the template must be written in ${langName}.
 
 IMPORTANT — Parameter tags that MUST be preserved exactly as-is in the output:
 ${paramList}
 
-These tags are replaced by the system with real data when the email is sent. You must include them in the appropriate places in both HTML and plain text versions.
+These tags are replaced by the system with real data when the email is sent. You must include them in the appropriate places in both HTML and plain text versions. Do NOT translate or modify these tags.
 
 Requirements:
 - Modern, clean design with good typography
@@ -42,8 +44,9 @@ Requirements:
 - Professional color scheme (consider using indigo/purple #4f46e5 as accent)
 - AIMEAT branding in header
 - Clear visual hierarchy
-- Footer with "Sent by AIMEAT Protocol" and unsubscribe note
+- Footer with "Sent by AIMEAT Protocol" and unsubscribe note (in ${langName})
 - Both HTML version and plain text fallback version
+- All text content must be in ${langName}
 
 Here is the current default template for reference:
 ---HTML---
@@ -53,8 +56,8 @@ ${tpl.defaultText || tpl.text || ''}
 ---END---
 
 Please provide:
-1. The complete HTML email template
-2. The plain text version
+1. The complete HTML email template (in ${langName})
+2. The plain text version (in ${langName})
 
 Make it visually stunning while keeping parameter tags intact.`;
 }
@@ -67,13 +70,12 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  // Sync when tpl changes (e.g. locale switch)
+  // Sync when tpl data or locale changes
   useEffect(() => {
     setEditHtml(tpl.preview || '');
     setEditText(tpl.text || '');
     setMsg(null);
-    setView('preview');
-  }, [tpl.id, locale]);
+  }, [tpl.id, tpl.preview, tpl.text, locale]);
 
   async function doSave() {
     setSaving(true);
@@ -103,7 +105,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
   }
 
   async function copyAiPrompt() {
-    const prompt = buildAiPrompt(tpl);
+    const prompt = buildAiPrompt(tpl, locale);
     try {
       await navigator.clipboard.writeText(prompt);
       setMsg({ ok: true, text: t('dashboard.emailTplAiPromptCopied') });
@@ -157,7 +159,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
         <iframe
           srcdoc=${editHtml}
           style="width:100%;height:420px;border:1px solid var(--glass-border);border-top:none;border-radius:0 0 6px 6px;background:#f4f4f7"
-          sandbox="allow-same-origin"
+          sandbox="allow-same-origin allow-scripts"
         />
       `}
       ${view === 'html' && html`
@@ -370,6 +372,7 @@ export default function EmailTab({ data, locale }) {
           ${expanded[tpl.id] && html`
             <div style="padding:0 14px 14px">
               <${TemplateEditor}
+                key=${`${tpl.id}-${tplLocale}`}
                 tpl=${tpl}
                 locale=${tplLocale}
                 onSave=${handleSaveTemplate}
