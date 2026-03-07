@@ -1713,6 +1713,8 @@
     "pushTestSending": "Sending...",
     "pushTestSent": "Sent!",
     "pushTestError": "Failed",
+    "pushTestNoSubs": "No subscriptions — subscribe via portal first",
+    "pushTestErrorDetail": "No subscription found or sending failed",
     "pushDefault": "default",
     "pushCustomized": "customized",
     "pushResetBtn": "Reset to Default Templates",

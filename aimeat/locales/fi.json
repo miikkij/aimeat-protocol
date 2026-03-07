@@ -1712,6 +1712,8 @@
     "pushTestSending": "Lähetetään...",
     "pushTestSent": "Lähetetty!",
     "pushTestError": "Epäonnistui",
+    "pushTestNoSubs": "Ei tilauksia — tilaa ensin portaalin kautta",
+    "pushTestErrorDetail": "Tilausta ei löytynyt tai lähetys epäonnistui",
     "pushDefault": "oletus",
     "pushCustomized": "mukautettu",
     "pushResetBtn": "Palauta oletuspohjat",

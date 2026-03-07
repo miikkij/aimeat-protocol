@@ -5,7 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import * as api from '/js/services/admin.js';
-import { dt, StatsGrid, Empty, ExpandableHelp } from './shared.js';
+import { dt, StatCard, Empty, ExpandableHelp } from './shared.js';
 
 export default function PushTab({ data, reload }) {
   const push = data.push;
@@ -74,22 +74,24 @@ export default function PushTab({ data, reload }) {
     <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.pushExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
 
-    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap">
-      <${StatsGrid} items=${[
-        { label: t('dashboard.totalSubscriptions'), value: push.total_subscriptions || subs.length, color: '#06b6d4' },
-        { label: t('dashboard.activeSubscriptions'), value: subs.filter(s => s.active !== false).length, color: '#22c55e' },
-      ]} />
-      <button
-        class="adm-btn"
-        style="margin-left:auto;white-space:nowrap"
-        onClick=${handleTest}
-        disabled=${testStatus === 'sending'}
-      >
-        ${testStatus === 'sending' ? t('dashboard.pushTestSending') :
-          testStatus === 'sent' ? t('dashboard.pushTestSent') :
-          testStatus === 'error' ? t('dashboard.pushTestError') :
-          t('dashboard.pushTestBtn')}
-      </button>
+    <div style="display:flex;gap:12px;align-items:stretch;margin-bottom:16px;flex-wrap:wrap">
+      <${StatCard} label=${t('dashboard.totalSubscriptions')} value=${push.total_subscriptions || subs.length} color="#06b6d4" />
+      <${StatCard} label=${t('dashboard.activeSubscriptions')} value=${subs.filter(s => s.active !== false).length} color="#22c55e" />
+      <div style="margin-left:auto;display:flex;flex-direction:column;justify-content:center;gap:6px;align-items:flex-end">
+        <button
+          class="adm-btn"
+          style="white-space:nowrap"
+          onClick=${handleTest}
+          disabled=${testStatus === 'sending' || !subs.length}
+        >
+          ${testStatus === 'sending' ? t('dashboard.pushTestSending') :
+            testStatus === 'sent' ? t('dashboard.pushTestSent') :
+            testStatus === 'error' ? t('dashboard.pushTestError') :
+            t('dashboard.pushTestBtn')}
+        </button>
+        ${!subs.length && html`<span style="font-size:.72rem;color:var(--text-dim)">${t('dashboard.pushTestNoSubs')}</span>`}
+        ${testStatus === 'error' && html`<span style="font-size:.72rem;color:#ef4444">${t('dashboard.pushTestErrorDetail')}</span>`}
+      </div>
     </div>
 
     <!-- Templates card — matches email tab structure -->

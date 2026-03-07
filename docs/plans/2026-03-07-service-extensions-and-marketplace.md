@@ -30,6 +30,136 @@ Extend the existing V8 sandbox extension system to support **multi-instance serv
 - New marketplace public SPA (multi-instance aware)
 - Matching extension action scripts
 
+## Phase 0: Internal Scheduler System
+
+**Goal:** Build a lightweight job scheduler into the AIMEAT core that services and extensions can use to register recurring tasks.
+
+Currently, scheduled work is handled with ad-hoc `setInterval` calls in individual services (e.g., `matching.ts` runs matching rounds on a timer). This phase replaces that pattern with a centralized scheduler that both core services and extensions can use.
+
+### Task 0.1: Scheduler Storage Interface
+
+Add to `src/storage/interface.ts`:
+
+```typescript
+export interface ScheduledJobRecord {
+  id: string;                              // Unique job identifier
+  name: string;                            // Human-readable name
+  type: 'extension' | 'core';             // Who registered this job
+  extensionName?: string;                  // For extension jobs
+  instanceId?: string;                     // For instance-scoped extension jobs
+  actionId?: string;                       // Extension action to invoke
+  coreHandler?: string;                    // Core handler identifier (e.g., 'matching.runRound')
+  cron: string;                            // Cron expression (e.g., "0 */6 * * *")
+  enabled: boolean;
+  input?: Record<string, unknown>;         // Input payload for the action
+  lastRunAt?: string;
+  lastRunResult?: 'success' | 'error';
+  lastRunError?: string;
+  lastRunDurationMs?: number;
+  nextRunAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+Add CRUD methods to `Storage` interface:
+```typescript
+createScheduledJob(record: ScheduledJobRecord): Promise<ScheduledJobRecord>;
+getScheduledJob(id: string): Promise<ScheduledJobRecord | null>;
+listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]>;
+updateScheduledJob(id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null>;
+deleteScheduledJob(id: string): Promise<boolean>;
+```
+
+**Files:** `src/storage/interface.ts`, `src/storage/providers/memory/index.ts`, `src/storage/providers/mongodb/index.ts`, `src/storage/providers/sqlite/index.ts`
+
+### Task 0.2: Scheduler Service
+
+Create `src/services/scheduler.ts` — the core scheduler engine:
+
+- Uses `croner` (pure JS, no native deps) for cron expression parsing and scheduling
+- Loads all enabled jobs from storage on startup
+- Runs jobs in-process on their cron schedule
+- For `type: 'extension'` jobs: calls `executeExtensionAction()` with the appropriate ctx
+- For `type: 'core'` jobs: calls registered core handler functions
+- Records last run time, result, duration, and next scheduled run in storage
+- Handles errors gracefully — a failed job does not crash the scheduler or block other jobs
+- Supports dynamic job registration/deregistration without restart
+
+```typescript
+export class Scheduler {
+  constructor(config: AimeatConfig, storage: Storage);
+  start(): Promise<void>;               // Load jobs from storage, start scheduling
+  stop(): void;                          // Stop all scheduled jobs
+  registerCoreHandler(id: string, fn: () => Promise<void>): void;  // Register core service handlers
+  addJob(record: ScheduledJobRecord): void;      // Add and schedule a new job
+  removeJob(id: string): void;                    // Unschedule and remove a job
+  triggerNow(id: string): Promise<void>;          // Manual trigger (for admin UI)
+}
+```
+
+**Files:** `src/services/scheduler.ts`
+
+### Task 0.3: Scheduler Routes (Admin API)
+
+Add admin endpoints for scheduler management:
+
+```
+GET    /v1/admin/scheduler/jobs              — List all scheduled jobs with status
+POST   /v1/admin/scheduler/jobs/:id/trigger  — Manually trigger a job now
+PATCH  /v1/admin/scheduler/jobs/:id          — Enable/disable a job, update cron
+DELETE /v1/admin/scheduler/jobs/:id          — Remove a job
+```
+
+**Files:** `src/routes/admin-scheduler.ts` (new), register in `src/server.ts`
+
+### Task 0.4: Extension Manifest Schedule Support
+
+When an extension is installed and activated, read the `schedules` section from its manifest and auto-register jobs:
+
+```yaml
+schedules:
+  - id: run-matching
+    action: run-matching
+    cron: "0 */6 * * *"
+    description: "Run matching algorithm"
+    instance_scope: true    # Creates one job per instance
+```
+
+When `instance_scope: true`, the scheduler creates a separate job for each instance of the extension. When an instance is created or deleted, the corresponding scheduled jobs are added or removed automatically.
+
+**Files:** `src/routes/extensions.ts` (activate/deactivate hooks)
+
+### Task 0.5: Migrate Existing Scheduled Work
+
+Migrate existing `setInterval`-based scheduled tasks to use the scheduler:
+
+- `src/services/matching.ts` — matching round execution
+- `src/services/federation.ts` — federation heartbeat/sync (if applicable)
+- Any other periodic tasks (token cleanup, expired match removal, etc.)
+
+Register these as `type: 'core'` jobs with sensible default cron expressions. Operators can adjust timing via the admin API.
+
+**Files:** `src/services/matching.ts`, `src/server.ts`
+
+### Task 0.6: Admin Tab — Scheduler View
+
+Add a scheduler section to the admin dashboard (can be part of the existing config tab or a new tab):
+
+- List all scheduled jobs with columns: name, type, cron, last run, next run, status, enabled
+- Toggle enable/disable
+- Manual "Run Now" button
+- View last error for failed jobs
+
+**Files:** `public/views/admin/scheduler-tab.js` or integrate into existing tab, `locales/en.json`, `locales/fi.json`
+
+### Task 0.7: Type Check + Test
+
+Run `npx tsc --noEmit`. Test scheduler with a simple core job and verify cron timing, error handling, and persistence across restart.
+
+---
+
 ## Phase 1: Multi-Instance Extension Runtime
 
 **Goal:** Extend the existing extension system to support multiple instances per extension.
@@ -370,6 +500,15 @@ Update `docs/frontend-development-guide.md` with the new services tab patterns a
 ## Implementation Order
 
 ```
+Phase 0 (Scheduler)      — Internal scheduler system
+  0.1 Scheduler storage interface
+  0.2 Scheduler service (croner)
+  0.3 Scheduler admin routes
+  0.4 Extension manifest schedule support
+  0.5 Migrate existing setInterval tasks
+  0.6 Admin tab — scheduler view
+  0.7 Type check + test
+
 Phase 1 (Foundation)     — Multi-instance runtime
   1.1 Storage interface
   1.2 Instance-scoped action route
@@ -418,12 +557,12 @@ Phase 6 (Cleanup)        — Docs and deprecations
 | Existing marketplace SPA users disrupted | Low | Phase 4 replaces the SPA cleanly. Old endpoints deprecated, not removed immediately |
 | Action script size limit (256 KB) too small | Low | Each action is a separate script. 256 KB per script is generous for validation/orchestration logic |
 
-## Open Questions
+## Resolved Questions
 
-1. **Wallet escrow**: The current ctx.wallet only has `consume()` (debit) and `getBalance()`. For proper marketplace escrow, we may need `hold()` and `release()` — or use the Work Queue's built-in escrow. Decision needed in Phase 2.
+1. **Wallet escrow**: Use the Work Queue's built-in escrow system. The marketplace extension validates state and flips listing status; the actual payment flow goes through `POST /v1/work/request` which handles escrow hold, release on delivery, and refund on dispute. No need to add `hold()`/`release()` to the extension ctx.
 
-2. **Scheduled actions**: The matching extension needs periodic execution (run matching rounds). Should extensions be able to register scheduled actions, or should the operator set up external cron triggers? Decision needed in Phase 5.
+2. **Scheduled actions**: Resolved — Phase 0 adds a core scheduler system. Extensions declare schedules in their manifest (`cron` expressions). The scheduler runs jobs in-process using `croner`. Core services (matching, federation) migrate from ad-hoc `setInterval` to the same scheduler. Operators can view, enable/disable, and manually trigger jobs from the admin UI.
 
-3. **Extension marketplace/registry**: Should there be a central registry where operators can browse and install community extensions? Out of scope for this plan but worth considering for a future phase.
+3. **Extension marketplace/registry**: Out of scope. Community-driven — share extensions via GitHub. A future registry can be built as a federation feature (a well-known node that indexes advertised extension capabilities).
 
-4. **Image storage**: Listings need images. Currently images would need to be stored as base64 in memory or referenced by external URL. Should the ctx API expose a file/blob storage API? Decision needed in Phase 2.
+4. **Image storage**: Use the existing Storage/Files API (`POST /v1/storage`). Sellers upload images through the core Storage API directly (supports raw body uploads, base64, visibility controls, quotas, chunked uploads). The listing stores storage keys or URLs as references. No new file APIs needed in the extension ctx.

@@ -672,3 +672,51 @@ Extensions are distributed as a bundle containing:
 Share via GitHub, npm, or any file hosting. The node operator downloads the bundle, reads the manifest and scripts, and POSTs them to `POST /v1/extensions`.
 
 There is no automatic package manager. This is intentional — operators should review extension code before installing it on their node.
+
+## File Storage for Extensions
+
+Extensions that need to handle files (e.g., listing images in a marketplace) should use the existing core **Storage/Files API** (`POST /v1/storage`). The extension itself does not need file access — clients upload files through the Storage API directly and pass the storage keys or URLs to extension actions.
+
+**Example — listing with images:**
+
+```javascript
+// Client-side flow:
+// 1. Upload image:  POST /v1/storage  →  returns storage key
+// 2. Create listing: POST /v1/ext/marketplace-behaviors/{instanceId}/create-listing
+//    Body: { title: "...", images: ["storage-key-1", "storage-key-2"] }
+
+// Extension action just stores the references:
+export default async function(ctx, input) {
+  await ctx.memory.set(`listing.${id}`, {
+    title: input.title,
+    images: input.images,   // Storage keys — not file data
+    // ...
+  });
+}
+```
+
+The Storage API supports raw body uploads, base64, visibility controls (`private`, `owner`, `public`), per-file size limits, total quota per agent, and chunked uploads for large files.
+
+## Scheduled Actions
+
+Extensions can declare recurring jobs in their manifest. The AIMEAT core scheduler reads these and runs them automatically on the specified cron schedule.
+
+```yaml
+schedules:
+  - id: run-matching
+    action: run-matching
+    cron: "0 */6 * * *"          # Every 6 hours
+    description: "Run matching algorithm"
+    instance_scope: true          # Runs once per instance
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `id` | Yes | Unique schedule identifier within the extension |
+| `action` | Yes | Action ID to invoke |
+| `cron` | Yes | Cron expression (standard 5-field format) |
+| `description` | No | Human-readable description |
+| `instance_scope` | No | If `true`, creates one job per instance. Default: `false` |
+| `input` | No | Static input payload to pass to the action |
+
+When `instance_scope` is `true`, the scheduler automatically creates a job for each instance and cleans up when instances are deleted. Operators can view, enable/disable, and manually trigger scheduled jobs from the admin dashboard.
