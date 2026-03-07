@@ -38,6 +38,7 @@ import CsmTab          from './admin/csm-tab.js';
 import MsmTab          from './admin/msm-tab.js';
 import FederationTab   from './admin/federation-tab.js';
 import GenesisTab      from './admin/genesis-tab.js';
+import ConsulTab       from './admin/consul-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -64,8 +65,9 @@ const NAV_GROUPS = [
     { id: 'work',          icon: '\u{1F4E6}',  key: 'dashboard.work',          component: WorkTab,           count: 'work' },
   ]},
   { key: 'dashboard.navInfrastructure', items: [
-    { id: 'email', icon: '\u2709',     key: 'dashboard.email', component: EmailTab },
-    { id: 'push',  icon: '\u{1F514}',  key: 'dashboard.push',  component: PushTab },
+    { id: 'email',  icon: '\u2709',     key: 'dashboard.email',  component: EmailTab },
+    { id: 'push',   icon: '\u{1F514}',  key: 'dashboard.push',   component: PushTab },
+    { id: 'consul', icon: '\u{1F5C4}',  key: 'dashboard.consul', component: ConsulTab },
   ]},
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   icon: '\u{1F4D6}', key: 'dashboard.directory',      component: DirectoryTab },
@@ -202,6 +204,7 @@ export default function Admin({ navigate, locale }) {
         api.getMatchingStats(), api.getMarketplaceStats(), api.getPushStats(),
         api.getCsmTemplates(), api.getMsmIntegrations(), api.getGenesisPeers(),
         api.getConfig(),
+        api.getConsulStatus().catch(() => ({ data: null })),
       ]);
       if (!mountRef.current) return;
 
@@ -215,6 +218,7 @@ export default function Admin({ navigate, locale }) {
       d.msmIntegrations = features[7].status === 'fulfilled' ? features[7].value.data : null;
       d.genesisPeers    = features[8].status === 'fulfilled' ? features[8].value.data : null;
       d.configSchema    = features[9].status === 'fulfilled' ? features[9].value.data : null;
+      d.consul          = features[10].status === 'fulfilled' ? features[10].value.data : null;
 
       // Phase 4: portal + stats + owners
       try {
