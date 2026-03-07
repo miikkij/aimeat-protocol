@@ -1457,6 +1457,7 @@
     "csmManagement": "CSM-hallinta",
     "msmManagement": "MSM-hallinta",
     "portal": "Portaali",
+    "portalDesc": "Hallitse solmusi julkista portaalia — aloitussivua, jonka vierailijat näkevät. Mukauta HTML-mallipohjaa, aseta dynaamista sisältöä muistiavaimilla ja KV-pareilla, esikatsele muutoksia reaaliajassa ja luo tekoälyystävällinen kehotekooste portaalistasi chat-integraatioita varten.",
     "portalTemplate": "Mallipohjan muokkaus",
     "portalPreview": "Portaalin esikatselu",
     "portalMemoryKeys": "Portaalin muistiavaimet",
@@ -1732,6 +1733,8 @@
     "cfgGroup_cross_federation": "Ristinfederaatio",
     "cfgGroup_personal_nodes": "Henkilökohtaiset solmut",
     "cfgGroup_match_notifications": "Match-ilmoitukset",
+    "cfgGroup_consul": "Consul",
+
     "cfg_node_id": "Solmun tunnus",
     "cfg_node_port": "Portti",
     "cfg_node_type": "Solmun tyyppi",
@@ -1789,7 +1792,13 @@
     "cfg_personal_nodes_enabled": "Henkilökohtaiset solmut käytössä",
     "cfg_personal_nodes_max_slots": "Maks. paikat",
     "cfg_match_notifications_enabled": "Match-ilmoitukset käytössä",
-    "cfg_match_notifications_interval_hours": "Ilmoitusväli (tuntia)"
+    "cfg_match_notifications_interval_hours": "Ilmoitusväli (tuntia)",
+    "cfg_consul_enabled": "Consul käytössä",
+    "cfg_consul_url": "Consul-osoite",
+    "cfg_consul_prefix": "KV-etuliite",
+    "cfg_consul_token": "ACL-avain",
+    "cfg_consul_watch_interval_seconds": "Tarkkailuväli (sekuntia)",
+    "cfg_consul_datacenter": "Datakeskus"
   },
   "launcher": {
     "title": "Omat Sovellukset",

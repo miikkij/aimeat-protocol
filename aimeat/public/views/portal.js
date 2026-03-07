@@ -996,7 +996,7 @@ function OnelinersFeed({ locale }) {
 
   useEffect(() => {
     function load() {
-      fetch('/v1/memory/oneliners')
+      fetch('/v1/memory/__site__/oneliners')
         .then(r => r.ok ? r.json() : null)
         .then(d => {
           if (d && d.ok && d.data && d.data.value && d.data.value.messages) {
