@@ -1,0 +1,127 @@
+extension: "1.0"
+
+metadata:
+  name: "matching-behaviors"
+  version: "1.0.0"
+  description: "Interest-based matching with geographic proximity scoring"
+  author: "aimeat-core"
+  license: "MIT"
+  aimeat: ">=1.5"
+
+required_apis:
+  - memory
+  - consent
+  - trust
+
+instances:
+  supported: true
+  config_per_instance:
+    type: object
+    properties:
+      name:
+        type: string
+        default: "Matching"
+      visibility:
+        type: string
+        enum: [public, password, invite]
+        default: public
+      password:
+        type: string
+      allowed_users:
+        type: array
+        items: { type: string }
+      max_distance_km:
+        type: number
+        default: 100
+      match_threshold:
+        type: number
+        default: 0.3
+      max_suggestions:
+        type: integer
+        default: 10
+      cooldown_days:
+        type: integer
+        default: 7
+
+actions:
+  - id: create-profile
+    description: "Register a matching profile"
+    method: POST
+    path: "/v1/ext/matching-behaviors/:instanceId/create-profile"
+    auth: required
+    input:
+      displayName: { type: string, required: true }
+      interests: { type: array, required: true }
+      seeking: { type: array }
+      city: { type: string }
+      area: { type: string }
+      country: { type: string }
+      lat: { type: number }
+      lon: { type: number }
+    script: "actions/create-profile.js"
+
+  - id: update-profile
+    description: "Update matching profile"
+    method: POST
+    path: "/v1/ext/matching-behaviors/:instanceId/update-profile"
+    auth: required
+    input:
+      displayName: { type: string }
+      interests: { type: array }
+      seeking: { type: array }
+      city: { type: string }
+      area: { type: string }
+      country: { type: string }
+      lat: { type: number }
+      lon: { type: number }
+    script: "actions/update-profile.js"
+
+  - id: get-suggestions
+    description: "View current match suggestions"
+    method: POST
+    path: "/v1/ext/matching-behaviors/:instanceId/get-suggestions"
+    auth: required
+    script: "actions/get-suggestions.js"
+
+  - id: respond
+    description: "Accept or dismiss a match suggestion"
+    method: POST
+    path: "/v1/ext/matching-behaviors/:instanceId/respond"
+    auth: required
+    input:
+      matchId: { type: string, required: true }
+      action: { type: string, required: true, enum: [accept, dismiss] }
+    script: "actions/respond.js"
+
+  - id: run-matching
+    description: "Execute matching algorithm round (operator only)"
+    method: POST
+    path: "/v1/ext/matching-behaviors/:instanceId/run-matching"
+    auth: required
+    script: "actions/run-matching.js"
+
+limits:
+  memory_mb: 128
+  timeout_ms: 30000
+  max_api_calls: 500
+
+config:
+  max_distance_km:
+    type: number
+    default: 100
+  match_threshold:
+    type: number
+    default: 0.3
+
+schedules:
+  - id: matching-round
+    description: "Run automated matching round"
+    cron: "0 */6 * * *"
+    action: run-matching
+
+federation:
+  advertise: true
+  capabilities:
+    - "interest-matching"
+    - "proximity-matching"
+    - "multi-instance"

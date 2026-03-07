@@ -25,6 +25,7 @@ import DataWalletTab from './profile/data-wallet-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import SecurityTab from './profile/security-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
+import NotificationsTab from './profile/notifications-tab.js';
 
 const TABS = [
   { id: 'portfolio',    key: 'portfolio.tabLabel',         component: PortfolioTab },
@@ -44,6 +45,7 @@ const TABS = [
   { id: 'dataWallet',   key: 'profile.tabs.dataWallet',    component: DataWalletTab },
   { id: 'nodeStats',    key: 'profile.tabs.nodeStats',     component: NodeStatsTab },
   { id: 'security',     key: 'profile.tabs.security',      component: SecurityTab },
+  { id: 'notifications', key: 'profile.tabs.notifications', component: NotificationsTab },
 ];
 
 export default function Profile({ navigate, locale }) {
