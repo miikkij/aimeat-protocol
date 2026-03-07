@@ -995,6 +995,12 @@
     "summaryDefault": "All other settings use defaults.",
     "backupCreated": "Backup saved to {{file}}",
     "written": "Config written to {{file}}",
+    "scaffoldPrompt": "Copy runtime files (public/, locales/, static/) into this directory?",
+    "scaffoldCopying": "Scaffolding runtime files...",
+    "scaffoldDone": "Scaffolded: {{copied}} copied, {{updated}} updated, {{skipped}} skipped (user-modified)",
+    "scaffoldSkippedFile": "Skipped (modified): {{file}}",
+    "scaffoldNoSource": "Could not locate package assets to scaffold. Skipping file copy.",
+    "updateDone": "Assets updated: {{copied}} new, {{updated}} updated, {{skipped}} skipped (user-modified)",
     "cancelled": "Setup cancelled.",
     "nextSteps": "Next steps:",
     "nextStep1": "Review the config:     cat {{file}}",
@@ -2374,7 +2380,8 @@
       "newBtn": "+ New listing",
       "empty": "No listings yet. Create your first!",
       "authRequired": "Sign in to view your listings.",
-      "error": "Could not load page."
+      "error": "Could not load page.",
+      "delistBtn": "Remove"
     },
     "myPurchases": {
       "title": "My purchases",

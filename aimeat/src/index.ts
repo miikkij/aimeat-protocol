@@ -41,6 +41,7 @@ USAGE
   aimeat validate                Validate configuration (env, files, database)
   aimeat check                   Alias for validate
   aimeat init                    Interactive config wizard (generates .env, .ini, or .json)
+  aimeat update                  Re-scaffold runtime files (safe update)
   aimeat join [URL]              Join a federation network
   aimeat maintenance on [MSG]    Enable maintenance mode (optional message)
   aimeat maintenance off         Disable maintenance mode
@@ -197,6 +198,26 @@ if (subcommand === 'config') {
 } else if (subcommand === 'init') {
   const { runInitWizard } = await import('./cli/init-wizard.js');
   await runInitWizard(config);
+  process.exit(0);
+} else if (subcommand === 'update') {
+  const { scaffoldFiles: doScaffold, findPackageRoot } = await import('./cli/scaffold.js');
+  const pkgRoot = findPackageRoot(dirname(fileURLToPath(import.meta.url)));
+  if (!pkgRoot) {
+    console.error('Could not locate package assets. Is aimeat installed correctly?');
+    process.exit(1);
+  }
+  const pkgJsonPath = join(pkgRoot, 'package.json');
+  const pkgVersion = existsSync(pkgJsonPath)
+    ? JSON.parse(readFileSync(pkgJsonPath, 'utf-8')).version as string
+    : '0.0.0';
+  const result = doScaffold(pkgRoot, process.cwd(), pkgVersion);
+  console.log(`Assets updated: ${result.copied} new, ${result.updated} updated, ${result.skippedModified} skipped (user-modified)`);
+  for (const file of result.modifiedFiles) {
+    console.log(`  Skipped (modified): ${file}`);
+  }
+  if (result.skippedUnchanged > 0) {
+    console.log(`  ${result.skippedUnchanged} files unchanged`);
+  }
   process.exit(0);
 } else if (subcommand === 'validate' || subcommand === 'check') {
   const { validateEnv, formatValidationResults } = await import('./utils/env-validator.js');

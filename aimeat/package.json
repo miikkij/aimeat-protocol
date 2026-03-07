@@ -7,10 +7,13 @@
   "bin": {
     "aimeat": "dist/bin/aimeat.js"
   },
+  "files": [
+    "dist/"
+  ],
   "scripts": {
     "dev": "tsx scripts/kill-port.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
-    "build": "tsc && node -e \"const fs=require('fs');fs.cpSync('locales','dist/locales',{recursive:true})\"",
+    "build": "tsc && node -e \"const fs=require('fs');fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example')\"",
     "start": "node --env-file=.env dist/src/index.js start",
     "test": "vitest run",
     "test:watch": "vitest",

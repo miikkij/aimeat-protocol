@@ -994,6 +994,12 @@
     "summaryDefault": "Kaikki muut asetukset käyttävät oletuksia.",
     "backupCreated": "Varmuuskopio tallennettu tiedostoon {{file}}",
     "written": "Asetukset kirjoitettu tiedostoon {{file}}",
+    "scaffoldPrompt": "Kopioidaanko ajonaikaiset tiedostot (public/, locales/, static/) tähän hakemistoon?",
+    "scaffoldCopying": "Kopioidaan ajonaikaisia tiedostoja...",
+    "scaffoldDone": "Kopioitu: {{copied}} uutta, {{updated}} päivitetty, {{skipped}} ohitettu (käyttäjän muokkaamia)",
+    "scaffoldSkippedFile": "Ohitettu (muokattu): {{file}}",
+    "scaffoldNoSource": "Paketin tiedostoja ei löydy. Ohitetaan tiedostojen kopiointi.",
+    "updateDone": "Tiedostot päivitetty: {{copied}} uutta, {{updated}} päivitetty, {{skipped}} ohitettu (käyttäjän muokkaamia)",
     "cancelled": "Asennus peruutettu.",
     "nextSteps": "Seuraavat vaiheet:",
     "nextStep1": "Tarkista asetukset:    cat {{file}}",
@@ -2373,7 +2379,8 @@
       "newBtn": "+ Uusi ilmoitus",
       "empty": "Ei vielä ilmoituksia. Luo ensimmäinen!",
       "authRequired": "Kirjaudu sisään nähdäksesi omat ilmoituksesi.",
-      "error": "Sivua ei voitu ladata."
+      "error": "Sivua ei voitu ladata.",
+      "delistBtn": "Poista"
     },
     "myPurchases": {
       "title": "Omat ostokset",

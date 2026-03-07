@@ -113,7 +113,7 @@ function ListingCard({ listing: l, onNav, tl }) {
           <div class="mk-card-title">${l.title}</div>
           <div class="mk-card-meta">${cl.icon} ${cl.name}${l.location && l.location.city ? ' \u00B7 ' + l.location.city : ''}${l.sellerGhii ? ' \u00B7 ' + l.sellerGhii : ''}</div>
         </div>
-        <div class="mk-price-badge">${l.priceMorsels} morsels</div>
+        <div class="mk-price-badge">${l.price} morsels</div>
       </div>
       ${l.description ? html`<div class="mk-card-desc">${l.description.length > 120 ? l.description.slice(0, 120) + '...' : l.description}</div>` : null}
       ${tags.length > 0 ? html`<div class="mk-tags">${tags.map(tg => html`<span class="mk-tag">${tg}</span>`)}</div>` : null}
@@ -304,8 +304,8 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
   const info = getAuthInfo();
   const isOwner = info.owner && info.owner === listing.ownerName;
   const feePercent = 5;
-  const fee = Math.ceil(listing.priceMorsels * feePercent / 100);
-  const totalCost = listing.priceMorsels + fee;
+  const fee = Math.ceil(listing.price * feePercent / 100);
+  const totalCost = listing.price + fee;
 
   return html`
     <div style="margin-bottom:16px;">
@@ -318,7 +318,7 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
           <div class="mk-card-meta">${cl.icon} ${cl.name}${listing.location && listing.location.city ? ' \u00B7 ' + listing.location.city : ''}${listing.location && listing.location.area ? ', ' + listing.location.area : ''} \u00B7 ${t('mkt.detail.seller')}: ${listing.sellerGhii}</div>
         </div>
         <div>
-          <div class="mk-price-badge" style="font-size:1.1rem;">${listing.priceMorsels} morsels</div>
+          <div class="mk-price-badge" style="font-size:1.1rem;">${listing.price} morsels</div>
           <div style="margin-top:8px;">${statusBadge(listing.status)}</div>
         </div>
       </div>
@@ -335,7 +335,7 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
           <div class="mk-card" style="padding:16px; background:rgba(255,105,180,0.05); border-color:rgba(255,105,180,0.2); flex:1;">
             <div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:8px;">${t('mkt.detail.totalPrice')} (${feePercent}%)</div>
             <div style="font-size:1.2rem; font-weight:700; color:var(--accent-bright);">${totalCost} morsels</div>
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">${t('mkt.detail.price')}: ${listing.priceMorsels} + ${t('mkt.detail.serviceFee')}: ${fee}</div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">${t('mkt.detail.price')}: ${listing.price} + ${t('mkt.detail.serviceFee')}: ${fee}</div>
           </div>
         </div>
         ${isLoggedIn() ? html`
@@ -374,7 +374,7 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
       title: document.getElementById('mk-sell-title').value,
       description: document.getElementById('mk-sell-desc').value,
       category: document.getElementById('mk-sell-category').value,
-      priceMorsels: parseInt(document.getElementById('mk-sell-price').value, 10),
+      price: parseInt(document.getElementById('mk-sell-price').value, 10),
     };
     const condition = document.getElementById('mk-sell-condition').value;
     if (condition) data.condition = condition;
@@ -492,14 +492,14 @@ function MyListingsView({ extAction, onNav, tl }) {
                 <div class="mk-card-meta">${cl.icon} ${cl.name} \u00B7 ${(l.createdAt || '').slice(0, 10)}</div>
               </div>
               <div style="text-align:right;">
-                <div class="mk-price-badge">${l.priceMorsels} morsels</div>
+                <div class="mk-price-badge">${l.price} morsels</div>
                 <div style="margin-top:6px;">${statusBadge(l.status)}</div>
               </div>
             </div>
           </a>
           ${l.status === 'active' ? html`
             <div style="margin-top:8px; display:flex; gap:8px;">
-              <button class="mk-btn mk-btn-secondary mk-btn-sm" onClick=${() => doAction('delist', { listingId: l.id }, 'Delisted')}>${t('mkt.status.delisted')}</button>
+              <button class="mk-btn mk-btn-secondary mk-btn-sm" onClick=${() => doAction('delist', { listingId: l.id }, 'Delisted')}>${t('mkt.myListings.delistBtn')}</button>
             </div>
           ` : null}
         </div>
@@ -551,7 +551,7 @@ function MyPurchasesView({ extAction, onNav, tl }) {
               <div class="mk-card-meta">${t('mkt.myPurchases.seller')}: ${p.sellerOwner || p.seller || ''} \u00B7 ${(p.createdAt || '').slice(0, 10)} ${p.trackingCode ? '\u00B7 ' + t('mkt.myPurchases.code') + ': ' + p.trackingCode : ''}</div>
             </div>
             <div style="text-align:right;">
-              <div class="mk-price-badge">${p.totalCostMorsels || p.priceMorsels || 0} morsels</div>
+              <div class="mk-price-badge">${p.totalCostMorsels || p.price || 0} morsels</div>
               <div style="margin-top:6px;">${statusBadge(p.status)}</div>
             </div>
           </div>

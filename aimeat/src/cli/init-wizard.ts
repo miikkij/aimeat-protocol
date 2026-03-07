@@ -1462,6 +1462,36 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
 
   p.log.success(t('init.written', { file: fileName }));
 
+  // ── Scaffold runtime files ──
+  const shouldScaffold = checkCancel(await p.confirm({
+    message: t('init.scaffoldPrompt'),
+    initialValue: true,
+  }), t);
+
+  if (shouldScaffold) {
+    const { scaffoldFiles: doScaffold, findPackageRoot } = await import('./scaffold.js');
+    const pkgRoot = findPackageRoot(dirname(fileURLToPath(import.meta.url)));
+    if (pkgRoot) {
+      const pkgJsonPath = join(pkgRoot, 'package.json');
+      const pkgVersion = existsSync(pkgJsonPath)
+        ? (JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { version: string }).version
+        : '0.0.0';
+      const spinner = p.spinner();
+      spinner.start(t('init.scaffoldCopying'));
+      const scaffoldResult = doScaffold(pkgRoot, process.cwd(), pkgVersion);
+      spinner.stop(t('init.scaffoldDone', {
+        copied: String(scaffoldResult.copied),
+        updated: String(scaffoldResult.updated),
+        skipped: String(scaffoldResult.skippedModified),
+      }));
+      for (const file of scaffoldResult.modifiedFiles) {
+        p.log.warn(t('init.scaffoldSkippedFile', { file }));
+      }
+    } else {
+      p.log.warn(t('init.scaffoldNoSource'));
+    }
+  }
+
   // Offer to join federation if role is not standalone and genesis URL is set
   const fedRole = settings.AIMEAT_FEDERATION_ROLE;
   const genesisUrl = settings.AIMEAT_GENESIS_URL;

@@ -542,16 +542,20 @@ export function adminRouter(
         }
 
         // 2. Ensure this node has a keypair
-        if (!config.publicKey || !config.privateKey) {
+        let publicKey = process.env.AIMEAT_PUBLIC_KEY ?? '';
+        let privateKey = process.env.AIMEAT_PRIVATE_KEY ?? '';
+        if (!publicKey || !privateKey) {
             const keys = await generateKeyPair();
-            config.publicKey = keys.publicKey;
-            config.privateKey = keys.privateKey;
+            publicKey = keys.publicKey;
+            privateKey = keys.privateKey;
+            process.env.AIMEAT_PUBLIC_KEY = publicKey;
+            process.env.AIMEAT_PRIVATE_KEY = privateKey;
         }
 
         // 3. Sign and send introduction
         const timestamp = new Date().toISOString();
         const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
-        const signature = await sign(config.privateKey, messageToSign);
+        const signature = await sign(privateKey, messageToSign);
 
         try {
             const introResp = await fetch(`${targetUrl}/v1/federation/peer/introduce`, {
@@ -561,7 +565,7 @@ export function adminRouter(
                     node_id: config.nodeId,
                     node_url: config.baseUrl,
                     node_type: config.nodeType,
-                    public_key: config.publicKey,
+                    public_key: publicKey,
                     role: joinRole,
                     message: '',
                     signature,

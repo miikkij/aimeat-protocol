@@ -143,7 +143,8 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   const __dirname = dirname(__filename);
   // Try multiple paths: relative to src/ (dev via tsx) and relative to dist/ (compiled)
   const publicCandidates = [
-    join(__dirname, '..', 'public'),      // dev: src/../public
+    join(process.cwd(), 'public'),         // scaffolded: CWD/public
+    join(__dirname, '..', 'public'),       // dev: src/../public
     join(__dirname, '..', '..', 'public'), // dist: dist/src/../../public
   ];
   const publicDir = publicCandidates.find(p => existsSync(p));
@@ -204,6 +205,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Serve locale files at /locales/*.json (used by SPA i18n module)
   const localeCandidates = [
+    join(process.cwd(), 'locales'),        // scaffolded: CWD/locales
     join(__dirname, '..', 'locales'),      // dev: src/../locales
     join(__dirname, '..', '..', 'locales'), // dist: dist/src/../../locales
   ];
@@ -214,7 +216,8 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // PWA static files (manifest.json, sw.js, offline.html, icons)
   const pwaCandidates = [
-    join(__dirname, '..', 'src', 'static'),      // dev
+    join(process.cwd(), 'static'),                // scaffolded: CWD/static
+    join(__dirname, '..', 'src', 'static'),       // dev
     join(__dirname, '..', '..', 'src', 'static'), // dist
   ];
   const pwaStaticDir = pwaCandidates.find(p => existsSync(p));
@@ -521,6 +524,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     if (!hasOwners) {
       // Serve wizard inline (resolvePublicFile pattern)
       const wizardCandidates = [
+        join(process.cwd(), 'public', 'wizard.html'),
         join(__dirname, '..', 'public', 'wizard.html'),
         join(__dirname, '..', '..', 'public', 'wizard.html'),
       ];
