@@ -853,6 +853,31 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (extensionName, id)
     );
 
+    -- ── System Prompts ──
+    CREATE TABLE IF NOT EXISTS system_prompts (
+      id          TEXT PRIMARY KEY,
+      category    TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      content     TEXT NOT NULL,
+      variables   TEXT NOT NULL DEFAULT '[]',
+      version     INTEGER NOT NULL DEFAULT 1,
+      active      INTEGER NOT NULL DEFAULT 1,
+      tags        TEXT NOT NULL DEFAULT '[]',
+      createdAt   TEXT NOT NULL,
+      updatedAt   TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS system_prompt_versions (
+      promptId    TEXT NOT NULL,
+      version     INTEGER NOT NULL,
+      content     TEXT NOT NULL,
+      tags        TEXT NOT NULL DEFAULT '[]',
+      savedBy     TEXT NOT NULL DEFAULT 'system',
+      savedAt     TEXT NOT NULL,
+      PRIMARY KEY (promptId, version)
+    );
+
   `);
 
   // ── Schema migrations for existing databases ──
