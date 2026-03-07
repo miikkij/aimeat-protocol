@@ -643,15 +643,18 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     const filterType = req.query.content_type as string | undefined;
 
     const allAgents = await storage.listAgents();
+    const seenKeys = new Set<string>();
     let manifests: any[] = [];
 
+    // Collect from all agents
     for (const agent of allAgents) {
       const agentManifests = await storage.listMemory(agent.gaii, {
         prefix: 'packages/',
         tags: ['knowledge-package'],
       });
       for (const m of agentManifests) {
-        if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package') {
+        if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
+          seenKeys.add(m.key);
           manifests.push({
             key: m.key,
             value: m.value,
@@ -660,8 +663,31 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
             flagCount: m.flagCount ?? 0,
             createdAt: m.createdAt,
             updatedAt: m.updatedAt,
+            isSystem: (m.tags || []).includes('system-knowledge'),
           });
         }
+      }
+    }
+
+    // Also collect system packages stored under operator GAII
+    const operatorGaii = req.auth!.sub as string;
+    const operatorManifests = await storage.listMemory(operatorGaii, {
+      prefix: 'packages/',
+      tags: ['knowledge-package'],
+    });
+    for (const m of operatorManifests) {
+      if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
+        seenKeys.add(m.key);
+        manifests.push({
+          key: m.key,
+          value: m.value,
+          ownerGaii: m.ownerGaii,
+          visibility: m.visibility,
+          flagCount: m.flagCount ?? 0,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+          isSystem: true,
+        });
       }
     }
 
@@ -686,15 +712,155 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
         name: m.value.name,
         author: m.value.author,
         content_type: m.value.content_type,
+        tags: m.value.tags || [],
         visibility: m.visibility,
         flag_count: m.flagCount,
         maturity: m.value.maturity,
+        entries_count: (m.value.entries || []).length,
+        is_system: m.isSystem || false,
         created: m.value.created || m.createdAt,
       })),
       total,
       page,
       per_page: perPage,
     }));
+  });
+
+  /* ── POST /v1/admin/knowledge/import — Operator creates system knowledge ── */
+  router.post('/v1/admin/knowledge/import', requireAuth(), requireRole('operator'), async (req, res) => {
+    const operatorGaii = req.auth!.sub as string;
+    const ownerName = req.auth!.owner as string;
+    const { name, content_type, tags, maturity, visibility, catalog_listed, entries } = req.body;
+
+    if (!name || typeof name !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_NAME', 'Package name is required'));
+      return;
+    }
+
+    const validTypes = ['idea', 'research', 'plan', 'dataset', 'document', 'tutorial', 'collection', 'article', 'story', 'fiction'];
+    if (!content_type || !validTypes.includes(content_type)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_TYPE', `content_type must be one of: ${validTypes.join(', ')}`));
+      return;
+    }
+
+    if (!entries || !Array.isArray(entries) || entries.length === 0) {
+      res.status(400).json(error(config.nodeId, 'NO_ENTRIES', 'At least one entry is required'));
+      return;
+    }
+
+    const packageId = uuidv4();
+    const now = new Date().toISOString();
+    const manifestKey = `packages/${packageId}/manifest`;
+    const parsedTags = (typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : (tags || [])) as string[];
+    const entryVisibility = visibility === 'operator' ? 'private' : 'public';
+
+    const manifest: KnowledgeManifest = {
+      type: 'knowledge-package',
+      name,
+      version: '1.0.0',
+      author: ownerName,
+      content_type: content_type as KnowledgeManifest['content_type'],
+      tags: parsedTags,
+      language: 'en',
+      maturity: maturity || 'published',
+      synthesis: { level: 'original', description: 'System knowledge created by operator' },
+      references: [],
+      entries: entries.map((e: any, i: number) => ({
+        key: `packages/${packageId}/entry-${i}`,
+        title: e.title || `Entry ${i + 1}`,
+        visibility: entryVisibility as 'public' | 'private' | 'owner',
+      })),
+      links: [],
+      sharing: {
+        catalog_listed: catalog_listed ?? (visibility !== 'operator'),
+        allow_clone: visibility !== 'operator',
+        morsel_price: 0,
+      },
+      created: now,
+      updated: now,
+    };
+
+    // Store manifest
+    await storage.setMemory({
+      key: manifestKey,
+      ownerGaii: operatorGaii,
+      value: manifest,
+      visibility: entryVisibility,
+      tags: ['knowledge-package', 'system-knowledge', content_type, ...parsedTags],
+      ttlHours: null,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Store entries
+    const createdEntries: string[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      const entryKey = `packages/${packageId}/entry-${i}`;
+      await storage.setMemory({
+        key: entryKey,
+        ownerGaii: operatorGaii,
+        value: { title: entries[i].title || `Entry ${i + 1}`, body: entries[i].content || '' },
+        visibility: entryVisibility,
+        tags: ['knowledge-entry', 'system-knowledge', content_type, ...parsedTags],
+        ttlHours: null,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      createdEntries.push(entryKey);
+    }
+
+    res.status(201).json(success(config.nodeId, {
+      package_id: packageId,
+      manifest_key: manifestKey,
+      entries_created: createdEntries.length,
+      visibility,
+      catalog_listed: manifest.sharing.catalog_listed,
+    }));
+  });
+
+  /* ── DELETE /v1/admin/knowledge/:id — Operator deletes a package ── */
+  router.delete('/v1/admin/knowledge/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+    const packageId = req.params.id as string;
+    const manifestKey = `packages/${packageId}/manifest`;
+
+    // Find the package across all agents
+    const allAgents = await storage.listAgents();
+    let found = false;
+
+    for (const agent of allAgents) {
+      const mem = await storage.getMemory(agent.gaii, manifestKey);
+      if (mem) {
+        // Delete manifest and all entries
+        const allEntries = await storage.listMemory(agent.gaii, { prefix: `packages/${packageId}/` });
+        for (const entry of allEntries) {
+          await storage.deleteMemory(agent.gaii, entry.key);
+        }
+        found = true;
+        break;
+      }
+    }
+
+    // Also try operator's own GAII for system packages
+    if (!found) {
+      const operatorGaii = req.auth!.sub as string;
+      const mem = await storage.getMemory(operatorGaii, manifestKey);
+      if (mem) {
+        const allEntries = await storage.listMemory(operatorGaii, { prefix: `packages/${packageId}/` });
+        for (const entry of allEntries) {
+          await storage.deleteMemory(operatorGaii, entry.key);
+        }
+        found = true;
+      }
+    }
+
+    if (!found) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
+      return;
+    }
+
+    res.json(success(config.nodeId, { deleted: packageId }));
   });
 
   /* ── POST /v1/admin/knowledge/:id/review — Operator reviews a package ── */

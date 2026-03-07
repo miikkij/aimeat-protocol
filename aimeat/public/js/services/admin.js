@@ -129,7 +129,13 @@ export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURI
 // ── Stats ──
 export const getStats        = ()       => apiGet('/v1/stats');
 
-// ── Knowledge Moderation ──
+// ── Scheduler ──
+export const getSchedulerJobs    = ()              => apiGet('/v1/admin/scheduler/jobs');
+export const triggerSchedulerJob = (id)            => apiPost(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}/trigger`);
+export const updateSchedulerJob  = (id, updates)   => apiPut(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`, updates);
+export const deleteSchedulerJob  = (id)            => apiDelete(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`);
+
+// ── Knowledge Management ──
 export const getKnowledgePackages = (opts = {}) => {
   const params = new URLSearchParams();
   if (opts.flagged) params.set('flagged', 'true');
@@ -138,6 +144,10 @@ export const getKnowledgePackages = (opts = {}) => {
   if (opts.page) params.set('page', String(opts.page));
   return apiGet(`/v1/admin/knowledge?${params.toString()}`);
 };
+export const createSystemKnowledge = (data) =>
+  apiPost('/v1/admin/knowledge/import', data);
+export const deleteKnowledgePackage = (packageId) =>
+  apiDelete(`/v1/admin/knowledge/${encodeURIComponent(packageId)}`);
 export const reviewKnowledgePackage = (packageId, reason, action, customText) =>
   apiPost(`/v1/admin/knowledge/${encodeURIComponent(packageId)}/review`, {
     reason, action, custom_text: customText,
