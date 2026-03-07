@@ -134,6 +134,7 @@ export function adminFeaturesRouter(
             smtp_port: config.smtpPort,
             smtp_from: config.smtpFrom,
             smtp_secure: config.smtpSecure,
+            smtp_reject_unauthorized: config.smtpRejectUnauthorized,
             confirmation_required: config.emailConfirmationRequired,
             smtp_user_configured: !!config.smtpUser,
             smtp_pass_configured: !!config.smtpPass,

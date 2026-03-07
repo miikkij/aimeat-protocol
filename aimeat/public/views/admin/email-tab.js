@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { EconRow, Empty, ExpandableHelp } from './shared.js';
-import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates } from '/js/services/admin.js';
+import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates, saveConfig } from '/js/services/admin.js';
 
 const TEMPLATE_IDS = ['notification', 'verification', 'magic_link', 'match_suggestion'];
 const TEMPLATE_LABELS = {
@@ -196,7 +196,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
 }
 
 /* ── Main Tab ── */
-export default function EmailTab({ data, locale }) {
+export default function EmailTab({ data, reload, locale }) {
   const email = data.email;
   const [to, setTo] = useState('');
   const [testTpl, setTestTpl] = useState('notification');
@@ -208,6 +208,7 @@ export default function EmailTab({ data, locale }) {
   const [expanded, setExpanded] = useState({});
   const [seeded, setSeeded] = useState(false);
   const [seedMsg, setSeedMsg] = useState(null);
+  const [cfgSaving, setCfgSaving] = useState(false);
 
   // Group send state
   const [grpGroup, setGrpGroup] = useState('operators');
@@ -230,6 +231,15 @@ export default function EmailTab({ data, locale }) {
       setTemplates(null);
     }
     setTplLoading(false);
+  }
+
+  async function toggleSmtpConfig(dotPath, newValue) {
+    setCfgSaving(true);
+    try {
+      await saveConfig([{ path: dotPath, value: newValue }]);
+      reload();
+    } catch (_) { /* reload will show current state */ }
+    setCfgSaving(false);
   }
 
   if (!email) return html`<${Empty} text=${t('dashboard.emailNotAvailable')} />`;
@@ -318,7 +328,17 @@ export default function EmailTab({ data, locale }) {
       <h4 style="margin:0 0 12px">${t('dashboard.smtpConfig')}</h4>
       <${EconRow} label=${t('dashboard.host')} value=${email.smtp_host || '\u2014'} />
       <${EconRow} label=${t('dashboard.port')} value=${email.smtp_port || '\u2014'} />
-      <${EconRow} label=${t('dashboard.secure')} value=${email.smtp_secure ? '\u2705' : '\u274C'} />
+      <div class="adm-hrow">
+        <span class="adm-hmetric">${t('dashboard.secure')}</span>
+        <span><label style="cursor:pointer"><input type="checkbox" checked=${email.smtp_secure} disabled=${cfgSaving}
+          onChange=${ev => toggleSmtpConfig('email.smtp_secure', ev.target.checked)} /> ${email.smtp_secure ? '\u2705' : '\u274C'}</label></span>
+      </div>
+      <div class="adm-hrow">
+        <span class="adm-hmetric">${t('dashboard.rejectUnauthorized')}</span>
+        <span><label style="cursor:pointer"><input type="checkbox" checked=${email.smtp_reject_unauthorized} disabled=${cfgSaving}
+          onChange=${ev => toggleSmtpConfig('email.smtp_reject_unauthorized', ev.target.checked)} /> ${email.smtp_reject_unauthorized ? '\u2705' : '\u274C'}
+          <span style="font-size:.72rem;color:var(--text-dim);margin-left:6px">${t('dashboard.rejectUnauthorizedHelp')}</span></label></span>
+      </div>
       <${EconRow} label=${t('dashboard.from')} value=${email.smtp_from || '\u2014'} />
       <${EconRow} label=${t('dashboard.emailUserConfigured')} value=${email.smtp_user_configured ? '\u2705' : '\u274C'} />
       <${EconRow} label=${t('dashboard.emailPassConfigured')} value=${email.smtp_pass_configured ? '\u2705' : '\u274C'} />

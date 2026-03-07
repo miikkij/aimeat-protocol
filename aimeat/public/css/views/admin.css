@@ -1,5 +1,17 @@
 /* ── Admin Dashboard SPA Styles ── */
 
+/* Admin-scoped variable overrides (prevent global theme.css from washing out colors) */
+.adm {
+  --text-dim: #94a3b8;
+  --text-bright: #e2e8f0;
+  --text-muted: #64748b;
+  --accent: #06b6d4;
+  --glass-border: #334155;
+  --glass-bg: #1e293b;
+  --bg-deep: #0f172a;
+  color: #cbd5e1;
+}
+
 /* Layout */
 .adm { display: flex; min-height: 100vh; position: relative; z-index: 1; }
 
