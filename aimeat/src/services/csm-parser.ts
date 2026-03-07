@@ -2,14 +2,10 @@ import { parse as parseYaml } from 'yaml';
 
 // ── CSM Types ──
 
-export type CsmServiceType =
-  'directory' | 'marketplace' | 'forum' | 'dating' |
-  'news' | 'opinion' | 'auction' | 'media' | 'community';
+/** Service type is a free-form string — CSM authors define their own types. */
+export type CsmServiceType = string;
 
-const VALID_SERVICE_TYPES: CsmServiceType[] = [
-  'directory', 'marketplace', 'forum', 'dating',
-  'news', 'opinion', 'auction', 'media', 'community',
-];
+export type CsmVisibilityDefault = 'private' | 'dmz' | 'local' | 'federation' | 'public';
 
 export interface CsmFieldDef {
   type: string;
@@ -42,7 +38,7 @@ export interface CsmDefinition {
     optional: Record<string, CsmFieldDef>;
   };
   consentRequirements: {
-    visibilityDefault: 'private' | 'federation' | 'public';
+    visibilityDefault: 'private' | 'dmz' | 'local' | 'federation' | 'public';
     requiresConsent: boolean;
     consentPurpose: string;
     dataRetention: string;
@@ -90,7 +86,7 @@ export function parseCsm(yamlContent: string): CsmDefinition {
       optional: (dataSchema?.optional ?? {}) as Record<string, CsmFieldDef>,
     },
     consentRequirements: {
-      visibilityDefault: String(consent?.visibility_default ?? 'federation') as 'private' | 'federation' | 'public',
+      visibilityDefault: String(consent?.visibility_default ?? 'federation') as CsmVisibilityDefault,
       requiresConsent: consent?.requires_consent !== false,
       consentPurpose: String(consent?.consent_purpose ?? ''),
       dataRetention: String(consent?.data_retention ?? 'until_revoked'),
@@ -118,9 +114,6 @@ export function validateCsm(def: CsmDefinition): string[] {
   if (!def.version) errors.push('csm version is required');
   if (!def.service.name) errors.push('service.name is required');
   if (!def.service.type) errors.push('service.type is required');
-  if (!VALID_SERVICE_TYPES.includes(def.service.type)) {
-    errors.push(`service.type must be one of: ${VALID_SERVICE_TYPES.join(', ')}`);
-  }
   if (!def.service.description) errors.push('service.description is required');
 
   // Validate data_schema: must have at least one required field
@@ -136,8 +129,8 @@ export function validateCsm(def: CsmDefinition): string[] {
   }
 
   // Validate consent requirements
-  if (!['private', 'federation', 'public'].includes(def.consentRequirements.visibilityDefault)) {
-    errors.push('consent_requirements.visibility_default must be one of: private, federation, public');
+  if (!['private', 'dmz', 'local', 'federation', 'public'].includes(def.consentRequirements.visibilityDefault)) {
+    errors.push('consent_requirements.visibility_default must be one of: private, dmz, local, federation, public');
   }
 
   return errors;

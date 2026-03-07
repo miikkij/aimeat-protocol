@@ -359,7 +359,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
   const config: AimeatConfig = {
     port,
-    baseUrl: process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`,
+    baseUrl: (process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, ''),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,

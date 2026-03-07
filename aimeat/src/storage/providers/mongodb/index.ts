@@ -130,49 +130,31 @@ export class MongoStorage implements Storage {
             // 4. Delete GHII records for this owner
             await this.prisma.ghii.deleteMany({ where: { ownerName: name } });
 
-            // 5. Delete personal nodes and their mailbox items & push subscriptions (in-memory)
-            for (const [nodeId, node] of this.personalNodes) {
-                if (node.ownerName === name) {
-                    for (const [mid, m] of this.mailboxItems) {
-                        if (m.personalNodeId === nodeId) this.mailboxItems.delete(mid);
-                    }
-                    for (const [pid, p] of this.personalPushSubscriptions) {
-                        if (p.personalNodeId === nodeId) this.personalPushSubscriptions.delete(pid);
-                    }
-                    for (const [nid, n] of this.notificationPreferences) {
-                        if (nid === nodeId) this.notificationPreferences.delete(nid);
-                    }
-                    this.personalNodes.delete(nodeId);
-                }
+            // 5. Delete personal nodes and their mailbox items & push subscriptions (Prisma)
+            const personalNodes = await this.prisma.personalNode.findMany({ where: { ownerName: name }, select: { id: true } });
+            const personalNodeIds = personalNodes.map((n: any) => n.id);
+            if (personalNodeIds.length > 0) {
+                await this.prisma.mailboxItem.deleteMany({ where: { personalNodeId: { in: personalNodeIds } } });
+                await this.prisma.personalPushSubscription.deleteMany({ where: { personalNodeId: { in: personalNodeIds } } });
+                await this.prisma.notificationPreference.deleteMany({ where: { personalNodeId: { in: personalNodeIds } } });
+                await this.prisma.personalNode.deleteMany({ where: { ownerName: name } });
             }
 
-            // 6. Delete push subscriptions for this owner (in-memory)
-            for (const [key, sub] of this.pushSubscriptions) {
-                if (sub.ownerName === name) this.pushSubscriptions.delete(key);
-            }
-            for (const [pid, p] of this.personalPushSubscriptions) {
-                if (p.ownerName === name) this.personalPushSubscriptions.delete(pid);
-            }
+            // 6. Delete push subscriptions for this owner
+            await this.prisma.pushSubscription.deleteMany({ where: { ownerName: name } });
+            await this.prisma.personalPushSubscription.deleteMany({ where: { ownerName: name } });
 
-            // 7. Delete listings for this owner (in-memory)
-            for (const [lid, l] of this.listingRecords) {
-                if (l.ownerName === name) this.listingRecords.delete(lid);
-            }
+            // 7. Delete listings for this owner (Prisma)
+            await this.prisma.listing.deleteMany({ where: { ownerName: name } });
 
-            // 8. Delete purchases for this owner as buyer or seller (in-memory)
-            for (const [pid, p] of this.purchaseRecords) {
-                if (p.buyerOwner === name || p.sellerOwner === name) this.purchaseRecords.delete(pid);
-            }
+            // 8. Delete purchases for this owner as buyer or seller (Prisma)
+            await this.prisma.purchase.deleteMany({ where: { OR: [{ buyerOwner: name }, { sellerOwner: name }] } });
 
-            // 9. Delete chat instances for this owner (in-memory)
-            for (const [cid, c] of this.chatInstances) {
-                if (c.ownerName === name) this.chatInstances.delete(cid);
-            }
+            // 9. Delete chat instances for this owner (Prisma)
+            await this.prisma.chatInstance.deleteMany({ where: { ownerName: name } });
 
-            // 10. Delete email verifications for this owner (in-memory)
-            for (const [eid, e] of this.emailVerifications) {
-                if (e.ownerName === name) this.emailVerifications.delete(eid);
-            }
+            // 10. Delete email verifications for this owner (Prisma)
+            await this.prisma.emailVerification.deleteMany({ where: { ownerName: name } });
 
             // 11. Delete the owner record
             await this.prisma.owner.delete({ where: { name } });
@@ -265,33 +247,24 @@ export class MongoStorage implements Storage {
         await this.prisma.transaction.deleteMany({ where: { gaii } });
         // Board posts authored by this agent (Prisma)
         await this.prisma.boardPost.deleteMany({ where: { authorGaii: gaii } });
-        // Board subscriptions (in-memory)
-        for (const [sid, s] of this.boardSubscriptions) {
-            if (s.gaii === gaii) this.boardSubscriptions.delete(sid);
-        }
-        // Boards owned by this agent — also delete their posts and subscriptions (Prisma + in-memory)
+        // Board subscriptions (Prisma)
+        await this.prisma.boardSubscription.deleteMany({ where: { gaii } });
+        // Boards owned by this agent — also delete their posts and subscriptions (Prisma)
         const boards = await this.prisma.board.findMany({ where: { ownerGaii: gaii }, select: { boardId: true } });
         for (const b of boards) {
             await this.prisma.boardPost.deleteMany({ where: { boardId: b.boardId } });
-            for (const [sid, s] of this.boardSubscriptions) {
-                if (s.boardId === b.boardId) this.boardSubscriptions.delete(sid);
-            }
+            await this.prisma.boardSubscription.deleteMany({ where: { boardId: b.boardId } });
         }
         await this.prisma.board.deleteMany({ where: { ownerGaii: gaii } });
-        // Consents (in-memory)
-        for (const [cid, c] of this.consents) {
-            if (c.ownerGaii === gaii) this.consents.delete(cid);
-        }
+        // Consents (Prisma)
+        await this.prisma.consent.deleteMany({ where: { ownerGaii: gaii } });
+        await this.prisma.consentAudit.deleteMany({ where: { ownerGaii: gaii } });
         // Storage files (Prisma)
         await this.prisma.storageFile.deleteMany({ where: { ownerGaii: gaii } });
-        // Matches (in-memory)
-        for (const [mid, m] of this.matchRecords) {
-            if (m.profileA === gaii || m.profileB === gaii) this.matchRecords.delete(mid);
-        }
-        // Flags raised by this agent (in-memory)
-        for (const [fid, f] of this.flags) {
-            if (f.flaggedBy === gaii) this.flags.delete(fid);
-        }
+        // Matches (Prisma)
+        await this.prisma.match.deleteMany({ where: { OR: [{ profileA: gaii }, { profileB: gaii }] } });
+        // Flags raised by this agent (Prisma)
+        await this.prisma.flag.deleteMany({ where: { flaggedBy: gaii } });
         // Escrow holds (Prisma)
         await this.prisma.escrowHold.deleteMany({ where: { fromGaii: gaii } });
         // OTKs (Prisma)
@@ -795,29 +768,52 @@ export class MongoStorage implements Storage {
     }
 
     // ── Board Subscriptions ─────────────────────────────────────
-    // Note: For MongoDB, subscriptions are stored in-memory (same as memory.ts)
-    // until a Prisma schema migration adds a BoardSubscription model.
-    private boardSubscriptions = new Map<string, import('../../interface.js').BoardSubscriptionRecord>();
 
     async createBoardSubscription(sub: import('../../interface.js').BoardSubscriptionRecord): Promise<import('../../interface.js').BoardSubscriptionRecord> {
-        this.boardSubscriptions.set(`${sub.boardId}::${sub.gaii}`, sub);
+        this.ensureReady();
+        await this.prisma.boardSubscription.upsert({
+            where: { boardId_gaii: { boardId: sub.boardId, gaii: sub.gaii } },
+            create: { id: sub.id, boardId: sub.boardId, gaii: sub.gaii, callbackUrl: sub.callbackUrl, filters: sub.filters as any ?? null, createdAt: new Date(sub.createdAt) },
+            update: { callbackUrl: sub.callbackUrl, filters: sub.filters as any ?? null },
+        });
         return sub;
     }
 
     async getBoardSubscription(boardId: string, gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord | null> {
-        return this.boardSubscriptions.get(`${boardId}::${gaii}`) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.boardSubscription.findUnique({ where: { boardId_gaii: { boardId, gaii } } });
+        return row ? this.toBoardSubscriptionRecord(row) : null;
     }
 
     async listBoardSubscriptions(boardId: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
-        return [...this.boardSubscriptions.values()].filter(s => s.boardId === boardId);
+        this.ensureReady();
+        const rows = await this.prisma.boardSubscription.findMany({ where: { boardId } });
+        return rows.map((r: any) => this.toBoardSubscriptionRecord(r));
     }
 
     async listSubscriptionsByAgent(gaii: string): Promise<import('../../interface.js').BoardSubscriptionRecord[]> {
-        return [...this.boardSubscriptions.values()].filter(s => s.gaii === gaii);
+        this.ensureReady();
+        const rows = await this.prisma.boardSubscription.findMany({ where: { gaii } });
+        return rows.map((r: any) => this.toBoardSubscriptionRecord(r));
     }
 
     async deleteBoardSubscription(boardId: string, gaii: string): Promise<boolean> {
-        return this.boardSubscriptions.delete(`${boardId}::${gaii}`);
+        this.ensureReady();
+        try {
+            await this.prisma.boardSubscription.delete({ where: { boardId_gaii: { boardId, gaii } } });
+            return true;
+        } catch { return false; }
+    }
+
+    private toBoardSubscriptionRecord(row: any): import('../../interface.js').BoardSubscriptionRecord {
+        return {
+            id: row.id,
+            boardId: row.boardId,
+            gaii: row.gaii,
+            callbackUrl: row.callbackUrl ?? undefined,
+            filters: row.filters ?? undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
     }
 
     // ── OTK ─────────────────────────────────────────────────────
@@ -1245,9 +1241,6 @@ export class MongoStorage implements Storage {
 
     // ── GHII (persisted via Prisma) ──
 
-    private personalNodes = new Map<string, PersonalNodeRecord>();
-    private mailboxItems = new Map<string, MailboxItemRecord>();
-
     private toGHIIRecord(row: any): GHIIRecord {
         return {
             username: row.username,
@@ -1384,144 +1377,172 @@ export class MongoStorage implements Storage {
         } catch { return false; }
     }
 
-    // ── Chat Instances (in-memory fallback until Prisma schema is updated) ──
-
-    private chatInstances = new Map<string, ChatInstanceRecord>();
+    // ── Chat Instances ──
 
     async createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord> {
-        this.chatInstances.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.chatInstance.create({
+            data: { id: record.id, platform: record.platform, appName: record.appName, ownerName: record.ownerName, ghii: record.ghii, nodeId: record.nodeId, isAnonymous: record.isAnonymous, createdAt: new Date(record.createdAt), lastSeen: new Date(record.lastSeen) },
+        });
         return record;
     }
 
     async getChatInstance(id: string): Promise<ChatInstanceRecord | null> {
-        return this.chatInstances.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.chatInstance.findUnique({ where: { id } });
+        return row ? this.toChatInstanceRecord(row) : null;
     }
 
     async listChatInstances(opts?: { ownerName?: string; platform?: string; ghii?: string }): Promise<ChatInstanceRecord[]> {
-        let results = [...this.chatInstances.values()];
-        if (opts?.ownerName) results = results.filter(r => r.ownerName === opts.ownerName);
-        if (opts?.platform) results = results.filter(r => r.platform === opts.platform);
-        if (opts?.ghii) results = results.filter(r => r.ghii === opts.ghii);
-        return results;
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.ownerName) where.ownerName = opts.ownerName;
+        if (opts?.platform) where.platform = opts.platform;
+        if (opts?.ghii) where.ghii = opts.ghii;
+        const rows = await this.prisma.chatInstance.findMany({ where });
+        return rows.map((r: any) => this.toChatInstanceRecord(r));
     }
 
     async updateChatInstance(id: string, updates: Partial<ChatInstanceRecord>): Promise<ChatInstanceRecord | null> {
-        const record = this.chatInstances.get(id);
-        if (!record) return null;
-        Object.assign(record, updates);
-        return record;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.lastSeen) data.lastSeen = new Date(updates.lastSeen);
+            if (updates.platform) data.platform = updates.platform;
+            if (updates.appName) data.appName = updates.appName;
+            const row = await this.prisma.chatInstance.update({ where: { id }, data });
+            return this.toChatInstanceRecord(row);
+        } catch { return null; }
     }
 
     async deleteChatInstance(id: string): Promise<boolean> {
-        return this.chatInstances.delete(id);
+        this.ensureReady();
+        try { await this.prisma.chatInstance.delete({ where: { id } }); return true; } catch { return false; }
+    }
+
+    private toChatInstanceRecord(row: any): ChatInstanceRecord {
+        return { id: row.id, platform: row.platform, appName: row.appName, ownerName: row.ownerName, ghii: row.ghii, nodeId: row.nodeId, isAnonymous: row.isAnonymous, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen };
     }
 
     // ── Personal Nodes ──
 
     async createPersonalNode(node: PersonalNodeRecord): Promise<PersonalNodeRecord> {
-        this.personalNodes.set(node.nodeId, { ...node });
-        return { ...node };
+        this.ensureReady();
+        await this.prisma.personalNode.create({
+            data: { id: node.nodeId, ownerName: node.ownerName, anchorNodeId: node.anchorNodeId, publicKey: node.publicKey, status: node.status, agentGaiis: node.agentGaiis, lastSeen: new Date(node.lastSeen), mailboxQuotaBytes: node.mailboxQuotaBytes, mailboxUsedBytes: node.mailboxUsedBytes, visibility: node.visibility, createdAt: new Date(node.createdAt) },
+        });
+        return node;
     }
 
     async getPersonalNode(nodeId: string): Promise<PersonalNodeRecord | null> {
-        const node = this.personalNodes.get(nodeId);
-        return node ? { ...node } : null;
+        this.ensureReady();
+        const row = await this.prisma.personalNode.findUnique({ where: { id: nodeId } });
+        return row ? this.toPersonalNodeRecord(row) : null;
     }
 
     async getPersonalNodeByOwner(ownerName: string): Promise<PersonalNodeRecord | null> {
-        for (const node of this.personalNodes.values()) {
-            if (node.ownerName === ownerName) return { ...node };
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.personalNode.findFirst({ where: { ownerName } });
+        return row ? this.toPersonalNodeRecord(row) : null;
     }
 
     async listPersonalNodes(opts?: { status?: string }): Promise<PersonalNodeRecord[]> {
-        let results = [...this.personalNodes.values()];
-        if (opts?.status) {
-            results = results.filter(n => n.status === opts.status);
-        }
-        return results.map(n => ({ ...n }));
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.personalNode.findMany({ where });
+        return rows.map((r: any) => this.toPersonalNodeRecord(r));
     }
 
     async updatePersonalNode(nodeId: string, updates: Partial<PersonalNodeRecord>): Promise<PersonalNodeRecord | null> {
-        const node = this.personalNodes.get(nodeId);
-        if (!node) return null;
-        Object.assign(node, updates, { updatedAt: new Date().toISOString() });
-        return { ...node };
+        this.ensureReady();
+        try {
+            const data: any = { ...updates };
+            delete data.nodeId;
+            if (data.lastSeen && typeof data.lastSeen === 'string') data.lastSeen = new Date(data.lastSeen);
+            if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
+            const row = await this.prisma.personalNode.update({ where: { id: nodeId }, data });
+            return this.toPersonalNodeRecord(row);
+        } catch { return null; }
     }
 
     async deletePersonalNode(nodeId: string): Promise<boolean> {
-        return this.personalNodes.delete(nodeId);
+        this.ensureReady();
+        try { await this.prisma.personalNode.delete({ where: { id: nodeId } }); return true; } catch { return false; }
+    }
+
+    private toPersonalNodeRecord(row: any): PersonalNodeRecord {
+        return { nodeId: row.id, ownerName: row.ownerName, anchorNodeId: row.anchorNodeId, publicKey: row.publicKey, status: row.status, agentGaiis: row.agentGaiis, lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen, mailboxQuotaBytes: row.mailboxQuotaBytes, mailboxUsedBytes: row.mailboxUsedBytes, visibility: row.visibility, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
     // ── Mailbox ──
 
     async createMailboxItem(item: MailboxItemRecord): Promise<MailboxItemRecord> {
-        this.mailboxItems.set(item.id, { ...item });
-        const node = this.personalNodes.get(item.personalNodeId);
-        if (node) node.mailboxUsedBytes += item.sizeBytes;
-        return { ...item };
+        this.ensureReady();
+        await this.prisma.mailboxItem.create({
+            data: { id: item.id, personalNodeId: item.personalNodeId, type: item.type, fromGaii: item.fromGaii, toGaii: item.toGaii, payload: item.payload, sizeBytes: item.sizeBytes, retentionDays: item.retentionDays, expiresAt: new Date(item.expiresAt), createdAt: new Date(item.createdAt) },
+        });
+        // Update personal node mailbox usage
+        try { await this.prisma.personalNode.update({ where: { id: item.personalNodeId }, data: { mailboxUsedBytes: { increment: item.sizeBytes } } }); } catch {}
+        return item;
     }
 
     async getMailboxItem(id: string): Promise<MailboxItemRecord | null> {
-        const item = this.mailboxItems.get(id);
-        return item ? { ...item } : null;
+        this.ensureReady();
+        const row = await this.prisma.mailboxItem.findUnique({ where: { id } });
+        return row ? this.toMailboxItemRecord(row) : null;
     }
 
     async listMailboxItems(personalNodeId: string, opts?: { type?: string; limit?: number }): Promise<MailboxItemRecord[]> {
-        let results = [...this.mailboxItems.values()]
-            .filter(i => i.personalNodeId === personalNodeId)
-            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        if (opts?.type) results = results.filter(i => i.type === opts.type);
-        if (opts?.limit) results = results.slice(0, opts.limit);
-        return results.map(i => ({ ...i }));
+        this.ensureReady();
+        const where: any = { personalNodeId };
+        if (opts?.type) where.type = opts.type;
+        const rows = await this.prisma.mailboxItem.findMany({ where, orderBy: { createdAt: 'asc' }, take: opts?.limit });
+        return rows.map((r: any) => this.toMailboxItemRecord(r));
     }
 
     async deleteMailboxItem(id: string): Promise<boolean> {
-        const item = this.mailboxItems.get(id);
-        if (!item) return false;
-        const node = this.personalNodes.get(item.personalNodeId);
-        if (node) node.mailboxUsedBytes = Math.max(0, node.mailboxUsedBytes - item.sizeBytes);
-        return this.mailboxItems.delete(id);
+        this.ensureReady();
+        try {
+            const item = await this.prisma.mailboxItem.findUnique({ where: { id } });
+            if (!item) return false;
+            await this.prisma.mailboxItem.delete({ where: { id } });
+            try { await this.prisma.personalNode.update({ where: { id: item.personalNodeId }, data: { mailboxUsedBytes: { decrement: item.sizeBytes } } }); } catch {}
+            return true;
+        } catch { return false; }
     }
 
     async deleteMailboxItemsByNode(personalNodeId: string): Promise<number> {
-        let count = 0;
-        for (const [id, item] of this.mailboxItems) {
-            if (item.personalNodeId === personalNodeId) {
-                this.mailboxItems.delete(id);
-                count++;
-            }
-        }
-        const node = this.personalNodes.get(personalNodeId);
-        if (node) node.mailboxUsedBytes = 0;
-        return count;
+        this.ensureReady();
+        const result = await this.prisma.mailboxItem.deleteMany({ where: { personalNodeId } });
+        try { await this.prisma.personalNode.update({ where: { id: personalNodeId }, data: { mailboxUsedBytes: 0 } }); } catch {}
+        return result.count;
     }
 
     async getMailboxStats(personalNodeId: string): Promise<{ count: number; totalBytes: number }> {
-        let count = 0;
-        let totalBytes = 0;
-        for (const item of this.mailboxItems.values()) {
-            if (item.personalNodeId === personalNodeId) {
-                count++;
-                totalBytes += item.sizeBytes;
-            }
-        }
-        return { count, totalBytes };
+        this.ensureReady();
+        const result = await this.prisma.mailboxItem.aggregate({ where: { personalNodeId }, _count: true, _sum: { sizeBytes: true } });
+        return { count: result._count, totalBytes: result._sum.sizeBytes ?? 0 };
     }
 
     async cleanExpiredMailboxItems(): Promise<number> {
-        const now = Date.now();
-        let count = 0;
-        for (const [id, item] of this.mailboxItems) {
-            if (new Date(item.expiresAt).getTime() < now) {
-                const node = this.personalNodes.get(item.personalNodeId);
-                if (node) node.mailboxUsedBytes = Math.max(0, node.mailboxUsedBytes - item.sizeBytes);
-                this.mailboxItems.delete(id);
-                count++;
-            }
+        this.ensureReady();
+        const expired = await this.prisma.mailboxItem.findMany({ where: { expiresAt: { lt: new Date() } }, select: { id: true, personalNodeId: true, sizeBytes: true } });
+        if (expired.length === 0) return 0;
+        // Update personal node usage for each affected node
+        const nodeBytes = new Map<string, number>();
+        for (const item of expired) {
+            nodeBytes.set(item.personalNodeId, (nodeBytes.get(item.personalNodeId) ?? 0) + item.sizeBytes);
         }
-        return count;
+        for (const [nodeId, bytes] of nodeBytes) {
+            try { await this.prisma.personalNode.update({ where: { id: nodeId }, data: { mailboxUsedBytes: { decrement: bytes } } }); } catch {}
+        }
+        const result = await this.prisma.mailboxItem.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+        return result.count;
+    }
+
+    private toMailboxItemRecord(row: any): MailboxItemRecord {
+        return { id: row.id, personalNodeId: row.personalNodeId, type: row.type, fromGaii: row.fromGaii, toGaii: row.toGaii, payload: row.payload, sizeBytes: row.sizeBytes, retentionDays: row.retentionDays, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
     // ── Maintenance Mode ────────────────────────────────────────
@@ -1543,59 +1564,64 @@ export class MongoStorage implements Storage {
         return state;
     }
 
-    // ── Schema Locking (in-memory fallback until Prisma schema is updated) ──
-
-    private schemas = new Map<string, SchemaRecord>();
-    private consents = new Map<string, ConsentRecord>();
-    private consentAudit: ConsentAuditEntry[] = [];
-    private csms = new Map<string, CsmRecord>();
+    // ── Schema Locking ──
 
     async setSchema(record: SchemaRecord): Promise<SchemaRecord> {
-        const storageKey = `${record.applyTo}:${record.keyPattern}`;
-        this.schemas.set(storageKey, record);
+        this.ensureReady();
+        await this.prisma.schemaLock.upsert({
+            where: { applyTo_keyPattern: { applyTo: record.applyTo, keyPattern: record.keyPattern } },
+            create: { keyPattern: record.keyPattern, applyTo: record.applyTo, schemaJson: record.schemaJson as any, schemaMode: record.schemaMode, lockedBy: record.lockedBy, setAt: new Date(record.setAt), semanticContext: record.semanticContext as any ?? null },
+            update: { schemaJson: record.schemaJson as any, schemaMode: record.schemaMode, lockedBy: record.lockedBy, semanticContext: record.semanticContext as any ?? null },
+        });
         return record;
     }
 
     async getSchema(keyPattern: string, applyTo?: 'exact' | 'prefix'): Promise<SchemaRecord | null> {
+        this.ensureReady();
         if (applyTo) {
-            return this.schemas.get(`${applyTo}:${keyPattern}`) ?? null;
+            const row = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo, keyPattern } } });
+            return row ? this.toSchemaRecord(row) : null;
         }
-        return this.schemas.get(`exact:${keyPattern}`) ?? this.schemas.get(`prefix:${keyPattern}`) ?? null;
+        const exact = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern } } });
+        if (exact) return this.toSchemaRecord(exact);
+        const prefix = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern } } });
+        return prefix ? this.toSchemaRecord(prefix) : null;
     }
 
     async deleteSchema(keyPattern: string): Promise<boolean> {
-        const deleted1 = this.schemas.delete(`exact:${keyPattern}`);
-        const deleted2 = this.schemas.delete(`prefix:${keyPattern}`);
-        return deleted1 || deleted2;
+        this.ensureReady();
+        let deleted = false;
+        try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern } } }); deleted = true; } catch {}
+        try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern } } }); deleted = true; } catch {}
+        return deleted;
     }
 
     async listSchemas(prefix?: string): Promise<SchemaRecord[]> {
-        const results: SchemaRecord[] = [];
-        for (const record of this.schemas.values()) {
-            if (!prefix || record.keyPattern.startsWith(prefix)) {
-                results.push(record);
-            }
-        }
-        return results;
+        this.ensureReady();
+        const where: any = {};
+        if (prefix) where.keyPattern = { startsWith: prefix };
+        const rows = await this.prisma.schemaLock.findMany({ where });
+        return rows.map((r: any) => this.toSchemaRecord(r));
     }
 
     async findApplicableSchema(memoryKey: string): Promise<SchemaRecord | null> {
+        this.ensureReady();
         // 1. Exact match — highest priority
-        const exact = this.schemas.get(`exact:${memoryKey}`);
-        if (exact) return exact;
+        const exact = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern: memoryKey } } });
+        if (exact) return this.toSchemaRecord(exact);
 
-        // 2. Wildcard pattern match — supports profile.*.interests style (dot-separated)
+        // 2. Load all prefix schemas for pattern matching
+        const prefixSchemas = await this.prisma.schemaLock.findMany({ where: { applyTo: 'prefix' } });
+        const allPrefixRecords = prefixSchemas.map((r: any) => this.toSchemaRecord(r));
+
+        // 2a. Wildcard pattern match — supports profile.*.interests style (dot-separated)
         let bestWildcard: SchemaRecord | null = null;
         let bestSegments = 0;
-        for (const record of this.schemas.values()) {
-            if (record.applyTo !== 'prefix') continue;
+        for (const record of allPrefixRecords) {
             if (!record.keyPattern.includes('*')) continue;
             if (mongoMatchWildcardPattern(record.keyPattern, memoryKey)) {
                 const segments = record.keyPattern.split('.').length;
-                if (segments > bestSegments) {
-                    bestWildcard = record;
-                    bestSegments = segments;
-                }
+                if (segments > bestSegments) { bestWildcard = record; bestSegments = segments; }
             }
         }
         if (bestWildcard) return bestWildcard;
@@ -1603,14 +1629,10 @@ export class MongoStorage implements Storage {
         // 2b. Glob-style pattern match — supports "recipe:*", "sensor:*" style (colon-separated)
         let bestGlob: SchemaRecord | null = null;
         let bestGlobLen = 0;
-        for (const record of this.schemas.values()) {
-            if (record.applyTo !== 'prefix') continue;
+        for (const record of allPrefixRecords) {
             if (!record.keyPattern.includes('*')) continue;
             if (mongoMatchGlobPattern(record.keyPattern, memoryKey)) {
-                if (record.keyPattern.length > bestGlobLen) {
-                    bestGlob = record;
-                    bestGlobLen = record.keyPattern.length;
-                }
+                if (record.keyPattern.length > bestGlobLen) { bestGlob = record; bestGlobLen = record.keyPattern.length; }
             }
         }
         if (bestGlob) return bestGlob;
@@ -1618,680 +1640,812 @@ export class MongoStorage implements Storage {
         // 3. Simple prefix match — longest prefix wins
         const parts = memoryKey.split('.');
         for (let i = parts.length - 1; i >= 1; i--) {
-            const prefix = parts.slice(0, i).join('.');
-            const prefixSchema = this.schemas.get(`prefix:${prefix}`);
-            if (prefixSchema) return prefixSchema;
+            const pfx = parts.slice(0, i).join('.');
+            const pfxRow = await this.prisma.schemaLock.findUnique({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern: pfx } } });
+            if (pfxRow) return this.toSchemaRecord(pfxRow);
         }
-
         return null;
     }
 
-    // ── Consent Layer (in-memory fallback until Prisma schema is updated) ──
+    private toSchemaRecord(row: any): SchemaRecord {
+        return { keyPattern: row.keyPattern, applyTo: row.applyTo, schemaJson: row.schemaJson as Record<string, unknown>, schemaMode: row.schemaMode, lockedBy: row.lockedBy, setAt: row.setAt instanceof Date ? row.setAt.toISOString() : row.setAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, semanticContext: row.semanticContext ?? undefined };
+    }
+
+    // ── Consent Layer ──
 
     async createConsent(record: ConsentRecord): Promise<ConsentRecord> {
-        this.consents.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.consent.create({
+            data: { id: record.id, ownerGaii: record.ownerGaii, dataPattern: record.dataPattern, recipient: record.recipient, purpose: record.purpose, scope: record.scope, expires: record.expires ? new Date(record.expires) : null, status: record.status, grantedAt: new Date(record.grantedAt), revokedAt: record.revokedAt ? new Date(record.revokedAt) : null, metadata: record.metadata as any ?? null },
+        });
         return record;
     }
 
     async getConsent(id: string): Promise<ConsentRecord | null> {
-        return this.consents.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.consent.findUnique({ where: { id } });
+        return row ? this.toConsentRecord(row) : null;
     }
 
-    async listConsents(ownerGaii: string, opts?: {
-        status?: 'active' | 'revoked' | 'expired';
-        recipient?: string;
-    }): Promise<ConsentRecord[]> {
-        const results: ConsentRecord[] = [];
-        for (const c of this.consents.values()) {
-            if (c.ownerGaii !== ownerGaii) continue;
-            if (opts?.status && c.status !== opts.status) continue;
-            if (opts?.recipient && c.recipient !== opts.recipient) continue;
-            results.push(c);
-        }
-        return results;
+    async listConsents(ownerGaii: string, opts?: { status?: 'active' | 'revoked' | 'expired'; recipient?: string }): Promise<ConsentRecord[]> {
+        this.ensureReady();
+        const where: any = { ownerGaii };
+        if (opts?.status) where.status = opts.status;
+        if (opts?.recipient) where.recipient = opts.recipient;
+        const rows = await this.prisma.consent.findMany({ where });
+        return rows.map((r: any) => this.toConsentRecord(r));
     }
 
     async updateConsent(id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null> {
-        const existing = this.consents.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates };
-        this.consents.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.revokedAt) data.revokedAt = new Date(updates.revokedAt);
+            if (updates.expires !== undefined) data.expires = updates.expires ? new Date(updates.expires) : null;
+            if (updates.metadata !== undefined) data.metadata = updates.metadata as any;
+            const row = await this.prisma.consent.update({ where: { id }, data });
+            return this.toConsentRecord(row);
+        } catch { return null; }
     }
 
     async deleteConsent(id: string): Promise<boolean> {
-        return this.consents.delete(id);
+        this.ensureReady();
+        try { await this.prisma.consent.delete({ where: { id } }); return true; } catch { return false; }
     }
 
     async findMatchingConsents(ownerGaii: string, memoryKey: string, accessorGaii: string): Promise<ConsentRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.consent.findMany({ where: { ownerGaii, status: 'active' } });
         const now = new Date().toISOString();
         const results: ConsentRecord[] = [];
 
-        for (const consent of this.consents.values()) {
-            if (consent.ownerGaii !== ownerGaii) continue;
-            if (consent.status !== 'active') continue;
-
+        for (const row of rows) {
+            const consent = this.toConsentRecord(row);
             // Check expiration
             if (consent.expires && consent.expires < now) {
-                consent.status = 'expired';
+                await this.prisma.consent.update({ where: { id: consent.id }, data: { status: 'expired' } });
                 continue;
             }
-
-            // Check recipient (supports *, exact GAII, ghii:, domain:, node:)
+            // Check recipient
             const accessor = parseGaiiLoose(accessorGaii);
             if (!matchesRecipient(consent.recipient, accessorGaii, accessor.owner, accessor.node)) continue;
-
             // Check data_pattern (glob match)
             if (!mongoConsentMatchPattern(consent.dataPattern, memoryKey)) continue;
-
             results.push(consent);
         }
-
         return results;
     }
 
     // Consent Audit
     async addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry> {
-        this.consentAudit.push(entry);
+        this.ensureReady();
+        await this.prisma.consentAudit.create({
+            data: { consentId: entry.consentId, ownerGaii: entry.ownerGaii, accessorGaii: entry.accessorGaii, memoryKey: entry.memoryKey, action: entry.action, timestamp: new Date(entry.timestamp), allowed: entry.allowed },
+        });
         return entry;
     }
 
-    async listConsentAudit(ownerGaii: string, opts?: {
-        days?: number;
-        consentId?: string;
-        accessorGaii?: string;
-    }): Promise<ConsentAuditEntry[]> {
-        const cutoff = opts?.days
-            ? new Date(Date.now() - opts.days * 86400000).toISOString()
-            : null;
-
-        return this.consentAudit.filter(e => {
-            if (e.ownerGaii !== ownerGaii) return false;
-            if (cutoff && e.timestamp < cutoff) return false;
-            if (opts?.consentId && e.consentId !== opts.consentId) return false;
-            if (opts?.accessorGaii && e.accessorGaii !== opts.accessorGaii) return false;
-            return true;
-        });
+    async listConsentAudit(ownerGaii: string, opts?: { days?: number; consentId?: string; accessorGaii?: string }): Promise<ConsentAuditEntry[]> {
+        this.ensureReady();
+        const where: any = { ownerGaii };
+        if (opts?.days) where.timestamp = { gte: new Date(Date.now() - opts.days * 86400000) };
+        if (opts?.consentId) where.consentId = opts.consentId;
+        if (opts?.accessorGaii) where.accessorGaii = opts.accessorGaii;
+        const rows = await this.prisma.consentAudit.findMany({ where, orderBy: { timestamp: 'desc' } });
+        return rows.map((r: any) => ({ id: r.id, consentId: r.consentId, ownerGaii: r.ownerGaii, accessorGaii: r.accessorGaii, memoryKey: r.memoryKey, action: r.action, timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp, allowed: r.allowed }));
     }
 
-    // ── CSM — Community Service Manifest (in-memory fallback) ──
+    private toConsentRecord(row: any): ConsentRecord {
+        return { id: row.id, ownerGaii: row.ownerGaii, dataPattern: row.dataPattern, recipient: row.recipient, purpose: row.purpose, scope: row.scope, expires: row.expires ? (row.expires instanceof Date ? row.expires.toISOString() : row.expires) : null, status: row.status, grantedAt: row.grantedAt instanceof Date ? row.grantedAt.toISOString() : row.grantedAt, revokedAt: row.revokedAt ? (row.revokedAt instanceof Date ? row.revokedAt.toISOString() : row.revokedAt) : null, metadata: row.metadata ?? undefined };
+    }
+
+    // ── CSM — Community Service Manifest ──
 
     async createCsm(record: CsmRecord): Promise<CsmRecord> {
-        if (this.csms.has(record.name)) throw new Error('CSM_NAME_TAKEN');
-        this.csms.set(record.name, record);
-        return record;
+        this.ensureReady();
+        try {
+            await this.prisma.csm.create({
+                data: { name: record.name, definition: record.definition as any, jsonSchemaKey: record.jsonSchemaKey, serviceType: record.serviceType, registeredBy: record.registeredBy, registeredAt: new Date(record.registeredAt), semantic: record.semantic as any ?? null, federate: record.federate ?? false },
+            });
+            return record;
+        } catch { throw new Error('CSM_NAME_TAKEN'); }
     }
 
     async getCsm(name: string): Promise<CsmRecord | null> {
-        return this.csms.get(name) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.csm.findUnique({ where: { name } });
+        return row ? this.toCsmRecord(row) : null;
     }
 
     async listCsms(opts?: { serviceType?: string }): Promise<CsmRecord[]> {
-        const results: CsmRecord[] = [];
-        for (const csm of this.csms.values()) {
-            if (opts?.serviceType && csm.serviceType !== opts.serviceType) continue;
-            results.push(csm);
-        }
-        return results;
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.serviceType) where.serviceType = opts.serviceType;
+        const rows = await this.prisma.csm.findMany({ where });
+        return rows.map((r: any) => this.toCsmRecord(r));
     }
 
     async updateCsm(name: string, updates: Partial<CsmRecord>): Promise<CsmRecord | null> {
-        const existing = this.csms.get(name);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, name: existing.name };
-        this.csms.set(name, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.definition) data.definition = updates.definition as any;
+            if (updates.serviceType) data.serviceType = updates.serviceType;
+            if (updates.semantic !== undefined) data.semantic = updates.semantic as any;
+            if (updates.federate !== undefined) data.federate = updates.federate;
+            const row = await this.prisma.csm.update({ where: { name }, data });
+            return this.toCsmRecord(row);
+        } catch { return null; }
     }
 
     async deleteCsm(name: string): Promise<boolean> {
-        return this.csms.delete(name);
+        this.ensureReady();
+        try { await this.prisma.csm.delete({ where: { name } }); return true; } catch { return false; }
     }
 
-    // ── MSM — Machine Service Manifest (in-memory fallback) ──
-    // TODO: Migrate to MongoDB collection ('msm') when persistence is needed.
-    // Current in-memory implementation means MSM data does not survive restarts.
+    private toCsmRecord(row: any): CsmRecord {
+        return { name: row.name, definition: row.definition as Record<string, unknown>, jsonSchemaKey: row.jsonSchemaKey, serviceType: row.serviceType, registeredBy: row.registeredBy, registeredAt: row.registeredAt instanceof Date ? row.registeredAt.toISOString() : row.registeredAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, semantic: row.semantic ?? undefined, federate: row.federate ?? undefined };
+    }
 
-    private msms = new Map<string, MsmRecord>();
+    // ── MSM — Machine Service Manifest ──
 
     async createMsm(record: MsmRecord): Promise<MsmRecord> {
-        if (this.msms.has(record.name)) throw new Error('MSM_NAME_TAKEN');
-        this.msms.set(record.name, record);
-        return record;
+        this.ensureReady();
+        try {
+            await this.prisma.msm.create({
+                data: { name: record.name, definition: record.definition as any, category: record.category, authType: record.authType, actionsCount: record.actionsCount, registeredBy: record.registeredBy, registeredAt: new Date(record.registeredAt), federate: record.federate ?? false },
+            });
+            return record;
+        } catch { throw new Error('MSM_NAME_TAKEN'); }
     }
 
     async getMsm(name: string): Promise<MsmRecord | null> {
-        return this.msms.get(name) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.msm.findUnique({ where: { name } });
+        return row ? this.toMsmRecord(row) : null;
     }
 
     async listMsms(opts?: { category?: string }): Promise<MsmRecord[]> {
-        let results = [...this.msms.values()];
-        if (opts?.category) results = results.filter(m => m.category === opts.category);
-        return results;
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.category) where.category = opts.category;
+        const rows = await this.prisma.msm.findMany({ where });
+        return rows.map((r: any) => this.toMsmRecord(r));
     }
 
     async updateMsm(name: string, updates: Partial<MsmRecord>): Promise<MsmRecord | null> {
-        const existing = this.msms.get(name);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, name: existing.name, updatedAt: new Date().toISOString() };
-        this.msms.set(name, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.definition) data.definition = updates.definition as any;
+            if (updates.category) data.category = updates.category;
+            if (updates.authType) data.authType = updates.authType;
+            if (updates.actionsCount !== undefined) data.actionsCount = updates.actionsCount;
+            if (updates.federate !== undefined) data.federate = updates.federate;
+            const row = await this.prisma.msm.update({ where: { name }, data });
+            return this.toMsmRecord(row);
+        } catch { return null; }
     }
 
     async deleteMsm(name: string): Promise<boolean> {
-        return this.msms.delete(name);
+        this.ensureReady();
+        try { await this.prisma.msm.delete({ where: { name } }); return true; } catch { return false; }
     }
 
-    // ── Email Verification (in-memory fallback until Prisma schema is updated) ──
+    private toMsmRecord(row: any): MsmRecord {
+        return { name: row.name, definition: row.definition as Record<string, unknown>, category: row.category, authType: row.authType, actionsCount: row.actionsCount, registeredBy: row.registeredBy, registeredAt: row.registeredAt instanceof Date ? row.registeredAt.toISOString() : row.registeredAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, federate: row.federate ?? undefined };
+    }
 
-    private emailVerifications = new Map<string, EmailVerificationRecord>();
+    // ── Email Verification ──
 
     async createEmailVerification(record: EmailVerificationRecord): Promise<EmailVerificationRecord> {
-        this.emailVerifications.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.emailVerification.create({
+            data: { id: record.id, ownerName: record.ownerName, emailHash: record.emailHash, code: record.code, purpose: record.purpose, status: record.status, attempts: record.attempts, expiresAt: new Date(record.expiresAt), createdAt: new Date(record.createdAt), verifiedAt: record.verifiedAt ? new Date(record.verifiedAt) : null },
+        });
         return record;
     }
 
     async getEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
-        return this.emailVerifications.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.emailVerification.findUnique({ where: { id } });
+        return row ? this.toEmailVerificationRecord(row) : null;
     }
 
     async getActiveEmailVerification(ownerName: string, purpose: string): Promise<EmailVerificationRecord | null> {
-        const now = new Date().toISOString();
-        for (const record of this.emailVerifications.values()) {
-            if (record.ownerName === ownerName && record.purpose === purpose &&
-                record.status === 'pending' && record.expiresAt > now) {
-                return record;
-            }
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.emailVerification.findFirst({ where: { ownerName, purpose, status: 'pending', expiresAt: { gt: new Date() } } });
+        return row ? this.toEmailVerificationRecord(row) : null;
     }
 
     async updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
-        const existing = this.emailVerifications.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates };
-        this.emailVerifications.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.attempts !== undefined) data.attempts = updates.attempts;
+            if (updates.verifiedAt) data.verifiedAt = new Date(updates.verifiedAt);
+            const row = await this.prisma.emailVerification.update({ where: { id }, data });
+            return this.toEmailVerificationRecord(row);
+        } catch { return null; }
     }
 
     async deleteExpiredEmailVerifications(): Promise<number> {
-        const now = new Date().toISOString();
-        let count = 0;
-        for (const [id, record] of this.emailVerifications) {
-            if (record.status === 'pending' && record.expiresAt < now) {
-                this.emailVerifications.delete(id);
-                count++;
-            }
-        }
-        return count;
+        this.ensureReady();
+        const result = await this.prisma.emailVerification.deleteMany({ where: { status: 'pending', expiresAt: { lt: new Date() } } });
+        return result.count;
+    }
+
+    private toEmailVerificationRecord(row: any): EmailVerificationRecord {
+        return { id: row.id, ownerName: row.ownerName, emailHash: row.emailHash, code: row.code, purpose: row.purpose, status: row.status, attempts: row.attempts, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, verifiedAt: row.verifiedAt ? (row.verifiedAt instanceof Date ? row.verifiedAt.toISOString() : row.verifiedAt) : null };
     }
 
     // ── Flags (Phase 1.5) ──────────────────────────────────
 
-    private flags = new Map<string, import('../../interface.js').FlagRecord>();
-
     async createFlag(record: import('../../interface.js').FlagRecord): Promise<import('../../interface.js').FlagRecord> {
-        this.flags.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.flag.create({ data: { id: record.id, targetType: record.targetType, targetId: record.targetId, flaggedBy: record.flaggedBy, reason: record.reason, description: record.description, status: record.status, createdAt: new Date(record.createdAt) } });
         return record;
     }
 
     async getFlag(id: string): Promise<import('../../interface.js').FlagRecord | null> {
-        return this.flags.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.flag.findUnique({ where: { id } });
+        return row ? this.toFlagRecord(row) : null;
     }
 
     async getFlagsByTarget(targetType: string, targetId: string): Promise<import('../../interface.js').FlagRecord[]> {
-        return [...this.flags.values()].filter(
-            f => f.targetType === targetType && f.targetId === targetId,
-        );
+        this.ensureReady();
+        const rows = await this.prisma.flag.findMany({ where: { targetType, targetId } });
+        return rows.map((r: any) => this.toFlagRecord(r));
     }
 
     async getFlagByUser(targetType: string, targetId: string, flaggedBy: string): Promise<import('../../interface.js').FlagRecord | null> {
-        for (const f of this.flags.values()) {
-            if (f.targetType === targetType && f.targetId === targetId && f.flaggedBy === flaggedBy) {
-                return f;
-            }
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.flag.findFirst({ where: { targetType, targetId, flaggedBy } });
+        return row ? this.toFlagRecord(row) : null;
     }
 
     async getFlagSummary(targetType: string, targetId: string): Promise<import('../../interface.js').FlagSummary | null> {
-        const matching = [...this.flags.values()].filter(
-            f => f.targetType === targetType && f.targetId === targetId,
-        );
+        this.ensureReady();
+        const matching = await this.prisma.flag.findMany({ where: { targetType, targetId } });
         if (matching.length === 0) return null;
-
         const byReason: Record<string, number> = {};
         let latestFlag = '';
         for (const f of matching) {
             byReason[f.reason] = (byReason[f.reason] ?? 0) + 1;
-            if (f.createdAt > latestFlag) latestFlag = f.createdAt;
+            const ts = f.createdAt instanceof Date ? f.createdAt.toISOString() : f.createdAt;
+            if (ts > latestFlag) latestFlag = ts;
         }
-
-        return {
-            targetType,
-            targetId,
-            totalFlags: matching.length,
-            byReason,
-            latestFlag,
-        };
+        return { targetType, targetId, totalFlags: matching.length, byReason, latestFlag };
     }
 
     async updateFlag(id: string, updates: Partial<import('../../interface.js').FlagRecord>): Promise<import('../../interface.js').FlagRecord | null> {
-        const existing = this.flags.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates };
-        this.flags.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.reviewedBy) data.reviewedBy = updates.reviewedBy;
+            if (updates.reviewedAt) data.reviewedAt = new Date(updates.reviewedAt);
+            const row = await this.prisma.flag.update({ where: { id }, data });
+            return this.toFlagRecord(row);
+        } catch { return null; }
     }
 
     async listFlags(opts?: { status?: string; targetType?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').FlagRecord[]> {
+        this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        let results = [...this.flags.values()];
-
-        if (opts?.status) results = results.filter(f => f.status === opts.status);
-        if (opts?.targetType) results = results.filter(f => f.targetType === opts.targetType);
-
-        // Sort newest first
-        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-        const start = (page - 1) * perPage;
-        return results.slice(start, start + perPage);
+        const where: any = {};
+        if (opts?.status) where.status = opts.status;
+        if (opts?.targetType) where.targetType = opts.targetType;
+        const rows = await this.prisma.flag.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage });
+        return rows.map((r: any) => this.toFlagRecord(r));
     }
 
-    // ── Matches (Phase 2.1 — in-memory fallback until Prisma schema is updated) ──
+    private toFlagRecord(row: any): import('../../interface.js').FlagRecord {
+        return { id: row.id, targetType: row.targetType, targetId: row.targetId, flaggedBy: row.flaggedBy, reason: row.reason, description: row.description ?? undefined, status: row.status, reviewedBy: row.reviewedBy ?? undefined, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
+    }
 
-    private matchRecords = new Map<string, import('../../interface.js').MatchRecord>();
+    // ── Matches (Phase 2.1) ──
 
     async createMatch(record: import('../../interface.js').MatchRecord): Promise<import('../../interface.js').MatchRecord> {
-        this.matchRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.match.create({ data: { id: record.id, profileA: record.profileA, profileB: record.profileB, score: record.score, breakdown: record.breakdown as any, status: record.status, notifiedAt: record.notifiedAt ? new Date(record.notifiedAt) : null, respondedAt: record.respondedAt ? new Date(record.respondedAt) : null, expiresAt: new Date(record.expiresAt), createdAt: new Date(record.createdAt) } });
         return record;
     }
 
     async getMatch(id: string): Promise<import('../../interface.js').MatchRecord | null> {
-        return this.matchRecords.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.match.findUnique({ where: { id } });
+        return row ? this.toMatchRecord(row) : null;
     }
 
     async getMatchByPair(profileA: string, profileB: string): Promise<import('../../interface.js').MatchRecord | null> {
-        for (const m of this.matchRecords.values()) {
-            if (
-                (m.profileA === profileA && m.profileB === profileB) ||
-                (m.profileA === profileB && m.profileB === profileA)
-            ) {
-                return m;
-            }
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.match.findFirst({ where: { OR: [{ profileA, profileB }, { profileA: profileB, profileB: profileA }] } });
+        return row ? this.toMatchRecord(row) : null;
     }
 
     async listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').MatchRecord[]> {
+        this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 10;
-        let results = [...this.matchRecords.values()].filter(
-            m => m.profileA === profile || m.profileB === profile,
-        );
-
-        if (opts?.status) results = results.filter(m => m.status === opts.status);
-
-        // Sort newest first
-        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-        const start = (page - 1) * perPage;
-        return results.slice(start, start + perPage);
+        const where: any = { OR: [{ profileA: profile }, { profileB: profile }] };
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.match.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage });
+        return rows.map((r: any) => this.toMatchRecord(r));
     }
 
     async updateMatch(id: string, updates: Partial<import('../../interface.js').MatchRecord>): Promise<import('../../interface.js').MatchRecord | null> {
-        const existing = this.matchRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates };
-        this.matchRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.notifiedAt) data.notifiedAt = new Date(updates.notifiedAt);
+            if (updates.respondedAt) data.respondedAt = new Date(updates.respondedAt);
+            const row = await this.prisma.match.update({ where: { id }, data });
+            return this.toMatchRecord(row);
+        } catch { return null; }
     }
 
     async deleteExpiredMatches(): Promise<number> {
-        const now = Date.now();
-        let count = 0;
-        for (const [id, match] of this.matchRecords) {
-            if (new Date(match.expiresAt).getTime() < now && match.status !== 'accepted') {
-                this.matchRecords.delete(id);
-                count++;
-            }
-        }
-        return count;
+        this.ensureReady();
+        const result = await this.prisma.match.deleteMany({ where: { expiresAt: { lt: new Date() }, status: { not: 'accepted' } } });
+        return result.count;
     }
 
     async listAllMatches(limit = 10000): Promise<import('../../interface.js').MatchRecord[]> {
-        const all = Array.from(this.matchRecords.values());
-        return all.slice(0, Math.min(limit, 10000));
+        this.ensureReady();
+        const rows = await this.prisma.match.findMany({ take: Math.min(limit, 10000) });
+        return rows.map((r: any) => this.toMatchRecord(r));
     }
 
-    // ── Organisms (Phase 2.2 — in-memory fallback until Prisma schema is updated) ──
+    private toMatchRecord(row: any): import('../../interface.js').MatchRecord {
+        return { id: row.id, profileA: row.profileA, profileB: row.profileB, score: row.score, breakdown: row.breakdown as any, status: row.status, notifiedAt: row.notifiedAt ? (row.notifiedAt instanceof Date ? row.notifiedAt.toISOString() : row.notifiedAt) : null, respondedAt: row.respondedAt ? (row.respondedAt instanceof Date ? row.respondedAt.toISOString() : row.respondedAt) : null, expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
+    }
 
-    private organismRecords = new Map<string, import('../../interface.js').OrganismRecord>();
-    private membershipRecords = new Map<string, import('../../interface.js').OrganismMembershipRecord>();
-    private joinRequestRecords = new Map<string, import('../../interface.js').JoinRequestRecord>();
+    // ── Organisms (Phase 2.2) ──
 
     async createOrganism(record: import('../../interface.js').OrganismRecord): Promise<import('../../interface.js').OrganismRecord> {
-        this.organismRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.organism.create({ data: { id: record.id, name: record.name, description: record.description, type: record.type, location: record.location as any ?? null, interests: record.interests, creatorGhii: record.creatorGhii, admins: record.admins, members: record.members, agentGaiis: record.agentGaiis, boardId: record.boardId, joinPolicy: record.joinPolicy, maxMembers: record.maxMembers, visibility: record.visibility, moderationConfig: record.moderationConfig as any, memoryNamespace: record.memoryNamespace, semantic: record.semantic as any ?? null, createdAt: new Date(record.createdAt) } });
         return record;
     }
 
     async getOrganism(id: string): Promise<import('../../interface.js').OrganismRecord | null> {
-        return this.organismRecords.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.organism.findUnique({ where: { id } });
+        return row ? this.toOrganismRecord(row) : null;
     }
 
     async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').OrganismRecord[]> {
+        this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        let results = [...this.organismRecords.values()];
-
-        if (opts?.type) results = results.filter(o => o.type === opts.type);
-        if (opts?.city) results = results.filter(o => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
-        if (opts?.interest) results = results.filter(o => o.interests.some(i => i.toLowerCase() === opts.interest!.toLowerCase()));
-        if (opts?.visibility) results = results.filter(o => o.visibility === opts.visibility);
-
-        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
+        const where: any = {};
+        if (opts?.type) where.type = opts.type;
+        if (opts?.visibility) where.visibility = opts.visibility;
+        // city and interest filtering done post-query (JSON field)
+        let rows = await this.prisma.organism.findMany({ where, orderBy: { createdAt: 'desc' } });
+        let results = rows.map((r: any) => this.toOrganismRecord(r));
+        if (opts?.city) results = results.filter((o: any) => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
+        if (opts?.interest) results = results.filter((o: any) => o.interests.some((i: string) => i.toLowerCase() === opts.interest!.toLowerCase()));
         const start = (page - 1) * perPage;
         return results.slice(start, start + perPage);
     }
 
     async updateOrganism(id: string, updates: Partial<import('../../interface.js').OrganismRecord>): Promise<import('../../interface.js').OrganismRecord | null> {
-        const existing = this.organismRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, id: existing.id };
-        this.organismRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = { ...updates };
+            delete data.id;
+            if (data.location) data.location = data.location as any;
+            if (data.moderationConfig) data.moderationConfig = data.moderationConfig as any;
+            if (data.semantic) data.semantic = data.semantic as any;
+            if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
+            const row = await this.prisma.organism.update({ where: { id }, data });
+            return this.toOrganismRecord(row);
+        } catch { return null; }
     }
 
     async deleteOrganism(id: string): Promise<boolean> {
-        // Get the organism to find its boardId and memoryNamespace
-        const org = this.organismRecords.get(id);
-
+        this.ensureReady();
+        const org = await this.prisma.organism.findUnique({ where: { id } });
         // Cascade: delete memberships and join requests
-        for (const [mid, m] of this.membershipRecords) {
-            if (m.organismId === id) this.membershipRecords.delete(mid);
-        }
-        for (const [jid, j] of this.joinRequestRecords) {
-            if (j.organismId === id) this.joinRequestRecords.delete(jid);
-        }
-
+        await this.prisma.organismMembership.deleteMany({ where: { organismId: id } });
+        await this.prisma.joinRequest.deleteMany({ where: { organismId: id } });
         // Cascade: delete organism reputation
-        this.organismReputations.delete(id);
+        try { await this.prisma.organismReputation.delete({ where: { organismId: id } }); } catch {}
 
         if (org) {
-            // Cascade: delete the organism's board and its posts/subscriptions (Prisma)
             try {
                 await this.prisma.boardPost.deleteMany({ where: { boardId: org.boardId } });
-                for (const [sid, s] of this.boardSubscriptions) {
-                    if (s.boardId === org.boardId) this.boardSubscriptions.delete(sid);
-                }
+                await this.prisma.boardSubscription.deleteMany({ where: { boardId: org.boardId } });
                 await this.prisma.board.delete({ where: { boardId: org.boardId } });
-            } catch { /* board may not exist */ }
-
-            // Cascade: delete memory entries under the organism's namespace (Prisma)
+            } catch {}
             await this.prisma.memory.deleteMany({ where: { ownerGaii: org.memoryNamespace } });
         }
+        try { await this.prisma.organism.delete({ where: { id } }); return true; } catch { return false; }
+    }
 
-        return this.organismRecords.delete(id);
+    private toOrganismRecord(row: any): import('../../interface.js').OrganismRecord {
+        return { id: row.id, name: row.name, description: row.description, type: row.type, location: row.location ?? undefined, interests: row.interests, creatorGhii: row.creatorGhii, admins: row.admins, members: row.members, agentGaiis: row.agentGaiis, boardId: row.boardId, joinPolicy: row.joinPolicy, maxMembers: row.maxMembers, visibility: row.visibility, moderationConfig: row.moderationConfig as any, memoryNamespace: row.memoryNamespace, semantic: row.semantic ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
     async createMembership(record: import('../../interface.js').OrganismMembershipRecord): Promise<import('../../interface.js').OrganismMembershipRecord> {
-        this.membershipRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.organismMembership.create({ data: { id: record.id, organismId: record.organismId, ghii: record.ghii, role: record.role, status: record.status, joinedAt: new Date(record.joinedAt), invitedBy: record.invitedBy } });
         return record;
     }
 
     async getMembership(organismId: string, ghii: string): Promise<import('../../interface.js').OrganismMembershipRecord | null> {
-        for (const m of this.membershipRecords.values()) {
-            if (m.organismId === organismId && m.ghii === ghii) return m;
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.organismMembership.findUnique({ where: { organismId_ghii: { organismId, ghii } } });
+        return row ? this.toMembershipRecord(row) : null;
     }
 
     async listMembers(organismId: string, opts?: { role?: string; status?: string }): Promise<import('../../interface.js').OrganismMembershipRecord[]> {
-        let results = [...this.membershipRecords.values()].filter(m => m.organismId === organismId);
-        if (opts?.role) results = results.filter(m => m.role === opts.role);
-        if (opts?.status) results = results.filter(m => m.status === opts.status);
-        return results;
+        this.ensureReady();
+        const where: any = { organismId };
+        if (opts?.role) where.role = opts.role;
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.organismMembership.findMany({ where });
+        return rows.map((r: any) => this.toMembershipRecord(r));
     }
 
     async listMembershipsByGhii(ghii: string): Promise<import('../../interface.js').OrganismMembershipRecord[]> {
-        return [...this.membershipRecords.values()].filter(m => m.ghii === ghii);
+        this.ensureReady();
+        const rows = await this.prisma.organismMembership.findMany({ where: { ghii } });
+        return rows.map((r: any) => this.toMembershipRecord(r));
     }
 
     async updateMembership(id: string, updates: Partial<import('../../interface.js').OrganismMembershipRecord>): Promise<import('../../interface.js').OrganismMembershipRecord | null> {
-        const existing = this.membershipRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, id: existing.id };
-        this.membershipRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.role) data.role = updates.role;
+            if (updates.status) data.status = updates.status;
+            const row = await this.prisma.organismMembership.update({ where: { id }, data });
+            return this.toMembershipRecord(row);
+        } catch { return null; }
     }
 
     async deleteMembership(id: string): Promise<boolean> {
-        return this.membershipRecords.delete(id);
+        this.ensureReady();
+        try { await this.prisma.organismMembership.delete({ where: { id } }); return true; } catch { return false; }
+    }
+
+    private toMembershipRecord(row: any): import('../../interface.js').OrganismMembershipRecord {
+        return { id: row.id, organismId: row.organismId, ghii: row.ghii, role: row.role, status: row.status, joinedAt: row.joinedAt instanceof Date ? row.joinedAt.toISOString() : row.joinedAt, invitedBy: row.invitedBy ?? undefined };
     }
 
     async createJoinRequest(record: import('../../interface.js').JoinRequestRecord): Promise<import('../../interface.js').JoinRequestRecord> {
-        this.joinRequestRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.joinRequest.create({ data: { id: record.id, organismId: record.organismId, ghii: record.ghii, message: record.message, status: record.status, reviewedBy: record.reviewedBy, createdAt: new Date(record.createdAt), reviewedAt: record.reviewedAt ? new Date(record.reviewedAt) : null } });
         return record;
     }
 
     async getJoinRequest(id: string): Promise<import('../../interface.js').JoinRequestRecord | null> {
-        return this.joinRequestRecords.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.joinRequest.findUnique({ where: { id } });
+        return row ? this.toJoinRequestRecord(row) : null;
     }
 
     async listJoinRequests(organismId: string, opts?: { status?: string }): Promise<import('../../interface.js').JoinRequestRecord[]> {
-        let results = [...this.joinRequestRecords.values()].filter(j => j.organismId === organismId);
-        if (opts?.status) results = results.filter(j => j.status === opts.status);
-        return results;
+        this.ensureReady();
+        const where: any = { organismId };
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.joinRequest.findMany({ where });
+        return rows.map((r: any) => this.toJoinRequestRecord(r));
     }
 
     async updateJoinRequest(id: string, updates: Partial<import('../../interface.js').JoinRequestRecord>): Promise<import('../../interface.js').JoinRequestRecord | null> {
-        const existing = this.joinRequestRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, id: existing.id };
-        this.joinRequestRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.reviewedBy) data.reviewedBy = updates.reviewedBy;
+            if (updates.reviewedAt) data.reviewedAt = new Date(updates.reviewedAt);
+            const row = await this.prisma.joinRequest.update({ where: { id }, data });
+            return this.toJoinRequestRecord(row);
+        } catch { return null; }
     }
 
-    // ── Appeals (Phase 2.4 — in-memory fallback until Prisma schema is updated) ──
+    private toJoinRequestRecord(row: any): import('../../interface.js').JoinRequestRecord {
+        return { id: row.id, organismId: row.organismId, ghii: row.ghii, message: row.message ?? undefined, status: row.status, reviewedBy: row.reviewedBy ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined };
+    }
 
-    private appealRecords = new Map<string, import('../../interface.js').AppealRecord>();
+    // ── Appeals (Phase 2.4) ──
 
     async createAppeal(record: import('../../interface.js').AppealRecord): Promise<import('../../interface.js').AppealRecord> {
-        this.appealRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.appeal.create({ data: { id: record.id, flagId: record.flagId, appealedBy: record.appealedBy, reason: record.reason, status: record.status, createdAt: new Date(record.createdAt) } });
         return record;
     }
 
     async getAppeal(id: string): Promise<import('../../interface.js').AppealRecord | null> {
-        return this.appealRecords.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.appeal.findUnique({ where: { id } });
+        return row ? this.toAppealRecord(row) : null;
     }
 
     async getAppealByFlagId(flagId: string): Promise<import('../../interface.js').AppealRecord | null> {
-        for (const a of this.appealRecords.values()) {
-            if (a.flagId === flagId) return a;
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.appeal.findFirst({ where: { flagId } });
+        return row ? this.toAppealRecord(row) : null;
     }
 
     async listAppeals(opts?: { status?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').AppealRecord[]> {
+        this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        let results = [...this.appealRecords.values()];
-
-        if (opts?.status) results = results.filter(a => a.status === opts.status);
-
-        // Sort newest first
-        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-        const start = (page - 1) * perPage;
-        return results.slice(start, start + perPage);
+        const where: any = {};
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.appeal.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * perPage, take: perPage });
+        return rows.map((r: any) => this.toAppealRecord(r));
     }
 
     async updateAppeal(id: string, updates: Partial<import('../../interface.js').AppealRecord>): Promise<import('../../interface.js').AppealRecord | null> {
-        const existing = this.appealRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, id: existing.id };
-        this.appealRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.reviewedBy) data.reviewedBy = updates.reviewedBy;
+            if (updates.reviewNote) data.reviewNote = updates.reviewNote;
+            if (updates.reviewedAt) data.reviewedAt = new Date(updates.reviewedAt);
+            const row = await this.prisma.appeal.update({ where: { id }, data });
+            return this.toAppealRecord(row);
+        } catch { return null; }
     }
 
-    // ── Marketplace (Phase 2.6 — in-memory fallback until Prisma schema is updated) ──
+    private toAppealRecord(row: any): import('../../interface.js').AppealRecord {
+        return { id: row.id, flagId: row.flagId, appealedBy: row.appealedBy, reason: row.reason, status: row.status, reviewedBy: row.reviewedBy ?? undefined, reviewNote: row.reviewNote ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined };
+    }
 
-    private listingRecords = new Map<string, import('../../interface.js').ListingRecord>();
-    private purchaseRecords = new Map<string, import('../../interface.js').PurchaseRecord>();
+    // ── Marketplace (Phase 2.6) ──
 
     async createListing(record: import('../../interface.js').ListingRecord): Promise<import('../../interface.js').ListingRecord> {
-        this.listingRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.listing.create({ data: { id: record.id, ownerName: record.ownerName, sellerGhii: record.sellerGhii, title: record.title, description: record.description, category: record.category, priceMorsels: record.priceMorsels, condition: record.condition, availability: record.availability, location: record.location as any ?? null, tags: record.tags ?? [], images: record.images ?? [], status: record.status, memoryKey: record.memoryKey, flagCount: record.flagCount, createdAt: new Date(record.createdAt), semantic: record.semantic as any ?? null } });
         return record;
     }
 
     async getListing(id: string): Promise<import('../../interface.js').ListingRecord | null> {
-        return this.listingRecords.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.listing.findUnique({ where: { id } });
+        return row ? this.toListingRecord(row) : null;
     }
 
     async listListings(opts?: { category?: string; city?: string; minPrice?: number; maxPrice?: number; status?: string; sellerOwner?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').ListingRecord[]> {
+        this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        let results = [...this.listingRecords.values()];
-
-        if (opts?.category) results = results.filter(l => l.category === opts.category);
-        if (opts?.city) results = results.filter(l => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
-        if (opts?.minPrice !== undefined) results = results.filter(l => l.priceMorsels >= opts.minPrice!);
-        if (opts?.maxPrice !== undefined) results = results.filter(l => l.priceMorsels <= opts.maxPrice!);
-        if (opts?.status) results = results.filter(l => l.status === opts.status);
-        if (opts?.sellerOwner) results = results.filter(l => l.ownerName === opts.sellerOwner);
-
-        results.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
+        const where: any = {};
+        if (opts?.category) where.category = opts.category;
+        if (opts?.status) where.status = opts.status;
+        if (opts?.sellerOwner) where.ownerName = opts.sellerOwner;
+        if (opts?.minPrice !== undefined || opts?.maxPrice !== undefined) {
+            where.priceMorsels = {};
+            if (opts?.minPrice !== undefined) where.priceMorsels.gte = opts.minPrice;
+            if (opts?.maxPrice !== undefined) where.priceMorsels.lte = opts.maxPrice;
+        }
+        let rows = await this.prisma.listing.findMany({ where, orderBy: { createdAt: 'desc' } });
+        let results = rows.map((r: any) => this.toListingRecord(r));
+        // city filtering post-query (JSON field)
+        if (opts?.city) results = results.filter((l: any) => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
         const start = (page - 1) * perPage;
         return results.slice(start, start + perPage);
     }
 
     async updateListing(id: string, updates: Partial<import('../../interface.js').ListingRecord>): Promise<import('../../interface.js').ListingRecord | null> {
-        const existing = this.listingRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, id: existing.id };
-        this.listingRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = { ...updates };
+            delete data.id;
+            if (data.location) data.location = data.location as any;
+            if (data.semantic) data.semantic = data.semantic as any;
+            if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
+            if (data.updatedAt && typeof data.updatedAt === 'string') data.updatedAt = new Date(data.updatedAt);
+            const row = await this.prisma.listing.update({ where: { id }, data });
+            return this.toListingRecord(row);
+        } catch { return null; }
     }
 
     async deleteListing(id: string): Promise<boolean> {
-        return this.listingRecords.delete(id);
+        this.ensureReady();
+        try { await this.prisma.listing.delete({ where: { id } }); return true; } catch { return false; }
+    }
+
+    private toListingRecord(row: any): import('../../interface.js').ListingRecord {
+        return { id: row.id, ownerName: row.ownerName, sellerGhii: row.sellerGhii, title: row.title, description: row.description, category: row.category, priceMorsels: row.priceMorsels, condition: row.condition ?? undefined, availability: row.availability ?? undefined, location: row.location ?? undefined, tags: row.tags ?? undefined, images: row.images ?? undefined, status: row.status, memoryKey: row.memoryKey, flagCount: row.flagCount, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt, semantic: row.semantic ?? undefined };
     }
 
     async createPurchase(record: import('../../interface.js').PurchaseRecord): Promise<import('../../interface.js').PurchaseRecord> {
-        this.purchaseRecords.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.purchase.create({ data: { id: record.id, listingId: record.listingId, buyerOwner: record.buyerOwner, sellerOwner: record.sellerOwner, priceMorsels: record.priceMorsels, transactionFeeMorsels: record.transactionFeeMorsels, totalCostMorsels: record.totalCostMorsels, status: record.status, ratingScore: record.rating?.score, ratingComment: record.rating?.comment, trackingCode: record.trackingCode, createdAt: new Date(record.createdAt), completedAt: record.completedAt ? new Date(record.completedAt) : null } });
         return record;
     }
 
     async getPurchase(id: string): Promise<import('../../interface.js').PurchaseRecord | null> {
-        return this.purchaseRecords.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.purchase.findUnique({ where: { id } });
+        return row ? this.toPurchaseRecord(row) : null;
     }
 
     async listPurchasesByBuyer(buyerOwner: string): Promise<import('../../interface.js').PurchaseRecord[]> {
-        return [...this.purchaseRecords.values()]
-            .filter(p => p.buyerOwner === buyerOwner)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        this.ensureReady();
+        const rows = await this.prisma.purchase.findMany({ where: { buyerOwner }, orderBy: { createdAt: 'desc' } });
+        return rows.map((r: any) => this.toPurchaseRecord(r));
     }
 
     async listPurchasesBySeller(sellerOwner: string): Promise<import('../../interface.js').PurchaseRecord[]> {
-        return [...this.purchaseRecords.values()]
-            .filter(p => p.sellerOwner === sellerOwner)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        this.ensureReady();
+        const rows = await this.prisma.purchase.findMany({ where: { sellerOwner }, orderBy: { createdAt: 'desc' } });
+        return rows.map((r: any) => this.toPurchaseRecord(r));
     }
 
     async updatePurchase(id: string, updates: Partial<import('../../interface.js').PurchaseRecord>): Promise<import('../../interface.js').PurchaseRecord | null> {
-        const existing = this.purchaseRecords.get(id);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, id: existing.id };
-        this.purchaseRecords.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status) data.status = updates.status;
+            if (updates.rating) { data.ratingScore = updates.rating.score; data.ratingComment = updates.rating.comment; }
+            if (updates.completedAt) data.completedAt = new Date(updates.completedAt);
+            const row = await this.prisma.purchase.update({ where: { id }, data });
+            return this.toPurchaseRecord(row);
+        } catch { return null; }
+    }
+
+    private toPurchaseRecord(row: any): import('../../interface.js').PurchaseRecord {
+        return { id: row.id, listingId: row.listingId, buyerOwner: row.buyerOwner, sellerOwner: row.sellerOwner, priceMorsels: row.priceMorsels, transactionFeeMorsels: row.transactionFeeMorsels, totalCostMorsels: row.totalCostMorsels, status: row.status, rating: row.ratingScore != null ? { score: row.ratingScore, comment: row.ratingComment ?? undefined } : undefined, trackingCode: row.trackingCode, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, completedAt: row.completedAt ? (row.completedAt instanceof Date ? row.completedAt.toISOString() : row.completedAt) : undefined };
     }
 
     // ── Push Subscriptions (Phase 3.1) ──
-    private pushSubscriptions = new Map<string, PushSubscriptionRecord>();
-    private trustedIssuers = new Map<string, TrustedIssuerRecord>();
 
     async createPushSubscription(record: PushSubscriptionRecord): Promise<PushSubscriptionRecord> {
-        this.pushSubscriptions.set(record.ownerName, record);
+        await this.prisma.pushSubscription.upsert({
+            where: { ownerName: record.ownerName },
+            update: {
+                endpoint: record.endpoint,
+                keys: record.keys as object,
+                lastUsedAt: new Date(record.lastUsedAt),
+            },
+            create: {
+                id: record.ownerName,
+                ownerName: record.ownerName,
+                endpoint: record.endpoint,
+                keys: record.keys as object,
+                createdAt: new Date(record.createdAt),
+                lastUsedAt: new Date(record.lastUsedAt),
+            },
+        });
         return record;
     }
     async getPushSubscription(ownerName: string): Promise<PushSubscriptionRecord | null> {
-        return this.pushSubscriptions.get(ownerName) ?? null;
+        const row = await this.prisma.pushSubscription.findUnique({ where: { ownerName } });
+        if (!row) return null;
+        const keys = row.keys as { p256dh: string; auth: string };
+        return {
+            ownerName: row.ownerName,
+            endpoint: row.endpoint,
+            keys,
+            createdAt: row.createdAt.toISOString(),
+            lastUsedAt: row.lastUsedAt.toISOString(),
+        };
     }
     async deletePushSubscription(ownerName: string): Promise<boolean> {
-        return this.pushSubscriptions.delete(ownerName);
+        try {
+            await this.prisma.pushSubscription.delete({ where: { ownerName } });
+            return true;
+        } catch { return false; }
     }
     async listPushSubscriptions(): Promise<PushSubscriptionRecord[]> {
-        return [...this.pushSubscriptions.values()];
+        const rows = await this.prisma.pushSubscription.findMany();
+        return rows.map((row: { ownerName: string; endpoint: string; keys: unknown; createdAt: Date; lastUsedAt: Date }) => {
+            const keys = row.keys as { p256dh: string; auth: string };
+            return {
+                ownerName: row.ownerName,
+                endpoint: row.endpoint,
+                keys,
+                createdAt: row.createdAt.toISOString(),
+                lastUsedAt: row.lastUsedAt.toISOString(),
+            };
+        });
     }
 
     // ── Trusted Issuers (Phase 3.3) ──
 
     async createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord> {
-        this.trustedIssuers.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.trustedIssuer.create({ data: { id: record.id, name: record.name, url: record.url, publicKey: record.publicKey, type: record.type, trusted: record.trusted, addedBy: record.addedBy, createdAt: new Date(record.createdAt) } });
         return record;
     }
     async getTrustedIssuer(id: string): Promise<TrustedIssuerRecord | null> {
-        return this.trustedIssuers.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.trustedIssuer.findUnique({ where: { id } });
+        return row ? this.toTrustedIssuerRecord(row) : null;
     }
     async getTrustedIssuerByUrl(url: string): Promise<TrustedIssuerRecord | null> {
-        for (const issuer of this.trustedIssuers.values()) {
-            if (issuer.url === url) return issuer;
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.trustedIssuer.findFirst({ where: { url } });
+        return row ? this.toTrustedIssuerRecord(row) : null;
     }
     async listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]> {
-        let issuers = [...this.trustedIssuers.values()];
-        if (opts?.type) issuers = issuers.filter(i => i.type === opts.type);
-        return issuers;
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.type) where.type = opts.type;
+        const rows = await this.prisma.trustedIssuer.findMany({ where });
+        return rows.map((r: any) => this.toTrustedIssuerRecord(r));
     }
     async deleteTrustedIssuer(id: string): Promise<boolean> {
-        return this.trustedIssuers.delete(id);
+        this.ensureReady();
+        try { await this.prisma.trustedIssuer.delete({ where: { id } }); return true; } catch { return false; }
+    }
+    private toTrustedIssuerRecord(row: any): TrustedIssuerRecord {
+        return { id: row.id, name: row.name, url: row.url, publicKey: row.publicKey, type: row.type, trusted: row.trusted, addedBy: row.addedBy, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
     // ── Genesis Peers (Phase 3.4) ──
 
-    private genesisPeers = new Map<string, import('../../interface.js').GenesisPeerRecord>();
-    private organismReputations = new Map<string, import('../../interface.js').OrganismReputationRecord>();
-
     async createGenesisPeer(record: import('../../interface.js').GenesisPeerRecord): Promise<import('../../interface.js').GenesisPeerRecord> {
-        this.genesisPeers.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.genesisPeer.create({ data: { id: record.id, genesisNodeId: record.genesisNodeId, genesisUrl: record.genesisUrl, publicKey: record.publicKey, status: record.status, lastSyncAt: new Date(record.lastSyncAt), catalogueHash: record.catalogueHash, createdAt: new Date(record.createdAt) } });
         return record;
     }
     async getGenesisPeer(id: string): Promise<import('../../interface.js').GenesisPeerRecord | null> {
-        return this.genesisPeers.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.genesisPeer.findUnique({ where: { id } });
+        return row ? this.toGenesisPeerRecord(row) : null;
     }
     async getGenesisPeerByNodeId(nodeId: string): Promise<import('../../interface.js').GenesisPeerRecord | null> {
-        for (const peer of this.genesisPeers.values()) {
-            if (peer.genesisNodeId === nodeId) return peer;
-        }
-        return null;
+        this.ensureReady();
+        const row = await this.prisma.genesisPeer.findFirst({ where: { genesisNodeId: nodeId } });
+        return row ? this.toGenesisPeerRecord(row) : null;
     }
     async listGenesisPeers(opts?: { status?: string }): Promise<import('../../interface.js').GenesisPeerRecord[]> {
-        let peers = [...this.genesisPeers.values()];
-        if (opts?.status) peers = peers.filter(p => p.status === opts.status);
-        return peers;
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.genesisPeer.findMany({ where });
+        return rows.map((r: any) => this.toGenesisPeerRecord(r));
     }
     async updateGenesisPeer(id: string, updates: Partial<import('../../interface.js').GenesisPeerRecord>): Promise<import('../../interface.js').GenesisPeerRecord | null> {
-        const peer = this.genesisPeers.get(id);
-        if (!peer) return null;
-        const updated = { ...peer, ...updates };
-        this.genesisPeers.set(id, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = { ...updates };
+            delete data.id;
+            if (data.lastSyncAt && typeof data.lastSyncAt === 'string') data.lastSyncAt = new Date(data.lastSyncAt);
+            if (data.createdAt && typeof data.createdAt === 'string') data.createdAt = new Date(data.createdAt);
+            const row = await this.prisma.genesisPeer.update({ where: { id }, data });
+            return this.toGenesisPeerRecord(row);
+        } catch { return null; }
     }
     async deleteGenesisPeer(id: string): Promise<boolean> {
-        return this.genesisPeers.delete(id);
+        this.ensureReady();
+        try { await this.prisma.genesisPeer.delete({ where: { id } }); return true; } catch { return false; }
+    }
+    private toGenesisPeerRecord(row: any): import('../../interface.js').GenesisPeerRecord {
+        return { id: row.id, genesisNodeId: row.genesisNodeId, genesisUrl: row.genesisUrl, publicKey: row.publicKey, status: row.status, lastSyncAt: row.lastSyncAt instanceof Date ? row.lastSyncAt.toISOString() : row.lastSyncAt, catalogueHash: row.catalogueHash, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt };
     }
 
     // ── Organism Reputation (Phase 3.4) ──
 
     async setOrganismReputation(record: import('../../interface.js').OrganismReputationRecord): Promise<import('../../interface.js').OrganismReputationRecord> {
-        this.organismReputations.set(record.organismId, record);
+        this.ensureReady();
+        await this.prisma.organismReputation.upsert({
+            where: { organismId: record.organismId },
+            create: { organismId: record.organismId, score: record.score, breakdown: record.breakdown as any, calculatedAt: new Date(record.calculatedAt) },
+            update: { score: record.score, breakdown: record.breakdown as any, calculatedAt: new Date(record.calculatedAt) },
+        });
         return record;
     }
     async getOrganismReputation(organismId: string): Promise<import('../../interface.js').OrganismReputationRecord | null> {
-        return this.organismReputations.get(organismId) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.organismReputation.findUnique({ where: { organismId } });
+        if (!row) return null;
+        return { organismId: row.organismId, score: row.score, breakdown: row.breakdown as any, calculatedAt: row.calculatedAt instanceof Date ? row.calculatedAt.toISOString() : row.calculatedAt };
     }
 
     // ── Realtime rooms (MongoDB-backed via Prisma) ──
@@ -2446,6 +2600,7 @@ export class MongoStorage implements Storage {
             installedBy: row.installedBy,
             installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt,
             activatedAt: row.activatedAt instanceof Date ? row.activatedAt.toISOString() : row.activatedAt ?? undefined,
+            ...(row.instances ? { instances: row.instances as ExtensionRecord['instances'] } : {}),
         };
     }
 
@@ -2463,6 +2618,7 @@ export class MongoStorage implements Storage {
                 config: record.config as any,
                 limits: record.limits as any,
                 federation: record.federation as any,
+                instances: record.instances ? record.instances as any : undefined,
                 installedBy: record.installedBy,
                 installedAt: new Date(record.installedAt),
                 activatedAt: record.activatedAt ? new Date(record.activatedAt) : null,
@@ -2597,336 +2753,510 @@ export class MongoStorage implements Storage {
         }
     }
 
-    // ── Cortex Extensions (Manifest-based) ── (in-memory fallback, no Prisma model yet)
-
-    private cortexExtensions = new Map<string, CortexExtensionRecord>();
-    private cortexLibFiles = new Map<string, string>();
+    // ── Cortex Extensions (Manifest-based) ──
 
     async createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord> {
-        if (this.cortexExtensions.has(record.name)) {
-            throw new Error(`Cortex extension "${record.name}" already exists`);
-        }
-        this.cortexExtensions.set(record.name, record);
-        return record;
+        this.ensureReady();
+        try {
+            await this.prisma.cortexExtension.create({ data: { name: record.name, namespace: record.namespace, shortName: record.shortName, apiVersion: record.apiVersion, version: record.version, description: record.description, author: record.author, license: record.license, tags: record.tags, labels: record.labels as any, aimeatCompat: record.aimeatCompat, status: record.status, visibility: record.visibility, installedAt: new Date(record.installedAt), activatedAt: record.activatedAt ? new Date(record.activatedAt) : null, installedBy: record.installedBy, manifest: record.manifest, components: record.components as any, activationArtifacts: record.activationArtifacts as any } });
+            return record;
+        } catch { throw new Error(`Cortex extension "${record.name}" already exists`); }
     }
 
     async getCortexExtension(name: string): Promise<CortexExtensionRecord | null> {
-        return this.cortexExtensions.get(name) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.cortexExtension.findUnique({ where: { name } });
+        return row ? this.toCortexExtensionRecord(row) : null;
     }
 
     async listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> {
-        let results = [...this.cortexExtensions.values()];
-        if (opts?.status) results = results.filter(e => e.status === opts.status);
-        if (opts?.namespace) results = results.filter(e => e.namespace === opts.namespace);
-        if (opts?.visibility) results = results.filter(e => e.visibility === opts.visibility);
-        if (opts?.installedBy) results = results.filter(e => e.installedBy === opts.installedBy);
-        return results;
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.status) where.status = opts.status;
+        if (opts?.namespace) where.namespace = opts.namespace;
+        if (opts?.visibility) where.visibility = opts.visibility;
+        if (opts?.installedBy) where.installedBy = opts.installedBy;
+        const rows = await this.prisma.cortexExtension.findMany({ where });
+        return rows.map((r: any) => this.toCortexExtensionRecord(r));
     }
 
     async updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null> {
-        const existing = this.cortexExtensions.get(name);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates };
-        this.cortexExtensions.set(name, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = { ...updates };
+            delete data.name;
+            if (data.labels) data.labels = data.labels as any;
+            if (data.components) data.components = data.components as any;
+            if (data.activationArtifacts) data.activationArtifacts = data.activationArtifacts as any;
+            if (data.activatedAt && typeof data.activatedAt === 'string') data.activatedAt = new Date(data.activatedAt);
+            if (data.installedAt && typeof data.installedAt === 'string') data.installedAt = new Date(data.installedAt);
+            const row = await this.prisma.cortexExtension.update({ where: { name }, data });
+            return this.toCortexExtensionRecord(row);
+        } catch { return null; }
     }
 
     async deleteCortexExtension(name: string): Promise<boolean> {
-        return this.cortexExtensions.delete(name);
+        this.ensureReady();
+        try { await this.prisma.cortexExtension.delete({ where: { name } }); return true; } catch { return false; }
+    }
+
+    private toCortexExtensionRecord(row: any): CortexExtensionRecord {
+        return { name: row.name, namespace: row.namespace, shortName: row.shortName, apiVersion: row.apiVersion, version: row.version, description: row.description, author: row.author, license: row.license ?? undefined, tags: row.tags, labels: row.labels as Record<string, string>, aimeatCompat: row.aimeatCompat ?? undefined, status: row.status, visibility: row.visibility, installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt, activatedAt: row.activatedAt ? (row.activatedAt instanceof Date ? row.activatedAt.toISOString() : row.activatedAt) : undefined, installedBy: row.installedBy, manifest: row.manifest, components: row.components as any, activationArtifacts: row.activationArtifacts as any };
     }
 
     async setCortexLibFile(extName: string, libName: string, content: string): Promise<void> {
-        this.cortexLibFiles.set(`${extName}::${libName}`, content);
+        this.ensureReady();
+        await this.prisma.cortexLibFile.upsert({
+            where: { extName_libName: { extName, libName } },
+            create: { extName, libName, content },
+            update: { content },
+        });
     }
 
     async getCortexLibFile(extName: string, libName: string): Promise<string | null> {
-        return this.cortexLibFiles.get(`${extName}::${libName}`) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.cortexLibFile.findUnique({ where: { extName_libName: { extName, libName } } });
+        return row?.content ?? null;
     }
 
     async deleteCortexLibFile(extName: string, libName: string): Promise<boolean> {
-        return this.cortexLibFiles.delete(`${extName}::${libName}`);
+        this.ensureReady();
+        try { await this.prisma.cortexLibFile.delete({ where: { extName_libName: { extName, libName } } }); return true; } catch { return false; }
     }
 
     // ── Personal Push Subscriptions (REQ-007) ──
 
-    private personalPushSubscriptions = new Map<string, PersonalPushSubscriptionRecord>();
-    private notificationPreferences = new Map<string, NotificationPreferences>();
-
     async createPersonalPushSubscription(record: PersonalPushSubscriptionRecord): Promise<PersonalPushSubscriptionRecord> {
-        this.personalPushSubscriptions.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.personalPushSubscription.create({ data: { id: record.id, personalNodeId: record.personalNodeId, ownerName: record.ownerName, endpoint: record.endpoint, keys: record.keys as any, failureCount: record.failureCount, createdAt: new Date(record.createdAt), lastUsedAt: record.lastUsedAt ? new Date(record.lastUsedAt) : null } });
         return record;
     }
 
     async getPersonalPushSubscription(id: string): Promise<PersonalPushSubscriptionRecord | null> {
-        return this.personalPushSubscriptions.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.personalPushSubscription.findUnique({ where: { id } });
+        return row ? this.toPersonalPushSubRecord(row) : null;
     }
 
     async listPersonalPushSubscriptions(personalNodeId: string): Promise<PersonalPushSubscriptionRecord[]> {
-        return [...this.personalPushSubscriptions.values()].filter(s => s.personalNodeId === personalNodeId);
+        this.ensureReady();
+        const rows = await this.prisma.personalPushSubscription.findMany({ where: { personalNodeId } });
+        return rows.map((r: any) => this.toPersonalPushSubRecord(r));
     }
 
     async updatePersonalPushSubscription(id: string, updates: Partial<PersonalPushSubscriptionRecord>): Promise<boolean> {
-        const existing = this.personalPushSubscriptions.get(id);
-        if (!existing) return false;
-        this.personalPushSubscriptions.set(id, { ...existing, ...updates });
-        return true;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.failureCount !== undefined) data.failureCount = updates.failureCount;
+            if (updates.lastUsedAt) data.lastUsedAt = new Date(updates.lastUsedAt);
+            if (updates.endpoint) data.endpoint = updates.endpoint;
+            if (updates.keys) data.keys = updates.keys as any;
+            await this.prisma.personalPushSubscription.update({ where: { id }, data });
+            return true;
+        } catch { return false; }
     }
 
     async deletePersonalPushSubscription(id: string): Promise<boolean> {
-        return this.personalPushSubscriptions.delete(id);
+        this.ensureReady();
+        try { await this.prisma.personalPushSubscription.delete({ where: { id } }); return true; } catch { return false; }
     }
 
     async deletePersonalPushSubscriptionsByNode(personalNodeId: string): Promise<number> {
-        let count = 0;
-        for (const [id, sub] of this.personalPushSubscriptions) {
-            if (sub.personalNodeId === personalNodeId) {
-                this.personalPushSubscriptions.delete(id);
-                count++;
-            }
-        }
-        return count;
+        this.ensureReady();
+        const result = await this.prisma.personalPushSubscription.deleteMany({ where: { personalNodeId } });
+        return result.count;
     }
 
     async countPersonalPushSubscriptions(personalNodeId: string): Promise<number> {
-        return [...this.personalPushSubscriptions.values()].filter(s => s.personalNodeId === personalNodeId).length;
+        this.ensureReady();
+        return await this.prisma.personalPushSubscription.count({ where: { personalNodeId } });
+    }
+
+    private toPersonalPushSubRecord(row: any): PersonalPushSubscriptionRecord {
+        return { id: row.id, personalNodeId: row.personalNodeId, ownerName: row.ownerName, endpoint: row.endpoint, keys: row.keys as any, failureCount: row.failureCount, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastUsedAt: row.lastUsedAt ? (row.lastUsedAt instanceof Date ? row.lastUsedAt.toISOString() : row.lastUsedAt) : null };
     }
 
     async getNotificationPreferences(personalNodeId: string): Promise<NotificationPreferences | null> {
-        return this.notificationPreferences.get(personalNodeId) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.notificationPreference.findUnique({ where: { personalNodeId } });
+        if (!row) return null;
+        return { personalNodeId: row.personalNodeId, enabled: row.enabled, channels: row.channels as any, notifyTypes: row.notifyTypes, cooldownMinutes: row.cooldownMinutes, quietHoursUtc: row.quietHoursUtc as any ?? null, email: row.email, locale: row.locale ?? undefined };
     }
 
     async upsertNotificationPreferences(prefs: NotificationPreferences): Promise<NotificationPreferences> {
-        this.notificationPreferences.set(prefs.personalNodeId, prefs);
+        this.ensureReady();
+        await this.prisma.notificationPreference.upsert({
+            where: { personalNodeId: prefs.personalNodeId },
+            create: { personalNodeId: prefs.personalNodeId, enabled: prefs.enabled, channels: prefs.channels, notifyTypes: prefs.notifyTypes, cooldownMinutes: prefs.cooldownMinutes, quietHoursUtc: prefs.quietHoursUtc as any ?? null, email: prefs.email, locale: prefs.locale },
+            update: { enabled: prefs.enabled, channels: prefs.channels, notifyTypes: prefs.notifyTypes, cooldownMinutes: prefs.cooldownMinutes, quietHoursUtc: prefs.quietHoursUtc as any ?? null, email: prefs.email, locale: prefs.locale },
+        });
         return prefs;
     }
 
     async deleteNotificationPreferences(personalNodeId: string): Promise<boolean> {
-        return this.notificationPreferences.delete(personalNodeId);
+        this.ensureReady();
+        try { await this.prisma.notificationPreference.delete({ where: { personalNodeId } }); return true; } catch { return false; }
     }
 
     // ── Notification Templates (Phase 3.2) ──────────────────────
 
-    private notificationTemplates = new Map<string, NotificationTemplateRecord>();
-
     private ntKey(id: string, locale: string): string { return `${id}::${locale}`; }
 
     async getNotificationTemplate(id: string, locale: string): Promise<NotificationTemplateRecord | null> {
-        return this.notificationTemplates.get(this.ntKey(id, locale)) ?? null;
+        const row = await this.prisma.notificationTemplate.findUnique({
+            where: { templateId_locale: { templateId: id, locale } },
+        });
+        if (!row) return null;
+        return {
+            id: row.templateId,
+            locale: row.locale,
+            fields: row.fields as NotificationTemplateRecord['fields'],
+            placeholders: row.placeholders,
+            updatedAt: row.updatedAt.toISOString(),
+            updatedBy: row.updatedBy,
+        };
     }
 
     async upsertNotificationTemplate(record: NotificationTemplateRecord): Promise<NotificationTemplateRecord> {
-        this.notificationTemplates.set(this.ntKey(record.id, record.locale), record);
+        const compositeId = this.ntKey(record.id, record.locale);
+        await this.prisma.notificationTemplate.upsert({
+            where: { templateId_locale: { templateId: record.id, locale: record.locale } },
+            update: {
+                fields: record.fields as object,
+                placeholders: record.placeholders,
+                updatedAt: new Date(record.updatedAt),
+                updatedBy: record.updatedBy,
+            },
+            create: {
+                id: compositeId,
+                templateId: record.id,
+                locale: record.locale,
+                fields: record.fields as object,
+                placeholders: record.placeholders,
+                updatedAt: new Date(record.updatedAt),
+                updatedBy: record.updatedBy,
+            },
+        });
         return record;
     }
 
     async listNotificationTemplates(): Promise<NotificationTemplateRecord[]> {
-        return [...this.notificationTemplates.values()];
+        const rows = await this.prisma.notificationTemplate.findMany();
+        return rows.map((row: { templateId: string; locale: string; fields: unknown; placeholders: string[]; updatedAt: Date; updatedBy: string }) => ({
+            id: row.templateId,
+            locale: row.locale,
+            fields: row.fields as NotificationTemplateRecord['fields'],
+            placeholders: row.placeholders,
+            updatedAt: row.updatedAt.toISOString(),
+            updatedBy: row.updatedBy,
+        }));
     }
 
     async deleteAllNotificationTemplates(): Promise<void> {
-        this.notificationTemplates.clear();
+        await this.prisma.notificationTemplate.deleteMany();
     }
 
     // ── Sessions (P3-7: Server-Side Session Tracking) ──────────
 
-    private sessions = new Map<string, { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string; revoked: boolean }>();
-
     async createSession(session: { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string }): Promise<void> {
-        this.sessions.set(session.sessionId, { ...session, revoked: false });
+        this.ensureReady();
+        await this.prisma.session.create({
+            data: {
+                sessionId: session.sessionId,
+                gaii: session.gaii,
+                owner: session.owner,
+                issuedAt: new Date(session.issuedAt),
+                expiresAt: new Date(session.expiresAt),
+                revoked: false,
+            },
+        });
     }
 
     async revokeSession(sessionId: string): Promise<boolean> {
-        const session = this.sessions.get(sessionId);
+        this.ensureReady();
+        const session = await this.prisma.session.findUnique({ where: { sessionId } });
         if (!session || session.revoked) return false;
-        session.revoked = true;
+        await this.prisma.session.update({ where: { sessionId }, data: { revoked: true } });
         return true;
     }
 
     async revokeAllSessions(owner: string): Promise<number> {
-        let count = 0;
-        for (const session of this.sessions.values()) {
-            if (session.owner === owner && !session.revoked) {
-                session.revoked = true;
-                count++;
-            }
-        }
-        return count;
+        this.ensureReady();
+        const result = await this.prisma.session.updateMany({
+            where: { owner, revoked: false },
+            data: { revoked: true },
+        });
+        return result.count;
     }
 
     async isSessionRevoked(sessionId: string): Promise<boolean> {
-        const session = this.sessions.get(sessionId);
+        this.ensureReady();
+        const session = await this.prisma.session.findUnique({ where: { sessionId } });
         if (!session) return false;
         return session.revoked;
     }
 
     // ── Token Revocation ──────────────────────────────────────
 
-    private revokedTokens = new Map<string, number>(); // tokenHash -> expiresAt
-
     async revokeToken(tokenHash: string, expiresAt: number): Promise<void> {
-        this.revokedTokens.set(tokenHash, expiresAt);
+        this.ensureReady();
+        await this.prisma.revokedToken.upsert({
+            where: { tokenHash },
+            update: { expiresAt },
+            create: { tokenHash, expiresAt },
+        });
     }
 
     async isTokenRevoked(tokenHash: string): Promise<boolean> {
-        return this.revokedTokens.has(tokenHash);
+        this.ensureReady();
+        const row = await this.prisma.revokedToken.findUnique({ where: { tokenHash } });
+        return !!row;
     }
 
     async cleanExpiredRevocations(): Promise<number> {
+        this.ensureReady();
         const now = Math.floor(Date.now() / 1000);
-        let count = 0;
-        for (const [hash, exp] of this.revokedTokens) {
-            if (exp < now) {
-                this.revokedTokens.delete(hash);
-                count++;
-            }
-        }
-        return count;
+        const result = await this.prisma.revokedToken.deleteMany({
+            where: { expiresAt: { lt: now } },
+        });
+        return result.count;
     }
 
-    // ── App Catalog (TODO: full Prisma implementation) ──
+    // ── App Catalog (Prisma-persisted) ──
 
-    private appStore = new Map<string, AppRecord>();
-    private appDownloads = new Map<string, number>();
+    private toAppRecord(row: any): AppRecord {
+        return {
+            ownerGaii: row.ownerGaii,
+            ownerName: row.ownerName,
+            filename: row.filename,
+            versionNumber: row.versionNumber,
+            manifest: row.manifest as any,
+            mimeType: row.mimeType,
+            size: row.size,
+            data: row.data,
+            accessCode: row.accessCode ?? undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+    }
 
     async createApp(record: AppRecord): Promise<AppRecord> {
-        const key = `${record.ownerGaii}:${record.filename}:${record.versionNumber}`;
-        this.appStore.set(key, record);
+        this.ensureReady();
+        await this.prisma.app.create({
+            data: {
+                ownerGaii: record.ownerGaii,
+                ownerName: record.ownerName,
+                filename: record.filename,
+                versionNumber: record.versionNumber,
+                manifest: record.manifest as any,
+                mimeType: record.mimeType,
+                size: record.size,
+                data: record.data,
+                accessCode: record.accessCode,
+                createdAt: new Date(record.createdAt),
+            },
+        });
         return record;
     }
 
     async getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {
+        this.ensureReady();
         if (version !== undefined) {
-            return this.appStore.get(`${ownerGaii}:${filename}:${version}`) ?? null;
+            const row = await this.prisma.app.findUnique({
+                where: { ownerGaii_filename_versionNumber: { ownerGaii, filename, versionNumber: version } },
+            });
+            return row ? this.toAppRecord(row) : null;
         }
-        let latest: AppRecord | null = null;
-        for (const r of this.appStore.values()) {
-            if (r.ownerGaii === ownerGaii && r.filename === filename) {
-                if (!latest || r.versionNumber > latest.versionNumber) latest = r;
-            }
-        }
-        return latest;
+        const rows = await this.prisma.app.findMany({
+            where: { ownerGaii, filename },
+            orderBy: { versionNumber: 'desc' },
+            take: 1,
+        });
+        return rows.length > 0 ? this.toAppRecord(rows[0]) : null;
     }
 
     async getAppByOwnerName(ownerName: string, filename: string, version?: number): Promise<AppRecord | null> {
-        let latest: AppRecord | null = null;
-        for (const r of this.appStore.values()) {
-            if (r.ownerName === ownerName && r.filename === filename) {
-                if (version !== undefined) {
-                    if (r.versionNumber === version) return r;
-                } else if (!latest || r.versionNumber > latest.versionNumber) {
-                    latest = r;
-                }
-            }
+        this.ensureReady();
+        if (version !== undefined) {
+            const row = await this.prisma.app.findFirst({
+                where: { ownerName, filename, versionNumber: version },
+            });
+            return row ? this.toAppRecord(row) : null;
         }
-        return latest;
+        const rows = await this.prisma.app.findMany({
+            where: { ownerName, filename },
+            orderBy: { versionNumber: 'desc' },
+            take: 1,
+        });
+        return rows.length > 0 ? this.toAppRecord(rows[0]) : null;
     }
 
     async listApps(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
-        const latestMap = new Map<string, AppRecord>();
-        for (const r of this.appStore.values()) {
+        this.ensureReady();
+        // Fetch all apps, then deduplicate to latest version per owner+filename
+        const where: any = {};
+        if (opts?.ownerGaii) where.ownerGaii = opts.ownerGaii;
+        const allRows = await this.prisma.app.findMany({ where, orderBy: { versionNumber: 'desc' } });
+        const latestMap = new Map<string, any>();
+        for (const r of allRows) {
             const key = `${r.ownerGaii}:${r.filename}`;
-            const existing = latestMap.get(key);
-            if (!existing || r.versionNumber > existing.versionNumber) latestMap.set(key, r);
+            if (!latestMap.has(key)) latestMap.set(key, r);
         }
-        let apps = Array.from(latestMap.values());
-        if (opts?.ownerGaii) apps = apps.filter(a => a.ownerGaii === opts.ownerGaii);
-        if (opts?.category) apps = apps.filter(a => a.manifest.category === opts.category);
-        if (opts?.tag) apps = apps.filter(a => a.manifest.tags.includes(opts.tag!));
+        let apps = Array.from(latestMap.values()).map((r: any) => this.toAppRecord(r));
+        if (opts?.category) apps = apps.filter((a: AppRecord) => a.manifest.category === opts.category);
+        if (opts?.tag) apps = apps.filter((a: AppRecord) => a.manifest.tags.includes(opts.tag!));
         if (opts?.q) {
             const q = opts.q.toLowerCase();
-            apps = apps.filter(a => a.filename.toLowerCase().includes(q) || a.manifest.name.toLowerCase().includes(q) || a.manifest.description.toLowerCase().includes(q));
+            apps = apps.filter((a: AppRecord) => a.filename.toLowerCase().includes(q) || a.manifest.name.toLowerCase().includes(q) || a.manifest.description.toLowerCase().includes(q));
         }
-        if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.priceMorsels);
+        if (opts?.freeOnly) apps = apps.filter((a: AppRecord) => !a.manifest.priceMorsels);
         const total = apps.length;
-        apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        apps.sort((a: AppRecord, b: AppRecord) => b.createdAt.localeCompare(a.createdAt));
         const offset = opts?.offset ?? 0;
         const limit = opts?.limit ?? 50;
         return { apps: apps.slice(offset, offset + limit), total };
     }
 
     async listAppVersions(ownerGaii: string, filename: string): Promise<AppRecord[]> {
-        const versions: AppRecord[] = [];
-        for (const r of this.appStore.values()) {
-            if (r.ownerGaii === ownerGaii && r.filename === filename) versions.push(r);
-        }
-        return versions.sort((a, b) => b.versionNumber - a.versionNumber);
+        this.ensureReady();
+        const rows = await this.prisma.app.findMany({
+            where: { ownerGaii, filename },
+            orderBy: { versionNumber: 'desc' },
+        });
+        return rows.map((r: any) => this.toAppRecord(r));
     }
 
     async getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number> {
-        let max = 0;
-        for (const r of this.appStore.values()) {
-            if (r.ownerGaii === ownerGaii && r.filename === filename && r.versionNumber > max) max = r.versionNumber;
-        }
-        return max;
+        this.ensureReady();
+        const row = await this.prisma.app.findFirst({
+            where: { ownerGaii, filename },
+            orderBy: { versionNumber: 'desc' },
+            select: { versionNumber: true },
+        });
+        return row?.versionNumber ?? 0;
     }
 
     async deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean> {
-        let deleted = false;
+        this.ensureReady();
         if (version !== undefined) {
-            deleted = this.appStore.delete(`${ownerGaii}:${filename}:${version}`);
-        } else {
-            for (const [key, r] of this.appStore) {
-                if (r.ownerGaii === ownerGaii && r.filename === filename) { this.appStore.delete(key); deleted = true; }
-            }
-            this.appDownloads.delete(`${ownerGaii}:${filename}`);
+            const result = await this.prisma.app.deleteMany({
+                where: { ownerGaii, filename, versionNumber: version },
+            });
+            return result.count > 0;
         }
-        return deleted;
+        const result = await this.prisma.app.deleteMany({ where: { ownerGaii, filename } });
+        await this.prisma.appDownload.deleteMany({ where: { ownerGaii, filename } });
+        return result.count > 0;
     }
 
     async updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean> {
-        let updated = false;
-        for (const r of this.appStore.values()) {
-            if (r.ownerGaii === ownerGaii && r.filename === filename) { r.accessCode = accessCode; updated = true; }
-        }
-        return updated;
+        this.ensureReady();
+        const result = await this.prisma.app.updateMany({
+            where: { ownerGaii, filename },
+            data: { accessCode: accessCode ?? null },
+        });
+        return result.count > 0;
     }
 
     async getAppDownloads(ownerGaii: string, filename: string): Promise<number> {
-        return this.appDownloads.get(`${ownerGaii}:${filename}`) ?? 0;
+        this.ensureReady();
+        const row = await this.prisma.appDownload.findUnique({
+            where: { ownerGaii_filename: { ownerGaii, filename } },
+        });
+        return row?.count ?? 0;
     }
 
     async incrementAppDownloads(ownerGaii: string, filename: string): Promise<void> {
-        const key = `${ownerGaii}:${filename}`;
-        this.appDownloads.set(key, (this.appDownloads.get(key) ?? 0) + 1);
+        this.ensureReady();
+        await this.prisma.appDownload.upsert({
+            where: { ownerGaii_filename: { ownerGaii, filename } },
+            update: { count: { increment: 1 } },
+            create: { ownerGaii, filename, count: 1 },
+        });
     }
 
-    // ── App Marketplace (in-memory purchase receipts) ──
+    // ── App Marketplace (Prisma-persisted purchase receipts) ──
 
-    private appPurchases = new Map<string, AppPurchaseRecord>();
+    private toAppPurchaseRecord(row: any): AppPurchaseRecord {
+        return {
+            transactionId: row.transactionId,
+            buyerGaii: row.buyerGaii,
+            buyerOwner: row.buyerOwner,
+            sellerGaii: row.sellerGaii,
+            sellerOwner: row.sellerOwner,
+            appFilename: row.appFilename,
+            appName: row.appName,
+            appVersionNumber: row.appVersionNumber,
+            licenseType: row.licenseType as 'single' | 'lifetime',
+            priceMorsels: row.priceMorsels,
+            transactionFeeMorsels: row.transactionFeeMorsels,
+            purchasedAt: row.purchasedAt instanceof Date ? row.purchasedAt.toISOString() : row.purchasedAt,
+            appContent: row.appContent,
+            appManifest: row.appManifest as any,
+            appScreenshot: row.appScreenshot ?? undefined,
+            signature: row.signature,
+            nodeId: row.nodeId,
+            nodePublicKey: row.nodePublicKey,
+        };
+    }
 
     async createAppPurchase(record: AppPurchaseRecord): Promise<AppPurchaseRecord> {
-        this.appPurchases.set(record.transactionId, record);
+        this.ensureReady();
+        await this.prisma.appPurchase.create({
+            data: {
+                transactionId: record.transactionId,
+                buyerGaii: record.buyerGaii,
+                buyerOwner: record.buyerOwner,
+                sellerGaii: record.sellerGaii,
+                sellerOwner: record.sellerOwner,
+                appFilename: record.appFilename,
+                appName: record.appName,
+                appVersionNumber: record.appVersionNumber,
+                licenseType: record.licenseType,
+                priceMorsels: record.priceMorsels,
+                transactionFeeMorsels: record.transactionFeeMorsels,
+                purchasedAt: new Date(record.purchasedAt),
+                appContent: record.appContent,
+                appManifest: record.appManifest as any,
+                appScreenshot: record.appScreenshot,
+                signature: record.signature,
+                nodeId: record.nodeId,
+                nodePublicKey: record.nodePublicKey,
+            },
+        });
         return record;
     }
 
     async getAppPurchase(transactionId: string): Promise<AppPurchaseRecord | null> {
-        return this.appPurchases.get(transactionId) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.appPurchase.findUnique({ where: { transactionId } });
+        return row ? this.toAppPurchaseRecord(row) : null;
     }
 
     async listAppPurchasesByBuyer(buyerGaii: string): Promise<AppPurchaseRecord[]> {
-        const results: AppPurchaseRecord[] = [];
-        for (const r of this.appPurchases.values()) {
-            if (r.buyerGaii === buyerGaii) results.push(r);
-        }
-        return results.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
+        this.ensureReady();
+        const rows = await this.prisma.appPurchase.findMany({
+            where: { buyerGaii },
+            orderBy: { purchasedAt: 'desc' },
+        });
+        return rows.map((r: any) => this.toAppPurchaseRecord(r));
     }
 
     async listAppPurchasesBySeller(sellerGaii: string): Promise<AppPurchaseRecord[]> {
-        const results: AppPurchaseRecord[] = [];
-        for (const r of this.appPurchases.values()) {
-            if (r.sellerGaii === sellerGaii) results.push(r);
-        }
-        return results.sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt));
+        this.ensureReady();
+        const rows = await this.prisma.appPurchase.findMany({
+            where: { sellerGaii },
+            orderBy: { purchasedAt: 'desc' },
+        });
+        return rows.map((r: any) => this.toAppPurchaseRecord(r));
     }
 
     async hasValidLicense(buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime'): Promise<boolean> {
-        for (const r of this.appPurchases.values()) {
-            if (r.buyerGaii === buyerGaii && r.sellerGaii === sellerGaii && r.appFilename === filename) {
-                if (r.licenseType === 'lifetime') return true;
-                if (!licenseType || licenseType === 'single') return true;
-            }
-        }
-        return false;
+        this.ensureReady();
+        const where: any = { buyerGaii, sellerGaii, appFilename: filename };
+        if (licenseType === 'lifetime') where.licenseType = 'lifetime';
+        const count = await this.prisma.appPurchase.count({ where });
+        return count > 0;
     }
 
     // ── Config Persistence ──────────────────────────────────
@@ -2967,134 +3297,300 @@ export class MongoStorage implements Storage {
     // ── Knowledge: Memory Links ──
     // ══════════════════════════════════════════════════════════
 
-    private knowledgeLinks = new Map<string, MemoryLinkRecord>();
-    private knowledgeReviews = new Map<string, OperatorReviewRecord>();
+    private toMemoryLinkRecord(row: any): MemoryLinkRecord {
+        return {
+            source: row.source,
+            target: row.target,
+            relation: row.relation,
+            description: row.description,
+            linked_at: row.linkedAt instanceof Date ? row.linkedAt.toISOString() : row.linkedAt,
+            linked_by: row.linkedBy,
+        };
+    }
 
     async createLink(record: MemoryLinkRecord): Promise<MemoryLinkRecord> {
-        const key = `${record.source}::${record.target}`;
-        this.knowledgeLinks.set(key, record);
+        this.ensureReady();
+        await this.prisma.knowledgeLink.create({
+            data: {
+                source: record.source,
+                target: record.target,
+                relation: record.relation,
+                description: record.description,
+                linkedAt: new Date(record.linked_at),
+                linkedBy: record.linked_by,
+            },
+        });
         return record;
     }
 
     async getLink(source: string, target: string): Promise<MemoryLinkRecord | null> {
-        return this.knowledgeLinks.get(`${source}::${target}`) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.knowledgeLink.findUnique({
+            where: { source_target: { source, target } },
+        });
+        return row ? this.toMemoryLinkRecord(row) : null;
     }
 
     async listLinks(key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {
+        this.ensureReady();
         const dir = opts?.direction ?? 'both';
-        const results: MemoryLinkRecord[] = [];
-        for (const link of this.knowledgeLinks.values()) {
-            const matchDir = dir === 'both'
-                ? (link.source === key || link.target === key)
-                : dir === 'outgoing' ? link.source === key : link.target === key;
-            if (!matchDir) continue;
-            if (opts?.relation && link.relation !== opts.relation) continue;
-            results.push(link);
-        }
-        return results;
+        const where: any = {};
+        if (dir === 'outgoing') where.source = key;
+        else if (dir === 'incoming') where.target = key;
+        else where.OR = [{ source: key }, { target: key }];
+        if (opts?.relation) where.relation = opts.relation;
+        const rows = await this.prisma.knowledgeLink.findMany({ where });
+        return rows.map((r: any) => this.toMemoryLinkRecord(r));
     }
 
     async deleteLink(source: string, target: string): Promise<boolean> {
-        return this.knowledgeLinks.delete(`${source}::${target}`);
+        this.ensureReady();
+        const result = await this.prisma.knowledgeLink.deleteMany({
+            where: { source, target },
+        });
+        return result.count > 0;
     }
 
     async findBrokenLinks(ownerGaii: string): Promise<MemoryLinkRecord[]> {
+        this.ensureReady();
+        const links = await this.prisma.knowledgeLink.findMany({
+            where: { linkedBy: ownerGaii },
+        });
         const broken: MemoryLinkRecord[] = [];
-        for (const link of this.knowledgeLinks.values()) {
-            if (link.linked_by !== ownerGaii) continue;
+        for (const link of links) {
             const sourceExists = await this.getMemory(ownerGaii, link.source);
             const targetExists = await this.getMemory(ownerGaii, link.target);
-            if (!sourceExists || !targetExists) broken.push(link);
+            if (!sourceExists || !targetExists) broken.push(this.toMemoryLinkRecord(link));
         }
         return broken;
     }
 
     // ══════════════════════════════════════════════════════════
-    // ── Knowledge: Operator Reviews ──
+    // ── Knowledge: Operator Reviews (Prisma-persisted) ──
     // ══════════════════════════════════════════════════════════
 
+    private toOperatorReviewRecord(row: any): OperatorReviewRecord {
+        return {
+            id: row.id,
+            packageId: row.packageId,
+            operatorGaii: row.operatorGaii,
+            reason: row.reason,
+            customText: row.customText ?? undefined,
+            action: row.action,
+            timestamp: row.timestamp instanceof Date ? row.timestamp.toISOString() : row.timestamp,
+        };
+    }
+
     async createReview(record: OperatorReviewRecord): Promise<OperatorReviewRecord> {
-        this.knowledgeReviews.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.knowledgeReview.create({
+            data: {
+                id: record.id,
+                packageId: record.packageId,
+                operatorGaii: record.operatorGaii,
+                reason: record.reason,
+                customText: record.customText,
+                action: record.action,
+                timestamp: new Date(record.timestamp),
+            },
+        });
         return record;
     }
 
     async listReviews(packageId: string): Promise<OperatorReviewRecord[]> {
-        return [...this.knowledgeReviews.values()].filter(r => r.packageId === packageId);
+        this.ensureReady();
+        const rows = await this.prisma.knowledgeReview.findMany({ where: { packageId } });
+        return rows.map((r: any) => this.toOperatorReviewRecord(r));
     }
 
     async listAllReviews(opts?: { page?: number; perPage?: number }): Promise<OperatorReviewRecord[]> {
-        const all = [...this.knowledgeReviews.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
-        const start = (page - 1) * perPage;
-        return all.slice(start, start + perPage);
+        const rows = await this.prisma.knowledgeReview.findMany({
+            orderBy: { timestamp: 'desc' },
+            skip: (page - 1) * perPage,
+            take: perPage,
+        });
+        return rows.map((r: any) => this.toOperatorReviewRecord(r));
     }
 
     // ══════════════════════════════════════════════════════════
     // ── Scheduler: Scheduled Jobs ──
     // ══════════════════════════════════════════════════════════
 
-    private scheduledJobs = new Map<string, ScheduledJobRecord>();
+    private toScheduledJobRecord(row: any): ScheduledJobRecord {
+        return {
+            id: row.id,
+            name: row.name,
+            type: row.type as 'extension' | 'core',
+            extensionName: row.extensionName ?? undefined,
+            instanceId: row.instanceId ?? undefined,
+            actionId: row.actionId ?? undefined,
+            coreHandler: row.coreHandler ?? undefined,
+            cron: row.cron,
+            enabled: row.enabled,
+            input: row.input as Record<string, unknown> | undefined,
+            lastRunAt: row.lastRunAt instanceof Date ? row.lastRunAt.toISOString() : row.lastRunAt ?? undefined,
+            lastRunResult: row.lastRunResult as 'success' | 'error' | undefined,
+            lastRunError: row.lastRunError ?? undefined,
+            lastRunDurationMs: row.lastRunDurationMs ?? undefined,
+            nextRunAt: row.nextRunAt instanceof Date ? row.nextRunAt.toISOString() : row.nextRunAt ?? undefined,
+            createdBy: row.createdBy,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
 
     async createScheduledJob(record: ScheduledJobRecord): Promise<ScheduledJobRecord> {
-        this.scheduledJobs.set(record.id, record);
+        this.ensureReady();
+        await this.prisma.scheduledJob.create({
+            data: {
+                id: record.id,
+                name: record.name,
+                type: record.type,
+                extensionName: record.extensionName,
+                instanceId: record.instanceId,
+                actionId: record.actionId,
+                coreHandler: record.coreHandler,
+                cron: record.cron,
+                enabled: record.enabled,
+                input: record.input as any,
+                lastRunAt: record.lastRunAt ? new Date(record.lastRunAt) : null,
+                lastRunResult: record.lastRunResult,
+                lastRunError: record.lastRunError,
+                lastRunDurationMs: record.lastRunDurationMs,
+                nextRunAt: record.nextRunAt ? new Date(record.nextRunAt) : null,
+                createdBy: record.createdBy,
+                createdAt: new Date(record.createdAt),
+                updatedAt: new Date(record.updatedAt),
+            },
+        });
         return record;
     }
 
     async getScheduledJob(id: string): Promise<ScheduledJobRecord | null> {
-        return this.scheduledJobs.get(id) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.scheduledJob.findUnique({ where: { id } });
+        return row ? this.toScheduledJobRecord(row) : null;
     }
 
     async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]> {
-        let results = [...this.scheduledJobs.values()];
-        if (filter?.type !== undefined) results = results.filter(j => j.type === filter.type);
-        if (filter?.extensionName !== undefined) results = results.filter(j => j.extensionName === filter.extensionName);
-        if (filter?.enabled !== undefined) results = results.filter(j => j.enabled === filter.enabled);
-        return results;
+        this.ensureReady();
+        const where: any = {};
+        if (filter?.type !== undefined) where.type = filter.type;
+        if (filter?.extensionName !== undefined) where.extensionName = filter.extensionName;
+        if (filter?.enabled !== undefined) where.enabled = filter.enabled;
+        const rows = await this.prisma.scheduledJob.findMany({ where });
+        return rows.map((r: any) => this.toScheduledJobRecord(r));
     }
 
     async updateScheduledJob(id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null> {
-        const existing = this.scheduledJobs.get(id);
+        this.ensureReady();
+        const existing = await this.prisma.scheduledJob.findUnique({ where: { id } });
         if (!existing) return null;
-        const updated = { ...existing, ...updates, id };
-        this.scheduledJobs.set(id, updated);
-        return updated;
+        const data: any = {};
+        if (updates.name !== undefined) data.name = updates.name;
+        if (updates.type !== undefined) data.type = updates.type;
+        if (updates.extensionName !== undefined) data.extensionName = updates.extensionName;
+        if (updates.instanceId !== undefined) data.instanceId = updates.instanceId;
+        if (updates.actionId !== undefined) data.actionId = updates.actionId;
+        if (updates.coreHandler !== undefined) data.coreHandler = updates.coreHandler;
+        if (updates.cron !== undefined) data.cron = updates.cron;
+        if (updates.enabled !== undefined) data.enabled = updates.enabled;
+        if (updates.input !== undefined) data.input = updates.input as any;
+        if (updates.lastRunAt !== undefined) data.lastRunAt = updates.lastRunAt ? new Date(updates.lastRunAt) : null;
+        if (updates.lastRunResult !== undefined) data.lastRunResult = updates.lastRunResult;
+        if (updates.lastRunError !== undefined) data.lastRunError = updates.lastRunError;
+        if (updates.lastRunDurationMs !== undefined) data.lastRunDurationMs = updates.lastRunDurationMs;
+        if (updates.nextRunAt !== undefined) data.nextRunAt = updates.nextRunAt ? new Date(updates.nextRunAt) : null;
+        const row = await this.prisma.scheduledJob.update({ where: { id }, data });
+        return this.toScheduledJobRecord(row);
     }
 
     async deleteScheduledJob(id: string): Promise<boolean> {
-        return this.scheduledJobs.delete(id);
+        this.ensureReady();
+        const result = await this.prisma.scheduledJob.deleteMany({ where: { id } });
+        return result.count > 0;
     }
 
     // ══════════════════════════════════════════════════════════
-    // ── Extension Instances ──
+    // ── Extension Instances (Prisma-persisted) ──
     // ══════════════════════════════════════════════════════════
 
-    private extensionInstances = new Map<string, ExtensionInstanceRecord>();
+    private toExtensionInstanceRecord(row: any): ExtensionInstanceRecord {
+        return {
+            id: row.instanceId,
+            extensionName: row.extensionName,
+            config: (row.config as Record<string, unknown>) || {},
+            status: row.status as 'active' | 'paused',
+            translations: row.translations as Record<string, Record<string, string>> | undefined,
+            createdBy: row.createdBy,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
 
     async createExtensionInstance(record: ExtensionInstanceRecord): Promise<ExtensionInstanceRecord> {
-        this.extensionInstances.set(`${record.extensionName}:${record.id}`, record);
-        return record;
+        this.ensureReady();
+        const row = await this.prisma.extensionInstance.create({
+            data: {
+                instanceId: record.id,
+                extensionName: record.extensionName,
+                config: record.config as any,
+                status: record.status,
+                translations: record.translations ? record.translations as any : undefined,
+                createdBy: record.createdBy,
+                createdAt: new Date(record.createdAt),
+            },
+        });
+        return this.toExtensionInstanceRecord(row);
     }
 
     async getExtensionInstance(extensionName: string, instanceId: string): Promise<ExtensionInstanceRecord | null> {
-        return this.extensionInstances.get(`${extensionName}:${instanceId}`) ?? null;
+        this.ensureReady();
+        const row = await this.prisma.extensionInstance.findUnique({
+            where: { extensionName_instanceId: { extensionName, instanceId } },
+        });
+        return row ? this.toExtensionInstanceRecord(row) : null;
     }
 
     async listExtensionInstances(extensionName: string): Promise<ExtensionInstanceRecord[]> {
-        return [...this.extensionInstances.values()].filter(r => r.extensionName === extensionName);
+        this.ensureReady();
+        const rows = await this.prisma.extensionInstance.findMany({
+            where: { extensionName },
+            orderBy: { createdAt: 'desc' },
+        });
+        return rows.map((r: any) => this.toExtensionInstanceRecord(r));
     }
 
     async updateExtensionInstance(extensionName: string, instanceId: string, updates: Partial<ExtensionInstanceRecord>): Promise<ExtensionInstanceRecord | null> {
-        const key = `${extensionName}:${instanceId}`;
-        const existing = this.extensionInstances.get(key);
-        if (!existing) return null;
-        const updated = { ...existing, ...updates, extensionName, id: instanceId };
-        this.extensionInstances.set(key, updated);
-        return updated;
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.config !== undefined) data.config = updates.config as any;
+            if (updates.status !== undefined) data.status = updates.status;
+            if (updates.translations !== undefined) data.translations = updates.translations as any;
+            const row = await this.prisma.extensionInstance.update({
+                where: { extensionName_instanceId: { extensionName, instanceId } },
+                data,
+            });
+            return this.toExtensionInstanceRecord(row);
+        } catch {
+            return null;
+        }
     }
 
     async deleteExtensionInstance(extensionName: string, instanceId: string): Promise<boolean> {
-        return this.extensionInstances.delete(`${extensionName}:${instanceId}`);
+        this.ensureReady();
+        try {
+            await this.prisma.extensionInstance.delete({
+                where: { extensionName_instanceId: { extensionName, instanceId } },
+            });
+            return true;
+        } catch {
+            return false;
+        }
     }
 }
 

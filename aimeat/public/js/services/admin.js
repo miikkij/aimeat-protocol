@@ -42,6 +42,16 @@ export const doRestore       = (data)   => apiPost('/v1/admin/restore', data);
 
 // ── Federation ──
 export const getFederation   = ()       => apiGet('/v1/admin/federation');
+export const getFederationPeers = ()    => apiGet('/v1/federation/peers');
+export const getFederationDirectory = () => apiGet('/v1/federation/directory');
+export const approvePeeringRequest = (id) => apiPut(`/v1/admin/peering/requests/${encodeURIComponent(id)}`, { decision: 'approve' });
+export const rejectPeeringRequest = (id) => apiPut(`/v1/admin/peering/requests/${encodeURIComponent(id)}`, { decision: 'reject' });
+export const activatePeer = (nodeId) => apiPost('/v1/federation/peer/activate', { peer_node_id: nodeId });
+export const addPeerDirect = (nodeId, url, publicKey) => apiPost('/v1/federation/peers', { node_id: nodeId, url, public_key: publicKey || undefined });
+export const removePeer = (nodeId) => apiDelete(`/v1/federation/peers/${encodeURIComponent(nodeId)}`);
+export const removePeerEmergency = (nodeId) => apiDelete(`/v1/federation/peers/${encodeURIComponent(nodeId)}?emergency=true`);
+export const testFederationNode = (targetUrl) => apiPost('/v1/federation/test', { target_url: targetUrl });
+export const joinGenesisNetwork = (genesisUrl, role) => apiPost('/v1/admin/federation/join', { genesis_url: genesisUrl, role: role || 'contributor' });
 
 // ── Hooks ──
 export const getHooks        = ()       => apiGet('/v1/admin/hooks');
@@ -133,6 +143,10 @@ export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURI
 export const getStats        = ()       => apiGet('/v1/stats');
 
 // ── Extensions & Instances ──
+export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
+export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);
+export const uninstallExtension       = (name)          => apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
+export const activateExtension        = (name)          => apiPost(`/v1/extensions/${encodeURIComponent(name)}/activate`);
 export const getExtensions            = ()              => apiGet('/v1/extensions');
 export const getExtensionInstances    = (name)          => apiGet(`/v1/extensions/${encodeURIComponent(name)}/instances`);
 export const createExtensionInstance  = (name, body)    => apiPost(`/v1/extensions/${encodeURIComponent(name)}/instances`, body);

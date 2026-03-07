@@ -26,6 +26,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           actionsCount: ext.actions.length,
           requiredApis: ext.requiredApis,
           federation: ext.federation,
+          instances: ext.instances ?? null,
           installedAt: ext.installedAt,
           activatedAt: ext.activatedAt,
         })),
@@ -495,9 +496,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      const { config: newConfig, status } = req.body as {
+      const { config: newConfig, status, translations } = req.body as {
         config?: Record<string, unknown>;
         status?: 'active' | 'paused';
+        translations?: Record<string, Record<string, string>>;
       };
 
       if (newConfig !== undefined && (typeof newConfig !== 'object' || newConfig === null || Array.isArray(newConfig))) {
@@ -514,6 +516,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       };
       if (newConfig !== undefined) updates.config = newConfig;
       if (status !== undefined) updates.status = status;
+      if (translations !== undefined) updates.translations = translations;
 
       const updated = await storage.updateExtensionInstance(name, instanceId, updates);
       if (!updated) {
@@ -561,6 +564,28 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
     } catch (err) {
       logger.error('Failed to delete extension instance', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete extension instance'));
+    }
+  });
+
+  // ── GET /v1/extensions/:name/instances/:instanceId/translations — Public translations ──
+  router.get('/v1/extensions/:name/instances/:instanceId/translations', async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const instanceId = req.params.instanceId as string;
+      const locale = (req.query.locale as string) || 'en';
+
+      const instance = await storage.getExtensionInstance(name, instanceId);
+      if (!instance) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+          `Instance "${instanceId}" not found for extension "${name}"`));
+        return;
+      }
+
+      const translations = instance.translations?.[locale] || {};
+      res.json(success(config.nodeId, { locale, translations }));
+    } catch (err) {
+      logger.error('Failed to get instance translations', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get instance translations'));
     }
   });
 

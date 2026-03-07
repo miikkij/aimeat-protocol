@@ -100,6 +100,7 @@ import { cortexRouter } from './routes/cortex.js';
 import { MailboxNotificationService } from './services/mailbox-notification.js';
 import { Scheduler } from './services/scheduler.js';
 import { adminSchedulerRouter } from './routes/admin-scheduler.js';
+import { adminExtensionsRouter } from './routes/admin-extensions.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -690,6 +691,9 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Scheduler admin routes
   app.use(adminSchedulerRouter(config, storage, scheduler));
+
+  // Bundled extensions admin routes
+  app.use(adminExtensionsRouter(config, storage, scheduler));
 
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>

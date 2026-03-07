@@ -328,6 +328,24 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           value: String(config.keyCacheRefreshMinutes),
           defaultVal: '5',
         },
+        {
+          envVar: 'AIMEAT_CROSS_FEDERATION_ENABLED',
+          description: 'Enable cross-federation genesis peering (connects independent nodes/clusters)',
+          value: String(config.crossFederationEnabled),
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_MAX_GENESIS_PEERS',
+          description: 'Maximum number of genesis peer connections',
+          value: String(config.maxGenesisPeers),
+          defaultVal: '10',
+        },
+        {
+          envVar: 'AIMEAT_GENESIS_SYNC_INTERVAL_HOURS',
+          description: 'Hours between catalogue sync with genesis peers',
+          value: String(config.genesisSyncIntervalHours),
+          defaultVal: '6',
+        },
       ],
     },
     {

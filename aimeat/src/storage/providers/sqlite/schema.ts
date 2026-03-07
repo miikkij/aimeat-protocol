@@ -579,6 +579,7 @@ export function initializeSchema(db: Database.Database): void {
       config         TEXT NOT NULL DEFAULT '{}',
       limits         TEXT NOT NULL DEFAULT '{}',
       federation     TEXT NOT NULL DEFAULT '{}',
+      instances      TEXT,
       installedBy    TEXT NOT NULL,
       installedAt    TEXT NOT NULL,
       activatedAt    TEXT

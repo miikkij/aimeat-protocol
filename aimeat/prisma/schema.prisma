@@ -311,11 +311,27 @@ model Extension {
   config       Json
   limits       Json
   federation   Json
+  instances    Json?
   installedBy  String
   installedAt  DateTime  @default(now())
   activatedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+model ExtensionInstance {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  instanceId    String
+  extensionName String
+  config        Json      @default("{}")
+  status        String    @default("active")
+  translations  Json?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([extensionName, instanceId])
+  @@index([extensionName])
 }
 
 model EscrowHold {
@@ -333,4 +349,536 @@ model EscrowHold {
 
   @@index([fromGaii])
   @@index([status])
+}
+
+model PushSubscription {
+  id         String   @id @map("_id")
+  ownerName  String   @unique
+  endpoint   String
+  keys       Json
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+}
+
+model NotificationTemplate {
+  id          String   @id @map("_id")
+  templateId  String
+  locale      String
+  fields      Json
+  placeholders String[]
+  updatedAt   DateTime @default(now())
+  updatedBy   String
+
+  @@unique([templateId, locale])
+}
+
+model BoardSubscription {
+  id          String   @id @map("_id")
+  boardId     String
+  gaii        String
+  callbackUrl String?
+  filters     Json?
+  createdAt   DateTime @default(now())
+
+  @@unique([boardId, gaii])
+  @@index([boardId])
+  @@index([gaii])
+}
+
+model PersonalNode {
+  id                String   @id @map("_id")
+  ownerName         String
+  anchorNodeId      String
+  publicKey         String
+  status            String   @default("offline")
+  agentGaiis        String[]
+  lastSeen          DateTime @default(now())
+  mailboxQuotaBytes Int
+  mailboxUsedBytes  Int      @default(0)
+  visibility        String   @default("private")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([ownerName])
+}
+
+model MailboxItem {
+  id             String   @id @map("_id")
+  personalNodeId String
+  type           String
+  fromGaii       String
+  toGaii         String
+  payload        String
+  sizeBytes      Int
+  retentionDays  Int
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([personalNodeId])
+  @@index([expiresAt])
+}
+
+model ChatInstance {
+  id        String   @id @map("_id")
+  platform  String
+  appName   String
+  ownerName String
+  ghii      String
+  nodeId    String
+  isAnonymous Boolean @default(false)
+  createdAt DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  @@index([ownerName])
+  @@index([ghii])
+}
+
+model SchemaLock {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  keyPattern      String
+  applyTo         String
+  schemaJson      Json
+  schemaMode      String   @default("open")
+  lockedBy        String
+  setAt           DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  semanticContext Json?
+
+  @@unique([applyTo, keyPattern])
+}
+
+model Consent {
+  id          String    @id @map("_id")
+  ownerGaii   String
+  dataPattern String
+  recipient   String
+  purpose     String
+  scope       String
+  expires     DateTime?
+  status      String    @default("active")
+  grantedAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  metadata    Json?
+
+  @@index([ownerGaii])
+  @@index([ownerGaii, status])
+}
+
+model ConsentAudit {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  consentId    String
+  ownerGaii    String
+  accessorGaii String
+  memoryKey    String
+  action       String
+  timestamp    DateTime @default(now())
+  allowed      Boolean
+
+  @@index([ownerGaii])
+  @@index([consentId])
+}
+
+model Csm {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  name           String   @unique
+  definition     Json
+  jsonSchemaKey  String
+  serviceType    String
+  registeredBy   String
+  registeredAt   DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  semantic       Json?
+  federate       Boolean  @default(false)
+}
+
+model Msm {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String   @unique
+  definition   Json
+  category     String
+  authType     String
+  actionsCount Int
+  registeredBy String
+  registeredAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  federate     Boolean  @default(false)
+}
+
+model EmailVerification {
+  id         String    @id @map("_id")
+  ownerName  String
+  emailHash  String
+  code       String
+  purpose    String
+  status     String    @default("pending")
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  verifiedAt DateTime?
+
+  @@index([ownerName, purpose, status])
+  @@index([expiresAt])
+}
+
+model Flag {
+  id         String    @id @map("_id")
+  targetType String
+  targetId   String
+  flaggedBy  String
+  reason     String
+  description String?
+  status     String    @default("active")
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([targetType, targetId])
+  @@index([status])
+}
+
+model Match {
+  id          String    @id @map("_id")
+  profileA    String
+  profileB    String
+  score       Float
+  breakdown   Json
+  status      String    @default("suggested")
+  notifiedAt  DateTime?
+  respondedAt DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@index([profileA])
+  @@index([profileB])
+  @@index([expiresAt])
+}
+
+model Organism {
+  id               String   @id @map("_id")
+  name             String
+  description      String
+  type             String
+  location         Json?
+  interests        String[]
+  creatorGhii      String
+  admins           String[]
+  members          String[]
+  agentGaiis       String[]
+  boardId          String
+  joinPolicy       String   @default("open")
+  maxMembers       Int      @default(100)
+  visibility       String   @default("public")
+  moderationConfig Json
+  memoryNamespace  String
+  semantic         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([creatorGhii])
+  @@index([visibility])
+}
+
+model OrganismMembership {
+  id         String   @id @map("_id")
+  organismId String
+  ghii       String
+  role       String
+  status     String   @default("active")
+  joinedAt   DateTime @default(now())
+  invitedBy  String?
+
+  @@unique([organismId, ghii])
+  @@index([organismId])
+  @@index([ghii])
+}
+
+model JoinRequest {
+  id         String    @id @map("_id")
+  organismId String
+  ghii       String
+  message    String?
+  status     String    @default("pending")
+  reviewedBy String?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([organismId])
+  @@index([organismId, status])
+}
+
+model Appeal {
+  id         String    @id @map("_id")
+  flagId     String
+  appealedBy String
+  reason     String
+  status     String    @default("pending")
+  reviewedBy String?
+  reviewNote String?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([flagId])
+  @@index([status])
+}
+
+model Listing {
+  id          String   @id @map("_id")
+  ownerName   String
+  sellerGhii  String
+  title       String
+  description String
+  category    String
+  priceMorsels Int
+  condition   String?
+  availability String?
+  location    Json?
+  tags        String[]
+  images      String[]
+  status      String   @default("active")
+  memoryKey   String
+  flagCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  semantic    Json?
+
+  @@index([category])
+  @@index([ownerName])
+  @@index([status])
+}
+
+model Purchase {
+  id                   String    @id @map("_id")
+  listingId            String
+  buyerOwner           String
+  sellerOwner          String
+  priceMorsels         Int
+  transactionFeeMorsels Int
+  totalCostMorsels     Int
+  status               String    @default("pending_delivery")
+  ratingScore          Int?
+  ratingComment        String?
+  trackingCode         String
+  createdAt            DateTime  @default(now())
+  completedAt          DateTime?
+
+  @@index([buyerOwner])
+  @@index([sellerOwner])
+  @@index([listingId])
+}
+
+model TrustedIssuer {
+  id        String   @id @map("_id")
+  name      String
+  url       String
+  publicKey String
+  type      String
+  trusted   Boolean  @default(true)
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  @@index([url])
+}
+
+model GenesisPeer {
+  id            String   @id @map("_id")
+  genesisNodeId String
+  genesisUrl    String
+  publicKey     String
+  status        String   @default("pending")
+  lastSyncAt    DateTime @default(now())
+  catalogueHash String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([genesisNodeId])
+  @@index([status])
+}
+
+model OrganismReputation {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  organismId   String   @unique
+  score        Float
+  breakdown    Json
+  calculatedAt DateTime @default(now())
+}
+
+model CortexExtension {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                String    @unique
+  namespace           String
+  shortName           String
+  apiVersion          String
+  version             String
+  description         String
+  author              String
+  license             String?
+  tags                String[]
+  labels              Json
+  aimeatCompat        String?
+  status              String    @default("inactive")
+  visibility          String    @default("private")
+  installedAt         DateTime  @default(now())
+  activatedAt         DateTime?
+  installedBy         String
+  manifest            String
+  components          Json
+  activationArtifacts Json
+}
+
+model CortexLibFile {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  extName  String
+  libName  String
+  content  String
+
+  @@unique([extName, libName])
+}
+
+model PersonalPushSubscription {
+  id             String    @id @map("_id")
+  personalNodeId String
+  ownerName      String
+  endpoint       String
+  keys           Json
+  failureCount   Int       @default(0)
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+
+  @@index([personalNodeId])
+}
+
+model NotificationPreference {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  personalNodeId  String   @unique
+  enabled         Boolean  @default(true)
+  channels        String[]
+  notifyTypes     String[]
+  cooldownMinutes Int      @default(5)
+  quietHoursUtc   Json?
+  email           String?
+  locale          String?
+}
+
+model Session {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId String   @unique
+  gaii      String
+  owner     String
+  issuedAt  DateTime
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+
+  @@index([owner])
+  @@index([expiresAt])
+}
+
+model RevokedToken {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  tokenHash String @unique
+  expiresAt Int
+
+  @@index([expiresAt])
+}
+
+model App {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  ownerGaii     String
+  ownerName     String
+  filename      String
+  versionNumber Int
+  manifest      Json
+  mimeType      String
+  size          Int
+  data          Bytes
+  accessCode    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([ownerGaii, filename, versionNumber])
+  @@index([ownerGaii, filename])
+  @@index([ownerName, filename])
+}
+
+model AppDownload {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  ownerGaii String
+  filename  String
+  count     Int    @default(0)
+
+  @@unique([ownerGaii, filename])
+}
+
+model AppPurchase {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  transactionId        String   @unique
+  buyerGaii            String
+  buyerOwner           String
+  sellerGaii           String
+  sellerOwner          String
+  appFilename          String
+  appName              String
+  appVersionNumber     Int
+  licenseType          String
+  priceMorsels         Int
+  transactionFeeMorsels Int
+  purchasedAt          DateTime @default(now())
+  appContent           String
+  appManifest          Json
+  appScreenshot        String?
+  signature            String
+  nodeId               String
+  nodePublicKey        String
+
+  @@index([buyerGaii])
+  @@index([sellerGaii])
+}
+
+model KnowledgeLink {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  source      String
+  target      String
+  relation    String
+  description String
+  linkedAt    DateTime @default(now())
+  linkedBy    String
+
+  @@unique([source, target])
+  @@index([source])
+  @@index([target])
+}
+
+model KnowledgeReview {
+  id            String   @id @map("_id")
+  packageId     String
+  operatorGaii  String
+  reason        String
+  customText    String?
+  action        String
+  timestamp     DateTime @default(now())
+
+  @@index([packageId])
+}
+
+model ScheduledJob {
+  id               String    @id @map("_id")
+  name             String
+  type             String
+  extensionName    String?
+  instanceId       String?
+  actionId         String?
+  coreHandler      String?
+  cron             String
+  enabled          Boolean   @default(true)
+  input            Json?
+  lastRunAt        DateTime?
+  lastRunResult    String?
+  lastRunError     String?
+  lastRunDurationMs Int?
+  nextRunAt        DateTime?
+  createdBy        String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([type])
+  @@index([extensionName])
+  @@index([enabled])
 }

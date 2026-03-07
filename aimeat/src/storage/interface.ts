@@ -758,6 +758,8 @@ export interface ExtensionInstanceRecord {
   extensionName: string;
   config: Record<string, unknown>;
   status: 'active' | 'paused';
+  /** Per-locale translation overrides: { "en": { "mkt.cat.foo": "Foo" }, "fi": { ... } } */
+  translations?: Record<string, Record<string, string>>;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

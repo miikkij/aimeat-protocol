@@ -102,6 +102,9 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_MAX_RELAY_HOPS: '3',
   AIMEAT_FEDERATION_ROLE: 'standalone',
   AIMEAT_GENESIS_URL: '',
+  AIMEAT_CROSS_FEDERATION_ENABLED: 'true',
+  AIMEAT_MAX_GENESIS_PEERS: '10',
+  AIMEAT_GENESIS_SYNC_INTERVAL_HOURS: '6',
   AIMEAT_INDEXNOW_KEY: '',
   AIMEAT_CONSENT_ENABLED: 'true',
   AIMEAT_CONSENT_MAX_PER_USER: '100',
@@ -294,6 +297,9 @@ function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_FEDERATION_ROLE', comment: 'operator = genesis directory | contributor = join genesis | standalone = independent' },
         { key: 'AIMEAT_GENESIS_URL', comment: 'Genesis node URL (for contributor role)' },
         { key: 'AIMEAT_MAX_RELAY_HOPS' },
+        { key: 'AIMEAT_CROSS_FEDERATION_ENABLED', comment: 'Enable cross-federation genesis peering (connects independent nodes/clusters)' },
+        { key: 'AIMEAT_MAX_GENESIS_PEERS', comment: 'Max genesis peer connections (1-100)' },
+        { key: 'AIMEAT_GENESIS_SYNC_INTERVAL_HOURS', comment: 'Hours between catalogue sync with genesis peers (1-168)' },
       ],
     },
     {
@@ -1134,6 +1140,46 @@ async function askAllAdvancedSettings(
   );
   if (relayHops !== '3') settings.AIMEAT_MAX_RELAY_HOPS = relayHops;
 
+  // ── Cross-Federation (Genesis Peering) ──
+  p.note(t('init.crossFedNote'));
+
+  const crossFedEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.crossFedEnabled'),
+      initialValue: cfg.crossFederationEnabled,
+    }),
+    t,
+  );
+  if (!crossFedEnabled) settings.AIMEAT_CROSS_FEDERATION_ENABLED = 'false';
+
+  if (crossFedEnabled) {
+    const maxPeers = checkCancel(
+      await p.text({
+        message: t('init.crossFedMaxPeers'),
+        defaultValue: String(cfg.maxGenesisPeers),
+        validate: (val: string | undefined) => {
+          const n = parseInt(val ?? '', 10);
+          if (isNaN(n) || n < 1 || n > 100) return t('init.crossFedMaxPeersInvalid');
+        },
+      }),
+      t,
+    );
+    if (maxPeers !== '10') settings.AIMEAT_MAX_GENESIS_PEERS = maxPeers;
+
+    const syncInterval = checkCancel(
+      await p.text({
+        message: t('init.crossFedSyncInterval'),
+        defaultValue: String(cfg.genesisSyncIntervalHours),
+        validate: (val: string | undefined) => {
+          const n = parseInt(val ?? '', 10);
+          if (isNaN(n) || n < 1 || n > 168) return t('init.crossFedSyncIntervalInvalid');
+        },
+      }),
+      t,
+    );
+    if (syncInterval !== '6') settings.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS = syncInterval;
+  }
+
   const rateLimitGlobal = checkCancel(
     await p.text({
       message: t('init.rateLimitGlobal'),
@@ -1425,9 +1471,25 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
     }), t);
 
     if (shouldJoin) {
-      const { runFederationJoin } = await import('./federation-join.js');
-      await runFederationJoin(config, genesisUrl, locale);
-      return; // join flow handles its own outro
+      try {
+        // Build a config reflecting the user's NEW settings (not the startup defaults)
+        const port = settings.AIMEAT_PORT || String(config.port);
+        const joinConfig: AimeatConfig = {
+          ...config,
+          nodeId: settings.AIMEAT_NODE_ID || config.nodeId,
+          baseUrl: settings.AIMEAT_BASE_URL || `http://localhost:${port}`,
+          nodeType: (settings.AIMEAT_NODE_TYPE as AimeatConfig['nodeType']) || config.nodeType,
+          federationRole: (fedRole as AimeatConfig['federationRole']) || config.federationRole,
+          genesisUrl: genesisUrl || config.genesisUrl,
+        };
+        const { runFederationJoin } = await import('./federation-join.js');
+        await runFederationJoin(joinConfig, genesisUrl, locale);
+      } catch (e) {
+        p.log.warn(t('init.joinFailed', {
+          error: e instanceof Error ? e.message : String(e),
+        }));
+        p.log.info(t('init.joinRetryHint'));
+      }
     }
   }
 

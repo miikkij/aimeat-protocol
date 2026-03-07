@@ -3151,13 +3151,14 @@ export class SqliteStorage implements Storage {
     try {
       this.db.prepare(
         `INSERT INTO extensions (name, version, description, author, status, requiredApis,
-         actions, config, limits, federation, installedBy, installedAt, activatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         actions, config, limits, federation, instances, installedBy, installedAt, activatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.name, record.version, record.description, record.author,
         record.status, JSON.stringify(record.requiredApis),
         JSON.stringify(record.actions), JSON.stringify(record.config),
         JSON.stringify(record.limits), JSON.stringify(record.federation),
+        record.instances ? JSON.stringify(record.instances) : null,
         record.installedBy, record.installedAt, record.activatedAt ?? null,
       );
       return record;
@@ -3189,13 +3190,14 @@ export class SqliteStorage implements Storage {
     this.db.prepare(
       `UPDATE extensions SET version = ?, description = ?, author = ?, status = ?,
        requiredApis = ?, actions = ?, config = ?, limits = ?, federation = ?,
-       installedBy = ?, installedAt = ?, activatedAt = ? WHERE name = ?`
+       instances = ?, installedBy = ?, installedAt = ?, activatedAt = ? WHERE name = ?`
     ).run(
       updated.version, updated.description, updated.author, updated.status,
       JSON.stringify(updated.requiredApis), JSON.stringify(updated.actions),
       JSON.stringify(updated.config), JSON.stringify(updated.limits),
-      JSON.stringify(updated.federation), updated.installedBy,
-      updated.installedAt, updated.activatedAt ?? null, name,
+      JSON.stringify(updated.federation),
+      updated.instances ? JSON.stringify(updated.instances) : null,
+      updated.installedBy, updated.installedAt, updated.activatedAt ?? null, name,
     );
     return updated;
   }
@@ -3221,6 +3223,7 @@ export class SqliteStorage implements Storage {
       installedAt: row.installedAt as string,
     };
     if (row.activatedAt) record.activatedAt = row.activatedAt as string;
+    if (row.instances) record.instances = JSON.parse(row.instances as string);
     return record;
   }
 

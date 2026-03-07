@@ -192,6 +192,7 @@ export default function Admin({ navigate, locale }) {
       const extras = await Promise.allSettled([
         api.getMaintenance(), api.getAdminWork(), api.getFederation(),
         api.getHooks(), api.getChatInstances(), api.getRealtime(),
+        api.getFederationPeers(),
       ]);
       if (!mountRef.current) return;
 
@@ -201,6 +202,7 @@ export default function Admin({ navigate, locale }) {
       d.hooks          = extras[3].status === 'fulfilled' ? (extras[3].value.data.extension_hooks || {}) : {};
       d.chatInstances  = extras[4].status === 'fulfilled' ? (extras[4].value.data.chat_instances || []) : [];
       d.realtime       = extras[5].status === 'fulfilled' ? extras[5].value.data : null;
+      d.livePeers      = extras[6].status === 'fulfilled' ? (extras[6].value.data?.peers || []) : [];
 
       // Phase 3: features
       const features = await Promise.allSettled([
@@ -222,7 +224,7 @@ export default function Admin({ navigate, locale }) {
       d.push            = features[5].status === 'fulfilled' ? features[5].value.data : null;
       d.csmTemplates    = features[6].status === 'fulfilled' ? features[6].value.data : null;
       d.msmIntegrations = features[7].status === 'fulfilled' ? features[7].value.data : null;
-      d.genesisPeers    = features[8].status === 'fulfilled' ? features[8].value.data : null;
+      d.genesis         = features[8].status === 'fulfilled' ? features[8].value.data : null;
       d.configSchema    = features[9].status === 'fulfilled' ? features[9].value.data : null;
       d.consul          = features[10].status === 'fulfilled' ? features[10].value.data : null;
       d.schedulerJobs   = features[11].status === 'fulfilled' ? features[11].value.data : null;
@@ -253,10 +255,10 @@ export default function Admin({ navigate, locale }) {
 
       // Final counts
       newCounts.work = d.workItems.length;
-      newCounts.peers = d.federation.length;
+      newCounts.peers = d.livePeers.length || d.federation.length;
       newCounts.rooms = d.realtime?.stats?.rooms || 0;
       newCounts.ghii = d.ghiiUsers.length;
-      newCounts.genesis = d.genesisPeers?.peers?.length || 0;
+      newCounts.genesis = d.genesis?.peers?.length || 0;
       newCounts.msm = d.msmIntegrations?.total || 0;
 
       if (mountRef.current) {

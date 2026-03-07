@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
 import { createT, type Locale, type TFunction } from '../i18n.js';
-import { generateKeyPair } from '../auth/keypair.js';
+import { generateKeyPair, sign } from '../auth/keypair.js';
 import type { AimeatConfig } from '../config.js';
 
 // Package root: from dist/src/cli/federation-join.js -> go up 3 levels to aimeat/
@@ -255,11 +255,15 @@ export async function runFederationJoin(
   // 4. Ensure we have a keypair
   const keys = await ensureKeypair(t);
 
-  // 5. Introduce ourselves
+  // 5. Introduce ourselves (with signature)
   const introSpinner = p.spinner();
   introSpinner.start(t('join.sending'));
   let introData: { request_id: string; status: string };
   try {
+    const timestamp = new Date().toISOString();
+    const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
+    const signature = await sign(keys.privateKey, messageToSign);
+
     const introResp = await fetch(`${targetUrl}/v1/federation/peer/introduce`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -270,6 +274,8 @@ export async function runFederationJoin(
         public_key: keys.publicKey,
         role,
         message: '',
+        signature,
+        timestamp,
       }),
       signal: AbortSignal.timeout(15_000),
     });

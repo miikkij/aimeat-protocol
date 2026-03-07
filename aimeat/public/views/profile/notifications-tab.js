@@ -24,11 +24,19 @@ export default function NotificationsTab({ session, showToast }) {
       if (vapidRes.data?.vapidPublicKey) {
         setVapidKey(vapidRes.data.vapidPublicKey);
       }
-      // Check if browser has active subscription
+      // Check if browser has active subscription and sync with server
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration('/sw.js');
         if (reg) {
           const sub = await reg.pushManager.getSubscription();
+          if (sub) {
+            // Re-register with server in case it lost the record (e.g. restart)
+            const subJson = sub.toJSON();
+            await apiPost('/v1/push/subscribe', {
+              endpoint: subJson.endpoint,
+              keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth },
+            });
+          }
           setSubscribed(!!sub);
         }
       }
@@ -64,10 +72,15 @@ export default function NotificationsTab({ session, showToast }) {
         applicationServerKey: outputArray,
       });
       const subJson = subscription.toJSON();
-      await apiPost('/v1/push/subscribe', {
+      const res = await apiPost('/v1/push/subscribe', {
         endpoint: subJson.endpoint,
         keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth },
       });
+      if (res.ok === false || res.error) {
+        showToast(res.error?.message || t('profile.notifications.subscribeFailed'), true);
+        setSubStatus(null);
+        return;
+      }
       setSubscribed(true);
       showToast(t('profile.notifications.subscribeSuccess'));
     } catch (err) {
@@ -96,7 +109,11 @@ export default function NotificationsTab({ session, showToast }) {
 
   async function handleTestPush() {
     try {
-      await apiPost('/v1/push/test');
+      const res = await apiPost('/v1/push/test');
+      if (res.ok === false || res.error) {
+        showToast(res.error?.message || t('profile.notifications.testFailed'), true);
+        return;
+      }
       showToast(t('profile.notifications.testSent'));
     } catch {
       showToast(t('profile.notifications.testFailed'), true);

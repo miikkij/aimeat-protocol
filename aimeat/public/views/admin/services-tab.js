@@ -1,6 +1,7 @@
 /**
  * Admin Dashboard — Services Tab
  * Manage installed service extensions and their instances.
+ * Install bundled extensions with one-click.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -8,152 +9,525 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, DataTable, Empty, ExpandableHelp } from './shared.js';
-import { getExtensionInstances, createExtensionInstance, updateExtensionInstance, deleteExtensionInstance } from '/js/services/admin.js';
+import { dt, Badge, StatsGrid, Empty, ExpandableHelp } from './shared.js';
+import {
+  getExtensionInstances, createExtensionInstance, updateExtensionInstance,
+  deleteExtensionInstance, getAvailableExtensions, installBundledExtension,
+  uninstallExtension,
+} from '/js/services/admin.js';
 
 const inputStyle = 'background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px';
+const labelStyle = 'font-size:.8rem;color:var(--text-dim)';
+const fieldWrap = 'display:flex;flex-direction:column;gap:2px';
 
-export default function ServicesTab({ data, reload }) {
-  const extensions = data.extensions?.extensions || [];
-  const [selected, setSelected] = useState(null);
+// Extension name → user-facing SPA URL
+const EXT_SPA_URLS = {
+  'marketplace-behaviors': '/v1/marketplace',
+};
+
+// ── Build default config values from JSON Schema properties ──
+function buildDefaults(schema) {
+  if (!schema?.properties) return {};
+  const cfg = {};
+  for (const [key, prop] of Object.entries(schema.properties)) {
+    if (prop.default !== undefined) cfg[key] = prop.default;
+  }
+  return cfg;
+}
+
+// ── Schema-driven config form ──
+function ConfigForm({ schema, config, onChange }) {
+  if (!schema?.properties) return null;
+  const props = schema.properties;
+  const keys = Object.keys(props);
+  if (keys.length === 0) return null;
+
+  function set(key, value) {
+    onChange({ ...config, [key]: value });
+  }
+
+  return html`
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
+      ${keys.map(key => {
+        const prop = props[key];
+        const val = config[key] ?? prop.default ?? '';
+
+        // Enum → select dropdown
+        if (prop.enum) {
+          return html`
+            <div style=${fieldWrap}>
+              <label style=${labelStyle}>${key}</label>
+              <select style=${inputStyle} value=${val}
+                onChange=${e => set(key, e.target.value)}>
+                ${prop.enum.map(opt => html`<option value=${opt}>${opt}</option>`)}
+              </select>
+            </div>
+          `;
+        }
+
+        // Array of strings → comma-separated input
+        if (prop.type === 'array') {
+          const arrVal = Array.isArray(val) ? val.join(', ') : (val || '');
+          return html`
+            <div style=${fieldWrap + ';flex:1;min-width:160px'}>
+              <label style=${labelStyle}>${key} <span style="opacity:.6">(${t('dashboard.servicesCommaSep')})</span></label>
+              <input type="text" style=${inputStyle} value=${arrVal}
+                placeholder=${(prop.default || []).join(', ') || 'a, b, c'}
+                onInput=${e => {
+                  const items = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                  set(key, items);
+                }} />
+            </div>
+          `;
+        }
+
+        // Number / integer
+        if (prop.type === 'number' || prop.type === 'integer') {
+          return html`
+            <div style=${fieldWrap}>
+              <label style=${labelStyle}>${key}</label>
+              <input type="number" style=${inputStyle + ';width:100px'} value=${val}
+                step=${prop.type === 'integer' ? 1 : 'any'}
+                onInput=${e => set(key, e.target.value === '' ? '' : Number(e.target.value))} />
+            </div>
+          `;
+        }
+
+        // String (default)
+        return html`
+          <div style=${fieldWrap + ';min-width:140px'}>
+            <label style=${labelStyle}>${key}</label>
+            <input type="text" style=${inputStyle} value=${val}
+              placeholder=${prop.default || ''}
+              onInput=${e => set(key, e.target.value)} />
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
+// ── Translation key patterns by extension ──
+const EXT_TRANSLATION_KEYS = {
+  'marketplace-behaviors': (cfg) => {
+    const keys = [];
+    const cats = cfg.categories || [];
+    for (const cat of cats) keys.push('mkt.cat.' + cat);
+    // Status labels, visibility labels are global — only custom ones need instance translations
+    return keys;
+  },
+};
+
+// ── AI prompt for generating instance translations ──
+function buildTranslationAiPrompt(extName, instanceId, keys, targetLocale, existingTranslations) {
+  const langName = targetLocale === 'fi' ? 'Finnish (suomi)' : targetLocale === 'en' ? 'English' : targetLocale;
+  const keyList = keys.map(k => {
+    const existing = existingTranslations[k];
+    return `  ${k}${existing ? ` (current: "${existing}")` : ''}`;
+  }).join('\n');
+
+  return `I need translations for a "${extName}" extension instance called "${instanceId}".
+
+Target language: ${langName}
+
+These are i18n keys that need translated values. Each key follows a dot-notation pattern where the last segment hints at the meaning.
+
+Keys to translate:
+${keyList}
+
+Please provide the translations in this exact JSON format (copy-pasteable):
+{
+${keys.map(k => `  "${k}": ""`).join(',\n')}
+}
+
+Rules:
+- Translate naturally, not literally
+- Keep translations concise (UI labels)
+- Output ONLY the JSON object, nothing else`;
+}
+
+// ── Instance Translation Editor ──
+function TranslationEditor({ extName, inst, onSave }) {
+  const [locale, setLocale] = useState('fi');
+  const [translations, setTranslations] = useState({});
+  const [customKey, setCustomKey] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [jsonMode, setJsonMode] = useState(false);
+  const [jsonText, setJsonText] = useState('');
+
+  // Derive required keys from config
+  const keyFn = EXT_TRANSLATION_KEYS[extName];
+  const autoKeys = keyFn ? keyFn(inst.config || {}) : [];
+
+  // Merge: auto keys + any existing keys from stored translations
+  const stored = inst.translations || {};
+  const storedForLocale = stored[locale] || {};
+  const allStoredKeys = Object.keys(storedForLocale);
+  const allKeys = [...new Set([...autoKeys, ...allStoredKeys])].sort();
+
+  // Sync local state when locale changes
+  useEffect(() => {
+    const s = (inst.translations || {})[locale] || {};
+    setTranslations({ ...s });
+    setJsonText(JSON.stringify(s, null, 2));
+    setMsg(null);
+  }, [locale, inst.translations]);
+
+  function setKey(key, value) {
+    setTranslations(prev => ({ ...prev, [key]: value }));
+  }
+
+  function removeKey(key) {
+    setTranslations(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function addCustomKey() {
+    if (!customKey.trim()) return;
+    setTranslations(prev => ({ ...prev, [customKey.trim()]: '' }));
+    setCustomKey('');
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setMsg(null);
+    try {
+      let toSave = translations;
+      if (jsonMode) {
+        try { toSave = JSON.parse(jsonText); } catch { setMsg({ ok: false, text: 'Invalid JSON' }); setSaving(false); return; }
+      }
+      // Merge with existing translations for other locales
+      const merged = { ...(inst.translations || {}), [locale]: toSave };
+      await onSave(extName, inst.id, merged);
+      setMsg({ ok: true, text: t('dashboard.servicesTlSaved') });
+    } catch (e) {
+      setMsg({ ok: false, text: e.message });
+    }
+    setSaving(false);
+  }
+
+  async function copyAiPrompt() {
+    const prompt = buildTranslationAiPrompt(extName, inst.id, allKeys.length > 0 ? allKeys : ['(no keys detected — add categories to config first)'], locale, translations);
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') });
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = prompt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') });
+    }
+  }
+
+  const displayKeys = [...new Set([...allKeys, ...Object.keys(translations)])].sort();
+
+  return html`
+    <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <strong style="font-size:.85rem">${t('dashboard.servicesTlTitle')}</strong>
+        <select style=${inputStyle + ';padding:4px 8px;font-size:.8rem'} value=${locale}
+          onChange=${e => setLocale(e.target.value)}>
+          <option value="fi">Suomi (fi)</option>
+          <option value="en">English (en)</option>
+        </select>
+        <button class="adm-btn-sm" onClick=${() => { setJsonMode(!jsonMode); if (!jsonMode) setJsonText(JSON.stringify(translations, null, 2)); }}
+          style="font-size:.75rem">${jsonMode ? t('dashboard.servicesTlFormMode') : 'JSON'}</button>
+        <button class="adm-btn-sm" onClick=${copyAiPrompt}
+          style="font-size:.75rem;color:#818cf8;border-color:rgba(79,70,229,0.3)">${t('dashboard.servicesTlAiPrompt')}</button>
+      </div>
+
+      ${jsonMode ? html`
+        <textarea value=${jsonText} onInput=${e => setJsonText(e.target.value)}
+          style="width:100%;height:200px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.2);color:var(--text-bright);resize:vertical"
+          spellcheck="false" />
+      ` : html`
+        <div style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto">
+          ${displayKeys.map(key => html`
+            <div style="display:flex;align-items:center;gap:6px">
+              <code style="font-size:.75rem;color:var(--text-dim);min-width:140px;flex-shrink:0">${key}</code>
+              <input type="text" style=${inputStyle + ';flex:1;padding:4px 8px;font-size:.85rem'} value=${translations[key] || ''}
+                placeholder=${key.split('.').pop()}
+                onInput=${e => setKey(key, e.target.value)} />
+              ${!autoKeys.includes(key) && html`
+                <button class="adm-btn-sm" style="font-size:.7rem;padding:2px 6px" onClick=${() => removeKey(key)}>\u2715</button>
+              `}
+            </div>
+          `)}
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+          <input type="text" style=${inputStyle + ';padding:4px 8px;font-size:.8rem;flex:1'} value=${customKey}
+            placeholder=${t('dashboard.servicesTlAddKey')} onInput=${e => setCustomKey(e.target.value)}
+            onKeyDown=${e => { if (e.key === 'Enter') addCustomKey(); }} />
+          <button class="adm-btn-sm" style="font-size:.75rem" onClick=${addCustomKey}>+</button>
+        </div>
+      `}
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSave} disabled=${saving}>
+          ${saving ? '...' : t('dashboard.servicesTlSave')}</button>
+        ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+      </div>
+    </div>
+  `;
+}
+
+// ── Inline instance panel for a single extension ──
+function ExtensionPanel({ ext, onUninstall }) {
+  const [expanded, setExpanded] = useState(false);
   const [instances, setInstances] = useState([]);
-  const [loadingInstances, setLoadingInstances] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newId, setNewId] = useState('');
-  const [newConfig, setNewConfig] = useState('');
+  const [editingTl, setEditingTl] = useState(null); // instance id with open translation editor
+  const [editingCfg, setEditingCfg] = useState(null); // instance id with open config editor
+  const [editCfgData, setEditCfgData] = useState({});
 
-  // Load instances when an extension is selected
-  useEffect(() => {
-    if (!selected) return;
-    setLoadingInstances(true);
-    getExtensionInstances(selected.name)
-      .then(res => {
-        setInstances(res.data?.instances || []);
-      })
+  const schema = ext.instances?.configSchema || null;
+  const [newConfig, setNewConfig] = useState(() => buildDefaults(schema));
+
+  function loadInstances() {
+    setLoading(true);
+    getExtensionInstances(ext.name)
+      .then(res => setInstances(res.data?.instances || []))
       .catch(() => setInstances([]))
-      .finally(() => setLoadingInstances(false));
-  }, [selected]);
+      .finally(() => setLoading(false));
+  }
 
-  // ── Create instance handler ──
+  function toggle() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next) loadInstances();
+  }
+
   async function handleCreate() {
     if (!newId.trim()) return;
     const body = { id: newId.trim() };
-    if (newConfig.trim()) {
-      try {
-        body.config = JSON.parse(newConfig);
-      } catch {
-        alert(t('dashboard.errorLabel') + ': Invalid JSON');
-        return;
-      }
+    // Only include non-empty config values
+    const cfg = {};
+    for (const [k, v] of Object.entries(newConfig)) {
+      if (v !== '' && v !== undefined && v !== null) cfg[k] = v;
     }
+    if (Object.keys(cfg).length > 0) body.config = cfg;
     try {
-      await createExtensionInstance(selected.name, body);
+      await createExtensionInstance(ext.name, body);
       setNewId('');
-      setNewConfig('');
+      setNewConfig(buildDefaults(schema));
       setShowCreate(false);
-      // Reload instances
-      const res = await getExtensionInstances(selected.name);
-      setInstances(res.data?.instances || []);
-      reload();
-    } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
-    }
+      loadInstances();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
   }
 
-  // ── Toggle instance status ──
   async function handleToggleStatus(inst) {
     const newStatus = inst.status === 'active' ? 'paused' : 'active';
     try {
-      await updateExtensionInstance(selected.name, inst.id, { status: newStatus });
-      const res = await getExtensionInstances(selected.name);
-      setInstances(res.data?.instances || []);
-      reload();
-    } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
-    }
+      await updateExtensionInstance(ext.name, inst.id, { status: newStatus });
+      loadInstances();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
   }
 
-  // ── Delete instance ──
   async function handleDelete(inst) {
     if (!confirm(t('dashboard.servicesDeleteConfirm') + ': ' + inst.id + '?')) return;
     try {
-      await deleteExtensionInstance(selected.name, inst.id);
-      const res = await getExtensionInstances(selected.name);
-      setInstances(res.data?.instances || []);
+      await deleteExtensionInstance(ext.name, inst.id);
+      loadInstances();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+  }
+
+  async function handleSaveTranslations(extName, instId, translations) {
+    await updateExtensionInstance(extName, instId, { translations });
+    loadInstances();
+  }
+
+  async function handleSaveConfig(inst) {
+    try {
+      await updateExtensionInstance(ext.name, inst.id, { config: editCfgData });
+      setEditingCfg(null);
+      loadInstances();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+  }
+
+  function openConfigEditor(inst) {
+    if (editingCfg === inst.id) {
+      setEditingCfg(null);
+    } else {
+      setEditCfgData({ ...(inst.config || {}) });
+      setEditingCfg(inst.id);
+    }
+  }
+
+  const actionCount = ext.actionCount || ext.action_count || ext.actionsCount || 0;
+  const instanceCount = ext.instanceCount || ext.instance_count || 0;
+
+  return html`
+    <div class="adm-card" style="margin-bottom:8px;overflow:hidden">
+      <!-- Extension header row -->
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none"
+        onClick=${toggle}>
+        <span style="font-size:.9rem;color:var(--text-dim);width:16px">${expanded ? '\u25BC' : '\u25B6'}</span>
+        <strong style="flex:1;min-width:0">${escHtml(ext.name)}</strong>
+        <span style="color:var(--text-dim);font-size:.85rem">${escHtml(ext.version || '\u2014')}</span>
+        <${Badge} type=${ext.status === 'active' ? 'healthy' : 'warning'} />
+        <span style="color:var(--text-dim);font-size:.85rem;min-width:80px;text-align:right">
+          ${actionCount} ${t('dashboard.servicesActionsCount').toLowerCase()}, ${instanceCount} inst.
+        </span>
+        <div style="display:flex;gap:4px" onClick=${e => e.stopPropagation()}>
+          <button class="adm-btn-sm adm-btn-danger" onClick=${() => onUninstall(ext.name)}>
+            ${t('dashboard.servicesUninstall')}
+          </button>
+        </div>
+      </div>
+
+      <!-- Expanded instance panel -->
+      ${expanded && html`
+        <div style="border-top:1px solid var(--glass-border);padding:12px 16px;background:rgba(0,0,0,0.15)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <button class="adm-btn-sm" onClick=${() => setShowCreate(!showCreate)}>
+              + ${t('dashboard.servicesCreateInstance')}
+            </button>
+            <button class="adm-btn-sm" onClick=${loadInstances} style="font-size:.8rem">
+              \u21BB
+            </button>
+          </div>
+
+          ${showCreate && html`
+            <div style="margin-bottom:12px;padding:12px;border:1px solid var(--glass-border);border-radius:6px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+                <div style=${fieldWrap}>
+                  <label style=${labelStyle}>${t('dashboard.servicesInstanceId')}</label>
+                  <input type="text" value=${newId} onInput=${e => setNewId(e.target.value)}
+                    style=${inputStyle + ';width:200px'} placeholder="my-instance-01" />
+                </div>
+                <button class="adm-btn-action" onClick=${handleCreate}>
+                  ${t('dashboard.servicesCreateInstance')}
+                </button>
+              </div>
+              ${schema && html`
+                <div>
+                  <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:6px;border-top:1px solid var(--glass-border);padding-top:8px">
+                    ${t('dashboard.servicesInstanceConfig')}
+                  </div>
+                  <${ConfigForm} schema=${schema} config=${newConfig} onChange=${setNewConfig} />
+                </div>
+              `}
+            </div>
+          `}
+
+          ${loading
+            ? html`<p style="margin:0;color:var(--text-dim)">${t('dashboard.loading')}...</p>`
+            : instances.length === 0
+              ? html`<p style="margin:0;color:var(--text-dim);font-size:.9rem">${t('dashboard.servicesNoInstances')}</p>`
+              : html`
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  ${instances.map(inst => {
+                    const spaUrl = EXT_SPA_URLS[ext.name];
+                    const tlOpen = editingTl === inst.id;
+                    const cfgOpen = editingCfg === inst.id;
+                    return html`
+                    <div>
+                      <div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:4px;background:var(--glass-bg)">
+                        <code style="flex:1;min-width:0;font-size:.9rem">${escHtml(inst.id)}</code>
+                        <${Badge} type=${inst.status === 'active' ? 'healthy' : 'warning'} />
+                        <span style="color:var(--text-dim);font-size:.8rem">${escHtml(inst.createdBy || inst.created_by || '')}</span>
+                        <span style="color:var(--text-dim);font-size:.8rem">${dt(inst.createdAt || inst.created_at)}</span>
+                        ${spaUrl && html`
+                          <a class="adm-btn-sm" href=${spaUrl} target="_blank"
+                            style="text-decoration:none;color:var(--accent-bright)"
+                            title=${t('dashboard.servicesOpenApp')}>
+                            \u2197 ${t('dashboard.servicesOpenApp')}
+                          </a>
+                        `}
+                        ${schema && html`
+                          <button class="adm-btn-sm" onClick=${() => openConfigEditor(inst)}
+                            style="font-size:.75rem${cfgOpen ? ';color:#818cf8' : ''}"
+                            title=${t('dashboard.servicesEditConfig')}>
+                            \u2699
+                          </button>
+                        `}
+                        <button class="adm-btn-sm" onClick=${() => setEditingTl(tlOpen ? null : inst.id)}
+                          style="font-size:.75rem${tlOpen ? ';color:#818cf8' : ''}"
+                          title=${t('dashboard.servicesTlTitle')}>
+                          \uD83C\uDF10
+                        </button>
+                        <button class="adm-btn-sm" onClick=${() => handleToggleStatus(inst)}>
+                          ${inst.status === 'active' ? '\u23F8' : '\u25B6'}
+                        </button>
+                        <button class="adm-btn-sm adm-btn-danger" onClick=${() => handleDelete(inst)}>
+                          \u2715
+                        </button>
+                      </div>
+                      ${cfgOpen && html`
+                        <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
+                          <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:8px">
+                            <strong>${t('dashboard.servicesEditConfig')}</strong>
+                          </div>
+                          <${ConfigForm} schema=${schema} config=${editCfgData} onChange=${setEditCfgData} />
+                          <div style="margin-top:10px;display:flex;gap:8px">
+                            <button class="adm-btn-action" style="font-size:.8rem" onClick=${() => handleSaveConfig(inst)}>
+                              ${t('dashboard.servicesCfgSave')}</button>
+                            <button class="adm-btn-sm" style="font-size:.8rem" onClick=${() => setEditingCfg(null)}>
+                              ${t('dashboard.servicesCfgCancel')}</button>
+                          </div>
+                        </div>
+                      `}
+                      ${tlOpen && html`
+                        <${TranslationEditor} extName=${ext.name} inst=${inst} onSave=${handleSaveTranslations} />
+                      `}
+                    </div>
+                  `; })}
+                </div>
+              `
+          }
+        </div>
+      `}
+    </div>
+  `;
+}
+
+export default function ServicesTab({ data, reload }) {
+  const extensions = data.extensions?.extensions || [];
+  const [available, setAvailable] = useState([]);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
+  const [installingName, setInstallingName] = useState(null);
+
+  // Load available bundled extensions
+  useEffect(() => {
+    setLoadingAvailable(true);
+    getAvailableExtensions()
+      .then(res => setAvailable(res.data?.extensions || []))
+      .catch(() => setAvailable([]))
+      .finally(() => setLoadingAvailable(false));
+  }, [extensions.length]);
+
+  async function handleInstall(name) {
+    setInstallingName(name);
+    try {
+      await installBundledExtension(name);
+      reload();
+    } catch (e) {
+      alert(t('dashboard.errorLabel') + ': ' + e.message);
+    } finally {
+      setInstallingName(null);
+    }
+  }
+
+  async function handleUninstall(name) {
+    if (!confirm(t('dashboard.servicesUninstallConfirm') + ': ' + name + '?')) return;
+    try {
+      await uninstallExtension(name);
       reload();
     } catch (e) {
       alert(t('dashboard.errorLabel') + ': ' + e.message);
     }
   }
 
-  // ── Detail view ──
-  if (selected) {
-    const instHeaders = [
-      'ID',
-      t('dashboard.status'),
-      t('dashboard.owner'),
-      t('dashboard.createdAt'),
-      t('dashboard.actions'),
-    ];
-
-    const instRows = instances.map(inst => [
-      escHtml(inst.id),
-      html`<${Badge} type=${inst.status === 'active' ? 'healthy' : 'warning'} />`,
-      escHtml(inst.createdBy || inst.created_by || '\u2014'),
-      dt(inst.createdAt || inst.created_at),
-      html`<div style="display:flex;gap:4px">
-        <button class="adm-btn-sm" onClick=${() => handleToggleStatus(inst)}>
-          ${t('dashboard.servicesStatusToggle')}
-        </button>
-        <button class="adm-btn-sm adm-btn-danger" onClick=${() => handleDelete(inst)}>
-          ${t('dashboard.deleteLabel')}
-        </button>
-      </div>`,
-    ]);
-
-    return html`
-      <div>
-        <button class="adm-btn-action" onClick=${() => { setSelected(null); setInstances([]); setShowCreate(false); }}
-          style="margin-bottom:12px">
-          ${t('dashboard.servicesBack')}
-        </button>
-
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-          <h3 style="margin:0">${escHtml(selected.name)}</h3>
-          <${Badge} type=${selected.status === 'active' ? 'healthy' : 'warning'} />
-        </div>
-
-        <button class="adm-btn-action" onClick=${() => setShowCreate(!showCreate)}
-          style="margin-bottom:12px">
-          ${t('dashboard.servicesCreateInstance')}
-        </button>
-
-        ${showCreate && html`
-          <div class="adm-card" style="margin-bottom:16px;padding:16px;display:flex;flex-direction:column;gap:8px">
-            <label>${t('dashboard.servicesInstanceId')}</label>
-            <input type="text" value=${newId} onInput=${e => setNewId(e.target.value)}
-              style=${inputStyle} placeholder="my-instance-01" />
-            <label>${t('dashboard.servicesInstanceConfig')}</label>
-            <textarea value=${newConfig} onInput=${e => setNewConfig(e.target.value)}
-              style=${inputStyle + ';min-height:60px;font-family:monospace'} placeholder='{"key": "value"}' />
-            <button class="adm-btn-action" onClick=${handleCreate}
-              style="align-self:flex-start;margin-top:4px">
-              ${t('dashboard.servicesCreateInstance')}
-            </button>
-          </div>
-        `}
-
-        ${loadingInstances
-          ? html`<p>${t('dashboard.loading')}...</p>`
-          : instances.length === 0
-            ? html`<${Empty} text=${t('dashboard.servicesNoInstances')} />`
-            : html`<${DataTable} headers=${instHeaders} rows=${instRows} scroll=${true} />`
-        }
-      </div>
-    `;
-  }
-
-  // ── Overview ──
+  // ── Stats ──
   const totalExtensions = extensions.length;
   const activeExtensions = extensions.filter(e => e.status === 'active').length;
   const totalInstances = extensions.reduce((sum, e) => sum + (e.instanceCount || e.instance_count || 0), 0);
@@ -164,25 +538,7 @@ export default function ServicesTab({ data, reload }) {
     { label: t('dashboard.servicesInstances'), value: totalInstances },
   ];
 
-  const headers = [
-    t('dashboard.servicesName'),
-    t('dashboard.servicesVersion'),
-    t('dashboard.status'),
-    t('dashboard.servicesActionsCount'),
-    t('dashboard.servicesInstancesCount'),
-    t('dashboard.actions'),
-  ];
-
-  const rows = extensions.map(ext => [
-    escHtml(ext.name),
-    escHtml(ext.version || '\u2014'),
-    html`<${Badge} type=${ext.status === 'active' ? 'healthy' : 'warning'} />`,
-    ext.actionCount || ext.action_count || 0,
-    ext.instanceCount || ext.instance_count || 0,
-    html`<button class="adm-btn-sm" onClick=${() => setSelected(ext)}>
-      ${t('dashboard.servicesManage')}
-    </button>`,
-  ]);
+  const installedNames = new Set(extensions.map(e => e.name));
 
   return html`
     <${ExpandableHelp} title=${t('dashboard.servicesHelpTitle')}>
@@ -190,9 +546,52 @@ export default function ServicesTab({ data, reload }) {
     <//>
     <${StatsGrid} items=${statsItems} />
     <p style="color:var(--text-dim);margin:8px 0 16px">${t('dashboard.servicesExplain')}</p>
-    ${extensions.length === 0
-      ? html`<${Empty} text=${t('dashboard.servicesNoExtensions')} />`
-      : html`<${DataTable} headers=${headers} rows=${rows} scroll=${true} />`
+
+    ${extensions.length > 0 && html`
+      ${extensions.map(ext => html`
+        <${ExtensionPanel} ext=${ext} onUninstall=${handleUninstall} />
+      `)}
+    `}
+
+    <h3 style="margin:24px 0 8px">${t('dashboard.servicesAvailable')}</h3>
+    <p style="color:var(--text-dim);margin:0 0 16px;font-size:.9rem">${t('dashboard.servicesAvailableDesc')}</p>
+
+    ${loadingAvailable
+      ? html`<p>${t('dashboard.loading')}...</p>`
+      : available.length === 0
+        ? html`<${Empty} text=${t('dashboard.servicesNoExtensions')} />`
+        : html`
+          <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill, minmax(340px, 1fr))">
+            ${available.map(ext => {
+              const isInstalled = ext.installed || installedNames.has(ext.name);
+              const isInstalling = installingName === ext.name;
+              return html`
+                <div class="adm-card" style="padding:16px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <strong style="font-size:1.05rem">${escHtml(ext.name)}</strong>
+                    <span style="color:var(--text-dim);font-size:.85rem">v${escHtml(ext.version)}</span>
+                  </div>
+                  <p style="margin:0;color:var(--text-dim);font-size:.9rem">${escHtml(ext.description)}</p>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.8rem">
+                    <span style="color:var(--text-dim)">${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}</span>
+                    <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
+                      ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
+                    </span>
+                    <span style="color:var(--text-dim)">${ext.actionsCount} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
+                  </div>
+                  <div style="margin-top:4px">
+                    ${isInstalled
+                      ? html`<span class="adm-btn-sm" style="opacity:0.6;cursor:default">${t('dashboard.servicesInstalled')}</span>`
+                      : html`<button class="adm-btn-action" disabled=${isInstalling} onClick=${() => handleInstall(ext.name)}>
+                          ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
+                        </button>`
+                    }
+                  </div>
+                </div>
+              `;
+            })}
+          </div>
+        `
     }
   `;
 }

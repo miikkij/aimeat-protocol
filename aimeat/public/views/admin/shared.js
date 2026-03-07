@@ -94,25 +94,24 @@ export function ExpandableHelp({ title, children }) {
 
 /** Simple data table */
 export function DataTable({ headers, rows, scroll }) {
+  const table = html`<table>
+    <thead><tr>${headers.map(h => html`<th>${h}</th>`)}</tr></thead>
+    <tbody>
+      ${rows.map(row => html`<tr>
+        ${row.map(cell => {
+          if (cell && typeof cell === 'object' && cell._html) {
+            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''}
+              dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
+          }
+          if (cell && typeof cell === 'object' && cell.mono) {
+            return html`<td class="mono" title=${cell.title || ''}>${cell.text}</td>`;
+          }
+          return html`<td>${cell}</td>`;
+        })}
+      </tr>`)}
+    </tbody>
+  </table>`;
   return html`<div class="adm-card">
-    ${scroll && html`<div class="scrollable">`}
-    <table>
-      <thead><tr>${headers.map(h => html`<th>${h}</th>`)}</tr></thead>
-      <tbody>
-        ${rows.map(row => html`<tr>
-          ${row.map(cell => {
-            if (cell && typeof cell === 'object' && cell._html) {
-              return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''}
-                dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
-            }
-            if (cell && typeof cell === 'object' && cell.mono) {
-              return html`<td class="mono" title=${cell.title || ''}>${cell.text}</td>`;
-            }
-            return html`<td>${cell}</td>`;
-          })}
-        </tr>`)}
-      </tbody>
-    </table>
-    ${scroll && html`</div>`}
+    ${scroll ? html`<div class="scrollable">${table}</div>` : table}
   </div>`;
 }

@@ -1,8 +1,9 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
+import { hasSession, getSession, getOwner } from '/js/services/auth.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
@@ -25,20 +26,12 @@ const STATUS_MAP = {
   delisted:         { cls: 'mk-status-delisted' },
 };
 
-/* ── Auth helpers ── */
-function getAuthHeaders() {
-  const token = localStorage.getItem('aimeat-token');
-  if (!token) return null;
-  return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
-}
+/* ── Auth helpers (uses centralized AIMEAT auth service) ── */
+function isLoggedIn() { return hasSession(); }
 function getAuthInfo() {
-  return {
-    token: localStorage.getItem('aimeat-token'),
-    gaii: localStorage.getItem('aimeat-gaii'),
-    owner: localStorage.getItem('aimeat-owner'),
-  };
+  const s = getSession();
+  return { token: s?.jwt, gaii: s?.gaii, owner: s?.owner || getOwner() };
 }
-function isLoggedIn() { return !!localStorage.getItem('aimeat-token'); }
 
 /* ── Tiny helpers ── */
 function getCategoryList(instanceConfig) {
@@ -48,9 +41,11 @@ function getCategoryList(instanceConfig) {
     return { key: k, icon: def ? def.icon : '\uD83D\uDD39' };
   });
 }
-function catLabel(key) {
+function catLabel(key, tl) {
   const def = DEFAULT_CATEGORIES.find(c => c.key === key);
-  return { name: t('mkt.cat.' + key) || key, icon: def ? def.icon : '' };
+  const translate = tl || t;
+  const name = translate('mkt.cat.' + key);
+  return { name: name !== 'mkt.cat.' + key ? name : key, icon: def ? def.icon : '' };
 }
 function statusBadge(status) {
   const m = STATUS_MAP[status] || {};
@@ -108,8 +103,8 @@ function InstanceSelector({ onSelect }) {
 }
 
 /* ── Listing Card (reused in home + browse) ── */
-function ListingCard({ listing: l, onNav }) {
-  const cl = catLabel(l.category);
+function ListingCard({ listing: l, onNav, tl }) {
+  const cl = catLabel(l.category, tl);
   const tags = (l.tags || []).slice(0, 4);
   return html`
     <a class="mk-card mk-card-clickable" onClick=${() => onNav('listing', { id: l.id })}>
@@ -127,7 +122,7 @@ function ListingCard({ listing: l, onNav }) {
 }
 
 /* ── Home ── */
-function HomeView({ extAction, instanceConfig, onNav }) {
+function HomeView({ extAction, instanceConfig, onNav, tl }) {
   const [listings, setListings] = useState(null);
   const [err, setErr] = useState('');
 
@@ -161,7 +156,7 @@ function HomeView({ extAction, instanceConfig, onNav }) {
       ${categories.map(cat => html`
         <a class="mk-category-card" onClick=${() => onNav('browse', { category: cat.key })}>
           <div class="mk-category-icon">${cat.icon}</div>
-          <div class="mk-category-name">${t('mkt.cat.' + cat.key) || cat.key}</div>
+          <div class="mk-category-name">${tl('mkt.cat.' + cat.key) !== 'mkt.cat.' + cat.key ? tl('mkt.cat.' + cat.key) : cat.key}</div>
           ${catCounts[cat.key] ? html`<div class="mk-category-count">${catCounts[cat.key]} ${t('mkt.home.announcements')}</div>` : null}
         </a>
       `)}
@@ -169,7 +164,7 @@ function HomeView({ extAction, instanceConfig, onNav }) {
 
     ${recent.length > 0 ? html`
       <h2 class="mk-section-heading">${t('mkt.home.recentHeading')}</h2>
-      ${recent.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} />`)}
+      ${recent.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} tl=${tl} />`)}
     ` : html`
       <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.home.emptyText')}</div></div>
     `}
@@ -182,7 +177,7 @@ function HomeView({ extAction, instanceConfig, onNav }) {
 }
 
 /* ── Browse / Search ── */
-function BrowseView({ extAction, instanceConfig, onNav, params }) {
+function BrowseView({ extAction, instanceConfig, onNav, params, tl }) {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState(params.category || '');
   const [minPrice, setMinPrice] = useState('');
@@ -226,7 +221,7 @@ function BrowseView({ extAction, instanceConfig, onNav, params }) {
   };
 
   const catOptions = [{ key: '', label: t('mkt.search.categoryAll') },
-    ...categories.map(c => ({ key: c.key, label: c.icon + ' ' + (t('mkt.cat.' + c.key) || c.key) }))];
+    ...categories.map(c => { const n = tl('mkt.cat.' + c.key); return { key: c.key, label: c.icon + ' ' + (n !== 'mkt.cat.' + c.key ? n : c.key) }; })];
 
   return html`
     <h1 class="mk-page-title">${t('mkt.search.title')}</h1>
@@ -255,7 +250,7 @@ function BrowseView({ extAction, instanceConfig, onNav, params }) {
     ${!results && !err ? html`<div class="mk-alert mk-alert-info">...</div>` : null}
     ${results && results.listings.length === 0 ? html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD0D</div><div class="mk-empty-text">${t('mkt.search.noResults')}</div></div>` : null}
     ${results && results.listings.length > 0 ? html`
-      ${results.listings.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} />`)}
+      ${results.listings.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} tl=${tl} />`)}
       ${results.total > 20 ? html`
         <div class="mk-pagination">
           ${page > 1 ? html`<a onClick=${() => doSearch(page - 1)}>\u00AB ${t('mkt.search.prev')}</a>` : null}
@@ -268,7 +263,7 @@ function BrowseView({ extAction, instanceConfig, onNav, params }) {
 }
 
 /* ── Listing Detail ── */
-function ListingDetailView({ extAction, onNav, params }) {
+function ListingDetailView({ extAction, onNav, params, tl }) {
   const [listing, setListing] = useState(null);
   const [err, setErr] = useState('');
   const [purchaseMsg, setPurchaseMsg] = useState('');
@@ -288,7 +283,7 @@ function ListingDetailView({ extAction, onNav, params }) {
   useEffect(() => { load(); }, [load]);
 
   const doPurchase = () => {
-    if (!getAuthHeaders()) return;
+    if (!isLoggedIn()) return;
     setPurchaseMsg(''); setPurchaseErr('');
     extAction('purchase', { listingId: params.id })
       .then(d => {
@@ -304,7 +299,7 @@ function ListingDetailView({ extAction, onNav, params }) {
   `;
   if (!listing) return html`<div class="mk-alert mk-alert-info">...</div>`;
 
-  const cl = catLabel(listing.category);
+  const cl = catLabel(listing.category, tl);
   const tags = listing.tags || [];
   const info = getAuthInfo();
   const isOwner = info.owner && info.owner === listing.ownerName;
@@ -362,7 +357,7 @@ function ListingDetailView({ extAction, onNav, params }) {
 }
 
 /* ── Create Listing ── */
-function CreateListingView({ extAction, instanceConfig, onNav }) {
+function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [sending, setSending] = useState(false);
@@ -400,7 +395,7 @@ function CreateListingView({ extAction, instanceConfig, onNav }) {
       .catch(e => { setSending(false); setErr(e.message || t('mkt.sell.unknownError')); });
   };
 
-  const catOptions = categories.map(c => ({ key: c.key, label: c.icon + ' ' + (t('mkt.cat.' + c.key) || c.key) }));
+  const catOptions = categories.map(c => { const n = tl('mkt.cat.' + c.key); return { key: c.key, label: c.icon + ' ' + (n !== 'mkt.cat.' + c.key ? n : c.key) }; });
 
   return html`
     <h1 class="mk-page-title">${t('mkt.sell.title')}</h1>
@@ -454,7 +449,7 @@ function CreateListingView({ extAction, instanceConfig, onNav }) {
 }
 
 /* ── My Listings ── */
-function MyListingsView({ extAction, onNav }) {
+function MyListingsView({ extAction, onNav, tl }) {
   const [listings, setListings] = useState(null);
   const [err, setErr] = useState('');
   const [actionMsg, setActionMsg] = useState('');
@@ -487,7 +482,7 @@ function MyListingsView({ extAction, onNav }) {
     <div style="margin-bottom:16px;"><a class="mk-btn mk-btn-primary" onClick=${() => onNav('sell')}>${t('mkt.myListings.newBtn')}</a></div>
     ${actionMsg ? html`<div class="mk-alert mk-alert-info">${actionMsg}</div>` : null}
     ${listings.length > 0 ? listings.map(l => {
-      const cl = catLabel(l.category);
+      const cl = catLabel(l.category, tl);
       return html`
         <div class="mk-card">
           <a class="mk-card-clickable" style="text-decoration:none;" onClick=${() => onNav('listing', { id: l.id })}>
@@ -514,7 +509,7 @@ function MyListingsView({ extAction, onNav }) {
 }
 
 /* ── My Purchases ── */
-function MyPurchasesView({ extAction, onNav }) {
+function MyPurchasesView({ extAction, onNav, tl }) {
   const [purchases, setPurchases] = useState(null);
   const [err, setErr] = useState('');
   const [rateId, setRateId] = useState('');
@@ -587,9 +582,15 @@ export default function MarketplaceView({ navigate: spaNavigate, locale }) {
   const [view, setView] = useState('instances');
   const [instanceId, setInstanceId] = useState(null);
   const [instanceConfig, setInstanceConfig] = useState({});
+  const [instanceTranslations, setInstanceTranslations] = useState({});
   const [params, setParams] = useState({});
 
   useViewCSS('/css/views/marketplace.css');
+
+  // Instance-aware translation: check instance translations first, then global
+  const tl = useCallback((key) => {
+    return instanceTranslations[key] || t(key);
+  }, [instanceTranslations]);
 
   const nav = useCallback((v, p) => {
     setView(v || 'instances');
@@ -602,6 +603,11 @@ export default function MarketplaceView({ navigate: spaNavigate, locale }) {
     setInstanceConfig(inst.config || {});
     setView('home');
     setParams({});
+    // Load instance translations for current locale
+    const loc = getLocale();
+    apiGet('/v1/extensions/marketplace-behaviors/instances/' + inst.id + '/translations?locale=' + loc)
+      .then(res => setInstanceTranslations(res.data?.translations || {}))
+      .catch(() => setInstanceTranslations({}));
   }, []);
 
   const extAction = useCallback(async (actionId, body = {}) => {
@@ -615,7 +621,7 @@ export default function MarketplaceView({ navigate: spaNavigate, locale }) {
     return html`<${InstanceSelector} onSelect=${selectInstance} />`;
   }
 
-  const sharedProps = { extAction, instanceConfig, onNav: nav, params };
+  const sharedProps = { extAction, instanceConfig, onNav: nav, params, tl };
 
   let content;
   switch (view) {

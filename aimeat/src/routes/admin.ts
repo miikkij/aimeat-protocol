@@ -117,8 +117,8 @@ export function adminRouter(
 
     // POST /v1/admin/setup/register — register owner (password-protected, no auth)
     router.post('/v1/admin/setup/register', async (req, res) => {
-        // Check admin session or password via header (NOT query param)
-        const sessionId = req.headers['x-admin-session'] as string;
+        // Check admin session (cookie or header) or password via header (NOT query param)
+        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
         if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
@@ -185,8 +185,8 @@ export function adminRouter(
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
     router.post('/v1/admin/setup/token', async (req, res) => {
-        // Check admin session or password via header (NOT query param)
-        const sessionId = req.headers['x-admin-session'] as string;
+        // Check admin session (cookie or header) or password via header (NOT query param)
+        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
         if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
@@ -512,6 +512,82 @@ export function adminRouter(
             })),
             total: peers.length,
         }));
+    });
+
+    // POST /v1/admin/federation/join — introduce this node to a genesis/target node (operator only)
+    router.post('/v1/admin/federation/join', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { genesis_url, role } = req.body ?? {};
+        if (!genesis_url || typeof genesis_url !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'genesis_url is required'));
+            return;
+        }
+        const joinRole = (role === 'operator' || role === 'contributor') ? role : 'contributor';
+        const targetUrl = genesis_url.replace(/\/+$/, '');
+
+        // 1. Discovery
+        let targetInfo: { node_id?: string; type?: string; protocol?: string; version?: string | number; capabilities?: string[] };
+        try {
+            const disc = await fetch(`${targetUrl}/.well-known/aimeat`, { signal: AbortSignal.timeout(10_000) });
+            if (!disc.ok) throw new Error(`HTTP ${disc.status}`);
+            const body = await disc.json() as { data?: typeof targetInfo };
+            targetInfo = body.data!;
+            if (!targetInfo?.protocol || targetInfo.protocol !== 'aimeat') {
+                res.status(502).json(error(config.nodeId, 'NOT_AIMEAT', 'Target is not an AIMEAT node'));
+                return;
+            }
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'DISCOVERY_FAILED',
+                `Cannot reach ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
+            return;
+        }
+
+        // 2. Ensure this node has a keypair
+        if (!config.publicKey || !config.privateKey) {
+            const keys = await generateKeyPair();
+            config.publicKey = keys.publicKey;
+            config.privateKey = keys.privateKey;
+        }
+
+        // 3. Sign and send introduction
+        const timestamp = new Date().toISOString();
+        const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
+        const signature = await sign(config.privateKey, messageToSign);
+
+        try {
+            const introResp = await fetch(`${targetUrl}/v1/federation/peer/introduce`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    node_id: config.nodeId,
+                    node_url: config.baseUrl,
+                    node_type: config.nodeType,
+                    public_key: config.publicKey,
+                    role: joinRole,
+                    message: '',
+                    signature,
+                    timestamp,
+                }),
+                signal: AbortSignal.timeout(15_000),
+            });
+
+            const introBody = await introResp.json() as { data?: { request_id: string; status: string; message?: string }; error?: { message?: string } };
+            if (!introResp.ok) {
+                const msg = introBody?.error?.message ?? `HTTP ${introResp.status}`;
+                res.status(introResp.status).json(error(config.nodeId, 'INTRODUCTION_FAILED', msg));
+                return;
+            }
+
+            res.json(success(config.nodeId, {
+                target_node_id: targetInfo.node_id,
+                target_url: targetUrl,
+                request_id: introBody.data?.request_id,
+                status: introBody.data?.status ?? 'pending',
+                message: introBody.data?.message ?? 'Introduction sent. Awaiting genesis operator approval.',
+            }));
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'INTRODUCTION_FAILED',
+                `Failed to introduce to ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
+        }
     });
 
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
