@@ -97,17 +97,20 @@ export default function Admin({ navigate, locale }) {
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [loginErr, setLoginErr] = useState('');
-  const [loginMode, setLoginMode] = useState('password'); // 'password' | 'key'
   const mountRef = useRef(true);
+  const retriedRef = useRef(false);
 
   // Auth listener
   useEffect(() => {
     const s = getSession();
     if (s) setSession(s);
     return onAuthChange(() => {
-      setSession(getSession());
+      const fresh = getSession();
+      setSession(fresh);
+      // Reset retry flag so loadAll can attempt token refresh again
+      retriedRef.current = false;
     });
   }, []);
 
@@ -124,16 +127,48 @@ export default function Admin({ navigate, locale }) {
   // Cleanup
   useEffect(() => { mountRef.current = true; return () => { mountRef.current = false; }; }, []);
 
-  // Load all data
+  // Load all data — server-side auth is the source of truth
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setAccessDenied(false);
     try {
-      // Phase 1: critical data
+      // Phase 1: critical data — getDashboard is the auth gate
       const [dash, agents, actions, boards] = await Promise.all([
         api.getDashboard(), api.getAdminAgents(), api.getActions(), api.getBoards(),
       ]);
       if (!mountRef.current) return;
+
+      // If the dashboard call failed (403/auth), show access denied
+      if (!dash.ok) {
+        const code = dash.error?.code || '';
+        if (code === 'FORBIDDEN' || code === 'AUTH_REQUIRED' || code === 'OPERATOR_REQUIRED' || code === 'ACCESS_DENIED') {
+          // Try token refresh once — the stored JWT may be stale (missing operator role)
+          const auth = window.AIMEAT?.auth;
+          const s = auth?.getSession();
+          if (s?.refresh && !retriedRef.current) {
+            retriedRef.current = true;
+            try {
+              await s.refresh();
+              // Retry dashboard call with refreshed token (don't dispatch event to avoid loop)
+              const dashRetry = await api.getDashboard();
+              if (dashRetry.ok) {
+                // Refresh worked — restart loadAll with fresh session
+                setSession(getSession());
+                setLoading(false);
+                return;
+              }
+            } catch {
+              // Refresh failed
+            }
+          }
+          setAccessDenied(true);
+        } else {
+          setError(dash.error?.message || 'Failed to load dashboard');
+        }
+        setLoading(false);
+        return;
+      }
 
       const d = {
         dash: dash.data, agents: agents.data, actions: actions.data, boards: boards.data,
@@ -218,12 +253,18 @@ export default function Admin({ navigate, locale }) {
         setLastUpdate(new Date().toLocaleTimeString());
       }
     } catch (e) {
-      if (mountRef.current) setError(e.message);
+      if (!mountRef.current) return;
+      // 403 = not operator, show access denied
+      if (e.message?.includes('403') || e.message?.includes('FORBIDDEN') || e.message?.includes('operator')) {
+        setAccessDenied(true);
+      } else {
+        setError(e.message);
+      }
     }
     if (mountRef.current) setLoading(false);
   }, []);
 
-  // Load on mount when session is ready
+  // Load on mount when session is ready — server decides if user is authorized
   useEffect(() => {
     if (session) loadAll();
   }, [session, loadAll]);
@@ -250,9 +291,8 @@ export default function Admin({ navigate, locale }) {
     </div>`;
   }
 
-  // ── Check operator role ──
-  const roles = session.roles || [];
-  if (!roles.includes('operator')) {
+  // ── Access denied (server returned 403) ──
+  if (accessDenied) {
     return html`<div class="adm">
       <div class="adm-login">
         <div class="adm-card" style="text-align:center">

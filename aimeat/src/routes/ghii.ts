@@ -63,9 +63,12 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         const existingOwner = await storage.getOwner(username);
         const ghii = `${username}@${config.nodeId}`;
 
+        // Preserve old roles before dev-mode wipe (so operator isn't lost)
+        let preservedRoles: string[] | null = null;
         if (existingOwner) {
             if (config.devMode) {
                 // Dev mode: wipe old account and re-create (lost credentials recovery)
+                preservedRoles = existingOwner.roles;
                 const oldAgents = await storage.getAgentsByOwner(username);
                 for (const agent of oldAgents) {
                     await storage.deleteAgent(agent.gaii);
@@ -82,12 +85,22 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         // Generate keypair for the owner account
         const keyPair = await generateKeyPair();
 
-        // Create owner with role=['owner'] (NOT operator — operators are node admins)
+        // First real owner gets operator role (same logic as /v1/owners)
+        // Also restore operator if the account previously had it (dev-mode re-create)
+        // Self-heal: if no operator exists anywhere, promote this user
+        const allOwners = await storage.listOwners();
+        const realOwners = allOwners.filter(o => o.name !== 'anonymous');
+        const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+        const roles: string[] = ['owner'];
+        if (realOwners.length === 0 || !hasOperator || preservedRoles?.includes('operator')) {
+            roles.push('operator');
+        }
+
         const owner = await storage.createOwner({
             name: username,
             displayName: display_name,
             publicKey: keyPair.publicKey,
-            roles: ['owner'],
+            roles,
             createdAt: new Date().toISOString(),
         });
 
@@ -312,6 +325,16 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         if (ownerRecord?.roles.includes('owner')) roles.push('owner');
         if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
+        // Self-heal: if no operator exists anywhere, promote this user
+        if (ownerRecord && !roles.includes('operator')) {
+          const allOwners = await storage.listOwners();
+          const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+          if (!hasOperator) {
+            roles.push('operator');
+            await storage.updateOwner(username, { roles: [...ownerRecord.roles, 'operator'] });
+          }
+        }
+
         const token = await issueJWT({
             sub: agent.gaii,
             owner: username,
@@ -376,12 +399,20 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         // Generate keypair for the owner account
         const keyPair = await generateKeyPair();
 
-        // Create owner with role=['owner']
+        // First real owner gets operator role (same logic as /v1/owners)
+        const allOwners = await storage.listOwners();
+        const realOwners = allOwners.filter(o => o.name !== 'anonymous');
+        const roles: string[] = ['owner'];
+        if (realOwners.length === 0) {
+            roles.push('operator');
+        }
+
+        // Create owner with role=['owner'] (+ 'operator' if first)
         const owner = await storage.createOwner({
             name: username,
             displayName: display_name,
             publicKey: keyPair.publicKey,
-            roles: ['owner'],
+            roles,
             createdAt: new Date().toISOString(),
         });
 

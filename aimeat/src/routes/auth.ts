@@ -234,6 +234,16 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       if (ownerRecord?.roles.includes('owner')) roles.push('owner');
       if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
+      // Self-heal: if no operator exists anywhere, promote this user
+      if (ownerRecord && !roles.includes('operator')) {
+        const allOwners = await storage.listOwners();
+        const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+        if (!hasOperator) {
+          roles.push('operator');
+          await storage.updateOwner(parsed.owner, { roles: [...ownerRecord.roles, 'operator'] });
+        }
+      }
+
       const token = await issueJWT({
         sub: gaii,
         owner: parsed.owner,

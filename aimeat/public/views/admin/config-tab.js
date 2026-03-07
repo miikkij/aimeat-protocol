@@ -23,6 +23,18 @@ export default function ConfigTab({ data, reload }) {
     groups[group].push({ path, entry: schema[path] });
   }
 
+  // Translate a config path — try dashboard.cfg_<dotpath> then fall back to raw path
+  function label(path) {
+    const key = 'dashboard.cfg_' + path.replace(/\./g, '_');
+    const val = t(key);
+    return val !== key ? val : path;
+  }
+  function groupLabel(g) {
+    const key = 'dashboard.cfgGroup_' + g;
+    const val = t(key);
+    return val !== key ? val : g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, ' ');
+  }
+
   function onChange(path, value) {
     setPending(prev => ({ ...prev, [path]: value }));
   }
@@ -65,12 +77,12 @@ export default function ConfigTab({ data, reload }) {
     ${Object.entries(groups).map(([g, items]) => html`
       <details class="adm-card" style="margin-bottom:8px" open>
         <summary style="cursor:pointer;font-weight:600;font-size:.95rem;padding:8px 0">
-          ${g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, ' ')}
+          ${groupLabel(g)}
         </summary>
         <div style="padding:8px 0">
           ${items.map(({ path: p, entry: e }) => html`
             <div class="adm-hrow">
-              <span class="adm-hmetric" title=${e.description}>${escHtml(p)}</span>
+              <span class="adm-hmetric" title=${e.description}>${label(p)}</span>
               <span>
                 ${!e.mutable
                   ? (typeof e.value === 'boolean'

@@ -68,12 +68,20 @@ export default function OverviewTab({ data }) {
         <table>
           <thead><tr><th>${t('dashboard.metric')}</th><th>${t('dashboard.value')}</th><th>${t('dashboard.zone')}</th><th>${t('dashboard.threshold')}</th></tr></thead>
           <tbody>
-            ${w.map(x => html`<tr>
-              <td>${escHtml(x.metric)}</td>
+            ${w.map(x => {
+              const metricKey = {
+                burn_mint_ratio: 'healthBurnMintRatio',
+                agent_churn_rate_30d: 'healthAgentChurn',
+                work_expiry_rate_30d: 'healthWorkExpiry',
+                dispute_rate_30d: 'healthDisputeRate',
+              }[x.metric];
+              return html`<tr>
+              <td>${metricKey ? t('dashboard.' + metricKey) : x.metric}</td>
               <td>${x.value}</td>
               <td><${Badge} type=${x.zone} /></td>
-              <td style="color:var(--text-dim)">${escHtml(x.threshold)}</td>
-            </tr>`)}
+              <td style="color:var(--text-dim)">${x.threshold}</td>
+            </tr>`;
+            })}
           </tbody>
         </table>
       </div>

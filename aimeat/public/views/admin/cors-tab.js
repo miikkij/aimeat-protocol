@@ -1,11 +1,96 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Empty } from './shared.js';
-import { clearGhiiCors, clearAgentCors } from '/js/services/admin.js';
+import { clearGhiiCors, clearAgentCors, setGhiiCors, setAgentCors } from '/js/services/admin.js';
+
+const COMMON_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'https://yourdomain.com',
+  '*',
+];
+
+/** Suggestion buttons that append an origin to an input value */
+function OriginSuggestions({ value, onChange }) {
+  function add(origin) {
+    const parts = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (!parts.includes(origin)) { parts.push(origin); }
+    onChange(parts.join(', '));
+  }
+  return html`
+    <div style="display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-top:.4rem">
+      <span style="color:var(--text-dim);font-size:.8rem">${t('dashboard.corsCommonOrigins')}</span>
+      ${COMMON_ORIGINS.map(o => html`
+        <button type="button" class="adm-btn-sm" style="font-size:.75rem;padding:2px 8px"
+          onClick=${() => add(o)}>${o}</button>
+      `)}
+    </div>
+  `;
+}
+
+/** Inline editor row for existing CORS overrides */
+function InlineEditor({ origins, onSave, onCancel }) {
+  const [val, setVal] = useState(origins.join(', '));
+  function save() {
+    const arr = val.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length === 0) return;
+    onSave(arr);
+  }
+  return html`
+    <div style="display:flex;flex-direction:column;gap:.4rem;padding:.5rem 0">
+      <input type="text" value=${val} onInput=${e => setVal(e.target.value)}
+        placeholder=${t('dashboard.corsOriginPlaceholder')}
+        style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:6px 10px;border-radius:6px;font-size:.85rem;font-family:monospace;width:100%" />
+      <${OriginSuggestions} value=${val} onChange=${setVal} />
+      <div style="display:flex;gap:.4rem;margin-top:.25rem">
+        <button class="adm-btn-action" onClick=${save}>${t('dashboard.corsSave')}</button>
+        <button class="adm-btn-sm" onClick=${onCancel}>${t('dashboard.corsCancel')}</button>
+      </div>
+    </div>
+  `;
+}
+
+/** Add-override form for GHII or Agent */
+function AddOverrideForm({ items, labelKey, idKey, nameKey, onSave }) {
+  const [selectedId, setSelectedId] = useState('');
+  const [origins, setOrigins] = useState('');
+
+  async function save() {
+    if (!selectedId || !origins.trim()) return;
+    const arr = origins.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length === 0) return;
+    await onSave(selectedId, arr);
+    setSelectedId('');
+    setOrigins('');
+  }
+
+  return html`
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--glass-border)">
+      <h3 style="font-size:.9rem;margin-bottom:.5rem">${t('dashboard.corsAddOverride')}</h3>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        <select value=${selectedId} onChange=${e => setSelectedId(e.target.value)}
+          style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:6px 10px;border-radius:6px;font-size:.85rem">
+          <option value="">${t(labelKey)}</option>
+          ${items.map(it => html`
+            <option value=${it[idKey]}>${escHtml(it[nameKey] || it[idKey])}</option>
+          `)}
+        </select>
+        <input type="text" value=${origins} onInput=${e => setOrigins(e.target.value)}
+          placeholder=${t('dashboard.corsOriginPlaceholder')}
+          style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:6px 10px;border-radius:6px;font-size:.85rem;font-family:monospace;width:100%" />
+        <${OriginSuggestions} value=${origins} onChange=${setOrigins} />
+        <div style="margin-top:.25rem">
+          <button class="adm-btn-action" onClick=${save}>${t('dashboard.corsSave')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
 
 export default function CorsTab({ data, reload }) {
   const configSchema = data.configSchema;
@@ -16,6 +101,10 @@ export default function CorsTab({ data, reload }) {
   const ghiiRows = (data.ghiiUsers || []).filter(u => u.allowed_origins?.length > 0);
   // Agent overrides
   const agentRows = (data.agents?.agents || []).filter(a => a.allowed_origins?.length > 0);
+
+  // Track which row is being edited
+  const [editGhii, setEditGhii] = useState(null);
+  const [editAgent, setEditAgent] = useState(null);
 
   async function doClearGhii(ghii) {
     if (!confirm(t('dashboard.corsClearConfirm'))) return;
@@ -32,6 +121,30 @@ export default function CorsTab({ data, reload }) {
       reload();
     } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
   }
+
+  async function doSaveGhii(ghii, origins) {
+    try {
+      await setGhiiCors(ghii, origins);
+      setEditGhii(null);
+      reload();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+  }
+
+  async function doSaveAgent(gaii, origins) {
+    try {
+      await setAgentCors(gaii, origins);
+      setEditAgent(null);
+      reload();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+  }
+
+  // All GHII users (for add-override dropdown), excluding those already overridden
+  const ghiiOverriddenSet = new Set(ghiiRows.map(r => r.ghii));
+  const ghiiAvailable = (data.ghiiUsers || []).filter(u => !ghiiOverriddenSet.has(u.ghii));
+
+  // All agents (for add-override dropdown), excluding those already overridden
+  const agentOverriddenSet = new Set(agentRows.map(a => a.gaii));
+  const agentAvailable = (data.agents?.agents || []).filter(a => !agentOverriddenSet.has(a.gaii));
 
   return html`
     <!-- Node default -->
@@ -52,12 +165,31 @@ export default function CorsTab({ data, reload }) {
           <tbody>
             ${ghiiRows.map(r => html`<tr>
               <td>${escHtml(r.owner_name || r.ghii)}</td>
-              <td class="mono" style="font-size:.8rem">${escHtml(r.allowed_origins.join(', '))}</td>
-              <td><button class="adm-btn-sm" onClick=${() => doClearGhii(r.ghii)}>${t('dashboard.corsClear')}</button></td>
+              <td style="width:100%">
+                ${editGhii === r.ghii
+                  ? html`<${InlineEditor}
+                      origins=${r.allowed_origins}
+                      onSave=${(arr) => doSaveGhii(r.ghii, arr)}
+                      onCancel=${() => setEditGhii(null)} />`
+                  : html`<span class="mono" style="font-size:.8rem">${escHtml(r.allowed_origins.join(', '))}</span>`
+                }
+              </td>
+              <td style="white-space:nowrap">
+                ${editGhii !== r.ghii && html`<span style="display:inline-flex;gap:.3rem">
+                  <button class="adm-btn-sm" onClick=${() => setEditGhii(r.ghii)}>${t('dashboard.corsEdit')}</button>
+                  <button class="adm-btn-sm" onClick=${() => doClearGhii(r.ghii)}>${t('dashboard.corsClear')}</button>
+                </span>`}
+              </td>
             </tr>`)}
           </tbody>
         </table>`
       }
+      <${AddOverrideForm}
+        items=${ghiiAvailable}
+        labelKey="dashboard.corsSelectUser"
+        idKey="ghii"
+        nameKey="owner_name"
+        onSave=${(ghii, origins) => doSaveGhii(ghii, origins)} />
     </div>
 
     <!-- Agent overrides -->
@@ -72,12 +204,31 @@ export default function CorsTab({ data, reload }) {
             ${agentRows.map(a => html`<tr>
               <td class="mono" style="font-size:.8rem">${escHtml(a.gaii)}</td>
               <td>${escHtml(a.owner)}</td>
-              <td class="mono" style="font-size:.8rem">${escHtml(a.allowed_origins.join(', '))}</td>
-              <td><button class="adm-btn-sm" onClick=${() => doClearAgent(a.gaii)}>${t('dashboard.corsClear')}</button></td>
+              <td style="width:100%">
+                ${editAgent === a.gaii
+                  ? html`<${InlineEditor}
+                      origins=${a.allowed_origins}
+                      onSave=${(arr) => doSaveAgent(a.gaii, arr)}
+                      onCancel=${() => setEditAgent(null)} />`
+                  : html`<span class="mono" style="font-size:.8rem">${escHtml(a.allowed_origins.join(', '))}</span>`
+                }
+              </td>
+              <td style="white-space:nowrap">
+                ${editAgent !== a.gaii && html`<span style="display:inline-flex;gap:.3rem">
+                  <button class="adm-btn-sm" onClick=${() => setEditAgent(a.gaii)}>${t('dashboard.corsEdit')}</button>
+                  <button class="adm-btn-sm" onClick=${() => doClearAgent(a.gaii)}>${t('dashboard.corsClear')}</button>
+                </span>`}
+              </td>
             </tr>`)}
           </tbody>
         </table>`
       }
+      <${AddOverrideForm}
+        items=${agentAvailable}
+        labelKey="dashboard.corsSelectAgent"
+        idKey="gaii"
+        nameKey="name"
+        onSave=${(gaii, origins) => doSaveAgent(gaii, origins)} />
     </div>
   `;
 }

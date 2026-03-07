@@ -6,10 +6,13 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, Empty } from './shared.js';
 import { getBoardPosts } from '/js/services/admin.js';
+import { apiPost } from '/js/api.js';
 
-export default function BoardsTab({ data }) {
+export default function BoardsTab({ data, reload }) {
   const boards = data.boards?.boards || [];
   const [posts, setPosts] = useState({});
+  const [showCreate, setShowCreate] = useState(false);
+  const [newBoard, setNewBoard] = useState({ name: '', slug: '', description: '', visibility: 'public' });
 
   async function togglePosts(slug) {
     if (posts[slug]) {
@@ -22,9 +25,51 @@ export default function BoardsTab({ data }) {
     } catch {}
   }
 
+  async function createBoard() {
+    if (!newBoard.name.trim() || !newBoard.slug.trim()) return;
+    try {
+      await apiPost('/v1/boards', {
+        name: newBoard.name,
+        slug: newBoard.slug,
+        description: newBoard.description,
+        visibility: newBoard.visibility,
+      });
+      alert(t('dashboard.boardCreateConfirm'));
+      setNewBoard({ name: '', slug: '', description: '', visibility: 'public' });
+      setShowCreate(false);
+      reload();
+    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+  }
+
   if (!boards.length) return html`<${Empty} text=${t('dashboard.noBoardsCreated')} />`;
 
   return html`
+    <div style="margin-bottom:12px">
+      <button class="adm-btn-action" onClick=${() => setShowCreate(!showCreate)}>
+        + ${t('dashboard.boardCreateSystem')}
+      </button>
+      ${showCreate && html`
+        <div class="adm-card" style="margin-top:8px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <input value=${newBoard.name} onInput=${e => setNewBoard(prev => ({...prev, name: e.target.value}))}
+              placeholder=${t('dashboard.boardName')}
+              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
+            <input value=${newBoard.slug} onInput=${e => setNewBoard(prev => ({...prev, slug: e.target.value}))}
+              placeholder=${t('dashboard.boardSlug')}
+              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px;font-family:monospace" />
+            <input value=${newBoard.description} onInput=${e => setNewBoard(prev => ({...prev, description: e.target.value}))}
+              placeholder=${t('dashboard.boardDescription')}
+              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
+            <select value=${newBoard.visibility} onChange=${e => setNewBoard(prev => ({...prev, visibility: e.target.value}))}
+              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px">
+              <option value="public">${t('dashboard.boardPublic')}</option>
+              <option value="private">${t('dashboard.boardPrivate')}</option>
+            </select>
+            <button class="adm-btn-action" onClick=${createBoard}>${t('dashboard.boardCreateSystem')}</button>
+          </div>
+        </div>
+      `}
+    </div>
     <div class="adm-card-grid">
       ${boards.map(b => html`
         <div class="adm-card">

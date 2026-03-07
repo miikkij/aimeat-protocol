@@ -132,17 +132,17 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
     app.use((_req, res, next) => {
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline'",
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self'",
-        "frame-src 'none'",
+        "frame-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
       ].join('; '));
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
       res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
       next();
     });

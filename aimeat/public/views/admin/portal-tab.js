@@ -60,7 +60,7 @@ export default function PortalTab({ data, reload }) {
   }
 
   async function delMem(key) {
-    if (!confirm('Delete ' + key + '?')) return;
+    if (!confirm(t('dashboard.portalDeleteKeyConfirm').replace('{key}', key))) return;
     try { await deleteMemory(key); loadMemKeys(); }
     catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
   }
@@ -70,7 +70,7 @@ export default function PortalTab({ data, reload }) {
       const res = await getSitePrompt();
       const prompt = res.data?.prompt || 'No prompt available';
       await navigator.clipboard.writeText(prompt);
-      alert('AI prompt copied to clipboard!');
+      alert(t('dashboard.portalAiCopied'));
     } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
   }
 
@@ -111,7 +111,22 @@ export default function PortalTab({ data, reload }) {
     <!-- Template editor -->
     <div class="adm-card">
       <h3>${t('dashboard.portalTemplate')}</h3>
-      <div style="margin-bottom:8px;color:var(--text-dim);font-size:.85rem">${t('dashboard.portalTagHelp')}</div>
+      <details style="margin-bottom:8px;color:var(--text-dim);font-size:.85rem">
+        <summary style="cursor:pointer;color:var(--text-bright)">${t('dashboard.portalTagHelpTitle')}</summary>
+        <div style="margin-top:8px">
+          <p style="margin-bottom:8px">${t('dashboard.portalTagHelpDetail')}</p>
+          <table>
+            <thead><tr><th>Tag</th><th>${t('dashboard.details')}</th></tr></thead>
+            <tbody>
+              <tr><td><code>\{\{config:node_id\}\}</code></td><td>${t('dashboard.tagExConfig')}</td></tr>
+              <tr><td><code>\{\{memory:portal/welcome\}\}</code></td><td>${t('dashboard.tagExMemory')}</td></tr>
+              <tr><td><code>\{\{storage:type\}\}</code></td><td>${t('dashboard.tagExStorage')}</td></tr>
+              <tr><td><code>\{\{kv:site_name\}\}</code></td><td>${t('dashboard.tagExKv')}</td></tr>
+              <tr><td><code>\{\{board:general\}\}</code></td><td>${t('dashboard.tagExBoard')}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
       <textarea rows="20" value=${template} onInput=${e => setTemplate(e.target.value)}
         style="width:100%;font-family:monospace;font-size:13px;padding:12px;border:1px solid var(--glass-border);border-radius:8px;background:var(--glass-bg);color:var(--text-bright);resize:vertical"></textarea>
       <div style="margin-top:8px;display:flex;gap:8px">
@@ -124,12 +139,13 @@ export default function PortalTab({ data, reload }) {
     <!-- Memory keys -->
     <div class="adm-card">
       <h3>${t('dashboard.portalMemoryKeys')}</h3>
+      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:8px">${t('dashboard.portalMemoryKeysExplain')}</p>
       ${memKeys === null
         ? html`<div style="color:var(--text-dim)">${t('dashboard.loading')}...</div>`
         : memKeys.length === 0
           ? html`<div style="color:var(--text-dim)">${t('dashboard.portalNoMemoryKeys')}</div>`
           : html`<table>
-            <thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+            <thead><tr><th>${t('dashboard.portalKeyLabel')}</th><th>${t('dashboard.portalValueLabel')}</th><th></th></tr></thead>
             <tbody>
               ${memKeys.map(k => html`<tr>
                 <td><code>${escHtml(k.key)}</code></td>
@@ -140,8 +156,8 @@ export default function PortalTab({ data, reload }) {
           </table>`
       }
       <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-        <input value=${newKey} onInput=${e => setNewKey(e.target.value)} placeholder="portal/key" style="flex:1" />
-        <input value=${newVal} onInput=${e => setNewVal(e.target.value)} placeholder="value" style="flex:2" />
+        <input class="adm-inp" value=${newKey} onInput=${e => setNewKey(e.target.value)} placeholder="portal/key" style="flex:1;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
+        <input class="adm-inp" value=${newVal} onInput=${e => setNewVal(e.target.value)} placeholder="value" style="flex:2;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
         <button class="adm-btn-action" onClick=${addMem}>+ ${t('dashboard.portalUpload')}</button>
       </div>
     </div>
@@ -149,11 +165,12 @@ export default function PortalTab({ data, reload }) {
     <!-- KV pairs -->
     <div class="adm-card">
       <h3>${t('dashboard.portalKvPairs')}</h3>
+      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:8px">${t('dashboard.portalKvExplain')}</p>
       ${kvKeys.length === 0
-        ? html`<div style="color:var(--text-dim)">No KV pairs configured (set AIMEAT_SITE_KV_* env vars)</div>`
+        ? html`<div style="color:var(--text-dim)">${t('dashboard.portalNoKvPairs')}</div>`
         : html`<table>
-          <thead><tr><th>Key</th><th>Value</th></tr></thead>
-          <tbody>${kvKeys.map(k => html`<tr><td><code>${escHtml(k)}</code></td><td>${escHtml(kv[k])}</td></tr>`)}</tbody>
+          <thead><tr><th>${t('dashboard.portalKeyLabel')}</th><th>${t('dashboard.portalValueLabel')}</th></tr></thead>
+          <tbody>${kvKeys.map(k => html`<tr><td><code>${escHtml(k)}</code></td><td class="adm-eval">${escHtml(kv[k])}</td></tr>`)}</tbody>
         </table>`
       }
     </div>
@@ -163,7 +180,7 @@ export default function PortalTab({ data, reload }) {
       <h3>${t('dashboard.portalAiChat')}</h3>
       <p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.portalAiExplain')}</p>
       <div style="margin-top:8px">
-        <button class="adm-btn-action" onClick=${copyPrompt}>\u{1F4CB} ${t('dashboard.portalDownload')} AI Prompt</button>
+        <button class="adm-btn-action" onClick=${copyPrompt}>\u{1F4CB} ${t('dashboard.portalAiLoadPrompt')}</button>
       </div>
     </div>
 

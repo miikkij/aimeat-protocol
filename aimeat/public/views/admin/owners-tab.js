@@ -3,7 +3,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty } from './shared.js';
+import { dt, Empty } from './shared.js';
 import { grantRole } from '/js/services/admin.js';
 
 export default function OwnersTab({ data, reload }) {
@@ -35,7 +35,7 @@ export default function OwnersTab({ data, reload }) {
               return html`<tr>
                 <td><strong>${escHtml(ow.name)}</strong></td>
                 <td>${escHtml(ow.display_name || '\u2014')}</td>
-                <td>${roles.map(r => html`<${Badge} type=${r} />${' '}`)}</td>
+                <td>${roles.length ? roles.map(r => html`<span class="tag" style="font-size:.75rem">${r}</span> `) : html`<span style="color:var(--text-dim)">—</span>`}</td>
                 <td>${ow.agents ? ow.agents.length : 0}</td>
                 <td style="color:var(--text-dim)">${dt(ow.created_at)}</td>
                 <td>${!isOp && html`<button class="adm-btn-sm" onClick=${() => doGrant(ow.name)}>${t('dashboard.grantOperator')}</button>`}</td>

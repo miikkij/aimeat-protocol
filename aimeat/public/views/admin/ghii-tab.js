@@ -21,6 +21,26 @@ export default function GhiiTab({ data, reload }) {
   }
 
   return html`
+    <div class="adm-card" style="margin-bottom:12px">
+      <h2>GHII <span style="font-weight:400;font-size:.85rem;color:var(--text-dim)">— ${t('dashboard.ghiiExplain')}</span></h2>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;color:var(--text-dim);font-size:.85rem">${t('dashboard.ghiiLevelsTitle')}</summary>
+        <div style="margin-top:8px;font-size:.85rem;color:var(--text-dim);line-height:1.6">
+          <div style="margin-bottom:4px"><${Badge} type="critical" /> ${t('dashboard.ghiiLevelL0')}</div>
+          <div style="margin-bottom:4px"><${Badge} type="watch" /> ${t('dashboard.ghiiLevelL1')}</div>
+          <div style="margin-bottom:4px"><${Badge} type="healthy" /> ${t('dashboard.ghiiLevelL2')}</div>
+        </div>
+      </details>
+      <details style="margin-top:6px">
+        <summary style="cursor:pointer;color:var(--text-dim);font-size:.85rem">TOTP</summary>
+        <p style="margin-top:6px;font-size:.85rem;color:var(--text-dim);line-height:1.5">${t('dashboard.ghiiTotpExplain')}</p>
+      </details>
+      <details style="margin-top:6px">
+        <summary style="cursor:pointer;color:var(--text-dim);font-size:.85rem">${t('dashboard.ghiiVerificationExplain').split('.')[0]}</summary>
+        <p style="margin-top:6px;font-size:.85rem;color:var(--text-dim);line-height:1.5">${t('dashboard.ghiiVerificationExplain')}</p>
+      </details>
+    </div>
+
     <${StatsGrid} items=${[
       { label: t('dashboard.totalGhiiUsers'), value: users.length, color: '#06b6d4' },
       { label: t('dashboard.totpEnabled'), value: users.filter(u => u.totp_enabled).length, color: '#22c55e' },

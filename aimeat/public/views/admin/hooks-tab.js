@@ -15,18 +15,39 @@ export default function HooksTab({ data, reload }) {
     catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
   }
 
+  // Hook descriptions for inline help
+  const hookDesc = {
+    pre_owner_registration: t('dashboard.hookDescPreOwnerReg'),
+    post_owner_registration: t('dashboard.hookDescPostOwnerReg'),
+    pre_agent_registration: t('dashboard.hookDescPreAgentReg'),
+    post_agent_registration: t('dashboard.hookDescPostAgentReg'),
+    owner_recovery: t('dashboard.hookDescOwnerRecovery'),
+    agent_rekey: t('dashboard.hookDescAgentRekey'),
+    pre_work_request: t('dashboard.hookDescPreWork'),
+    post_work_delivery: t('dashboard.hookDescPostWork'),
+    post_settlement: t('dashboard.hookDescPostSettlement'),
+    pre_board_post: t('dashboard.hookDescPreBoard'),
+    pre_federation_peer: t('dashboard.hookDescPreFederation'),
+  };
+
   return html`
     <div class="adm-card">
       <h2>${t('dashboard.extensionHooks')}</h2>
-      <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:12px">${t('dashboard.hooksExplain')}</p>
+      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:8px">${t('dashboard.hooksExplain')}</p>
+      <details style="margin-bottom:12px">
+        <summary style="cursor:pointer;color:var(--text-dim);font-size:.8rem">${t('dashboard.hooksWhatAre')}</summary>
+        <p style="color:var(--text-dim);font-size:.8rem;margin-top:6px;line-height:1.5">${t('dashboard.hooksWhatAreDetail')}</p>
+      </details>
       <div class="scrollable">
         <table>
-          <thead><tr><th>${t('dashboard.hook')}</th><th>${t('dashboard.boundActions')}</th><th></th></tr></thead>
+          <thead><tr><th>${t('dashboard.hook')}</th><th>${t('dashboard.details')}</th><th>${t('dashboard.boundActions')}</th><th></th></tr></thead>
           <tbody>
             ${hookNames.map(name => {
               const actions = hooks[name] || [];
+              const desc = hookDesc[name] || '';
               return html`<tr>
                 <td class="mono" style="font-size:.8rem">${escHtml(name)}</td>
+                <td style="color:var(--text-dim);font-size:.8rem;max-width:250px">${desc}</td>
                 <td>${actions.length > 0
                   ? actions.map(a => html`<span class="tag">${escHtml(a)}</span> `)
                   : html`<span style="color:var(--text-dim)">${t('dashboard.noneLabel')}</span>`

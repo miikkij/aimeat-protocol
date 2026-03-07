@@ -75,9 +75,11 @@ export const getPushStats    = ()       => apiGet('/v1/admin/push');
 
 // ── CSM ──
 export const getCsmTemplates = ()       => apiGet('/v1/admin/csm');
+export const getCsmDetail    = (name)   => apiGet(`/v1/admin/csm/${encodeURIComponent(name)}`);
 
 // ── MSM ──
 export const getMsmIntegrations = ()    => apiGet('/v1/admin/msm');
+export const getMsmDetail       = (name) => apiGet(`/v1/admin/msm/${encodeURIComponent(name)}`);
 
 // ── Genesis ──
 export const getGenesisPeers    = ()          => apiGet('/v1/admin/genesis-peers');
@@ -87,6 +89,8 @@ export const removeGenesisPeer  = (id)        => apiDelete(`/v1/admin/genesis-pe
 
 // ── CORS ──
 export const clearAgentCors  = (gaii)   => apiPut(`/v1/admin/agents/${encodeURIComponent(gaii)}/cors`, { allowed_origins: null });
+export const setAgentCors    = (gaii, origins) => apiPut(`/v1/admin/agents/${encodeURIComponent(gaii)}/cors`, { allowed_origins: origins });
+export const setGhiiCors     = (ghii, origins) => apiPut(`/v1/admin/ghii/${encodeURIComponent(ghii)}/cors`, { allowed_origins: origins });
 
 // ── Portal / Site ──
 export const getSiteMeta      = ()      => apiGet('/v1/site');

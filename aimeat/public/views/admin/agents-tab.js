@@ -25,6 +25,7 @@ export default function AgentsTab({ data }) {
   }
 
   return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.gaiiExplain')}</p>
     <div class="adm-card">
       <div class="scrollable">
         <table>

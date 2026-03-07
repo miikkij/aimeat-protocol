@@ -12,6 +12,7 @@ export default function ChatInstancesTab({ data }) {
   const sessions = ch.sessions || [];
 
   return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.chatExplain')}</p>
     <${StatsGrid} items=${[
       { label: t('dashboard.totalSessions'), value: ch.total || sessions.length, color: '#06b6d4' },
       { label: t('dashboard.activeSessions'), value: sessions.filter(s => !s.ended_at).length, color: '#22c55e' },
