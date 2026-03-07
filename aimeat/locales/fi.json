@@ -228,7 +228,8 @@
       "dataWallet": "Tietolompakko",
       "nodeStats": "Solmutilastot",
       "extensions": "Laajennukset",
-      "security": "Turvallisuus"
+      "security": "Turvallisuus",
+      "notifications": "Ilmoitukset"
     },
     "agents": {
       "title": "Agenttisi",

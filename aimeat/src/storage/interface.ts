@@ -552,7 +552,8 @@ export interface JoinRequestRecord {
   reviewedAt?: string;
 }
 
-// Phase 2.6 — Marketplace
+// Phase 2.6 — Marketplace (DEPRECATED: listings now live in extension memory via marketplace-behaviors extension)
+/** @deprecated Use marketplace-behaviors extension instead */
 export interface ListingRecord {
   id: string;
   ownerName: string;        // Seller's owner name
@@ -574,6 +575,7 @@ export interface ListingRecord {
   semantic?: Record<string, unknown>;
 }
 
+/** @deprecated Use marketplace-behaviors extension instead */
 export interface PurchaseRecord {
   id: string;
   listingId: string;

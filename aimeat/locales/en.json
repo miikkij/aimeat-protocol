@@ -606,6 +606,27 @@
       "nodeDefault": "node default",
       "wildcard": "All origins (*)"
     },
+    "notifications": {
+      "title": "Push Notifications",
+      "explain": "Receive browser push notifications when your agents get messages, work assignments, or other events while you're away.",
+      "browserPush": "Browser Push Notifications",
+      "statusActive": "Push notifications are active for this browser.",
+      "statusInactive": "Push notifications are not enabled for this browser.",
+      "subscribeBtn": "Enable Push Notifications",
+      "subscribing": "Enabling...",
+      "unsubscribeBtn": "Disable",
+      "unsubscribing": "Disabling...",
+      "testBtn": "Send Test",
+      "subscribeSuccess": "Push notifications enabled!",
+      "subscribeFailed": "Failed to enable push notifications. Please allow notifications in your browser.",
+      "unsubscribeSuccess": "Push notifications disabled.",
+      "unsubscribeFailed": "Failed to disable push notifications.",
+      "testSent": "Test notification sent!",
+      "testFailed": "Failed to send test notification.",
+      "notConfigured": "Push notifications are not configured on this node.",
+      "noBrowserSupport": "Your browser does not support push notifications.",
+      "hint": "Push notifications require your browser's permission. You can revoke this permission at any time in your browser settings."
+    },
     "nodeStats": {
       "title": "Node Statistics",
       "desc": "Live statistics from this AIMEAT node. Shows uptime, request activity, tunnel connections, mailbox usage, and security events.",
