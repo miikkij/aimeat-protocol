@@ -186,3 +186,11 @@ export const reviewKnowledgePackage = (packageId, reason, action, customText) =>
   apiPost(`/v1/admin/knowledge/${encodeURIComponent(packageId)}/review`, {
     reason, action, custom_text: customText,
   });
+
+// ── System Prompts ──
+export const getSystemPrompts      = ()               => apiGet('/v1/admin/prompts');
+export const getSystemPrompt       = (id)             => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}`);
+export const updateSystemPrompt    = (id, content, tags) => apiPut(`/v1/admin/prompts/${encodeURIComponent(id)}`, { content, tags });
+export const getPromptVersions     = (id)             => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}/versions`);
+export const getPromptVersion      = (id, ver)        => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}/versions/${ver}`);
+export const activatePromptVersion = (id, ver)        => apiPut(`/v1/admin/prompts/${encodeURIComponent(id)}/activate/${ver}`, {});
