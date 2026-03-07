@@ -198,20 +198,102 @@ async function generateKeyPair() {
   };
 }
 
-async function sign(privateKeyB64, message) {
-  const privBytes = Uint8Array.from(atob(privateKeyB64), c => c.charCodeAt(0));
+// SECURITY: Import raw Ed25519 private key as non-extractable CryptoKey
+async function importEd25519Key(privateKeyBase64) {
+  const privBytes = Uint8Array.from(atob(privateKeyBase64), c => c.charCodeAt(0));
   // Build PKCS8 DER wrapper for Ed25519
   const pkcs8Prefix = new Uint8Array([48, 46, 2, 1, 0, 48, 5, 6, 3, 43, 101, 112, 4, 34, 4, 32]);
   const pkcs8 = new Uint8Array(pkcs8Prefix.length + privBytes.length);
   pkcs8.set(pkcs8Prefix);
   pkcs8.set(privBytes, pkcs8Prefix.length);
-  const key = await crypto.subtle.importKey('pkcs8', pkcs8, 'Ed25519', false, ['sign']);
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', pkcs8, 'Ed25519', false /* non-extractable */, ['sign']);
+  // Zero raw key bytes
+  privBytes.fill(0);
+  pkcs8.fill(0);
+  return cryptoKey;
+}
+
+// Sign using CryptoKey (preferred) or base64 key string (fallback)
+async function sign(keyOrB64, message) {
+  let key = keyOrB64;
+  if (typeof keyOrB64 === 'string') {
+    // Legacy path: raw base64 key → import as CryptoKey
+    key = await importEd25519Key(keyOrB64);
+  }
   const msgBytes = new TextEncoder().encode(message);
   const sigBytes = await crypto.subtle.sign('Ed25519', key, msgBytes);
   return btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
 }
 
-// ── Storage helpers ──
+// ── IndexedDB Key Store (SECURITY: non-extractable CryptoKeys) ──
+
+const KEY_DB_NAME = 'aimeat_keys';
+const KEY_STORE_NAME = 'cryptokeys';
+
+function openKeyDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(KEY_DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(KEY_STORE_NAME);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function storeKey(name, cryptoKey) {
+  const db = await openKeyDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(KEY_STORE_NAME, 'readwrite');
+    tx.objectStore(KEY_STORE_NAME).put(cryptoKey, name);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function loadKey(name) {
+  const db = await openKeyDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(KEY_STORE_NAME, 'readonly');
+    const req = tx.objectStore(KEY_STORE_NAME).get(name);
+    req.onsuccess = () => { db.close(); resolve(req.result || null); };
+    req.onerror = () => { db.close(); resolve(null); };
+  });
+}
+
+async function deleteKey(name) {
+  try {
+    const db = await openKeyDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(KEY_STORE_NAME, 'readwrite');
+      tx.objectStore(KEY_STORE_NAME).delete(name);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); resolve(); };
+    });
+  } catch(e) { /* IndexedDB may not be available */ }
+}
+
+// Migrate legacy localStorage keys to IndexedDB (one-time)
+async function migrateKeysToIndexedDB() {
+  try {
+    const session = load('session');
+    if (session && session.privateKey) {
+      const cryptoKey = await importEd25519Key(session.privateKey);
+      await storeKey('agent_key', cryptoKey);
+      // Remove private key from localStorage, keep metadata
+      delete session.privateKey;
+      save('session', session);
+    }
+    const ownerKey = load('owner_key');
+    if (typeof ownerKey === 'string' && ownerKey.length > 0) {
+      const cryptoKey = await importEd25519Key(ownerKey);
+      await storeKey('owner_key', cryptoKey);
+      remove('owner_key');
+    }
+  } catch(e) {
+    console.warn('AIMEAT: Key migration to IndexedDB failed, falling back to localStorage', e);
+  }
+}
+
+// ── Storage helpers (metadata only — NO private keys) ──
 
 const STORAGE_PREFIX = 'aimeat_';
 
@@ -269,7 +351,9 @@ function createSession(data) {
     owner: data.owner,
     gaii: data.gaii || null,
     jwt: data.jwt,
-    privateKey: data.privateKey,
+    // SECURITY: Private keys are stored as non-extractable CryptoKeys in IndexedDB,
+    // NOT in this session object or localStorage. Use _cryptoKey for in-memory ref only.
+    _cryptoKey: data._cryptoKey || null,
     publicKey: data.publicKey,
     nodeUrl: NODE_URL,
 
@@ -285,20 +369,27 @@ function createSession(data) {
       return resp.json();
     },
 
-    // Re-authenticate
+    // Re-authenticate using CryptoKey from IndexedDB
     async refresh() {
-      if (!session.gaii || !session.privateKey) throw new Error('Cannot refresh — no agent credentials');
+      if (!session.gaii) throw new Error('Cannot refresh — no agent credentials');
+      // Load CryptoKey from IndexedDB (or use in-memory ref)
+      let key = session._cryptoKey;
+      if (!key) {
+        key = await loadKey('agent_key');
+      }
+      if (!key) throw new Error('Cannot refresh — no signing key found in IndexedDB');
       const timestamp = new Date().toISOString();
       const message = session.gaii + timestamp;
-      const signature = await sign(session.privateKey, message);
+      const signature = await sign(key, message);
       const data = await api('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify({ gaii: session.gaii, timestamp, signature }),
       });
       session.jwt = data.data.token;
+      // SECURITY: Only save metadata to localStorage (no private keys)
       save('session', {
         owner: session.owner, gaii: session.gaii, ghii: session.ghii,
-        jwt: session.jwt, privateKey: session.privateKey, publicKey: session.publicKey,
+        jwt: session.jwt, publicKey: session.publicKey,
       });
       return session;
     },
@@ -382,18 +473,23 @@ const auth = {
       body: JSON.stringify({ gaii: agentGaii, timestamp, signature }),
     });
 
+    // SECURITY: Import private keys as non-extractable CryptoKeys in IndexedDB
+    const agentCryptoKey = await importEd25519Key(agentPrivateKey);
+    await storeKey('agent_key', agentCryptoKey);
+    const ownerCryptoKey = await importEd25519Key(serverPrivateKey);
+    await storeKey('owner_key', ownerCryptoKey);
+
     const session = createSession({
       ghii, owner: ownerName, gaii: agentGaii,
       jwt: tokenData.data.token,
-      privateKey: agentPrivateKey, publicKey: agentData.data.public_key,
+      _cryptoKey: agentCryptoKey, publicKey: agentData.data.public_key,
     });
 
-    // Persist
+    // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
       owner: ownerName, gaii: agentGaii, ghii,
-      jwt: session.jwt, privateKey: agentPrivateKey, publicKey: agentData.data.public_key,
+      jwt: session.jwt, publicKey: agentData.data.public_key,
     });
-    save('owner_key', serverPrivateKey);
 
     currentSession = session;
     emit('login', session);
@@ -410,7 +506,12 @@ const auth = {
     if (!stored) return null;
     if (username && stored.owner !== username) return null;
 
-    const session = createSession(stored);
+    // SECURITY: Run one-time migration from localStorage to IndexedDB
+    await migrateKeysToIndexedDB();
+
+    // Load CryptoKey from IndexedDB
+    const cryptoKey = await loadKey('agent_key');
+    const session = createSession({ ...stored, _cryptoKey: cryptoKey });
 
     if (isExpired(session.jwt)) {
       try {
@@ -441,20 +542,29 @@ const auth = {
     });
 
     const d = data.data;
+
+    // SECURITY: Import private keys as non-extractable CryptoKeys in IndexedDB
+    const agentCryptoKey = await importEd25519Key(d.agent_private_key);
+    await storeKey('agent_key', agentCryptoKey);
+    if (d.owner_private_key) {
+      const ownerCryptoKey = await importEd25519Key(d.owner_private_key);
+      await storeKey('owner_key', ownerCryptoKey);
+    }
+
     const session = createSession({
       ghii: d.ghii.ghii,
       owner: d.owner.name,
       gaii: d.agent.gaii,
       jwt: d.token,
-      privateKey: d.agent_private_key,
+      _cryptoKey: agentCryptoKey,
       publicKey: '',
     });
 
+    // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
       owner: d.owner.name, gaii: d.agent.gaii, ghii: d.ghii.ghii,
-      jwt: d.token, privateKey: d.agent_private_key, publicKey: '',
+      jwt: d.token, publicKey: '',
     });
-    save('owner_key', d.owner_private_key);
 
     currentSession = session;
     emit('login', session);
@@ -466,11 +576,14 @@ const auth = {
     return currentSession;
   },
 
-  /** Logout — clear stored credentials */
-  logout() {
+  /** Logout — clear stored credentials from localStorage and IndexedDB */
+  async logout() {
     currentSession = null;
     remove('session');
     remove('owner_key');
+    // SECURITY: Delete CryptoKeys from IndexedDB
+    await deleteKey('agent_key');
+    await deleteKey('owner_key');
     emit('logout');
   },
 

@@ -99,6 +99,9 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     // Extension hook: post_agent_registration (fire-and-forget)
     executeHooks(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner }).catch(() => { });
 
+    // SECURITY: Prevent caching of response containing private key
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
     res.status(201).json(success(config.nodeId, {
       agent: {
         gaii: agent.gaii,
@@ -389,6 +392,9 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       }
     }
 
+    // SECURITY: Prevent caching of response containing private key
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
     res.status(201).json(success(config.nodeId, {
       agent: {
         gaii: agent.gaii,
@@ -425,6 +431,9 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     // Extension hook: agent_rekey (fire-and-forget)
     executeHooks(config, storage, 'agent_rekey', { gaii, owner: agent.owner }).catch(() => { });
 
+    // SECURITY: Prevent caching of response containing private key
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
     res.json(success(config.nodeId, {
       rekeyed: true,
       gaii,
@@ -454,16 +463,14 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Porting fee (configurable)
+    // Porting fee — atomic debit prevents double-spending
     const PORTING_FEE = config.agentPortingFeeMorsels;
-    if (agent.morselBalance < PORTING_FEE) {
+    const debited = await storage.debitBalance(gaii, PORTING_FEE);
+    if (!debited) {
       res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
         `Porting requires ${PORTING_FEE} morsels, you have ${agent.morselBalance}`));
       return;
     }
-
-    // Deduct fee
-    await storage.updateAgent(gaii, { morselBalance: agent.morselBalance - PORTING_FEE });
     await storage.addTransaction({
       id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       gaii,
@@ -535,6 +542,12 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Defense-in-depth: verify ownership even though getAgentsByOwner is scoped
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own agents'));
+      return;
+    }
+
     const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });
     if (!updated) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update agent scopes'));
@@ -594,6 +607,12 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     const agent = agents.find(a => a.name === agentName);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found`));
+      return;
+    }
+
+    // Defense-in-depth: verify ownership even though getAgentsByOwner is scoped
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own agents'));
       return;
     }
 

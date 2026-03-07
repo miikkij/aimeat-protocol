@@ -266,12 +266,11 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         if (refundAmount > 0) {
             await returnEscrow(storage, work, refundAmount);
-            // Pay remaining to provider
+            // Pay remaining to provider (atomic credit)
             const remaining = work.cost.total - refundAmount;
             if (remaining > 0) {
-                const provider = await storage.getAgent(work.providerGaii);
-                if (provider) {
-                    await storage.updateAgent(work.providerGaii, { morselBalance: provider.morselBalance + remaining });
+                const credited = await storage.creditBalance(work.providerGaii, remaining);
+                if (credited) {
                     await storage.addTransaction({
                         id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
                         gaii: work.providerGaii,
@@ -372,9 +371,8 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             await returnEscrow(storage, work, to_requester);
         }
         if (to_provider > 0) {
-            const provider = await storage.getAgent(work.providerGaii);
-            if (provider) {
-                await storage.updateAgent(work.providerGaii, { morselBalance: provider.morselBalance + to_provider });
+            const credited = await storage.creditBalance(work.providerGaii, to_provider);
+            if (credited) {
                 await storage.addTransaction({
                     id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
                     gaii: work.providerGaii,

@@ -1,6 +1,7 @@
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 export interface HookContext {
     [key: string]: unknown;
@@ -42,6 +43,13 @@ export async function executeHooks(
             // Execute the hook action via webhook if configured
             const webhookUrl = action.webhookUrl;
             if (webhookUrl) {
+                // SSRF validation: block requests to private/reserved IPs
+                const urlCheck = await validateOutboundUrl(webhookUrl);
+                if (!urlCheck.valid) {
+                    logger.warn(`Blocked outbound request to ${webhookUrl}: ${urlCheck.reason}`);
+                    continue;
+                }
+
                 const response = await fetch(webhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

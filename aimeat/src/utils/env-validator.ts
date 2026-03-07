@@ -19,6 +19,11 @@ export function validateEnv(): ValidationResult[] {
   const results: ValidationResult[] = [];
   const env = process.env;
 
+  // ── Dev Mode ──
+  if (env.AIMEAT_DEV_MODE === 'true') {
+    results.push({ level: 'warning', variable: 'AIMEAT_DEV_MODE', message: 'Dev mode is enabled. This relaxes security checks and should never be used in production.' });
+  }
+
   // ── Port ──
   const portRaw = env.AIMEAT_PORT;
   if (portRaw !== undefined) {
@@ -69,8 +74,10 @@ export function validateEnv(): ValidationResult[] {
   const storageProvider = env.AIMEAT_STORAGE;
   if (storageProvider && !['memory', 'sqlite', 'mongodb'].includes(storageProvider)) {
     results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: `Invalid value "${storageProvider}". Must be one of: memory, sqlite, mongodb` });
+  } else if (storageProvider === 'memory') {
+    results.push({ level: 'warning', variable: 'AIMEAT_STORAGE', message: 'Using in-memory storage — all data will be lost on restart. Use sqlite or mongodb for production.' });
   } else if (!storageProvider) {
-    results.push({ level: 'info', variable: 'AIMEAT_STORAGE', message: 'Not set. Default: memory' });
+    results.push({ level: 'warning', variable: 'AIMEAT_STORAGE', message: 'Not set. Defaults to memory — all data will be lost on restart. Set AIMEAT_STORAGE=sqlite for persistence.' });
   }
 
   if (storageProvider === 'sqlite') {
@@ -236,6 +243,18 @@ export function validateEnv(): ValidationResult[] {
           results.push({ level: 'warning', variable: 'AIMEAT_SMTP_SECURE', message: 'Port 465 requires TLS. Set AIMEAT_SMTP_SECURE=true or change port to 587.' });
         }
       }
+    }
+  }
+
+  // ── TOTP / 2FA ──────────────────────────────────────────────────
+  const totpEnabled = env.AIMEAT_TOTP_ENABLED;
+  if (totpEnabled !== 'false') {
+    // TOTP is enabled by default — encryption key should be set
+    const totpKey = env.AIMEAT_TOTP_ENCRYPTION_KEY;
+    if (!totpKey) {
+      results.push({ level: 'error', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: 'Required when TOTP is enabled. TOTP secrets are stored unencrypted without this key. Set a 32-byte hex key or disable TOTP with AIMEAT_TOTP_ENABLED=false.' });
+    } else if (totpKey.length < 64) {
+      results.push({ level: 'warning', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: `Key length ${totpKey.length} hex chars is short. Expected 64 hex chars (32 bytes) for AES-256-GCM.` });
     }
   }
 

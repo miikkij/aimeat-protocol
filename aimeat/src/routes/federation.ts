@@ -11,6 +11,8 @@ import { PeeringRequestSchema, PeeringDecisionSchema, validateBody } from '../mo
 import type { PeerInfo } from '../services/federation.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
+import { sign, verify } from '../auth/keypair.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 export function federationRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -64,8 +66,9 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
     });
 
     // POST /v1/federation/peer/introduce — unauthenticated "knock on the door" for joining nodes
+    // SECURITY: Requires cryptographic signature + operator approval (never auto-approve)
     router.post('/v1/federation/peer/introduce', async (req, res) => {
-        const { node_id, node_url, node_type, public_key, role, message } = req.body ?? {};
+        const { node_id, node_url, node_type, public_key, role, message, signature, timestamp } = req.body ?? {};
 
         if (!node_id || !node_url || !public_key || !role) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id, node_url, public_key, and role are required'));
@@ -74,6 +77,35 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
 
         if (role !== 'contributor' && role !== 'operator') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'role must be "contributor" or "operator"'));
+            return;
+        }
+
+        // SECURITY: Require signature and timestamp
+        if (!signature || !timestamp) {
+            res.status(400).json(error(config.nodeId, 'MISSING_SIGNATURE',
+                'Peer introduction must include signature and timestamp'));
+            return;
+        }
+
+        // SECURITY: Verify timestamp freshness (5 minute window)
+        const ts = new Date(timestamp).getTime();
+        if (isNaN(ts) || Math.abs(Date.now() - ts) > 300_000) {
+            res.status(400).json(error(config.nodeId, 'STALE_TIMESTAMP',
+                'Timestamp is missing, invalid, or outside the 5-minute freshness window'));
+            return;
+        }
+
+        // SECURITY: Verify signature with provided public key
+        const messageToVerify = `${node_id}${node_url}${timestamp}`;
+        let valid = false;
+        try {
+            valid = await verify(public_key, messageToVerify, signature);
+        } catch {
+            valid = false;
+        }
+        if (!valid) {
+            res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE',
+                'Signature verification failed'));
             return;
         }
 
@@ -92,8 +124,8 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
 
         const id = `peer-req-${randomBytes(8).toString('hex')}`;
         const now = new Date().toISOString();
-        const autoApprove = role === 'contributor';
 
+        // SECURITY: Never auto-approve — always create pending request for operator review
         await storage.createPeeringRequest({
             id,
             fromNodeUrl: node_url,
@@ -102,29 +134,16 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             targetUrl: node_url,
             publicKey: public_key,
             message: message ?? '',
-            status: autoApprove ? 'auto_approved' : 'pending',
+            status: 'pending',
             createdAt: now,
             updatedAt: now,
         });
 
-        // Auto-approve contributors: add to peers immediately
-        if (autoApprove) {
-            peers.set(node_id, {
-                nodeId: node_id,
-                url: node_url,
-                publicKey: public_key,
-                status: 'active',
-                addedAt: now,
-                lastSeen: now,
-            });
-        }
-
-        res.status(201).json(success(config.nodeId, {
+        res.status(202).json(success(config.nodeId, {
             request_id: id,
-            status: autoApprove ? 'auto_approved' : 'pending',
-        }, autoApprove ? [
-            { description: 'Exchange keys', method: 'POST', url: '/v1/federation/key-exchange' },
-        ] : [
+            status: 'pending',
+            message: 'Peer introduction received. Awaiting operator approval.',
+        }, [
             { description: 'Check introduction status', method: 'GET', url: `/v1/federation/peer/introduce/${id}/status` },
         ]));
     });
@@ -206,6 +225,13 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         const { target_url } = req.body ?? {};
         if (!target_url) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_url is required'));
+            return;
+        }
+
+        // SSRF validation: block requests to private/reserved IPs
+        const urlCheck = await validateOutboundUrl(target_url);
+        if (!urlCheck.valid) {
+            res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'URL validation failed'));
             return;
         }
 
@@ -326,11 +352,29 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
     });
 
     // POST /v1/federation/heartbeat — peer health heartbeat
-    router.post('/v1/federation/heartbeat', (req, res) => {
-        const { from_node_id, timestamp, status: peerStatus, stats } = req.body ?? {};
+    // SECURITY: Verify signature from known peers
+    router.post('/v1/federation/heartbeat', async (req, res) => {
+        const { from_node_id, timestamp, status: peerStatus, stats, signature } = req.body ?? {};
 
         if (from_node_id && peers.has(from_node_id)) {
             const peer = peers.get(from_node_id)!;
+
+            // SECURITY: Verify heartbeat signature if peer has a public key
+            if (peer.publicKey && signature) {
+                const messageToVerify = `${from_node_id}${timestamp}`;
+                let valid = false;
+                try {
+                    valid = await verify(peer.publicKey, messageToVerify, signature);
+                } catch {
+                    valid = false;
+                }
+                if (!valid) {
+                    res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE',
+                        'Heartbeat signature verification failed'));
+                    return;
+                }
+            }
+
             peer.lastSeen = new Date().toISOString();
             peer.status = 'active';
         }
@@ -459,6 +503,12 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 const activePeers = [...peers.values()].filter(p => p.status === 'active');
                 for (const otherPeer of activePeers) {
                     try {
+                        // SSRF validation: block requests to private/reserved IPs
+                        const peerUrlCheck = await validateOutboundUrl(otherPeer.url);
+                        if (!peerUrlCheck.valid) {
+                            logger.warn(`Blocked outbound request to peer ${otherPeer.nodeId}: ${peerUrlCheck.reason}`);
+                            continue;
+                        }
                         await fetch(`${otherPeer.url}/v1/federation/trust-advisory`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -552,6 +602,22 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             return;
         }
 
+        // P1-11: Require signed replication — verify peer signature
+        if (!signature) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on replication request'));
+            return;
+        }
+        if (!peer.publicKey) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
+            return;
+        }
+        const replicatePayload = JSON.stringify({ source_node, gaii, key, value, visibility, version, timestamp });
+        const replicateValid = await verify(peer.publicKey, replicatePayload, signature);
+        if (!replicateValid) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on replication request'));
+            return;
+        }
+
         // Store replicated memory with cross-node prefix
         const replicaKey = `replica:${source_node}:${key}`;
         await storage.setMemory({
@@ -580,7 +646,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
     // newer than that timestamp are expected. Existing actions are updated rather
     // than duplicated (upsert by federated ID).
     router.post('/v1/federation/catalogue-sync', async (req, res) => {
-        const { source_node, actions: actionList, since_timestamp, catalogue_hash } = req.body ?? {};
+        const { source_node, actions: actionList, since_timestamp, catalogue_hash, signature } = req.body ?? {};
 
         if (!source_node || !Array.isArray(actionList)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and actions array required'));
@@ -590,6 +656,22 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         const peer = [...peers.values()].find(p => p.nodeId === source_node);
         if (!peer || peer.status !== 'active') {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+
+        // P1-11: Require signed catalogue sync — verify peer signature
+        if (!signature) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on catalogue-sync request'));
+            return;
+        }
+        if (!peer.publicKey) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
+            return;
+        }
+        const catalogueSyncPayload = JSON.stringify({ source_node, actions: actionList, since_timestamp, catalogue_hash });
+        const catalogueSyncValid = await verify(peer.publicKey, catalogueSyncPayload, signature);
+        if (!catalogueSyncValid) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on catalogue-sync request'));
             return;
         }
 
@@ -775,13 +857,10 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
 
         const requesterGaii = req.auth!.sub;
 
-        // Helper: charge 1 morsel routing fee per hop
+        // Helper: charge 1 morsel routing fee per hop (atomic debit)
         async function chargeRoutingFee(): Promise<void> {
-            const agent = await storage.getAgent(requesterGaii);
-            if (agent && agent.morselBalance >= 1) {
-                await storage.updateAgent(requesterGaii, {
-                    morselBalance: agent.morselBalance - 1,
-                });
+            const debited = await storage.debitBalance(requesterGaii, 1);
+            if (debited) {
                 await storage.addTransaction({
                     id: `txn-${randomBytes(8).toString('hex')}`,
                     gaii: requesterGaii,
@@ -799,6 +878,12 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         if (targetPeer) {
             try {
                 const targetUrl = `${targetPeer.url}${path}`;
+                // SSRF validation: block requests to private/reserved IPs
+                const targetUrlCheck = await validateOutboundUrl(targetUrl);
+                if (!targetUrlCheck.valid) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_URL', targetUrlCheck.reason ?? 'URL validation failed'));
+                    return;
+                }
                 const response = await fetch(targetUrl, {
                     method: method ?? 'GET',
                     headers: {
@@ -842,6 +927,12 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         for (const relay of activePeers) {
             try {
                 const relayUrl = `${relay.url}/v1/federation/route`;
+                // SSRF validation: block requests to private/reserved IPs
+                const relayUrlCheck = await validateOutboundUrl(relayUrl);
+                if (!relayUrlCheck.valid) {
+                    logger.warn(`Blocked outbound relay to peer ${relay.nodeId}: ${relayUrlCheck.reason}`);
+                    continue;
+                }
                 const response = await fetch(relayUrl, {
                     method: 'POST',
                     headers: {
@@ -917,6 +1008,12 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         const activePeers = [...peers.values()].filter(p => p.status === 'active');
         for (const peer of activePeers) {
             try {
+                // SSRF validation: block requests to private/reserved IPs
+                const peerResolveCheck = await validateOutboundUrl(peer.url);
+                if (!peerResolveCheck.valid) {
+                    logger.warn(`Blocked outbound resolve to peer ${peer.nodeId}: ${peerResolveCheck.reason}`);
+                    continue;
+                }
                 const resp = await fetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {
                     signal: AbortSignal.timeout(5_000),
                 });
@@ -956,6 +1053,29 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         }
 
         try {
+            // SSRF validation: block requests to private/reserved IPs
+            const crossNodeUrlCheck = await validateOutboundUrl(peer.url);
+            if (!crossNodeUrlCheck.valid) {
+                res.status(400).json(error(config.nodeId, 'INVALID_URL', crossNodeUrlCheck.reason ?? 'URL validation failed'));
+                return;
+            }
+
+            // P1-11: Sign outbound cross-node work request
+            const workPayload = {
+                action_id,
+                provider_gaii,
+                input,
+                ttl_hours: ttl_hours ?? 24,
+                cross_node_requester: req.auth!.sub,
+                origin_node: config.nodeId,
+                timestamp: new Date().toISOString(),
+            };
+            const nodeKey = await storage.getNodeKey();
+            let workSignature: string | undefined;
+            if (nodeKey?.privateKey) {
+                workSignature = await sign(nodeKey.privateKey, JSON.stringify(workPayload));
+            }
+
             const response = await fetch(`${peer.url}/v1/work/request`, {
                 method: 'POST',
                 headers: {
@@ -964,12 +1084,8 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     'X-Requester-Node': config.nodeId,
                 },
                 body: JSON.stringify({
-                    action_id,
-                    provider_gaii,
-                    input,
-                    ttl_hours: ttl_hours ?? 24,
-                    cross_node_requester: req.auth!.sub,
-                    origin_node: config.nodeId,
+                    ...workPayload,
+                    signature: workSignature,
                 }),
                 signal: AbortSignal.timeout(30_000),
             });
@@ -978,11 +1094,9 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
 
             // Charge 1 morsel routing fee
             const requesterGaii = req.auth!.sub;
-            const agent = await storage.getAgent(requesterGaii);
-            if (agent && agent.morselBalance >= 1) {
-                await storage.updateAgent(requesterGaii, {
-                    morselBalance: agent.morselBalance - 1,
-                });
+            // Atomic routing fee debit
+            const debited = await storage.debitBalance(requesterGaii, 1);
+            if (debited) {
                 await storage.addTransaction({
                     id: `txn-${randomBytes(8).toString('hex')}`,
                     gaii: requesterGaii,
@@ -999,6 +1113,207 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         } catch (err) {
             res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
                 `Failed to submit cross-node work: ${err instanceof Error ? err.message : 'unknown error'}`));
+        }
+    });
+
+    // ── P1-11: Signed Federation Settlements ──
+
+    // POST /v1/federation/settle — Receive a signed settlement from a peer node
+    // Used for cross-node morsel transfers (e.g., work completed on a remote node
+    // that needs to credit/debit morsels on this node). The request must be
+    // cryptographically signed by the sending node's Ed25519 private key.
+    router.post('/v1/federation/settle', async (req, res) => {
+        const {
+            from_node,
+            to_node,
+            gaii,
+            amount,
+            tracking_code,
+            reason,
+            timestamp: settlementTimestamp,
+            signature,
+        } = req.body ?? {};
+
+        // Validate required fields
+        if (!from_node || !to_node || !gaii || amount === undefined || !tracking_code || !signature) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'from_node, to_node, gaii, amount, tracking_code, and signature are required'));
+            return;
+        }
+
+        // Verify this settlement is addressed to us
+        if (to_node !== config.nodeId) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                `Settlement addressed to ${to_node}, but this node is ${config.nodeId}`));
+            return;
+        }
+
+        // Validate amount is a positive number
+        if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'amount must be a positive finite number'));
+            return;
+        }
+
+        // Verify the sending node is a known active peer
+        const peer = [...peers.values()].find(p => p.nodeId === from_node);
+        if (!peer || (peer.status !== 'active' && peer.status !== 'depeering')) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                `Node ${from_node} is not a known active peer`));
+            return;
+        }
+
+        // Verify peer has a public key for signature verification
+        if (!peer.publicKey) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                'Peer has no public key on file for signature verification'));
+            return;
+        }
+
+        // Verify the cryptographic signature
+        const settlementPayload = JSON.stringify({
+            from_node,
+            to_node,
+            gaii,
+            amount,
+            tracking_code,
+            reason,
+            timestamp: settlementTimestamp,
+        });
+        const signatureValid = await verify(peer.publicKey, settlementPayload, signature);
+        if (!signatureValid) {
+            logger.warn(`Invalid settlement signature from node ${from_node} for tracking code ${tracking_code}`);
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
+                'Invalid signature on settlement request'));
+            return;
+        }
+
+        // Prevent replay attacks: check if tracking code was already settled
+        const existingTxns = await storage.getTransactions(gaii);
+        const duplicate = existingTxns.find((t: { trackingCode?: string; type: string }) =>
+            t.trackingCode === `settle:${tracking_code}` && t.type === 'federation_settlement',
+        );
+        if (duplicate) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT',
+                `Settlement already processed for tracking code ${tracking_code}`));
+            return;
+        }
+
+        // Apply the settlement: credit morsels to the target agent
+        const credited = await storage.creditBalance(gaii, Math.floor(amount));
+        if (!credited) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `Agent ${gaii} not found on this node`));
+            return;
+        }
+
+        // Record the settlement transaction
+        await storage.addTransaction({
+            id: `txn-${randomBytes(8).toString('hex')}`,
+            gaii,
+            type: 'federation_settlement',
+            amount: Math.floor(amount),
+            counterpartyGaii: from_node,
+            trackingCode: `settle:${tracking_code}`,
+            timestamp: new Date().toISOString(),
+        });
+
+        logger.info(`Federation settlement applied: ${amount} morsels to ${gaii} from node ${from_node} (tc: ${tracking_code})`);
+
+        res.json(success(config.nodeId, {
+            settled: true,
+            from_node,
+            to_node,
+            gaii,
+            amount: Math.floor(amount),
+            tracking_code,
+        }));
+    });
+
+    // POST /v1/federation/settle/outbound — Send a signed settlement to a peer node (operator only)
+    // This endpoint allows operators to initiate a settlement to credit morsels on a remote node.
+    router.post('/v1/federation/settle/outbound', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { target_node, gaii, amount, tracking_code, reason } = req.body ?? {};
+
+        if (!target_node || !gaii || amount === undefined || !tracking_code) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'target_node, gaii, amount, and tracking_code are required'));
+            return;
+        }
+
+        if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'amount must be a positive finite number'));
+            return;
+        }
+
+        const peer = [...peers.values()].find(p => p.nodeId === target_node && p.status === 'active');
+        if (!peer) {
+            res.status(404).json(error(config.nodeId, 'FEDERATION_ERROR',
+                `No active peer for node ${target_node}`));
+            return;
+        }
+
+        const nodeKey = await storage.getNodeKey();
+        if (!nodeKey?.privateKey) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR',
+                'Node private key not available for signing'));
+            return;
+        }
+
+        const settlementTimestamp = new Date().toISOString();
+        const settlementPayload = JSON.stringify({
+            from_node: config.nodeId,
+            to_node: target_node,
+            gaii,
+            amount,
+            tracking_code,
+            reason: reason ?? 'operator_settlement',
+            timestamp: settlementTimestamp,
+        });
+        const settlementSignature = await sign(nodeKey.privateKey, settlementPayload);
+
+        try {
+            // SSRF validation
+            const settleUrlCheck = await validateOutboundUrl(peer.url);
+            if (!settleUrlCheck.valid) {
+                res.status(400).json(error(config.nodeId, 'INVALID_URL', settleUrlCheck.reason ?? 'URL validation failed'));
+                return;
+            }
+
+            const response = await fetch(`${peer.url}/v1/federation/settle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    from_node: config.nodeId,
+                    to_node: target_node,
+                    gaii,
+                    amount,
+                    tracking_code,
+                    reason: reason ?? 'operator_settlement',
+                    timestamp: settlementTimestamp,
+                    signature: settlementSignature,
+                }),
+                signal: AbortSignal.timeout(30_000),
+            });
+
+            const data = await response.json().catch(() => null);
+
+            if (response.ok) {
+                logger.info(`Outbound settlement sent: ${amount} morsels for ${gaii} to node ${target_node} (tc: ${tracking_code})`);
+                res.json(success(config.nodeId, {
+                    sent: true,
+                    target_node,
+                    gaii,
+                    amount,
+                    tracking_code,
+                    response_data: data,
+                }));
+            } else {
+                res.status(response.status).json(error(config.nodeId, 'FEDERATION_ERROR',
+                    `Settlement rejected by peer: ${JSON.stringify(data)}`));
+            }
+        } catch (err) {
+            res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
+                `Failed to send settlement to ${target_node}: ${err instanceof Error ? err.message : 'unknown error'}`));
         }
     });
 

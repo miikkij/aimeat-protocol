@@ -450,6 +450,11 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value exceeds ${config.microMemoryMaxValueSizeBytes} byte limit`));
                     return;
                 }
+                // Keys-per-set limit check for add operations (new keys only)
+                if (writeOp === 'add' && !(key in record.entries) && Object.keys(record.entries).length >= config.microMemoryMaxKeysPerSet) {
+                    res.status(400).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Maximum ${config.microMemoryMaxKeysPerSet} keys per set`));
+                    return;
+                }
                 // M-5: Total micro-memory quota check for public/shared writes
                 const pubAddBytes = Buffer.byteLength(key, 'utf8') + Buffer.byteLength(value, 'utf8');
                 const pubExistingBytes = record.entries[key]

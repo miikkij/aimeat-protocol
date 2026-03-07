@@ -263,3 +263,7 @@
   .pf .ext-grid{grid-template-columns:1fr}
   .pf .ext-bundled-grid{grid-template-columns:1fr}
 }
+/* Session management — revoke all sessions */
+.pf .sec-revoke-btn{padding:8px 20px;border:1px solid var(--danger,#ef4444);border-radius:8px;background:transparent;color:var(--danger,#ef4444);font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px}
+.pf .sec-revoke-btn:hover:not(:disabled){background:var(--danger,#ef4444);color:#fff}
+.pf .sec-revoke-btn:disabled{opacity:.5;cursor:not-allowed}

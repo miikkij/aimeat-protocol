@@ -110,6 +110,66 @@ export class MongoStorage implements Storage {
     async deleteOwner(name: string): Promise<boolean> {
         this.ensureReady();
         try {
+            // 1. Get all agents belonging to this owner
+            const agents = await this.prisma.agent.findMany({ where: { owner: name }, select: { gaii: true } });
+            const agentGaiis = agents.map((a: any) => a.gaii);
+
+            // 2. Cascade delete all agent-related data for each agent
+            for (const gaii of agentGaiis) {
+                await this.cascadeDeleteAgentData(gaii);
+            }
+
+            // 3. Delete all agents for this owner
+            await this.prisma.agent.deleteMany({ where: { owner: name } });
+
+            // 4. Delete GHII records for this owner
+            await this.prisma.ghii.deleteMany({ where: { ownerName: name } });
+
+            // 5. Delete personal nodes and their mailbox items & push subscriptions (in-memory)
+            for (const [nodeId, node] of this.personalNodes) {
+                if (node.ownerName === name) {
+                    for (const [mid, m] of this.mailboxItems) {
+                        if (m.personalNodeId === nodeId) this.mailboxItems.delete(mid);
+                    }
+                    for (const [pid, p] of this.personalPushSubscriptions) {
+                        if (p.personalNodeId === nodeId) this.personalPushSubscriptions.delete(pid);
+                    }
+                    for (const [nid, n] of this.notificationPreferences) {
+                        if (nid === nodeId) this.notificationPreferences.delete(nid);
+                    }
+                    this.personalNodes.delete(nodeId);
+                }
+            }
+
+            // 6. Delete push subscriptions for this owner (in-memory)
+            for (const [key, sub] of this.pushSubscriptions) {
+                if (sub.ownerName === name) this.pushSubscriptions.delete(key);
+            }
+            for (const [pid, p] of this.personalPushSubscriptions) {
+                if (p.ownerName === name) this.personalPushSubscriptions.delete(pid);
+            }
+
+            // 7. Delete listings for this owner (in-memory)
+            for (const [lid, l] of this.listingRecords) {
+                if (l.ownerName === name) this.listingRecords.delete(lid);
+            }
+
+            // 8. Delete purchases for this owner as buyer or seller (in-memory)
+            for (const [pid, p] of this.purchaseRecords) {
+                if (p.buyerOwner === name || p.sellerOwner === name) this.purchaseRecords.delete(pid);
+            }
+
+            // 9. Delete chat instances for this owner (in-memory)
+            for (const [cid, c] of this.chatInstances) {
+                if (c.ownerName === name) this.chatInstances.delete(cid);
+            }
+
+            // 10. Delete email verifications for this owner (in-memory)
+            for (const [eid, e] of this.emailVerifications) {
+                if (e.ownerName === name) this.emailVerifications.delete(eid);
+            }
+
+            // 11. Delete the owner record
             await this.prisma.owner.delete({ where: { name } });
             return true;
         } catch { return false; }
@@ -161,15 +221,130 @@ export class MongoStorage implements Storage {
     async deleteAgent(gaii: string): Promise<boolean> {
         this.ensureReady();
         try {
+            // Cascade delete all agent-related data
+            await this.cascadeDeleteAgentData(gaii);
+            // Delete the agent record itself
             await this.prisma.agent.delete({ where: { gaii } });
             return true;
         } catch { return false; }
+    }
+
+    /**
+     * Cascade-delete all data associated with a single agent GAII.
+     * Called by both deleteOwner and deleteAgent.
+     */
+    private async cascadeDeleteAgentData(gaii: string): Promise<void> {
+        // Memory (Prisma)
+        await this.prisma.memory.deleteMany({ where: { ownerGaii: gaii } });
+        // Micro-memory (Prisma)
+        await this.prisma.microMemory.deleteMany({ where: { gaii } });
+        // Actions (Prisma)
+        await this.prisma.action.deleteMany({ where: { providerGaii: gaii } });
+        // Work — also clean up related disputes (Prisma)
+        const workItems = await this.prisma.work.findMany({
+            where: { OR: [{ providerGaii: gaii }, { requesterGaii: gaii }] },
+            select: { trackingCode: true },
+        });
+        for (const w of workItems) {
+            const disputes = await this.prisma.dispute.findMany({
+                where: { trackingCode: w.trackingCode },
+                select: { disputeId: true },
+            });
+            for (const d of disputes) {
+                await this.prisma.disputeAudit.deleteMany({ where: { disputeId: d.disputeId } });
+            }
+            await this.prisma.dispute.deleteMany({ where: { trackingCode: w.trackingCode } });
+        }
+        await this.prisma.work.deleteMany({ where: { OR: [{ providerGaii: gaii }, { requesterGaii: gaii }] } });
+        // Wallet transactions (Prisma)
+        await this.prisma.transaction.deleteMany({ where: { gaii } });
+        // Board posts authored by this agent (Prisma)
+        await this.prisma.boardPost.deleteMany({ where: { authorGaii: gaii } });
+        // Board subscriptions (in-memory)
+        for (const [sid, s] of this.boardSubscriptions) {
+            if (s.gaii === gaii) this.boardSubscriptions.delete(sid);
+        }
+        // Boards owned by this agent — also delete their posts and subscriptions (Prisma + in-memory)
+        const boards = await this.prisma.board.findMany({ where: { ownerGaii: gaii }, select: { boardId: true } });
+        for (const b of boards) {
+            await this.prisma.boardPost.deleteMany({ where: { boardId: b.boardId } });
+            for (const [sid, s] of this.boardSubscriptions) {
+                if (s.boardId === b.boardId) this.boardSubscriptions.delete(sid);
+            }
+        }
+        await this.prisma.board.deleteMany({ where: { ownerGaii: gaii } });
+        // Consents (in-memory)
+        for (const [cid, c] of this.consents) {
+            if (c.ownerGaii === gaii) this.consents.delete(cid);
+        }
+        // Storage files (Prisma)
+        await this.prisma.storageFile.deleteMany({ where: { ownerGaii: gaii } });
+        // Matches (in-memory)
+        for (const [mid, m] of this.matchRecords) {
+            if (m.profileA === gaii || m.profileB === gaii) this.matchRecords.delete(mid);
+        }
+        // Flags raised by this agent (in-memory)
+        for (const [fid, f] of this.flags) {
+            if (f.flaggedBy === gaii) this.flags.delete(fid);
+        }
+        // Escrow holds (Prisma)
+        await this.prisma.escrowHold.deleteMany({ where: { fromGaii: gaii } });
+        // OTKs (Prisma)
+        await this.prisma.otk.deleteMany({ where: { ownerGaii: gaii } });
     }
 
     async listAgents(): Promise<AgentRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.agent.findMany();
         return rows.map((r: any) => this.toAgentRecord(r));
+    }
+
+    async debitBalance(gaii: string, amount: number): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.agent.update({
+                where: { gaii, morselBalance: { gte: amount } },
+                data: { morselBalance: { decrement: amount } },
+            });
+            return true;
+        } catch { return false; }
+    }
+
+    async creditBalance(gaii: string, amount: number): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.agent.update({
+                where: { gaii },
+                data: { morselBalance: { increment: amount } },
+            });
+            return true;
+        } catch { return false; }
+    }
+
+    async creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number> {
+        this.ensureReady();
+        const agent = await this.prisma.agent.findUnique({ where: { gaii }, select: { morselBalance: true } });
+        if (!agent || agent.morselBalance >= cap) return 0;
+        const actualCredit = Math.min(amount, cap - agent.morselBalance);
+        if (actualCredit <= 0) return 0;
+        await this.prisma.agent.update({
+            where: { gaii },
+            data: { morselBalance: { increment: actualCredit } },
+        });
+        return actualCredit;
+    }
+
+    async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.$transaction(async (tx: any) => {
+                const from = await tx.agent.findUnique({ where: { gaii: fromGaii }, select: { morselBalance: true } });
+                if (!from || from.morselBalance < amount) throw new Error('INSUFFICIENT');
+                await tx.agent.update({ where: { gaii: fromGaii }, data: { morselBalance: { decrement: amount } } });
+                await tx.agent.update({ where: { gaii: toGaii }, data: { morselBalance: { increment: amount } } });
+            });
+            return true;
+        } catch { return false; }
     }
 
     // ── Memory ──────────────────────────────────────────────────
@@ -447,9 +622,9 @@ export class MongoStorage implements Storage {
         return rows.map((r: any) => this.toWorkRecord(r));
     }
 
-    async listAllWork(): Promise<WorkRecord[]> {
+    async listAllWork(limit = 10000): Promise<WorkRecord[]> {
         this.ensureReady();
-        const rows = await this.prisma.work.findMany();
+        const rows = await this.prisma.work.findMany({ take: Math.min(limit, 10000), orderBy: { createdAt: 'desc' } });
         return rows.map((r: any) => this.toWorkRecord(r));
     }
 
@@ -489,9 +664,10 @@ export class MongoStorage implements Storage {
         }));
     }
 
-    async listAllTransactions(): Promise<WalletTransaction[]> {
+    async listAllTransactions(limit = 10000): Promise<WalletTransaction[]> {
         this.ensureReady();
         const rows = await this.prisma.transaction.findMany({
+            take: Math.min(limit, 10000),
             orderBy: { timestamp: 'desc' },
         });
         return rows.map((r: any) => ({
@@ -816,9 +992,9 @@ export class MongoStorage implements Storage {
         return rows.map((r: any) => this.toDisputeRecord(r));
     }
 
-    async listAllDisputes(): Promise<DisputeRecord[]> {
+    async listAllDisputes(limit = 10000): Promise<DisputeRecord[]> {
         this.ensureReady();
-        const rows = await this.prisma.dispute.findMany();
+        const rows = await this.prisma.dispute.findMany({ take: Math.min(limit, 10000), orderBy: { createdAt: 'desc' } });
         return rows.map((r: any) => this.toDisputeRecord(r));
     }
 
@@ -1778,8 +1954,9 @@ export class MongoStorage implements Storage {
         return count;
     }
 
-    async listAllMatches(): Promise<import('../../interface.js').MatchRecord[]> {
-        return Array.from(this.matchRecords.values());
+    async listAllMatches(limit = 10000): Promise<import('../../interface.js').MatchRecord[]> {
+        const all = Array.from(this.matchRecords.values());
+        return all.slice(0, Math.min(limit, 10000));
     }
 
     // ── Organisms (Phase 2.2 — in-memory fallback until Prisma schema is updated) ──
@@ -1822,12 +1999,34 @@ export class MongoStorage implements Storage {
     }
 
     async deleteOrganism(id: string): Promise<boolean> {
+        // Get the organism to find its boardId and memoryNamespace
+        const org = this.organismRecords.get(id);
+
+        // Cascade: delete memberships and join requests
         for (const [mid, m] of this.membershipRecords) {
             if (m.organismId === id) this.membershipRecords.delete(mid);
         }
         for (const [jid, j] of this.joinRequestRecords) {
             if (j.organismId === id) this.joinRequestRecords.delete(jid);
         }
+
+        // Cascade: delete organism reputation
+        this.organismReputations.delete(id);
+
+        if (org) {
+            // Cascade: delete the organism's board and its posts/subscriptions (Prisma)
+            try {
+                await this.prisma.boardPost.deleteMany({ where: { boardId: org.boardId } });
+                for (const [sid, s] of this.boardSubscriptions) {
+                    if (s.boardId === org.boardId) this.boardSubscriptions.delete(sid);
+                }
+                await this.prisma.board.delete({ where: { boardId: org.boardId } });
+            } catch { /* board may not exist */ }
+
+            // Cascade: delete memory entries under the organism's namespace (Prisma)
+            await this.prisma.memory.deleteMany({ where: { ownerGaii: org.memoryNamespace } });
+        }
+
         return this.organismRecords.delete(id);
     }
 
@@ -2498,6 +2697,62 @@ export class MongoStorage implements Storage {
 
     async deleteNotificationPreferences(personalNodeId: string): Promise<boolean> {
         return this.notificationPreferences.delete(personalNodeId);
+    }
+
+    // ── Sessions (P3-7: Server-Side Session Tracking) ──────────
+
+    private sessions = new Map<string, { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string; revoked: boolean }>();
+
+    async createSession(session: { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string }): Promise<void> {
+        this.sessions.set(session.sessionId, { ...session, revoked: false });
+    }
+
+    async revokeSession(sessionId: string): Promise<boolean> {
+        const session = this.sessions.get(sessionId);
+        if (!session || session.revoked) return false;
+        session.revoked = true;
+        return true;
+    }
+
+    async revokeAllSessions(owner: string): Promise<number> {
+        let count = 0;
+        for (const session of this.sessions.values()) {
+            if (session.owner === owner && !session.revoked) {
+                session.revoked = true;
+                count++;
+            }
+        }
+        return count;
+    }
+
+    async isSessionRevoked(sessionId: string): Promise<boolean> {
+        const session = this.sessions.get(sessionId);
+        if (!session) return false;
+        return session.revoked;
+    }
+
+    // ── Token Revocation ──────────────────────────────────────
+
+    private revokedTokens = new Map<string, number>(); // tokenHash -> expiresAt
+
+    async revokeToken(tokenHash: string, expiresAt: number): Promise<void> {
+        this.revokedTokens.set(tokenHash, expiresAt);
+    }
+
+    async isTokenRevoked(tokenHash: string): Promise<boolean> {
+        return this.revokedTokens.has(tokenHash);
+    }
+
+    async cleanExpiredRevocations(): Promise<number> {
+        const now = Math.floor(Date.now() / 1000);
+        let count = 0;
+        for (const [hash, exp] of this.revokedTokens) {
+            if (exp < now) {
+                this.revokedTokens.delete(hash);
+                count++;
+            }
+        }
+        return count;
     }
 }
 

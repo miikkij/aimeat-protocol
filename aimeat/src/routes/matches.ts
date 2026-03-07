@@ -9,6 +9,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { auditDataAccess } from '../services/consent.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -39,12 +40,61 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
 
     const matches = await storage.listMatchesByProfile(ghii, { status, page, perPage });
 
-    // Build the response with formatted match data
-    const formatted = matches.map(m => {
+    // Build the response with formatted match data, checking consent for each partner
+    const formatted: Array<Record<string, unknown>> = [];
+
+    for (const m of matches) {
       const isProfileA = m.profileA === ghii;
       const matchedGhii = isProfileA ? m.profileB : m.profileA;
 
-      return {
+      // Consent check: verify matched partner still has active matching consent
+      // before revealing their profile details
+      let partnerConsentActive = true;
+      if (config.consentEnabled) {
+        try {
+          const matchedGhiiRecord = await storage.getGHII(matchedGhii);
+          if (matchedGhiiRecord) {
+            const agents = await storage.getAgentsByOwner(matchedGhiiRecord.ownerName);
+            partnerConsentActive = false;
+            for (const agent of agents) {
+              const consents = await storage.listConsents(agent.gaii, { status: 'active' });
+              const matchConsent = consents.find(
+                c => c.purpose === 'matching' && c.status === 'active',
+              );
+              if (matchConsent) {
+                partnerConsentActive = true;
+                // Audit the data access
+                await auditDataAccess(storage, matchConsent.id, agent.gaii,
+                  req.auth!.sub, `match:${m.id}`, 'read', true);
+                break;
+              }
+            }
+          }
+        } catch {
+          // If we can't verify consent, redact partner details for safety
+          partnerConsentActive = false;
+        }
+      }
+
+      if (!partnerConsentActive) {
+        // Partner revoked matching consent — redact their details
+        formatted.push({
+          id: m.id,
+          matchedProfile: {
+            ghii: '[redacted]',
+            sharedInterests: [],
+            distanceKm: null,
+            consentRevoked: true,
+          },
+          score: m.score,
+          status: m.status,
+          expiresAt: m.expiresAt,
+          createdAt: m.createdAt,
+        });
+        continue;
+      }
+
+      formatted.push({
         id: m.id,
         matchedProfile: {
           ghii: matchedGhii,
@@ -62,15 +112,17 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
         },
         expiresAt: m.expiresAt,
         createdAt: m.createdAt,
-      };
-    });
+      });
+    }
 
-    // Try to enrich with display names and city
+    // Try to enrich with display names and city (only for non-redacted matches)
     for (const match of formatted) {
+      const mp = match.matchedProfile as Record<string, unknown>;
+      if (mp.consentRevoked) continue;
       try {
-        const ghiiRecord = await storage.getGHII(match.matchedProfile.ghii);
+        const ghiiRecord = await storage.getGHII(mp.ghii as string);
         if (ghiiRecord) {
-          (match.matchedProfile as Record<string, unknown>).displayName = ghiiRecord.displayName;
+          mp.displayName = ghiiRecord.displayName;
         }
       } catch {
         // Skip enrichment on failure

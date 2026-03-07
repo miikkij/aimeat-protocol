@@ -26,14 +26,22 @@ const BUILD_ID = Date.now().toString(36);
  *  - window.__B injected so dynamic import() calls can append ?v=BUILD_ID
  *  - importmap entries stamped with BUILD_ID so ALL first-party modules
  *    (static + dynamic imports from any view) get fresh URLs after restart
+ *  - CSP nonce injected into all script and style tags
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function serveSpa(res: any, spaPath: string): void {
+function serveSpa(res: import('express').Response, spaPath: string): void {
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
 
+  // Inject CSP nonce into all script and style tags
+  const nonce = res.locals.cspNonce as string || '';
+  if (nonce) {
+    html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+    html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+  }
+
   // Inject window.__B for dynamic import() cache-busting in spa.html scripts
-  html = html.replace('</head>', `<script>window.__B="${v}";</script>\n</head>`);
+  const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
+  html = html.replace('</head>', `<script${nonceAttr}>window.__B="${v}";</script>\n</head>`);
 
   // Stamp all importmap entries with the build version
   html = html.replace(

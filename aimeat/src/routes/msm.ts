@@ -56,7 +56,7 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/msm — Register a new MSM integration
   // Accepts text/yaml or application/json
-  router.post('/v1/msm', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/msm', requireAuth(), requireRole(config.msmInstallRole), async (req, res) => {
     const ownerName = req.auth!.owner;
 
     let definition: MsmDefinition;

@@ -23,6 +23,7 @@ export function calculateWorkCost(baseMorsels: number, burnRate: number) {
 
 /**
  * Hold morsels in escrow for a work request.
+ * Uses atomic debitBalance to prevent double-spending (TOCTOU race condition).
  */
 export async function holdEscrow(
     storage: Storage,
@@ -31,12 +32,8 @@ export async function holdEscrow(
     trackingCode: string,
     total: number,
 ): Promise<boolean> {
-    const requester = await storage.getAgent(requesterGaii);
-    if (!requester || requester.morselBalance < total) return false;
-
-    await storage.updateAgent(requesterGaii, {
-        morselBalance: requester.morselBalance - total,
-    });
+    const debited = await storage.debitBalance(requesterGaii, total);
+    if (!debited) return false;
 
     await storage.addTransaction({
         id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -76,12 +73,9 @@ export async function settlePayment(
     const relayShare = Math.floor(remainingFee * 0.2);
     const registryShare = remainingFee - providerNodeShare - requesterNodeShare - relayShare; // ~20%, absorbs rounding
 
-    // Pay provider the base price
-    const provider = await storage.getAgent(work.providerGaii);
-    if (provider) {
-        await storage.updateAgent(work.providerGaii, {
-            morselBalance: provider.morselBalance + basePrice,
-        });
+    // Pay provider the base price (atomic credit prevents race conditions)
+    const credited = await storage.creditBalance(work.providerGaii, basePrice);
+    if (credited) {
         await storage.addTransaction({
             id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             gaii: work.providerGaii,
@@ -166,6 +160,7 @@ export async function settlePayment(
 
 /**
  * Return escrow to requester (for rejections, disputes won by requester, etc.)
+ * Uses atomic creditBalance to prevent race conditions.
  */
 export async function returnEscrow(
     storage: Storage,
@@ -173,11 +168,8 @@ export async function returnEscrow(
     amount?: number,
 ): Promise<void> {
     const returnAmount = amount ?? work.cost.total;
-    const requester = await storage.getAgent(work.requesterGaii);
-    if (requester) {
-        await storage.updateAgent(work.requesterGaii, {
-            morselBalance: requester.morselBalance + returnAmount,
-        });
+    const credited = await storage.creditBalance(work.requesterGaii, returnAmount);
+    if (credited) {
         await storage.addTransaction({
             id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             gaii: work.requesterGaii,
@@ -192,20 +184,16 @@ export async function returnEscrow(
 
 /**
  * Apply daily allowance to an agent.
+ * Uses atomic creditBalanceCapped to prevent race conditions.
  */
 export async function applyDailyAllowance(
     storage: Storage,
     config: AimeatConfig,
     gaii: string,
 ): Promise<number> {
-    const agent = await storage.getAgent(gaii);
-    if (!agent) return 0;
-
-    const newBalance = Math.min(agent.morselBalance + config.dailyAllowance, config.dailyAllowanceCap);
-    const credited = newBalance - agent.morselBalance;
+    const credited = await storage.creditBalanceCapped(gaii, config.dailyAllowance, config.dailyAllowanceCap);
     if (credited <= 0) return 0;
 
-    await storage.updateAgent(gaii, { morselBalance: newBalance });
     await storage.addTransaction({
         id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         gaii,

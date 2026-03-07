@@ -359,45 +359,26 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
         },
         wallet: {
-          hold: async (from, amount, reason) => {
-            const holdId = `hold-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            await storage.createEscrowHold({
-              holdId,
-              fromGaii: from,
-              amount,
-              reason,
-              status: 'held',
-              extensionName: ext.name,
-              createdAt: new Date().toISOString(),
-            });
-            return { holdId };
-          },
-          release: async (holdId, to) => {
-            await storage.releaseEscrowHold(holdId, to);
-          },
-          transfer: async (from, to, amount, reason) => {
-            const txId = `ext-tx-${Date.now()}`;
+          // SECURITY: Extensions can only debit the calling agent's own balance
+          consume: async (amount: number, reason: string) => {
+            const debited = await storage.debitBalance(callerGaii, amount);
+            if (!debited) return { success: false, error: 'Insufficient balance' };
             await storage.addTransaction({
-              id: `${txId}-debit`,
-              gaii: from,
-              type: 'extension_transfer',
+              id: `ext-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              gaii: callerGaii,
+              type: 'extension_consume',
               amount: -amount,
-              counterpartyGaii: to,
+              trackingCode: `ext:${ext.name}:${reason}`,
               timestamp: new Date().toISOString(),
             });
-            await storage.addTransaction({
-              id: `${txId}-credit`,
-              gaii: to,
-              type: 'extension_transfer',
-              amount: amount,
-              counterpartyGaii: from,
-              timestamp: new Date().toISOString(),
-            });
+            return { success: true };
           },
-          getBalance: async (gaii) => {
-            const agent = await storage.getAgent(gaii);
+          // SECURITY: Extensions can only read the calling agent's own balance
+          getBalance: async () => {
+            const agent = await storage.getAgent(callerGaii);
             return agent?.morselBalance ?? 0;
           },
+          // hold, release, transfer REMOVED — extensions cannot move other agents' funds
         },
         consent: {
           check: async (gaii, scope) => {
@@ -412,13 +393,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage): Router
           },
         },
         trust: {
-          adjust: async (gaii, delta, _reason) => {
+          getScore: async (gaii: string) => {
             const agent = await storage.getAgent(gaii);
-            if (agent) {
-              const newScore = Math.max(0, Math.min(100, agent.trustScore + delta));
-              await storage.updateAgent(gaii, { trustScore: newScore });
-            }
+            return agent?.trustScore ?? 0;
           },
+          // trust.adjust removed — trust scores are system-computed only
         },
         caller: {
           gaii: callerGaii,

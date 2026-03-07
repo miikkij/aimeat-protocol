@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
-import { issueJWT, revokeToken } from '../auth/jwt.js';
+import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseGAII } from '../utils/gaii.js';
@@ -234,13 +234,26 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       if (ownerRecord?.roles.includes('owner')) roles.push('owner');
       if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
+      // P3-7: Create session record for JWT tracking
+      const sessionId = generateSessionId();
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + config.jwtTtlSeconds * 1000);
+
       const token = await issueJWT({
         sub: gaii,
         owner: parsed.owner,
         node: config.nodeId,
         roles,
         scopes: agent.defaultScopes,
-      }, config.jwtTtlSeconds);
+      }, config.jwtTtlSeconds, sessionId);
+
+      await storage.createSession({
+        sessionId,
+        gaii,
+        owner: parsed.owner,
+        issuedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      });
 
       // Update last seen
       await storage.updateAgent(gaii, { lastSeen: new Date().toISOString() });
@@ -290,16 +303,29 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
       const roles = [...ownerRecord.roles];
 
+      // P3-7: Create session record for JWT tracking
+      const ownerSessionId = generateSessionId();
+      const ownerNow = new Date();
+      const ownerExpiresAt = new Date(ownerNow.getTime() + config.jwtTtlSeconds * 1000);
+
       const token = await issueJWT({
         sub: ownerName,
         owner: ownerName,
         node: config.nodeId,
         roles,
-      }, config.jwtTtlSeconds);
+      }, config.jwtTtlSeconds, ownerSessionId);
+
+      await storage.createSession({
+        sessionId: ownerSessionId,
+        gaii: ownerName,
+        owner: ownerName,
+        issuedAt: ownerNow.toISOString(),
+        expiresAt: ownerExpiresAt.toISOString(),
+      });
 
       res.json(success(config.nodeId, {
         token,
-        expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+        expires_at: ownerExpiresAt.toISOString(),
         ttl_seconds: config.jwtTtlSeconds,
         identity: {
           owner: ownerName,
@@ -318,30 +344,56 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/auth/refresh
   router.post('/v1/auth/refresh', requireAuth(), async (req, res) => {
+    // P3-7: Create new session record for refreshed token
+    const refreshSessionId = generateSessionId();
+    const refreshNow = new Date();
+    const refreshExpiresAt = new Date(refreshNow.getTime() + config.jwtTtlSeconds * 1000);
+
     const token = await issueJWT({
       sub: req.auth!.sub,
       owner: req.auth!.owner,
       node: config.nodeId,
       roles: req.auth!.roles,
-    }, config.jwtTtlSeconds);
+    }, config.jwtTtlSeconds, refreshSessionId);
+
+    await storage.createSession({
+      sessionId: refreshSessionId,
+      gaii: req.auth!.sub,
+      owner: req.auth!.owner,
+      issuedAt: refreshNow.toISOString(),
+      expiresAt: refreshExpiresAt.toISOString(),
+    });
 
     res.json(success(config.nodeId, {
       token,
-      expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+      expires_at: refreshExpiresAt.toISOString(),
       ttl_seconds: config.jwtTtlSeconds,
     }));
   });
 
   // POST /v1/auth/revoke
-  router.post('/v1/auth/revoke', requireAuth(), (req, res) => {
+  router.post('/v1/auth/revoke', requireAuth(), async (req, res) => {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
-      revokeToken(token, req.auth!.exp);
+      await revokeToken(token, req.auth!.exp);
     }
 
     res.json(success(config.nodeId, {
       revoked: true,
+    }, [
+      { description: 'Get a new token', method: 'POST', url: '/v1/auth/token' },
+    ]));
+  });
+
+  // DELETE /v1/auth/sessions — revoke all sessions for the authenticated owner (P3-7)
+  router.delete('/v1/auth/sessions', requireAuth(), async (req, res) => {
+    const owner = req.auth!.owner;
+    const count = await storage.revokeAllSessions(owner);
+
+    res.json(success(config.nodeId, {
+      revoked_sessions: count,
+      owner,
     }, [
       { description: 'Get a new token', method: 'POST', url: '/v1/auth/token' },
     ]));

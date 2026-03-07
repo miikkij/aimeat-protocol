@@ -8,5 +8,5 @@ export interface DisputeRepository {
   addDisputeAuditEntry(disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry>;
   getDisputeAuditLog(disputeId: string): Promise<DisputeAuditEntry[]>;
   listDisputesByProvider(gaii: string): Promise<DisputeRecord[]>;
-  listAllDisputes(): Promise<DisputeRecord[]>;
+  listAllDisputes(limit?: number): Promise<DisputeRecord[]>;
 }

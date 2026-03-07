@@ -623,7 +623,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     return { content: [{ type: 'text' as const, text: `Daily mint cap (${config.maxOperatorMintPerDay}) would be exceeded. Already minted ${mintedToday} today.` }], isError: true };
                 }
 
-                await storage.updateAgent(gaii, { morselBalance: agent.morselBalance + amount });
+                await storage.creditBalance(gaii, amount);
                 const { randomBytes: rb } = await import('node:crypto');
                 await storage.addTransaction({
                     id: `tx-${Date.now()}-${rb(4).toString('hex')}`,
@@ -632,7 +632,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     timestamp: new Date().toISOString(),
                 });
                 emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: agent.morselBalance + amount }, null, 2) }] };
+                const updatedAgent = await storage.getAgent(gaii);
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: updatedAgent?.morselBalance ?? 0 }, null, 2) }] };
             },
         );
 

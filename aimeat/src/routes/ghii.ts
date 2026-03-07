@@ -12,6 +12,22 @@ import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 import { hashPassword, verifyPassword } from '../services/password.js';
 
+// SECURITY: Password strength validation
+const WEAK_PASSWORDS = [
+    'password', 'admin', 'testadminpw123', '123456', '12345678', 'letmein', 'qwerty',
+    'abc123', 'TestAdminPw123!', 'secret', 'test', 'demo', 'welcome', 'login',
+    'master', 'dragon', 'monkey', 'shadow', 'sunshine', 'trustno1',
+];
+
+function validatePasswordStrength(password: string): string | null {
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain a number';
+    if (WEAK_PASSWORDS.includes(password.toLowerCase())) return 'Password is too common';
+    return null;
+}
+
 /**
  * GHII — Global Human Intelligence Identifier
  *
@@ -46,16 +62,21 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
-        // Validate password if provided
+        // SECURITY: Validate password strength if provided
         if (password !== undefined && password !== null) {
-            if (typeof password !== 'string' || password.length < 4) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Password must be at least 4 characters'));
+            if (typeof password !== 'string') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Password must be a string'));
+                return;
+            }
+            const pwErr = validatePasswordStrength(password);
+            if (pwErr) {
+                res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr));
                 return;
             }
         }
 
-        // Hash password if provided
-        const passwordHash = (typeof password === 'string' && password.length >= 4)
+        // Hash password if provided (validation already done above)
+        const passwordHash = (typeof password === 'string' && password.length >= 8)
             ? await hashPassword(password)
             : undefined;
 
@@ -64,19 +85,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         const ghii = `${username}@${config.nodeId}`;
 
         if (existingOwner) {
-            if (config.devMode) {
-                // Dev mode: wipe old account and re-create (lost credentials recovery)
-                const oldAgents = await storage.getAgentsByOwner(username);
-                for (const agent of oldAgents) {
-                    await storage.deleteAgent(agent.gaii);
-                }
-                const oldGhii = await storage.getGHII(ghii);
-                if (oldGhii) await storage.deleteGHII(ghii);
-                await storage.deleteOwner(username);
-            } else {
-                res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`));
-                return;
-            }
+            // SECURITY: Never silently wipe accounts, even in dev mode.
+            // Use the admin reset endpoint for explicit account resets with audit trail.
+            res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`));
+            return;
         }
 
         // Generate keypair for the owner account
@@ -109,6 +121,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             updatedAt: now,
         });
 
+        // SECURITY: Prevent caching of response containing private key
+        res.set('Cache-Control', 'no-store');
+        res.set('Pragma', 'no-cache');
         res.status(201).json(success(config.nodeId, {
             ghii: {
                 ghii: ghiiRecord.ghii,
@@ -127,7 +142,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             private_key: keyPair.privateKey,
             public_key: keyPair.publicKey,
             has_password: !!passwordHash,
-            note: 'Store the private key securely. It cannot be retrieved again. You need it to authenticate and create agents.',
+            note: 'SECURITY: Store the private key securely. It cannot be retrieved again. Consider client-side key generation for enhanced security.',
         }, [
             { description: 'Create an agent for your identity', method: 'POST', url: '/v1/agents' },
             { description: 'Update your GHII profile', method: 'PUT', url: '/v1/ghii' },
@@ -319,6 +334,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             roles,
         }, config.jwtTtlSeconds);
 
+        // SECURITY: Prevent caching of response containing private keys
+        res.set('Cache-Control', 'no-store');
+        res.set('Pragma', 'no-cache');
         res.json(success(config.nodeId, {
             ghii: {
                 ghii: ghiiRecord.ghii,
@@ -446,6 +464,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         // Notify directory of new profile (Phase 1.4 — event-driven refresh)
         if (onDirectoryChange) onDirectoryChange();
 
+        // SECURITY: Prevent caching of response containing private key
+        res.set('Cache-Control', 'no-store');
+        res.set('Pragma', 'no-cache');
         res.status(201).json(success(config.nodeId, {
             ghii: {
                 ghii: ghiiRecord.ghii,
@@ -574,6 +595,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             roles,
         }, config.jwtTtlSeconds);
 
+        // SECURITY: Prevent caching of response containing private key
+        res.set('Cache-Control', 'no-store');
+        res.set('Pragma', 'no-cache');
         res.json(success(config.nodeId, {
             verified: true,
             ghii,
@@ -713,6 +737,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             roles,
         }, config.jwtTtlSeconds);
 
+        // SECURITY: Prevent caching of response containing private keys
+        res.set('Cache-Control', 'no-store');
+        res.set('Pragma', 'no-cache');
         res.json(success(config.nodeId, {
             ghii,
             token: jwtToken,

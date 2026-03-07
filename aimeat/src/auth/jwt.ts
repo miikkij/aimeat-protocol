@@ -1,5 +1,7 @@
 import { SignJWT, jwtVerify, importPKCS8, importSPKI, exportPKCS8, exportSPKI } from 'jose';
 import * as ed from '@noble/ed25519';
+import { createHash, randomBytes } from 'node:crypto';
+import type { Storage } from '../storage/interface.js';
 
 // We use EdDSA JWTs signed with the node's private key
 // jose requires CryptoKey objects, so we convert from raw Ed25519 bytes
@@ -36,10 +38,15 @@ export interface JWTPayload {
   scopes?: string[];  // omitted = ['*'] for backward compat
 }
 
-export async function issueJWT(payload: JWTPayload, ttlSeconds: number): Promise<string> {
+/** Generate a unique session ID for JWT tracking. */
+export function generateSessionId(): string {
+  return `sid-${randomBytes(16).toString('hex')}`;
+}
+
+export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionId?: string): Promise<string> {
   if (!nodePrivateKey) throw new Error('Node keys not initialized');
 
-  return new SignJWT({
+  const builder = new SignJWT({
     owner: payload.owner,
     node: payload.node,
     roles: payload.roles,
@@ -48,8 +55,14 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number): Promise
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
     .setIssuedAt()
-    .setExpirationTime(`${ttlSeconds}s`)
-    .sign(nodePrivateKey);
+    .setExpirationTime(`${ttlSeconds}s`);
+
+  // P3-7: Embed session ID for server-side session tracking
+  if (sessionId) {
+    builder.setJti(sessionId);
+  }
+
+  return builder.sign(nodePrivateKey);
 }
 
 export interface VerifiedToken {
@@ -59,6 +72,8 @@ export interface VerifiedToken {
   roles: string[];
   exp: number;
   scopes: string[];
+  anonymous?: boolean;
+  sessionId?: string;  // P3-7: Server-side session tracking
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -75,34 +90,88 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       roles: payload.roles as string[],
       exp: payload.exp as number,
       scopes: (payload.scopes as string[]) ?? ['*'],
+      sessionId: payload.jti as string | undefined,
     };
   } catch {
     return null;
   }
 }
 
-// Revocation list (in-memory, TTL-based)
-const revokedTokens = new Map<string, number>(); // token -> expiresAt
+// ── Token Revocation (storage-backed with in-memory cache) ─────────────
 
-export function revokeToken(token: string, expiresAt: number): void {
-  revokedTokens.set(token, expiresAt);
+/** Hash a raw JWT token to a fixed-length hex string for storage. */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
-export function isRevoked(token: string): boolean {
-  const exp = revokedTokens.get(token);
-  if (exp === undefined) return false;
-  // Clean up expired entries
-  if (Date.now() / 1000 > exp) {
-    revokedTokens.delete(token);
-    return false;
-  }
-  return true;
+// In-memory cache for fast repeated lookups (TTL 60 seconds).
+// Entries are { revoked: boolean, cachedAt: number }.
+const revocationCache = new Map<string, { revoked: boolean; cachedAt: number }>();
+const CACHE_TTL_MS = 60_000;
+
+// Reference to the storage layer, set via initRevocationStorage().
+let _storage: Storage | null = null;
+let _cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Initialize the token revocation system with a persistent storage backend.
+ * Must be called once during server startup (after storage is created).
+ */
+export function initRevocationStorage(storage: Storage): void {
+  _storage = storage;
+
+  // Periodic cleanup of expired revoked tokens (every 60 seconds)
+  if (_cleanupInterval) clearInterval(_cleanupInterval);
+  _cleanupInterval = setInterval(async () => {
+    try {
+      await storage.cleanExpiredRevocations();
+    } catch {
+      // Swallow cleanup errors silently — non-critical
+    }
+    // Also evict stale cache entries
+    const now = Date.now();
+    for (const [key, entry] of revocationCache) {
+      if (now - entry.cachedAt > CACHE_TTL_MS) {
+        revocationCache.delete(key);
+      }
+    }
+  }, 60_000);
 }
 
-// Periodic cleanup of expired revoked tokens
-setInterval(() => {
-  const now = Date.now() / 1000;
-  for (const [token, exp] of revokedTokens) {
-    if (now > exp) revokedTokens.delete(token);
+/**
+ * Revoke a token. Persists to storage and updates the in-memory cache.
+ */
+export async function revokeToken(token: string, expiresAt: number): Promise<void> {
+  const hash = hashToken(token);
+
+  // Persist to storage
+  if (_storage) {
+    await _storage.revokeToken(hash, expiresAt);
   }
-}, 60_000);
+
+  // Update cache
+  revocationCache.set(hash, { revoked: true, cachedAt: Date.now() });
+}
+
+/**
+ * Check if a token has been revoked.
+ * Uses in-memory cache as L1, falls back to storage for cache misses.
+ */
+export async function isRevoked(token: string): Promise<boolean> {
+  const hash = hashToken(token);
+
+  // L1: Check in-memory cache
+  const cached = revocationCache.get(hash);
+  if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
+    return cached.revoked;
+  }
+
+  // L2: Check storage
+  if (_storage) {
+    const revoked = await _storage.isTokenRevoked(hash);
+    revocationCache.set(hash, { revoked, cachedAt: Date.now() });
+    return revoked;
+  }
+
+  return false;
+}

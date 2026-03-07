@@ -627,6 +627,24 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (extName, libName)
     );
 
+    -- ── Sessions (P3-7: Server-Side Session Tracking) ──
+    CREATE TABLE IF NOT EXISTS sessions (
+      sessionId      TEXT PRIMARY KEY,
+      gaii           TEXT NOT NULL,
+      owner          TEXT NOT NULL,
+      issuedAt       TEXT NOT NULL,
+      expiresAt      TEXT NOT NULL,
+      revoked        INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_owner ON sessions(owner);
+    CREATE INDEX IF NOT EXISTS idx_sessions_gaii ON sessions(gaii);
+
+    -- ── Revoked Tokens ──
+    CREATE TABLE IF NOT EXISTS revoked_tokens (
+      token_hash     TEXT PRIMARY KEY,
+      expires_at     INTEGER NOT NULL
+    );
+
     -- ── Node Key (single-row) ──
     CREATE TABLE IF NOT EXISTS node_key (
       id             INTEGER PRIMARY KEY DEFAULT 1,
@@ -704,6 +722,7 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_escrow_fromGaii ON escrow_holds(fromGaii);
     CREATE INDEX IF NOT EXISTS idx_pps_nodeId ON personal_push_subscriptions(personalNodeId);
     CREATE INDEX IF NOT EXISTS idx_pps_ownerName ON personal_push_subscriptions(ownerName);
+    CREATE INDEX IF NOT EXISTS idx_revoked_expires ON revoked_tokens(expires_at);
 
   `);
 

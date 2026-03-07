@@ -6,5 +6,5 @@ export interface WorkRepository {
   updateWork(trackingCode: string, updates: Partial<WorkRecord>): Promise<WorkRecord | null>;
   listWorkByProvider(gaii: string): Promise<WorkRecord[]>;
   listWorkByRequester(gaii: string): Promise<WorkRecord[]>;
-  listAllWork(): Promise<WorkRecord[]>;
+  listAllWork(limit?: number): Promise<WorkRecord[]>;
 }

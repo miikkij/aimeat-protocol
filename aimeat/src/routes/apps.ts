@@ -76,6 +76,16 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         const owner = req.params.owner as string;
         const filename = req.params.filename as string;
 
+        // SECURITY: Defense-in-depth path traversal protection
+        const decodedFn = decodeURIComponent(filename);
+        if (decodedFn.includes('..') || decodedFn.includes('/') || decodedFn.includes('\\')
+            || decodedFn.includes('%2f') || decodedFn.includes('%2F')
+            || decodedFn.includes('%5c') || decodedFn.includes('%5C')
+            || decodedFn.includes('\0')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+            return;
+        }
+
         const agents = await storage.getAgentsByOwner(owner);
         if (agents.length === 0) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
@@ -102,6 +112,16 @@ export function appsRouter(config: AimeatConfig, storage: Storage): Router {
         const owner = req.params.owner as string;
         const filename = req.params.filename as string;
         const code = (req.query.code as string) || req.headers['x-access-code'] as string | undefined;
+
+        // SECURITY: Defense-in-depth path traversal protection
+        const decodedFilename = decodeURIComponent(filename);
+        if (decodedFilename.includes('..') || decodedFilename.includes('/') || decodedFilename.includes('\\')
+            || decodedFilename.includes('%2f') || decodedFilename.includes('%2F')
+            || decodedFilename.includes('%5c') || decodedFilename.includes('%5C')
+            || decodedFilename.includes('\0')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_FILENAME', 'Filename contains invalid characters'));
+            return;
+        }
 
         // Find the agent that owns this file
         const agents = await storage.getAgentsByOwner(owner);

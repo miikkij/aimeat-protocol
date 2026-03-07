@@ -124,25 +124,27 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (agent.morselBalance + grantAmount > config.dailyAllowanceCap) {
+    // Use atomic creditBalanceCapped to prevent TOCTOU race conditions
+    const credited = await storage.creditBalanceCapped(gaii, grantAmount, config.dailyAllowanceCap);
+    if (credited <= 0) {
       res.status(409).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-        `Balance would exceed accumulation cap of ${config.dailyAllowanceCap}`));
+        `Balance is already at or above accumulation cap of ${config.dailyAllowanceCap}`));
       return;
     }
 
-    await storage.updateAgent(gaii, { morselBalance: agent.morselBalance + grantAmount });
     await storage.addTransaction({
       id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       gaii,
       type: 'allowance',
-      amount: grantAmount,
+      amount: credited,
       timestamp: new Date().toISOString(),
     });
 
+    const updatedAgent = await storage.getAgent(gaii);
     res.json(success(config.nodeId, {
       '@type': 'schema:TransferAction',
-      granted: grantAmount,
-      new_balance: agent.morselBalance + grantAmount,
+      granted: credited,
+      new_balance: updatedAgent?.morselBalance ?? 0,
       reason,
     }));
   });

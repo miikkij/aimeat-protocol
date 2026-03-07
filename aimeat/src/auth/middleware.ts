@@ -2,6 +2,15 @@ import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
+import type { Storage } from '../storage/interface.js';
+
+// P3-7: Reference to storage for session revocation checks
+let _sessionStorage: Storage | null = null;
+
+/** Initialize session-aware auth middleware. Called once during server startup. */
+export function initSessionAuth(storage: Storage): void {
+  _sessionStorage = storage;
+}
 
 // Anonymous mode: when enabled, inject this identity for unauthenticated requests
 let _anonymousMode = false;
@@ -43,7 +52,7 @@ export function optionalAuth() {
   return async (req: Request, _res: Response, next: NextFunction) => {
     const token = extractToken(req);
     if (token) {
-      if (isRevoked(token)) {
+      if (await isRevoked(token)) {
         req.auth = undefined;
       } else {
         const verified = await verifyJWT(token);
@@ -61,6 +70,7 @@ export function optionalAuth() {
         roles: ['agent'],
         exp: Math.floor(Date.now() / 1000) + 86400,
         scopes: ['memory:read', 'catalogue:read', 'social:read'],
+        anonymous: true,
       };
     }
     next();
@@ -73,8 +83,17 @@ export function optionalAuth() {
  */
 export function requireAuth() {
   return async (req: Request, res: Response, next: NextFunction) => {
-    // If auth was already resolved by global optionalAuth() (e.g. anonymous mode), pass through
+    // If auth was already resolved by global optionalAuth() (e.g. anonymous mode)
     if (req.auth) {
+      // SECURITY: Reject anonymous credentials — requireAuth() requires real authentication
+      if (req.auth.anonymous) {
+        const stats = getStats();
+        if (stats) stats.increment('auth_failures_total');
+        const prom = getPromMetrics();
+        if (prom) prom.authFailuresTotal.inc();
+        res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'This endpoint requires authentication'));
+        return;
+      }
       next();
       return;
     }
@@ -89,7 +108,7 @@ export function requireAuth() {
       return;
     }
 
-    if (isRevoked(token)) {
+    if (await isRevoked(token)) {
       const stats = getStats();
       if (stats) stats.increment('auth_failures_total');
       const prom = getPromMetrics();
@@ -108,7 +127,36 @@ export function requireAuth() {
       return;
     }
 
+    // P3-7: Check if the session has been revoked
+    if (verified.sessionId && _sessionStorage) {
+      const sessionRevoked = await _sessionStorage.isSessionRevoked(verified.sessionId);
+      if (sessionRevoked) {
+        const stats = getStats();
+        if (stats) stats.increment('auth_failures_total');
+        const prom = getPromMetrics();
+        if (prom) prom.authFailuresTotal.inc();
+        res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Session has been revoked'));
+        return;
+      }
+    }
+
     req.auth = verified;
+    next();
+  };
+}
+
+/**
+ * Require authentication OR anonymous credentials.
+ * Use for endpoints that should be accessible in anonymous mode
+ * (e.g. public catalogue searches, board reads, directory listing).
+ */
+export function requireAuthOrAnonymous() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      return;
+    }
+    // Allow both authenticated and anonymous
     next();
   };
 }
@@ -187,14 +235,11 @@ export function requireScope(...requiredScopes: string[]) {
 
 function extractToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith('Bearer ')) {
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
-  // Fallback: token or _token query parameter
-  const queryToken = req.query.token ?? req.query._token;
-  if (typeof queryToken === 'string') {
-    return queryToken;
-  }
+  // SECURITY: JWT tokens must NOT be accepted via URL query parameters.
+  // Tokens in URLs are logged in access logs, browser history, and referrer headers.
   return null;
 }
 

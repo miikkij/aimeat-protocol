@@ -268,6 +268,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             }
         }
 
+        // Per-file size limit (must match POST /v1/storage enforcement)
+        if (assembledData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
+            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Assembled file size (${assembledData.length} bytes) exceeds ${config.storageMaxFileSizeMb}MB per-file limit`));
+            return;
+        }
+
         // M-2: Total storage quota check before committing assembled file
         const gaii = upload.ownerGaii;
         const storageQuota = await checkStorageQuota(config, storage, gaii, assembledData.length);
@@ -402,6 +408,24 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
+        // Cross-agent access: if the file is not owned by the requester, enforce consent
+        if (file.ownerGaii !== req.auth!.sub) {
+            if (file.visibility === 'public') {
+                // Public files are always accessible
+            } else if (config.consentEnabled) {
+                const consentResult = await checkConsentForRead(
+                    storage, `storage:${key}`, file.ownerGaii, req.auth!.sub, file.visibility,
+                );
+                if (!consentResult.allowed) {
+                    res.status(403).end();
+                    return;
+                }
+            } else {
+                res.status(403).end();
+                return;
+            }
+        }
+
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Content-Length', file.size);
         res.setHeader('X-AIMEAT-Visibility', file.visibility);
@@ -417,6 +441,26 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
             return;
+        }
+
+        // Cross-agent access: if the file is not owned by the requester, enforce consent
+        if (file.ownerGaii !== req.auth!.sub) {
+            if (file.visibility === 'public') {
+                // Public files are always accessible
+            } else if (config.consentEnabled) {
+                const consentResult = await checkConsentForRead(
+                    storage, `storage:${key}`, file.ownerGaii, req.auth!.sub, file.visibility,
+                );
+                await auditDataAccess(storage, consentResult.consentId ?? null,
+                    file.ownerGaii, req.auth!.sub, `storage:${key}`, 'read', consentResult.allowed);
+                if (!consentResult.allowed) {
+                    res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this file'));
+                    return;
+                }
+            } else {
+                res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only access your own files'));
+                return;
+            }
         }
 
         // Range header support
@@ -449,6 +493,17 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Anonymous namespace enforcement
         if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only delete keys prefixed with "anonymous/"'));
+            return;
+        }
+
+        // Defense-in-depth: verify ownership before deletion
+        const existing = await storage.getStorageFile(gaii, key);
+        if (!existing) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+            return;
+        }
+        if (existing.ownerGaii !== req.auth!.sub) {
+            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own files'));
             return;
         }
 

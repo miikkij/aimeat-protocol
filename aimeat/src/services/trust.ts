@@ -26,6 +26,9 @@ export async function calculateTrustScore(gaii: string, storage: Storage): Promi
   let positiveRatings = 0, negativeRatings = 0;
   let totalDeliveryTime = 0;
 
+  // Track unique counterparties for diversity check (anti-manipulation)
+  const uniqueCounterparties = new Set<string>();
+
   // Track disputes lost from actual dispute data
   const disputes = await storage.listDisputesByProvider(gaii);
   const disputesLost = disputes.filter(d =>
@@ -33,8 +36,12 @@ export async function calculateTrustScore(gaii: string, storage: Storage): Promi
   ).length;
 
   for (const w of providerWork) {
+    // SECURITY: Skip self-work (defense in depth — should be blocked at creation)
+    if (w.requesterGaii === gaii) continue;
+
     if (w.status === 'delivered' || w.status === 'rated') {
       delivered++;
+      uniqueCounterparties.add(w.requesterGaii);
       if (w.rating) {
         if (w.rating.score >= 4) positiveRatings++;
         else negativeRatings++;
@@ -68,6 +75,12 @@ export async function calculateTrustScore(gaii: string, storage: Storage): Promi
     volumeFactor * 0.15 +
     disputePenalty * 0.15,
   );
+
+  // SECURITY: Require minimum 3 unique counterparties for meaningful trust score
+  // Prevents trust inflation through repeated work with a single colluding party
+  if (uniqueCounterparties.size < 3) {
+    score = Math.min(score, 40);
+  }
 
   // Inactivity decay: -1 per 30 days with no transactions
   if (agent.lastSeen) {

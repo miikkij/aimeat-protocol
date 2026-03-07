@@ -32,6 +32,11 @@ export async function setAgentCors(agentName, origins) {
   });
 }
 
+/** Revoke all active JWT sessions for the authenticated owner. */
+export async function revokeAllSessions() {
+  return api('/v1/auth/sessions', { method: 'DELETE' });
+}
+
 /**
  * Load full security data: GHII CORS + all agent CORS settings.
  * @param {Array} agents - List of agent objects (must have .name)

@@ -93,8 +93,100 @@ export class SqliteStorage implements Storage {
   }
 
   async deleteOwner(name: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM owners WHERE name = ?').run(name);
-    return result.changes > 0;
+    const txn = this.db.transaction(() => {
+      // 1. Get all agents belonging to this owner
+      const agentRows = this.db.prepare('SELECT gaii FROM agents WHERE owner = ?').all(name) as { gaii: string }[];
+      const agentGaiis = agentRows.map(r => r.gaii);
+
+      // 2. Cascade delete all agent-related data for each agent
+      for (const gaii of agentGaiis) {
+        this.cascadeDeleteAgentData(gaii);
+      }
+
+      // 3. Delete all agents for this owner
+      this.db.prepare('DELETE FROM agents WHERE owner = ?').run(name);
+
+      // 4. Delete GHII records for this owner
+      this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);
+
+      // 5. Delete personal nodes and their mailbox items & push subscriptions
+      const nodeRows = this.db.prepare('SELECT nodeId FROM personal_nodes WHERE ownerName = ?').all(name) as { nodeId: string }[];
+      for (const node of nodeRows) {
+        this.db.prepare('DELETE FROM mailbox_items WHERE personalNodeId = ?').run(node.nodeId);
+        this.db.prepare('DELETE FROM personal_push_subscriptions WHERE personalNodeId = ?').run(node.nodeId);
+        this.db.prepare('DELETE FROM notification_preferences WHERE personalNodeId = ?').run(node.nodeId);
+      }
+      this.db.prepare('DELETE FROM personal_nodes WHERE ownerName = ?').run(name);
+
+      // 6. Delete push subscriptions for this owner
+      this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ?').run(name);
+      this.db.prepare('DELETE FROM personal_push_subscriptions WHERE ownerName = ?').run(name);
+
+      // 7. Delete listings for this owner
+      this.db.prepare('DELETE FROM listings WHERE ownerName = ?').run(name);
+
+      // 8. Delete purchases for this owner (as buyer or seller)
+      this.db.prepare('DELETE FROM purchases WHERE buyerOwner = ? OR sellerOwner = ?').run(name, name);
+
+      // 9. Delete chat instances for this owner
+      this.db.prepare('DELETE FROM chat_instances WHERE ownerName = ?').run(name);
+
+      // 10. Delete email verifications for this owner
+      this.db.prepare('DELETE FROM email_verifications WHERE ownerName = ?').run(name);
+
+      // 11. Delete the owner record itself
+      const result = this.db.prepare('DELETE FROM owners WHERE name = ?').run(name);
+      return result.changes > 0;
+    });
+    return txn();
+  }
+
+  /**
+   * Cascade-delete all data associated with a single agent GAII.
+   * Called inside a transaction by both deleteOwner and deleteAgent.
+   */
+  private cascadeDeleteAgentData(gaii: string): void {
+    // Memory
+    this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(gaii);
+    // Micro-memory
+    this.db.prepare('DELETE FROM micro_memory WHERE gaii = ?').run(gaii);
+    // Actions
+    this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
+    // Work (as provider or requester) — also clean up related disputes
+    const workRows = this.db.prepare(
+      'SELECT trackingCode FROM work WHERE providerGaii = ? OR requesterGaii = ?'
+    ).all(gaii, gaii) as { trackingCode: string }[];
+    for (const w of workRows) {
+      this.db.prepare('DELETE FROM dispute_audit WHERE disputeId IN (SELECT id FROM disputes WHERE trackingCode = ?)').run(w.trackingCode);
+      this.db.prepare('DELETE FROM disputes WHERE trackingCode = ?').run(w.trackingCode);
+    }
+    this.db.prepare('DELETE FROM work WHERE providerGaii = ? OR requesterGaii = ?').run(gaii, gaii);
+    // Wallet transactions
+    this.db.prepare('DELETE FROM wallet_transactions WHERE gaii = ?').run(gaii);
+    // Board posts authored by this agent
+    this.db.prepare('DELETE FROM board_posts WHERE authorGaii = ?').run(gaii);
+    // Board subscriptions
+    this.db.prepare('DELETE FROM board_subscriptions WHERE gaii = ?').run(gaii);
+    // Boards owned by this agent — also delete their posts and subscriptions
+    const boardRows = this.db.prepare('SELECT id FROM boards WHERE ownerGaii = ?').all(gaii) as { id: string }[];
+    for (const b of boardRows) {
+      this.db.prepare('DELETE FROM board_posts WHERE boardId = ?').run(b.id);
+      this.db.prepare('DELETE FROM board_subscriptions WHERE boardId = ?').run(b.id);
+    }
+    this.db.prepare('DELETE FROM boards WHERE ownerGaii = ?').run(gaii);
+    // Consents and consent audit
+    this.db.prepare('DELETE FROM consent_audit WHERE ownerGaii = ?').run(gaii);
+    this.db.prepare('DELETE FROM consents WHERE ownerGaii = ?').run(gaii);
+    // Storage files
+    this.db.prepare('DELETE FROM storage_files WHERE ownerGaii = ?').run(gaii);
+    // Matches (as profileA or profileB)
+    this.db.prepare('DELETE FROM matches WHERE profileA = ? OR profileB = ?').run(gaii, gaii);
+    // Flags raised by this agent
+    this.db.prepare('DELETE FROM flags WHERE flaggedBy = ?').run(gaii);
+    // Escrow holds
+    this.db.prepare('DELETE FROM escrow_holds WHERE fromGaii = ?').run(gaii);
+    // OTKs (one-time keys)
+    this.db.prepare('DELETE FROM otks WHERE ownerGaii = ?').run(gaii);
   }
 
   private deserializeOwner(row: Record<string, unknown>): OwnerRecord {
@@ -165,13 +257,63 @@ export class SqliteStorage implements Storage {
   }
 
   async deleteAgent(gaii: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM agents WHERE gaii = ?').run(gaii);
-    return result.changes > 0;
+    const txn = this.db.transaction(() => {
+      // Cascade delete all agent-related data
+      this.cascadeDeleteAgentData(gaii);
+      // Delete the agent record itself
+      const result = this.db.prepare('DELETE FROM agents WHERE gaii = ?').run(gaii);
+      return result.changes > 0;
+    });
+    return txn();
   }
 
   async listAgents(): Promise<AgentRecord[]> {
     const rows = this.db.prepare('SELECT * FROM agents').all() as Record<string, unknown>[];
     return rows.map(r => this.deserializeAgent(r));
+  }
+
+  async debitBalance(gaii: string, amount: number): Promise<boolean> {
+    const result = this.db.prepare(
+      `UPDATE agents SET morselBalance = morselBalance - ? WHERE gaii = ? AND morselBalance >= ?`
+    ).run(amount, gaii, amount);
+    return result.changes > 0;
+  }
+
+  async creditBalance(gaii: string, amount: number): Promise<boolean> {
+    const result = this.db.prepare(
+      `UPDATE agents SET morselBalance = morselBalance + ? WHERE gaii = ?`
+    ).run(amount, gaii);
+    return result.changes > 0;
+  }
+
+  async creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number> {
+    // SQLite transaction ensures atomicity — no interleaving between read and write
+    const txn = this.db.transaction(() => {
+      const row = this.db.prepare('SELECT morselBalance FROM agents WHERE gaii = ?').get(gaii) as Record<string, unknown> | undefined;
+      if (!row) return 0;
+      const oldBalance = row.morselBalance as number;
+      if (oldBalance >= cap) return 0;
+      const actualCredit = Math.min(amount, cap - oldBalance);
+      if (actualCredit <= 0) return 0;
+      this.db.prepare('UPDATE agents SET morselBalance = morselBalance + ? WHERE gaii = ?').run(actualCredit, gaii);
+      return actualCredit;
+    });
+    return txn();
+  }
+
+  async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
+    const txn = this.db.transaction(() => {
+      const debit = this.db.prepare(
+        `UPDATE agents SET morselBalance = morselBalance - ? WHERE gaii = ? AND morselBalance >= ?`
+      ).run(amount, fromGaii, amount);
+      if (debit.changes === 0) return false;
+
+      this.db.prepare(
+        `UPDATE agents SET morselBalance = morselBalance + ? WHERE gaii = ?`
+      ).run(amount, toGaii);
+      return true;
+    });
+    return txn();
   }
 
   private deserializeAgent(row: Record<string, unknown>): AgentRecord {
@@ -503,8 +645,8 @@ export class SqliteStorage implements Storage {
     return rows.map(r => this.deserializeWork(r));
   }
 
-  async listAllWork(): Promise<WorkRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM work').all() as Record<string, unknown>[];
+  async listAllWork(limit = 10000): Promise<WorkRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM work ORDER BY createdAt DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeWork(r));
   }
 
@@ -549,8 +691,8 @@ export class SqliteStorage implements Storage {
     return rows.reverse().map(r => this.deserializeTransaction(r));
   }
 
-  async listAllTransactions(): Promise<WalletTransaction[]> {
-    const rows = this.db.prepare('SELECT * FROM wallet_transactions').all() as Record<string, unknown>[];
+  async listAllTransactions(limit = 10000): Promise<WalletTransaction[]> {
+    const rows = this.db.prepare('SELECT * FROM wallet_transactions ORDER BY timestamp DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeTransaction(r));
   }
 
@@ -929,8 +1071,8 @@ export class SqliteStorage implements Storage {
     return rows.map(r => this.deserializeDispute(r));
   }
 
-  async listAllDisputes(): Promise<DisputeRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM disputes').all() as Record<string, unknown>[];
+  async listAllDisputes(limit = 10000): Promise<DisputeRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM disputes ORDER BY createdAt DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeDispute(r));
   }
 
@@ -2208,8 +2350,8 @@ export class SqliteStorage implements Storage {
     return result.changes;
   }
 
-  async listAllMatches(): Promise<MatchRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM matches').all() as Record<string, unknown>[];
+  async listAllMatches(limit = 10000): Promise<MatchRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM matches ORDER BY createdAt DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeMatch(r));
   }
 
@@ -2297,11 +2439,31 @@ export class SqliteStorage implements Storage {
   }
 
   async deleteOrganism(id: string): Promise<boolean> {
-    // Cascade: delete memberships and join requests
-    this.db.prepare('DELETE FROM organism_memberships WHERE organismId = ?').run(id);
-    this.db.prepare('DELETE FROM join_requests WHERE organismId = ?').run(id);
-    const result = this.db.prepare('DELETE FROM organisms WHERE id = ?').run(id);
-    return result.changes > 0;
+    const txn = this.db.transaction(() => {
+      // Get the organism to find its boardId and memoryNamespace
+      const org = this.db.prepare('SELECT boardId, memoryNamespace FROM organisms WHERE id = ?').get(id) as { boardId: string; memoryNamespace: string } | undefined;
+
+      // Cascade: delete memberships and join requests
+      this.db.prepare('DELETE FROM organism_memberships WHERE organismId = ?').run(id);
+      this.db.prepare('DELETE FROM join_requests WHERE organismId = ?').run(id);
+
+      // Cascade: delete organism reputation
+      this.db.prepare('DELETE FROM organism_reputations WHERE organismId = ?').run(id);
+
+      if (org) {
+        // Cascade: delete the organism's board and its posts/subscriptions
+        this.db.prepare('DELETE FROM board_posts WHERE boardId = ?').run(org.boardId);
+        this.db.prepare('DELETE FROM board_subscriptions WHERE boardId = ?').run(org.boardId);
+        this.db.prepare('DELETE FROM boards WHERE id = ?').run(org.boardId);
+
+        // Cascade: delete memory entries under the organism's namespace
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(org.memoryNamespace);
+      }
+
+      const result = this.db.prepare('DELETE FROM organisms WHERE id = ?').run(id);
+      return result.changes > 0;
+    });
+    return txn();
   }
 
   private deserializeOrganism(row: Record<string, unknown>): OrganismRecord {
@@ -3352,5 +3514,51 @@ export class SqliteStorage implements Storage {
       quietHoursUtc: row.quietHoursUtc ? JSON.parse(row.quietHoursUtc as string) : null,
       email: (row.email as string) ?? null,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Sessions (P3-7: Server-Side Session Tracking) ──
+  // ══════════════════════════════════════════════════════════
+
+  async createSession(session: { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string }): Promise<void> {
+    this.db.prepare(
+      'INSERT INTO sessions (sessionId, gaii, owner, issuedAt, expiresAt, revoked) VALUES (?, ?, ?, ?, ?, 0)'
+    ).run(session.sessionId, session.gaii, session.owner, session.issuedAt, session.expiresAt);
+  }
+
+  async revokeSession(sessionId: string): Promise<boolean> {
+    const result = this.db.prepare('UPDATE sessions SET revoked = 1 WHERE sessionId = ? AND revoked = 0').run(sessionId);
+    return result.changes > 0;
+  }
+
+  async revokeAllSessions(owner: string): Promise<number> {
+    const result = this.db.prepare('UPDATE sessions SET revoked = 1 WHERE owner = ? AND revoked = 0').run(owner);
+    return result.changes;
+  }
+
+  async isSessionRevoked(sessionId: string): Promise<boolean> {
+    const row = this.db.prepare('SELECT revoked FROM sessions WHERE sessionId = ?').get(sessionId) as { revoked: number } | undefined;
+    if (!row) return false; // session not tracked = not revoked
+    return row.revoked === 1;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Token Revocation ──
+  // ══════════════════════════════════════════════════════════
+
+  async revokeToken(tokenHash: string, expiresAt: number): Promise<void> {
+    this.db.prepare(
+      'INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at) VALUES (?, ?)'
+    ).run(tokenHash, expiresAt);
+  }
+
+  async isTokenRevoked(tokenHash: string): Promise<boolean> {
+    const row = this.db.prepare('SELECT 1 FROM revoked_tokens WHERE token_hash = ?').get(tokenHash);
+    return !!row;
+  }
+
+  async cleanExpiredRevocations(): Promise<number> {
+    const result = this.db.prepare('DELETE FROM revoked_tokens WHERE expires_at < ?').run(Math.floor(Date.now() / 1000));
+    return result.changes;
   }
 }

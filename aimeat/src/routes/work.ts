@@ -12,6 +12,7 @@ import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchem
 import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -45,41 +46,58 @@ function fireWebhook(url: string, payload: Record<string, unknown>, maxRetries: 
   const event = (payload.event as string) ?? 'unknown';
   const trackingCode = (payload.tracking_code as string) ?? '';
   const doFetch = (attempt: number) => {
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: AbortSignal.timeout(10_000),
-    }).then(resp => {
-      const entry: WebhookLogEntry = {
-        url, trackingCode, event, attempt,
-        status: resp.ok ? 'success' : 'failed',
-        httpStatus: resp.status,
-        timestamp: new Date().toISOString(),
-      };
-      if (!resp.ok && attempt < maxRetries) {
-        entry.status = 'retrying';
+    // SSRF validation: block requests to private/reserved IPs
+    validateOutboundUrl(url).then(urlCheck => {
+      if (!urlCheck.valid) {
+        logger.warn(`Blocked webhook to ${url}: ${urlCheck.reason}`);
+        const entry: WebhookLogEntry = {
+          url, trackingCode, event, attempt,
+          status: 'failed',
+          error: `SSRF blocked: ${urlCheck.reason}`,
+          timestamp: new Date().toISOString(),
+        };
+        webhookLog.push(entry);
+        if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+        return;
       }
-      webhookLog.push(entry);
-      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-      if (!resp.ok && attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000;
-        setTimeout(() => doFetch(attempt + 1), delay);
-      }
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(10_000),
+      }).then(resp => {
+        const entry: WebhookLogEntry = {
+          url, trackingCode, event, attempt,
+          status: resp.ok ? 'success' : 'failed',
+          httpStatus: resp.status,
+          timestamp: new Date().toISOString(),
+        };
+        if (!resp.ok && attempt < maxRetries) {
+          entry.status = 'retrying';
+        }
+        webhookLog.push(entry);
+        if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+        if (!resp.ok && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          setTimeout(() => doFetch(attempt + 1), delay);
+        }
+      }).catch(err => {
+        const entry: WebhookLogEntry = {
+          url, trackingCode, event, attempt,
+          status: attempt < maxRetries ? 'retrying' : 'failed',
+          error: String(err),
+          timestamp: new Date().toISOString(),
+        };
+        webhookLog.push(entry);
+        if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
+        logger.warn(`Webhook delivery failed (attempt ${attempt}/${maxRetries})`, { url, error: String(err) });
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          setTimeout(() => doFetch(attempt + 1), delay);
+        }
+      });
     }).catch(err => {
-      const entry: WebhookLogEntry = {
-        url, trackingCode, event, attempt,
-        status: attempt < maxRetries ? 'retrying' : 'failed',
-        error: String(err),
-        timestamp: new Date().toISOString(),
-      };
-      webhookLog.push(entry);
-      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-      logger.warn(`Webhook delivery failed (attempt ${attempt}/${maxRetries})`, { url, error: String(err) });
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000;
-        setTimeout(() => doFetch(attempt + 1), delay);
-      }
+      logger.warn(`Webhook URL validation failed for ${url}`, { error: String(err) });
     });
   };
   doFetch(1);
@@ -99,6 +117,18 @@ async function createWorkItem(
     return { error: 'action_id, provider_gaii, and input are required', status: 400, code: 'INVALID_INPUT' };
   }
 
+  // SECURITY: Prevent self-work (trust score manipulation)
+  if (requesterGaii === provider_gaii) {
+    return { error: 'Cannot create work request to yourself', status: 400, code: 'SELF_WORK' };
+  }
+
+  // SECURITY: Prevent same-owner work (different agent, same human)
+  const requesterAgent = await storage.getAgent(requesterGaii);
+  const providerAgent = await storage.getAgent(provider_gaii);
+  if (requesterAgent && providerAgent && requesterAgent.owner === providerAgent.owner) {
+    return { error: 'Cannot create work request between your own agents', status: 400, code: 'SAME_OWNER_WORK' };
+  }
+
   // Extension hook: pre_work_request
   const hookResult = await executeHooks(config, storage, 'pre_work_request', {
     requester_gaii: requesterGaii, action_id, provider_gaii,
@@ -116,12 +146,11 @@ async function createWorkItem(
     // This is a personal node agent — treat as local work, notify via tunnel/mailbox later
     personalNodeTarget = resolved.nodeId;
   } else if (resolved && !resolved.local) {
-    // Charge 1 morsel cross-node routing fee (§15)
-    const requester = await storage.getAgent(requesterGaii);
-    if (!requester || requester.morselBalance < 1) {
+    // Charge 1 morsel cross-node routing fee (§15) — atomic debit prevents double-spending
+    const debited = await storage.debitBalance(requesterGaii, 1);
+    if (!debited) {
       return { error: 'Insufficient morsels for cross-node routing fee (1 morsel)', status: 402, code: 'INSUFFICIENT_MORSELS' };
     }
-    await storage.updateAgent(requesterGaii, { morselBalance: requester.morselBalance - 1 });
     await storage.addTransaction({
       id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       gaii: requesterGaii,
@@ -133,6 +162,12 @@ async function createWorkItem(
 
     // Forward work request to the remote node
     try {
+      // SSRF validation: block requests to private/reserved IPs
+      const remoteUrlCheck = await validateOutboundUrl(resolved.nodeUrl);
+      if (!remoteUrlCheck.valid) {
+        logger.warn(`Blocked outbound work request to ${resolved.nodeUrl}: ${remoteUrlCheck.reason}`);
+        return { error: `Remote node URL blocked: ${remoteUrlCheck.reason}`, status: 400, code: 'INVALID_URL' };
+      }
       const resp = await fetch(`${resolved.nodeUrl}/v1/work/request`, {
         method: 'POST',
         headers: {

@@ -18,6 +18,18 @@ const contextFormat = winston.format((info) => {
   return info;
 });
 
+/** SECURITY: Mask sensitive fields in log output to prevent credential leaks. */
+const SENSITIVE_FIELDS = ['token', 'password', 'private_key', 'privateKey', 'secret', 'authorization', 'cookie', 'encryptionKey'];
+
+const maskSensitive = winston.format((info) => {
+  for (const field of SENSITIVE_FIELDS) {
+    if (info[field] !== undefined) {
+      info[field] = '***REDACTED***';
+    }
+  }
+  return info;
+});
+
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL ?? 'info',
   defaultMeta: { node_id: process.env.AIMEAT_NODE_ID || 'aimeat-local-001-dev' },
@@ -25,6 +37,7 @@ export const logger = winston.createLogger({
     winston.format.timestamp(),
     winston.format.errors({ stack: true }),
     contextFormat(),
+    maskSensitive(),
     process.env.NODE_ENV === 'production'
       ? winston.format.json()
       : winston.format.combine(

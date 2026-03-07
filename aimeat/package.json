@@ -37,7 +37,9 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:init": "node --env-file=.env --import tsx scripts/db-init.ts",
-    "indexnow": "node --env-file=.env --import tsx scripts/indexnow.ts"
+    "indexnow": "node --env-file=.env --import tsx scripts/indexnow.ts",
+    "audit": "pnpm audit --audit-level=high",
+    "audit:fix": "pnpm audit --fix"
   },
   "keywords": [
     "aimeat",

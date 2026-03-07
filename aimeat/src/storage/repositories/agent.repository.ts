@@ -7,4 +7,16 @@ export interface AgentRepository {
   updateAgent(gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null>;
   deleteAgent(gaii: string): Promise<boolean>;
   listAgents(): Promise<AgentRecord[]>;
+
+  /** Atomically debit balance. Returns false if insufficient funds. */
+  debitBalance(gaii: string, amount: number): Promise<boolean>;
+
+  /** Atomically credit balance. Returns false if agent not found. */
+  creditBalance(gaii: string, amount: number): Promise<boolean>;
+
+  /** Atomically credit balance with a cap. Returns actual amount credited (may be 0 if already at cap). */
+  creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number>;
+
+  /** Atomically transfer: debit from + credit to in one transaction. Returns false if insufficient funds or agent not found. */
+  transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean>;
 }

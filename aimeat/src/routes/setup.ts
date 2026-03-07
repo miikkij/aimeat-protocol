@@ -58,12 +58,19 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
         }
     });
 
-    // GET /v1/setup/wizard — Serve the wizard HTML page
+    // GET /v1/setup/wizard — Serve the wizard HTML page with CSP nonce injection
     router.get('/v1/setup/wizard', (req, res) => {
         if (!checkSetupIp(req, res)) return;
         const htmlPath = resolvePublicFile('wizard.html');
         if (htmlPath) {
-            res.type('text/html').send(readFileSync(htmlPath, 'utf-8'));
+            let html = readFileSync(htmlPath, 'utf-8');
+            // Inject CSP nonce into all script and style tags
+            const nonce = res.locals.cspNonce as string || '';
+            if (nonce) {
+                html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+                html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+            }
+            res.type('text/html').send(html);
         } else {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Setup wizard page not found'));
         }

@@ -17,17 +17,15 @@ export interface ExtensionCtx {
         delete(key: string): Promise<boolean>;
     };
     wallet: {
-        hold?(from: string, amount: number, reason: string): Promise<{ holdId: string }>;
-        release?(holdId: string, to: string): Promise<void>;
-        transfer?(from: string, to: string, amount: number, reason: string): Promise<void>;
-        getBalance?(gaii: string): Promise<number>;
+        consume?(amount: number, reason: string): Promise<{ success: boolean; error?: string }>;
+        getBalance?(): Promise<number>;
     };
     consent: {
         check?(gaii: string, scope: string): Promise<boolean>;
         require?(gaii: string, scope: string): Promise<void>;
     };
     trust: {
-        adjust?(gaii: string, delta: number, reason: string): Promise<void>;
+        getScore?(gaii: string): Promise<number>;
     };
     caller: { gaii: string; owner: string; roles: string[] };
     config: Record<string, unknown>;
@@ -131,17 +129,15 @@ ${userFnDecl}
             delete: async (key)        => __call(__memory_delete, [key]),
         },
         wallet: {
-            hold:       __wallet_hold     ? (async (from, amount, reason) => __call(__wallet_hold, [from, amount, reason]))     : undefined,
-            release:    __wallet_release   ? (async (holdId, to) => __call(__wallet_release, [holdId, to]))                      : undefined,
-            transfer:   __wallet_transfer  ? (async (from, to, amount, reason) => __call(__wallet_transfer, [from, to, amount, reason])) : undefined,
-            getBalance: __wallet_balance   ? (async (gaii) => __call(__wallet_balance, [gaii]))                                   : undefined,
+            consume:    __wallet_consume   ? (async (amount, reason) => __call(__wallet_consume, [amount, reason]))               : undefined,
+            getBalance: __wallet_balance   ? (async () => __call(__wallet_balance, []))                                            : undefined,
         },
         consent: {
             check:   __consent_check   ? (async (gaii, scope) => __call(__consent_check, [gaii, scope]))   : undefined,
             require: __consent_require ? (async (gaii, scope) => __call(__consent_require, [gaii, scope])) : undefined,
         },
         trust: {
-            adjust: __trust_adjust ? (async (gaii, delta, reason) => __call(__trust_adjust, [gaii, delta, reason])) : undefined,
+            getScore: __trust_getScore ? (async (gaii) => __call(__trust_getScore, [gaii])) : undefined,
         },
         caller: JSON.parse(__callerJson),
         config: JSON.parse(__configJson),
@@ -208,28 +204,11 @@ export async function executeExtensionAction(
             counter, limits.maxApiCalls,
         ));
 
-        // ── Wallet API references ────────────────────────────
-        jail.setSync('__wallet_hold', ctx.wallet.hold
+        // ── Wallet API references (caller-only operations) ──
+        jail.setSync('__wallet_consume', ctx.wallet.consume
             ? makeRef(
-                async (from, amount, reason) =>
-                    ctx.wallet.hold!(from as string, amount as number, reason as string),
-                counter, limits.maxApiCalls,
-            )
-            : null,
-        );
-
-        jail.setSync('__wallet_release', ctx.wallet.release
-            ? makeRef(
-                async (holdId, to) => ctx.wallet.release!(holdId as string, to as string),
-                counter, limits.maxApiCalls,
-            )
-            : null,
-        );
-
-        jail.setSync('__wallet_transfer', ctx.wallet.transfer
-            ? makeRef(
-                async (from, to, amount, reason) =>
-                    ctx.wallet.transfer!(from as string, to as string, amount as number, reason as string),
+                async (amount, reason) =>
+                    ctx.wallet.consume!(amount as number, reason as string),
                 counter, limits.maxApiCalls,
             )
             : null,
@@ -237,7 +216,7 @@ export async function executeExtensionAction(
 
         jail.setSync('__wallet_balance', ctx.wallet.getBalance
             ? makeRef(
-                async (gaii) => ctx.wallet.getBalance!(gaii as string),
+                async () => ctx.wallet.getBalance!(),
                 counter, limits.maxApiCalls,
             )
             : null,
@@ -260,11 +239,11 @@ export async function executeExtensionAction(
             : null,
         );
 
-        // ── Trust API reference ──────────────────────────────
-        jail.setSync('__trust_adjust', ctx.trust.adjust
+        // ── Trust API reference (read-only — trust scores are system-computed) ──
+        jail.setSync('__trust_getScore', ctx.trust.getScore
             ? makeRef(
-                async (gaii, delta, reason) =>
-                    ctx.trust.adjust!(gaii as string, delta as number, reason as string),
+                async (gaii) =>
+                    ctx.trust.getScore!(gaii as string),
                 counter, limits.maxApiCalls,
             )
             : null,

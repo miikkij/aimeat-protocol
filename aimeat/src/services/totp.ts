@@ -1,6 +1,6 @@
 import { TOTP, Secret } from 'otpauth';
 import { createRequire } from 'node:module';
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 
 // CJS-ESM interop for qrcode
 const require = createRequire(import.meta.url);
@@ -101,9 +101,16 @@ export function validateBackupCode(
   code: string,
   hashedCodes: string[],
 ): { valid: boolean; index: number } {
-  const hashed = createHash('sha256').update(code).digest('hex');
-  const index = hashedCodes.indexOf(hashed);
-  return { valid: index !== -1, index };
+  // SECURITY: Use timing-safe comparison to prevent timing attacks
+  const hashedBuf = createHash('sha256').update(code).digest();
+
+  for (let i = 0; i < hashedCodes.length; i++) {
+    const storedBuf = Buffer.from(hashedCodes[i], 'hex');
+    if (hashedBuf.length === storedBuf.length && timingSafeEqual(hashedBuf, storedBuf)) {
+      return { valid: true, index: i };
+    }
+  }
+  return { valid: false, index: -1 };
 }
 
 // ── AES-256-GCM encryption/decryption ──

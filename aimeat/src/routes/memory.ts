@@ -75,6 +75,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     const existing = await storage.getMemory(gaii, key);
 
+    // Defense-in-depth: verify ownership on overwrite even though getMemory is scoped by GAII
+    if (existing && existing.ownerGaii !== req.auth!.sub) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
+      return;
+    }
+
     // Quota enforcement: configurable per-agent key limit and per-value size limit
     const MAX_KEYS_PER_AGENT = config.memoryMaxKeysPerAgent;
     const MAX_VALUE_SIZE = config.memoryMaxValueSizeKb * 1024;
@@ -187,7 +193,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       })),
       total: records.length,
       quota: {
-        max_keys: 1000,
+        max_keys: config.memoryMaxKeysPerAgent,
         used_keys: records.length,
         max_bytes: config.memoryQuotaMb * 1024 * 1024,
         used_bytes: totalBytes,
@@ -293,6 +299,17 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
+    // Defense-in-depth: verify ownership before deletion
+    const existing = await storage.getMemory(gaii, key);
+    if (!existing) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
+      return;
+    }
+    if (existing.ownerGaii !== req.auth!.sub) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own memory records'));
+      return;
+    }
+
     const deleted = await storage.deleteMemory(gaii, key);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
@@ -329,6 +346,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
+    // Defense-in-depth: verify ownership even though getMemory is scoped by GAII
+    if (existing.ownerGaii !== req.auth!.sub) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
+      return;
+    }
+
     if (existing.version !== version) {
       res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
         `Expected version ${version} but current is ${existing.version}`,
@@ -336,8 +359,15 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // M-1: Total memory quota check on update
+    // Per-value size limit (configurable, must match POST enforcement)
     const newValueSize = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    const maxValueSize = config.memoryMaxValueSizeKb * 1024;
+    if (newValueSize > maxValueSize) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value size ${newValueSize} bytes exceeds limit of ${maxValueSize} bytes`));
+      return;
+    }
+
+    // M-1: Total memory quota check on update
     const existingSize = Buffer.byteLength(JSON.stringify(existing.value), 'utf8');
     const quotaCheck = await checkMemoryQuota(config, storage, gaii, newValueSize, existingSize);
     if (!quotaCheck.allowed) {
@@ -440,6 +470,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const record = await storage.getMemory(gaii, key);
     if (!record) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found`));
+      return;
+    }
+
+    // Defense-in-depth: verify ownership even though getMemory is scoped by GAII
+    if (record.ownerGaii !== req.auth!.sub) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
       return;
     }
 

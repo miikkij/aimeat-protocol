@@ -25,27 +25,96 @@ export function adminRouter(
 ): Router {
     const router = Router();
 
-    // ── Admin Setup Pages (password-protected, no JWT needed) ──
+    // ── Admin session management (in-memory, ephemeral) ──
+    const adminSessions = new Map<string, { createdAt: number }>();
+    const ADMIN_SESSION_TTL = 3600_000; // 1 hour
 
-    function checkSetupPassword(req: import('express').Request, res: import('express').Response): boolean {
-        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
-        if (!config.adminPassword || pw !== config.adminPassword) {
-            res.status(401).type('text/html').send(ADMIN_LOGIN_HTML);
+    function createAdminSession(): string {
+        const sessionId = randomBytes(32).toString('hex');
+        adminSessions.set(sessionId, { createdAt: Date.now() });
+        return sessionId;
+    }
+
+    function validateAdminSession(sessionId: string): boolean {
+        const session = adminSessions.get(sessionId);
+        if (!session) return false;
+        if (Date.now() - session.createdAt > ADMIN_SESSION_TTL) {
+            adminSessions.delete(sessionId);
             return false;
         }
         return true;
     }
 
-    // GET /v1/admin/setup — setup wizard (register owner + get token)
+    /** Parse a named cookie from the raw Cookie header */
+    function getCookie(req: import('express').Request, name: string): string | undefined {
+        const header = req.headers.cookie;
+        if (!header) return undefined;
+        const match = header.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
+        return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
+    }
+
+    /** Inject CSP nonce attributes into all <script> and <style> tags in an HTML string */
+    function injectCspNonce(html: string, res: import('express').Response): string {
+        const nonce = res.locals.cspNonce as string || '';
+        if (!nonce) return html;
+        return html
+            .replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`)
+            .replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+    }
+
+    // ── Admin Setup Pages (password-protected, no JWT needed) ──
+
+    function checkSetupPassword(req: import('express').Request, res: import('express').Response): boolean {
+        // Check admin session cookie first
+        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
+        if (sessionId && validateAdminSession(sessionId)) return true;
+
+        // Accept password via header only (NOT query param — password must not appear in URLs)
+        const pw = (req.headers['x-admin-password'] as string) ?? '';
+        if (!config.adminPassword || pw !== config.adminPassword) {
+            res.status(401).type('text/html').send(injectCspNonce(ADMIN_LOGIN_HTML, res));
+            return false;
+        }
+        return true;
+    }
+
+    /** Set the admin session cookie on a response */
+    function setSessionCookie(res: import('express').Response, sessionId: string): void {
+        const isHttps = config.baseUrl?.startsWith('https://');
+        res.setHeader('Set-Cookie',
+            `admin_session=${sessionId}; HttpOnly; SameSite=Strict; Path=/v1/admin; Max-Age=3600${isHttps ? '; Secure' : ''}`);
+    }
+
+    // POST /v1/admin/setup/auth — authenticate with admin password, get session cookie
+    router.post('/v1/admin/setup/auth', (req, res) => {
+        const pw = (req.headers['x-admin-password'] as string) ?? req.body?.admin_password ?? '';
+        if (!config.adminPassword || pw !== config.adminPassword) {
+            res.status(401).json({ ok: false, error: 'Invalid admin password' });
+            return;
+        }
+        const sessionId = createAdminSession();
+        setSessionCookie(res, sessionId);
+        res.json({ ok: true, session_id: sessionId });
+    });
+
+    // GET /v1/admin/setup — setup wizard (password never embedded in HTML)
     router.get('/v1/admin/setup', (req, res) => {
-        if (!checkSetupPassword(req, res)) return;
-        res.type('text/html').send(ADMIN_SETUP_HTML.replace(/\{\{PW\}\}/g, config.adminPassword!).replace(/\{\{NODE_ID\}\}/g, config.nodeId));
+        // Check if already authenticated via session cookie
+        const sessionId = getCookie(req, 'admin_session');
+        if (sessionId && validateAdminSession(sessionId)) {
+            res.type('text/html').send(injectCspNonce(ADMIN_SETUP_HTML.replace(/\{\{NODE_ID\}\}/g, config.nodeId), res));
+            return;
+        }
+        // Show login page (no password embedded anywhere)
+        res.type('text/html').send(injectCspNonce(ADMIN_LOGIN_HTML, res));
     });
 
     // POST /v1/admin/setup/register — register owner (password-protected, no auth)
     router.post('/v1/admin/setup/register', async (req, res) => {
-        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
-        if (!config.adminPassword || pw !== config.adminPassword) {
+        // Check admin session or password via header (NOT query param)
+        const sessionId = req.headers['x-admin-session'] as string;
+        const pw = (req.headers['x-admin-password'] as string) ?? '';
+        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -110,8 +179,10 @@ export function adminRouter(
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
     router.post('/v1/admin/setup/token', async (req, res) => {
-        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
-        if (!config.adminPassword || pw !== config.adminPassword) {
+        // Check admin session or password via header (NOT query param)
+        const sessionId = req.headers['x-admin-session'] as string;
+        const pw = (req.headers['x-admin-password'] as string) ?? '';
+        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -152,14 +223,16 @@ export function adminRouter(
             token,
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
             roles: ownerRecord.roles,
-            dashboard_url: `/v1/admin/ui?token=${token}`,
+            dashboard_url: '/v1/admin/ui',
         });
     });
 
     // POST /v1/admin/setup/initial-otk — generate an Initial OTK (password-protected)
     router.post('/v1/admin/setup/initial-otk', async (req, res) => {
-        const pw = (req.query.pw as string) ?? (req.headers['x-admin-password'] as string) ?? '';
-        if (!config.adminPassword || pw !== config.adminPassword) {
+        // Check admin session or password via header (NOT query param)
+        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
+        const pw = (req.headers['x-admin-password'] as string) ?? '';
+        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -401,7 +474,7 @@ export function adminRouter(
         const langParam = req.query.lang as string | undefined;
         const locale = resolveLocale(langParam, req.headers.cookie, req.headers['accept-language']);
         if (langParam) res.cookie('aimeat-lang', locale, { maxAge: 365 * 24 * 60 * 60 * 1000, path: '/', sameSite: 'lax' });
-        res.type('text/html').send(buildDashboardHtml(locale));
+        res.type('text/html').send(injectCspNonce(buildDashboardHtml(locale), res));
     });
 
     // GET /v1/admin/translations — return dashboard translations as JSON for SPA language switching
@@ -532,7 +605,6 @@ export function adminRouter(
 
         res.json(success(config.nodeId, { schema }));
     });
-
     // PUT /v1/admin/config — atomic config update with dot-path addressing (§14.2, Appendix B)
     // Body format: {"changes": [{"path": "morsel_policy.daily_allowance", "value": 75}, ...]}
     router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
@@ -942,7 +1014,7 @@ export function adminRouter(
             return;
         }
 
-        await storage.updateAgent(gaii, { morselBalance: agent.morselBalance + amount });
+        await storage.creditBalance(gaii, amount);
         await storage.addTransaction({
             id: `tx-${Date.now()}-${randomBytes(4).toString('hex')}`,
             gaii,
@@ -952,10 +1024,11 @@ export function adminRouter(
             timestamp: new Date().toISOString(),
         });
 
+        const updatedAgent = await storage.getAgent(gaii);
         res.json(success(config.nodeId, {
             gaii,
             minted: amount,
-            new_balance: agent.morselBalance + amount,
+            new_balance: updatedAgent?.morselBalance ?? 0,
             daily_minted: mintedToday + amount,
             daily_cap: config.maxOperatorMintPerDay,
         }));
@@ -970,6 +1043,9 @@ const ADMIN_LOGIN_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>AIMEAT Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh}
 .box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:32px;width:380px;text-align:center}
 h1{font-size:1.4rem;margin-bottom:8px}
 .sub{color:#94a3b8;font-size:.85rem;margin-bottom:24px}
@@ -977,19 +1053,36 @@ input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;ba
 input:focus{outline:none;border-color:#3b82f6}
 button{width:100%;padding:10px;border-radius:8px;border:none;background:#3b82f6;color:#fff;font-size:.95rem;font-weight:600;cursor:pointer}
 button:hover{background:#2563eb}
+button:disabled{opacity:.5;cursor:not-allowed}
 .hint{color:#64748b;font-size:.75rem;margin-top:16px}
+.err{color:#ef4444;font-size:.85rem;margin-top:8px;display:none}
 </style></head><body>
 <div class="box">
 <h1>&#x2764;&#xFE0F; AIMEAT Admin</h1>
 <p class="sub">Enter the admin password to continue</p>
 <form onsubmit="go(event)">
 <input type="password" id="pw" placeholder="Admin password" autofocus/>
-<button type="submit">Continue</button>
+<button type="submit" id="btn">Continue</button>
 </form>
+<p id="errMsg" class="err"></p>
 <p class="hint">Password is printed when the server starts, or set via AIMEAT_ADMIN_PASSWORD</p>
 </div>
 <script>
-function go(e){e.preventDefault();var pw=document.getElementById('pw').value;if(pw)location.href='/v1/admin/setup?pw='+encodeURIComponent(pw);}
+async function go(e){
+  e.preventDefault();
+  var pw=document.getElementById('pw').value;
+  if(!pw)return;
+  var btn=document.getElementById('btn');
+  btn.disabled=true;btn.textContent='Authenticating...';
+  document.getElementById('errMsg').style.display='none';
+  try{
+    var r=await fetch('/v1/admin/setup/auth',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Password':pw},body:'{}'});
+    var d=await r.json();
+    if(!d.ok){document.getElementById('errMsg').textContent=d.error||'Invalid password';document.getElementById('errMsg').style.display='block';btn.disabled=false;btn.textContent='Continue';return;}
+    // Cookie is set by the server response — just reload the page
+    location.href='/v1/admin/setup';
+  }catch(ex){document.getElementById('errMsg').textContent='Network error';document.getElementById('errMsg').style.display='block';btn.disabled=false;btn.textContent='Continue';}
+}
 </script>
 </body></html>`;
 
@@ -1132,7 +1225,6 @@ a:hover{text-decoration:underline}
 
 </div>
 <script>
-const PW='{{PW}}';
 let regOwner='',regKey='';
 
 function switchTab(name){
@@ -1149,8 +1241,8 @@ function toggleLoginMode(e){
 }
 
 async function api(method,path,body){
-  const h={'Content-Type':'application/json','X-Admin-Password':PW};
-  const r=await fetch(path+'?pw='+encodeURIComponent(PW),{method,headers:h,body:body?JSON.stringify(body):undefined});
+  const h={'Content-Type':'application/json'};
+  const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
   return r.json();
 }
 
@@ -1166,7 +1258,7 @@ function esc(s){const d=document.createElement('div');d.textContent=String(s??''
 function showLoginSuccess(token,roles,dashUrl){
   document.getElementById('loginResult').classList.add('hidden');
   document.getElementById('loginRoles').textContent='Roles: '+(Array.isArray(roles)?roles.join(', '):roles);
-  document.getElementById('loginDashLink').href=dashUrl||('/v1/admin/ui?token='+token);
+  document.getElementById('loginDashLink').href=dashUrl||'/v1/admin/ui';
   document.getElementById('loginJwtBox').textContent=token;
   document.getElementById('loginSuccess').classList.remove('hidden');
 }
@@ -1186,7 +1278,7 @@ async function doPasswordLogin(){
       document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';return;
     }
     var d=r.data;
-    showLoginSuccess(d.token,['owner','operator'],'/v1/admin/ui?token='+d.token);
+    showLoginSuccess(d.token,['owner','operator'],'/v1/admin/ui');
     document.getElementById('btnPwLogin').textContent='Login';
     document.getElementById('btnPwLogin').disabled=false;
   }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';}

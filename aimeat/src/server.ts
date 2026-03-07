@@ -2,13 +2,14 @@ import express from 'express';
 import compression from 'compression';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { pbkdf2Sync, randomBytes as cryptoRandomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from './config.js';
 import { createStorage } from './storage/storage-factory.js';
 import { generateKeyPair } from './auth/keypair.js';
-import { initNodeKeys } from './auth/jwt.js';
+import { initNodeKeys, initRevocationStorage } from './auth/jwt.js';
 import { corsMiddleware } from './middleware/cors.js';
-import { optionalAuth, enableAnonymousAuth, requireAuth, requireRole } from './auth/middleware.js';
+import { optionalAuth, enableAnonymousAuth, requireAuth, requireRole, initSessionAuth } from './auth/middleware.js';
 import { success, error } from './middleware/envelope.js';
 import { logger } from './utils/logger.js';
 
@@ -100,6 +101,16 @@ export interface ServerResult {
 export async function createServer(config: AimeatConfig): Promise<ServerResult> {
   const app = express();
 
+  // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies
+  const trustProxy = process.env.AIMEAT_TRUST_PROXY;
+  if (trustProxy === 'true') {
+    app.set('trust proxy', true);
+  } else if (trustProxy) {
+    app.set('trust proxy', trustProxy);
+  } else if (config.baseUrl && !config.baseUrl.includes('localhost') && !config.baseUrl.includes('127.0.0.1')) {
+    app.set('trust proxy', 'loopback');
+  }
+
   // Compress all responses (gzip/deflate based on Accept-Encoding)
   app.use(compression());
 
@@ -127,12 +138,15 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
       next();
     });
 
-    // Security headers — CSP, anti-clickjacking, content-type enforcement
+    // Security headers — CSP with per-request nonce, anti-clickjacking, content-type enforcement
     app.use((_req, res, next) => {
+      // SECURITY P3-2: Generate a per-request nonce for CSP script/style allowlisting
+      const nonce = crypto.randomUUID().replace(/-/g, '');
+      res.locals.cspNonce = nonce;
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
-        "style-src 'self' 'unsafe-inline'",
+        `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com`,
+        `style-src 'self' 'nonce-${nonce}'`,
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self'",
@@ -143,6 +157,10 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'DENY');
       res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      // SECURITY: HSTS — instruct browsers to always use HTTPS
+      if (config.baseUrl?.startsWith('https://')) {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      }
       next();
     });
 
@@ -226,6 +244,16 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use('/v1/memory', rateLimit(config.rateLimits.memory, config.rateLimits.roleMultipliers));
   app.use('/v1/boards', rateLimit(config.rateLimits.boards, config.rateLimits.roleMultipliers));
 
+  // SECURITY: Dedicated stricter rate limits for critical endpoints
+  app.use('/v1/auth/challenge', rateLimit({ windowMs: 60_000, max: 10 }));
+  app.use('/v1/owners', rateLimit({ windowMs: 3_600_000, max: 5 }));
+  app.use('/v1/ghii', rateLimit({ windowMs: 3_600_000, max: 10 }));
+  app.use('/v1/flags', rateLimit({ windowMs: 3_600_000, max: 20 }));
+  app.use('/v1/appeals', rateLimit({ windowMs: 86_400_000, max: 20 }));
+  app.use('/v1/admin/setup', rateLimit({ windowMs: 60_000, max: 5 }));
+  app.use('/v1/federation/peer/introduce', rateLimit({ windowMs: 3_600_000, max: 5 }));
+  app.use('/v1/catalogue', rateLimit({ windowMs: 60_000, max: 30 }));
+
   // Idempotency-Key support for POST/PUT
   app.use(idempotency());
 
@@ -244,6 +272,12 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
 
   // Wire storage into CORS middleware (lazy reference, now populated)
   storageForCors = storage;
+
+  // Wire storage into token revocation system for persistent revocation
+  initRevocationStorage(storage);
+
+  // P3-7: Wire storage into session-aware auth middleware
+  initSessionAuth(storage);
 
   // Maintenance mode cache — loaded once from storage, updated on toggle
   let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
@@ -636,14 +670,8 @@ function startDailyAllowanceJob(config: AimeatConfig, storage: Storage): void {
     try {
       const agents = await storage.listAgents();
       for (const agent of agents) {
-        if (agent.morselBalance < config.dailyAllowanceCap) {
-          const credit = Math.min(config.dailyAllowance, config.dailyAllowanceCap - agent.morselBalance);
-          if (credit > 0) {
-            await storage.updateAgent(agent.gaii, {
-              morselBalance: agent.morselBalance + credit,
-            });
-          }
-        }
+        // Atomic capped credit prevents race conditions
+        await storage.creditBalanceCapped(agent.gaii, config.dailyAllowance, config.dailyAllowanceCap);
       }
       logger.info(`Daily allowance credited to ${agents.length} agents`);
     } catch (err) {
@@ -959,6 +987,17 @@ function loadPersistedNodeKey(): { publicKey: string; privateKey: string } | nul
   try {
     if (!existsSync(keyPath)) return null;
     const data = JSON.parse(readFileSync(keyPath, 'utf-8'));
+
+    // P3-8: Handle encrypted key file
+    if (data.encrypted) {
+      const passphrase = process.env.AIMEAT_KEY_PASSPHRASE;
+      if (!passphrase) {
+        logger.error('Node key file is encrypted but AIMEAT_KEY_PASSPHRASE is not set. Cannot decrypt.');
+        process.exit(1);
+      }
+      return decryptNodeKey(data, passphrase);
+    }
+
     if (data.publicKey && data.privateKey) return data;
     return null;
   } catch {
@@ -1095,8 +1134,72 @@ function persistNodeKey(kp: { publicKey: string; privateKey: string }): void {
   try {
     const dir = dirname(keyPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(keyPath, JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey }, null, 2) + '\n', { mode: 0o600 });
+
+    const passphrase = process.env.AIMEAT_KEY_PASSPHRASE;
+    if (passphrase) {
+      // P3-8: Encrypt the key file using AES-256-GCM with passphrase-derived key
+      const encrypted = encryptNodeKey(kp, passphrase);
+      writeFileSync(keyPath, JSON.stringify(encrypted, null, 2) + '\n', { mode: 0o600 });
+      logger.info('Node key encrypted and saved to ~/.aimeat/node-key.json');
+    } else {
+      // Backward compatible: write plaintext
+      writeFileSync(keyPath, JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey }, null, 2) + '\n', { mode: 0o600 });
+    }
   } catch (err) {
     logger.warn('Could not persist node key', { path: keyPath, error: err });
   }
+}
+
+// ── P3-8: Node Key Encryption Helpers ────────────────────────────────
+
+interface EncryptedKeyFile {
+  encrypted: true;
+  salt: string;
+  iv: string;
+  authTag: string;
+  data: string;
+}
+
+function encryptNodeKey(
+  kp: { publicKey: string; privateKey: string },
+  passphrase: string,
+): EncryptedKeyFile {
+  const salt = cryptoRandomBytes(32);
+  const iv = cryptoRandomBytes(12); // 96-bit IV for AES-256-GCM
+  const derivedKey = pbkdf2Sync(passphrase, salt, 100_000, 32, 'sha512');
+
+  const cipher = createCipheriv('aes-256-gcm', derivedKey, iv);
+  const plaintext = JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey });
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return {
+    encrypted: true,
+    salt: salt.toString('hex'),
+    iv: iv.toString('hex'),
+    authTag: authTag.toString('hex'),
+    data: encrypted.toString('hex'),
+  };
+}
+
+function decryptNodeKey(
+  file: EncryptedKeyFile,
+  passphrase: string,
+): { publicKey: string; privateKey: string } {
+  const salt = Buffer.from(file.salt, 'hex');
+  const iv = Buffer.from(file.iv, 'hex');
+  const authTag = Buffer.from(file.authTag, 'hex');
+  const encryptedData = Buffer.from(file.data, 'hex');
+  const derivedKey = pbkdf2Sync(passphrase, salt, 100_000, 32, 'sha512');
+
+  const decipher = createDecipheriv('aes-256-gcm', derivedKey, iv);
+  decipher.setAuthTag(authTag);
+  const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+  const data = JSON.parse(decrypted.toString('utf-8'));
+
+  if (!data.publicKey || !data.privateKey) {
+    throw new Error('Decrypted key file does not contain valid key data');
+  }
+
+  return { publicKey: data.publicKey, privateKey: data.privateKey };
 }

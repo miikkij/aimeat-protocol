@@ -168,12 +168,8 @@ export async function chargeOverage(
 ): Promise<void> {
     if (morsels <= 0) return;
 
-    const agent = await storage.getAgent(gaii);
-    if (!agent) return;
-
-    await storage.updateAgent(gaii, {
-        morselBalance: agent.morselBalance - morsels,
-    });
+    // Atomic debit — may go negative for overage charges (intentional)
+    await storage.debitBalance(gaii, morsels);
     await storage.addTransaction({
         id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         gaii,

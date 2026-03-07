@@ -95,12 +95,23 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         // Phase 2.4 — Auto-hide: use per-organism threshold if applicable
+        // SECURITY P3-11: Weight flags by reporter's trust score and account age
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
-        const activeFlagCount = activeFlags.filter(f => f.status === 'active').length;
+        let weightedFlagCount = 0;
+        for (const f of activeFlags) {
+            if (f.status !== 'active') continue;
+            const reporter = await storage.getAgent(f.flaggedBy);
+            if (!reporter) { weightedFlagCount += 0.5; continue; }
+            const trustFactor = Math.max(0.1, (reporter.trustScore ?? 50) / 100);
+            const owner = await storage.getOwner(reporter.owner);
+            const ageDays = owner ? Math.floor((Date.now() - new Date(owner.createdAt).getTime()) / 86_400_000) : 0;
+            const ageFactor = Math.min(1, ageDays / 30); // Full weight after 30 days
+            weightedFlagCount += Math.max(0.1, trustFactor * Math.max(0.2, ageFactor));
+        }
         const autoHideThreshold = organism
             ? organism.moderationConfig.autoHideThreshold
             : config.autoHideThreshold;
-        const hidden = activeFlagCount >= autoHideThreshold;
+        const hidden = weightedFlagCount >= autoHideThreshold;
 
         res.status(201).json(success(config.nodeId, { ...flag, hidden }, [
             { description: 'View flag summary for this target', method: 'GET', url: `/v1/flags/summary/${targetType}/${targetId}` },

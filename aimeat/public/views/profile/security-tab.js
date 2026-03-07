@@ -13,6 +13,7 @@ export default function SecurityTab({ session, showToast }) {
   const [loading, setLoading] = useState(false);
   const [corsEditGhii, setCorsEditGhii] = useState(null);
   const [corsEditAgent, setCorsEditAgent] = useState(null);
+  const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
     if (session) loadData();
@@ -52,6 +53,21 @@ export default function SecurityTab({ session, showToast }) {
       setCorsEditAgent(null);
       loadData();
     } catch(e) { showToast(e.message || t('profile.error'), true); }
+  }
+
+  async function handleRevokeAll() {
+    if (!confirm(t('profile.security.revokeConfirm') || 'Are you sure you want to revoke all active sessions? You will be logged out.')) return;
+    setRevoking(true);
+    try {
+      const data = await securityService.revokeAllSessions();
+      if (data.ok !== false) {
+        showToast((t('profile.security.sessionsRevoked') || 'All sessions revoked') + ` (${data.data?.revoked ?? 0})`);
+        setTimeout(() => { localStorage.removeItem('aimeat_session'); location.reload(); }, 1500);
+      } else {
+        showToast(data.error?.message || 'Failed to revoke sessions', true);
+      }
+    } catch(e) { showToast(e.message || 'Error', true); }
+    setRevoking(false);
   }
 
   if (loading || !securityData) return html`<${Spinner} text=${t('profile.security.loading')} />`;
@@ -137,6 +153,18 @@ export default function SecurityTab({ session, showToast }) {
       <div style="margin-top:.75rem;font-size:.8rem;font-family:monospace;color:var(--love3)">
         Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
       </div>
+    </div>
+
+    <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.sessions') || 'Session Management'}</h3>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${t('profile.security.sessionsHint') || 'Revoke all active sessions. You will need to re-authenticate on all devices.'}</p>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:600">${t('profile.security.sessionsLabel') || 'Active Sessions'}</span>
+      </div>
+      <p style="font-size:.85rem;color:var(--muted);margin:.5rem 0">${t('profile.security.sessionsDesc') || 'Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.'}</p>
+      <button class="sec-revoke-btn" onClick=${handleRevokeAll} disabled=${revoking}>
+        ${revoking ? (t('profile.security.revoking') || 'Revoking...') : (t('profile.security.revokeAll') || 'Revoke All Sessions')}
+      </button>
     </div>
   `;
 }

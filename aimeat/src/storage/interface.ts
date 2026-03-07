@@ -784,6 +784,8 @@ import type { MarketplaceRepository } from './repositories/marketplace.repositor
 import type { FederationRepository } from './repositories/federation.repository.js';
 import type { NodeRepository } from './repositories/node.repository.js';
 import type { NotificationRepository } from './repositories/notification.repository.js';
+import type { AuthRepository } from './repositories/auth.repository.js';
+import type { SessionRepository } from './repositories/session.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -792,4 +794,5 @@ export interface Storage extends
   MicroMemoryRepository, FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
-  FederationRepository, NodeRepository, NotificationRepository { }
+  FederationRepository, NodeRepository, NotificationRepository,
+  AuthRepository, SessionRepository { }

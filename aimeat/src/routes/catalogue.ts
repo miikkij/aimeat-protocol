@@ -14,7 +14,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const search = req.query.search as string | undefined;
     const category = req.query.category as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
-    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
+    const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
     const actions = await storage.listActions({ search, category });
     const start = (page - 1) * perPage;
@@ -49,7 +49,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   router.get('/v1/catalogue/actions', async (req, res) => {
     const category = req.query.category as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
-    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
+    const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
     const actions = await storage.listActions({ category });
     const start = (page - 1) * perPage;
@@ -74,7 +74,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   // GET /v1/catalogue/agents — agent directory (Tier 0)
   router.get('/v1/catalogue/agents', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
-    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
+    const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
     const agents = await storage.listAgents();
     const start = (page - 1) * perPage;
@@ -174,6 +174,8 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   });
 
   // GET /v1/catalogue/directory — people directory search (Tier 0, Phase 1.4)
+  // Consent note: DirectoryService only indexes profiles with an active "federation"
+  // consent grant, so all entries returned here have already opted in to public listing.
   router.get('/v1/catalogue/directory', async (req, res) => {
     if (!directoryService) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Directory service is not available'));
@@ -190,7 +192,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lon = req.query.lon ? parseFloat(req.query.lon as string) : undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
-    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
+    const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
     const interests = interestsRaw ? interestsRaw.split(',').map(s => s.trim()).filter(Boolean) : undefined;
 

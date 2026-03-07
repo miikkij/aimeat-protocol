@@ -4,10 +4,12 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { executeHooks } from '../services/hooks.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -22,19 +24,26 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         if (sub.filters?.categories?.length && post.category && !sub.filters.categories.includes(post.category)) continue;
         if (sub.filters?.tags?.length && !sub.filters.tags.some(t => post.tags.includes(t))) continue;
         if (!sub.callbackUrl) continue;
-        fetch(sub.callbackUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event: 'board.new_post',
-            board_id: boardId,
-            post_id: post.id,
-            author_gaii: post.authorGaii,
-            title: post.title,
-            category: post.category,
-            timestamp: new Date().toISOString(),
-          }),
-          signal: AbortSignal.timeout(10_000),
+        // SSRF validation: block requests to private/reserved IPs
+        validateOutboundUrl(sub.callbackUrl).then(urlCheck => {
+          if (!urlCheck.valid) {
+            logger.warn(`Blocked board notification to ${sub.callbackUrl}: ${urlCheck.reason}`);
+            return;
+          }
+          return fetch(sub.callbackUrl!, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'board.new_post',
+              board_id: boardId,
+              post_id: post.id,
+              author_gaii: post.authorGaii,
+              title: post.title,
+              category: post.category,
+              timestamp: new Date().toISOString(),
+            }),
+            signal: AbortSignal.timeout(10_000),
+          });
         }).catch(err => {
           logger.warn('Board subscription notification failed', { boardId, gaii: sub.gaii, error: String(err) });
         });
@@ -169,13 +178,13 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // Public board posting costs morsels — system boards are free (§15, Appendix B)
     if (board.visibility === 'public') {
       const cost = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
-      const agent = await storage.getAgent(gaii);
-      if (!agent || agent.morselBalance < cost) {
+      const debited = await storage.debitBalance(gaii, cost);
+      if (!debited) {
+        const agent = await storage.getAgent(gaii);
         res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
           `Posting costs ${cost} morsels, you have ${agent?.morselBalance ?? 0}`));
         return;
       }
-      await storage.updateAgent(gaii, { morselBalance: agent.morselBalance - cost });
       await storage.addTransaction({
         id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
         gaii,
@@ -235,8 +244,21 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
-        return;
+        // Consent fallback: check if the caller has a consent grant for this board
+        if (config.consentEnabled) {
+          const consentResult = await checkConsentForRead(
+            storage, `board:${boardId}`, board.ownerGaii, gaii, board.visibility,
+          );
+          await auditDataAccess(storage, consentResult.consentId ?? null,
+            board.ownerGaii, gaii, `board:${boardId}`, 'read', consentResult.allowed);
+          if (!consentResult.allowed) {
+            res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this board'));
+            return;
+          }
+        } else {
+          res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
+          return;
+        }
       }
     }
 
@@ -334,8 +356,21 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
-        return;
+        // Consent fallback: check if the caller has a consent grant for this board
+        if (config.consentEnabled) {
+          const consentResult = await checkConsentForRead(
+            storage, `board:${boardId}`, board.ownerGaii, gaii, board.visibility,
+          );
+          await auditDataAccess(storage, consentResult.consentId ?? null,
+            board.ownerGaii, gaii, `board:${boardId}`, 'read', consentResult.allowed);
+          if (!consentResult.allowed) {
+            res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this board'));
+            return;
+          }
+        } else {
+          res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
+          return;
+        }
       }
     }
 
