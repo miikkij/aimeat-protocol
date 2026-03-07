@@ -1076,14 +1076,15 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="box">
 <h1>&#x2764;&#xFE0F; AIMEAT Admin</h1>
 <p class="sub">Enter the admin password to continue</p>
-<form onsubmit="go(event)">
-<input type="password" id="pw" placeholder="Admin password" autofocus/>
+<form id="loginForm">
+<input type="password" id="pw" placeholder="Admin password" autofocus autocomplete="current-password"/>
 <button type="submit" id="btn">Continue</button>
 </form>
 <p id="errMsg" class="err"></p>
 <p class="hint">Password is printed when the server starts, or set via AIMEAT_ADMIN_PASSWORD</p>
 </div>
 <script>
+document.getElementById('loginForm').addEventListener('submit', go);
 async function go(e){
   e.preventDefault();
   var pw=document.getElementById('pw').value;
@@ -1149,14 +1150,20 @@ a:hover{text-decoration:underline}
 .divider span{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--card);padding:0 12px;color:var(--muted);font-size:.75rem}
 .success-panel{text-align:center;padding:16px 0}
 .success-panel h3{color:var(--green);font-size:1.1rem;margin-bottom:8px}
+.desc{font-size:.9rem;color:var(--muted);margin-bottom:4px}
+.toggle-link{color:var(--muted);font-size:.75rem;margin-top:12px;text-align:center}
+.roles-text{color:var(--muted);font-size:.85rem;margin-bottom:4px}
+.jwt-section{margin-top:14px;text-align:left}
+.pw-hint{color:var(--muted);font-size:.72rem;margin-top:2px}
+.label-tag{color:var(--cyan);font-size:.7rem}
 </style></head><body>
 <div class="container">
 <h1>&#x2764;&#xFE0F; AIMEAT</h1>
 <p class="sub">Node: <strong>{{NODE_ID}}</strong></p>
 
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('login')">Login</button>
-  <button class="tab" onclick="switchTab('register')">Register</button>
+  <button class="tab active" data-tab="login">Login</button>
+  <button class="tab" data-tab="register">Register</button>
 </div>
 
 <!-- ═══ LOGIN TAB ═══ -->
@@ -1164,35 +1171,35 @@ a:hover{text-decoration:underline}
 <div class="card">
   <!-- Password Login (default for humans) -->
   <div id="loginPasswordMode">
-    <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Sign in with your username and password.</p>
+    <p class="desc">Sign in with your username and password.</p>
     <label>Username</label>
     <input type="text" id="loginUser" placeholder="e.g. myname" autocomplete="username" autofocus/>
     <label>Password</label>
     <input type="password" id="loginPass" placeholder="Your password" autocomplete="current-password"/>
-    <button class="btn-primary" id="btnPwLogin" onclick="doPasswordLogin()">Login</button>
-    <p style="color:var(--muted);font-size:.75rem;margin-top:12px;text-align:center">
-      <a href="#" onclick="toggleLoginMode(event)">Advanced: Login with private key</a>
+    <button class="btn-primary" id="btnPwLogin">Login</button>
+    <p class="toggle-link">
+      <a href="#" id="toggleToKeyLogin">Advanced: Login with private key</a>
     </p>
   </div>
   <!-- Key Login (advanced, for developers/agents) -->
   <div id="loginKeyMode" class="hidden">
-    <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Sign in with your owner name and private key.</p>
+    <p class="desc">Sign in with your owner name and private key.</p>
     <label>Owner Name</label>
     <input type="text" id="loginOwner" placeholder="e.g. myname" autocomplete="off"/>
     <label>Private Key</label>
     <textarea id="loginKey" placeholder="Paste your private key here" rows="3"></textarea>
-    <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
-    <p style="color:var(--muted);font-size:.75rem;margin-top:12px;text-align:center">
-      <a href="#" onclick="toggleLoginMode(event)">Back to password login</a>
+    <button class="btn-primary" id="btnLogin">Login</button>
+    <p class="toggle-link">
+      <a href="#" id="toggleToPwLogin">Back to password login</a>
     </p>
   </div>
   <div id="loginResult" class="hidden"></div>
   <div id="loginSuccess" class="hidden">
     <div class="success-panel">
       <h3>&#x2713; Authenticated</h3>
-      <p style="color:var(--muted);font-size:.85rem;margin-bottom:4px" id="loginRoles"></p>
+      <p class="roles-text" id="loginRoles"></p>
       <a id="loginDashLink" href="#" class="btn-green">Open Dashboard &#x2192;</a>
-      <div style="margin-top:14px;text-align:left">
+      <div class="jwt-section">
         <label>JWT Token (for API use)</label>
         <div class="key-box" id="loginJwtBox"></div>
       </div>
@@ -1204,15 +1211,15 @@ a:hover{text-decoration:underline}
 <!-- ═══ REGISTER TAB ═══ -->
 <div class="tab-panel" id="panel-register">
 <div class="card">
-  <p style="font-size:.9rem;color:var(--muted);margin-bottom:4px">Create a new owner account. The first owner gets the <strong>operator</strong> role.</p>
+  <p class="desc">Create a new owner account. The first owner gets the <strong>operator</strong> role.</p>
   <label>Owner Name</label>
   <input type="text" id="regOwner" placeholder="e.g. myname" autocomplete="off"/>
   <label>Display Name (optional)</label>
   <input type="text" id="regDisplay" placeholder="e.g. Node Operator"/>
-  <label>Password <span style="color:var(--cyan);font-size:.7rem">(recommended)</span></label>
+  <label>Password <span class="label-tag">(recommended)</span></label>
   <input type="password" id="regPassword" placeholder="Set a login password" autocomplete="new-password"/>
-  <p style="color:var(--muted);font-size:.72rem;margin-top:2px">With a password you can login from any device without keys.</p>
-  <button class="btn-primary" id="btnRegister" onclick="doRegister()">Create Account</button>
+  <p class="pw-hint">With a password you can login from any device without keys.</p>
+  <button class="btn-primary" id="btnRegister">Create Account</button>
   <div id="regResult" class="hidden"></div>
   <div id="regKeys" class="hidden">
     <div class="divider"><span>YOUR KEYS</span></div>
@@ -1222,14 +1229,14 @@ a:hover{text-decoration:underline}
     <label>Public Key</label>
     <div class="key-box" id="regPublicKey"></div>
     <div class="divider"><span>CONTINUE</span></div>
-    <button class="btn-primary" id="btnRegToken" onclick="doRegToken()">Login &amp; Open Dashboard</button>
+    <button class="btn-primary" id="btnRegToken">Login &amp; Open Dashboard</button>
     <div id="regTokenResult" class="hidden"></div>
     <div id="regSuccess" class="hidden">
       <div class="success-panel">
         <h3>&#x2713; Authenticated</h3>
-        <p style="color:var(--muted);font-size:.85rem;margin-bottom:4px" id="regRoles"></p>
+        <p class="roles-text" id="regRoles"></p>
         <a id="regDashLink" href="#" class="btn-green">Open Dashboard &#x2192;</a>
-        <div style="margin-top:14px;text-align:left">
+        <div class="jwt-section">
           <label>JWT Token (for API use)</label>
           <div class="key-box" id="regJwtBox"></div>
         </div>
@@ -1246,7 +1253,7 @@ let regOwner='',regKey='';
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
-  document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
+  document.querySelector('.tab[data-tab="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
 
@@ -1332,7 +1339,7 @@ async function doRegister(){
     regOwner=r.owner.name;regKey=r.private_key;
     var roles=r.owner.roles.join(', ');
     var msg='<strong>Account created!</strong> Roles: '+roles;
-    if(r.has_password)msg+='<br/><span style="color:var(--cyan)">Password login enabled \u2014 you can login with your username and password.</span>';
+    if(r.has_password)msg+='<br/><span class="label-tag">Password login enabled \u2014 you can login with your username and password.</span>';
     show('regResult',msg,'result-ok');
     document.getElementById('regPrivateKey').textContent=r.private_key;
     document.getElementById('regPublicKey').textContent=r.public_key;
@@ -1355,5 +1362,14 @@ async function doRegToken(){
     document.getElementById('btnRegToken').classList.add('hidden');
   }catch(e){show('regTokenResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';}
 }
+
+/* ── Bind event listeners ── */
+document.querySelectorAll('.tab[data-tab]').forEach(function(t){t.addEventListener('click',function(){switchTab(t.getAttribute('data-tab'))})});
+document.getElementById('toggleToKeyLogin').addEventListener('click',toggleLoginMode);
+document.getElementById('toggleToPwLogin').addEventListener('click',toggleLoginMode);
+document.getElementById('btnPwLogin').addEventListener('click',doPasswordLogin);
+document.getElementById('btnLogin').addEventListener('click',doLogin);
+document.getElementById('btnRegister').addEventListener('click',doRegister);
+document.getElementById('btnRegToken').addEventListener('click',doRegToken);
 </script>
 </body></html>`;

@@ -160,7 +160,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
-        `style-src 'self' 'nonce-${nonce}'`,
+        `style-src 'self' 'unsafe-inline'`,
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self'",
@@ -258,15 +258,15 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   app.use('/v1/memory', rateLimit(config.rateLimits.memory, config.rateLimits.roleMultipliers));
   app.use('/v1/boards', rateLimit(config.rateLimits.boards, config.rateLimits.roleMultipliers));
 
-  // SECURITY: Dedicated stricter rate limits for critical endpoints
-  app.use('/v1/auth/challenge', rateLimit({ windowMs: 60_000, max: 10 }));
-  app.use('/v1/owners', rateLimit({ windowMs: 3_600_000, max: 5 }));
-  app.use('/v1/ghii', rateLimit({ windowMs: 3_600_000, max: 10 }));
-  app.use('/v1/flags', rateLimit({ windowMs: 3_600_000, max: 20 }));
-  app.use('/v1/appeals', rateLimit({ windowMs: 86_400_000, max: 20 }));
-  app.use('/v1/admin/setup', rateLimit({ windowMs: 60_000, max: 5 }));
-  app.use('/v1/federation/peer/introduce', rateLimit({ windowMs: 3_600_000, max: 5 }));
-  app.use('/v1/catalogue', rateLimit({ windowMs: 60_000, max: 30 }));
+  // Per-endpoint rate limits (300/s — matching global default)
+  app.use('/v1/auth/challenge', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/owners', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/ghii', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/flags', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/appeals', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/admin/setup', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/federation/peer/introduce', rateLimit({ windowMs: 1_000, max: 300 }));
+  app.use('/v1/catalogue', rateLimit({ windowMs: 1_000, max: 300 }));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency());
