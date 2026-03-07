@@ -8,6 +8,8 @@ import { applyConfigOverrides } from './config.js';
 import { createStorage } from './storage/storage-factory.js';
 import { ConfigProvenance } from './services/config-provenance.js';
 import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from './services/config-schema.js';
+import { createConsulConfigService, applyConsulValues } from './services/consul-config.js';
+import type { ConsulConfigService } from './services/consul-config.js';
 import { generateKeyPair } from './auth/keypair.js';
 import { initNodeKeys } from './auth/jwt.js';
 import { corsMiddleware } from './middleware/cors.js';
@@ -277,7 +279,30 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     if (envOverrides.length > 0) provenance.markEnv(envOverrides);
   }
 
-  // Apply DB overrides (highest precedence — applied after env/file)
+  // ── Consul KV Config ──
+  // Load Consul values (priority: above file/env, below DB)
+  const consulService = createConsulConfigService(config);
+  if (consulService) {
+    try {
+      const consulValues = await consulService.loadAll();
+      if (Object.keys(consulValues).length > 0) {
+        const { applied } = applyConsulValues(config, consulValues);
+        provenance.markConsul(applied);
+        logger.info(`Applied ${applied.length} config value(s) from Consul KV`);
+      }
+
+      // Start watching for live changes (Consul priority: below DB, above file)
+      consulService.startWatching((changes) => {
+        logger.info(`[consul] Config update detected: ${Object.keys(changes).length} keys`);
+        const { applied } = applyConsulValues(config, changes);
+        provenance.markConsul(applied);
+      });
+    } catch (err) {
+      logger.warn(`Consul config load failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Apply DB overrides (highest precedence — applied after env/file/consul)
   const { applied: dbApplied, skipped: dbSkipped } = await applyConfigOverrides(config, storage, provenance);
   if (dbApplied.length > 0) {
     logger.info(`Applied ${dbApplied.length} config override(s) from database: ${dbApplied.join(', ')}`);
@@ -546,7 +571,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   app.use(adminRouter(config, storage, {
     get: () => maintenanceCache,
     set: (state: MaintenanceState) => { maintenanceCache = state; },
-  }, provenance));
+  }, provenance, consulService));
   app.use(federationRouter(config, storage, peers));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));

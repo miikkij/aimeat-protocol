@@ -8,6 +8,12 @@ import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 export const getDashboard    = ()       => apiGet('/v1/admin/dashboard');
 export const getConfig       = ()       => apiGet('/v1/admin/config');
 export const saveConfig      = (changes)=> apiPut('/v1/admin/config', { changes });
+export const deleteConfig    = (path)   => apiDelete(`/v1/admin/config/${encodeURIComponent(path)}`);
+
+// ── Consul ──
+export const getConsulStatus = ()       => apiGet('/v1/admin/consul');
+export const consulExport    = ()       => apiPost('/v1/admin/consul/export');
+export const consulImport    = ()       => apiPost('/v1/admin/consul/import');
 export const getTranslations = (lang)   => apiGet(`/v1/admin/translations?lang=${lang}`);
 
 // ── Agents & Owners ──

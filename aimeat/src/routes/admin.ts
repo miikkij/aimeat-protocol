@@ -16,6 +16,8 @@ import { generateOtk } from '../utils/otk.js';
 import { hashPassword } from '../services/password.js';
 import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue } from '../services/config-schema.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
+import type { ConsulConfigService } from '../services/consul-config.js';
+import { applyConsulValues } from '../services/consul-config.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -25,6 +27,7 @@ export function adminRouter(
         set: (state: import('../storage/interface.js').MaintenanceState) => void;
     },
     provenance?: ConfigProvenance,
+    consulService?: ConsulConfigService | null,
 ): Router {
     const router = Router();
 
@@ -598,6 +601,72 @@ export function adminRouter(
             newSource: provenance?.getSource(path) ?? 'default',
             note: 'DB override removed. Value reverts to file/env/default on next restart.',
         }));
+    });
+
+    // ── Consul Integration Endpoints ──
+
+    // GET /v1/admin/consul — Consul connection status and key listing
+    router.get('/v1/admin/consul', requireAuth(), requireRole('operator'), async (_req, res) => {
+        if (!consulService) {
+            res.json(success(config.nodeId, {
+                enabled: false,
+                note: 'Consul integration is not enabled. Set AIMEAT_CONSUL_ENABLED=true and AIMEAT_CONSUL_URL, or use --consul flag.',
+            }));
+            return;
+        }
+
+        const healthy = await consulService.health();
+        const values = await consulService.loadAll();
+
+        res.json(success(config.nodeId, {
+            enabled: true,
+            url: config.consulUrl,
+            prefix: config.consulPrefix,
+            healthy,
+            key_count: Object.keys(values).length,
+            keys: Object.keys(values),
+            watch_interval_seconds: config.consulWatchIntervalSeconds,
+        }));
+    });
+
+    // POST /v1/admin/consul/export — push current mutable config to Consul KV
+    router.post('/v1/admin/consul/export', requireAuth(), requireRole('operator'), async (_req, res) => {
+        if (!consulService) {
+            res.status(400).json(error(config.nodeId, 'CONSUL_DISABLED', 'Consul is not enabled'));
+            return;
+        }
+
+        let exported = 0;
+        for (const [dotPath, field] of Object.entries(MUTABLE_CONFIG_MAP)) {
+            try {
+                const value = (config as any)[field.key];
+                await consulService.set(dotPath, serializeConfigValue(value));
+                exported++;
+            } catch { /* skip individual failures */ }
+        }
+
+        res.json(success(config.nodeId, { exported, total: Object.keys(MUTABLE_CONFIG_MAP).length }));
+    });
+
+    // POST /v1/admin/consul/import — pull config from Consul KV and apply to runtime + DB
+    router.post('/v1/admin/consul/import', requireAuth(), requireRole('operator'), async (_req, res) => {
+        if (!consulService) {
+            res.status(400).json(error(config.nodeId, 'CONSUL_DISABLED', 'Consul is not enabled'));
+            return;
+        }
+
+        const values = await consulService.loadAll();
+        const { applied } = applyConsulValues(config, values);
+
+        // Persist to DB if available
+        if (storage.supportsConfigPersistence()) {
+            for (const dotPath of applied) {
+                await storage.setConfigValue(dotPath, values[dotPath]);
+            }
+            if (provenance) provenance.markDatabase(applied);
+        }
+
+        res.json(success(config.nodeId, { imported: applied.length, total: Object.keys(values).length }));
     });
 
     // GET /v1/admin/agents — list all agents with full details (operator only)

@@ -256,6 +256,18 @@
   border: 1px solid #eab308;
   border-radius: 8px;
 }
+.adm-config-readonly { opacity: 0.85; pointer-events: none; }
+.adm-config-readonly input,
+.adm-config-readonly select { background: var(--glass-bg, #1e293b); cursor: not-allowed; }
+.adm-config-readonly-banner {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #3b82f622;
+  border: 1px solid #3b82f655;
+  border-radius: 8px;
+  color: #93c5fd;
+  font-size: .85rem;
+}
 
 /* Expandable help sections */
 .adm-help {
