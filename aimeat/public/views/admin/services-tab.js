@@ -14,7 +14,8 @@ import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance,
   deleteExtensionInstance, getAvailableExtensions, installBundledExtension,
   uninstallExtension, getActionScript, updateActionScript, scaffoldExtension,
-  getDiskScript, saveDiskScript, addDiskAction, reinstallExtension,
+  getDiskScript, saveDiskScript, addDiskAction, deleteDiskAction,
+  getDiskManifest, saveDiskManifest, reinstallExtension,
 } from '/js/services/admin.js';
 
 const inputStyle = 'background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px';
