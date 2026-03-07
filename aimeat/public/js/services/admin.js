@@ -91,6 +91,9 @@ export const getPushStats        = ()                   => apiGet('/v1/admin/pus
 export const savePushTemplate    = (id, locale, fields) => apiPut(`/v1/admin/push/templates/${encodeURIComponent(id)}/${encodeURIComponent(locale)}`, { fields });
 export const testPush            = ()                   => apiPost('/v1/admin/push/test');
 export const resetPushTemplates  = ()                   => apiPost('/v1/admin/push/templates/reset');
+export const getVapidKey         = ()                   => apiGet('/v1/push/vapid-key');
+export const subscribePush       = (endpoint, keys)     => apiPost('/v1/push/subscribe', { endpoint, keys });
+export const unsubscribePush     = ()                   => apiDelete('/v1/push/subscribe');
 
 // ── CSM ──
 export const getCsmTemplates = ()       => apiGet('/v1/admin/csm');

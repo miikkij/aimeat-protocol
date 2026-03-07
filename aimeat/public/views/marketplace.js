@@ -8,7 +8,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 const html = htm.bind(h);
 
 /* ── Constants ── */
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { key: 'palvelut', icon: '\uD83D\uDEE0\uFE0F' },
   { key: 'tuotteet', icon: '\uD83D\uDCE6' },
   { key: 'data',     icon: '\uD83D\uDCCA' },
@@ -17,12 +17,12 @@ const CATEGORIES = [
 ];
 
 const STATUS_MAP = {
-  active:           { cls: 'mk-status-active',    color: 'var(--success)' },
-  sold:             { cls: 'mk-status-sold',       color: '#818cf8' },
-  pending_delivery: { cls: 'mk-status-pending',    color: 'var(--warning, #eab308)' },
-  delivered:        { cls: 'mk-status-delivered',   color: 'var(--success)' },
-  completed:        { cls: 'mk-status-completed',   color: '#818cf8' },
-  delisted:         { cls: 'mk-status-delisted',    color: '#ef4444' },
+  active:           { cls: 'mk-status-active' },
+  sold:             { cls: 'mk-status-sold' },
+  pending_delivery: { cls: 'mk-status-pending' },
+  delivered:        { cls: 'mk-status-delivered' },
+  completed:        { cls: 'mk-status-completed' },
+  delisted:         { cls: 'mk-status-delisted' },
 };
 
 /* ── Auth helpers ── */
@@ -41,9 +41,16 @@ function getAuthInfo() {
 function isLoggedIn() { return !!localStorage.getItem('aimeat-token'); }
 
 /* ── Tiny helpers ── */
+function getCategoryList(instanceConfig) {
+  const keys = instanceConfig.categories || DEFAULT_CATEGORIES.map(c => c.key);
+  return keys.map(k => {
+    const def = DEFAULT_CATEGORIES.find(c => c.key === k);
+    return { key: k, icon: def ? def.icon : '\uD83D\uDD39' };
+  });
+}
 function catLabel(key) {
-  const cat = CATEGORIES.find(c => c.key === key);
-  return cat ? { name: t('mkt.cat.' + key), icon: cat.icon } : { name: key, icon: '' };
+  const def = DEFAULT_CATEGORIES.find(c => c.key === key);
+  return { name: t('mkt.cat.' + key) || key, icon: def ? def.icon : '' };
 }
 function statusBadge(status) {
   const m = STATUS_MAP[status] || {};
@@ -59,61 +66,48 @@ function stars(score) {
    Sub-views
    ══════════════════════════════════════════════ */
 
-/* ── Home ── */
-function HomeView({ onNav }) {
-  const [listings, setListings] = useState(null);
+/* ── Instance Selector ── */
+function InstanceSelector({ onSelect }) {
+  const [instances, setInstances] = useState(null);
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    apiGet('/v1/marketplace/listings?per_page=50&page=1')
-      .then(j => { if (!j.ok) throw new Error(); setListings(j.data); })
+    apiGet('/v1/extensions/marketplace-behaviors/instances')
+      .then(j => {
+        if (!j.ok) throw new Error();
+        setInstances(j.data.instances || j.data || []);
+      })
       .catch(() => setErr(t('mkt.myListings.error')));
   }, []);
 
   if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
-  if (!listings) return html`<div class="mk-alert mk-alert-info">...</div>`;
-
-  const items = listings.listings || [];
-  const total = listings.total || items.length;
-  const catCounts = {};
-  items.forEach(l => { catCounts[l.category] = (catCounts[l.category] || 0) + 1; });
-  const recent = items.slice(0, 6);
+  if (!instances) return html`<div class="mk-alert mk-alert-info">...</div>`;
 
   return html`
-    <h1 class="mk-page-title">${t('mkt.home.title')}</h1>
-    <p class="mk-page-subtitle">${t('mkt.home.subtitle')}</p>
-
-    <div class="mk-stats-grid">
-      <div class="mk-stat-card"><div class="mk-stat-value">${total}</div><div class="mk-stat-label">${t('mkt.home.listings')}</div></div>
-      <div class="mk-stat-card"><div class="mk-stat-value">${Object.keys(catCounts).length}</div><div class="mk-stat-label">${t('mkt.home.categories')}</div></div>
-    </div>
-
-    <h2 class="mk-section-heading">${t('mkt.home.categoriesHeading')}</h2>
-    <div class="mk-categories-grid">
-      ${CATEGORIES.map(cat => html`
-        <a class="mk-category-card" onClick=${() => onNav('search', { category: cat.key })}>
-          <div class="mk-category-icon">${cat.icon}</div>
-          <div class="mk-category-name">${t('mkt.cat.' + cat.key)}</div>
-          ${catCounts[cat.key] ? html`<div class="mk-category-count">${catCounts[cat.key]} ${t('mkt.home.announcements')}</div>` : null}
-        </a>
-      `)}
-    </div>
-
-    ${recent.length > 0 ? html`
-      <h2 class="mk-section-heading">${t('mkt.home.recentHeading')}</h2>
-      ${recent.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} />`)}
-    ` : html`
-      <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.home.emptyText')}</div></div>
-    `}
-
-    <div style="text-align:center; margin-top:32px;">
-      <a class="mk-btn mk-btn-primary" style="margin-right:8px;" onClick=${() => onNav('search')}>${t('mkt.home.browseBtn')}</a>
-      <a class="mk-btn mk-btn-secondary" onClick=${() => onNav('sell')}>${t('mkt.home.sellBtn')}</a>
-    </div>
+    <h1 class="mk-page-title">${t('mkt.instanceSelector')}</h1>
+    <p class="mk-page-subtitle">${t('mkt.instanceSelectorSubtitle')}</p>
+    ${instances.length === 0
+      ? html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.noInstances')}</div></div>`
+      : html`
+        <div class="mk-instance-grid">
+          ${instances.map(inst => {
+            const vis = (inst.config && inst.config.visibility) || 'public';
+            return html`
+              <div class="mk-instance-card" onClick=${() => onSelect(inst)}>
+                <div class="mk-instance-name">${inst.config && inst.config.name || inst.id}</div>
+                <div class="mk-instance-meta">
+                  <span class="mk-visibility-badge mk-vis-${vis}">${t('mkt.visibility.' + vis) || vis}</span>
+                  ${inst.config && inst.config.description ? html`<div style="margin-top:6px;">${inst.config.description}</div>` : null}
+                </div>
+              </div>
+            `;
+          })}
+        </div>
+      `}
   `;
 }
 
-/* ── Listing Card (reused in home + search) ── */
+/* ── Listing Card (reused in home + browse) ── */
 function ListingCard({ listing: l, onNav }) {
   const cl = catLabel(l.category);
   const tags = (l.tags || []).slice(0, 4);
@@ -132,54 +126,107 @@ function ListingCard({ listing: l, onNav }) {
   `;
 }
 
-/* ── Search ── */
-function SearchView({ onNav, params }) {
+/* ── Home ── */
+function HomeView({ extAction, instanceConfig, onNav }) {
+  const [listings, setListings] = useState(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    extAction('browse', { limit: 50 })
+      .then(d => setListings(d))
+      .catch(() => setErr(t('mkt.myListings.error')));
+  }, []);
+
+  if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
+  if (!listings) return html`<div class="mk-alert mk-alert-info">...</div>`;
+
+  const items = listings.listings || [];
+  const total = listings.total || items.length;
+  const categories = getCategoryList(instanceConfig);
+  const catCounts = {};
+  items.forEach(l => { catCounts[l.category] = (catCounts[l.category] || 0) + 1; });
+  const recent = items.slice(0, 6);
+
+  return html`
+    <h1 class="mk-page-title">${instanceConfig.name || t('mkt.home.title')}</h1>
+    <p class="mk-page-subtitle">${instanceConfig.description || t('mkt.home.subtitle')}</p>
+
+    <div class="mk-stats-grid">
+      <div class="mk-stat-card"><div class="mk-stat-value">${total}</div><div class="mk-stat-label">${t('mkt.home.listings')}</div></div>
+      <div class="mk-stat-card"><div class="mk-stat-value">${Object.keys(catCounts).length}</div><div class="mk-stat-label">${t('mkt.home.categories')}</div></div>
+    </div>
+
+    <h2 class="mk-section-heading">${t('mkt.home.categoriesHeading')}</h2>
+    <div class="mk-categories-grid">
+      ${categories.map(cat => html`
+        <a class="mk-category-card" onClick=${() => onNav('browse', { category: cat.key })}>
+          <div class="mk-category-icon">${cat.icon}</div>
+          <div class="mk-category-name">${t('mkt.cat.' + cat.key) || cat.key}</div>
+          ${catCounts[cat.key] ? html`<div class="mk-category-count">${catCounts[cat.key]} ${t('mkt.home.announcements')}</div>` : null}
+        </a>
+      `)}
+    </div>
+
+    ${recent.length > 0 ? html`
+      <h2 class="mk-section-heading">${t('mkt.home.recentHeading')}</h2>
+      ${recent.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} />`)}
+    ` : html`
+      <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.home.emptyText')}</div></div>
+    `}
+
+    <div style="text-align:center; margin-top:32px;">
+      <a class="mk-btn mk-btn-primary" style="margin-right:8px;" onClick=${() => onNav('browse')}>${t('mkt.home.browseBtn')}</a>
+      <a class="mk-btn mk-btn-secondary" onClick=${() => onNav('sell')}>${t('mkt.home.sellBtn')}</a>
+    </div>
+  `;
+}
+
+/* ── Browse / Search ── */
+function BrowseView({ extAction, instanceConfig, onNav, params }) {
   const [q, setQ] = useState('');
   const [category, setCategory] = useState(params.category || '');
-  const [city, setCity] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [page, setPage] = useState(1);
   const [results, setResults] = useState(null);
   const [err, setErr] = useState('');
+  const categories = getCategoryList(instanceConfig);
 
   const doSearch = useCallback((pg) => {
     const p = pg || 1;
     setPage(p);
     setResults(null);
     setErr('');
-    let url = '/v1/marketplace/listings?page=' + p + '&per_page=20';
-    if (category) url += '&category=' + encodeURIComponent(category);
-    if (city) url += '&city=' + encodeURIComponent(city);
-    if (minPrice) url += '&min_price=' + encodeURIComponent(minPrice);
-    if (maxPrice) url += '&max_price=' + encodeURIComponent(maxPrice);
-    apiGet(url)
-      .then(j => {
-        if (!j.ok) throw new Error();
-        let items = j.data.listings || [];
+    const body = { page: p, limit: 20 };
+    if (category) body.category = category;
+    if (minPrice) body.minPrice = parseInt(minPrice, 10);
+    if (maxPrice) body.maxPrice = parseInt(maxPrice, 10);
+    extAction('browse', body)
+      .then(d => {
+        let items = d.listings || [];
         if (q) {
           const lower = q.toLowerCase();
           items = items.filter(l =>
             l.title.toLowerCase().includes(lower) ||
-            l.description.toLowerCase().includes(lower) ||
+            (l.description || '').toLowerCase().includes(lower) ||
             (l.tags || []).some(tg => tg.toLowerCase().includes(lower))
           );
         }
-        setResults({ listings: items, total: j.data.total || 0 });
+        setResults({ listings: items, total: d.total || 0 });
       })
       .catch(() => setErr(t('mkt.search.error')));
-  }, [q, category, city, minPrice, maxPrice]);
+  }, [q, category, minPrice, maxPrice, extAction]);
 
   useEffect(() => { doSearch(1); }, []);
 
   const clearSearch = () => {
-    setQ(''); setCategory(''); setCity(''); setMinPrice(''); setMaxPrice('');
+    setQ(''); setCategory(''); setMinPrice(''); setMaxPrice('');
     setPage(1); setResults(null);
     setTimeout(() => doSearch(1), 0);
   };
 
   const catOptions = [{ key: '', label: t('mkt.search.categoryAll') },
-    ...CATEGORIES.map(c => ({ key: c.key, label: c.icon + ' ' + t('mkt.cat.' + c.key) }))];
+    ...categories.map(c => ({ key: c.key, label: c.icon + ' ' + (t('mkt.cat.' + c.key) || c.key) }))];
 
   return html`
     <h1 class="mk-page-title">${t('mkt.search.title')}</h1>
@@ -192,8 +239,6 @@ function SearchView({ onNav, params }) {
           <select class="mk-form-select" value=${category} onChange=${e => setCategory(e.target.value)}>
             ${catOptions.map(o => html`<option value=${o.key}>${o.label}</option>`)}
           </select></div>
-        <div class="mk-form-group"><label class="mk-form-label">${t('mkt.search.city')}</label>
-          <input type="text" class="mk-form-input" placeholder=${t('mkt.search.cityPlaceholder')} value=${city} onInput=${e => setCity(e.target.value)} /></div>
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.search.price')}</label>
           <div style="display:flex; gap:8px;">
             <input type="number" class="mk-form-input" placeholder=${t('mkt.search.minPlaceholder')} value=${minPrice} onInput=${e => setMinPrice(e.target.value)} min="0" />
@@ -223,7 +268,7 @@ function SearchView({ onNav, params }) {
 }
 
 /* ── Listing Detail ── */
-function ListingDetailView({ onNav, params }) {
+function ListingDetailView({ extAction, onNav, params }) {
   const [listing, setListing] = useState(null);
   const [err, setErr] = useState('');
   const [purchaseMsg, setPurchaseMsg] = useState('');
@@ -231,27 +276,26 @@ function ListingDetailView({ onNav, params }) {
 
   const load = useCallback(() => {
     setListing(null); setErr('');
-    apiGet('/v1/marketplace/listings/' + encodeURIComponent(params.id))
-      .then(j => { if (!j.ok) throw new Error(); setListing(j.data.listing); })
+    extAction('browse', { listingId: params.id })
+      .then(d => {
+        const item = d.listing || (d.listings && d.listings.find(l => l.id === params.id));
+        if (!item) throw new Error('Not found');
+        setListing(item);
+      })
       .catch(() => setErr(t('mkt.detail.loadError')));
-  }, [params.id]);
+  }, [params.id, extAction]);
 
   useEffect(() => { load(); }, [load]);
 
   const doPurchase = () => {
-    const headers = getAuthHeaders();
-    if (!headers) return;
+    if (!getAuthHeaders()) return;
     setPurchaseMsg(''); setPurchaseErr('');
-    apiPost('/v1/marketplace/listings/' + encodeURIComponent(params.id) + '/purchase')
-      .then(j => {
-        if (j.ok) {
-          setPurchaseMsg(t('mkt.detail.purchaseSuccess') + (j.data.trackingCode ? ' Code: ' + j.data.trackingCode : ''));
-          setTimeout(() => load(), 2000);
-        } else {
-          setPurchaseErr(t('mkt.detail.purchaseFailed') + ': ' + (j.error ? j.error.message : t('mkt.sell.unknownError')));
-        }
+    extAction('purchase', { listingId: params.id })
+      .then(d => {
+        setPurchaseMsg(t('mkt.detail.purchaseSuccess') + (d.trackingCode ? ' Code: ' + d.trackingCode : ''));
+        setTimeout(() => load(), 2000);
       })
-      .catch(() => setPurchaseErr(t('mkt.sell.networkError')));
+      .catch(e => setPurchaseErr(t('mkt.detail.purchaseFailed') + ': ' + (e.message || t('mkt.sell.unknownError'))));
   };
 
   if (err) return html`
@@ -317,11 +361,12 @@ function ListingDetailView({ onNav, params }) {
   `;
 }
 
-/* ── Sell ── */
-function SellView({ onNav }) {
+/* ── Create Listing ── */
+function CreateListingView({ extAction, instanceConfig, onNav }) {
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [sending, setSending] = useState(false);
+  const categories = getCategoryList(instanceConfig);
 
   if (!isLoggedIn()) return html`
     <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.sell.authRequired')}</div></div>
@@ -346,20 +391,16 @@ function SellView({ onNav }) {
     const tags = document.getElementById('mk-sell-tags').value;
     if (tags) data.tags = tags.split(',').map(s => s.trim()).filter(Boolean);
 
-    apiPost('/v1/marketplace/listings', data)
-      .then(j => {
+    extAction('create-listing', data)
+      .then(d => {
         setSending(false);
-        if (j.ok) {
-          setMsg(t('mkt.sell.success') + ' ' + j.data.listingId);
-          setTimeout(() => onNav('listing', { id: j.data.listingId }), 1500);
-        } else {
-          setErr(j.error ? j.error.message : t('mkt.sell.unknownError'));
-        }
+        setMsg(t('mkt.sell.success') + ' ' + (d.listingId || d.id || ''));
+        setTimeout(() => onNav('listing', { id: d.listingId || d.id }), 1500);
       })
-      .catch(() => { setSending(false); setErr(t('mkt.sell.networkError')); });
+      .catch(e => { setSending(false); setErr(e.message || t('mkt.sell.unknownError')); });
   };
 
-  const catOptions = CATEGORIES.map(c => ({ key: c.key, label: c.icon + ' ' + t('mkt.cat.' + c.key) }));
+  const catOptions = categories.map(c => ({ key: c.key, label: c.icon + ' ' + (t('mkt.cat.' + c.key) || c.key) }));
 
   return html`
     <h1 class="mk-page-title">${t('mkt.sell.title')}</h1>
@@ -413,16 +454,28 @@ function SellView({ onNav }) {
 }
 
 /* ── My Listings ── */
-function MyListingsView({ onNav }) {
+function MyListingsView({ extAction, onNav }) {
   const [listings, setListings] = useState(null);
   const [err, setErr] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
 
   useEffect(() => {
     if (!isLoggedIn()) return;
-    apiGet('/v1/marketplace/my-listings')
-      .then(j => { if (!j.ok) throw new Error(); setListings(j.data.listings || []); })
+    extAction('browse', { seller: 'me', status: 'all' })
+      .then(d => setListings(d.listings || []))
       .catch(() => setErr(t('mkt.myListings.error')));
   }, []);
+
+  const doAction = (actionId, body, successMsg) => {
+    setActionMsg('');
+    extAction(actionId, body)
+      .then(() => {
+        setActionMsg(successMsg);
+        extAction('browse', { seller: 'me', status: 'all' })
+          .then(d => setListings(d.listings || []));
+      })
+      .catch(e => setActionMsg('Error: ' + (e.message || 'failed')));
+  };
 
   if (!isLoggedIn()) return html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.myListings.authRequired')}</div></div>`;
   if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
@@ -432,49 +485,57 @@ function MyListingsView({ onNav }) {
     <h1 class="mk-page-title">${t('mkt.myListings.title')}</h1>
     <p class="mk-page-subtitle">${t('mkt.myListings.subtitle')}</p>
     <div style="margin-bottom:16px;"><a class="mk-btn mk-btn-primary" onClick=${() => onNav('sell')}>${t('mkt.myListings.newBtn')}</a></div>
+    ${actionMsg ? html`<div class="mk-alert mk-alert-info">${actionMsg}</div>` : null}
     ${listings.length > 0 ? listings.map(l => {
       const cl = catLabel(l.category);
       return html`
-        <a class="mk-card mk-card-clickable" onClick=${() => onNav('listing', { id: l.id })}>
-          <div class="mk-listing-header">
-            <div>
-              <div class="mk-card-title">${l.title}</div>
-              <div class="mk-card-meta">${cl.icon} ${cl.name} \u00B7 ${(l.createdAt || '').slice(0, 10)}</div>
+        <div class="mk-card">
+          <a class="mk-card-clickable" style="text-decoration:none;" onClick=${() => onNav('listing', { id: l.id })}>
+            <div class="mk-listing-header">
+              <div>
+                <div class="mk-card-title">${l.title}</div>
+                <div class="mk-card-meta">${cl.icon} ${cl.name} \u00B7 ${(l.createdAt || '').slice(0, 10)}</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mk-price-badge">${l.priceMorsels} morsels</div>
+                <div style="margin-top:6px;">${statusBadge(l.status)}</div>
+              </div>
             </div>
-            <div style="text-align:right;">
-              <div class="mk-price-badge">${l.priceMorsels} morsels</div>
-              <div style="margin-top:6px;">${statusBadge(l.status)}</div>
+          </a>
+          ${l.status === 'active' ? html`
+            <div style="margin-top:8px; display:flex; gap:8px;">
+              <button class="mk-btn mk-btn-secondary mk-btn-sm" onClick=${() => doAction('delist', { listingId: l.id }, 'Delisted')}>${t('mkt.status.delisted')}</button>
             </div>
-          </div>
-        </a>
+          ` : null}
+        </div>
       `;
     }) : html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDCE6</div><div class="mk-empty-text">${t('mkt.myListings.empty')}</div></div>`}
   `;
 }
 
 /* ── My Purchases ── */
-function MyPurchasesView({ onNav }) {
+function MyPurchasesView({ extAction, onNav }) {
   const [purchases, setPurchases] = useState(null);
   const [err, setErr] = useState('');
+  const [rateId, setRateId] = useState('');
+  const [rateScore, setRateScore] = useState(5);
+  const [rateComment, setRateComment] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
 
   useEffect(() => {
     if (!isLoggedIn()) return;
-    apiGet('/v1/marketplace/my-purchases')
-      .then(j => {
-        if (!j.ok) throw new Error();
-        const list = j.data.purchases || [];
-        if (list.length === 0) { setPurchases([]); return; }
-        // Fetch listing details for each purchase
-        Promise.all(list.map(p =>
-          apiGet('/v1/marketplace/listings/' + encodeURIComponent(p.listingId))
-            .then(lj => lj.ok ? lj.data.listing : null)
-            .catch(() => null)
-        )).then(listings => {
-          setPurchases(list.map((p, i) => ({ ...p, _listing: listings[i] })));
-        });
-      })
+    extAction('browse', { buyer: 'me' })
+      .then(d => setPurchases(d.purchases || d.listings || []))
       .catch(() => setErr(t('mkt.myPurchases.error')));
   }, []);
+
+  const doRate = () => {
+    if (!rateId) return;
+    setActionMsg('');
+    extAction('rate', { listingId: rateId, score: rateScore, comment: rateComment })
+      .then(() => { setActionMsg(t('mkt.detail.purchaseSuccess')); setRateId(''); setRateComment(''); })
+      .catch(e => setActionMsg('Error: ' + (e.message || 'failed')));
+  };
 
   if (!isLoggedIn()) return html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.myPurchases.authRequired')}</div></div>`;
   if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
@@ -483,32 +544,39 @@ function MyPurchasesView({ onNav }) {
   return html`
     <h1 class="mk-page-title">${t('mkt.myPurchases.title')}</h1>
     <p class="mk-page-subtitle">${t('mkt.myPurchases.subtitle')}</p>
+    ${actionMsg ? html`<div class="mk-alert mk-alert-info">${actionMsg}</div>` : null}
     ${purchases.length === 0 ? html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.myPurchases.empty')}</div></div>` : null}
     ${purchases.map(p => {
-      const title = p._listing ? p._listing.title : t('mkt.myPurchases.unknown');
+      const title = p.title || p._listing && p._listing.title || t('mkt.myPurchases.unknown');
       return html`
         <div class="mk-card">
           <div class="mk-listing-header">
             <div>
               <div class="mk-card-title">${title}</div>
-              <div class="mk-card-meta">${t('mkt.myPurchases.seller')}: ${p.sellerOwner} \u00B7 ${(p.createdAt || '').slice(0, 10)} \u00B7 ${t('mkt.myPurchases.code')}: ${p.trackingCode}</div>
+              <div class="mk-card-meta">${t('mkt.myPurchases.seller')}: ${p.sellerOwner || p.seller || ''} \u00B7 ${(p.createdAt || '').slice(0, 10)} ${p.trackingCode ? '\u00B7 ' + t('mkt.myPurchases.code') + ': ' + p.trackingCode : ''}</div>
             </div>
             <div style="text-align:right;">
-              <div class="mk-price-badge">${p.totalCostMorsels} morsels</div>
+              <div class="mk-price-badge">${p.totalCostMorsels || p.priceMorsels || 0} morsels</div>
               <div style="margin-top:6px;">${statusBadge(p.status)}</div>
             </div>
           </div>
-          ${p.rating ? html`
-            <div style="margin-top:8px;">
-              ${stars(p.rating.score)}
-              ${p.rating.comment ? html`<span style="font-size:0.85rem; color:var(--text-dim); margin-left:8px;">"${p.rating.comment}"</span>` : null}
-            </div>
-          ` : (p.status === 'delivered' || p.status === 'completed') ? html`
-            <div style="margin-top:12px; font-size:0.85rem; color:var(--text-dim);">${t('mkt.myPurchases.rateHint')}${p.id}/rate</div>
-          ` : null}
+          ${p.rating ? html`<div style="margin-top:8px;">${stars(p.rating.score)}${p.rating.comment ? html`<span style="font-size:0.85rem; color:var(--text-dim); margin-left:8px;">"${p.rating.comment}"</span>` : null}</div>` : null}
         </div>
       `;
     })}
+
+    <div class="mk-card" style="margin-top:24px;">
+      <h3 class="mk-section-heading">${t('mkt.myPurchases.rateHint')}</h3>
+      <div class="mk-form-grid">
+        <div class="mk-form-group"><label class="mk-form-label">Listing ID</label>
+          <input type="text" class="mk-form-input" value=${rateId} onInput=${e => setRateId(e.target.value)} placeholder="listing-id" /></div>
+        <div class="mk-form-group"><label class="mk-form-label">Score (1-5)</label>
+          <input type="number" class="mk-form-input" value=${rateScore} onInput=${e => setRateScore(parseInt(e.target.value, 10))} min="1" max="5" /></div>
+      </div>
+      <div class="mk-form-group"><label class="mk-form-label">Comment</label>
+        <input type="text" class="mk-form-input" value=${rateComment} onInput=${e => setRateComment(e.target.value)} /></div>
+      <button class="mk-btn mk-btn-primary mk-btn-sm" onClick=${doRate}>${t('mkt.detail.purchaseBtn')}</button>
+    </div>
   `;
 }
 
@@ -516,34 +584,57 @@ function MyPurchasesView({ onNav }) {
    Main Marketplace Component
    ══════════════════════════════════════════════ */
 export default function MarketplaceView({ navigate: spaNavigate, locale }) {
-  const [view, setView] = useState('home');
+  const [view, setView] = useState('instances');
+  const [instanceId, setInstanceId] = useState(null);
+  const [instanceConfig, setInstanceConfig] = useState({});
   const [params, setParams] = useState({});
 
   useViewCSS('/css/views/marketplace.css');
 
-  const onNav = useCallback((v, p) => {
-    setView(v || 'home');
+  const nav = useCallback((v, p) => {
+    setView(v || 'instances');
     setParams(p || {});
     window.scrollTo(0, 0);
   }, []);
 
+  const selectInstance = useCallback((inst) => {
+    setInstanceId(inst.id);
+    setInstanceConfig(inst.config || {});
+    setView('home');
+    setParams({});
+  }, []);
+
+  const extAction = useCallback(async (actionId, body = {}) => {
+    const res = await apiPost('/v1/ext/marketplace-behaviors/' + instanceId + '/' + actionId, body);
+    if (!res.ok) throw new Error(res.error && res.error.message || 'Action failed');
+    return res.data;
+  }, [instanceId]);
+
+  // If no instance selected, show instance selector
+  if (view === 'instances' || !instanceId) {
+    return html`<${InstanceSelector} onSelect=${selectInstance} />`;
+  }
+
+  const sharedProps = { extAction, instanceConfig, onNav: nav, params };
+
   let content;
   switch (view) {
-    case 'search':   content = html`<${SearchView} onNav=${onNav} params=${params} />`; break;
-    case 'listing':  content = html`<${ListingDetailView} onNav=${onNav} params=${params} />`; break;
-    case 'sell':     content = html`<${SellView} onNav=${onNav} />`; break;
-    case 'my-listings':  content = html`<${MyListingsView} onNav=${onNav} />`; break;
-    case 'my-purchases': content = html`<${MyPurchasesView} onNav=${onNav} />`; break;
-    default:         content = html`<${HomeView} onNav=${onNav} />`; break;
+    case 'browse':       content = html`<${BrowseView} ...${sharedProps} />`; break;
+    case 'listing':      content = html`<${ListingDetailView} ...${sharedProps} />`; break;
+    case 'sell':         content = html`<${CreateListingView} ...${sharedProps} />`; break;
+    case 'my-listings':  content = html`<${MyListingsView} ...${sharedProps} />`; break;
+    case 'my-purchases': content = html`<${MyPurchasesView} ...${sharedProps} />`; break;
+    default:             content = html`<${HomeView} ...${sharedProps} />`; break;
   }
 
   return html`
     <nav class="mk-nav">
-      <a class=${view === 'home' ? 'active' : ''} onClick=${() => onNav('home')}>${t('mkt.brand')}</a>
-      <a class=${view === 'search' ? 'active' : ''} onClick=${() => onNav('search')}>${t('mkt.nav.search')}</a>
-      <a class=${view === 'sell' ? 'active' : ''} onClick=${() => onNav('sell')}>${t('mkt.nav.sell')}</a>
-      <a class=${view === 'my-listings' ? 'active' : ''} onClick=${() => onNav('my-listings')}>${t('mkt.nav.myListings')}</a>
-      <a class=${view === 'my-purchases' ? 'active' : ''} onClick=${() => onNav('my-purchases')}>${t('mkt.nav.myPurchases')}</a>
+      <a class="mk-back-link" onClick=${() => { setInstanceId(null); nav('instances'); }}>${t('mkt.backToMarketplaces')}</a>
+      <a class=${view === 'home' ? 'active' : ''} onClick=${() => nav('home')}>${instanceConfig.name || t('mkt.brand')}</a>
+      <a class=${view === 'browse' ? 'active' : ''} onClick=${() => nav('browse')}>${t('mkt.nav.search')}</a>
+      <a class=${view === 'sell' ? 'active' : ''} onClick=${() => nav('sell')}>${t('mkt.nav.sell')}</a>
+      <a class=${view === 'my-listings' ? 'active' : ''} onClick=${() => nav('my-listings')}>${t('mkt.nav.myListings')}</a>
+      <a class=${view === 'my-purchases' ? 'active' : ''} onClick=${() => nav('my-purchases')}>${t('mkt.nav.myPurchases')}</a>
     </nav>
     ${content}
   `;

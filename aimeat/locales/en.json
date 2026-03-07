@@ -1758,6 +1758,13 @@
     "pushFieldTitle": "Title",
     "pushFieldSubject": "Subject",
     "pushFieldBody": "Body",
+    "pushSubscribeBtn": "Subscribe this browser",
+    "pushSubscribing": "Subscribing...",
+    "pushSubscribed": "Subscribed!",
+    "pushUnsubscribeBtn": "Unsubscribe",
+    "pushNoBrowserSupport": "This browser does not support push notifications",
+    "pushTestNoSubs": "No subscriptions \u2014 subscribe first",
+    "pushTestErrorDetail": "Send failed \u2014 check subscription",
 
     "totalEntries": "Total Entries",
     "cities": "Cities",
@@ -2091,6 +2098,11 @@
   },
   "mkt": {
     "brand": "AIME AT Tori",
+    "instanceSelector": "Choose a Marketplace",
+    "instanceSelectorSubtitle": "Select a marketplace to browse or sell items",
+    "noInstances": "No marketplaces available",
+    "visibility": { "public": "Public", "password": "Password Protected", "invite": "Invite Only" },
+    "backToMarketplaces": "\u2190 All Marketplaces",
     "nav": {
       "search": "Search",
       "sell": "Sell",

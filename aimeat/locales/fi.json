@@ -1757,6 +1757,13 @@
     "pushFieldTitle": "Otsikko",
     "pushFieldSubject": "Aihe",
     "pushFieldBody": "Sisältö",
+    "pushSubscribeBtn": "Tilaa tämä selain",
+    "pushSubscribing": "Tilataan...",
+    "pushSubscribed": "Tilattu!",
+    "pushUnsubscribeBtn": "Peru tilaus",
+    "pushNoBrowserSupport": "Tämä selain ei tue push-ilmoituksia",
+    "pushTestNoSubs": "Ei tilauksia \u2014 tilaa ensin",
+    "pushTestErrorDetail": "Lähetys epäonnistui \u2014 tarkista tilaus",
 
     "totalEntries": "Merkintöjä yhteensä",
     "cities": "Kaupungit",
@@ -2090,6 +2097,11 @@
   },
   "mkt": {
     "brand": "AIME AT Tori",
+    "instanceSelector": "Valitse kauppapaikka",
+    "instanceSelectorSubtitle": "Valitse kauppapaikka selataksesi tai myyd\u00e4ksesi",
+    "noInstances": "Ei saatavilla olevia kauppapaikkoja",
+    "visibility": { "public": "Julkinen", "password": "Salasanasuojattu", "invite": "Vain kutsutut" },
+    "backToMarketplaces": "\u2190 Kaikki kauppapaikat",
     "nav": {
       "search": "Haku",
       "sell": "Myy",

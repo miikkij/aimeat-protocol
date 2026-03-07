@@ -20,6 +20,7 @@ export default function PushTab({ data, reload }) {
   const [testStatus, setTestStatus] = useState(null);
   const [resetStatus, setResetStatus] = useState(null);
   const [expanded, setExpanded] = useState({});
+  const [subStatus, setSubStatus] = useState(null); // null | 'subscribing' | 'subscribed' | 'unsubscribing' | 'error'
 
   const localeTpls = templates.filter(tpl => tpl.locale === tplLocale);
 
@@ -61,6 +62,54 @@ export default function PushTab({ data, reload }) {
     }
   };
 
+  const handleSubscribe = async () => {
+    setSubStatus('subscribing');
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert(t('dashboard.pushNoBrowserSupport') || 'This browser does not support push notifications');
+        setSubStatus('error');
+        return;
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const vapidRes = await api.getVapidKey();
+      const vapidKey = vapidRes.data.vapidPublicKey;
+      const urlBase64 = vapidKey.replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(urlBase64);
+      const outputArray = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) outputArray[i] = raw.charCodeAt(i);
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: outputArray,
+      });
+      const subJson = subscription.toJSON();
+      await api.subscribePush(subJson.endpoint, { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth });
+      setSubStatus('subscribed');
+      reload();
+    } catch (err) {
+      console.error('Push subscribe failed:', err);
+      setSubStatus('error');
+      setTimeout(() => setSubStatus(null), 3000);
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    setSubStatus('unsubscribing');
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+      }
+      await api.unsubscribePush();
+      setSubStatus(null);
+      reload();
+    } catch {
+      setSubStatus('error');
+      setTimeout(() => setSubStatus(null), 3000);
+    }
+  };
+
   const updateField = (tplId, field, value) => {
     const tpl = localeTpls.find(t => t.id === tplId);
     if (tpl) tpl.fields[field] = value;
@@ -78,17 +127,36 @@ export default function PushTab({ data, reload }) {
       <${StatCard} label=${t('dashboard.totalSubscriptions')} value=${push.total_subscriptions || subs.length} color="#06b6d4" />
       <${StatCard} label=${t('dashboard.activeSubscriptions')} value=${subs.filter(s => s.active !== false).length} color="#22c55e" />
       <div style="margin-left:auto;display:flex;flex-direction:column;justify-content:center;gap:6px;align-items:flex-end">
-        <button
-          class="adm-btn"
-          style="white-space:nowrap"
-          onClick=${handleTest}
-          disabled=${testStatus === 'sending' || !subs.length}
-        >
-          ${testStatus === 'sending' ? t('dashboard.pushTestSending') :
-            testStatus === 'sent' ? t('dashboard.pushTestSent') :
-            testStatus === 'error' ? t('dashboard.pushTestError') :
-            t('dashboard.pushTestBtn')}
-        </button>
+        <div style="display:flex;gap:8px">
+          <button
+            class="adm-btn"
+            style="white-space:nowrap"
+            onClick=${handleSubscribe}
+            disabled=${subStatus === 'subscribing'}
+          >
+            ${subStatus === 'subscribing' ? (t('dashboard.pushSubscribing') || 'Subscribing...') :
+              subStatus === 'subscribed' ? (t('dashboard.pushSubscribed') || 'Subscribed!') :
+              (t('dashboard.pushSubscribeBtn') || 'Subscribe this browser')}
+          </button>
+          <button
+            class="adm-btn"
+            style="white-space:nowrap"
+            onClick=${handleTest}
+            disabled=${testStatus === 'sending' || !subs.length}
+          >
+            ${testStatus === 'sending' ? t('dashboard.pushTestSending') :
+              testStatus === 'sent' ? t('dashboard.pushTestSent') :
+              testStatus === 'error' ? t('dashboard.pushTestError') :
+              t('dashboard.pushTestBtn')}
+          </button>
+        </div>
+        ${subs.length > 0 && html`
+          <button
+            style="font-size:.72rem;color:var(--text-dim);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0"
+            onClick=${handleUnsubscribe}
+            disabled=${subStatus === 'unsubscribing'}
+          >${t('dashboard.pushUnsubscribeBtn') || 'Unsubscribe'}</button>
+        `}
         ${!subs.length && html`<span style="font-size:.72rem;color:var(--text-dim)">${t('dashboard.pushTestNoSubs')}</span>`}
         ${testStatus === 'error' && html`<span style="font-size:.72rem;color:#ef4444">${t('dashboard.pushTestErrorDetail')}</span>`}
       </div>
