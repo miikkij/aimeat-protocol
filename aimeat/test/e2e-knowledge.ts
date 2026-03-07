@@ -257,6 +257,102 @@ await test('Retrieve agent prompt template', async () => {
   }
 });
 
+// ─── Phase 3: Discovery and Sharing ───
+console.log('\nPhase 3: Discovery and Sharing');
+
+let discoverablePackageId = '';
+
+await test('Import a public package for discovery', async () => {
+  const { status, body } = await json('/v1/packages/import', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({
+      package: {
+        type: 'knowledge-package',
+        name: 'Discoverable Package',
+        version: '1.0.0',
+        author: ownerName,
+        content_type: 'research',
+        tags: ['discovery-test'],
+        language: 'en',
+        maturity: 'published',
+        synthesis: { level: 'original', description: 'Test' },
+        references: [],
+        entries: [{ key: 'data', title: 'Test Data', visibility: 'public' }],
+        links: [],
+        sharing: { catalog_listed: true, allow_clone: true, morsel_price: 0 },
+      },
+      entry_data: { data: { title: 'Test Data', summary: 'Discoverable content' } },
+    }),
+  });
+  assert(status === 201, `Expected 201, got ${status}`);
+  discoverablePackageId = body.data.package_id;
+});
+
+await test('Discover packages via catalogue', async () => {
+  const { status, body } = await json('/v1/catalogue/knowledge?tags=discovery-test');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(body.data?.packages?.length >= 1, 'Expected at least 1 package');
+});
+
+await test('Export a package', async () => {
+  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/export?format=json`);
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(body.aimeat_knowledge_package === true, 'Expected aimeat_knowledge_package flag');
+  assert(body.exported_from?.package_id === discoverablePackageId, 'Expected correct package_id in export');
+});
+
+await test('Clone a package', async () => {
+  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/clone`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ target_prefix: 'my-clone' }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data?.cloned_package_id, 'Expected cloned_package_id');
+  assert(body.data?.entries_cloned >= 1, 'Expected at least 1 cloned entry');
+});
+
+// ─── Phase 4: Quality and Moderation ───
+console.log('\nPhase 4: Quality and Moderation');
+
+await test('Get package reputation signals', async () => {
+  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/reputation`);
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(body.data?.clone_count !== undefined, 'Expected clone_count');
+  assert(body.data?.flag_count !== undefined, 'Expected flag_count');
+});
+
+await test('Operator can list packages for review', async () => {
+  const { status, body } = await json('/v1/admin/knowledge', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+  assert(Array.isArray(body.data?.packages), 'Expected packages array');
+});
+
+await test('Operator can review a package', async () => {
+  const { status, body } = await json(`/v1/admin/knowledge/${discoverablePackageId}/review`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+      reason: 'routine_review',
+      action: 'approve',
+    }),
+  });
+  assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data?.review_id, 'Expected review_id');
+});
+
+await test('Package owner can see operator reviews', async () => {
+  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/reviews`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(body.data?.count >= 1, 'Expected at least 1 review');
+  assert(body.data?.reviews[0]?.action === 'approve', 'Expected approve action');
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await json(`/v1/owners/${ownerName}?cascade=true`, {

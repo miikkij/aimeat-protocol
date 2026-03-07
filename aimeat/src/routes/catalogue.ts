@@ -240,6 +240,92 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     ]));
   });
 
+  // GET /v1/catalogue/knowledge — shared knowledge packages (Tier 0)
+  router.get('/v1/catalogue/knowledge', async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
+    const perPage = Math.min(50, Math.max(1, parseInt(req.query.limit as string ?? '20', 10)));
+    const contentType = req.query.content_type as string | undefined;
+    const tagsFilter = req.query.tags ? (req.query.tags as string).split(',').map(t => t.trim()) : [];
+    const language = req.query.language as string | undefined;
+    const sort = (req.query.sort as string) || 'recent';
+
+    // Find all public package manifests across all agents
+    const allAgents = await storage.listAgents();
+    let manifests: Array<{ key: string; value: any; ownerGaii: string; tags: string[]; createdAt: string; updatedAt: string }> = [];
+
+    for (const agent of allAgents) {
+      const agentManifests = await storage.listMemory(agent.gaii, {
+        prefix: 'packages/',
+        visibility: 'public',
+        tags: ['knowledge-package'],
+      });
+      for (const m of agentManifests) {
+        if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package') {
+          manifests.push({
+            key: m.key,
+            value: m.value,
+            ownerGaii: m.ownerGaii,
+            tags: m.tags,
+            createdAt: m.createdAt,
+            updatedAt: m.updatedAt,
+          });
+        }
+      }
+    }
+
+    // Apply filters
+    if (contentType) {
+      manifests = manifests.filter(m => m.value.content_type === contentType);
+    }
+    if (tagsFilter.length > 0) {
+      manifests = manifests.filter(m =>
+        tagsFilter.every(t => m.value.tags?.includes(t) || m.tags?.includes(t))
+      );
+    }
+    if (language) {
+      manifests = manifests.filter(m => m.value.language === language);
+    }
+
+    // Sort
+    if (sort === 'recent') {
+      manifests.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+    }
+
+    // Paginate
+    const total = manifests.length;
+    const paged = manifests.slice((page - 1) * perPage, page * perPage);
+
+    const items = paged.map(m => {
+      const v = m.value;
+      const packageId = m.key.replace('packages/', '').replace('/manifest', '');
+      return {
+        package_id: packageId,
+        name: v.name,
+        author: v.author,
+        content_type: v.content_type,
+        tags: v.tags,
+        language: v.language,
+        maturity: v.maturity,
+        synthesis: v.synthesis,
+        references_count: (v.references || []).length,
+        verified_references: (v.references || []).filter((r: any) => r.verified).length,
+        entries_count: (v.entries || []).length,
+        public_entries: (v.entries || []).filter((e: any) => e.visibility === 'public').length,
+        sharing: v.sharing,
+        created: v.created || m.createdAt,
+        updated: v.updated || m.updatedAt,
+      };
+    });
+
+    res.json(success(config.nodeId, {
+      packages: items,
+      total,
+      page,
+      per_page: perPage,
+      pages: Math.ceil(total / perPage),
+    }));
+  });
+
   // GET /v1/catalogue/:actionId — action detail (Tier 0, no auth)
   router.get('/v1/catalogue/:actionId', async (req, res) => {
     const actions = await storage.listActions();

@@ -115,3 +115,17 @@ export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURI
 
 // ── Stats ──
 export const getStats        = ()       => apiGet('/v1/stats');
+
+// ── Knowledge Moderation ──
+export const getKnowledgePackages = (opts = {}) => {
+  const params = new URLSearchParams();
+  if (opts.flagged) params.set('flagged', 'true');
+  if (opts.author) params.set('author', opts.author);
+  if (opts.content_type) params.set('content_type', opts.content_type);
+  if (opts.page) params.set('page', String(opts.page));
+  return apiGet(`/v1/admin/knowledge?${params.toString()}`);
+};
+export const reviewKnowledgePackage = (packageId, reason, action, customText) =>
+  apiPost(`/v1/admin/knowledge/${encodeURIComponent(packageId)}/review`, {
+    reason, action, custom_text: customText,
+  });
