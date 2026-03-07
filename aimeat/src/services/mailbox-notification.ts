@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord, PersonalPushSubscriptionRecord, NotificationPreferences } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { resolveTemplate } from './notification-templates.js';
 
 const require = createRequire(import.meta.url);
 
@@ -143,20 +144,21 @@ export class MailboxNotificationService {
         timestamp: new Date().toISOString(),
       };
 
+      const locale = prefs.locale ?? 'en';
       let sentAny = false;
       const sentChannels: string[] = [];
 
       if (prefs.channels.includes('web_push') && this.webpush) {
         const subscriptions = await this.storage.listPersonalPushSubscriptions(personalNodeId);
         for (const sub of subscriptions) {
-          const ok = await this.sendWebPush(sub, payload);
+          const ok = await this.sendWebPush(sub, payload, locale);
           if (ok) { sentAny = true; sentChannels.push('web_push'); }
         }
       }
 
       // Email channel
       if (prefs.channels.includes('email') && prefs.email) {
-        const emailSent = await this.sendEmail(personalNodeId, prefs.email, payload);
+        const emailSent = await this.sendEmail(personalNodeId, prefs.email, payload, locale);
         if (emailSent) { sentAny = true; sentChannels.push('email'); }
       }
 
@@ -178,14 +180,18 @@ export class MailboxNotificationService {
     this.emailCooldownMap.delete(personalNodeId);
   }
 
-  private async sendWebPush(sub: PersonalPushSubscriptionRecord, payload: MailboxPushPayload): Promise<boolean> {
+  private async sendWebPush(sub: PersonalPushSubscriptionRecord, payload: MailboxPushPayload, locale: string): Promise<boolean> {
     if (!this.webpush) return false;
     try {
+      const tpl = await resolveTemplate(this.storage, 'web_push_mailbox', locale, {
+        count: payload.pending_count,
+        type: payload.highest_priority_type,
+      });
       await this.webpush.sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys },
         JSON.stringify({
-          title: 'AIMEAT: Pending messages',
-          body: `${payload.pending_count} message(s) waiting — ${payload.highest_priority_type}`,
+          title: tpl.title ?? 'AIMEAT: Pending messages',
+          body: tpl.body,
           icon: '/icons/icon-192.png',
           tag: 'mailbox-alert',
           data: payload,
@@ -217,7 +223,7 @@ export class MailboxNotificationService {
     }
   }
 
-  private async sendEmail(personalNodeId: string, email: string, payload: MailboxPushPayload): Promise<boolean> {
+  private async sendEmail(personalNodeId: string, email: string, payload: MailboxPushPayload, locale: string): Promise<boolean> {
     if (!this.emailTransport) return false;
 
     // Check email-specific rate limit
@@ -229,18 +235,18 @@ export class MailboxNotificationService {
     }
 
     try {
+      const tpl = await resolveTemplate(this.storage, 'email_mailbox', locale, {
+        count: payload.pending_count,
+        type: payload.highest_priority_type,
+        nodeId: payload.node_id,
+        age: payload.oldest_item_age_minutes,
+      });
       await this.emailTransport.sendMail({
         from: this.config.smtpFrom,
         to: email,
-        subject: `AIMEAT: ${payload.pending_count} pending message(s) for your node`,
+        subject: tpl.subject ?? `AIMEAT: ${payload.pending_count} pending message(s) for your node`,
         text: [
-          `Your personal node "${payload.node_id}" has ${payload.pending_count} pending message(s).`,
-          '',
-          `Highest priority: ${payload.highest_priority_type}`,
-          `Oldest message: ${payload.oldest_item_age_minutes} minutes ago`,
-          '',
-          'Please reconnect your personal node to retrieve these messages.',
-          `Operator: ${payload.operator_node}`,
+          tpl.body,
           '',
           '---',
           'This notification was sent by the AIMEAT Protocol.',

@@ -366,6 +366,7 @@ export interface NotificationPreferences {
   cooldownMinutes: number;
   quietHoursUtc: { start: string; end: string } | null;
   email: string | null;
+  locale?: string;  // defaults to "en"
 }
 
 export interface MaintenanceState {
@@ -613,6 +614,20 @@ export interface PushSubscriptionRecord {
   lastUsedAt: string;
 }
 
+// Phase 3.2 — Notification Templates (editable, per-locale)
+export interface NotificationTemplateRecord {
+  id: string;              // "web_push_mailbox", "email_mailbox"
+  locale: string;          // "en", "fi"
+  fields: {
+    title?: string;        // web push title (null for email)
+    body: string;          // web push body or email body
+    subject?: string;      // email subject (null for web push)
+  };
+  placeholders: string[];  // informational: ["{count}", "{type}", "{nodeId}", "{age}"]
+  updatedAt: string;
+  updatedBy: string;       // operator owner name
+}
+
 // Phase 3.3 — Trusted Issuers
 export interface TrustedIssuerRecord {
   id: string;
@@ -848,6 +863,7 @@ import type { SessionRepository } from './repositories/session.repository.js';
 import type { AppRepository } from './repositories/app.repository.js';
 import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
 import type { ConfigRepository } from './repositories/config.repository.js';
+import type { NotificationTemplateRepository } from './repositories/notification-template.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -858,4 +874,5 @@ export interface Storage extends
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
   AuthRepository, SessionRepository,
-  AppRepository, AppMarketplaceRepository, ConfigRepository { }
+  AppRepository, AppMarketplaceRepository, ConfigRepository,
+  NotificationTemplateRepository { }

@@ -19,6 +19,7 @@ import type {
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
   AppRecord, AppListOptions, AppPurchaseRecord,
+  NotificationTemplateRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -3514,6 +3515,44 @@ export class SqliteStorage implements Storage {
       cooldownMinutes: row.cooldownMinutes as number,
       quietHoursUtc: row.quietHoursUtc ? JSON.parse(row.quietHoursUtc as string) : null,
       email: (row.email as string) ?? null,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Notification Templates (Phase 3.2) ──
+  // ══════════════════════════════════════════════════════════
+
+  async getNotificationTemplate(id: string, locale: string): Promise<NotificationTemplateRecord | null> {
+    const row = this.db.prepare('SELECT * FROM notification_templates WHERE id = ? AND locale = ?').get(id, locale) as Record<string, unknown> | undefined;
+    return row ? this.deserializeNotificationTemplate(row) : null;
+  }
+
+  async upsertNotificationTemplate(record: NotificationTemplateRecord): Promise<NotificationTemplateRecord> {
+    this.db.prepare(`
+      INSERT INTO notification_templates (id, locale, fields, placeholders, updatedAt, updatedBy)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id, locale) DO UPDATE SET fields = excluded.fields, placeholders = excluded.placeholders, updatedAt = excluded.updatedAt, updatedBy = excluded.updatedBy
+    `).run(record.id, record.locale, JSON.stringify(record.fields), JSON.stringify(record.placeholders), record.updatedAt, record.updatedBy);
+    return record;
+  }
+
+  async listNotificationTemplates(): Promise<NotificationTemplateRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM notification_templates ORDER BY id, locale').all() as Record<string, unknown>[];
+    return rows.map(r => this.deserializeNotificationTemplate(r));
+  }
+
+  async deleteAllNotificationTemplates(): Promise<void> {
+    this.db.prepare('DELETE FROM notification_templates').run();
+  }
+
+  private deserializeNotificationTemplate(row: Record<string, unknown>): NotificationTemplateRecord {
+    return {
+      id: row.id as string,
+      locale: row.locale as string,
+      fields: JSON.parse(row.fields as string),
+      placeholders: JSON.parse(row.placeholders as string),
+      updatedAt: row.updatedAt as string,
+      updatedBy: row.updatedBy as string,
     };
   }
 

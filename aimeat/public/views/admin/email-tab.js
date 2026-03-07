@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { EconRow, Empty, ExpandableHelp } from './shared.js';
-import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate } from '/js/services/admin.js';
+import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates } from '/js/services/admin.js';
 
 const TEMPLATE_IDS = ['notification', 'verification', 'magic_link', 'match_suggestion'];
 const TEMPLATE_LABELS = {
@@ -206,6 +206,8 @@ export default function EmailTab({ data, locale }) {
   const [templates, setTemplates] = useState(null);
   const [tplLoading, setTplLoading] = useState(false);
   const [expanded, setExpanded] = useState({});
+  const [seeded, setSeeded] = useState(false);
+  const [seedMsg, setSeedMsg] = useState(null);
 
   // Group send state
   const [grpGroup, setGrpGroup] = useState('operators');
@@ -223,6 +225,7 @@ export default function EmailTab({ data, locale }) {
     try {
       const r = await getEmailTemplates(loc);
       setTemplates(r.data.templates || []);
+      setSeeded(!!r.data.seeded);
     } catch (_) {
       setTemplates(null);
     }
@@ -278,6 +281,29 @@ export default function EmailTab({ data, locale }) {
   async function handleResetTemplate(id, loc) {
     await resetEmailTemplate(id, loc);
     await loadTemplates(loc);
+  }
+
+  async function doSeedDefaults() {
+    setSeedMsg(null);
+    try {
+      const r = await seedEmailTemplates();
+      setSeedMsg({ ok: true, text: t('dashboard.emailTplSeeded').replace('{count}', r.data.count) });
+      await loadTemplates(tplLocale);
+    } catch (e) {
+      setSeedMsg({ ok: false, text: e.message });
+    }
+  }
+
+  async function doResetAll() {
+    if (!confirm(t('dashboard.emailTplResetAllConfirm'))) return;
+    setSeedMsg(null);
+    try {
+      const r = await resetAllEmailTemplates();
+      setSeedMsg({ ok: true, text: t('dashboard.emailTplResetAllDone').replace('{count}', r.data.count) });
+      await loadTemplates(tplLocale);
+    } catch (e) {
+      setSeedMsg({ ok: false, text: e.message });
+    }
   }
 
   return html`
@@ -355,6 +381,23 @@ export default function EmailTab({ data, locale }) {
         </div>
       </div>
       <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 12px">${t('dashboard.emailTemplatesExplain')}</p>
+
+      <!-- Seed / Reset All buttons -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border)">
+        ${!seeded && html`
+          <button class="adm-btn-action" onClick=${doSeedDefaults}
+            style="font-size:.8rem;background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.3);color:#22c55e">${t('dashboard.emailTplSeedDefaults')}</button>
+          <span style="font-size:.78rem;color:var(--text-dim)">${t('dashboard.emailTplSeedExplain')}</span>
+        `}
+        ${seeded && html`
+          <button class="adm-btn-action" onClick=${doResetAll}
+            style="font-size:.8rem;color:#ef4444;border-color:rgba(239,68,68,0.3)">${t('dashboard.emailTplResetAll')}</button>
+          <button class="adm-btn-action" onClick=${doSeedDefaults}
+            style="font-size:.8rem">${t('dashboard.emailTplReseed')}</button>
+          <span style="font-size:.78rem;color:var(--text-dim)">${t('dashboard.emailTplSeededStatus')}</span>
+        `}
+        ${seedMsg && html`<span style="font-size:.8rem;color:${seedMsg.ok ? '#22c55e' : '#ef4444'}">${seedMsg.text}</span>`}
+      </div>
 
       ${tplLoading ? html`<p style="color:var(--text-dim);font-size:.85rem">...</p>` : null}
 

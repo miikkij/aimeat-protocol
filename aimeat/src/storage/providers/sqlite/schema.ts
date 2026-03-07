@@ -684,6 +684,17 @@ export function initializeSchema(db: Database.Database): void {
       email           TEXT
     );
 
+    -- ── Notification Templates (Phase 3.2) ──
+    CREATE TABLE IF NOT EXISTS notification_templates (
+      id            TEXT NOT NULL,
+      locale        TEXT NOT NULL,
+      fields        TEXT NOT NULL DEFAULT '{}',
+      placeholders  TEXT NOT NULL DEFAULT '[]',
+      updatedAt     TEXT NOT NULL,
+      updatedBy     TEXT NOT NULL,
+      PRIMARY KEY (id, locale)
+    );
+
     -- ── App Catalog (versioned apps with manifest) ──
     CREATE TABLE IF NOT EXISTS apps (
       ownerGaii      TEXT NOT NULL,

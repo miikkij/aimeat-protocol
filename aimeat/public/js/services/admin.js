@@ -71,6 +71,8 @@ export const sendTestEmail   = (to, template, locale) => apiPost('/v1/admin/emai
 export const getEmailTemplates = (locale) => apiGet(`/v1/admin/email/templates?locale=${locale || 'en'}`);
 export const saveEmailTemplate = (id, locale, htmlContent, textContent) => apiPut(`/v1/admin/email/templates/${id}`, { locale, html: htmlContent, text: textContent });
 export const resetEmailTemplate = (id, locale) => apiDelete(`/v1/admin/email/templates/${id}?locale=${locale || 'en'}`);
+export const seedEmailTemplates = () => apiPost('/v1/admin/email/templates/seed');
+export const resetAllEmailTemplates = () => apiPost('/v1/admin/email/templates/reset');
 export const sendGroupEmail  = (group, subject, body) => apiPost('/v1/admin/email/send-group', { group, subject, body });
 
 // ── Directory ──
@@ -85,7 +87,10 @@ export const runMatching       = ()     => apiPost('/v1/admin/matching/run');
 export const getMarketplaceStats = ()   => apiGet('/v1/admin/marketplace');
 
 // ── Push ──
-export const getPushStats    = ()       => apiGet('/v1/admin/push');
+export const getPushStats        = ()                   => apiGet('/v1/admin/push');
+export const savePushTemplate    = (id, locale, fields) => apiPut(`/v1/admin/push/templates/${encodeURIComponent(id)}/${encodeURIComponent(locale)}`, { fields });
+export const testPush            = ()                   => apiPost('/v1/admin/push/test');
+export const resetPushTemplates  = ()                   => apiPost('/v1/admin/push/templates/reset');
 
 // ── CSM ──
 export const getCsmTemplates = ()       => apiGet('/v1/admin/csm');

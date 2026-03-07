@@ -43,6 +43,7 @@ import type {
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
     AppRecord, AppListOptions, AppPurchaseRecord,
+    NotificationTemplateRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -2698,6 +2699,29 @@ export class MongoStorage implements Storage {
 
     async deleteNotificationPreferences(personalNodeId: string): Promise<boolean> {
         return this.notificationPreferences.delete(personalNodeId);
+    }
+
+    // ── Notification Templates (Phase 3.2) ──────────────────────
+
+    private notificationTemplates = new Map<string, NotificationTemplateRecord>();
+
+    private ntKey(id: string, locale: string): string { return `${id}::${locale}`; }
+
+    async getNotificationTemplate(id: string, locale: string): Promise<NotificationTemplateRecord | null> {
+        return this.notificationTemplates.get(this.ntKey(id, locale)) ?? null;
+    }
+
+    async upsertNotificationTemplate(record: NotificationTemplateRecord): Promise<NotificationTemplateRecord> {
+        this.notificationTemplates.set(this.ntKey(record.id, record.locale), record);
+        return record;
+    }
+
+    async listNotificationTemplates(): Promise<NotificationTemplateRecord[]> {
+        return [...this.notificationTemplates.values()];
+    }
+
+    async deleteAllNotificationTemplates(): Promise<void> {
+        this.notificationTemplates.clear();
     }
 
     // ── Sessions (P3-7: Server-Side Session Tracking) ──────────

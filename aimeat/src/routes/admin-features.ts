@@ -9,6 +9,8 @@ import type { DirectoryService } from '../services/directory.js';
 import type { MatchingEngine } from '../services/matching.js';
 import type { PushService } from '../services/push.js';
 import type { GenesisPeeringService } from '../services/genesis-peering.js';
+import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplates } from '../services/notification-templates.js';
+import type { TemplateId } from '../services/notification-templates.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -214,10 +216,9 @@ export function adminFeaturesRouter(
         res.json(success(config.nodeId, { sent, total: recipients.length, group }));
     }));
 
-    router.get('/v1/admin/email/templates', ...auth, handle(async (req, res) => {
-        const locale = (req.query.locale as string) || 'en';
-
-        const defaults = [
+    /** Generate code-default templates for a given locale */
+    function emailTemplateDefaults(locale: string) {
+        return [
             { id: 'verification', usedIn: 'ghii', ...verificationEmailHtml('123456', locale),
               params: ['{{code}}'], paramDescriptions: { '{{code}}': 'Verification code (e.g. 123456)' } },
             { id: 'magic_link', usedIn: 'ghii', ...magicLinkEmailHtml('https://example.com/login?token=sample', locale),
@@ -230,8 +231,20 @@ export function adminFeaturesRouter(
             ], locale),
               params: ['{{matches}}'], paramDescriptions: { '{{matches}}': 'Array of match cards (name, GHII, interests, distance)' } },
         ];
+    }
 
-        // Check for custom overrides stored in memory
+    /** Write a single template (html+text) to memory */
+    async function writeEmailTplToMemory(id: string, locale: string, htmlContent: string, textContent: string) {
+        const now = new Date().toISOString();
+        const base = { ownerGaii: '__site__', visibility: 'private' as const, tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now };
+        await storage.setMemory({ ...base, key: `_email_tpl/${id}/${locale}/html`, value: htmlContent });
+        await storage.setMemory({ ...base, key: `_email_tpl/${id}/${locale}/text`, value: textContent });
+    }
+
+    router.get('/v1/admin/email/templates', ...auth, handle(async (req, res) => {
+        const locale = (req.query.locale as string) || 'en';
+        const defaults = emailTemplateDefaults(locale);
+
         const templates = [];
         for (const tpl of defaults) {
             const customHtmlRec = await storage.getMemory('__site__', `_email_tpl/${tpl.id}/${locale}/html`);
@@ -248,10 +261,13 @@ export function adminFeaturesRouter(
                 paramDescriptions: tpl.paramDescriptions,
             });
         }
-        res.json(success(config.nodeId, { templates, locale }));
+
+        // Check if any templates are seeded at all
+        const seeded = templates.some(t => t.isCustom);
+        res.json(success(config.nodeId, { templates, locale, seeded }));
     }));
 
-    // PUT /v1/admin/email/templates/:id — Save custom template override
+    // PUT /v1/admin/email/templates/:id — Save custom template
     router.put('/v1/admin/email/templates/:id', ...auth, handle(async (req, res) => {
         const id = req.params.id as string;
         const locale = (req.body.locale as string) || 'en';
@@ -263,44 +279,59 @@ export function adminFeaturesRouter(
             return;
         }
 
-        const now = new Date().toISOString();
-        if (typeof htmlContent === 'string') {
-            await storage.setMemory({
-                ownerGaii: '__site__',
-                key: `_email_tpl/${id}/${locale}/html`,
-                value: htmlContent,
-                visibility: 'private',
-                tags: [],
-                ttlHours: null,
-                version: 1,
-                createdAt: now,
-                updatedAt: now,
-            });
-        }
-        if (typeof textContent === 'string') {
-            await storage.setMemory({
-                ownerGaii: '__site__',
-                key: `_email_tpl/${id}/${locale}/text`,
-                value: textContent,
-                visibility: 'private',
-                tags: [],
-                ttlHours: null,
-                version: 1,
-                createdAt: now,
-                updatedAt: now,
-            });
-        }
-
+        await writeEmailTplToMemory(id, locale, htmlContent ?? '', textContent ?? '');
         res.json(success(config.nodeId, { saved: true, id, locale }));
     }));
 
-    // DELETE /v1/admin/email/templates/:id — Reset template to default
+    // POST /v1/admin/email/templates/seed — Seed all defaults (en + fi) into memory
+    router.post('/v1/admin/email/templates/seed', ...auth, handle(async (_req, res) => {
+        let count = 0;
+        for (const locale of ['en', 'fi']) {
+            const defaults = emailTemplateDefaults(locale);
+            for (const tpl of defaults) {
+                await writeEmailTplToMemory(tpl.id, locale, tpl.html, tpl.text);
+                count++;
+            }
+        }
+        res.json(success(config.nodeId, { seeded: true, count }));
+    }));
+
+    // POST /v1/admin/email/templates/reset — Delete all custom, re-seed defaults
+    router.post('/v1/admin/email/templates/reset', ...auth, handle(async (_req, res) => {
+        const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
+        // Delete all existing
+        for (const locale of ['en', 'fi']) {
+            for (const id of validIds) {
+                await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/html`);
+                await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/text`);
+            }
+        }
+        // Re-seed defaults
+        let count = 0;
+        for (const locale of ['en', 'fi']) {
+            const defaults = emailTemplateDefaults(locale);
+            for (const tpl of defaults) {
+                await writeEmailTplToMemory(tpl.id, locale, tpl.html, tpl.text);
+                count++;
+            }
+        }
+        res.json(success(config.nodeId, { reset: true, count }));
+    }));
+
+    // DELETE /v1/admin/email/templates/:id — Reset single template to default
     router.delete('/v1/admin/email/templates/:id', ...auth, handle(async (req, res) => {
         const id = req.params.id as string;
         const locale = (req.query.locale as string) || 'en';
 
         await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/html`);
         await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/text`);
+
+        // Re-seed this template's default
+        const defaults = emailTemplateDefaults(locale);
+        const tpl = defaults.find(d => d.id === id);
+        if (tpl) {
+            await writeEmailTplToMemory(id, locale, tpl.html, tpl.text);
+        }
 
         res.json(success(config.nodeId, { reset: true, id, locale }));
     }));
@@ -373,17 +404,95 @@ export function adminFeaturesRouter(
 
     router.get('/v1/admin/push', ...auth, handle(async (_req, res) => {
         const subs = await storage.listPushSubscriptions();
+        const templates = await storage.listNotificationTemplates();
+
+        // Build template map: merge stored with defaults
+        const templateList: Array<Record<string, unknown>> = [];
+        for (const locale of SUPPORTED_LOCALES) {
+            for (const id of TEMPLATE_IDS) {
+                const stored = templates.find(t => t.id === id && t.locale === locale);
+                const def = getDefaultTemplate(id, locale);
+                templateList.push({
+                    id,
+                    locale,
+                    fields: stored ? stored.fields : def.fields,
+                    placeholders: def.placeholders,
+                    is_default: !stored,
+                    updated_at: stored?.updatedAt ?? null,
+                    updated_by: stored?.updatedBy ?? null,
+                });
+            }
+        }
+
         res.json(success(config.nodeId, {
             enabled: services.pushService.enabled,
             vapid_configured: !!config.vapidPublicKey && !!config.vapidPrivateKey,
+            locales: [...SUPPORTED_LOCALES],
             total_subscriptions: subs.length,
             subscriptions: subs.map(s => ({
                 owner_name: s.ownerName,
-                endpoint: s.endpoint?.substring(0, 60) ?? '—',
+                endpoint: s.endpoint?.substring(0, 60) ?? '\u2014',
                 created_at: s.createdAt,
                 last_used_at: s.lastUsedAt,
             })),
+            templates: templateList,
         }));
+    }));
+
+    // PUT /v1/admin/push/templates/:id/:locale — Save/update a template
+    router.put('/v1/admin/push/templates/:id/:locale', ...auth, handle(async (req, res) => {
+        const id = param(req.params.id);
+        const locale = param(req.params.locale);
+        if (!TEMPLATE_IDS.includes(id as TemplateId)) {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', `Invalid template id. Valid: ${TEMPLATE_IDS.join(', ')}`));
+            return;
+        }
+        if (!SUPPORTED_LOCALES.includes(locale as typeof SUPPORTED_LOCALES[number])) {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', `Invalid locale. Valid: ${SUPPORTED_LOCALES.join(', ')}`));
+            return;
+        }
+        const { fields } = req.body;
+        if (!fields || typeof fields.body !== 'string') {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'fields.body is required'));
+            return;
+        }
+        const def = getDefaultTemplate(id as TemplateId, locale);
+        const record = await storage.upsertNotificationTemplate({
+            id,
+            locale,
+            fields: {
+                title: typeof fields.title === 'string' ? fields.title : undefined,
+                body: fields.body,
+                subject: typeof fields.subject === 'string' ? fields.subject : undefined,
+            },
+            placeholders: def.placeholders,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.auth!.owner,
+        });
+        res.json(success(config.nodeId, { template: record }));
+    }));
+
+    // POST /v1/admin/push/test — Send test notification to operator
+    router.post('/v1/admin/push/test', ...auth, handle(async (req, res) => {
+        const ownerName = req.auth!.owner;
+        const ok = await services.pushService.sendNotification(ownerName, {
+            title: 'AIMEAT Test',
+            body: 'Push notifications are working!',
+            icon: '/icons/icon-192.png',
+            url: '/v1/portal',
+            tag: 'test',
+        });
+        if (!ok) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No push subscription found for your account, or notification failed'));
+            return;
+        }
+        res.json(success(config.nodeId, { sent: true }));
+    }));
+
+    // POST /v1/admin/push/templates/reset — Reset all templates to defaults
+    router.post('/v1/admin/push/templates/reset', ...auth, handle(async (req, res) => {
+        const count = await seedDefaultTemplates(storage, req.auth!.owner);
+        res.json(success(config.nodeId, { reset: true, count }));
     }));
 
     // ── CSM Templates ───────────────────────────────────────
