@@ -1817,15 +1817,55 @@ git commit -m "feat: add aimeat config export CLI command"
 
 ```bash
 # Import config from a file into the database:
+aimeat config import --file .env
 aimeat config import --file aimeat.ini
 aimeat config import --file aimeat.json
-aimeat config import --file .env
 aimeat config import --from consul   # Pull from Consul KV into DB
 ```
 
-Parses the file, validates values against `CONFIG_FIELDS`, and writes mutable values to the database via `storage.setConfigValue()`. Requires a persistent database.
+**Step 2: Implementation details**
 
-**Step 2: Commit**
+The import command:
+1. Requires a persistent database (MongoDB or SQLite). Fails with clear error on in-memory.
+2. Parses the source file using the appropriate parser (env, INI, or JSON — detected by extension or `--format` flag).
+3. Flattens to dot-path keys using `flattenToStrings()` from config-loader.
+4. Validates each value against `CONFIG_FIELDS` from config-schema — rejects unknown keys and type mismatches.
+5. Filters out immutable fields (with warning: "Skipping immutable field: node.id").
+6. Writes mutable values to the database via `storage.setConfigValue()`.
+7. Reports summary: "Imported 23 values, skipped 5 immutable, 2 unknown."
+
+**Step 3: The `.env` → database migration workflow**
+
+This is the primary use case for operators upgrading from env-only setups:
+
+```bash
+# 1. Start with persistent DB (already configured in .env or CLI)
+aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
+
+# 2. Import existing .env into the database
+aimeat config import --file .env
+
+# 3. Done! Now manage config via the admin dashboard.
+#    The .env file can be reduced to just bootstrap fields:
+#    DATABASE_URL, AIMEAT_STORAGE_PROVIDER, AIMEAT_ADMIN_PASSWORD
+```
+
+The import is **additive** — it writes values to the DB but doesn't delete the `.env` file. Since DB has higher precedence, the imported values immediately take effect. The operator can then optionally trim their `.env` down to just the immutable bootstrap fields.
+
+**Step 4: Interactive confirmation**
+
+Before writing, show a summary and ask for confirmation:
+
+```
+Found 35 config values in .env
+  23 mutable → will import to database
+   5 immutable → will skip (node.id, port, storage.type, ...)
+   7 unknown → will skip
+
+Proceed? [Y/n]
+```
+
+**Step 5: Commit**
 
 ```bash
 git add src/cli/config-import.ts src/index.ts
@@ -1834,9 +1874,134 @@ git commit -m "feat: add aimeat config import CLI command"
 
 ---
 
+### Task 27: Update HELP_TEXT and CLI i18n
+
+**Files:**
+- Modify: `aimeat/src/index.ts`
+- Modify: `aimeat/locales/en.json`
+- Modify: `aimeat/locales/fi.json`
+
+**Step 1: Update the hardcoded HELP_TEXT in index.ts**
+
+The current `HELP_TEXT` (lines 24-60) is outdated. Replace with:
+
+```typescript
+const HELP_TEXT = `
+aimeat — AI Memory Exchange and Action Transfer protocol node
+
+USAGE
+  aimeat start [options]         Start the node
+  aimeat serve [options]         Alias for start
+  aimeat config                  Show all settings and their current values
+  aimeat config export [opts]    Export config (--format env|ini|json|consul)
+  aimeat config import [opts]    Import config to database (--file <path> | --from consul)
+  aimeat validate                Validate configuration (env, files, database)
+  aimeat check                   Alias for validate
+  aimeat init                    Interactive config wizard (generates .env, .ini, or .json)
+  aimeat join [URL]              Join a federation network
+  aimeat maintenance on [MSG]    Enable maintenance mode (optional message)
+  aimeat maintenance off         Disable maintenance mode
+  aimeat maintenance             Show maintenance status
+  aimeat backup  [FILE]          Export all data to JSON
+  aimeat restore <FILE>          Import data from JSON backup
+
+START OPTIONS
+  --db <type>              Storage type: mongodb, sqlite, memory
+  --db-url <url>           Database connection URL (MongoDB)
+  --db-path <path>         SQLite database file path
+  -p, --port <port>        HTTP port (default: 40050)
+  --node-id <id>           Node identity string
+  --admin-password <pw>    Operator admin secret
+  -c, --config <path>      Config file path (JSON)
+  --consul <url>           Enable Consul and set URL (e.g., http://consul:8500)
+  --consul-prefix <prefix> Consul KV prefix (default: aimeat/config)
+  --consul-token <token>   Consul ACL token
+  -h, --help               Show this help
+  -v, --version            Show version
+
+CONFIG EXPORT OPTIONS
+  --format <fmt>           Output format: env, ini, json, consul
+
+CONFIG IMPORT OPTIONS
+  --file <path>            Import from file (.env, .ini, or .json)
+  --from consul            Import from Consul KV into database
+
+QUICK START
+  1. Run "aimeat init" to create a config (interactive wizard)
+  2. Run "aimeat validate" to check for problems
+  3. Run "aimeat start" to launch the node
+
+MIGRATION: .env to database
+  1. aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
+  2. aimeat config import --file .env
+  3. Manage config via admin dashboard (changes persist to database)
+
+MULTIPLE ENVIRONMENTS
+  aimeat init creates .env (default) or named config files.
+  Use config files to manage multiple environments on one machine:
+    aimeat start --config production.json
+    aimeat start --config staging.json
+`;
+```
+
+**Step 2: Add CLI help translations to locale files**
+
+Add a `cli` section to both locale files so that future CLI i18n is possible:
+
+In `en.json`:
+```json
+{
+    "cli": {
+        "helpHeader": "aimeat — AI Memory Exchange and Action Transfer protocol node",
+        "startDesc": "Start the node",
+        "configDesc": "Show all settings and their current values",
+        "configExportDesc": "Export config to file or Consul",
+        "configImportDesc": "Import config from file or Consul into database",
+        "validateDesc": "Validate configuration (env, files, database)",
+        "initDesc": "Interactive config wizard",
+        "importSuccess": "Imported {count} values to database ({skipped} skipped)",
+        "importRequiresDb": "Config import requires a persistent database (MongoDB or SQLite). Current storage: {type}",
+        "importNoFile": "File not found: {path}",
+        "importConfirm": "Import {mutable} mutable values to database? ({immutable} immutable and {unknown} unknown will be skipped)",
+        "exportSuccess": "Exported {count} config values in {format} format",
+        "migrationHint": "Tip: To migrate .env to database, run: aimeat config import --file .env"
+    }
+}
+```
+
+In `fi.json`:
+```json
+{
+    "cli": {
+        "helpHeader": "aimeat — AI-muistin vaihto- ja toiminnansiirtoprotokolla",
+        "startDesc": "Käynnistä solmu",
+        "configDesc": "Näytä kaikki asetukset ja niiden nykyiset arvot",
+        "configExportDesc": "Vie asetukset tiedostoon tai Consuliin",
+        "configImportDesc": "Tuo asetukset tiedostosta tai Consulista tietokantaan",
+        "validateDesc": "Tarkista asetukset (ympäristö, tiedostot, tietokanta)",
+        "initDesc": "Interaktiivinen asetustenvelho",
+        "importSuccess": "Tuotiin {count} arvoa tietokantaan ({skipped} ohitettiin)",
+        "importRequiresDb": "Asetusten tuonti vaatii pysyvän tietokannan (MongoDB tai SQLite). Nykyinen tallennus: {type}",
+        "importNoFile": "Tiedostoa ei löydy: {path}",
+        "importConfirm": "Tuodaanko {mutable} muutettavaa arvoa tietokantaan? ({immutable} muuttumatonta ja {unknown} tuntematonta ohitetaan)",
+        "exportSuccess": "Vietiin {count} asetusarvoa {format}-muodossa",
+        "migrationHint": "Vinkki: Siirrä .env tietokantaan komennolla: aimeat config import --file .env"
+    }
+}
+```
+
+**Step 3: Commit**
+
+```bash
+git add src/index.ts locales/en.json locales/fi.json
+git commit -m "feat: update CLI help text and add CLI i18n translations"
+```
+
+---
+
 ## Phase 8: Tests
 
-### Task 27: Unit Tests for Config System
+### Task 28: Unit Tests for Config System
 
 **Files:**
 - Create: `aimeat/test/config-loader.test.ts`
@@ -1893,7 +2058,7 @@ git commit -m "test: add unit tests for config loader, schema, and provenance"
 
 ---
 
-### Task 28: E2E Tests for Config Persistence
+### Task 29: E2E Tests for Config Persistence
 
 **Files:**
 - Modify: `aimeat/test/e2e-full.ts`
@@ -1924,7 +2089,7 @@ git commit -m "test: add E2E tests for config persistence, provenance, and in-me
 
 ---
 
-### Task 29: Consul Mock Tests
+### Task 30: Consul Mock Tests
 
 **Files:**
 - Create: `aimeat/test/consul-config.test.ts`
@@ -1955,7 +2120,7 @@ git commit -m "test: add Consul config service tests with mocked HTTP"
 
 ## Phase 9: Documentation
 
-### Task 30: Write Configuration Guide
+### Task 31: Write Configuration Guide
 
 **Files:**
 - Create: `aimeat/docs/configuration-guide.md`
@@ -1999,11 +2164,11 @@ git commit -m "docs: add comprehensive configuration guide"
 | **4: CLI Bootstrap** | 15-16 | `--db`/`--consul` args, .env.example update |
 | **5: Consul** | 17-20 | Consul client, service, startup wiring, admin API |
 | **6: Admin UI** | 21-23 | Source badges, reset, in-memory banner, Consul tab, i18n |
-| **7: CLI** | 24-26 | Init wizard update, config export, config import |
-| **8: Tests** | 27-29 | Unit tests, E2E tests, Consul mock tests |
-| **9: Docs** | 30 | Configuration guide |
+| **7: CLI** | 24-27 | Init wizard update, config export, config import, **HELP_TEXT + CLI i18n** |
+| **8: Tests** | 28-30 | Unit tests, E2E tests, Consul mock tests |
+| **9: Docs** | 31 | Configuration guide |
 
-**Total: 30 tasks across 9 phases.**
+**Total: 31 tasks across 9 phases.**
 
 ### Key Design Decisions
 
