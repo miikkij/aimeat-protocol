@@ -286,5 +286,330 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
     }
   });
 
+  // ── POST /v1/admin/extensions/scaffold — Create extension files on disk ──
+  router.post('/v1/admin/extensions/scaffold', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const body = req.body as Record<string, unknown>;
+      const name = body.name as string;
+      const description = body.description as string || 'Custom extension';
+      const multiInstance = body.multiInstance as boolean ?? true;
+      const apis = (body.apis as string[]) ?? ['memory'];
+
+      if (!name || typeof name !== 'string' || !/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(name)) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
+          'name is required (3-64 chars, lowercase alphanumeric + hyphens)'));
+        return;
+      }
+
+      const dir = getBundledExtensionsDir();
+      const extDir = join(dir, name);
+      if (existsSync(extDir)) {
+        res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS', `Extension directory "${name}" already exists`));
+        return;
+      }
+
+      // Create directory structure
+      const { mkdirSync, writeFileSync } = await import('node:fs');
+      mkdirSync(join(extDir, 'actions'), { recursive: true });
+
+      // Generate extension.yaml
+      const apisYaml = apis.map(a => `  - ${a}`).join('\n');
+      const instancesYaml = multiInstance ? `
+instances:
+  supported: true
+  config_per_instance:
+    type: object
+    properties:
+      visibility:
+        type: string
+        enum: [public, private]
+        default: public` : '';
+
+      const yaml = `extension: "1.0"
+
+metadata:
+  name: "${name}"
+  version: "1.0.0"
+  description: "${description.replace(/"/g, '\\"')}"
+  author: "custom"
+
+required_apis:
+${apisYaml}
+${instancesYaml}
+
+actions:
+  - id: list
+    description: "List items"
+    method: POST
+    path: "/v1/ext/${name}/:instanceId/list"
+    auth: required
+    input:
+      status:
+        type: string
+      offset:
+        type: integer
+      limit:
+        type: integer
+    output:
+      items:
+        type: array
+      total:
+        type: integer
+    script: "actions/list.js"
+
+  - id: create
+    description: "Create an item"
+    method: POST
+    path: "/v1/ext/${name}/:instanceId/create"
+    auth: required
+    input:
+      title:
+        type: string
+        required: true
+      description:
+        type: string
+    output:
+      id:
+        type: string
+      item:
+        type: object
+    script: "actions/create.js"
+`;
+
+      const listScript = `export default async function(ctx, input) {
+  // ctx.memory   — get/set/search/delete key-value data
+  // ctx.wallet   — consume morsels, check balance
+  // ctx.caller   — { gaii, owner, roles }
+  // ctx.config   — extension-wide config
+  // ctx.instance — { id, config } (instance-specific)
+  // ctx.log      — info/warn/error logging
+
+  const results = await ctx.memory.search('item.');
+  let items = results.map(r => r.value);
+
+  // Filter by status
+  const status = input.status || 'active';
+  if (status !== 'all') {
+    items = items.filter(i => i.status === status);
+  }
+
+  // Sort newest first
+  items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  // Paginate
+  const total = items.length;
+  const offset = input.offset || 0;
+  const limit = Math.min(input.limit || 20, 100);
+  items = items.slice(offset, offset + limit);
+
+  return { items, total, offset, limit };
+}
+`;
+
+      const createScript = `export default async function(ctx, input) {
+  if (!input.title || typeof input.title !== 'string') {
+    throw new Error('title is required');
+  }
+
+  const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  const item = {
+    id,
+    title: input.title,
+    description: input.description || '',
+    creator: ctx.caller.gaii,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+  };
+
+  await ctx.memory.set('item.' + id, item);
+  ctx.log.info('Item created', { id, creator: ctx.caller.gaii });
+
+  return { id, item };
+}
+`;
+
+      writeFileSync(join(extDir, 'extension.yaml'), yaml, 'utf-8');
+      writeFileSync(join(extDir, 'actions', 'list.js'), listScript, 'utf-8');
+      writeFileSync(join(extDir, 'actions', 'create.js'), createScript, 'utf-8');
+
+      logger.info(`Extension scaffolded on disk: ${name}`, { dir: extDir, by: req.auth!.sub });
+
+      res.status(201).json(success(config.nodeId, {
+        name,
+        directory: extDir,
+        files: ['extension.yaml', 'actions/list.js', 'actions/create.js'],
+      }));
+    } catch (err) {
+      logger.error('Failed to scaffold extension', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to scaffold extension'));
+    }
+  });
+
+  // ── GET /v1/admin/extensions/available/:name/scripts/:actionId — Read action script from disk ──
+  router.get('/v1/admin/extensions/available/:name/scripts/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const actionId = req.params.actionId as string;
+      const dir = getBundledExtensionsDir();
+      const scriptPath = join(dir, name, 'actions', `${actionId}.js`);
+
+      if (!existsSync(scriptPath)) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Script "${actionId}" not found for extension "${name}"`));
+        return;
+      }
+
+      const content = readFileSync(scriptPath, 'utf-8');
+      res.json(success(config.nodeId, { actionId, scriptContent: content }));
+    } catch (err) {
+      logger.error('Failed to read extension script', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to read extension script'));
+    }
+  });
+
+  // ── PUT /v1/admin/extensions/available/:name/scripts/:actionId — Write action script to disk ──
+  router.put('/v1/admin/extensions/available/:name/scripts/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const actionId = req.params.actionId as string;
+      const body = req.body as Record<string, unknown>;
+      const scriptContent = body.scriptContent as string;
+
+      if (!scriptContent || typeof scriptContent !== 'string') {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'scriptContent (string) is required'));
+        return;
+      }
+
+      const dir = getBundledExtensionsDir();
+      const extDir = join(dir, name);
+      if (!existsSync(extDir)) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found on disk`));
+        return;
+      }
+
+      const actionsDir = join(extDir, 'actions');
+      if (!existsSync(actionsDir)) {
+        const { mkdirSync } = await import('node:fs');
+        mkdirSync(actionsDir, { recursive: true });
+      }
+
+      const { writeFileSync: wfs } = await import('node:fs');
+      wfs(join(actionsDir, `${actionId}.js`), scriptContent, 'utf-8');
+
+      logger.info(`Extension script saved: ${name}/actions/${actionId}.js`, { by: req.auth!.sub });
+      res.json(success(config.nodeId, { actionId, saved: true }));
+    } catch (err) {
+      logger.error('Failed to write extension script', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to write extension script'));
+    }
+  });
+
+  // ── POST /v1/admin/extensions/available/:name/reinstall — Reinstall from disk (update) ──
+  router.post('/v1/admin/extensions/available/:name/reinstall', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+
+      // Read updated files from disk
+      const bundled = readBundledExtensionFull(name);
+      if (!bundled) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found on disk`));
+        return;
+      }
+
+      const manifest = parseYaml(bundled.manifest) as Record<string, unknown>;
+      const metadata = manifest.metadata as Record<string, unknown>;
+      const actions = manifest.actions as Array<Record<string, unknown>>;
+      const manifestConfig = manifest.config as Record<string, unknown> | undefined;
+      const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
+      const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
+      const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
+
+      // Check if already installed
+      const existingExt = await storage.getExtension(name);
+
+      const record: ExtensionRecord = {
+        name: metadata.name as string,
+        version: metadata.version as string,
+        description: metadata.description as string,
+        author: metadata.author as string,
+        status: 'active',
+        requiredApis: (manifest.required_apis as string[]) ?? [],
+        actions: actions.map(a => ({
+          id: a.id as string,
+          method: (a.method as string).toUpperCase(),
+          path: a.path as string,
+          inputSchema: (a.input as Record<string, unknown>) ?? {},
+          outputSchema: (a.output as Record<string, unknown>) ?? {},
+          scriptContent: bundled.scripts[a.script as string] || '',
+        })),
+        config: {
+          ...(manifestConfig
+            ? Object.fromEntries(
+                Object.entries(manifestConfig).map(([k, v]) => {
+                  if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                    return [k, (v as Record<string, unknown>).default];
+                  }
+                  return [k, v];
+                }),
+              )
+            : {}),
+        },
+        limits: {
+          memoryMb: Math.min(
+            (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
+            config.extensionMaxMemoryMb,
+          ),
+          timeoutMs: Math.min(
+            (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
+            config.extensionTimeoutMs,
+          ),
+          maxApiCalls: Math.min(
+            (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
+            config.extensionMaxApiCalls,
+          ),
+        },
+        federation: {
+          advertise: (manifestFederation?.advertise as boolean) ?? false,
+          capabilities: (manifestFederation?.capabilities as string[]) ?? [],
+        },
+        ...(manifestInstances?.supported ? {
+          instances: {
+            supported: true,
+            configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
+          },
+        } : {}),
+        installedBy: req.auth!.sub,
+        installedAt: existingExt?.installedAt ?? new Date().toISOString(),
+        activatedAt: new Date().toISOString(),
+      };
+
+      if (existingExt) {
+        // Update existing — preserve instances
+        await storage.updateExtension(name, {
+          version: record.version,
+          description: record.description,
+          actions: record.actions,
+          config: record.config,
+          limits: record.limits,
+          requiredApis: record.requiredApis,
+          federation: record.federation,
+          ...(record.instances ? { instances: record.instances } : {}),
+        });
+        logger.info(`Extension reinstalled (updated): ${name}`, { by: req.auth!.sub });
+      } else {
+        // Fresh install
+        await storage.createExtension(record);
+        logger.info(`Extension installed from disk: ${name}`, { by: req.auth!.sub });
+      }
+
+      res.json(success(config.nodeId, {
+        extension: { name, version: record.version, status: 'active', actionsCount: record.actions.length },
+        reinstalled: !!existingExt,
+      }));
+    } catch (err) {
+      logger.error('Failed to reinstall extension', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to reinstall extension'));
+    }
+  });
+
   return router;
 }

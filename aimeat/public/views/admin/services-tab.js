@@ -13,7 +13,8 @@ import { dt, Badge, StatsGrid, Empty, ExpandableHelp } from './shared.js';
 import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance,
   deleteExtensionInstance, getAvailableExtensions, installBundledExtension,
-  uninstallExtension,
+  uninstallExtension, getActionScript, updateActionScript, scaffoldExtension,
+  getDiskScript, saveDiskScript, reinstallExtension,
 } from '/js/services/admin.js';
 
 const inputStyle = 'background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px';
@@ -278,6 +279,153 @@ function TranslationEditor({ extName, inst, onSave }) {
   `;
 }
 
+// ── Action Script Editor ──
+function ActionScriptEditor({ extName, actions, onUpdated }) {
+  const [selectedAction, setSelectedAction] = useState(null);
+  const [script, setScript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function loadScript(actionId) {
+    if (selectedAction === actionId) { setSelectedAction(null); return; }
+    setLoading(true); setMsg(null);
+    try {
+      const res = await getActionScript(extName, actionId);
+      setScript(res.data?.action?.scriptContent || '');
+      setSelectedAction(actionId);
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    setLoading(false);
+  }
+
+  async function handleSave() {
+    setSaving(true); setMsg(null);
+    try {
+      await updateActionScript(extName, selectedAction, script);
+      setMsg({ ok: true, text: t('dashboard.servicesScriptSaved') });
+      if (onUpdated) onUpdated();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    setSaving(false);
+  }
+
+  return html`
+    <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
+        ${actions.map(a => html`
+          <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
+            style="font-size:.75rem${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+            ${a.method} ${escHtml(a.id)}
+          </button>
+        `)}
+      </div>
+
+      ${loading && html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`}
+
+      ${selectedAction && !loading && html`
+        <div style="margin-top:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <code style="font-size:.8rem;color:var(--text-dim)">${extName}/${selectedAction}</code>
+          </div>
+          <textarea value=${script} onInput=${e => setScript(e.target.value)}
+            style="width:100%;height:320px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.3);color:var(--text-bright);resize:vertical;tab-size:2"
+            spellcheck="false"
+            onKeyDown=${e => {
+              if (e.key === 'Tab') {
+                e.preventDefault();
+                const ta = e.target;
+                const start = ta.selectionStart;
+                const end = ta.selectionEnd;
+                const val = ta.value;
+                ta.value = val.substring(0, start) + '  ' + val.substring(end);
+                ta.selectionStart = ta.selectionEnd = start + 2;
+                setScript(ta.value);
+              }
+              if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSave();
+              }
+            }}
+          />
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSave} disabled=${saving}>
+              ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
+            <span style="font-size:.75rem;color:var(--text-dim)">Ctrl+S</span>
+            ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// ── Extension Scaffold Form ──
+function ScaffoldForm({ onCreated }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [multiInstance, setMultiInstance] = useState(true);
+  const [apis, setApis] = useState(['memory', 'wallet']);
+  const [creating, setCreating] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const allApis = ['memory', 'wallet', 'consent', 'trust'];
+
+  function toggleApi(api) {
+    setApis(prev => prev.includes(api) ? prev.filter(a => a !== api) : [...prev, api]);
+  }
+
+  async function handleCreate() {
+    if (!name.trim()) return;
+    setCreating(true); setMsg(null);
+    try {
+      await scaffoldExtension({ name: name.trim(), description: description.trim(), multiInstance, apis });
+      setMsg({ ok: true, text: t('dashboard.servicesScaffoldDone') });
+      setName(''); setDescription('');
+      if (onCreated) onCreated();
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    setCreating(false);
+  }
+
+  return html`
+    <div class="adm-card" style="padding:16px;margin-bottom:16px">
+      <h3 style="margin:0 0 12px;font-size:1rem">${t('dashboard.servicesScaffoldTitle')}</h3>
+      <p style="margin:0 0 12px;color:var(--text-dim);font-size:.85rem">${t('dashboard.servicesScaffoldDesc')}</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style=${fieldWrap}>
+          <label style=${labelStyle}>${t('dashboard.servicesName')}</label>
+          <input type="text" value=${name} onInput=${e => setName(e.target.value)}
+            style=${inputStyle + ';width:220px'} placeholder="my-service" />
+        </div>
+        <div style=${fieldWrap + ';flex:1;min-width:200px'}>
+          <label style=${labelStyle}>${t('dashboard.servicesScaffoldDescLabel')}</label>
+          <input type="text" value=${description} onInput=${e => setDescription(e.target.value)}
+            style=${inputStyle} placeholder="What does this extension do?" />
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:.8rem;color:var(--text-dim)">APIs:</label>
+          ${allApis.map(api => html`
+            <label style="display:flex;align-items:center;gap:3px;font-size:.8rem;cursor:pointer;color:${apis.includes(api) ? 'var(--text-bright)' : 'var(--text-dim)'}">
+              <input type="checkbox" checked=${apis.includes(api)} onChange=${() => toggleApi(api)} />
+              ${api}
+            </label>
+          `)}
+        </div>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem;cursor:pointer;color:var(--text-dim)">
+          <input type="checkbox" checked=${multiInstance} onChange=${e => setMultiInstance(e.target.checked)} />
+          ${t('dashboard.servicesMultiInstance')}
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+        <button class="adm-btn-action" onClick=${handleCreate} disabled=${creating || !name.trim()}>
+          ${creating ? '...' : t('dashboard.servicesScaffoldBtn')}</button>
+        ${msg && html`<span style="font-size:.85rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+      </div>
+    </div>
+  `;
+}
+
 // ── Inline instance panel for a single extension ──
 function ExtensionPanel({ ext, onUninstall }) {
   const [expanded, setExpanded] = useState(false);
@@ -288,6 +436,7 @@ function ExtensionPanel({ ext, onUninstall }) {
   const [editingTl, setEditingTl] = useState(null); // instance id with open translation editor
   const [editingCfg, setEditingCfg] = useState(null); // instance id with open config editor
   const [editCfgData, setEditCfgData] = useState({});
+  const [showScripts, setShowScripts] = useState(false);
 
   const schema = ext.instances?.configSchema || null;
   const [newConfig, setNewConfig] = useState(() => buildDefaults(schema));
@@ -391,10 +540,18 @@ function ExtensionPanel({ ext, onUninstall }) {
             <button class="adm-btn-sm" onClick=${() => setShowCreate(!showCreate)}>
               + ${t('dashboard.servicesCreateInstance')}
             </button>
+            <button class="adm-btn-sm" onClick=${() => setShowScripts(!showScripts)}
+              style="font-size:.8rem${showScripts ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+              \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+            </button>
             <button class="adm-btn-sm" onClick=${loadInstances} style="font-size:.8rem">
               \u21BB
             </button>
           </div>
+
+          ${showScripts && html`
+            <${ActionScriptEditor} extName=${ext.name} actions=${ext.actions || []} />
+          `}
 
           ${showCreate && html`
             <div style="margin-bottom:12px;padding:12px;border:1px solid var(--glass-border);border-radius:6px;display:flex;flex-direction:column;gap:10px">
@@ -490,6 +647,140 @@ function ExtensionPanel({ ext, onUninstall }) {
   `;
 }
 
+// ── Available Extension Card (with disk script editor) ──
+function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, reload }) {
+  const [showEditor, setShowEditor] = useState(false);
+  const [selectedAction, setSelectedAction] = useState(null);
+  const [script, setScript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  // Derive action IDs from actionsCount + common patterns
+  // We'll try to load based on the action ID
+  const [actionIds, setActionIds] = useState([]);
+
+  useEffect(() => {
+    if (showEditor && actionIds.length === 0) {
+      // Try reading extension.yaml to get action IDs — for now, use a convention-based approach
+      // The available ext info doesn't include action IDs, so we infer from common patterns
+      // or just let the user type the action name
+      setActionIds([]); // Will be populated by the manifest endpoint in the future
+    }
+  }, [showEditor]);
+
+  async function loadScript(actionId) {
+    if (selectedAction === actionId) { setSelectedAction(null); return; }
+    setLoading(true); setMsg(null);
+    try {
+      const res = await getDiskScript(ext.name, actionId);
+      setScript(res.data?.scriptContent || '');
+      setSelectedAction(actionId);
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    setLoading(false);
+  }
+
+  async function handleSave() {
+    setSaving(true); setMsg(null);
+    try {
+      await saveDiskScript(ext.name, selectedAction, script);
+      setMsg({ ok: true, text: t('dashboard.servicesScriptSaved') });
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+    setSaving(false);
+  }
+
+  async function handleReinstall() {
+    setMsg(null);
+    try {
+      await onReinstall(ext.name);
+      setMsg({ ok: true, text: t('dashboard.servicesReinstalled') });
+    } catch (e) { setMsg({ ok: false, text: e.message }); }
+  }
+
+  return html`
+    <div class="adm-card" style="padding:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <strong style="font-size:1.05rem">${escHtml(ext.name)}</strong>
+        <span style="color:var(--text-dim);font-size:.85rem">v${escHtml(ext.version)}</span>
+      </div>
+      <p style="margin:0;color:var(--text-dim);font-size:.9rem">${escHtml(ext.description)}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.8rem">
+        <span style="color:var(--text-dim)">${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}</span>
+        <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
+          ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
+        </span>
+        <span style="color:var(--text-dim)">${ext.actionsCount} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
+      </div>
+      <div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${isInstalled
+          ? html`
+            <button class="adm-btn-action" disabled=${isInstalling} onClick=${handleReinstall}>
+              ${isInstalling ? '...' : t('dashboard.servicesReinstall')}
+            </button>
+            <span style="font-size:.8rem;color:var(--text-dim)">${t('dashboard.servicesInstalled')}</span>
+          `
+          : html`<button class="adm-btn-action" disabled=${isInstalling} onClick=${() => onInstall(ext.name)}>
+              ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
+            </button>`
+        }
+        <button class="adm-btn-sm" onClick=${() => setShowEditor(!showEditor)}
+          style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+          \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
+        </button>
+        ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+      </div>
+
+      ${showEditor && html`
+        <div style="margin-top:4px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+            <label style="font-size:.8rem;color:var(--text-dim)">${t('dashboard.servicesScriptAction')}:</label>
+            <input type="text" id="disk-action-${ext.name}" style=${inputStyle + ';width:160px;padding:4px 8px;font-size:.85rem'}
+              placeholder="create-listing"
+              onKeyDown=${e => { if (e.key === 'Enter') loadScript(e.target.value.trim()); }} />
+            <button class="adm-btn-sm" style="font-size:.8rem"
+              onClick=${() => { const el = document.getElementById('disk-action-' + ext.name); if (el?.value) loadScript(el.value.trim()); }}>
+              ${t('dashboard.loading').replace('...', '')}
+            </button>
+          </div>
+
+          ${loading && html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`}
+
+          ${selectedAction && !loading && html`
+            <div>
+              <code style="font-size:.8rem;color:var(--text-dim)">${ext.name}/actions/${selectedAction}.js</code>
+              <textarea value=${script} onInput=${e => setScript(e.target.value)}
+                style="width:100%;height:320px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.3);color:var(--text-bright);resize:vertical;tab-size:2;margin-top:4px"
+                spellcheck="false"
+                onKeyDown=${e => {
+                  if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const ta = e.target;
+                    const start = ta.selectionStart;
+                    const end = ta.selectionEnd;
+                    const val = ta.value;
+                    ta.value = val.substring(0, start) + '  ' + val.substring(end);
+                    ta.selectionStart = ta.selectionEnd = start + 2;
+                    setScript(ta.value);
+                  }
+                  if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleSave();
+                  }
+                }}
+              />
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSave} disabled=${saving}>
+                  ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
+                <span style="font-size:.75rem;color:var(--text-dim)">Ctrl+S</span>
+              </div>
+            </div>
+          `}
+        </div>
+      `}
+    </div>
+  `;
+}
+
 export default function ServicesTab({ data, reload }) {
   const extensions = data.extensions?.extensions || [];
   const [available, setAvailable] = useState([]);
@@ -527,6 +818,18 @@ export default function ServicesTab({ data, reload }) {
     }
   }
 
+  async function handleReinstall(name) {
+    setInstallingName(name);
+    try {
+      await reinstallExtension(name);
+      reload();
+    } catch (e) {
+      alert(t('dashboard.errorLabel') + ': ' + e.message);
+    } finally {
+      setInstallingName(null);
+    }
+  }
+
   // ── Stats ──
   const totalExtensions = extensions.length;
   const activeExtensions = extensions.filter(e => e.status === 'active').length;
@@ -553,6 +856,8 @@ export default function ServicesTab({ data, reload }) {
       `)}
     `}
 
+    <${ScaffoldForm} onCreated=${reload} />
+
     <h3 style="margin:24px 0 8px">${t('dashboard.servicesAvailable')}</h3>
     <p style="color:var(--text-dim);margin:0 0 16px;font-size:.9rem">${t('dashboard.servicesAvailableDesc')}</p>
 
@@ -561,34 +866,13 @@ export default function ServicesTab({ data, reload }) {
       : available.length === 0
         ? html`<${Empty} text=${t('dashboard.servicesNoExtensions')} />`
         : html`
-          <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill, minmax(340px, 1fr))">
+          <div style="display:flex;flex-direction:column;gap:12px">
             ${available.map(ext => {
               const isInstalled = ext.installed || installedNames.has(ext.name);
               const isInstalling = installingName === ext.name;
-              return html`
-                <div class="adm-card" style="padding:16px;display:flex;flex-direction:column;gap:8px">
-                  <div style="display:flex;align-items:center;justify-content:space-between">
-                    <strong style="font-size:1.05rem">${escHtml(ext.name)}</strong>
-                    <span style="color:var(--text-dim);font-size:.85rem">v${escHtml(ext.version)}</span>
-                  </div>
-                  <p style="margin:0;color:var(--text-dim);font-size:.9rem">${escHtml(ext.description)}</p>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.8rem">
-                    <span style="color:var(--text-dim)">${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}</span>
-                    <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
-                      ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
-                    </span>
-                    <span style="color:var(--text-dim)">${ext.actionsCount} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
-                  </div>
-                  <div style="margin-top:4px">
-                    ${isInstalled
-                      ? html`<span class="adm-btn-sm" style="opacity:0.6;cursor:default">${t('dashboard.servicesInstalled')}</span>`
-                      : html`<button class="adm-btn-action" disabled=${isInstalling} onClick=${() => handleInstall(ext.name)}>
-                          ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
-                        </button>`
-                    }
-                  </div>
-                </div>
-              `;
+              return html`<${AvailableExtCard} ext=${ext} isInstalled=${isInstalled}
+                isInstalling=${isInstalling}
+                onInstall=${handleInstall} onReinstall=${handleReinstall} reload=${reload} />`;
             })}
           </div>
         `

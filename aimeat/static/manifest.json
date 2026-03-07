@@ -1,0 +1,17 @@
+{
+  "name": "AIMEAT",
+  "short_name": "AIMEAT",
+  "description": "AI Memory Exchange and Action Transfer — Sinun nodesi, sinun datasi",
+  "start_url": "/v1/portal/human/dashboard",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#ff69b4",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "categories": ["social", "utilities"],
+  "lang": "fi",
+  "dir": "ltr"
+}

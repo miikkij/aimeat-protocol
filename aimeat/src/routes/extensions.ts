@@ -246,6 +246,88 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
     }
   });
 
+  // ── GET /v1/extensions/:name/actions/:actionId — Get action script content ──
+  router.get('/v1/extensions/:name/actions/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const actionId = req.params.actionId as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+      const action = ext.actions.find(a => a.id === actionId);
+      if (!action) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${actionId}" not found in extension "${name}"`));
+        return;
+      }
+      res.json(success(config.nodeId, {
+        action: {
+          id: action.id,
+          method: action.method,
+          path: action.path,
+          inputSchema: action.inputSchema,
+          outputSchema: action.outputSchema,
+          scriptContent: action.scriptContent,
+        },
+      }));
+    } catch (err) {
+      logger.error('Failed to get action script', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get action script'));
+    }
+  });
+
+  // ── PATCH /v1/extensions/:name/actions/:actionId — Update action script ──
+  router.patch('/v1/extensions/:name/actions/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const actionId = req.params.actionId as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+      const actionIdx = ext.actions.findIndex(a => a.id === actionId);
+      if (actionIdx === -1) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${actionId}" not found in extension "${name}"`));
+        return;
+      }
+
+      const body = req.body as Record<string, unknown>;
+      const scriptContent = body.scriptContent as string | undefined;
+      if (!scriptContent || typeof scriptContent !== 'string') {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'scriptContent (string) is required'));
+        return;
+      }
+
+      // Enforce size limit
+      const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
+      if (sizeKb > config.extensionMaxCodeSizeKb) {
+        res.status(400).json(error(config.nodeId, 'CODE_TOO_LARGE',
+          `Script is ${sizeKb.toFixed(1)}KB, max is ${config.extensionMaxCodeSizeKb}KB`));
+        return;
+      }
+
+      // Update the action's script
+      const updatedActions = [...ext.actions];
+      updatedActions[actionIdx] = { ...updatedActions[actionIdx], scriptContent };
+
+      await storage.updateExtension(name, { actions: updatedActions });
+
+      logger.info(`Action script updated: ${name}/${actionId}`, { by: req.auth!.sub, sizeKb: sizeKb.toFixed(1) });
+
+      res.json(success(config.nodeId, {
+        action: {
+          id: actionId,
+          scriptContent,
+        },
+      }));
+    } catch (err) {
+      logger.error('Failed to update action script', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update action script'));
+    }
+  });
+
   // ── DELETE /v1/extensions/:name — Uninstall extension ──────────
   router.delete('/v1/extensions/:name', requireAuth(), requireRole('operator'), async (req, res) => {
     try {

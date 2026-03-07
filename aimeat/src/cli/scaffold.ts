@@ -27,8 +27,17 @@ export interface ScaffoldResult {
 
 const MANIFEST_FILE = '.aimeat-manifest.json';
 
-/** Directories to scaffold from package root into target. */
-const SCAFFOLD_DIRS = ['public', 'locales', 'static'];
+/**
+ * Directories to scaffold: [sourceDir, targetDir].
+ * In dev mode, static files live at src/static/; in dist they're at static/.
+ * Both map to static/ in the target directory.
+ */
+const SCAFFOLD_DIRS: Array<[string, string]> = [
+  ['public', 'public'],
+  ['locales', 'locales'],
+  ['static', 'static'],        // dist mode
+  ['src/static', 'static'],    // dev mode fallback
+];
 
 export function computeFileHash(filePath: string): string {
   const content = readFileSync(filePath);
@@ -84,13 +93,18 @@ export function scaffoldFiles(
   };
 
   // Collect all source files across scaffold dirs
-  for (const dir of SCAFFOLD_DIRS) {
-    const srcDir = join(pkgRoot, dir);
+  const seenTargets = new Set<string>();
+  for (const [srcDirName, targetDirName] of SCAFFOLD_DIRS) {
+    const srcDir = join(pkgRoot, srcDirName);
     if (!existsSync(srcDir)) continue;
+    // Skip if we already processed this target (e.g. static/ found in dist mode)
+    if (seenTargets.has(targetDirName)) continue;
+    seenTargets.add(targetDirName);
 
-    const files = listFiles(srcDir, pkgRoot);
-    for (const relPath of files) {
-      const srcPath = join(pkgRoot, relPath);
+    const files = listFiles(srcDir, join(pkgRoot, srcDirName));
+    for (const fileRelPath of files) {
+      const relPath = targetDirName + '/' + fileRelPath;
+      const srcPath = join(srcDir, fileRelPath);
       const destPath = join(targetDir, relPath);
       const srcHash = computeFileHash(srcPath);
 

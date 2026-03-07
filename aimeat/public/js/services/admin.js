@@ -152,6 +152,12 @@ export const getExtensionInstances    = (name)          => apiGet(`/v1/extension
 export const createExtensionInstance  = (name, body)    => apiPost(`/v1/extensions/${encodeURIComponent(name)}/instances`, body);
 export const updateExtensionInstance  = (name, id, body)=> apiPatch(`/v1/extensions/${encodeURIComponent(name)}/instances/${encodeURIComponent(id)}`, body);
 export const deleteExtensionInstance  = (name, id)      => apiDelete(`/v1/extensions/${encodeURIComponent(name)}/instances/${encodeURIComponent(id)}`);
+export const getActionScript         = (name, actionId) => apiGet(`/v1/extensions/${encodeURIComponent(name)}/actions/${encodeURIComponent(actionId)}`);
+export const updateActionScript      = (name, actionId, scriptContent) => apiPatch(`/v1/extensions/${encodeURIComponent(name)}/actions/${encodeURIComponent(actionId)}`, { scriptContent });
+export const scaffoldExtension       = (body)           => apiPost('/v1/admin/extensions/scaffold', body);
+export const getDiskScript           = (name, actionId) => apiGet(`/v1/admin/extensions/available/${encodeURIComponent(name)}/scripts/${encodeURIComponent(actionId)}`);
+export const saveDiskScript          = (name, actionId, scriptContent) => apiPut(`/v1/admin/extensions/available/${encodeURIComponent(name)}/scripts/${encodeURIComponent(actionId)}`, { scriptContent });
+export const reinstallExtension      = (name)           => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/reinstall`);
 
 // ── Scheduler ──
 export const getSchedulerJobs    = ()              => apiGet('/v1/admin/scheduler/jobs');

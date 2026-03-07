@@ -1,0 +1,4448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#1a1a2e"/>
+  <title>My Apps — AIMEAT</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --text: #f0e6ff;
+      --accent: #e94560;
+      --accent2: #0f3460;
+      --surface-glass: rgba(30, 20, 45, .55);
+      --border-subtle: rgba(192, 132, 252, .15);
+      --border-hover: rgba(192, 132, 252, .35);
+      --text-muted: rgba(196, 181, 212, .7);
+      --text-dim: rgba(216, 180, 254, .4);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --transition: .25s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(168, 85, 247, .10) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(233, 69, 96, .07) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(15, 52, 96, .12) 0%, transparent 60%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(26, 26, 46, .85);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f0abfc, #e94560, #f9a8d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    #search-input {
+      flex: 1;
+      min-width: 160px;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      color: var(--text);
+      font-size: .9rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    #search-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    #search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, .15);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: border-color var(--transition), transform var(--transition),
+                  box-shadow var(--transition), background var(--transition);
+      user-select: none;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+      background: rgba(30, 20, 45, .8);
+    }
+
+    .icon-btn:active {
+      transform: translateY(0);
+    }
+
+    #add-btn {
+      background: linear-gradient(135deg, var(--accent), #c53a50);
+      border-color: transparent;
+      font-weight: 700;
+      font-size: 1.4rem;
+    }
+
+    #add-btn:hover {
+      box-shadow: 0 4px 20px rgba(233, 69, 96, .35);
+      border-color: transparent;
+      background: linear-gradient(135deg, #f05575, #e94560);
+    }
+
+    /* ── Tag Bar ────────────────────────────────────── */
+
+    #tag-bar {
+      position: relative;
+      z-index: 1;
+      padding: 12px 24px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    #tag-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      color: var(--text-muted);
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--transition);
+      user-select: none;
+    }
+
+    .tag:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+    }
+
+    .tag.active {
+      background: linear-gradient(135deg, var(--accent), #c53a50);
+      border-color: transparent;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* ── App Grid ───────────────────────────────────── */
+
+    #app-grid {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      padding: 8px 24px 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      align-content: start;
+    }
+
+    .app-card {
+      background: var(--surface-glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color var(--transition), transform var(--transition),
+                  box-shadow var(--transition);
+      position: relative;
+      text-align: center;
+      animation: cardIn .5s cubic-bezier(.16, 1, .3, 1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px) scale(.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .app-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-3px);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, .25),
+        0 0 48px rgba(168, 85, 247, .06);
+    }
+
+    .app-card:active {
+      transform: translateY(-1px);
+    }
+
+    .app-card.dragging {
+      opacity: .35;
+      transform: scale(.95);
+      box-shadow: none;
+    }
+
+    .app-card.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .app-card .app-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, var(--accent2), rgba(15, 52, 96, .6));
+      border: 1px solid rgba(192, 132, 252, .1);
+      flex-shrink: 0;
+    }
+
+    .app-card .app-name {
+      font-size: .85rem;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .app-card .app-source {
+      font-size: .7rem;
+      color: var(--text-dim);
+    }
+
+    .app-card .app-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .app-card:hover .app-actions {
+      opacity: 1;
+    }
+
+    .app-card .app-actions button {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-glass);
+      color: var(--text-muted);
+      font-size: .7rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .app-card .app-actions button:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(233, 69, 96, .12);
+    }
+
+    .app-card .fav-star {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      font-size: .85rem;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .app-card:hover .fav-star,
+    .app-card .fav-star.visible {
+      opacity: 1;
+    }
+
+    /* ── Card Menu Button ─────────────────────────────── */
+
+    .card-menu-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      background: var(--surface-glass, rgba(22, 33, 62, 0.8));
+      border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+      color: var(--text);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 2;
+    }
+    .app-card:hover .card-menu-btn,
+    .card-menu-btn:focus { opacity: 1; }
+    .card-menu-btn:hover { background: var(--accent); }
+
+    /* ── Empty State ────────────────────────────────── */
+
+    .empty-state {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 72px 24px;
+      text-align: center;
+      color: var(--text-dim);
+    }
+
+    .empty-state .empty-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      opacity: .6;
+      filter: drop-shadow(0 4px 12px rgba(168, 85, 247, .15));
+    }
+
+    .empty-state h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: .9rem;
+      line-height: 1.6;
+      max-width: 340px;
+      margin-bottom: 6px;
+    }
+
+    .empty-state .empty-formats {
+      font-size: .78rem;
+      color: var(--text-dim);
+      opacity: .7;
+      margin-top: 4px;
+    }
+
+    /* ── Footer ─────────────────────────────────────── */
+
+    footer {
+      position: relative;
+      z-index: 1;
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #stats {
+      font-size: .75rem;
+      color: var(--text-dim);
+      letter-spacing: .04em;
+    }
+
+    .footer-brand {
+      font-size: .7rem;
+      color: var(--text-dim);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      opacity: .6;
+    }
+
+    /* ── Modal Overlay ──────────────────────────────── */
+
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #modal-overlay[hidden] {
+      display: none;
+    }
+
+    .modal {
+      background: rgba(22, 33, 62, .92);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow:
+        0 0 80px rgba(168, 85, 247, .08),
+        0 4px 40px rgba(0, 0, 0, .3);
+      animation: cardIn .4s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    .modal h2 {
+      font-size: 1.15rem;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #f0abfc, #e94560);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ── Modal Form Elements ──────────────────────────── */
+
+    .modal-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .modal-tab {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: .85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .modal-tab:not(:last-child) {
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .modal-tab:hover {
+      color: var(--text);
+      background: rgba(192, 132, 252, .06);
+    }
+
+    .modal-tab.active {
+      background: linear-gradient(135deg, var(--accent), #c53a50);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .modal-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .label-hint {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-dim);
+    }
+
+    .modal-input {
+      width: 100%;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: .88rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .modal-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(233, 69, 96, .15);
+    }
+
+    select.modal-input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='rgba(196,181,212,.7)' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+
+    select.modal-input option {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .modal-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .modal-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .modal-btn {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .modal-btn.secondary {
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .modal-btn.secondary:hover {
+      color: var(--text);
+      border-color: var(--border-hover);
+    }
+
+    .modal-btn.primary {
+      background: linear-gradient(135deg, var(--accent), #c53a50);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .modal-btn.primary:hover:not(:disabled) {
+      box-shadow: 0 4px 20px rgba(233, 69, 96, .35);
+      background: linear-gradient(135deg, #f05575, #e94560);
+    }
+
+    .modal-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Drop Zone ──────────────────────────────────── */
+
+    .drop-zone {
+      border: 2px dashed var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 28px 20px;
+      text-align: center;
+      transition: border-color var(--transition), background var(--transition);
+      cursor: pointer;
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(233, 69, 96, .06);
+    }
+
+    .drop-zone-icon {
+      font-size: 2rem;
+      margin-bottom: 8px;
+      opacity: .5;
+    }
+
+    .drop-zone-text {
+      font-size: .85rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .drop-zone-hint {
+      font-size: .75rem;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .browse-btn {
+      padding: 7px 18px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-glass);
+      color: var(--text);
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-family: inherit;
+    }
+
+    .browse-btn:hover {
+      border-color: var(--border-hover);
+      background: rgba(30, 20, 45, .8);
+    }
+
+    .drop-zone-selected {
+      margin-top: 10px;
+      font-size: .8rem;
+      color: var(--accent);
+      font-weight: 500;
+      min-height: 1.2em;
+    }
+
+    /* ── Iframe View ────────────────────────────────── */
+
+    #iframe-view {
+      position: fixed;
+      inset: 0;
+      z-index: 600;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #iframe-view[hidden] {
+      display: none;
+    }
+
+    #iframe-view .iframe-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: rgba(26, 26, 46, .9);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    #iframe-view .iframe-toolbar .iframe-title {
+      flex: 1;
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #iframe-view iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+    }
+
+    /* ── Context Menu ──────────────────────────────── */
+
+    #context-menu {
+      position: fixed;
+      z-index: 700;
+      background: rgba(22, 33, 62, .95);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 6px 0;
+      min-width: 180px;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, .4),
+        0 0 48px rgba(168, 85, 247, .06);
+      animation: cardIn .2s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    #context-menu[hidden] {
+      display: none;
+    }
+
+    #context-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 9px 16px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: .84rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition);
+      text-align: left;
+    }
+
+    #context-menu button:hover {
+      background: rgba(192, 132, 252, .1);
+    }
+
+    #context-menu button.danger {
+      color: var(--accent);
+    }
+
+    #context-menu button.danger:hover {
+      background: rgba(233, 69, 96, .12);
+    }
+
+    #context-menu hr {
+      border: none;
+      border-top: 1px solid var(--border-subtle);
+      margin: 4px 0;
+    }
+
+    /* ── Responsive ─────────────────────────────────── */
+
+    @media (max-width: 480px) {
+      header {
+        padding: 12px 16px;
+        gap: 10px;
+      }
+
+      header h1 {
+        font-size: 1.1rem;
+      }
+
+      #search-input {
+        min-width: 0;
+        order: 3;
+        flex-basis: 100%;
+      }
+
+      #tag-bar {
+        padding: 10px 16px;
+      }
+
+      #app-grid {
+        padding: 8px 16px 20px;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      footer {
+        padding: 12px 16px;
+      }
+    }
+
+    /* ── Light Theme ─────────────────────────────────── */
+
+    [data-theme="light"] {
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --text: #1a1a2e;
+      --accent: #e94560;
+      --accent2: #a8d8ea;
+      --surface-glass: rgba(255, 255, 255, .75);
+      --border-subtle: rgba(26, 26, 46, .12);
+      --border-hover: rgba(26, 26, 46, .25);
+      --text-muted: rgba(26, 26, 46, .6);
+      --text-dim: rgba(26, 26, 46, .35);
+    }
+
+    [data-theme="light"] body::before {
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(168, 216, 234, .15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 90%, rgba(233, 69, 96, .06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(168, 216, 234, .08) 0%, transparent 60%);
+    }
+
+    [data-theme="light"] header {
+      background: rgba(245, 245, 245, .9);
+    }
+
+    [data-theme="light"] .modal {
+      background: rgba(255, 255, 255, .95);
+    }
+
+    [data-theme="light"] #context-menu {
+      background: rgba(255, 255, 255, .95);
+    }
+
+    /* ── Source Modal ──────────────────────────────── */
+
+    #source-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #source-overlay[hidden] {
+      display: none;
+    }
+
+    .source-modal { max-width: 800px; width: 95vw; }
+    #source-code {
+      width: 100%;
+      min-height: 400px;
+      max-height: 60vh;
+      background: #0d1117;
+      color: #c9d1d9;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: vertical;
+      tab-size: 2;
+    }
+
+    [data-theme="light"] #iframe-view .iframe-toolbar {
+      background: rgba(245, 245, 245, .95);
+    }
+
+    /* ── Settings Modal ──────────────────────────────── */
+
+    #settings-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #settings-overlay[hidden] {
+      display: none;
+    }
+
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .settings-section-title {
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .settings-row label {
+      flex: 0 0 130px;
+      font-size: .84rem;
+      color: var(--text-muted);
+    }
+
+    .settings-row .modal-input {
+      flex: 1;
+    }
+
+    .settings-backup-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .modal-btn.danger {
+      background: transparent;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .modal-btn.danger:hover {
+      background: rgba(233, 69, 96, .12);
+    }
+
+    /* ── AIMEAT Import Dialog ─────────────────────────── */
+
+    #aimeat-import-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 550;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #aimeat-import-overlay[hidden] {
+      display: none;
+    }
+
+    .aimeat-app-list {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 16px;
+    }
+
+    .aimeat-app-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      transition: border-color var(--transition);
+    }
+
+    .aimeat-app-item:hover {
+      border-color: var(--border-hover);
+    }
+
+    .aimeat-app-item input[type="checkbox"] {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .aimeat-app-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .aimeat-app-name {
+      font-size: .85rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .aimeat-app-size {
+      font-size: .72rem;
+      color: var(--text-dim);
+    }
+
+    .aimeat-app-item select {
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-size: .78rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .aimeat-app-item select option {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    /* ── Publish Modal ──────────────────────────────── */
+
+    #publish-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 560;
+      background: rgba(10, 10, 18, .7);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #publish-overlay[hidden] {
+      display: none;
+    }
+
+    /* ── Published Apps Section ──────────────────────── */
+
+    #published-section {
+      margin: 0 24px 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .published-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .published-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .published-header .arrow {
+      transition: transform var(--transition);
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+
+    .published-header .arrow.open {
+      transform: rotate(180deg);
+    }
+
+    .published-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .published-card {
+      background: var(--surface-glass);
+      border: 1px solid rgba(52, 211, 153, .25);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .published-card:hover {
+      border-color: rgba(52, 211, 153, .5);
+      box-shadow: 0 4px 20px rgba(52, 211, 153, .08);
+    }
+
+    .published-card-name {
+      font-weight: 600;
+      font-size: .88rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .published-card-meta {
+      font-size: .72rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .published-card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .published-card-actions button {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--text);
+      font-size: .72rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .published-card-actions button:hover {
+      border-color: var(--border-hover);
+      background: rgba(192, 132, 252, .1);
+    }
+
+    .published-card-actions button.danger:hover {
+      border-color: var(--accent);
+      background: rgba(233, 69, 96, .1);
+      color: var(--accent);
+    }
+
+    .published-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: .85rem;
+    }
+
+    /* ── Cortex Extensions Bar ──────────────────────── */
+
+    .cortex-mini-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;cursor:pointer;min-width:160px;flex-shrink:0;transition:all .15s}
+    .cortex-mini-card:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18)}
+    .cortex-mini-name{font-weight:600;font-size:.85rem;margin-bottom:.25rem;white-space:nowrap}
+    .cortex-mini-meta{font-size:.7rem;color:var(--text-muted,#889)}
+
+    /* ── Prompt Builder Panel ──────────────────────── */
+    #prompt-builder-overlay {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(10,10,18,.75); backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center; padding: 24px;
+    }
+    .prompt-builder-modal {
+      background: rgba(22,33,62,.94); backdrop-filter: blur(28px);
+      border: 1px solid rgba(255,255,255,.1); border-radius: 16px;
+      padding: 28px; max-width: 900px; width: 96vw; max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .prompt-builder-modal h2 { margin: 0 0 16px; font-size: 1.1rem; }
+    .pb-mode-row { display: flex; gap: 12px; margin-bottom: 14px; }
+    .pb-mode-radio { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; }
+    .pb-mode-radio input { accent-color: var(--accent, #ff6b9d); }
+    .pb-desc-area {
+      width: 100%; min-height: 60px; max-height: 120px; resize: vertical;
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px; padding: 10px 14px; color: inherit; font-size: .85rem;
+      font-family: inherit; line-height: 1.5; margin-bottom: 14px;
+    }
+    .pb-desc-area:focus { outline: none; border-color: rgba(255,107,157,.5); }
+    .pb-ext-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: .85rem; margin-bottom: 10px; }
+    .pb-ext-toggle input { accent-color: var(--accent, #ff6b9d); }
+    .pb-ext-list {
+      display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px; max-height: 160px; overflow-y: auto;
+    }
+    .pb-ext-list.open { display: flex; }
+    .pb-ext-chip {
+      display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px; cursor: pointer; font-size: .8rem; transition: all .15s;
+    }
+    .pb-ext-chip:hover { background: rgba(255,255,255,.1); }
+    .pb-ext-chip.selected { background: rgba(255,107,157,.15); border-color: rgba(255,107,157,.4); }
+    .pb-ext-chip input { accent-color: var(--accent, #ff6b9d); pointer-events: none; }
+    .pb-preview {
+      flex: 1; min-height: 120px; overflow-y: auto; margin-bottom: 14px; padding: 12px;
+      background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px; font-family: 'Consolas','Monaco','Courier New',monospace;
+      font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+      color: var(--text-dim, #aab);
+    }
+    .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted,#889); margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>My Apps</h1>
+    <input type="text" id="search-input" placeholder="Search apps..." autocomplete="off" spellcheck="false"/>
+    <div class="header-actions">
+      <button class="icon-btn" id="add-btn" title="Add app">+</button>
+      <button class="icon-btn" id="generate-btn" title="Generate with AI">&#x2728;</button>
+      <button class="icon-btn" id="homepage-btn" title="Generate Homepage">&#x1F3E0;</button>
+      <button class="icon-btn" id="settings-btn" title="Settings">&#x2699;</button>
+    </div>
+  </header>
+
+  <nav id="tag-bar"></nav>
+
+  <!-- Active Extensions Bar -->
+  <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <h3 style="margin:0;font-size:.95rem;color:var(--text-muted,#aab)">&#x1F50C; Active Extensions</h3>
+      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted,#aab);cursor:pointer;font-size:.8rem">&#x25BC; toggle</button>
+    </div>
+    <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+  </div>
+
+  <!-- Extension Popup Overlay -->
+  <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(10,10,18,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:rgba(22,33,62,.92);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
+      <div id="cortex-popup-content"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cortex Extension Editor Overlay -->
+  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(10,10,18,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:rgba(22,33,62,.96);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto">
+      <h2 style="margin-top:0;font-size:1.1rem">&#x1F6E0;&#xFE0F; Extension Editor</h2>
+      <p id="cortex-editor-name" style="color:var(--text-muted,#889);font-size:.85rem;margin-top:-.5rem"></p>
+      <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
+      <div style="margin-bottom:1rem">
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem">Manifest (YAML)</label>
+        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
+      </div>
+      <div id="cortex-editor-libs"></div>
+      <div style="margin-bottom:1.5rem">
+        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">+ Add Lib File</button>
+      </div>
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
+        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">&#x1F4E5; Export Files</button>
+        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:var(--accent,#34d399);color:#000;font-weight:600;cursor:pointer">Save &amp; Re-install</button>
+        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Published Apps Section -->
+  <div id="published-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.togglePublished()">
+      <h2>&#x1F680; Published Apps <span id="published-count"></span></h2>
+      <span class="arrow open" id="published-arrow">&#x25BC;</span>
+    </div>
+    <div id="published-grid" class="published-grid"></div>
+  </div>
+
+  <!-- Recently Opened Strip -->
+  <div id="recent-section" style="display:none;margin:0 24px 1rem">
+    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted,#aab)">&#x1F552; Recently Opened</h3>
+    <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
+  </div>
+
+  <main id="app-grid"></main>
+
+  <footer>
+    <span id="stats">0 apps</span>
+    <span class="footer-brand">AIMEAT</span>
+  </footer>
+
+  <div id="modal-overlay" hidden>
+    <div class="modal" id="add-app-modal">
+      <h2 id="modal-title">Add App</h2>
+
+      <!-- Source tabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="url">URL</button>
+        <button class="modal-tab" data-tab="file">File</button>
+        <button class="modal-tab" data-tab="paste">Paste</button>
+        <button class="modal-tab" data-tab="aimeat">AIMEAT</button>
+      </div>
+
+      <!-- URL tab content -->
+      <div class="tab-content active" id="tab-url">
+        <label class="modal-label" for="app-url">App URL</label>
+        <input type="url" id="app-url" class="modal-input" placeholder="https://example.com/app.html" autocomplete="off"/>
+      </div>
+
+      <!-- File tab content -->
+      <div class="tab-content" id="tab-file">
+        <label class="modal-label">HTML File</label>
+        <div class="drop-zone" id="drop-zone">
+          <div class="drop-zone-icon">&#x1F4C4;</div>
+          <p class="drop-zone-text">Drag &amp; drop an HTML file here</p>
+          <p class="drop-zone-hint">or</p>
+          <button type="button" class="browse-btn" id="browse-btn">Browse files</button>
+          <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
+          <p class="drop-zone-selected" id="selected-file-name"></p>
+        </div>
+      </div>
+
+      <!-- Paste tab content -->
+      <div class="tab-content" id="tab-paste">
+        <label class="modal-label" for="app-paste-code">Paste HTML Source Code</label>
+        <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
+      </div>
+
+      <!-- AIMEAT tab content -->
+      <div class="tab-content" id="tab-aimeat">
+        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
+          Import apps from a connected AIMEAT server. Configure the server URL in Settings first.
+        </p>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%">
+          Fetch Available Apps
+        </button>
+      </div>
+
+      <!-- Common fields -->
+      <div class="modal-fields">
+        <div class="modal-row">
+          <div class="modal-field" style="flex:1">
+            <label class="modal-label" for="app-name">App Name</label>
+            <input type="text" id="app-name" class="modal-input" placeholder="My App" autocomplete="off"/>
+          </div>
+          <div class="modal-field" style="width:72px">
+            <label class="modal-label" for="app-icon">Icon</label>
+            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;" style="text-align:center;font-size:1.2rem"/>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="app-tags">Tags <span class="label-hint">(comma separated)</span></label>
+          <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" autocomplete="off"/>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label" for="app-open-mode">Open Mode</label>
+          <select id="app-open-mode" class="modal-input">
+            <option value="tab">New Tab</option>
+            <option value="iframe">Inline (iframe)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" id="modal-cancel-btn">Cancel</button>
+        <button type="button" class="modal-btn primary" id="modal-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="iframe-view" hidden>
+    <div class="iframe-toolbar">
+      <button class="icon-btn" onclick="window._launcher.closeIframe()" title="Close">&#x2715;</button>
+      <span class="iframe-title" id="iframe-title"></span>
+      <button class="icon-btn" onclick="window._launcher.openExternal()" title="Open in new tab">&#x2197;</button>
+    </div>
+    <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
+  </div>
+
+  <div id="context-menu" hidden>
+    <button data-action="edit">&#x270F;&#xFE0F; Edit</button>
+    <button data-action="favorite">&#x2B50; Toggle favorite</button>
+    <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
+    <button data-action="view-source">&#x1F441; View / Edit Source</button>
+    <button data-action="improve-ai">&#x2728; Improve with AI</button>
+    <button data-action="share-prompt">&#x1F4E4; Share as Prompt</button>
+    <hr>
+    <button data-action="publish">&#x1F680; Publish to server</button>
+    <hr>
+    <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-overlay" hidden>
+    <div class="modal" id="settings-modal">
+      <h2>Settings</h2>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <div class="settings-row">
+          <label for="setting-theme">Theme</label>
+          <select id="setting-theme" class="modal-input">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Defaults</div>
+        <div class="settings-row">
+          <label for="setting-open-mode">Default open mode</label>
+          <select id="setting-open-mode" class="modal-input">
+            <option value="tab">New Tab</option>
+            <option value="iframe">Inline (iframe)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">AIMEAT Server</div>
+        <div class="settings-row">
+          <label for="setting-aimeat-url">Server URL</label>
+          <input type="url" id="setting-aimeat-url" class="modal-input" placeholder="http://localhost:40050" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Backup &amp; Restore</div>
+        <div class="settings-backup-actions">
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()">Export JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()">Import JSON</button>
+          <input type="file" id="import-file-input" accept=".json" hidden/>
+        </div>
+      </div>
+
+      <div class="settings-section" style="margin-bottom:0">
+        <div class="settings-section-title">Danger Zone</div>
+        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()">Clear All Data</button>
+      </div>
+
+      <div class="modal-actions" style="margin-top:24px">
+        <button type="button" class="modal-btn secondary" id="settings-cancel-btn">Cancel</button>
+        <button type="button" class="modal-btn primary" id="settings-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Source Modal -->
+  <div id="source-overlay" hidden>
+    <div class="modal source-modal">
+      <h2 id="source-title">View Source</h2>
+      <textarea id="source-code"></textarea>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="copy-source-btn">Copy Source</button>
+        <button class="modal-btn primary" id="copy-prompt-btn">Copy with AI Prompt</button>
+        <button class="modal-btn primary" id="save-source-btn" disabled>Save Changes</button>
+        <button class="modal-btn secondary" id="close-source-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AIMEAT Import Dialog (dynamically populated) -->
+  <div id="aimeat-import-overlay" hidden>
+    <div class="modal" id="aimeat-import-modal">
+      <h2>Import from AIMEAT</h2>
+      <div class="aimeat-app-list" id="aimeat-app-list"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true">Cancel</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()">Import Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Publish Modal -->
+  <div id="publish-overlay" hidden>
+    <div class="modal" id="publish-modal">
+      <h2>&#x1F680; Publish App</h2>
+      <div class="form-group">
+        <label for="publish-filename">Filename</label>
+        <input type="text" id="publish-filename" class="modal-input" placeholder="my-app.html" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
+      </div>
+      <div class="form-group">
+        <label for="publish-access-code">Access Code (optional)</label>
+        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">4-64 chars. If set, only people with the code can download.</div>
+      </div>
+      <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true">Cancel</button>
+        <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()">Publish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Builder Panel -->
+  <div id="prompt-builder-overlay">
+    <div class="prompt-builder-modal">
+      <h2 id="pb-title">&#x2728; Generate App Prompt</h2>
+      <div class="pb-mode-row">
+        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> New App</label>
+        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> Improve This App</label>
+      </div>
+      <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do, or what changes to make..."></textarea>
+      <label class="pb-ext-toggle"><input type="checkbox" id="pb-ext-checkbox"> Include Cortex Extensions</label>
+      <div class="pb-ext-list" id="pb-ext-list"></div>
+      <div class="pb-preview-label">Live Preview</div>
+      <div class="pb-preview" id="pb-preview"></div>
+      <div class="modal-actions">
+        <button class="modal-btn secondary" id="pb-cancel-btn">Cancel</button>
+        <button class="modal-btn primary" id="pb-copy-btn">Copy Prompt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Published Apps Section (inserted before grid, toggled) -->
+
+<script>
+(function () {
+  'use strict';
+
+  // ── IndexedDB wrapper ──────────────────────────────
+
+  const DB_NAME = 'AppLauncherDB';
+  const DB_VERSION = 2;
+  const STORE_NAME = 'apps';
+
+  let dbInstance = null;
+
+  function openDB() {
+    if (dbInstance) return Promise.resolve(dbInstance);
+    return new Promise(function (resolve, reject) {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = function (event) {
+        const db = event.target.result;
+        var store;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store.createIndex('tags', 'tags', { multiEntry: true });
+          store.createIndex('source', 'source', { unique: false });
+          store.createIndex('favorite', 'favorite', { unique: false });
+          store.createIndex('sortOrder', 'sortOrder', { unique: false });
+        } else {
+          store = event.target.transaction.objectStore(STORE_NAME);
+          if (!store.indexNames.contains('sortOrder')) {
+            store.createIndex('sortOrder', 'sortOrder', { unique: false });
+          }
+        }
+      };
+
+      request.onsuccess = function (event) {
+        dbInstance = event.target.result;
+        resolve(dbInstance);
+      };
+
+      request.onerror = function (event) {
+        reject(event.target.error);
+      };
+    });
+  }
+
+  function getAllApps() {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+
+        request.onsuccess = function () {
+          resolve(request.result);
+        };
+        request.onerror = function () {
+          reject(request.error);
+        };
+      });
+    });
+  }
+
+  function saveApp(app) {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(app);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function deleteApp(id) {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete(id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  // ── Config (localStorage) ─────────────────────────
+
+  const DEFAULT_CONFIG = {
+    theme: 'dark',
+    defaultOpenMode: 'tab',
+    aimeatUrl: '',
+    language: 'en'
+  };
+
+  function loadConfig() {
+    try {
+      return Object.assign({}, DEFAULT_CONFIG, JSON.parse(localStorage.getItem('appLauncherConfig') || '{}'));
+    } catch (e) {
+      return Object.assign({}, DEFAULT_CONFIG);
+    }
+  }
+
+  function saveConfig(config) {
+    localStorage.setItem('appLauncherConfig', JSON.stringify(config));
+  }
+
+  // ── ID Generator ─────────────────────────────────
+
+  function generateId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // ── File Reading Helper ─────────────────────────
+
+  function readFileAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        resolve(reader.result);
+      };
+      reader.onerror = function () {
+        reject(reader.error);
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // ── ZIP Helpers ────────────────────────────────
+
+  function mimeFromExtension(name) {
+    var ext = (name.split('.').pop() || '').toLowerCase();
+    var map = {
+      html: 'text/html', htm: 'text/html',
+      css: 'text/css',
+      js: 'application/javascript', mjs: 'application/javascript',
+      json: 'application/json',
+      svg: 'image/svg+xml',
+      png: 'image/png',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      ico: 'image/x-icon',
+      woff: 'font/woff', woff2: 'font/woff2',
+      ttf: 'font/ttf', otf: 'font/otf',
+      eot: 'application/vnd.ms-fontobject',
+      mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
+      mp4: 'video/mp4', webm: 'video/webm',
+      xml: 'application/xml',
+      txt: 'text/plain',
+      pdf: 'application/pdf'
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+
+  function toBase64(uint8arr) {
+    var binary = '';
+    for (var i = 0; i < uint8arr.length; i++) {
+      binary += String.fromCharCode(uint8arr[i]);
+    }
+    return btoa(binary);
+  }
+
+  // ── Minimal ZIP Parser ────────────────────────────
+
+  async function extractZip(arrayBuffer) {
+    var view = new DataView(arrayBuffer);
+    var files = [];
+    var offset = 0;
+
+    while (offset < view.byteLength - 4) {
+      var sig = view.getUint32(offset, true);
+      if (sig !== 0x04034b50) break; // Not a local file header
+
+      var compressionMethod = view.getUint16(offset + 8, true);
+      var compressedSize = view.getUint32(offset + 18, true);
+      var nameLen = view.getUint16(offset + 26, true);
+      var extraLen = view.getUint16(offset + 28, true);
+      var name = new TextDecoder().decode(new Uint8Array(arrayBuffer, offset + 30, nameLen));
+      var dataStart = offset + 30 + nameLen + extraLen;
+      var rawData = new Uint8Array(arrayBuffer, dataStart, compressedSize);
+
+      var data;
+      if (compressionMethod === 0) {
+        data = rawData; // Stored (no compression)
+      } else if (compressionMethod === 8) {
+        // Deflate — use browser's DecompressionStream
+        var ds = new DecompressionStream('raw');
+        var writer = ds.writable.getWriter();
+        writer.write(rawData);
+        writer.close();
+        var reader = ds.readable.getReader();
+        var chunks = [];
+        while (true) {
+          var result = await reader.read();
+          if (result.done) break;
+          chunks.push(result.value);
+        }
+        var totalLen = chunks.reduce(function (s, c) { return s + c.length; }, 0);
+        data = new Uint8Array(totalLen);
+        var pos = 0;
+        for (var ci = 0; ci < chunks.length; ci++) {
+          data.set(chunks[ci], pos);
+          pos += chunks[ci].length;
+        }
+      } else {
+        throw new Error('Unsupported compression method: ' + compressionMethod);
+      }
+
+      if (!name.endsWith('/')) { // Skip directories
+        files.push({ name: name, data: data });
+      }
+      offset = dataStart + compressedSize;
+    }
+
+    return files;
+  }
+
+  // ── ZIP Inline Bundler ────────────────────────────
+
+  async function bundleZip(files) {
+    // 1. Find index.html or any .html file as the base
+    var htmlFile = null;
+    for (var i = 0; i < files.length; i++) {
+      var lowerName = files[i].name.toLowerCase();
+      if (lowerName === 'index.html' || lowerName.endsWith('/index.html')) {
+        htmlFile = files[i];
+        break;
+      }
+    }
+    if (!htmlFile) {
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].name.toLowerCase().match(/\.html?$/)) {
+          htmlFile = files[i];
+          break;
+        }
+      }
+    }
+    if (!htmlFile) {
+      throw new Error('No HTML file found in ZIP');
+    }
+
+    // 2. Determine the base path (directory containing the HTML file)
+    var lastSlash = htmlFile.name.lastIndexOf('/');
+    var basePath = lastSlash >= 0 ? htmlFile.name.substring(0, lastSlash + 1) : '';
+
+    // 3. Build a map of relative file paths to file data
+    var fileMap = {};
+    for (var i = 0; i < files.length; i++) {
+      var fname = files[i].name;
+      // Store path relative to base
+      if (basePath && fname.startsWith(basePath)) {
+        fileMap[fname.substring(basePath.length)] = files[i].data;
+      }
+      // Also store the full path for lookup
+      fileMap[fname] = files[i].data;
+    }
+
+    // Helper: resolve a reference relative to the HTML file's directory
+    function resolveRef(ref) {
+      // Strip leading ./
+      var cleaned = ref.replace(/^\.\//, '');
+      // Try direct lookup
+      if (fileMap[cleaned]) return fileMap[cleaned];
+      // Try with basePath prepended
+      if (fileMap[basePath + cleaned]) return fileMap[basePath + cleaned];
+      return null;
+    }
+
+    // Helper: get file content as text
+    function fileAsText(data) {
+      return new TextDecoder().decode(data);
+    }
+
+    // Helper: get file content as data URL
+    function fileAsDataUrl(ref, data) {
+      var mime = mimeFromExtension(ref);
+      return 'data:' + mime + ';base64,' + toBase64(data);
+    }
+
+    var html = fileAsText(htmlFile.data);
+
+    // 4. Replace <link rel="stylesheet" href="..."> with inline <style>
+    html = html.replace(/<link\s+[^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi, function (tag) {
+      var hrefMatch = tag.match(/href\s*=\s*["']([^"']+)["']/i);
+      if (!hrefMatch) return tag;
+      var href = hrefMatch[1];
+      var fileData = resolveRef(href);
+      if (!fileData) return tag; // keep original if file not found
+      var cssContent = fileAsText(fileData);
+      // Inline CSS url() references within the stylesheet
+      cssContent = inlineCssUrls(cssContent);
+      return '<style>/* ' + href + ' */\n' + cssContent + '</style>';
+    });
+
+    // 5. Replace script-src tags with inline script blocks
+    html = html.replace(/<script\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>\s*<\/script>/gi, function (tag, src) {
+      var fileData = resolveRef(src);
+      if (!fileData) return tag; // keep original if file not found
+      return '<script>/* ' + src + ' */\n' + fileAsText(fileData) + '<\/script>';
+    });
+
+    // 6. Replace src="..." and href="..." pointing to binary assets with data URLs
+    html = html.replace(/(src|href)\s*=\s*["']([^"']+)["']/gi, function (match, attr, ref) {
+      // Skip data: URLs, http(s) URLs, # anchors, and javascript:
+      if (ref.match(/^(data:|https?:|#|javascript:|mailto:)/i)) return match;
+      // Skip already-inlined stylesheets and scripts (they won't match since already replaced)
+      var fileData = resolveRef(ref);
+      if (!fileData) return match;
+      var mime = mimeFromExtension(ref);
+      // Only inline binary/image/font assets, not html/css/js (already handled above)
+      if (mime.match(/^(image|font|audio|video)\//)) {
+        return attr + '="' + fileAsDataUrl(ref, fileData) + '"';
+      }
+      return match;
+    });
+
+    // 7. Replace CSS url(...) references in inline <style> blocks
+    html = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function (tag, cssContent) {
+      var inlined = inlineCssUrls(cssContent);
+      if (inlined !== cssContent) {
+        return tag.replace(cssContent, inlined);
+      }
+      return tag;
+    });
+
+    function inlineCssUrls(css) {
+      return css.replace(/url\(\s*["']?([^"')]+)["']?\s*\)/gi, function (match, ref) {
+        if (ref.match(/^(data:|https?:|#)/i)) return match;
+        var fileData = resolveRef(ref);
+        if (!fileData) return match;
+        return 'url("' + fileAsDataUrl(ref, fileData) + '")';
+      });
+    }
+
+    return html;
+  }
+
+  // ── App Creation from ZIP ─────────────────────────
+
+  async function addAppFromZip(name, arrayBuffer, icon, tags, openMode) {
+    var files = await extractZip(arrayBuffer);
+    var bundledHtml = await bundleZip(files);
+    var encoded = btoa(unescape(encodeURIComponent(bundledHtml)));
+    var app = {
+      id: generateId(),
+      name: name,
+      description: '',
+      source: 'zip',
+      url: null,
+      blob: encoded,
+      tags: tags,
+      openMode: openMode,
+      icon: icon || '\u{1F4E6}',
+      screenshot: null,
+      favorite: false,
+      addedAt: new Date().toISOString(),
+      lastOpenedAt: null
+    };
+    await saveApp(app);
+    return app;
+  }
+
+  // ── App Creation from URL ───────────────────────
+
+  function addAppFromUrl(name, url, icon, tags, openMode) {
+    var app = {
+      id: generateId(),
+      name: name,
+      description: '',
+      source: 'url',
+      url: url,
+      blob: null,
+      tags: tags,
+      openMode: openMode,
+      icon: icon || '\u{1F4DD}',
+      screenshot: null,
+      favorite: false,
+      addedAt: new Date().toISOString(),
+      lastOpenedAt: null
+    };
+    return saveApp(app).then(function () {
+      return app;
+    });
+  }
+
+  // ── App Creation from File ──────────────────────
+
+  function addAppFromFile(name, file, icon, tags, openMode) {
+    return readFileAsText(file).then(function (content) {
+      var encoded = btoa(unescape(encodeURIComponent(content)));
+      var app = {
+        id: generateId(),
+        name: name,
+        description: '',
+        source: 'local',
+        url: null,
+        blob: encoded,
+        tags: tags,
+        openMode: openMode,
+        icon: icon || '\u{1F4DD}',
+        screenshot: null,
+        favorite: false,
+        addedAt: new Date().toISOString(),
+        lastOpenedAt: null
+      };
+      return saveApp(app).then(function () {
+        return app;
+      });
+    });
+  }
+
+  // ── App Creation from Pasted Source ─────────────
+
+  function addAppFromSource(name, sourceCode, icon, tags, openMode) {
+    var encoded = btoa(unescape(encodeURIComponent(sourceCode)));
+    var app = {
+      id: generateId(),
+      name: name,
+      description: '',
+      source: 'local',
+      url: null,
+      blob: encoded,
+      tags: tags,
+      openMode: openMode,
+      icon: icon || '\u{1F4DD}',
+      screenshot: null,
+      favorite: false,
+      addedAt: new Date().toISOString(),
+      lastOpenedAt: null
+    };
+    return saveApp(app).then(function () {
+      return app;
+    });
+  }
+
+  // ── Modal State ─────────────────────────────────
+
+  var selectedFile = null;
+  var editingAppId = null;
+
+  function showModal() {
+    document.getElementById('modal-overlay').hidden = false;
+    document.getElementById('modal-title').textContent = 'Add App';
+    // Default to URL tab
+    switchTab('url');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').hidden = true;
+    // Reset form
+    document.getElementById('app-url').value = '';
+    document.getElementById('app-name').value = '';
+    document.getElementById('app-icon').value = '';
+    document.getElementById('app-tags').value = '';
+    document.getElementById('app-open-mode').value = 'tab';
+    document.getElementById('selected-file-name').textContent = '';
+    document.getElementById('file-input').value = '';
+    document.getElementById('app-paste-code').value = '';
+    selectedFile = null;
+    editingAppId = null;
+  }
+
+  function switchTab(tabName) {
+    // Toggle tab buttons
+    var tabs = document.querySelectorAll('.modal-tab');
+    tabs.forEach(function (tab) {
+      if (tab.getAttribute('data-tab') === tabName) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
+    // Toggle tab content
+    var contents = document.querySelectorAll('.tab-content');
+    contents.forEach(function (content) {
+      if (content.id === 'tab-' + tabName) {
+        content.classList.add('active');
+      } else {
+        content.classList.remove('active');
+      }
+    });
+  }
+
+  function handleFileDrop(file) {
+    if (!file) return;
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      selectedFile = file;
+      document.getElementById('selected-file-name').textContent = file.name;
+      var nameInput = document.getElementById('app-name');
+      if (!nameInput.value.trim()) {
+        nameInput.value = file.name.replace(/\.zip$/i, '');
+      }
+      return;
+    }
+    if (!file.name.match(/\.html?$/i)) {
+      alert('Please select an HTML or ZIP file (.html, .htm, or .zip)');
+      return;
+    }
+    selectedFile = file;
+    document.getElementById('selected-file-name').textContent = file.name;
+    // Auto-fill name from filename if empty
+    var nameInput = document.getElementById('app-name');
+    if (!nameInput.value.trim()) {
+      nameInput.value = file.name.replace(/\.html?$/i, '');
+    }
+  }
+
+  function handleSave() {
+    var name = document.getElementById('app-name').value.trim();
+    var icon = document.getElementById('app-icon').value.trim();
+    var tagsRaw = document.getElementById('app-tags').value.trim();
+    var openMode = document.getElementById('app-open-mode').value;
+
+    var tags = tagsRaw ? tagsRaw.split(',').map(function (t) { return t.trim(); }).filter(Boolean) : [];
+
+    // ── Edit mode: update existing app ──
+    if (editingAppId) {
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === editingAppId) { app = allApps[i]; break; }
+      }
+      if (!app) {
+        closeModal();
+        return;
+      }
+      if (!name) {
+        alert('Please enter a name');
+        return;
+      }
+      app.name = name;
+      app.icon = icon || app.icon;
+      app.tags = tags;
+      app.openMode = openMode;
+      saveApp(app).then(function () {
+        closeModal();
+        renderApps();
+      });
+      return;
+    }
+
+    // ── Create mode ──
+    var activeTab = document.querySelector('.modal-tab.active');
+    var tabName = activeTab ? activeTab.getAttribute('data-tab') : 'url';
+
+    if (tabName === 'url') {
+      var url = document.getElementById('app-url').value.trim();
+      if (!url) {
+        alert('Please enter a URL');
+        return;
+      }
+      if (!name) {
+        // Derive name from URL
+        try {
+          name = new URL(url).hostname;
+        } catch (e) {
+          name = url;
+        }
+      }
+      addAppFromUrl(name, url, icon, tags, openMode).then(function () {
+        closeModal();
+        renderApps();
+      });
+    } else if (tabName === 'paste') {
+      var pastedCode = document.getElementById('app-paste-code').value.trim();
+      if (!pastedCode) {
+        alert('Please paste your HTML source code');
+        return;
+      }
+      if (!name) {
+        // Try to extract title from HTML
+        var titleMatch = pastedCode.match(/<title[^>]*>([^<]+)<\/title>/i);
+        name = titleMatch ? titleMatch[1].trim() : 'Pasted App';
+      }
+      addAppFromSource(name, pastedCode, icon, tags, openMode).then(function () {
+        closeModal();
+        renderApps();
+      });
+    } else if (tabName === 'file') {
+      if (!selectedFile) {
+        alert('Please select a file');
+        return;
+      }
+      if (selectedFile.name.toLowerCase().endsWith('.zip')) {
+        // ZIP file — extract and bundle
+        if (!name) {
+          name = selectedFile.name.replace(/\.zip$/i, '');
+        }
+        selectedFile.arrayBuffer().then(function (arrayBuffer) {
+          return addAppFromZip(name, arrayBuffer, icon, tags, openMode);
+        }).then(function () {
+          closeModal();
+          renderApps();
+        }).catch(function (err) {
+          alert('ZIP import failed: ' + (err.message || err));
+        });
+      } else {
+        // HTML file
+        if (!name) {
+          name = selectedFile.name.replace(/\.html?$/i, '');
+        }
+        addAppFromFile(name, selectedFile, icon, tags, openMode).then(function () {
+          closeModal();
+          renderApps();
+        });
+      }
+    }
+  }
+
+  // ── Module-level state ──────────────────────────────
+
+  var allApps = [];
+  var activeTag = null;
+  var searchQuery = '';
+
+  // ── Helpers ────────────────────────────────────────
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function sourceLabel(source) {
+    switch (source) {
+      case 'local': return '\u{1F4C4} local';
+      case 'url':   return '\u{1F310} url';
+      case 'aimeat': return '\u{1F4E6} aimeat';
+      case 'zip':   return '\u{1F4E6} zip';
+      default:      return source || 'unknown';
+    }
+  }
+
+  // ── Tag Rendering ─────────────────────────────────
+
+  function renderTags() {
+    var tagBar = document.getElementById('tag-bar');
+    var tagSet = {};
+    var hasFavorites = false;
+
+    for (var i = 0; i < allApps.length; i++) {
+      var app = allApps[i];
+      if (app.favorite) hasFavorites = true;
+      if (app.tags && app.tags.length) {
+        for (var j = 0; j < app.tags.length; j++) {
+          tagSet[app.tags[j]] = true;
+        }
+      }
+    }
+
+    var uniqueTags = Object.keys(tagSet).sort();
+    var html = '';
+
+    // "All" button
+    html += '<button class="tag' + (activeTag === null ? ' active' : '') + '" onclick="window._launcher.filterByTag(null)">All</button>';
+
+    // Favorites button (only if any favorites exist)
+    if (hasFavorites) {
+      html += '<button class="tag' + (activeTag === '__favorites__' ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'__favorites__\')">\u2B50 Favorites</button>';
+    }
+
+    // One button per unique tag
+    for (var k = 0; k < uniqueTags.length; k++) {
+      var tag = uniqueTags[k];
+      html += '<button class="tag' + (activeTag === tag ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'' + escapeHtml(tag.replace(/'/g, "\\'")) + '\')">' + escapeHtml(tag) + '</button>';
+    }
+
+    tagBar.innerHTML = html;
+  }
+
+  // ── Tag Filtering ─────────────────────────────────
+
+  function filterByTag(tag) {
+    activeTag = tag;
+    renderApps();
+  }
+
+  // ── Launch App ──────────────────────────────────
+
+  function launchApp(id, mode) {
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === id) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    app.lastOpenedAt = new Date().toISOString();
+    saveApp(app).then(function () {
+      if (mode === 'tab') {
+        launchInTab(app);
+      } else if (mode === 'iframe') {
+        launchInIframe(app);
+      }
+    });
+  }
+
+  function launchInTab(app) {
+    if (app.source === 'url' && app.url) {
+      window.open(app.url, '_blank', 'noopener');
+    } else if (app.blob) {
+      // Use blob URL instead of document.write to maintain browser sandbox
+      var html = decodeURIComponent(escape(atob(app.blob)));
+      var blob = new Blob([html], { type: 'text/html' });
+      var blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank', 'noopener');
+      // Revoke after a short delay to allow the tab to load
+      setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 5000);
+    }
+  }
+
+  function launchInIframe(app) {
+    var view = document.getElementById('iframe-view');
+    var iframe = document.getElementById('app-iframe');
+    var title = document.getElementById('iframe-title');
+
+    title.textContent = app.name || 'App';
+    iframe.dataset.appId = app.id;
+
+    if (app.source === 'url' && app.url) {
+      iframe.removeAttribute('srcdoc');
+      iframe.src = app.url;
+      currentIframeUrl = app.url;
+    } else if (app.blob) {
+      var html = decodeURIComponent(escape(atob(app.blob)));
+      iframe.removeAttribute('src');
+      iframe.srcdoc = html;
+      currentIframeUrl = '';
+    }
+
+    view.hidden = false;
+  }
+
+  // ── Rendering ─────────────────────────────────────
+
+  function renderApps() {
+    getAllApps().then(function (apps) {
+      allApps = apps;
+
+      // Sort: favorites first, then by sortOrder (if set), then by date
+      allApps.sort(function (a, b) {
+        // Favorites first
+        if (a.favorite && !b.favorite) return -1;
+        if (!a.favorite && b.favorite) return 1;
+        // Then by explicit sortOrder if present
+        var oA = typeof a.sortOrder === 'number' ? a.sortOrder : Infinity;
+        var oB = typeof b.sortOrder === 'number' ? b.sortOrder : Infinity;
+        if (oA !== oB) return oA - oB;
+        // Then by most recently used/added
+        var dateA = a.lastOpenedAt || a.addedAt || '';
+        var dateB = b.lastOpenedAt || b.addedAt || '';
+        if (dateA > dateB) return -1;
+        if (dateA < dateB) return 1;
+        return 0;
+      });
+
+      // Filter by activeTag
+      var filtered = allApps;
+      if (activeTag === '__favorites__') {
+        filtered = allApps.filter(function (app) { return app.favorite; });
+      } else if (activeTag !== null) {
+        filtered = allApps.filter(function (app) {
+          return app.tags && app.tags.indexOf(activeTag) !== -1;
+        });
+      }
+
+      // Filter by searchQuery
+      if (searchQuery) {
+        var q = searchQuery.toLowerCase();
+        filtered = filtered.filter(function (app) {
+          if (app.name && app.name.toLowerCase().indexOf(q) !== -1) return true;
+          if (app.tags) {
+            for (var i = 0; i < app.tags.length; i++) {
+              if (app.tags[i].toLowerCase().indexOf(q) !== -1) return true;
+            }
+          }
+          return false;
+        });
+      }
+
+      var grid = document.getElementById('app-grid');
+
+      if (filtered.length === 0) {
+        if (!activeTag && !searchQuery && allApps.length === 0) {
+          // No apps at all — show helpful empty state
+          grid.innerHTML =
+            '<div class="empty-state">' +
+              '<div class="empty-icon">\u{1F680}</div>' +
+              '<h3>No apps yet</h3>' +
+              '<p>Add your first app using the <strong>+</strong> button above</p>' +
+              '<span class="empty-formats">Supports: HTML files, URLs, ZIP packages, AIMEAT imports</span>' +
+            '</div>';
+        } else {
+          // Filters active but no matches
+          grid.innerHTML =
+            '<div class="empty-state">' +
+              '<div class="empty-icon">\u{1F50D}</div>' +
+              '<h3>No matches</h3>' +
+              '<p>No apps match the current filter. Try a different search term or tag.</p>' +
+            '</div>';
+        }
+      } else {
+        var html = '';
+        for (var i = 0; i < filtered.length; i++) {
+          var app = filtered[i];
+          var iconDisplay = app.icon || '\u{1F4DD}';
+          html +=
+            '<div class="app-card" draggable="true" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)" style="animation-delay:' + (i * 0.04) + 's">' +
+              '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
+              '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
+              '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
+              '<div class="app-source">' + sourceLabel(app.source) + '</div>' +
+              '<div class="app-actions">' +
+                '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'tab\')" title="Open in tab">\u25B6 Tab</button>' +
+                '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'iframe\')" title="Open in iframe">\u25FB</button>' +
+              '</div>' +
+              (app.favorite ? '<span class="fav-star visible">\u2B50</span>' : '') +
+            '</div>';
+        }
+        grid.innerHTML = html;
+      }
+
+      // Update stats
+      var statsEl = document.getElementById('stats');
+      var totalSize = 0;
+      for (var s = 0; s < allApps.length; s++) {
+        if (allApps[s].blob) {
+          totalSize += allApps[s].blob.length;
+        }
+      }
+      var sizeLabel = totalSize < 1024 ? totalSize + ' B'
+        : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB'
+        : (totalSize / 1048576).toFixed(1) + ' MB';
+      statsEl.textContent = allApps.length + ' app' + (allApps.length !== 1 ? 's' : '') + ' \u00B7 ' + sizeLabel + ' stored';
+
+      // Render tag bar
+      renderTags();
+
+      // Render recently opened strip
+      renderRecentlyOpened();
+    });
+  }
+
+  function renderRecentlyOpened() {
+    var section = document.getElementById('recent-section');
+    var strip = document.getElementById('recent-strip');
+    var recent = allApps
+      .filter(function(a) { return a.lastOpenedAt; })
+      .sort(function(a, b) { return (b.lastOpenedAt || '') > (a.lastOpenedAt || '') ? 1 : -1; })
+      .slice(0, 5);
+    if (recent.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    strip.innerHTML = recent.map(function(app) {
+      var icon = app.icon || '\u{1F4DD}';
+      return '<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" onmouseover="this.style.borderColor=\'rgba(192,132,252,.35)\'" onmouseout="this.style.borderColor=\'rgba(192,132,252,.15)\'">' +
+        '<div style="font-size:1.3rem;text-align:center">' + escapeHtml(icon) + '</div>' +
+        '<div style="font-size:.75rem;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">' + escapeHtml(app.name) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Iframe helpers ────────────────────────────────
+
+  var currentIframeUrl = '';
+
+  function closeIframe() {
+    var view = document.getElementById('iframe-view');
+    var iframe = document.getElementById('app-iframe');
+    view.hidden = true;
+    iframe.removeAttribute('src');
+    iframe.removeAttribute('srcdoc');
+    delete iframe.dataset.appId;
+    currentIframeUrl = '';
+  }
+
+  function openExternal() {
+    var iframe = document.getElementById('app-iframe');
+    var appId = iframe.dataset.appId;
+    if (currentIframeUrl) {
+      window.open(currentIframeUrl, '_blank');
+    } else if (appId) {
+      // Blob app — find it and launch in tab
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === appId) { app = allApps[i]; break; }
+      }
+      if (app) launchInTab(app);
+    }
+  }
+
+  // ── Context Menu ────────────────────────────────
+
+  var contextAppId = null;
+
+  function showContextMenu(event, id) {
+    if (event.preventDefault) event.preventDefault();
+    if (event.stopPropagation) event.stopPropagation();
+    contextAppId = id;
+
+    var menu = document.getElementById('context-menu');
+    menu.hidden = false;
+
+    // Position at cursor, but keep on screen
+    var x = event.clientX;
+    var y = event.clientY;
+    var menuWidth = 200; // approximate min-width
+    var menuHeight = 160; // approximate height
+
+    if (x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 8;
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = window.innerHeight - menuHeight - 8;
+    }
+
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+  }
+
+  function hideContextMenu() {
+    var menu = document.getElementById('context-menu');
+    menu.hidden = true;
+    contextAppId = null;
+  }
+
+  function handleContextAction(action) {
+    if (!contextAppId) return;
+    var appId = contextAppId;
+    hideContextMenu();
+
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === appId) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    switch (action) {
+      case 'edit':
+        // Open modal pre-filled with app data
+        editingAppId = appId;
+        document.getElementById('modal-title').textContent = 'Edit App';
+        document.getElementById('app-name').value = app.name || '';
+        document.getElementById('app-icon').value = app.icon || '';
+        document.getElementById('app-tags').value = (app.tags || []).join(', ');
+        document.getElementById('app-open-mode').value = app.openMode || 'tab';
+
+        // Set the correct source tab
+        if (app.source === 'url') {
+          switchTab('url');
+          document.getElementById('app-url').value = app.url || '';
+        } else {
+          switchTab('file');
+          document.getElementById('selected-file-name').textContent = '(existing file)';
+        }
+
+        document.getElementById('modal-overlay').hidden = false;
+        break;
+
+      case 'favorite':
+        app.favorite = !app.favorite;
+        saveApp(app).then(function () {
+          renderApps();
+        });
+        break;
+
+      case 'toggle-mode':
+        app.openMode = app.openMode === 'iframe' ? 'tab' : 'iframe';
+        saveApp(app).then(function () {
+          renderApps();
+        });
+        break;
+
+      case 'view-source':
+        viewSource(app);
+        break;
+
+      case 'delete':
+        if (confirm('Delete "' + (app.name || 'this app') + '"?')) {
+          deleteApp(appId).then(function () {
+            renderApps();
+            loadPublishedApps();
+          });
+        }
+        break;
+
+      case 'publish':
+        showPublishModal(appId);
+        break;
+
+      case 'improve-ai':
+        openPromptBuilder(app);
+        break;
+
+      case 'share-prompt':
+        generateSharePrompt(app);
+        break;
+    }
+  }
+
+  // ── View Source ──────────────────────────────────
+
+  function viewSource(app) {
+    var overlay = document.getElementById('source-overlay');
+    var textarea = document.getElementById('source-code');
+    var title = document.getElementById('source-title');
+    var saveBtn = document.getElementById('save-source-btn');
+
+    title.textContent = 'View / Edit Source: ' + (app.name || 'App');
+
+    var isEditable = !!app.blob; // Only blob-based apps can be edited
+    if (app.blob) {
+      textarea.value = decodeURIComponent(escape(atob(app.blob)));
+    } else if (app.url) {
+      textarea.value = '// This app is URL-based (' + app.url + ')\n// Source code is not stored locally.\n// Open the URL to view the app.';
+    } else {
+      textarea.value = '// No source available';
+    }
+
+    textarea.readOnly = !isEditable;
+    saveBtn.disabled = true;
+    saveBtn.style.display = isEditable ? '' : 'none';
+    overlay.hidden = false;
+    // Store app metadata for save and prompt
+    overlay.dataset.appName = app.name || 'App';
+    overlay.dataset.appId = app.id || '';
+    overlay.dataset.originalSource = textarea.value;
+  }
+
+  // ── Share as Prompt ────────────────────────────
+
+  function generateSharePrompt(app) {
+    if (!app || !app.blob) {
+      alert('Only local HTML apps can be shared as prompts.');
+      return;
+    }
+
+    var source = decodeURIComponent(escape(atob(app.blob)));
+    var prompt = 'Recreate this HTML app exactly as provided.\n\n';
+    prompt += 'App name: ' + (app.name || 'Untitled') + '\n';
+    if (app.tags && app.tags.length) {
+      prompt += 'Tags: ' + app.tags.join(', ') + '\n';
+    }
+    prompt += '\nReturn the COMPLETE HTML file below without modifications.\n';
+    prompt += 'If the user asks for changes, apply them to this source.\n\n';
+    prompt += '--- Source Code ---\n' + source;
+
+    navigator.clipboard.writeText(prompt).then(function() {
+      alert('Share prompt copied! Paste it into any AI chat to recreate this app.');
+    }).catch(function() {
+      // Fallback: show in source overlay
+      var overlay = document.getElementById('source-overlay');
+      var textarea = document.getElementById('source-code');
+      var title = document.getElementById('source-title');
+      var saveBtn = document.getElementById('save-source-btn');
+      title.textContent = 'Share Prompt: ' + (app.name || 'App');
+      textarea.value = prompt;
+      textarea.readOnly = true;
+      saveBtn.style.display = 'none';
+      overlay.hidden = false;
+      overlay.dataset.appId = '';
+      overlay.dataset.originalSource = '';
+    });
+  }
+
+  // ── Generate Homepage Prompt ──────────────────────
+
+  function generateHomepagePrompt() {
+    if (allApps.length === 0) {
+      alert('Add some apps first before generating a homepage.');
+      return;
+    }
+
+    var appList = allApps.map(function(app) {
+      var launchInfo = '';
+      if (app.url) {
+        launchInfo = 'URL: ' + app.url;
+      } else {
+        launchInfo = 'Local HTML app (user will open it from their launcher)';
+      }
+      return '- ' + (app.icon || '') + ' ' + app.name +
+        (app.description ? ' (' + app.description + ')' : '') +
+        ' [' + launchInfo + ']' +
+        (app.tags.length ? ' Tags: ' + app.tags.join(', ') : '');
+    }).join('\n');
+
+    var prompt = 'Create a single HTML file that serves as my personal homepage/dashboard.\n\n' +
+      'My apps:\n' + appList + '\n\n' +
+      'Requirements:\n' +
+      '- Show each app as a clickable card with its icon and name\n' +
+      '- For URL-based apps, clicking opens the URL in a new tab\n' +
+      '- For local apps, show a note that they can be opened from the App Launcher\n' +
+      '- Modern, responsive design with dark theme\n' +
+      '- Group apps by their tags if they have tags\n' +
+      '- Everything in one self-contained HTML file, no external dependencies\n' +
+      '- Add a header with my name/title (I will customize this)\n' +
+      '- Make it visually distinctive and professional';
+
+    // Reuse the source overlay for displaying the prompt
+    var overlay = document.getElementById('source-overlay');
+    var textarea = document.getElementById('source-code');
+    var title = document.getElementById('source-title');
+
+    title.textContent = 'Generate Homepage - Copy this prompt to AI';
+    textarea.value = prompt;
+    overlay.dataset.appName = 'Homepage';
+    overlay.hidden = false;
+  }
+
+  // ── Theme ────────────────────────────────────────
+
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+
+  // ── Settings ────────────────────────────────────
+
+  function openSettings() {
+    var config = loadConfig();
+    document.getElementById('setting-theme').value = config.theme || 'dark';
+    document.getElementById('setting-open-mode').value = config.defaultOpenMode || 'tab';
+    document.getElementById('setting-aimeat-url').value = config.aimeatUrl || '';
+    document.getElementById('settings-overlay').hidden = false;
+  }
+
+  function saveSettings() {
+    var config = loadConfig();
+    config.theme = document.getElementById('setting-theme').value;
+    config.defaultOpenMode = document.getElementById('setting-open-mode').value;
+    config.aimeatUrl = document.getElementById('setting-aimeat-url').value.trim();
+    saveConfig(config);
+    applyTheme(config.theme);
+    document.getElementById('settings-overlay').hidden = true;
+    // Sync config to server (best-effort)
+    syncConfigToServer(config);
+  }
+
+  function syncConfigToServer(config) {
+    var url = config.aimeatUrl;
+    if (!url) return;
+    url = url.replace(/\/+$/, '');
+    // Only sync safe fields, not the URL itself
+    var syncPayload = {
+      theme: config.theme,
+      defaultOpenMode: config.defaultOpenMode,
+      language: config.language || 'en'
+    };
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (auth) {
+        var token = auth.data && auth.data.token;
+        if (!token) return;
+        return fetch(url + '/v1/memory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            key: 'app-launcher/config',
+            value: syncPayload,
+            visibility: 'private'
+          })
+        });
+      })
+      .catch(function () { /* best-effort */ });
+  }
+
+  function loadConfigFromServer() {
+    var config = loadConfig();
+    var url = config.aimeatUrl;
+    if (!url) return;
+    url = url.replace(/\/+$/, '');
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (auth) {
+        var token = auth.data && auth.data.token;
+        if (!token) return;
+        var gaii = auth.data.gaii || auth.data.sub || '';
+        if (!gaii) return;
+        return fetch(url + '/v1/memory/app-launcher%2Fconfig', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function (r) {
+          if (!r.ok) return null;
+          return r.json();
+        });
+      })
+      .then(function (json) {
+        if (!json || !json.data || !json.data.value) return;
+        var remote = json.data.value;
+        var local = loadConfig();
+        var changed = false;
+        // Merge remote into local (remote wins for preferences, but don't overwrite aimeatUrl)
+        if (remote.theme && remote.theme !== local.theme) {
+          local.theme = remote.theme;
+          changed = true;
+        }
+        if (remote.defaultOpenMode && remote.defaultOpenMode !== local.defaultOpenMode) {
+          local.defaultOpenMode = remote.defaultOpenMode;
+          changed = true;
+        }
+        if (remote.language && remote.language !== local.language) {
+          local.language = remote.language;
+          changed = true;
+        }
+        if (changed) {
+          saveConfig(local);
+          applyTheme(local.theme);
+        }
+      })
+      .catch(function () { /* best-effort */ });
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-overlay').hidden = true;
+  }
+
+  // ── Export / Import ─────────────────────────────
+
+  function exportBackup() {
+    getAllApps().then(function (apps) {
+      var config = loadConfig();
+      var backup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        config: config,
+        apps: apps
+      };
+      var json = JSON.stringify(backup, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'app-catalog-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  function handleImportBackup(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var backup = JSON.parse(reader.result);
+        if (!backup.apps || !Array.isArray(backup.apps)) {
+          alert('Invalid backup file: missing apps array');
+          return;
+        }
+        // Import config if present
+        if (backup.config && typeof backup.config === 'object') {
+          var currentConfig = loadConfig();
+          var merged = Object.assign({}, currentConfig, backup.config);
+          saveConfig(merged);
+          applyTheme(merged.theme);
+        }
+        // Import apps with new IDs to avoid conflicts
+        var promises = [];
+        for (var i = 0; i < backup.apps.length; i++) {
+          var app = Object.assign({}, backup.apps[i]);
+          app.id = generateId(); // New ID to avoid conflicts
+          promises.push(saveApp(app));
+        }
+        Promise.all(promises).then(function () {
+          alert('Imported ' + backup.apps.length + ' app(s) successfully');
+          renderApps();
+        });
+      } catch (e) {
+        alert('Failed to parse backup file: ' + (e.message || e));
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ── Clear All Data ──────────────────────────────
+
+  function clearAllData() {
+    if (!confirm('Are you sure you want to clear all data? This cannot be undone.')) return;
+    if (!confirm('This will delete ALL apps and reset settings. Continue?')) return;
+
+    openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).clear();
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    }).then(function () {
+      localStorage.removeItem('appLauncherConfig');
+      applyTheme('dark');
+      renderApps();
+      document.getElementById('settings-overlay').hidden = true;
+      alert('All data cleared');
+    });
+  }
+
+  // ── AIMEAT Import ───────────────────────────────
+
+  var aimeatAppsCache = [];
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function importFromAimeat() {
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      alert('Set AIMEAT server URL in Settings first');
+      return;
+    }
+
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, ''); // strip trailing slash
+    closeModal();
+
+    fetch(aimeatUrl + '/v1/apps?include_peers=true')
+      .then(function (resp) {
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+        return resp.json();
+      })
+      .then(function (json) {
+        var apps = json.data && json.data.apps ? json.data.apps : [];
+        var peerApps = json.data && json.data.peer_apps ? json.data.peer_apps : [];
+        // Merge local and peer apps; tag peer apps with source info
+        for (var p = 0; p < peerApps.length; p++) {
+          peerApps[p]._from_peer = true;
+        }
+        var allFetched = apps.concat(peerApps);
+        if (allFetched.length === 0) {
+          alert('No apps found on the AIMEAT server');
+          return;
+        }
+        aimeatAppsCache = allFetched;
+        showAimeatImportDialog(allFetched, aimeatUrl);
+      })
+      .catch(function (err) {
+        var msg = 'Failed to fetch apps from AIMEAT server.\n\n' + (err.message || err);
+        if (err.message && err.message.indexOf('Failed to fetch') !== -1) {
+          msg += '\n\nIf the launcher is opened via file://, CORS will block the request. Open it from the AIMEAT server instead.';
+        }
+        alert(msg);
+      });
+  }
+
+  function showAimeatImportDialog(apps, aimeatUrl) {
+    var listEl = document.getElementById('aimeat-app-list');
+    var html = '';
+    for (var i = 0; i < apps.length; i++) {
+      var app = apps[i];
+      var displayName = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename;
+      var displayAuthor = (app.manifest && app.manifest.authorDisplay) ? app.manifest.authorDisplay : (app.owner || '');
+      var displayDesc = (app.manifest && app.manifest.description) ? app.manifest.description : '';
+      var displayVer = app.version_number ? 'v' + app.version_number : '';
+      var displayCat = (app.manifest && app.manifest.category) ? app.manifest.category : '';
+      var peerLabel = app._from_peer && app._peer_node ? ' \u00B7 \uD83C\uDF10 ' + escapeHtml(app._peer_node) : '';
+      html +=
+        '<div class="aimeat-app-item">' +
+          '<input type="checkbox" data-index="' + i + '" checked/>' +
+          '<div class="aimeat-app-info">' +
+            '<div class="aimeat-app-name">' + escapeHtml(displayName) + (displayVer ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(displayVer) + '</span>' : '') + '</div>' +
+            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? ' \u00B7 ' + escapeHtml(displayAuthor) : '') + (displayCat ? ' \u00B7 ' + escapeHtml(displayCat) : '') + peerLabel + '</div>' +
+            (displayDesc ? '<div class="aimeat-app-size" style="opacity:.6">' + escapeHtml(displayDesc.substring(0, 100)) + '</div>' : '') +
+          '</div>' +
+          '<select data-index="' + i + '">' +
+            '<option value="link">Link (online only)</option>' +
+            '<option value="download">Download (offline)</option>' +
+          '</select>' +
+        '</div>';
+    }
+    listEl.innerHTML = html;
+    // Store the aimeatUrl for processing
+    listEl.dataset.aimeatUrl = aimeatUrl;
+    document.getElementById('aimeat-import-overlay').hidden = false;
+  }
+
+  function processAimeatImport() {
+    var listEl = document.getElementById('aimeat-app-list');
+    var aimeatUrl = listEl.dataset.aimeatUrl;
+    var checkboxes = listEl.querySelectorAll('input[type="checkbox"]');
+    var selects = listEl.querySelectorAll('select');
+    var config = loadConfig();
+    var defaultOpenMode = config.defaultOpenMode || 'tab';
+
+    var toImport = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+      if (checkboxes[i].checked) {
+        var idx = parseInt(checkboxes[i].getAttribute('data-index'), 10);
+        var mode = selects[i].value;
+        toImport.push({ app: aimeatAppsCache[idx], mode: mode });
+      }
+    }
+
+    if (toImport.length === 0) {
+      alert('No apps selected');
+      return;
+    }
+
+    var promises = [];
+    for (var j = 0; j < toImport.length; j++) {
+      (function (item) {
+        var app = item.app;
+        var name = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename.replace(/\.html?$/i, '');
+        var importedVersion = app.version_number || 1;
+        // For peer apps, use the peer's URL as the base
+        var baseUrl = (app._from_peer && app._peer_url) ? app._peer_url.replace(/\/+$/, '') : aimeatUrl;
+
+        if (item.mode === 'link') {
+          // Link mode: store URL with ?mode=inline, pinned to latest
+          var inlineUrl = baseUrl + app.download_url + '?mode=inline';
+          promises.push(addAppFromUrl(name, inlineUrl, '\u{1F4E6}', ['aimeat'], defaultOpenMode));
+        } else {
+          // Download mode: fetch content and store blob (pinned to current version)
+          var downloadUrl = baseUrl + app.download_url;
+          promises.push(
+            fetch(downloadUrl)
+              .then(function (resp) {
+                if (!resp.ok) throw new Error('Download failed: ' + resp.status);
+                return resp.text();
+              })
+              .then(function (content) {
+                var encoded = btoa(unescape(encodeURIComponent(content)));
+                var record = {
+                  id: generateId(),
+                  name: name,
+                  description: (app.manifest && app.manifest.description) ? app.manifest.description : '',
+                  source: 'aimeat',
+                  aimeatOwner: app.owner || null,
+                  aimeatFilename: app.filename || null,
+                  aimeatVersion: importedVersion,
+                  url: null,
+                  blob: encoded,
+                  tags: ['aimeat'],
+                  openMode: defaultOpenMode,
+                  icon: '\u{1F4E6}',
+                  screenshot: null,
+                  favorite: false,
+                  addedAt: new Date().toISOString(),
+                  lastOpenedAt: null
+                };
+                return saveApp(record);
+              })
+          );
+        }
+      })(toImport[j]);
+    }
+
+    Promise.all(promises).then(function () {
+      document.getElementById('aimeat-import-overlay').hidden = true;
+      renderApps();
+    }).catch(function (err) {
+      alert('Import error: ' + (err.message || err));
+    });
+  }
+
+  // ── Publish to AIMEAT ───────────────────────────
+
+  var publishAppId = null;
+
+  function showPublishModal(appId) {
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === appId) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      alert('Set AIMEAT server URL in Settings first');
+      return;
+    }
+
+    publishAppId = appId;
+    var safeName = (app.name || 'app').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').toLowerCase();
+    if (!/\.html?$/i.test(safeName)) safeName += '.html';
+    document.getElementById('publish-filename').value = safeName;
+    document.getElementById('publish-access-code').value = '';
+    document.getElementById('publish-status').textContent = '';
+    document.getElementById('publish-submit-btn').disabled = false;
+    document.getElementById('publish-overlay').hidden = false;
+  }
+
+  function submitPublish() {
+    if (!publishAppId) return;
+
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === publishAppId) { app = allApps[i]; break; }
+    }
+    if (!app) return;
+
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var filename = document.getElementById('publish-filename').value.trim();
+    var accessCode = document.getElementById('publish-access-code').value.trim();
+    var statusEl = document.getElementById('publish-status');
+    var submitBtn = document.getElementById('publish-submit-btn');
+
+    if (!filename || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
+      statusEl.textContent = 'Invalid filename. Use letters, numbers, dots, hyphens, underscores.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    if (accessCode && (accessCode.length < 4 || accessCode.length > 64)) {
+      statusEl.textContent = 'Access code must be 4-64 characters.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    // Get the HTML content
+    var htmlContent = '';
+    if (app.blob) {
+      htmlContent = app.blob; // already base64
+    } else if (app.url) {
+      statusEl.textContent = 'Cannot publish URL-linked apps. Download it first (right-click \u2192 View Source \u2192 Save).';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    } else {
+      statusEl.textContent = 'No app content found.';
+      statusEl.style.color = 'var(--accent)';
+      return;
+    }
+
+    statusEl.textContent = 'Publishing...';
+    statusEl.style.color = '#34d399';
+    submitBtn.disabled = true;
+
+    // Get auth token first
+    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(resp) { return resp.json(); })
+      .then(function(authJson) {
+        var token = authJson.data && authJson.data.token;
+        if (!token) throw new Error('Could not get auth token');
+
+        var body = {
+          filename: filename,
+          content: htmlContent,
+          mime_type: 'text/html',
+          name: app.name || filename.replace(/\.html?$/i, ''),
+          description: app.description || '',
+          category: 'utility',
+          tags: app.tags || [],
+          uses_cortex: []
+        };
+        if (accessCode) body.access_code = accessCode;
+
+        return fetch(aimeatUrl + '/v1/apps', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(body)
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          statusEl.textContent = '\u2714 Published! ' + (json.data.download_url || '');
+          statusEl.style.color = '#34d399';
+          // Mark app as published in IndexedDB
+          app.published = true;
+          app.publishedFilename = filename;
+          app.publishedAt = new Date().toISOString();
+          app.publishedUrl = json.data.download_url || null;
+          app.publishedVersionNumber = json.data.version_number || 1;
+          app.publishedVersionsUrl = json.data.versions_url || null;
+          saveApp(app).then(function() {
+            loadPublishedApps();
+          });
+        } else {
+          statusEl.textContent = '\u2718 ' + (json.error_description || json.error_code || 'Publish failed');
+          statusEl.style.color = 'var(--accent)';
+          submitBtn.disabled = false;
+        }
+      })
+      .catch(function(err) {
+        statusEl.textContent = '\u2718 ' + (err.message || 'Publish failed');
+        statusEl.style.color = 'var(--accent)';
+        submitBtn.disabled = false;
+      });
+  }
+
+  // ── Published Apps Section ──────────────────────
+
+  var publishedVisible = true;
+
+  function togglePublished() {
+    publishedVisible = !publishedVisible;
+    var grid = document.getElementById('published-grid');
+    var arrow = document.getElementById('published-arrow');
+    grid.style.display = publishedVisible ? '' : 'none';
+    arrow.classList.toggle('open', publishedVisible);
+  }
+
+  function loadPublishedApps() {
+    getAllApps().then(function(apps) {
+      var published = apps.filter(function(a) { return a.published; });
+      var section = document.getElementById('published-section');
+      var grid = document.getElementById('published-grid');
+      var countEl = document.getElementById('published-count');
+
+      if (published.length === 0) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = '';
+      countEl.textContent = '(' + published.length + ')';
+      var config = loadConfig();
+      var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+
+      var html = '';
+      for (var i = 0; i < published.length; i++) {
+        var app = published[i];
+        var url = app.publishedUrl ? (aimeatUrl + app.publishedUrl) : '';
+        html +=
+          '<div class="published-card">' +
+            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + (app.publishedVersionNumber ? ' <span style="opacity:.5;font-size:.85em">v' + app.publishedVersionNumber + '</span>' : '') + '</div>' +
+            '<div class="published-card-meta">' +
+              '<span>' + escapeHtml(app.publishedFilename || '') + '</span>' +
+              '<span>' + (app.publishedAt ? new Date(app.publishedAt).toLocaleDateString() : '') + '</span>' +
+            '</div>' +
+            '<div class="published-card-actions">' +
+              (url ? '<button onclick="window.open(\'' + escapeHtml(url) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' : '') +
+              '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.id) + '\')" class="danger">&#x1F5D1; Remove</button>' +
+            '</div>' +
+          '</div>';
+      }
+      grid.innerHTML = html;
+    });
+  }
+
+  function unpublishApp(appId) {
+    if (!confirm('Remove this published app from the server?')) return;
+
+    var app = null;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === appId) { app = allApps[i]; break; }
+    }
+    if (!app || !app.publishedFilename) return;
+
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+
+    // Get auth token and delete
+    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(resp) { return resp.json(); })
+      .then(function(authJson) {
+        var token = authJson.data && authJson.data.token;
+        if (!token) throw new Error('Could not get auth token');
+        return fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(app.publishedFilename), {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          app.published = false;
+          delete app.publishedFilename;
+          delete app.publishedAt;
+          delete app.publishedUrl;
+          delete app.publishedVersionNumber;
+          delete app.publishedVersionsUrl;
+          saveApp(app).then(function() {
+            loadPublishedApps();
+          });
+        } else {
+          alert('Failed to remove: ' + (json.error_description || 'Unknown error'));
+        }
+      })
+      .catch(function(err) {
+        alert('Error: ' + (err.message || err));
+      });
+  }
+
+  // ── Cortex Extensions Bar ─────────────────────────
+
+  var cortexToken = null;
+
+  function cortexEsc(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function loadCortexExtensions() {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+
+    // Get anonymous token first (same pattern as AIMEAT import)
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(authData) {
+        var token = authData.data && authData.data.token;
+        if (!token) return;
+        cortexToken = token;
+        return fetch(url + '/v1/cortex?status=active', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      })
+      .then(function(r) { return r ? r.json() : null; })
+      .then(function(data) {
+        if (!data || !data.data || !data.data.extensions) return;
+        var exts = data.data.extensions;
+        if (!exts.length) return;
+
+        document.getElementById('cortex-bar').style.display = 'block';
+        var grid = document.getElementById('cortex-bar-grid');
+        grid.innerHTML = exts.map(function(ext) {
+          var types = ext.component_types || [];
+          var libCount = types.filter(function(t) { return t === 'lib'; }).length;
+          var schemaCount = types.filter(function(t) { return t === 'schema'; }).length;
+          return '<div class="cortex-mini-card" onclick="showCortexPopup(\'' + encodeURIComponent(ext.name) + '\')">'
+            + '<div class="cortex-mini-name">&#x1F4E6; ' + cortexEsc(ext.short_name || ext.name) + '</div>'
+            + '<div class="cortex-mini-meta">' + libCount + ' lib &middot; ' + schemaCount + ' schema</div>'
+            + '</div>';
+        }).join('');
+      })
+      .catch(function(e) { console.warn('Cortex bar load failed:', e); });
+  }
+
+  function showCortexPopup(encodedName) {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var el = document.getElementById('cortex-popup-content');
+    el.innerHTML = '<p>Loading...</p>';
+    document.getElementById('cortex-popup-overlay').style.display = 'flex';
+
+    if (!cortexToken) { el.innerHTML = '<p>No auth token available</p>'; return; }
+
+    fetch(url + '/v1/cortex/' + encodedName, {
+      headers: { 'Authorization': 'Bearer ' + cortexToken }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var ext = data.data;
+        var comps = ext.components || [];
+        var html = '<h2 style="margin-top:0">' + cortexEsc(ext.name) + '</h2>';
+        html += '<p style="color:var(--text-muted,#889)">' + cortexEsc(ext.description || '') + '</p>';
+        html += '<h3 style="font-size:.9rem">Available for your apps:</h3>';
+
+        // Libs
+        comps.filter(function(c) { return c.type === 'lib'; }).forEach(function(lib) {
+          var scriptUrl = url + '/v1/cortex/' + encodedName + '/libs/' + encodeURIComponent(lib.filename);
+          var tag = '<script src="' + scriptUrl + '"><\/script>';
+          html += '<div style="margin-bottom:1rem">'
+            + '<div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div>'
+            + '<div style="font-family:monospace;font-size:.75rem;background:rgba(0,0,0,.3);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
+            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy</button>';
+          if (lib.api_surface) {
+            html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div>'
+              + '<div style="font-family:monospace;font-size:.75rem;background:rgba(0,0,0,.3);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
+              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy API</button>';
+          }
+          html += '</div>';
+        });
+
+        // Schemas
+        comps.filter(function(c) { return c.type === 'schema'; }).forEach(function(s) {
+          html += '<div style="margin-bottom:.5rem;font-size:.85rem">&#x1F4D0; Schema: <code>' + cortexEsc(s.key_pattern) + '</code> &mdash; data validated automatically</div>';
+        });
+
+        // Prompts
+        comps.filter(function(c) { return c.type === 'prompt'; }).forEach(function(p) {
+          var preview = (p.content || '').substring(0, 150);
+          html += '<div style="margin-bottom:.5rem">'
+            + '<div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div>'
+            + '<div style="font-size:.75rem;color:var(--text-muted,#889)">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
+            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy Prompt</button>'
+            + '</div>';
+        });
+
+        // Edit button (only if owner session available)
+        var hasSession = false;
+        try { hasSession = !!getCortexOwnerToken(); } catch(e) {}
+        if (hasSession) {
+          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.08)">'
+            + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
+            + '</div>';
+        }
+
+        el.innerHTML = html;
+      })
+      .catch(function(e) {
+        el.innerHTML = '<p>Error: ' + cortexEsc(e.message) + '</p>';
+      });
+  }
+
+  function cortexCopy(text, btn) {
+    navigator.clipboard.writeText(text.replace(/\\n/g, '\n')).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+  }
+
+  // ── Cortex Extension Editor ───────────────────────
+
+  var cortexEditorExtName = null; // name of extension being edited
+  var cortexEditorWasActive = false; // was it active before editing?
+  var cortexEditorLibCounter = 0; // counter for unique lib section IDs
+
+  function getCortexOwnerToken() {
+    try {
+      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+        return window.AIMEAT.auth.getSession().jwt;
+      }
+      var stored = localStorage.getItem('aimeat_session');
+      if (stored) {
+        var parsed = JSON.parse(stored);
+        return parsed.jwt || null;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function openCortexEditor(encodedName) {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in as an owner to edit extensions.'); return; }
+
+    var statusEl = document.getElementById('cortex-editor-status');
+    statusEl.textContent = 'Loading extension data...';
+    statusEl.style.color = '#34d399';
+    document.getElementById('cortex-editor-manifest').value = '';
+    document.getElementById('cortex-editor-libs').innerHTML = '';
+    document.getElementById('cortex-editor-name').textContent = '';
+    cortexEditorLibCounter = 0;
+
+    // Close the detail popup
+    document.getElementById('cortex-popup-overlay').style.display = 'none';
+    document.getElementById('cortex-editor-overlay').style.display = 'flex';
+
+    fetch(url + '/v1/cortex/' + encodedName + '/export', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.data) { statusEl.textContent = 'Error: ' + (data.error || 'Unknown error'); statusEl.style.color = 'var(--accent,#e74c6f)'; return; }
+        var ext = data.data;
+        cortexEditorExtName = ext.name;
+        cortexEditorWasActive = (ext.status === 'active');
+        document.getElementById('cortex-editor-name').textContent = ext.name + (cortexEditorWasActive ? ' (active)' : ' (inactive)');
+        document.getElementById('cortex-editor-manifest').value = ext.manifest || '';
+
+        // Render lib editors
+        var libsHtml = '';
+        var libs = ext.libs || {};
+        var filenames = Object.keys(libs);
+        for (var i = 0; i < filenames.length; i++) {
+          cortexEditorLibCounter++;
+          var fname = filenames[i];
+          libsHtml += cortexEditorLibSection(cortexEditorLibCounter, fname, libs[fname]);
+        }
+        document.getElementById('cortex-editor-libs').innerHTML = libsHtml;
+        statusEl.textContent = 'Loaded. ' + filenames.length + ' lib file' + (filenames.length !== 1 ? 's' : '') + '.';
+      })
+      .catch(function(e) {
+        statusEl.textContent = 'Error loading: ' + e.message;
+        statusEl.style.color = 'var(--accent,#e74c6f)';
+      });
+  }
+
+  function cortexEditorLibSection(id, filename, content) {
+    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
+      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 6px;color:#e0e0e0;font-family:monospace;font-size:.8rem;width:200px" /></label>'
+      + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,100,100,.3);background:transparent;color:#f87171;cursor:pointer">Remove</button>'
+      + '</div>'
+      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
+      + '</div>';
+  }
+
+  function cortexEditorAddLib() {
+    cortexEditorLibCounter++;
+    var container = document.getElementById('cortex-editor-libs');
+    container.insertAdjacentHTML('beforeend', cortexEditorLibSection(cortexEditorLibCounter, 'new-lib.js', ''));
+  }
+
+  function cortexEditorCollectLibs() {
+    var libs = {};
+    var container = document.getElementById('cortex-editor-libs');
+    var nameInputs = container.querySelectorAll('input[data-lib-name]');
+    for (var i = 0; i < nameInputs.length; i++) {
+      var id = nameInputs[i].getAttribute('data-lib-name');
+      var fname = nameInputs[i].value.trim();
+      var contentEl = container.querySelector('textarea[data-lib-content="' + id + '"]');
+      if (fname && contentEl) {
+        libs[fname] = contentEl.value;
+      }
+    }
+    return libs;
+  }
+
+  function cortexEditorSave() {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert('No auth token available.'); return; }
+
+    var manifest = document.getElementById('cortex-editor-manifest').value;
+    if (!manifest.trim()) { alert('Manifest cannot be empty.'); return; }
+
+    var libs = cortexEditorCollectLibs();
+    var statusEl = document.getElementById('cortex-editor-status');
+    var saveBtn = document.getElementById('cortex-editor-save-btn');
+    var oldName = cortexEditorExtName;
+    var wasActive = cortexEditorWasActive;
+
+    statusEl.textContent = 'Deleting old extension...';
+    statusEl.style.color = '#34d399';
+    saveBtn.disabled = true;
+
+    // Step 1: Delete old extension
+    fetch(url + '/v1/cortex/' + encodeURIComponent(oldName), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) {
+      if (!r.ok && r.status !== 404) throw new Error('Delete failed: ' + r.status);
+      statusEl.textContent = 'Installing updated extension...';
+      // Step 2: Install new
+      return fetch(url + '/v1/cortex', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manifest: manifest, libs: libs })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok') {
+        var errMsg = data.error || 'Install failed';
+        if (data.details && data.details.errors) errMsg += ': ' + data.details.errors.join('; ');
+        throw new Error(errMsg);
+      }
+      var newName = data.data.name;
+      cortexEditorExtName = newName;
+
+      // Step 3: Activate if was active before
+      if (wasActive) {
+        statusEl.textContent = 'Activating...';
+        return fetch(url + '/v1/cortex/' + encodeURIComponent(newName) + '/activate', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) { return r.json(); });
+      }
+      return null;
+    })
+    .then(function(activateData) {
+      saveBtn.disabled = false;
+      if (activateData && activateData.status !== 'ok') {
+        statusEl.textContent = 'Installed but activation failed: ' + (activateData.error || 'unknown');
+        statusEl.style.color = 'orange';
+      } else {
+        statusEl.textContent = 'Saved and re-installed successfully!';
+        statusEl.style.color = '#34d399';
+        cortexEditorWasActive = wasActive; // preserve
+        // Refresh the cortex bar
+        loadCortexExtensions();
+      }
+    })
+    .catch(function(e) {
+      saveBtn.disabled = false;
+      statusEl.textContent = 'Error: ' + e.message;
+      statusEl.style.color = 'var(--accent,#e74c6f)';
+    });
+  }
+
+  function cortexEditorExport() {
+    var manifest = document.getElementById('cortex-editor-manifest').value;
+    var libs = cortexEditorCollectLibs();
+    var name = (cortexEditorExtName || 'extension').replace(/\//g, '-');
+
+    // Download manifest
+    var manifestBlob = new Blob([manifest], { type: 'text/yaml' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(manifestBlob);
+    a.download = name + '.yaml';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    // Download each lib file
+    var filenames = Object.keys(libs);
+    for (var i = 0; i < filenames.length; i++) {
+      var libBlob = new Blob([libs[filenames[i]]], { type: 'application/javascript' });
+      var b = document.createElement('a');
+      b.href = URL.createObjectURL(libBlob);
+      b.download = filenames[i];
+      b.click();
+      URL.revokeObjectURL(b.href);
+    }
+  }
+
+  function closeCortexEditor() {
+    document.getElementById('cortex-editor-overlay').style.display = 'none';
+    cortexEditorExtName = null;
+  }
+
+  // ── Prompt Builder Panel ──────────────────────────
+
+  var pbExtensionsCache = null; // cached cortex extension list
+  var pbExtDetailCache = {};   // cached extension details (name → detail object)
+  var pbSourceApp = null; // app being improved (null = new app mode)
+
+  function openPromptBuilder(app) {
+    pbSourceApp = app || null;
+    var overlay = document.getElementById('prompt-builder-overlay');
+    var desc = document.getElementById('pb-description');
+    var extCheckbox = document.getElementById('pb-ext-checkbox');
+    var extList = document.getElementById('pb-ext-list');
+
+    // Reset state
+    desc.value = '';
+    extCheckbox.checked = false;
+    extList.classList.remove('open');
+
+    // Set mode based on whether we have a source app
+    var radios = document.querySelectorAll('input[name="pb-mode"]');
+    if (pbSourceApp) {
+      radios[1].checked = true; // Improve This App
+      desc.placeholder = 'Describe what changes to make to "' + (pbSourceApp.name || 'this app') + '"...';
+    } else {
+      radios[0].checked = true; // New App
+      desc.placeholder = 'Describe what the app should do...';
+    }
+
+    // Load Cortex extensions into picker
+    loadPbExtensions();
+
+    overlay.style.display = 'flex';
+    desc.focus();
+    updatePbPreview();
+  }
+
+  function closePbPanel() {
+    document.getElementById('prompt-builder-overlay').style.display = 'none';
+    pbSourceApp = null;
+  }
+
+  function loadPbExtensions() {
+    var list = document.getElementById('pb-ext-list');
+    var config = loadConfig();
+    if (!config.aimeatUrl) {
+      list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Configure AIMEAT URL in Settings to load extensions</span>';
+      return;
+    }
+
+    // Use cached data if available
+    if (pbExtensionsCache) {
+      renderPbExtensions(pbExtensionsCache);
+      return;
+    }
+
+    list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Loading extensions...</span>';
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+
+    var token = cortexToken;
+    var fetchExts = function(authToken) {
+      fetch(url + '/v1/cortex?status=active', {
+        headers: { 'Authorization': 'Bearer ' + authToken }
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.data || !data.data.extensions) {
+            list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">No extensions available</span>';
+            return;
+          }
+          pbExtensionsCache = data.data.extensions;
+          renderPbExtensions(pbExtensionsCache);
+        })
+        .catch(function() {
+          list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Failed to load extensions</span>';
+        });
+    };
+
+    if (token) {
+      fetchExts(token);
+    } else {
+      fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(authData) {
+          var t = authData.data && authData.data.token;
+          if (!t) { list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Auth failed</span>'; return; }
+          cortexToken = t;
+          fetchExts(t);
+        })
+        .catch(function() {
+          list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Failed to authenticate</span>';
+        });
+    }
+  }
+
+  function renderPbExtensions(extensions) {
+    var list = document.getElementById('pb-ext-list');
+    if (!extensions.length) {
+      list.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">No active extensions</span>';
+      return;
+    }
+    list.innerHTML = extensions.map(function(ext, i) {
+      var types = (ext.component_types || []).join(', ');
+      return '<label class="pb-ext-chip" data-ext-index="' + i + '">'
+        + '<input type="checkbox" data-ext-name="' + cortexEsc(ext.name) + '"> '
+        + cortexEsc(ext.short_name || ext.name)
+        + ' <span style="font-size:.7rem;color:var(--text-muted)">(' + cortexEsc(types) + ')</span>'
+        + '</label>';
+    }).join('');
+
+    // Toggle selected class and update preview on change
+    list.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        this.closest('.pb-ext-chip').classList.toggle('selected', this.checked);
+        if (this.checked) {
+          fetchExtDetail(this.getAttribute('data-ext-name'));
+        } else {
+          updatePbPreview();
+        }
+      });
+    });
+  }
+
+  function getSelectedExtensions() {
+    var selected = [];
+    var checkboxes = document.querySelectorAll('#pb-ext-list input[type="checkbox"]:checked');
+    checkboxes.forEach(function(cb) {
+      var name = cb.getAttribute('data-ext-name');
+      // Prefer detail cache, fall back to list data
+      if (pbExtDetailCache[name]) {
+        selected.push(pbExtDetailCache[name]);
+      } else if (pbExtensionsCache) {
+        for (var i = 0; i < pbExtensionsCache.length; i++) {
+          if (pbExtensionsCache[i].name === name) {
+            selected.push(pbExtensionsCache[i]);
+            break;
+          }
+        }
+      }
+    });
+    return selected;
+  }
+
+  function fetchExtDetail(extName) {
+    // Already cached
+    if (pbExtDetailCache[extName]) { updatePbPreview(); return; }
+    var config = loadConfig();
+    if (!config.aimeatUrl || !cortexToken) { updatePbPreview(); return; }
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(url + '/v1/cortex/' + encodeURIComponent(extName), {
+      headers: { 'Authorization': 'Bearer ' + cortexToken }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.data) {
+          pbExtDetailCache[extName] = data.data;
+        }
+        updatePbPreview();
+      })
+      .catch(function() { updatePbPreview(); });
+  }
+
+  function buildPromptFromBuilder() {
+    var config = loadConfig();
+    var nodeUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : 'https://your-aimeat-node.example';
+    var mode = document.querySelector('input[name="pb-mode"]:checked').value;
+    var description = document.getElementById('pb-description').value.trim();
+    var selectedExts = document.getElementById('pb-ext-checkbox').checked ? getSelectedExtensions() : [];
+
+    var prompt = '';
+
+    // Header
+    if (mode === 'improve' && pbSourceApp) {
+      prompt += 'Here is an HTML app called "' + (pbSourceApp.name || 'Untitled') + '".\n';
+      prompt += 'Make the following change: ' + (description || '[DESCRIBE YOUR CHANGE HERE]') + '\n\n';
+      prompt += 'Return the COMPLETE updated HTML file. Do not omit any parts.\n\n';
+    } else {
+      prompt += 'Create a new single-file HTML app.\n';
+      prompt += 'Description: ' + (description || '[DESCRIBE WHAT THE APP SHOULD DO]') + '\n\n';
+    }
+
+    // AIMEAT Platform Instructions
+    prompt += '## AIMEAT Platform Instructions\n\n';
+    prompt += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
+
+    // Core libraries
+    prompt += '### Available Client Libraries\n';
+    prompt += 'Load via script tags from the AIMEAT node (' + nodeUrl + '):\n';
+    prompt += '- aimeat-auth (' + nodeUrl + '/v1/libs/aimeat-auth.js) - Identity, login, JWT, session management\n';
+    prompt += '- aimeat-data (' + nodeUrl + '/v1/libs/aimeat-data.js) - Memory storage, search, key-value data\n';
+    prompt += '- aimeat-storage (' + nodeUrl + '/v1/libs/aimeat-storage.js) - File upload/download\n';
+    prompt += '- aimeat-social (' + nodeUrl + '/v1/libs/aimeat-social.js) - Boards, posts, reactions\n';
+    prompt += '- aimeat-wallet (' + nodeUrl + '/v1/libs/aimeat-wallet.js) - Balance, transactions\n';
+    prompt += '- aimeat-work (' + nodeUrl + '/v1/libs/aimeat-work.js) - Actions, work requests\n\n';
+
+    // Cortex extension instructions
+    if (selectedExts.length > 0) {
+      prompt += '### Cortex Extensions (include these)\n\n';
+      selectedExts.forEach(function(ext) {
+        prompt += '#### ' + ext.name + '\n';
+        prompt += ext.description ? ext.description + '\n' : '';
+
+        // Use detailed components if available
+        var comps = ext.components;
+        if (comps && comps.length) {
+          comps.forEach(function(c) {
+            if (c.type === 'lib' && c.filename) {
+              prompt += 'Load the library:\n```html\n';
+              prompt += '<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + encodeURIComponent(c.filename) + '"></' + 'script>\n';
+              prompt += '```\n';
+              if (c.api_surface) {
+                prompt += 'API Surface:\n```\n' + c.api_surface + '\n```\n';
+              }
+            } else if (c.type === 'schema') {
+              prompt += 'Data schema: `' + (c.key_pattern || '') + '` — data is validated automatically.\n';
+            } else if (c.type === 'prompt') {
+              prompt += 'Prompt template: ' + (c.name || '') + '\n';
+            }
+          });
+        } else {
+          // Fallback: only list-level type info
+          var types = ext.component_types || [];
+          if (types.indexOf('lib') !== -1) {
+            prompt += 'Includes a JS library (load via `<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/...">`).\n';
+          }
+          if (types.indexOf('schema') !== -1) {
+            prompt += 'Provides validated data schemas.\n';
+          }
+          if (types.indexOf('prompt') !== -1) {
+            prompt += 'Includes prompt templates.\n';
+          }
+        }
+        prompt += '\n';
+      });
+    }
+
+    // Auth pattern
+    prompt += '### Auth Pattern\n';
+    prompt += '```html\n';
+    prompt += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
+    prompt += '<script>\n';
+    prompt += 'AIMEAT.auth.mountLoginButton("#login", {\n';
+    prompt += '  onLogin: function(session) { /* session.owner, session.jwt, session.fetch() */ },\n';
+    prompt += '  onLogout: function() { /* hide content */ }\n';
+    prompt += '});\n';
+    prompt += '</' + 'script>\n';
+    prompt += '```\n\n';
+
+    // Data storage
+    prompt += '### Data Storage\n';
+    prompt += '```javascript\n';
+    prompt += 'await AIMEAT.data.set("key", "value", { visibility: "private", tags: ["t1"] });\n';
+    prompt += 'var val = await AIMEAT.data.get("key");\n';
+    prompt += 'var results = await AIMEAT.data.search("query");\n';
+    prompt += '```\n\n';
+
+    // Design guidelines
+    prompt += '### Design Guidelines\n';
+    prompt += 'Recommended dark theme:\n';
+    prompt += '```css\n';
+    prompt += ':root { --bg:#0f0a14; --card:rgba(30,20,40,0.85); --text:#f0e6f6;\n';
+    prompt += '  --accent:#ff6b9d; --border:rgba(255,107,157,0.25); --radius:12px; }\n';
+    prompt += '```\n';
+    prompt += 'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
+    prompt += 'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n';
+
+    // Rules
+    prompt += '### Important Rules\n';
+    prompt += '- Return the COMPLETE HTML file, not fragments\n';
+    prompt += '- Never use literal closing script tags in JS comments or strings\n';
+    prompt += '- Keep it as a single self-contained HTML file\n';
+    prompt += '- Include error handling and loading states for API calls\n\n';
+
+    // Source code for improve mode
+    if (mode === 'improve' && pbSourceApp && pbSourceApp.blob) {
+      var source = decodeURIComponent(escape(atob(pbSourceApp.blob)));
+      prompt += '--- Source Code ---\n' + source;
+    }
+
+    return prompt;
+  }
+
+  function updatePbPreview() {
+    var preview = document.getElementById('pb-preview');
+    var prompt = buildPromptFromBuilder();
+    // Show first ~2000 chars with truncation indicator
+    if (prompt.length > 2000) {
+      preview.textContent = prompt.substring(0, 2000) + '\n\n... (' + prompt.length + ' chars total)';
+    } else {
+      preview.textContent = prompt;
+    }
+  }
+
+  // ── Drag & Drop Reordering ─────────────────────
+
+  var dragSourceId = null;
+
+  function onCardDragStart(e) {
+    var card = e.target.closest('.app-card');
+    if (!card) return;
+    dragSourceId = card.dataset.id;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSourceId);
+  }
+
+  function onCardDragEnd(e) {
+    var card = e.target.closest('.app-card');
+    if (card) card.classList.remove('dragging');
+    // Remove all drag-over highlights
+    var cards = document.querySelectorAll('.app-card.drag-over');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+    dragSourceId = null;
+  }
+
+  function onCardDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var card = e.target.closest('.app-card');
+    if (!card || card.dataset.id === dragSourceId) return;
+    // Remove highlight from others
+    var cards = document.querySelectorAll('.app-card.drag-over');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+    card.classList.add('drag-over');
+  }
+
+  function onCardDrop(e) {
+    e.preventDefault();
+    var targetCard = e.target.closest('.app-card');
+    if (!targetCard) return;
+    var targetId = targetCard.dataset.id;
+    if (!dragSourceId || dragSourceId === targetId) return;
+
+    // Find indexes in the currently rendered/sorted allApps
+    var srcIdx = -1, tgtIdx = -1;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === dragSourceId) srcIdx = i;
+      if (allApps[i].id === targetId) tgtIdx = i;
+    }
+    if (srcIdx === -1 || tgtIdx === -1) return;
+
+    // Move the source app to the target position
+    var moved = allApps.splice(srcIdx, 1)[0];
+    allApps.splice(tgtIdx, 0, moved);
+
+    // Assign sortOrder values based on new positions
+    var saves = [];
+    for (var j = 0; j < allApps.length; j++) {
+      allApps[j].sortOrder = j;
+      saves.push(saveApp(allApps[j]));
+    }
+
+    // Re-render immediately (no animation delay for reorder)
+    var grid = document.getElementById('app-grid');
+    var cards = grid.querySelectorAll('.app-card');
+    for (var k = 0; k < cards.length; k++) {
+      cards[k].classList.remove('drag-over', 'dragging');
+    }
+
+    Promise.all(saves).then(function () {
+      renderApps();
+    });
+  }
+
+  // ── Public API ────────────────────────────────────
+
+  window._launcher = {
+    openDB: openDB,
+    getAllApps: getAllApps,
+    saveApp: saveApp,
+    deleteApp: deleteApp,
+    loadConfig: loadConfig,
+    saveConfig: saveConfig,
+    renderApps: renderApps,
+    renderTags: renderTags,
+    filterByTag: filterByTag,
+    launchApp: launchApp,
+    launchInTab: launchInTab,
+    launchInIframe: launchInIframe,
+    closeIframe: closeIframe,
+    openExternal: openExternal,
+    setCurrentIframeUrl: function (url) { currentIframeUrl = url; },
+    showContextMenu: showContextMenu,
+    hideContextMenu: hideContextMenu,
+    handleContextAction: handleContextAction,
+    generateId: generateId,
+    readFileAsText: readFileAsText,
+    addAppFromUrl: addAppFromUrl,
+    addAppFromFile: addAppFromFile,
+    addAppFromSource: addAppFromSource,
+    addAppFromZip: addAppFromZip,
+    showModal: showModal,
+    closeModal: closeModal,
+    openSettings: openSettings,
+    saveSettings: saveSettings,
+    closeSettings: closeSettings,
+    applyTheme: applyTheme,
+    exportBackup: exportBackup,
+    clearAllData: clearAllData,
+    importFromAimeat: importFromAimeat,
+    processAimeatImport: processAimeatImport,
+    viewSource: viewSource,
+    generateHomepagePrompt: generateHomepagePrompt,
+    showPublishModal: showPublishModal,
+    submitPublish: submitPublish,
+    loadPublishedApps: loadPublishedApps,
+    togglePublished: togglePublished,
+    unpublishApp: unpublishApp,
+    renderRecentlyOpened: renderRecentlyOpened,
+    loadCortexExtensions: loadCortexExtensions,
+    showCortexPopup: showCortexPopup,
+    cortexCopy: cortexCopy,
+    openCortexEditor: openCortexEditor,
+    closeCortexEditor: closeCortexEditor,
+    cortexEditorAddLib: cortexEditorAddLib,
+    cortexEditorSave: cortexEditorSave,
+    cortexEditorExport: cortexEditorExport,
+    openPromptBuilder: openPromptBuilder,
+    closePbPanel: closePbPanel,
+    onCardDragStart: onCardDragStart,
+    onCardDragEnd: onCardDragEnd,
+    onCardDragOver: onCardDragOver,
+    onCardDrop: onCardDrop,
+    syncConfigToServer: syncConfigToServer,
+    loadConfigFromServer: loadConfigFromServer
+  };
+
+  // Expose cortex functions globally for inline onclick handlers
+  window.showCortexPopup = showCortexPopup;
+  window.cortexCopy = cortexCopy;
+
+  // ── Bootstrap ─────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // ── Apply theme on load ─────────────────────────
+    applyTheme(loadConfig().theme);
+
+    renderApps();
+    loadPublishedApps();
+    loadCortexExtensions();
+    loadConfigFromServer();
+
+    // ── Search input ─────────────────────────────────
+    document.getElementById('search-input').addEventListener('input', function (e) {
+      searchQuery = e.target.value.trim();
+      renderApps();
+    });
+
+    // ── Add App button ──────────────────────────────
+    document.getElementById('add-btn').addEventListener('click', function () {
+      showModal();
+    });
+
+    // ── Generate with AI button ─────────────────────
+    document.getElementById('generate-btn').addEventListener('click', function () {
+      openPromptBuilder(null);
+    });
+
+    // ── Settings button ─────────────────────────────
+    document.getElementById('settings-btn').addEventListener('click', function () {
+      openSettings();
+    });
+
+    // ── Settings save / cancel ──────────────────────
+    document.getElementById('settings-save-btn').addEventListener('click', function () {
+      saveSettings();
+    });
+
+    document.getElementById('settings-cancel-btn').addEventListener('click', function () {
+      closeSettings();
+    });
+
+    // ── Click settings overlay to close ─────────────
+    document.getElementById('settings-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeSettings();
+      }
+    });
+
+    // ── Import backup file input ────────────────────
+    document.getElementById('import-file-input').addEventListener('change', function () {
+      if (this.files && this.files.length > 0) {
+        handleImportBackup(this.files[0]);
+        this.value = ''; // Reset for re-import
+      }
+    });
+
+    // ── Click AIMEAT import overlay to close ────────
+    document.getElementById('aimeat-import-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
+    // ── Click publish overlay to close ──────────────
+    document.getElementById('publish-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
+    // ── Click cortex popup overlay to close ─────────
+    document.getElementById('cortex-popup-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.style.display = 'none';
+      }
+    });
+
+    // ── Click cortex editor overlay to close ────────
+    document.getElementById('cortex-editor-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeCortexEditor();
+      }
+    });
+
+    // ── Tab switching ───────────────────────────────
+    var tabBtns = document.querySelectorAll('#add-app-modal .modal-tab');
+    tabBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        switchTab(btn.getAttribute('data-tab'));
+      });
+    });
+
+    // ── Drop zone events ────────────────────────────
+    var dropZone = document.getElementById('drop-zone');
+    var fileInput = document.getElementById('file-input');
+    var browseBtn = document.getElementById('browse-btn');
+
+    dropZone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFileDrop(e.dataTransfer.files[0]);
+      }
+    });
+
+    browseBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length > 0) {
+        handleFileDrop(fileInput.files[0]);
+      }
+    });
+
+    // ── Modal save / cancel ─────────────────────────
+    document.getElementById('modal-save-btn').addEventListener('click', function () {
+      handleSave();
+    });
+
+    document.getElementById('modal-cancel-btn').addEventListener('click', function () {
+      closeModal();
+    });
+
+    // ── Click overlay to close ──────────────────────
+    document.getElementById('modal-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+
+    // ── Context menu action buttons ─────────────────
+    var contextMenu = document.getElementById('context-menu');
+    var contextBtns = contextMenu.querySelectorAll('button[data-action]');
+    contextBtns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        handleContextAction(btn.getAttribute('data-action'));
+      });
+    });
+
+    // ── PostMessage auth protocol for sandboxed iframes ──
+    window.addEventListener('message', function(e) {
+      var iframe = document.getElementById('app-iframe');
+      if (!iframe || !iframe.contentWindow) return;
+      // Only respond to messages from our iframe
+      if (e.source !== iframe.contentWindow) return;
+      if (!e.data || e.data.type !== 'aimeat-request-auth') return;
+
+      // Get JWT from aimeat-auth library if available, else from localStorage
+      var jwt = null;
+      var nodeUrl = '';
+      try {
+        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+          var session = window.AIMEAT.auth.getSession();
+          jwt = session.jwt;
+          nodeUrl = session.nodeUrl || '';
+        } else {
+          var stored = localStorage.getItem('aimeat_session');
+          if (stored) {
+            var parsed = JSON.parse(stored);
+            jwt = parsed.jwt || null;
+          }
+          var config = loadConfig();
+          nodeUrl = config.aimeatUrl || '';
+        }
+      } catch(err) { /* ignore parse errors */ }
+
+      iframe.contentWindow.postMessage({
+        type: 'aimeat-auth',
+        jwt: jwt,
+        nodeUrl: nodeUrl
+      }, '*');
+    });
+
+    // ── Click anywhere to close context menu ────────
+    document.addEventListener('click', function () {
+      hideContextMenu();
+    });
+
+    // ── Keyboard shortcuts ──────────────────────────
+    document.addEventListener('keydown', function (e) {
+      // Escape — close modals / overlays (source-overlay first in cascade)
+      if (e.key === 'Escape') {
+        if (document.getElementById('cortex-editor-overlay').style.display === 'flex') {
+          closeCortexEditor();
+        } else if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
+          closePbPanel();
+        } else if (!document.getElementById('source-overlay').hidden) {
+          document.getElementById('source-overlay').hidden = true;
+        } else if (!document.getElementById('context-menu').hidden) {
+          hideContextMenu();
+        } else if (!document.getElementById('aimeat-import-overlay').hidden) {
+          document.getElementById('aimeat-import-overlay').hidden = true;
+        } else if (!document.getElementById('publish-overlay').hidden) {
+          document.getElementById('publish-overlay').hidden = true;
+        } else if (!document.getElementById('settings-overlay').hidden) {
+          closeSettings();
+        } else if (!document.getElementById('modal-overlay').hidden) {
+          closeModal();
+        }
+        return;
+      }
+      // Ctrl+N / Cmd+N — open Add App modal
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        showModal();
+        return;
+      }
+      // Ctrl+F / Cmd+F — focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('search-input').focus();
+      }
+    });
+
+    // ── Long-press for touch devices ─────────────────
+    document.getElementById('app-grid').addEventListener('touchstart', function(e) {
+      var card = e.target.closest('.app-card');
+      if (!card) return;
+      var appId = card.getAttribute('data-id');
+      card._longPressTimer = setTimeout(function() {
+        e.preventDefault();
+        window._launcher.showContextMenu(e.touches[0], appId);
+      }, 500);
+    }, { passive: false });
+
+    document.getElementById('app-grid').addEventListener('touchend', function(e) {
+      var card = e.target.closest('.app-card');
+      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
+    });
+
+    document.getElementById('app-grid').addEventListener('touchmove', function(e) {
+      var card = e.target.closest('.app-card');
+      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
+    });
+
+    // ── Copy Source button ───────────────────────────
+    document.getElementById('copy-source-btn').addEventListener('click', function() {
+      var code = document.getElementById('source-code').value;
+      var btn = this;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function() {
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.textContent = 'Copy Source'; }, 1500);
+        });
+      } else {
+        // Fallback: select text in textarea
+        var ta = document.getElementById('source-code');
+        ta.select();
+        document.execCommand('copy');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy Source'; }, 1500);
+      }
+    });
+
+    // ── Build rich AI prompt with AIMEAT instructions ─
+    function buildAiPrompt(appName, code) {
+      var config = loadConfig();
+      var nodeUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : 'https://your-aimeat-node.example';
+
+      return 'Here is an HTML app called "' + appName + '".\n' +
+        'Make the following change: [DESCRIBE YOUR CHANGE HERE]\n\n' +
+        'Return the COMPLETE updated HTML file. Do not omit any parts.\n\n' +
+        '## AIMEAT Platform Instructions\n\n' +
+        'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n' +
+        '### Available Client Libraries\n' +
+        'Load via script tags from the AIMEAT node (' + nodeUrl + '):\n' +
+        '- aimeat-auth (' + nodeUrl + '/v1/libs/aimeat-auth.js) - Identity, login, JWT, session management\n' +
+        '- aimeat-data (' + nodeUrl + '/v1/libs/aimeat-data.js) - Memory storage, search, key-value data\n' +
+        '- aimeat-storage (' + nodeUrl + '/v1/libs/aimeat-storage.js) - File upload/download\n' +
+        '- aimeat-social (' + nodeUrl + '/v1/libs/aimeat-social.js) - Boards, posts, reactions\n' +
+        '- aimeat-wallet (' + nodeUrl + '/v1/libs/aimeat-wallet.js) - Balance, transactions\n' +
+        '- aimeat-work (' + nodeUrl + '/v1/libs/aimeat-work.js) - Actions, work requests\n\n' +
+        '### Auth Pattern\n' +
+        '```html\n' +
+        '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n' +
+        '<script>\n' +
+        'AIMEAT.auth.mountLoginButton("#login", {\n' +
+        '  onLogin: function(session) { /* session.owner, session.jwt, session.fetch() */ },\n' +
+        '  onLogout: function() { /* hide content */ }\n' +
+        '});\n' +
+        '</' + 'script>\n' +
+        '```\n\n' +
+        '### Data Storage\n' +
+        '```javascript\n' +
+        'await AIMEAT.data.set("key", "value", { visibility: "private", tags: ["t1"] });\n' +
+        'var val = await AIMEAT.data.get("key");\n' +
+        'var results = await AIMEAT.data.search("query");\n' +
+        '```\n\n' +
+        '### Upload to AIMEAT Node\n' +
+        'After updating, the user can upload the app to their AIMEAT node:\n' +
+        '```\n' +
+        'POST ' + nodeUrl + '/v1/apps\n' +
+        'Authorization: Bearer <jwt>\n' +
+        'Content-Type: application/json\n' +
+        '{ "filename": "app.html", "content": "<base64>", "mime_type": "text/html" }\n' +
+        '```\n\n' +
+        '### Self-Download Pattern\n' +
+        'Include a download button so users can save the app:\n' +
+        '```javascript\n' +
+        'function downloadSelf() {\n' +
+        '  var html = document.documentElement.outerHTML;\n' +
+        '  var blob = new Blob(["<!DOCTYPE html>" + html], {type:"text/html"});\n' +
+        '  var a = document.createElement("a");\n' +
+        '  a.href = URL.createObjectURL(blob); a.download = "my-app.html"; a.click();\n' +
+        '}\n' +
+        '```\n\n' +
+        '### Browser APIs Available\n' +
+        'Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB,\n' +
+        'Notifications, Drag & Drop, Clipboard, Speech API, Fullscreen, Web Workers,\n' +
+        'CSS Animations, SVG, Gamepad API, Share API.\n\n' +
+        '### Design Guidelines\n' +
+        'Recommended dark theme:\n' +
+        '```css\n' +
+        ':root { --bg:#0f0a14; --card:rgba(30,20,40,0.85); --text:#f0e6f6;\n' +
+        '  --accent:#ff6b9d; --border:rgba(255,107,157,0.25); --radius:12px; }\n' +
+        '```\n' +
+        'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+        'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n' +
+        '### Important Rules\n' +
+        '- Return the COMPLETE HTML file, not fragments\n' +
+        '- Never use literal closing script tags in JS comments or strings (breaks HTML parser)\n' +
+        '- Keep it as a single self-contained HTML file\n' +
+        '- Include error handling and loading states for API calls\n\n' +
+        '--- Source Code ---\n' + code;
+    }
+
+    // ── Copy with AI Prompt button → opens Prompt Builder ───
+    document.getElementById('copy-prompt-btn').addEventListener('click', function() {
+      var overlay = document.getElementById('source-overlay');
+      var appId = overlay.dataset.appId;
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === appId) { app = allApps[i]; break; }
+      }
+      openPromptBuilder(app);
+    });
+
+    // ── Enable/disable Save button when source changes ─
+    document.getElementById('source-code').addEventListener('input', function() {
+      var overlay = document.getElementById('source-overlay');
+      var saveBtn = document.getElementById('save-source-btn');
+      var original = overlay.dataset.originalSource || '';
+      saveBtn.disabled = (this.value === original);
+    });
+
+    // ── Save Changes button ──────────────────────────
+    document.getElementById('save-source-btn').addEventListener('click', function() {
+      var overlay = document.getElementById('source-overlay');
+      var textarea = document.getElementById('source-code');
+      var appId = overlay.dataset.appId;
+      var btn = this;
+
+      if (!appId) {
+        alert('Cannot save: no app ID found.');
+        return;
+      }
+
+      var newSource = textarea.value;
+      // Encode to base64 blob
+      var newBlob = btoa(unescape(encodeURIComponent(newSource)));
+
+      // Find the app in allApps and update it
+      var app = null;
+      for (var i = 0; i < allApps.length; i++) {
+        if (allApps[i].id === appId) {
+          app = allApps[i];
+          break;
+        }
+      }
+
+      if (!app) {
+        alert('App not found in library.');
+        return;
+      }
+
+      app.blob = newBlob;
+      btn.textContent = 'Saving...';
+      btn.disabled = true;
+
+      saveApp(app).then(function() {
+        btn.textContent = 'Saved!';
+        overlay.dataset.originalSource = newSource;
+        setTimeout(function() {
+          btn.textContent = 'Save Changes';
+          btn.disabled = true;
+        }, 1500);
+        renderApps();
+      }).catch(function(err) {
+        btn.textContent = 'Save Changes';
+        btn.disabled = false;
+        alert('Failed to save: ' + (err.message || err));
+      });
+    });
+
+    // ── Close source modal helper ─────────────────────
+    function closeSourceModal() {
+      var saveBtn = document.getElementById('save-source-btn');
+      if (!saveBtn.disabled) {
+        if (!confirm('You have unsaved changes. Close anyway?')) return;
+      }
+      document.getElementById('source-overlay').hidden = true;
+    }
+
+    // ── Click source overlay background to close ─────
+    document.getElementById('source-overlay').addEventListener('click', function(e) {
+      if (e.target === this) closeSourceModal();
+    });
+
+    // ── Close button in source modal ─────────────────
+    document.getElementById('close-source-btn').addEventListener('click', closeSourceModal);
+
+    // ── Homepage button ──────────────────────────────
+    document.getElementById('homepage-btn').addEventListener('click', generateHomepagePrompt);
+
+    // ── Prompt Builder event listeners ───────────────
+    document.getElementById('pb-cancel-btn').addEventListener('click', closePbPanel);
+
+    document.getElementById('pb-copy-btn').addEventListener('click', function() {
+      var prompt = buildPromptFromBuilder();
+      var btn = this;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(prompt).then(function() {
+          btn.textContent = 'Copied!';
+          setTimeout(function() { btn.textContent = 'Copy Prompt'; closePbPanel(); }, 1200);
+        });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = prompt;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy Prompt'; closePbPanel(); }, 1200);
+      }
+    });
+
+    document.getElementById('pb-ext-checkbox').addEventListener('change', function() {
+      document.getElementById('pb-ext-list').classList.toggle('open', this.checked);
+      updatePbPreview();
+    });
+
+    document.querySelectorAll('input[name="pb-mode"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        var desc = document.getElementById('pb-description');
+        if (this.value === 'improve' && pbSourceApp) {
+          desc.placeholder = 'Describe what changes to make to "' + (pbSourceApp.name || 'this app') + '"...';
+        } else {
+          desc.placeholder = 'Describe what the app should do...';
+        }
+        updatePbPreview();
+      });
+    });
+
+    document.getElementById('pb-description').addEventListener('input', updatePbPreview);
+
+    document.getElementById('prompt-builder-overlay').addEventListener('click', function(e) {
+      if (e.target === this) closePbPanel();
+    });
+  });
+
+})();
+</script>
+</body>
+</html>
