@@ -15,12 +15,13 @@ export default function PushTab({ data, reload }) {
   const templates = push.templates || [];
   const locales = push.locales || ['en'];
 
-  const [activeLocale, setActiveLocale] = useState(locales[0] || 'en');
+  const [tplLocale, setTplLocale] = useState(locales[0] || 'en');
   const [saving, setSaving] = useState(null);
   const [testStatus, setTestStatus] = useState(null);
   const [resetStatus, setResetStatus] = useState(null);
+  const [expanded, setExpanded] = useState({});
 
-  const localeTpls = templates.filter(tpl => tpl.locale === activeLocale);
+  const localeTpls = templates.filter(tpl => tpl.locale === tplLocale);
 
   const handleSave = async (tpl) => {
     const key = `${tpl.id}::${tpl.locale}`;
@@ -29,9 +30,9 @@ export default function PushTab({ data, reload }) {
       await api.savePushTemplate(tpl.id, tpl.locale, tpl.fields);
       setSaving(null);
       reload();
-    } catch (err) {
+    } catch {
       setSaving(null);
-      alert(t('dashboard.saveFailed') || 'Save failed: ' + String(err));
+      alert(t('dashboard.saveFailed'));
     }
   };
 
@@ -48,7 +49,7 @@ export default function PushTab({ data, reload }) {
   };
 
   const handleReset = async () => {
-    if (!confirm(t('dashboard.pushResetConfirm') || 'Reset all templates to defaults? This will overwrite any customizations.')) return;
+    if (!confirm(t('dashboard.pushResetConfirm'))) return;
     setResetStatus('resetting');
     try {
       await api.resetPushTemplates();
@@ -65,6 +66,10 @@ export default function PushTab({ data, reload }) {
     if (tpl) tpl.fields[field] = value;
   };
 
+  function toggle(id) {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
   return html`
     <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.pushExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
@@ -74,106 +79,98 @@ export default function PushTab({ data, reload }) {
         { label: t('dashboard.totalSubscriptions'), value: push.total_subscriptions || subs.length, color: '#06b6d4' },
         { label: t('dashboard.activeSubscriptions'), value: subs.filter(s => s.active !== false).length, color: '#22c55e' },
       ]} />
-      <div style="margin-left:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-        <button
-          class="adm-btn"
-          style="white-space:nowrap"
-          onClick=${handleTest}
-          disabled=${testStatus === 'sending'}
-        >
-          ${testStatus === 'sending' ? (t('dashboard.pushTestSending') || 'Sending...') :
-            testStatus === 'sent' ? (t('dashboard.pushTestSent') || 'Sent!') :
-            testStatus === 'error' ? (t('dashboard.pushTestError') || 'Failed') :
-            (t('dashboard.pushTestBtn') || 'Send Test Push')}
-        </button>
+      <button
+        class="adm-btn"
+        style="margin-left:auto;white-space:nowrap"
+        onClick=${handleTest}
+        disabled=${testStatus === 'sending'}
+      >
+        ${testStatus === 'sending' ? t('dashboard.pushTestSending') :
+          testStatus === 'sent' ? t('dashboard.pushTestSent') :
+          testStatus === 'error' ? t('dashboard.pushTestError') :
+          t('dashboard.pushTestBtn')}
+      </button>
+    </div>
+
+    <!-- Templates card — matches email tab structure -->
+    <div class="adm-card" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h4 style="margin:0">${t('dashboard.pushTemplatesTitle')}</h4>
+        <div style="display:flex;gap:4px">
+          ${locales.map(l => html`
+            <button class=${tplLocale === l ? 'adm-btn' : 'adm-btn-action'} style="padding:4px 10px;font-size:.75rem"
+              onClick=${() => setTplLocale(l)}>${l.toUpperCase()}</button>
+          `)}
+        </div>
       </div>
-    </div>
+      <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 12px">${t('dashboard.pushTemplatesExplain')}</p>
 
-    <!-- Locale Tabs -->
-    <div style="display:flex;gap:4px;margin-bottom:16px">
-      ${locales.map(loc => html`
-        <button class=${activeLocale === loc ? 'adm-btn' : 'adm-btn-action'} style="padding:4px 10px;font-size:.75rem"
-          onClick=${() => setActiveLocale(loc)}>${loc.toUpperCase()}</button>
-      `)}
-    </div>
-
-    <!-- Editable Templates -->
-    <div class="adm-card">
-      <h3>${t('dashboard.pushTemplatesTitle')}</h3>
-      <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:12px">${t('dashboard.pushTemplatesExplain')}</p>
-
-      <div style="display:flex;flex-direction:column;gap:16px">
-        ${localeTpls.map(tpl => {
-          const isWebPush = tpl.id.startsWith('web_push');
-          const key = `${tpl.id}::${tpl.locale}`;
-          const isSaving = saving === key;
-          return html`
-            <div style="border:1px solid var(--glass-border);border-radius:8px;padding:14px;background:rgba(255,255,255,0.02)">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <div style="font-weight:700;font-size:.9rem">
-                  ${isWebPush ? t('dashboard.pushWebPushTitle') : t('dashboard.pushEmailTitle')}
-                </div>
-                <span style="font-size:.7rem;color:${tpl.is_default ? 'var(--text-dim)' : '#22c55e'}">${tpl.is_default ? (t('dashboard.pushDefault') || 'default') : (t('dashboard.pushCustomized') || 'customized')}</span>
-              </div>
-              <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px">
-                ${isWebPush ? t('dashboard.pushWebPushUsed') : t('dashboard.pushEmailUsed')}
-              </div>
-
-              <div style="display:flex;flex-direction:column;gap:8px">
-                ${isWebPush ? html`
-                  <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldTitle')}</label>
-                  <input
-                    class="adm-input"
-                    style="font-size:.85rem;font-family:monospace"
-                    value=${tpl.fields.title || ''}
-                    onInput=${(e) => updateField(tpl.id, 'title', e.target.value)}
-                  />
-                ` : html`
-                  <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldSubject')}</label>
-                  <input
-                    class="adm-input"
-                    style="font-size:.85rem;font-family:monospace"
-                    value=${tpl.fields.subject || ''}
-                    onInput=${(e) => updateField(tpl.id, 'subject', e.target.value)}
-                  />
-                `}
-
-                <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldBody')}</label>
-                <textarea
-                  class="adm-input"
-                  style="font-size:.85rem;font-family:monospace;min-height:${isWebPush ? '40px' : '100px'};resize:vertical"
-                  onInput=${(e) => updateField(tpl.id, 'body', e.target.value)}
-                >${tpl.fields.body || ''}</textarea>
-
-                <!-- Placeholder badges -->
-                <div style="display:flex;gap:6px;flex-wrap:wrap">
-                  ${(tpl.placeholders || []).map(p => html`
-                    <span style="font-size:.72rem;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3)">${p}</span>
-                  `)}
-                </div>
-
-                <div style="display:flex;justify-content:flex-end;margin-top:4px">
-                  <button
-                    class="adm-btn"
-                    style="font-size:.8rem"
-                    onClick=${() => handleSave(tpl)}
-                    disabled=${isSaving}
-                  >${isSaving ? t('dashboard.saving') : t('dashboard.save')}</button>
-                </div>
-              </div>
+      ${localeTpls.map(tpl => {
+        const isWebPush = tpl.id.startsWith('web_push');
+        const key = `${tpl.id}::${tpl.locale}`;
+        const isSaving = saving === key;
+        const isOpen = expanded[tpl.id];
+        return html`
+          <div style="border:1px solid ${isOpen ? '#818cf8' : 'var(--glass-border)'};border-radius:8px;margin-bottom:10px;overflow:hidden;transition:border-color .2s ease">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;background:${isOpen ? 'rgba(79,70,229,0.04)' : 'rgba(255,255,255,.03)'}"
+              onClick=${() => toggle(tpl.id)}>
+              <span style="display:flex;align-items:center;gap:8px">
+                <strong>${isWebPush ? t('dashboard.pushWebPushTitle') : t('dashboard.pushEmailTitle')}</strong>
+                <span style="font-size:.72rem;color:var(--text-dim)">${isWebPush ? t('dashboard.pushWebPushUsed') : t('dashboard.pushEmailUsed')}</span>
+                ${!tpl.is_default && html`<span style="font-size:.65rem;background:rgba(79,70,229,0.15);color:#818cf8;padding:1px 6px;border-radius:3px;font-weight:600">${t('dashboard.pushCustomized')}</span>`}
+              </span>
+              <span style="font-size:.75rem;color:var(--text-dim)">${isOpen ? '\u25B2' : '\u25BC'}</span>
             </div>
-          `;
-        })}
-      </div>
+            ${isOpen && html`
+              <div style="padding:0 14px 14px">
+                <div style="border-top:1px solid var(--glass-border);padding:12px 0 0">
+                  <!-- Placeholder badges -->
+                  ${tpl.placeholders && tpl.placeholders.length > 0 && html`
+                    <div style="margin-bottom:10px;padding:8px 10px;border-radius:6px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15)">
+                      <div style="font-size:.72rem;font-weight:600;color:#f59e0b;margin-bottom:4px">${t('dashboard.emailTplParams')}</div>
+                      <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">${t('dashboard.emailTplParamsExplain')}</div>
+                      <div style="display:flex;flex-wrap:wrap;gap:6px">
+                        ${tpl.placeholders.map(p => html`
+                          <span style="font-size:.72rem;background:rgba(0,0,0,0.2);color:#f59e0b;padding:2px 8px;border-radius:4px;font-family:monospace">${p}</span>
+                        `)}
+                      </div>
+                    </div>
+                  `}
+
+                  <!-- Fields -->
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <label style="font-size:.75rem;color:var(--text-dim)">${isWebPush ? t('dashboard.pushFieldTitle') : t('dashboard.pushFieldSubject')}</label>
+                    <input
+                      class="adm-input"
+                      style="font-size:.85rem;font-family:monospace"
+                      value=${isWebPush ? (tpl.fields.title || '') : (tpl.fields.subject || '')}
+                      onInput=${(e) => updateField(tpl.id, isWebPush ? 'title' : 'subject', e.target.value)}
+                    />
+
+                    <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldBody')}</label>
+                    <textarea
+                      class="adm-input"
+                      style="font-size:.85rem;font-family:monospace;min-height:${isWebPush ? '40px' : '100px'};resize:vertical"
+                      onInput=${(e) => updateField(tpl.id, 'body', e.target.value)}
+                    >${tpl.fields.body || ''}</textarea>
+                  </div>
+
+                  <!-- Action buttons -->
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+                    <button class="adm-btn-action" onClick=${() => handleSave(tpl)} disabled=${isSaving}
+                      style="font-size:.8rem">${isSaving ? t('dashboard.saving') : t('dashboard.save')}</button>
+                  </div>
+                </div>
+              </div>
+            `}
+          </div>
+        `;
+      })}
 
       <!-- Reset button -->
-      <div style="display:flex;justify-content:flex-end;margin-top:12px">
-        <button
-          class="adm-btn"
-          style="font-size:.78rem;color:var(--text-dim)"
-          onClick=${handleReset}
-          disabled=${resetStatus === 'resetting'}
-        >${resetStatus === 'resetting' ? (t('dashboard.pushResetting') || 'Resetting...') : (t('dashboard.pushResetBtn') || 'Reset to Default Templates')}</button>
+      <div style="display:flex;justify-content:flex-end;margin-top:4px">
+        <button class="adm-btn-action" onClick=${handleReset} disabled=${resetStatus === 'resetting'}
+          style="font-size:.8rem;color:#ef4444;border-color:rgba(239,68,68,0.3)">${resetStatus === 'resetting' ? t('dashboard.pushResetting') : t('dashboard.pushResetBtn')}</button>
       </div>
     </div>
 
