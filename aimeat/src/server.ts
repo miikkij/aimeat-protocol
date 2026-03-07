@@ -76,6 +76,7 @@ import { TunnelManager } from './services/personal-tunnel.js';
 import { startConsentExpiryJob } from './services/consent.js';
 import { seedProfileSchemas } from './services/profile-schemas.js';
 import { seedCsmTemplates } from './services/csm-seed.js';
+import { seedKnowledgeTemplates } from './services/knowledge.js';
 import { createEmailService } from './services/email.js';
 import { DirectoryService } from './services/directory.js';
 import { siteRouter } from './routes/site.js';
@@ -393,6 +394,11 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   seedCsmTemplates(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} CSM schemas`); })
     .catch(err => logger.error('Failed to seed CSM schemas', { error: err }));
+
+  // Seed knowledge packager prompt templates
+  seedKnowledgeTemplates(storage, `system@${config.nodeId}`)
+    .then(() => logger.info('Knowledge prompt templates seeded'))
+    .catch(err => logger.error('Failed to seed knowledge templates', { error: err }));
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);

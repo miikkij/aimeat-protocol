@@ -2504,5 +2504,109 @@
     "importConfirm": "Tuodaanko {mutable} muutettavaa arvoa tietokantaan? ({immutable} muuttumatonta ja {unknown} tuntematonta ohitetaan)",
     "exportSuccess": "Vietiin {count} asetusarvoa {format}-muodossa",
     "migrationHint": "Vinkki: Siirrä .env tietokantaan komennolla: aimeat config import --file .env"
+  },
+  "knowledge": {
+    "tabLabel": "Tietopankki",
+    "actionBar": {
+      "copyHumanPrompt": "Kopioi kehote AI-chattiin",
+      "copyAgentPrompt": "Kopioi kehote OpenClaw-agentille",
+      "description": "Käytä näitä kehotteita pakataksesi tutkimuksen, ideat tai minkä tahansa sisällön rakenteiseksi tiedoksi. Liitä kehote AI-chattiisi tai anna se OpenClaw-agentillesi."
+    },
+    "import": {
+      "title": "Tuo tietopaketti",
+      "placeholder": "Liitä tähän AI-chatin tuottama tulos",
+      "uploadFile": "Lataa tiedosto",
+      "agentNote": "Agentit lataavat automaattisesti — sinun ei tarvitse liittää mitään, jos käytit OpenClawia.",
+      "preview": "Paketin esikatselu",
+      "ghiiConfirm": "Tallennetaan tunnuksella: {ghii}",
+      "ghiiMismatch": "Tämä paketti luotiin tunnukselle {ghii}. Tuodaanko silti omana?",
+      "catalogToggle": "Listaa jaettuun tietoluetteloon?",
+      "organismShare": "Jaa organismille?",
+      "confirmImport": "Vahvista tuonti",
+      "willCreate": "Luo {entries} muistia ja {consents} suostumusta",
+      "success": "Tietopaketti tuotu onnistuneesti!",
+      "error": "Tietopaketin tuonti epäonnistui"
+    },
+    "myKnowledge": {
+      "title": "Omat tiedot",
+      "empty": "Ei vielä tietopaketteja. Käytä yllä olevia kehotteita ensimmäisen paketin luomiseen!",
+      "cloned": "Kloonattu",
+      "draft": "Luonnos",
+      "entries": "{count} merkintää",
+      "clones": "{count} kloonia",
+      "viewEdit": "Näytä / Muokkaa",
+      "shareSettings": "Jakamisasetukset",
+      "export": "Vie"
+    },
+    "sharedWithMe": {
+      "title": "Jaettu minulle",
+      "empty": "Kukaan ei ole vielä jakanut tietopaketteja kanssasi.",
+      "cloneToMine": "Kloonaa omiin tietoihin",
+      "viewOriginal": "Näytä alkuperäinen"
+    },
+    "organisms": {
+      "title": "Tietoorganismit",
+      "empty": "Et ole jäsenenä yhdessäkään tiedonjako-organismissa.",
+      "contribute": "Osallistu",
+      "packages": "{count} pakettia",
+      "members": "{count} jäsentä"
+    },
+    "discover": {
+      "title": "Löydä",
+      "search": "Hae tietoa...",
+      "empty": "Ei jaettuja tietopaketteja.",
+      "cloneToMine": "Kloonaa omiin tietoihin",
+      "viewDetails": "Näytä tiedot",
+      "trustAdvisory": "Vahvista kriittinen tieto itsenäisesti ennen sen käyttämistä."
+    },
+    "contentTypes": {
+      "idea": "Idea",
+      "research": "Tutkimus",
+      "plan": "Suunnitelma",
+      "dataset": "Tietojoukko",
+      "document": "Asiakirja",
+      "tutorial": "Opas",
+      "collection": "Kokoelma",
+      "article": "Artikkeli",
+      "story": "Tarina",
+      "fiction": "Fiktio"
+    },
+    "synthesis": {
+      "original": "Alkuperäinen",
+      "assisted": "Tekoälyavusteinen",
+      "synthesized": "Tekoälyllä syntetisoitu",
+      "ai-generated": "Tekoälyn luoma"
+    },
+    "maturity": {
+      "draft": "Luonnos",
+      "review": "Arvioitavana",
+      "published": "Julkaistu"
+    },
+    "visibility": {
+      "public": "Julkinen",
+      "private": "Yksityinen",
+      "owner": "Jaettu"
+    },
+    "operator": {
+      "tabLabel": "Tietopankki",
+      "review": "Arvioi",
+      "reasons": {
+        "routine_review": "Rutiiniarviointi",
+        "legal_compliance": "Lainmukaisuustarkistus",
+        "community_report": "Yhteisön ilmoitus",
+        "content_quality": "Sisällön laadun tarkistus",
+        "storage_issue": "Tallennusongelma",
+        "custom": "Mukautettu"
+      },
+      "actions": {
+        "approve": "Hyväksy",
+        "flag": "Merkitse",
+        "delist": "Poista listalta",
+        "restrict": "Rajoita",
+        "note": "Lisää muistiinpano"
+      },
+      "reviewedBy": "Arvioinut {operator} päivänä {date}",
+      "reason": "Syy: {reason}"
+    }
   }
 }
