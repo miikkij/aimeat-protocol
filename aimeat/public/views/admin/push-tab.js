@@ -1,62 +1,180 @@
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import * as api from '/js/services/admin.js';
 import { dt, StatsGrid, Empty, ExpandableHelp } from './shared.js';
 
-export default function PushTab({ data }) {
+export default function PushTab({ data, reload }) {
   const push = data.push;
   if (!push) return html`<${Empty} text=${t('dashboard.pushNotConfigured')} />`;
 
   const subs = push.subscriptions || [];
+  const templates = push.templates || [];
+  const locales = push.locales || ['en'];
+
+  const [activeLocale, setActiveLocale] = useState(locales[0] || 'en');
+  const [saving, setSaving] = useState(null);
+  const [testStatus, setTestStatus] = useState(null);
+  const [resetStatus, setResetStatus] = useState(null);
+
+  const localeTpls = templates.filter(tpl => tpl.locale === activeLocale);
+
+  const handleSave = async (tpl) => {
+    const key = `${tpl.id}::${tpl.locale}`;
+    setSaving(key);
+    try {
+      await api.savePushTemplate(tpl.id, tpl.locale, tpl.fields);
+      setSaving(null);
+      reload();
+    } catch (err) {
+      setSaving(null);
+      alert(t('dashboard.saveFailed') || 'Save failed: ' + String(err));
+    }
+  };
+
+  const handleTest = async () => {
+    setTestStatus('sending');
+    try {
+      await api.testPush();
+      setTestStatus('sent');
+      setTimeout(() => setTestStatus(null), 3000);
+    } catch {
+      setTestStatus('error');
+      setTimeout(() => setTestStatus(null), 3000);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!confirm(t('dashboard.pushResetConfirm') || 'Reset all templates to defaults? This will overwrite any customizations.')) return;
+    setResetStatus('resetting');
+    try {
+      await api.resetPushTemplates();
+      setResetStatus(null);
+      reload();
+    } catch {
+      setResetStatus('error');
+      setTimeout(() => setResetStatus(null), 3000);
+    }
+  };
+
+  const updateField = (tplId, field, value) => {
+    const tpl = localeTpls.find(t => t.id === tplId);
+    if (tpl) tpl.fields[field] = value;
+  };
 
   return html`
     <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.pushExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
 
-    <${StatsGrid} items=${[
-      { label: t('dashboard.totalSubscriptions'), value: push.total_subscriptions || subs.length, color: '#06b6d4' },
-      { label: t('dashboard.activeSubscriptions'), value: subs.filter(s => s.active !== false).length, color: '#22c55e' },
-    ]} />
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+      <${StatsGrid} items=${[
+        { label: t('dashboard.totalSubscriptions'), value: push.total_subscriptions || subs.length, color: '#06b6d4' },
+        { label: t('dashboard.activeSubscriptions'), value: subs.filter(s => s.active !== false).length, color: '#22c55e' },
+      ]} />
+      <button
+        class="adm-btn"
+        style="margin-left:auto;white-space:nowrap"
+        onClick=${handleTest}
+        disabled=${testStatus === 'sending'}
+      >
+        ${testStatus === 'sending' ? (t('dashboard.pushTestSending') || 'Sending...') :
+          testStatus === 'sent' ? (t('dashboard.pushTestSent') || 'Sent!') :
+          testStatus === 'error' ? (t('dashboard.pushTestError') || 'Failed') :
+          (t('dashboard.pushTestBtn') || 'Send Test Push')}
+      </button>
+    </div>
 
-    <!-- Message Templates -->
+    <!-- Locale Tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:16px">
+      ${locales.map(loc => html`
+        <button
+          class="adm-btn ${activeLocale === loc ? 'active' : ''}"
+          style="padding:4px 16px;font-size:.85rem;text-transform:uppercase;${activeLocale === loc ? 'background:var(--accent);color:#fff' : ''}"
+          onClick=${() => setActiveLocale(loc)}
+        >${loc}</button>
+      `)}
+    </div>
+
+    <!-- Editable Templates -->
     <div class="adm-card">
       <h3>${t('dashboard.pushTemplatesTitle')}</h3>
       <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:12px">${t('dashboard.pushTemplatesExplain')}</p>
 
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <!-- Web Push template -->
-        <div style="border:1px solid var(--glass-border);border-radius:8px;padding:12px;background:rgba(255,255,255,0.02)">
-          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">${t('dashboard.pushWebPushTitle')}</div>
-          <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:8px">${t('dashboard.pushWebPushUsed')}</div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <div style="display:flex;gap:8px;align-items:baseline">
-              <span style="font-size:.72rem;color:var(--text-dim);min-width:60px">${t('dashboard.pushTemplate')}:</span>
-              <code style="font-size:.82rem;color:#06b6d4;background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:4px">${t('dashboard.pushWebPushTitleTpl')}</code>
-            </div>
-            <div style="display:flex;gap:8px;align-items:baseline">
-              <span style="font-size:.72rem;color:var(--text-dim);min-width:60px">Body:</span>
-              <code style="font-size:.82rem;color:#06b6d4;background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:4px">${t('dashboard.pushWebPushBodyTpl')}</code>
-            </div>
-          </div>
-        </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        ${localeTpls.map(tpl => {
+          const isWebPush = tpl.id.startsWith('web_push');
+          const key = `${tpl.id}::${tpl.locale}`;
+          const isSaving = saving === key;
+          return html`
+            <div style="border:1px solid var(--glass-border);border-radius:8px;padding:14px;background:rgba(255,255,255,0.02)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <div style="font-weight:700;font-size:.9rem">
+                  ${isWebPush ? t('dashboard.pushWebPushTitle') : t('dashboard.pushEmailTitle')}
+                </div>
+                <span style="font-size:.7rem;color:${tpl.is_default ? 'var(--text-dim)' : '#22c55e'}">${tpl.is_default ? (t('dashboard.pushDefault') || 'default') : (t('dashboard.pushCustomized') || 'customized')}</span>
+              </div>
+              <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px">
+                ${isWebPush ? t('dashboard.pushWebPushUsed') : t('dashboard.pushEmailUsed')}
+              </div>
 
-        <!-- Email template -->
-        <div style="border:1px solid var(--glass-border);border-radius:8px;padding:12px;background:rgba(255,255,255,0.02)">
-          <div style="font-weight:700;font-size:.9rem;margin-bottom:4px">${t('dashboard.pushEmailTitle')}</div>
-          <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:8px">${t('dashboard.pushEmailUsed')}</div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <div style="display:flex;gap:8px;align-items:baseline">
-              <span style="font-size:.72rem;color:var(--text-dim);min-width:60px">Subject:</span>
-              <code style="font-size:.82rem;color:#06b6d4;background:rgba(0,0,0,0.2);padding:2px 8px;border-radius:4px">${t('dashboard.pushEmailSubjectTpl')}</code>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                ${isWebPush ? html`
+                  <label style="font-size:.75rem;color:var(--text-dim)">Title</label>
+                  <input
+                    class="adm-input"
+                    style="font-size:.85rem;font-family:monospace"
+                    value=${tpl.fields.title || ''}
+                    onInput=${(e) => updateField(tpl.id, 'title', e.target.value)}
+                  />
+                ` : html`
+                  <label style="font-size:.75rem;color:var(--text-dim)">Subject</label>
+                  <input
+                    class="adm-input"
+                    style="font-size:.85rem;font-family:monospace"
+                    value=${tpl.fields.subject || ''}
+                    onInput=${(e) => updateField(tpl.id, 'subject', e.target.value)}
+                  />
+                `}
+
+                <label style="font-size:.75rem;color:var(--text-dim)">Body</label>
+                <textarea
+                  class="adm-input"
+                  style="font-size:.85rem;font-family:monospace;min-height:${isWebPush ? '40px' : '100px'};resize:vertical"
+                  onInput=${(e) => updateField(tpl.id, 'body', e.target.value)}
+                >${tpl.fields.body || ''}</textarea>
+
+                <!-- Placeholder badges -->
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  ${(tpl.placeholders || []).map(p => html`
+                    <span style="font-size:.72rem;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3)">${p}</span>
+                  `)}
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;margin-top:4px">
+                  <button
+                    class="adm-btn"
+                    style="font-size:.8rem"
+                    onClick=${() => handleSave(tpl)}
+                    disabled=${isSaving}
+                  >${isSaving ? (t('dashboard.saving') || 'Saving...') : (t('dashboard.save') || 'Save')}</button>
+                </div>
+              </div>
             </div>
-            <div style="margin-top:4px">
-              <span style="font-size:.72rem;color:var(--text-dim)">Body:</span>
-              <pre style="font-size:.78rem;color:var(--text-bright);background:rgba(0,0,0,0.2);padding:8px 10px;border-radius:4px;margin:4px 0 0;white-space:pre-wrap;line-height:1.4">${t('dashboard.pushEmailBodyTpl')}</pre>
-            </div>
-          </div>
-        </div>
+          `;
+        })}
+      </div>
+
+      <!-- Reset button -->
+      <div style="display:flex;justify-content:flex-end;margin-top:12px">
+        <button
+          class="adm-btn"
+          style="font-size:.78rem;color:var(--text-dim)"
+          onClick=${handleReset}
+          disabled=${resetStatus === 'resetting'}
+        >${resetStatus === 'resetting' ? (t('dashboard.pushResetting') || 'Resetting...') : (t('dashboard.pushResetBtn') || 'Reset to Default Templates')}</button>
       </div>
     </div>
 

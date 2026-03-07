@@ -80,6 +80,9 @@ export function createEmailService(config: AimeatConfig): EmailService {
       user: config.smtpUser,
       pass: config.smtpPass ?? '',
     } : undefined,
+    tls: {
+      rejectUnauthorized: config.smtpRejectUnauthorized,
+    },
   });
 
   const from = config.smtpFrom;

@@ -267,23 +267,8 @@ export function adminFeaturesRouter(
         res.json(success(config.nodeId, { templates, locale, seeded }));
     }));
 
-    // PUT /v1/admin/email/templates/:id — Save custom template
-    router.put('/v1/admin/email/templates/:id', ...auth, handle(async (req, res) => {
-        const id = req.params.id as string;
-        const locale = (req.body.locale as string) || 'en';
-        const { html: htmlContent, text: textContent } = req.body;
-
-        const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
-        if (!validIds.includes(id)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid template id: ${id}`));
-            return;
-        }
-
-        await writeEmailTplToMemory(id, locale, htmlContent ?? '', textContent ?? '');
-        res.json(success(config.nodeId, { saved: true, id, locale }));
-    }));
-
     // POST /v1/admin/email/templates/seed — Seed all defaults (en + fi) into memory
+    // NOTE: static routes MUST be before parameterized /:id routes
     router.post('/v1/admin/email/templates/seed', ...auth, handle(async (_req, res) => {
         let count = 0;
         for (const locale of ['en', 'fi']) {
@@ -299,14 +284,12 @@ export function adminFeaturesRouter(
     // POST /v1/admin/email/templates/reset — Delete all custom, re-seed defaults
     router.post('/v1/admin/email/templates/reset', ...auth, handle(async (_req, res) => {
         const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
-        // Delete all existing
         for (const locale of ['en', 'fi']) {
             for (const id of validIds) {
                 await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/html`);
                 await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/text`);
             }
         }
-        // Re-seed defaults
         let count = 0;
         for (const locale of ['en', 'fi']) {
             const defaults = emailTemplateDefaults(locale);
@@ -316,6 +299,22 @@ export function adminFeaturesRouter(
             }
         }
         res.json(success(config.nodeId, { reset: true, count }));
+    }));
+
+    // PUT /v1/admin/email/templates/:id — Save custom template
+    router.put('/v1/admin/email/templates/:id', ...auth, handle(async (req, res) => {
+        const id = req.params.id as string;
+        const locale = (req.body.locale as string) || 'en';
+        const { html: htmlContent, text: textContent } = req.body;
+
+        const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
+        if (!validIds.includes(id)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid template id: ${id}`));
+            return;
+        }
+
+        await writeEmailTplToMemory(id, locale, htmlContent ?? '', textContent ?? '');
+        res.json(success(config.nodeId, { saved: true, id, locale }));
     }));
 
     // DELETE /v1/admin/email/templates/:id — Reset single template to default

@@ -91,6 +91,9 @@ export class MailboxNotificationService {
             user: config.smtpUser,
             pass: config.smtpPass ?? '',
           },
+          tls: {
+            rejectUnauthorized: config.smtpRejectUnauthorized,
+          },
         });
         logger.info('MailboxNotificationService: email transport initialized');
       } catch (err) {

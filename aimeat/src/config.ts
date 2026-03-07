@@ -155,6 +155,7 @@ export interface AimeatConfig {
   smtpPass: string | null;
   smtpFrom: string;
   smtpSecure: boolean;
+  smtpRejectUnauthorized: boolean;
   emailConfirmationRequired: boolean;
   emailEnabled: boolean;
 
@@ -444,6 +445,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     smtpPass: process.env.AIMEAT_SMTP_PASS ?? null,
     smtpFrom: process.env.AIMEAT_SMTP_FROM ?? 'AIMEAT <noreply@localhost>',
     smtpSecure: process.env.AIMEAT_SMTP_SECURE === 'true',
+    smtpRejectUnauthorized: process.env.AIMEAT_SMTP_REJECT_UNAUTHORIZED !== 'false',
     emailConfirmationRequired: process.env.AIMEAT_EMAIL_CONFIRMATION_REQUIRED === 'true',
     emailEnabled: (process.env.AIMEAT_SMTP_HOST ?? null) !== null,
     matchNotificationIntervalHours: parseInt(process.env.AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS ?? '24', 10),

@@ -248,8 +248,12 @@ export default function EmailTab({ data, locale }) {
     setSending(true);
     setResult(null);
     try {
-      await sendTestEmail(to, testTpl, tplLocale);
-      setResult({ ok: true, msg: t('dashboard.emailSent') });
+      const r = await sendTestEmail(to, testTpl, tplLocale);
+      if (r.data?.sent) {
+        setResult({ ok: true, msg: t('dashboard.emailSent') });
+      } else {
+        setResult({ ok: false, msg: t('dashboard.emailSendFailed') });
+      }
     } catch (e) {
       setResult({ ok: false, msg: e.message });
     }
