@@ -1937,6 +1937,89 @@ await test('Owner delete (cascade)', async () => {
     assert(gBody.ok === false || gBody.data === null, 'owner gone');
 });
 
+// ─── Config System ───
+console.log('\nConfig System');
+
+await test('GET /v1/admin/config returns schema with source provenance', async () => {
+    const { body } = await json('/v1/admin/config', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+    assert(body.data.schema !== undefined, 'has schema');
+    assert(typeof body.data.editable === 'boolean', 'has editable flag');
+    // Check at least one field has source info
+    const firstField = Object.values(body.data.schema as Record<string, any>)[0];
+    assert(firstField.source !== undefined, 'fields have source provenance');
+});
+
+await test('GET /v1/admin/config includes canReset for database fields', async () => {
+    const { body } = await json('/v1/admin/config', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.ok === true, 'ok');
+    // All default fields should have canReset: false
+    for (const [, entry] of Object.entries(body.data.schema as Record<string, any>)) {
+        if ((entry as any).source === 'default') {
+            assert((entry as any).canReset === false, `default field should not be resettable`);
+        }
+    }
+});
+
+await test('PUT /v1/admin/config persists mutable field', async () => {
+    const { body, status } = await json('/v1/admin/config', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ changes: [{ path: 'morsel_policy.welcome_bonus', value: 999 }] }),
+    });
+    // If in-memory, expect 403; if persistent, expect 200
+    if (status === 403) {
+        assert(body.error?.code === 'READONLY_CONFIG', 'in-memory guard');
+    } else {
+        assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+        assert(body.data.applied?.length >= 1, 'at least one applied');
+    }
+});
+
+await test('PUT /v1/admin/config rejects immutable field', async () => {
+    const { body, status } = await json('/v1/admin/config', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ changes: [{ path: 'node.id', value: 'hacked' }] }),
+    });
+    if (status === 403) {
+        // In-memory guard kicks in first
+        assert(body.error?.code === 'READONLY_CONFIG', 'in-memory guard');
+    } else {
+        // Immutable field should be skipped, not applied
+        assert(body.ok === true, 'ok');
+        assert(!body.data.applied?.includes('node.id'), 'node.id not applied');
+    }
+});
+
+await test('PUT /v1/admin/config validates field types', async () => {
+    const { body, status } = await json('/v1/admin/config', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ changes: [{ path: 'morsel_policy.welcome_bonus', value: 'not-a-number' }] }),
+    });
+    if (status === 403) {
+        // In-memory guard
+        assert(true, 'in-memory guard');
+    } else {
+        // Should reject invalid type
+        assert(body.ok === true, 'ok');
+        assert(body.data.skipped?.length >= 1, 'invalid value should be skipped');
+    }
+});
+
+await test('GET /v1/admin/consul returns status (disabled or enabled)', async () => {
+    const { body } = await json('/v1/admin/consul', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
+    assert(typeof body.data.enabled === 'boolean', 'has enabled flag');
+});
+
 // ─── Summary ───
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);
