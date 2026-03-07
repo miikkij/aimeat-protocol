@@ -36,6 +36,14 @@ pnpm build
 
 # Start production
 pnpm start
+
+# Start with CLI bootstrap args
+pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
+pnpm start -- --db sqlite --db-path ./data/aimeat.db
+pnpm start -- --consul http://consul:8500
+
+# Start with config file
+pnpm start -- --config production.ini
 ```
 
 ## Code Conventions

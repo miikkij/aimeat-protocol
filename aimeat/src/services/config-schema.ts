@@ -146,6 +146,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Match Notifications (Phase 1.6, mutable) ──
   { key: 'matchNotificationEnabled', dotPath: 'match_notifications.enabled', envVar: 'AIMEAT_MATCH_NOTIFICATION_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Match notification emails enabled' },
   { key: 'matchNotificationIntervalHours', dotPath: 'match_notifications.interval_hours', envVar: 'AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between match notification batches', range: '1-168' },
+
+  // ── Consul (immutable — set before startup) ──
+  { key: 'consulEnabled', dotPath: 'consul.enabled', envVar: 'AIMEAT_CONSUL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Enable Consul integration' },
+  { key: 'consulUrl', dotPath: 'consul.url', envVar: 'AIMEAT_CONSUL_URL', type: 'string', validate: () => true, immutable: true, description: 'Consul HTTP URL' },
+  { key: 'consulPrefix', dotPath: 'consul.prefix', envVar: 'AIMEAT_CONSUL_PREFIX', type: 'string', validate: () => true, immutable: true, description: 'Consul KV prefix' },
+  { key: 'consulToken', dotPath: 'consul.token', envVar: 'AIMEAT_CONSUL_TOKEN', type: 'string', validate: () => true, immutable: true, description: 'Consul ACL token', adminDisplay: 'configured' },
+  { key: 'consulWatchIntervalSeconds', dotPath: 'consul.watch_interval_seconds', envVar: 'AIMEAT_CONSUL_WATCH_INTERVAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 5 && (v as number) <= 3600, immutable: true, description: 'Consul watch poll interval in seconds', range: '5-3600' },
+  { key: 'consulDatacenter', dotPath: 'consul.datacenter', envVar: 'AIMEAT_CONSUL_DATACENTER', type: 'string', validate: () => true, immutable: true, description: 'Consul datacenter name' },
 ];
 
 // ── Derived Lookup Maps ──
