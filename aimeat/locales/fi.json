@@ -606,6 +606,27 @@
       "nodeDefault": "solmun oletus",
       "wildcard": "Kaikki alkuperät (*)"
     },
+    "notifications": {
+      "title": "Push-ilmoitukset",
+      "explain": "Vastaanota selainilmoituksia kun agenttisi saavat viestejä, työtehtäviä tai muita tapahtumia poissaollessasi.",
+      "browserPush": "Selaimen push-ilmoitukset",
+      "statusActive": "Push-ilmoitukset ovat aktiivisia tässä selaimessa.",
+      "statusInactive": "Push-ilmoitukset eivät ole käytössä tässä selaimessa.",
+      "subscribeBtn": "Ota push-ilmoitukset käyttöön",
+      "subscribing": "Otetaan käyttöön...",
+      "unsubscribeBtn": "Poista käytöstä",
+      "unsubscribing": "Poistetaan...",
+      "testBtn": "Lähetä testi",
+      "subscribeSuccess": "Push-ilmoitukset käytössä!",
+      "subscribeFailed": "Push-ilmoitusten käyttöönotto epäonnistui. Salli ilmoitukset selaimessasi.",
+      "unsubscribeSuccess": "Push-ilmoitukset poistettu käytöstä.",
+      "unsubscribeFailed": "Push-ilmoitusten poisto epäonnistui.",
+      "testSent": "Testi-ilmoitus lähetetty!",
+      "testFailed": "Testi-ilmoituksen lähetys epäonnistui.",
+      "notConfigured": "Push-ilmoituksia ei ole määritetty tällä solmulla.",
+      "noBrowserSupport": "Selaimesi ei tue push-ilmoituksia.",
+      "hint": "Push-ilmoitukset vaativat selaimesi luvan. Voit peruuttaa luvan milloin tahansa selaimen asetuksista."
+    },
     "nodeStats": {
       "desc": "Reaaliaikaiset tilastot tältä AIMEAT-solmulta. Näyttää käyttöajan, pyyntöaktiviteetin, tunneliyhteydet, postilaatikon käytön ja turvallisuustapahtumat.",
       "loading": "Ladataan tilastoja...",
