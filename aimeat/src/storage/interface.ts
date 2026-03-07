@@ -722,6 +722,29 @@ export interface ExtensionRecord {
   activatedAt?: string;
 }
 
+// ── Scheduled Jobs ────────────────────────────────────────────────
+
+export interface ScheduledJobRecord {
+  id: string;
+  name: string;
+  type: 'extension' | 'core';
+  extensionName?: string;
+  instanceId?: string;
+  actionId?: string;
+  coreHandler?: string;
+  cron: string;
+  enabled: boolean;
+  input?: Record<string, unknown>;
+  lastRunAt?: string;
+  lastRunResult?: 'success' | 'error';
+  lastRunError?: string;
+  lastRunDurationMs?: number;
+  nextRunAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ── Generic Escrow ─────────────────────────────────────────────────
 
 export interface EscrowHoldRecord {
@@ -953,6 +976,7 @@ import type { AppMarketplaceRepository } from './repositories/app-marketplace.re
 import type { ConfigRepository } from './repositories/config.repository.js';
 import type { NotificationTemplateRepository } from './repositories/notification-template.repository.js';
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
+import type { SchedulerRepository } from './repositories/scheduler.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -965,4 +989,4 @@ export interface Storage extends
   AuthRepository, SessionRepository,
   AppRepository, AppMarketplaceRepository, ConfigRepository,
   NotificationTemplateRepository,
-  KnowledgeRepository { }
+  KnowledgeRepository, SchedulerRepository { }

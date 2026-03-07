@@ -819,6 +819,28 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_kreviews_package ON knowledge_reviews(packageId);
     CREATE INDEX IF NOT EXISTS idx_kreviews_timestamp ON knowledge_reviews(timestamp);
 
+    -- ── Scheduled Jobs ──
+    CREATE TABLE IF NOT EXISTS scheduled_jobs (
+      id              TEXT PRIMARY KEY,
+      name            TEXT NOT NULL,
+      type            TEXT NOT NULL DEFAULT 'core',
+      extensionName   TEXT,
+      instanceId      TEXT,
+      actionId        TEXT,
+      coreHandler     TEXT,
+      cron            TEXT NOT NULL,
+      enabled         INTEGER NOT NULL DEFAULT 1,
+      input           TEXT,
+      lastRunAt       TEXT,
+      lastRunResult   TEXT,
+      lastRunError    TEXT,
+      lastRunDurationMs INTEGER,
+      nextRunAt       TEXT,
+      createdBy       TEXT NOT NULL,
+      createdAt       TEXT NOT NULL,
+      updatedAt       TEXT NOT NULL
+    );
+
   `);
 
   // ── Schema migrations for existing databases ──

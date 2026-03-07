@@ -21,6 +21,7 @@ import type {
   AppRecord, AppListOptions, AppPurchaseRecord,
   NotificationTemplateRecord,
   MemoryLinkRecord, OperatorReviewRecord,
+  ScheduledJobRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -3940,5 +3941,101 @@ export class SqliteStorage implements Storage {
     const perPage = opts?.perPage ?? 20;
     const offset = (page - 1) * perPage;
     return this.db.prepare('SELECT * FROM knowledge_reviews ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(perPage, offset) as OperatorReviewRecord[];
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Scheduled Jobs ──
+  // ══════════════════════════════════════════════════════════
+
+  async createScheduledJob(record: ScheduledJobRecord): Promise<ScheduledJobRecord> {
+    try {
+      this.db.prepare(
+        `INSERT INTO scheduled_jobs (id, name, type, extensionName, instanceId, actionId,
+         coreHandler, cron, enabled, input, lastRunAt, lastRunResult, lastRunError,
+         lastRunDurationMs, nextRunAt, createdBy, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        record.id, record.name, record.type,
+        record.extensionName ?? null, record.instanceId ?? null, record.actionId ?? null,
+        record.coreHandler ?? null, record.cron, record.enabled ? 1 : 0,
+        record.input ? JSON.stringify(record.input) : null,
+        record.lastRunAt ?? null, record.lastRunResult ?? null, record.lastRunError ?? null,
+        record.lastRunDurationMs ?? null, record.nextRunAt ?? null,
+        record.createdBy, record.createdAt, record.updatedAt,
+      );
+      return record;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) {
+        throw new Error(`Scheduled job "${record.id}" already exists`);
+      }
+      throw err;
+    }
+  }
+
+  async getScheduledJob(id: string): Promise<ScheduledJobRecord | null> {
+    const row = this.db.prepare('SELECT * FROM scheduled_jobs WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.deserializeScheduledJob(row) : null;
+  }
+
+  async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]> {
+    let sql = 'SELECT * FROM scheduled_jobs';
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filter?.type) { conditions.push('type = ?'); params.push(filter.type); }
+    if (filter?.extensionName) { conditions.push('extensionName = ?'); params.push(filter.extensionName); }
+    if (filter?.enabled !== undefined) { conditions.push('enabled = ?'); params.push(filter.enabled ? 1 : 0); }
+    if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeScheduledJob(r));
+  }
+
+  async updateScheduledJob(id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null> {
+    const existing = await this.getScheduledJob(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.db.prepare(
+      `UPDATE scheduled_jobs SET name = ?, type = ?, extensionName = ?, instanceId = ?,
+       actionId = ?, coreHandler = ?, cron = ?, enabled = ?, input = ?,
+       lastRunAt = ?, lastRunResult = ?, lastRunError = ?, lastRunDurationMs = ?,
+       nextRunAt = ?, createdBy = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
+    ).run(
+      updated.name, updated.type,
+      updated.extensionName ?? null, updated.instanceId ?? null, updated.actionId ?? null,
+      updated.coreHandler ?? null, updated.cron, updated.enabled ? 1 : 0,
+      updated.input ? JSON.stringify(updated.input) : null,
+      updated.lastRunAt ?? null, updated.lastRunResult ?? null, updated.lastRunError ?? null,
+      updated.lastRunDurationMs ?? null, updated.nextRunAt ?? null,
+      updated.createdBy, updated.createdAt, updated.updatedAt, id,
+    );
+    return updated;
+  }
+
+  async deleteScheduledJob(id: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM scheduled_jobs WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
+  private deserializeScheduledJob(row: Record<string, unknown>): ScheduledJobRecord {
+    const record: ScheduledJobRecord = {
+      id: row.id as string,
+      name: row.name as string,
+      type: row.type as ScheduledJobRecord['type'],
+      cron: row.cron as string,
+      enabled: (row.enabled as number) === 1,
+      createdBy: row.createdBy as string,
+      createdAt: row.createdAt as string,
+      updatedAt: row.updatedAt as string,
+    };
+    if (row.extensionName) record.extensionName = row.extensionName as string;
+    if (row.instanceId) record.instanceId = row.instanceId as string;
+    if (row.actionId) record.actionId = row.actionId as string;
+    if (row.coreHandler) record.coreHandler = row.coreHandler as string;
+    if (row.input) record.input = JSON.parse(row.input as string);
+    if (row.lastRunAt) record.lastRunAt = row.lastRunAt as string;
+    if (row.lastRunResult) record.lastRunResult = row.lastRunResult as ScheduledJobRecord['lastRunResult'];
+    if (row.lastRunError) record.lastRunError = row.lastRunError as string;
+    if (row.lastRunDurationMs !== null && row.lastRunDurationMs !== undefined) record.lastRunDurationMs = row.lastRunDurationMs as number;
+    if (row.nextRunAt) record.nextRunAt = row.nextRunAt as string;
+    return record;
   }
 }

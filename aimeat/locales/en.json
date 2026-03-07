@@ -2707,6 +2707,33 @@
     "operator": {
       "tabLabel": "Knowledge",
       "review": "Review",
+      "systemSection": "System Knowledge",
+      "systemDesc": "Create and manage node-wide knowledge packages accessible to all users or operators only.",
+      "allPackages": "All Knowledge Packages",
+      "createPackage": "Create System Package",
+      "editPackage": "Edit",
+      "deletePackage": "Delete",
+      "confirmDelete": "Delete this package? This cannot be undone.",
+      "createForm": {
+        "name": "Package name",
+        "contentType": "Content type",
+        "tags": "Tags (comma separated)",
+        "maturity": "Maturity",
+        "visibility": "Visibility",
+        "visibilityPublic": "Public — everyone can see",
+        "visibilityOperator": "Operator only — sysadmins and their agents",
+        "catalogListed": "List in public catalogue",
+        "entryTitle": "Entry title",
+        "entryContent": "Content",
+        "addEntry": "Add entry",
+        "removeEntry": "Remove",
+        "submit": "Create Package",
+        "success": "System knowledge package created!",
+        "error": "Failed to create package"
+      },
+      "showFlaggedOnly": "Show flagged only",
+      "noPackages": "No knowledge packages found",
+      "flags": "{count} flags",
       "reasons": {
         "routine_review": "Routine review",
         "legal_compliance": "Legal compliance check",
@@ -2723,7 +2750,11 @@
         "note": "Add Note"
       },
       "reviewedBy": "Reviewed by {operator} on {date}",
-      "reason": "Reason: {reason}"
+      "reason": "Reason: {reason}",
+      "reasonLabel": "Reason",
+      "actionLabel": "Action",
+      "customReason": "Custom reason...",
+      "submitReview": "Submit Review"
     }
   }
 }

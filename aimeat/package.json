@@ -63,6 +63,7 @@
     "better-sqlite3": "^12.6.2",
     "compression": "^1.8.1",
     "consul": "^2.0.1",
+    "croner": "^10.0.1",
     "express": "^5.2.1",
     "ini": "^6.0.0",
     "isolated-vm": "^6.0.2",

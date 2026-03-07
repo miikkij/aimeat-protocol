@@ -45,6 +45,7 @@ import type {
     AppRecord, AppListOptions, AppPurchaseRecord,
     NotificationTemplateRecord,
     MemoryLinkRecord, OperatorReviewRecord,
+    ScheduledJobRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3026,6 +3027,41 @@ export class MongoStorage implements Storage {
         const perPage = opts?.perPage ?? 20;
         const start = (page - 1) * perPage;
         return all.slice(start, start + perPage);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Scheduler: Scheduled Jobs ──
+    // ══════════════════════════════════════════════════════════
+
+    private scheduledJobs = new Map<string, ScheduledJobRecord>();
+
+    async createScheduledJob(record: ScheduledJobRecord): Promise<ScheduledJobRecord> {
+        this.scheduledJobs.set(record.id, record);
+        return record;
+    }
+
+    async getScheduledJob(id: string): Promise<ScheduledJobRecord | null> {
+        return this.scheduledJobs.get(id) ?? null;
+    }
+
+    async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]> {
+        let results = [...this.scheduledJobs.values()];
+        if (filter?.type !== undefined) results = results.filter(j => j.type === filter.type);
+        if (filter?.extensionName !== undefined) results = results.filter(j => j.extensionName === filter.extensionName);
+        if (filter?.enabled !== undefined) results = results.filter(j => j.enabled === filter.enabled);
+        return results;
+    }
+
+    async updateScheduledJob(id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null> {
+        const existing = this.scheduledJobs.get(id);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, id };
+        this.scheduledJobs.set(id, updated);
+        return updated;
+    }
+
+    async deleteScheduledJob(id: string): Promise<boolean> {
+        return this.scheduledJobs.delete(id);
     }
 }
 

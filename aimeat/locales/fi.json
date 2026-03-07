@@ -2706,6 +2706,33 @@
     "operator": {
       "tabLabel": "Tietopankki",
       "review": "Arvioi",
+      "systemSection": "Järjestelmän tietopankki",
+      "systemDesc": "Luo ja hallinnoi solmun laajuisia tietopaketteja, jotka ovat kaikkien käyttäjien tai vain operaattoreiden käytettävissä.",
+      "allPackages": "Kaikki tietopaketit",
+      "createPackage": "Luo järjestelmäpaketti",
+      "editPackage": "Muokkaa",
+      "deletePackage": "Poista",
+      "confirmDelete": "Poista tämä paketti? Tätä ei voi perua.",
+      "createForm": {
+        "name": "Paketin nimi",
+        "contentType": "Sisältötyyppi",
+        "tags": "Tunnisteet (pilkulla erotettuna)",
+        "maturity": "Kypsyys",
+        "visibility": "Näkyvyys",
+        "visibilityPublic": "Julkinen — kaikki voivat nähdä",
+        "visibilityOperator": "Vain operaattorit — ylläpitäjät ja heidän agenttinsa",
+        "catalogListed": "Listaa julkiseen luetteloon",
+        "entryTitle": "Merkinnän otsikko",
+        "entryContent": "Sisältö",
+        "addEntry": "Lisää merkintä",
+        "removeEntry": "Poista",
+        "submit": "Luo paketti",
+        "success": "Järjestelmän tietopaketti luotu!",
+        "error": "Paketin luonti epäonnistui"
+      },
+      "showFlaggedOnly": "Näytä vain merkityt",
+      "noPackages": "Tietopaketteja ei löytynyt",
+      "flags": "{count} merkintää",
       "reasons": {
         "routine_review": "Rutiiniarviointi",
         "legal_compliance": "Lainmukaisuustarkistus",
@@ -2722,7 +2749,11 @@
         "note": "Lisää muistiinpano"
       },
       "reviewedBy": "Arvioinut {operator} päivänä {date}",
-      "reason": "Syy: {reason}"
+      "reason": "Syy: {reason}",
+      "reasonLabel": "Syy",
+      "actionLabel": "Toiminto",
+      "customReason": "Mukautettu syy...",
+      "submitReview": "Lähetä arviointi"
     }
   }
 }
