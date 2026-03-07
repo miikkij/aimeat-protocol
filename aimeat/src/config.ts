@@ -72,12 +72,14 @@ export interface AimeatConfig {
   maxActionsPerAgent: number;
   minTrustForPaidActions: number;
   appMaxSizeMb: number;
+  maxAppsPerAgent: number;
   agentPortingFeeMorsels: number;
   memoryOverageMorselsPerMbMonth: number;
   storageOverageMorselsPerGbMonth: number;
   maxOperatorMintPerDay: number;
   boardPostBaseCost: number;
   boardPostCostPerKb: number;
+  appAnnouncementBoardId: string;
   webhookMaxRetries: number;
   workQueueMaxPending: number;
   otkTtlMs: number;
@@ -279,12 +281,14 @@ export function loadConfig(): AimeatConfig {
     maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
     minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),
     appMaxSizeMb: parseInt(process.env.AIMEAT_APP_MAX_SIZE_MB ?? '5', 10),
+    maxAppsPerAgent: parseInt(process.env.AIMEAT_MAX_APPS_PER_AGENT ?? '50', 10),
     agentPortingFeeMorsels: parseInt(process.env.AIMEAT_AGENT_PORTING_FEE ?? '50', 10),
     memoryOverageMorselsPerMbMonth: parseInt(process.env.AIMEAT_MEMORY_OVERAGE_MORSELS ?? '10', 10),
     storageOverageMorselsPerGbMonth: parseInt(process.env.AIMEAT_STORAGE_OVERAGE_MORSELS ?? '100', 10),
     maxOperatorMintPerDay: parseInt(process.env.AIMEAT_MAX_OPERATOR_MINT_PER_DAY ?? '10000', 10),
     boardPostBaseCost: parseInt(process.env.AIMEAT_BOARD_POST_BASE_COST ?? '5', 10),
     boardPostCostPerKb: parseInt(process.env.AIMEAT_BOARD_POST_COST_PER_KB ?? '2', 10),
+    appAnnouncementBoardId: process.env.AIMEAT_APP_ANNOUNCEMENT_BOARD_ID ?? 'app-announcements',
     webhookMaxRetries: parseInt(process.env.AIMEAT_WEBHOOK_MAX_RETRIES ?? '5', 10),
     workQueueMaxPending: parseInt(process.env.AIMEAT_WORK_QUEUE_MAX_PENDING ?? '10', 10),
     otkTtlMs: parseInt(process.env.AIMEAT_OTK_TTL_MS ?? '300000', 10),

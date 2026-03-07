@@ -111,7 +111,15 @@ import { foo } from '../services/foo';     // ❌
 | `src/cli/` | CLI wizards (init wizard) |
 | `src/utils/` | GAII utilities, logger |
 | `locales/` | i18n translations (en.json, fi.json) |
+| `public/views/admin/` | Admin dashboard tab components (Preact + HTM) |
+| `public/views/admin/shared.js` | Shared admin components (Badge, ExpandableHelp, etc.) |
+| `public/js/services/admin.js` | Admin API service layer |
+| `public/css/views/admin.css` | Admin dashboard styles (adm-* prefix) |
 | `test/` | E2E test suite |
+
+## Frontend
+
+The frontend is a Preact + HTM SPA with no build step. See `docs/frontend-development-guide.md` for complete architecture, component library, admin dashboard tab conventions, and CSS patterns.
 
 ## Testing
 

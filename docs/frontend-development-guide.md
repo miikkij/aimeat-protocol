@@ -370,3 +370,161 @@ test('my view renders correctly', async ({ page }) => {
 4. Add translation keys to `locales/en.json` and `locales/fi.json`
 5. Add a Playwright test in `test/playwright/views.spec.ts`
 6. Run `npx tsc --noEmit` to verify
+
+---
+
+## Admin Dashboard SPA
+
+The admin dashboard (`/v1/admin`) is a self-contained SPA within the main AIMEAT frontend. It uses the same Preact + HTM stack but has its own component library, layout system, and CSS.
+
+### Architecture
+
+```
+public/views/
+├── admin.js                    # Main dashboard shell (sidebar, routing, data loading)
+└── admin/                      # Tab components
+    ├── shared.js               # Shared admin components (Badge, StatsGrid, ExpandableHelp, etc.)
+    ├── overview-tab.js          # Node health, stats, economy, warnings
+    ├── economy-tab.js           # Morsel economy details
+    ├── config-tab.js            # Live configuration editor
+    ├── cors-tab.js              # CORS policy management
+    ├── maintenance-tab.js       # Maintenance mode toggle
+    ├── hooks-tab.js             # Extension hooks management
+    ├── portal-tab.js            # Portal template editor, memory keys, KV pairs
+    ├── stats-tab.js             # Usage statistics with charts
+    ├── owners-tab.js            # Owner management
+    ├── agents-tab.js            # Agent management
+    ├── ghii-tab.js              # GHII identity & verification
+    ├── actions-tab.js           # Published actions
+    ├── boards-tab.js            # Discussion boards
+    ├── chat-instances-tab.js    # Chat sessions
+    ├── realtime-tab.js          # WebSocket rooms
+    ├── work-tab.js              # Work requests & deliveries
+    ├── email-tab.js             # Email/SMTP configuration
+    ├── push-tab.js              # Push notifications
+    ├── directory-tab.js         # Directory index management
+    ├── matching-tab.js          # Matching engine
+    ├── marketplace-tab.js       # Marketplace management
+    ├── csm-tab.js               # CSM template management
+    ├── msm-tab.js               # MSM integration management
+    ├── federation-tab.js        # Federation cluster management
+    └── genesis-tab.js           # Genesis peer management
+
+public/css/views/admin.css       # All admin dashboard styles (adm-* prefix)
+public/js/services/admin.js      # Admin API service layer
+```
+
+### Tab Component Contract
+
+Every tab module in `public/views/admin/` must:
+
+1. **Export a default Preact component** as the tab content
+2. **Accept `{ data, reload }` props** (some tabs also receive `session`, `navigate`, `locale`, `switchPage`)
+3. **Use `t('dashboard.keyName')` for all user-visible text** (i18n)
+4. **Use shared components** from `./shared.js` (Badge, StatsGrid, EconRow, ExpandableHelp, Empty, etc.)
+
+```javascript
+import { h } from 'preact';
+import htm from 'htm';
+const html = htm.bind(h);
+import { t } from '/js/i18n.js';
+import { escHtml } from '/js/utils.js';
+import { StatsGrid, Empty, ExpandableHelp } from './shared.js';
+
+export default function MyTab({ data, reload }) {
+  const myData = data.mySection;
+  if (!myData) return html`<${Empty} text=${t('dashboard.myEmptyMsg')} />`;
+
+  return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.myExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.myHelpTitle')}>
+      <p>${t('dashboard.myHelpDetail')}</p>
+    </${ExpandableHelp}>
+    <!-- Tab content here -->
+  `;
+}
+```
+
+### Shared Admin Components (`shared.js`)
+
+| Component | Props | Description |
+|-----------|-------|-------------|
+| `Badge` | `{ type }` | Colored badge (healthy/watch/critical/info/public/private/etc.) |
+| `StatCard` | `{ label, value, sub, color }` | Single stat card with large number |
+| `StatsGrid` | `{ items }` | 4-column grid of StatCards |
+| `EconRow` | `{ label, value }` | Key-value row (like economy stats) |
+| `HealthRow` | `{ label, obj }` | Health metric row with badge + value |
+| `ExpandableHelp` | `{ title, children }` | Collapsible help section with styled details/summary |
+| `Empty` | `{ text }` | Empty state placeholder |
+| `ErrorBox` | `{ message }` | Red error box |
+| `Spinner` | `{ text }` | Loading spinner |
+| `DataTable` | `{ headers, rows, scroll }` | Generic data table |
+| `num(n)` | — | Format number with locale |
+| `dt(s)` | — | Format date string |
+| `fmtUp(s)` | — | Format uptime seconds |
+| `fmtBytes(b)` | — | Format bytes |
+
+### Adding a New Admin Tab
+
+1. Create `public/views/admin/my-tab.js` following the tab component contract above
+2. Import it in `public/views/admin.js` and add to the `tabs` array:
+   ```javascript
+   import MyTab from './admin/my-tab.js';
+   // In tabs array:
+   { id: 'my-tab', icon: '\u{1F4CB}', key: 'dashboard.myTab', component: MyTab, count: 'myCount' }
+   ```
+3. Add API functions to `public/js/services/admin.js` if needed
+4. Add translation keys under `dashboard.*` in both `locales/en.json` and `locales/fi.json`
+5. Add CSS classes to `public/css/views/admin.css` using `adm-*` prefix
+
+### Admin CSS Classes
+
+All admin styles use the `adm-` prefix. Key classes:
+
+| Class | Usage |
+|-------|-------|
+| `adm-card` | Card container with glass background |
+| `adm-grid adm-grid-4` | 4-column responsive grid |
+| `adm-grid adm-grid-2` | 2-column responsive grid |
+| `adm-card-grid` | Auto-fill card grid (340px min) |
+| `adm-btn` | Primary button (blue) |
+| `adm-btn-sm` | Small outlined button |
+| `adm-btn-action` | Action button (outlined, accent color) |
+| `adm-badge adm-badge-{type}` | Status badge |
+| `adm-erow` | Economy/key-value row |
+| `adm-hrow` | Health metric row |
+| `adm-help` | Expandable help section |
+| `adm-help-summary` | Help section header |
+| `adm-help-body` | Help section content |
+| `adm-nav-item` | Sidebar navigation item |
+| `adm-sub-panel` | Nested sub-panel |
+
+### Admin API Service (`admin.js`)
+
+All admin API calls go through `public/js/services/admin.js`. This module imports `apiGet`, `apiPost`, `apiPut`, `apiDelete` from `/js/api.js` and exports named functions for each admin endpoint.
+
+```javascript
+// Pattern for adding new admin API functions:
+export const getMyData  = ()     => apiGet('/v1/admin/my-endpoint');
+export const updateMyData = (id, data) => apiPut(`/v1/admin/my-endpoint/${encodeURIComponent(id)}`, data);
+```
+
+### Admin i18n Keys
+
+Admin translation keys live under `dashboard.*` in the locale files. Conventions:
+
+| Pattern | Example | Usage |
+|---------|---------|-------|
+| `dashboard.{tabName}` | `dashboard.overview` | Tab label in sidebar |
+| `dashboard.{feature}Explain` | `dashboard.emailExplain` | Tab explanation paragraph |
+| `dashboard.{feature}HelpTitle` | `dashboard.emailSmtpHelp` | ExpandableHelp title |
+| `dashboard.{feature}HelpDetail` | `dashboard.emailSmtpHelpDetail` | ExpandableHelp body text |
+| `dashboard.{feature}Empty` / `dashboard.no{Feature}` | `dashboard.marketplaceEmpty` | Empty state message |
+| `dashboard.cfg_{path}` | `dashboard.cfg_economy_welcome_bonus` | Config setting label |
+| `dashboard.cfgGroup_{group}` | `dashboard.cfgGroup_economy` | Config group header |
+
+### XSS Prevention in Admin
+
+- Use `escHtml()` **only** for user-provided data (owner names, agent IDs, descriptions)
+- Do **NOT** use `escHtml()` on `t()` translations — Preact's virtual DOM handles escaping automatically
+- Double-escaping issue: `escHtml()` in htm templates causes `<=` to render as `&lt;=` because Preact already escapes text nodes

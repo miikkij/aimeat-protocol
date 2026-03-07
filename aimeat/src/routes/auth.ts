@@ -234,6 +234,16 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       if (ownerRecord?.roles.includes('owner')) roles.push('owner');
       if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
+      // Self-heal: if no operator exists anywhere, promote this user
+      if (ownerRecord && !roles.includes('operator')) {
+        const allOwners = await storage.listOwners();
+        const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+        if (!hasOperator) {
+          roles.push('operator');
+          await storage.updateOwner(parsed.owner, { roles: [...ownerRecord.roles, 'operator'] });
+        }
+      }
+
       // P3-7: Create session record for JWT tracking
       const sessionId = generateSessionId();
       const now = new Date();

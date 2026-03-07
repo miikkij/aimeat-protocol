@@ -237,6 +237,18 @@
       transform: translateY(-1px);
     }
 
+    .app-card.dragging {
+      opacity: .35;
+      transform: scale(.95);
+      box-shadow: none;
+    }
+
+    .app-card.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent);
+      transform: translateY(-2px);
+    }
+
     .app-card .app-icon {
       width: 56px;
       height: 56px;
@@ -1236,6 +1248,28 @@
     </div>
   </div>
 
+  <!-- Cortex Extension Editor Overlay -->
+  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(10,10,18,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:rgba(22,33,62,.96);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto">
+      <h2 style="margin-top:0;font-size:1.1rem">&#x1F6E0;&#xFE0F; Extension Editor</h2>
+      <p id="cortex-editor-name" style="color:var(--text-muted,#889);font-size:.85rem;margin-top:-.5rem"></p>
+      <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
+      <div style="margin-bottom:1rem">
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem">Manifest (YAML)</label>
+        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
+      </div>
+      <div id="cortex-editor-libs"></div>
+      <div style="margin-bottom:1.5rem">
+        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">+ Add Lib File</button>
+      </div>
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
+        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">&#x1F4E5; Export Files</button>
+        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:var(--accent,#34d399);color:#000;font-weight:600;cursor:pointer">Save &amp; Re-install</button>
+        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Published Apps Section -->
   <div id="published-section" style="display:none">
     <div class="published-header" onclick="window._launcher.togglePublished()">
@@ -1353,6 +1387,7 @@
     <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
     <button data-action="view-source">&#x1F441; View / Edit Source</button>
     <button data-action="improve-ai">&#x2728; Improve with AI</button>
+    <button data-action="share-prompt">&#x1F4E4; Share as Prompt</button>
     <hr>
     <button data-action="publish">&#x1F680; Publish to server</button>
     <hr>
@@ -1492,7 +1527,7 @@
   // ── IndexedDB wrapper ──────────────────────────────
 
   const DB_NAME = 'AppLauncherDB';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_NAME = 'apps';
 
   let dbInstance = null;
@@ -1504,11 +1539,18 @@
 
       request.onupgradeneeded = function (event) {
         const db = event.target.result;
+        var store;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
-          const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
           store.createIndex('tags', 'tags', { multiEntry: true });
           store.createIndex('source', 'source', { unique: false });
           store.createIndex('favorite', 'favorite', { unique: false });
+          store.createIndex('sortOrder', 'sortOrder', { unique: false });
+        } else {
+          store = event.target.transaction.objectStore(STORE_NAME);
+          if (!store.indexNames.contains('sortOrder')) {
+            store.createIndex('sortOrder', 'sortOrder', { unique: false });
+          }
         }
       };
 
@@ -2224,11 +2266,15 @@
     getAllApps().then(function (apps) {
       allApps = apps;
 
-      // Sort: favorites first, then by lastOpenedAt or addedAt (newest first)
+      // Sort: favorites first, then by sortOrder (if set), then by date
       allApps.sort(function (a, b) {
         // Favorites first
         if (a.favorite && !b.favorite) return -1;
         if (!a.favorite && b.favorite) return 1;
+        // Then by explicit sortOrder if present
+        var oA = typeof a.sortOrder === 'number' ? a.sortOrder : Infinity;
+        var oB = typeof b.sortOrder === 'number' ? b.sortOrder : Infinity;
+        if (oA !== oB) return oA - oB;
         // Then by most recently used/added
         var dateA = a.lastOpenedAt || a.addedAt || '';
         var dateB = b.lastOpenedAt || b.addedAt || '';
@@ -2288,7 +2334,7 @@
           var app = filtered[i];
           var iconDisplay = app.icon || '\u{1F4DD}';
           html +=
-            '<div class="app-card" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" style="animation-delay:' + (i * 0.04) + 's">' +
+            '<div class="app-card" draggable="true" data-id="' + escapeHtml(app.id) + '" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" oncontextmenu="window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)" style="animation-delay:' + (i * 0.04) + 's">' +
               '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
@@ -2473,6 +2519,10 @@
       case 'improve-ai':
         openPromptBuilder(app);
         break;
+
+      case 'share-prompt':
+        generateSharePrompt(app);
+        break;
     }
   }
 
@@ -2503,6 +2553,42 @@
     overlay.dataset.appName = app.name || 'App';
     overlay.dataset.appId = app.id || '';
     overlay.dataset.originalSource = textarea.value;
+  }
+
+  // ── Share as Prompt ────────────────────────────
+
+  function generateSharePrompt(app) {
+    if (!app || !app.blob) {
+      alert('Only local HTML apps can be shared as prompts.');
+      return;
+    }
+
+    var source = decodeURIComponent(escape(atob(app.blob)));
+    var prompt = 'Recreate this HTML app exactly as provided.\n\n';
+    prompt += 'App name: ' + (app.name || 'Untitled') + '\n';
+    if (app.tags && app.tags.length) {
+      prompt += 'Tags: ' + app.tags.join(', ') + '\n';
+    }
+    prompt += '\nReturn the COMPLETE HTML file below without modifications.\n';
+    prompt += 'If the user asks for changes, apply them to this source.\n\n';
+    prompt += '--- Source Code ---\n' + source;
+
+    navigator.clipboard.writeText(prompt).then(function() {
+      alert('Share prompt copied! Paste it into any AI chat to recreate this app.');
+    }).catch(function() {
+      // Fallback: show in source overlay
+      var overlay = document.getElementById('source-overlay');
+      var textarea = document.getElementById('source-code');
+      var title = document.getElementById('source-title');
+      var saveBtn = document.getElementById('save-source-btn');
+      title.textContent = 'Share Prompt: ' + (app.name || 'App');
+      textarea.value = prompt;
+      textarea.readOnly = true;
+      saveBtn.style.display = 'none';
+      overlay.hidden = false;
+      overlay.dataset.appId = '';
+      overlay.dataset.originalSource = '';
+    });
   }
 
   // ── Generate Homepage Prompt ──────────────────────
@@ -2577,6 +2663,84 @@
     saveConfig(config);
     applyTheme(config.theme);
     document.getElementById('settings-overlay').hidden = true;
+    // Sync config to server (best-effort)
+    syncConfigToServer(config);
+  }
+
+  function syncConfigToServer(config) {
+    var url = config.aimeatUrl;
+    if (!url) return;
+    url = url.replace(/\/+$/, '');
+    // Only sync safe fields, not the URL itself
+    var syncPayload = {
+      theme: config.theme,
+      defaultOpenMode: config.defaultOpenMode,
+      language: config.language || 'en'
+    };
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (auth) {
+        var token = auth.data && auth.data.token;
+        if (!token) return;
+        return fetch(url + '/v1/memory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            key: 'app-launcher/config',
+            value: syncPayload,
+            visibility: 'private'
+          })
+        });
+      })
+      .catch(function () { /* best-effort */ });
+  }
+
+  function loadConfigFromServer() {
+    var config = loadConfig();
+    var url = config.aimeatUrl;
+    if (!url) return;
+    url = url.replace(/\/+$/, '');
+    fetch(url + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (auth) {
+        var token = auth.data && auth.data.token;
+        if (!token) return;
+        var gaii = auth.data.gaii || auth.data.sub || '';
+        if (!gaii) return;
+        return fetch(url + '/v1/memory/app-launcher%2Fconfig', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function (r) {
+          if (!r.ok) return null;
+          return r.json();
+        });
+      })
+      .then(function (json) {
+        if (!json || !json.data || !json.data.value) return;
+        var remote = json.data.value;
+        var local = loadConfig();
+        var changed = false;
+        // Merge remote into local (remote wins for preferences, but don't overwrite aimeatUrl)
+        if (remote.theme && remote.theme !== local.theme) {
+          local.theme = remote.theme;
+          changed = true;
+        }
+        if (remote.defaultOpenMode && remote.defaultOpenMode !== local.defaultOpenMode) {
+          local.defaultOpenMode = remote.defaultOpenMode;
+          changed = true;
+        }
+        if (remote.language && remote.language !== local.language) {
+          local.language = remote.language;
+          changed = true;
+        }
+        if (changed) {
+          saveConfig(local);
+          applyTheme(local.theme);
+        }
+      })
+      .catch(function () { /* best-effort */ });
   }
 
   function closeSettings() {
@@ -2684,19 +2848,25 @@
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, ''); // strip trailing slash
     closeModal();
 
-    fetch(aimeatUrl + '/v1/apps')
+    fetch(aimeatUrl + '/v1/apps?include_peers=true')
       .then(function (resp) {
         if (!resp.ok) throw new Error('Server returned ' + resp.status);
         return resp.json();
       })
       .then(function (json) {
         var apps = json.data && json.data.apps ? json.data.apps : [];
-        if (apps.length === 0) {
+        var peerApps = json.data && json.data.peer_apps ? json.data.peer_apps : [];
+        // Merge local and peer apps; tag peer apps with source info
+        for (var p = 0; p < peerApps.length; p++) {
+          peerApps[p]._from_peer = true;
+        }
+        var allFetched = apps.concat(peerApps);
+        if (allFetched.length === 0) {
           alert('No apps found on the AIMEAT server');
           return;
         }
-        aimeatAppsCache = apps;
-        showAimeatImportDialog(apps, aimeatUrl);
+        aimeatAppsCache = allFetched;
+        showAimeatImportDialog(allFetched, aimeatUrl);
       })
       .catch(function (err) {
         var msg = 'Failed to fetch apps from AIMEAT server.\n\n' + (err.message || err);
@@ -2712,12 +2882,19 @@
     var html = '';
     for (var i = 0; i < apps.length; i++) {
       var app = apps[i];
+      var displayName = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename;
+      var displayAuthor = (app.manifest && app.manifest.authorDisplay) ? app.manifest.authorDisplay : (app.owner || '');
+      var displayDesc = (app.manifest && app.manifest.description) ? app.manifest.description : '';
+      var displayVer = app.version_number ? 'v' + app.version_number : '';
+      var displayCat = (app.manifest && app.manifest.category) ? app.manifest.category : '';
+      var peerLabel = app._from_peer && app._peer_node ? ' \u00B7 \uD83C\uDF10 ' + escapeHtml(app._peer_node) : '';
       html +=
         '<div class="aimeat-app-item">' +
           '<input type="checkbox" data-index="' + i + '" checked/>' +
           '<div class="aimeat-app-info">' +
-            '<div class="aimeat-app-name">' + escapeHtml(app.filename) + '</div>' +
-            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (app.owner ? ' \u00B7 ' + escapeHtml(app.owner) : '') + '</div>' +
+            '<div class="aimeat-app-name">' + escapeHtml(displayName) + (displayVer ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(displayVer) + '</span>' : '') + '</div>' +
+            '<div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? ' \u00B7 ' + escapeHtml(displayAuthor) : '') + (displayCat ? ' \u00B7 ' + escapeHtml(displayCat) : '') + peerLabel + '</div>' +
+            (displayDesc ? '<div class="aimeat-app-size" style="opacity:.6">' + escapeHtml(displayDesc.substring(0, 100)) + '</div>' : '') +
           '</div>' +
           '<select data-index="' + i + '">' +
             '<option value="link">Link (online only)</option>' +
@@ -2757,15 +2934,18 @@
     for (var j = 0; j < toImport.length; j++) {
       (function (item) {
         var app = item.app;
-        var name = app.filename.replace(/\.html?$/i, '');
+        var name = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename.replace(/\.html?$/i, '');
+        var importedVersion = app.version_number || 1;
+        // For peer apps, use the peer's URL as the base
+        var baseUrl = (app._from_peer && app._peer_url) ? app._peer_url.replace(/\/+$/, '') : aimeatUrl;
 
         if (item.mode === 'link') {
-          // Link mode: store URL with ?mode=inline
-          var inlineUrl = aimeatUrl + app.download_url + '?mode=inline';
+          // Link mode: store URL with ?mode=inline, pinned to latest
+          var inlineUrl = baseUrl + app.download_url + '?mode=inline';
           promises.push(addAppFromUrl(name, inlineUrl, '\u{1F4E6}', ['aimeat'], defaultOpenMode));
         } else {
-          // Download mode: fetch content and store blob
-          var downloadUrl = aimeatUrl + app.download_url;
+          // Download mode: fetch content and store blob (pinned to current version)
+          var downloadUrl = baseUrl + app.download_url;
           promises.push(
             fetch(downloadUrl)
               .then(function (resp) {
@@ -2777,8 +2957,11 @@
                 var record = {
                   id: generateId(),
                   name: name,
-                  description: '',
+                  description: (app.manifest && app.manifest.description) ? app.manifest.description : '',
                   source: 'aimeat',
+                  aimeatOwner: app.owner || null,
+                  aimeatFilename: app.filename || null,
+                  aimeatVersion: importedVersion,
                   url: null,
                   blob: encoded,
                   tags: ['aimeat'],
@@ -2887,7 +3070,12 @@
         var body = {
           filename: filename,
           content: htmlContent,
-          mime_type: 'text/html'
+          mime_type: 'text/html',
+          name: app.name || filename.replace(/\.html?$/i, ''),
+          description: app.description || '',
+          category: 'utility',
+          tags: app.tags || [],
+          uses_cortex: []
         };
         if (accessCode) body.access_code = accessCode;
 
@@ -2910,6 +3098,8 @@
           app.publishedFilename = filename;
           app.publishedAt = new Date().toISOString();
           app.publishedUrl = json.data.download_url || null;
+          app.publishedVersionNumber = json.data.version_number || 1;
+          app.publishedVersionsUrl = json.data.versions_url || null;
           saveApp(app).then(function() {
             loadPublishedApps();
           });
@@ -2961,7 +3151,7 @@
         var url = app.publishedUrl ? (aimeatUrl + app.publishedUrl) : '';
         html +=
           '<div class="published-card">' +
-            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + '</div>' +
+            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + (app.publishedVersionNumber ? ' <span style="opacity:.5;font-size:.85em">v' + app.publishedVersionNumber + '</span>' : '') + '</div>' +
             '<div class="published-card-meta">' +
               '<span>' + escapeHtml(app.publishedFilename || '') + '</span>' +
               '<span>' + (app.publishedAt ? new Date(app.publishedAt).toLocaleDateString() : '') + '</span>' +
@@ -3006,6 +3196,8 @@
           delete app.publishedFilename;
           delete app.publishedAt;
           delete app.publishedUrl;
+          delete app.publishedVersionNumber;
+          delete app.publishedVersionsUrl;
           saveApp(app).then(function() {
             loadPublishedApps();
           });
@@ -3116,6 +3308,15 @@
             + '</div>';
         });
 
+        // Edit button (only if owner session available)
+        var hasSession = false;
+        try { hasSession = !!getCortexOwnerToken(); } catch(e) {}
+        if (hasSession) {
+          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.08)">'
+            + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
+            + '</div>';
+        }
+
         el.innerHTML = html;
       })
       .catch(function(e) {
@@ -3131,9 +3332,213 @@
     });
   }
 
+  // ── Cortex Extension Editor ───────────────────────
+
+  var cortexEditorExtName = null; // name of extension being edited
+  var cortexEditorWasActive = false; // was it active before editing?
+  var cortexEditorLibCounter = 0; // counter for unique lib section IDs
+
+  function getCortexOwnerToken() {
+    try {
+      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+        return window.AIMEAT.auth.getSession().jwt;
+      }
+      var stored = localStorage.getItem('aimeat_session');
+      if (stored) {
+        var parsed = JSON.parse(stored);
+        return parsed.jwt || null;
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function openCortexEditor(encodedName) {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in as an owner to edit extensions.'); return; }
+
+    var statusEl = document.getElementById('cortex-editor-status');
+    statusEl.textContent = 'Loading extension data...';
+    statusEl.style.color = '#34d399';
+    document.getElementById('cortex-editor-manifest').value = '';
+    document.getElementById('cortex-editor-libs').innerHTML = '';
+    document.getElementById('cortex-editor-name').textContent = '';
+    cortexEditorLibCounter = 0;
+
+    // Close the detail popup
+    document.getElementById('cortex-popup-overlay').style.display = 'none';
+    document.getElementById('cortex-editor-overlay').style.display = 'flex';
+
+    fetch(url + '/v1/cortex/' + encodedName + '/export', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.data) { statusEl.textContent = 'Error: ' + (data.error || 'Unknown error'); statusEl.style.color = 'var(--accent,#e74c6f)'; return; }
+        var ext = data.data;
+        cortexEditorExtName = ext.name;
+        cortexEditorWasActive = (ext.status === 'active');
+        document.getElementById('cortex-editor-name').textContent = ext.name + (cortexEditorWasActive ? ' (active)' : ' (inactive)');
+        document.getElementById('cortex-editor-manifest').value = ext.manifest || '';
+
+        // Render lib editors
+        var libsHtml = '';
+        var libs = ext.libs || {};
+        var filenames = Object.keys(libs);
+        for (var i = 0; i < filenames.length; i++) {
+          cortexEditorLibCounter++;
+          var fname = filenames[i];
+          libsHtml += cortexEditorLibSection(cortexEditorLibCounter, fname, libs[fname]);
+        }
+        document.getElementById('cortex-editor-libs').innerHTML = libsHtml;
+        statusEl.textContent = 'Loaded. ' + filenames.length + ' lib file' + (filenames.length !== 1 ? 's' : '') + '.';
+      })
+      .catch(function(e) {
+        statusEl.textContent = 'Error loading: ' + e.message;
+        statusEl.style.color = 'var(--accent,#e74c6f)';
+      });
+  }
+
+  function cortexEditorLibSection(id, filename, content) {
+    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
+      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 6px;color:#e0e0e0;font-family:monospace;font-size:.8rem;width:200px" /></label>'
+      + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,100,100,.3);background:transparent;color:#f87171;cursor:pointer">Remove</button>'
+      + '</div>'
+      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
+      + '</div>';
+  }
+
+  function cortexEditorAddLib() {
+    cortexEditorLibCounter++;
+    var container = document.getElementById('cortex-editor-libs');
+    container.insertAdjacentHTML('beforeend', cortexEditorLibSection(cortexEditorLibCounter, 'new-lib.js', ''));
+  }
+
+  function cortexEditorCollectLibs() {
+    var libs = {};
+    var container = document.getElementById('cortex-editor-libs');
+    var nameInputs = container.querySelectorAll('input[data-lib-name]');
+    for (var i = 0; i < nameInputs.length; i++) {
+      var id = nameInputs[i].getAttribute('data-lib-name');
+      var fname = nameInputs[i].value.trim();
+      var contentEl = container.querySelector('textarea[data-lib-content="' + id + '"]');
+      if (fname && contentEl) {
+        libs[fname] = contentEl.value;
+      }
+    }
+    return libs;
+  }
+
+  function cortexEditorSave() {
+    var config = loadConfig();
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    var token = getCortexOwnerToken();
+    if (!token) { alert('No auth token available.'); return; }
+
+    var manifest = document.getElementById('cortex-editor-manifest').value;
+    if (!manifest.trim()) { alert('Manifest cannot be empty.'); return; }
+
+    var libs = cortexEditorCollectLibs();
+    var statusEl = document.getElementById('cortex-editor-status');
+    var saveBtn = document.getElementById('cortex-editor-save-btn');
+    var oldName = cortexEditorExtName;
+    var wasActive = cortexEditorWasActive;
+
+    statusEl.textContent = 'Deleting old extension...';
+    statusEl.style.color = '#34d399';
+    saveBtn.disabled = true;
+
+    // Step 1: Delete old extension
+    fetch(url + '/v1/cortex/' + encodeURIComponent(oldName), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) {
+      if (!r.ok && r.status !== 404) throw new Error('Delete failed: ' + r.status);
+      statusEl.textContent = 'Installing updated extension...';
+      // Step 2: Install new
+      return fetch(url + '/v1/cortex', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manifest: manifest, libs: libs })
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status !== 'ok') {
+        var errMsg = data.error || 'Install failed';
+        if (data.details && data.details.errors) errMsg += ': ' + data.details.errors.join('; ');
+        throw new Error(errMsg);
+      }
+      var newName = data.data.name;
+      cortexEditorExtName = newName;
+
+      // Step 3: Activate if was active before
+      if (wasActive) {
+        statusEl.textContent = 'Activating...';
+        return fetch(url + '/v1/cortex/' + encodeURIComponent(newName) + '/activate', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        }).then(function(r) { return r.json(); });
+      }
+      return null;
+    })
+    .then(function(activateData) {
+      saveBtn.disabled = false;
+      if (activateData && activateData.status !== 'ok') {
+        statusEl.textContent = 'Installed but activation failed: ' + (activateData.error || 'unknown');
+        statusEl.style.color = 'orange';
+      } else {
+        statusEl.textContent = 'Saved and re-installed successfully!';
+        statusEl.style.color = '#34d399';
+        cortexEditorWasActive = wasActive; // preserve
+        // Refresh the cortex bar
+        loadCortexExtensions();
+      }
+    })
+    .catch(function(e) {
+      saveBtn.disabled = false;
+      statusEl.textContent = 'Error: ' + e.message;
+      statusEl.style.color = 'var(--accent,#e74c6f)';
+    });
+  }
+
+  function cortexEditorExport() {
+    var manifest = document.getElementById('cortex-editor-manifest').value;
+    var libs = cortexEditorCollectLibs();
+    var name = (cortexEditorExtName || 'extension').replace(/\//g, '-');
+
+    // Download manifest
+    var manifestBlob = new Blob([manifest], { type: 'text/yaml' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(manifestBlob);
+    a.download = name + '.yaml';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    // Download each lib file
+    var filenames = Object.keys(libs);
+    for (var i = 0; i < filenames.length; i++) {
+      var libBlob = new Blob([libs[filenames[i]]], { type: 'application/javascript' });
+      var b = document.createElement('a');
+      b.href = URL.createObjectURL(libBlob);
+      b.download = filenames[i];
+      b.click();
+      URL.revokeObjectURL(b.href);
+    }
+  }
+
+  function closeCortexEditor() {
+    document.getElementById('cortex-editor-overlay').style.display = 'none';
+    cortexEditorExtName = null;
+  }
+
   // ── Prompt Builder Panel ──────────────────────────
 
-  var pbExtensionsCache = null; // cached cortex extension details
+  var pbExtensionsCache = null; // cached cortex extension list
+  var pbExtDetailCache = {};   // cached extension details (name → detail object)
   var pbSourceApp = null; // app being improved (null = new app mode)
 
   function openPromptBuilder(app) {
@@ -3243,7 +3648,11 @@
     list.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
       cb.addEventListener('change', function() {
         this.closest('.pb-ext-chip').classList.toggle('selected', this.checked);
-        updatePbPreview();
+        if (this.checked) {
+          fetchExtDetail(this.getAttribute('data-ext-name'));
+        } else {
+          updatePbPreview();
+        }
       });
     });
   }
@@ -3253,7 +3662,10 @@
     var checkboxes = document.querySelectorAll('#pb-ext-list input[type="checkbox"]:checked');
     checkboxes.forEach(function(cb) {
       var name = cb.getAttribute('data-ext-name');
-      if (pbExtensionsCache) {
+      // Prefer detail cache, fall back to list data
+      if (pbExtDetailCache[name]) {
+        selected.push(pbExtDetailCache[name]);
+      } else if (pbExtensionsCache) {
         for (var i = 0; i < pbExtensionsCache.length; i++) {
           if (pbExtensionsCache[i].name === name) {
             selected.push(pbExtensionsCache[i]);
@@ -3263,6 +3675,25 @@
       }
     });
     return selected;
+  }
+
+  function fetchExtDetail(extName) {
+    // Already cached
+    if (pbExtDetailCache[extName]) { updatePbPreview(); return; }
+    var config = loadConfig();
+    if (!config.aimeatUrl || !cortexToken) { updatePbPreview(); return; }
+    var url = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(url + '/v1/cortex/' + encodeURIComponent(extName), {
+      headers: { 'Authorization': 'Bearer ' + cortexToken }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data && data.data) {
+          pbExtDetailCache[extName] = data.data;
+        }
+        updatePbPreview();
+      })
+      .catch(function() { updatePbPreview(); });
   }
 
   function buildPromptFromBuilder() {
@@ -3304,17 +3735,36 @@
       selectedExts.forEach(function(ext) {
         prompt += '#### ' + ext.name + '\n';
         prompt += ext.description ? ext.description + '\n' : '';
-        var types = ext.component_types || [];
-        if (types.indexOf('lib') !== -1) {
-          prompt += 'Load the library:\n```html\n';
-          prompt += '<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + (ext.short_name || ext.name).replace(/\s+/g, '-').toLowerCase() + '.js"></' + 'script>\n';
-          prompt += '```\n';
-        }
-        if (types.indexOf('schema') !== -1) {
-          prompt += 'This extension provides validated data schemas.\n';
-        }
-        if (types.indexOf('prompt') !== -1) {
-          prompt += 'This extension includes prompt templates.\n';
+
+        // Use detailed components if available
+        var comps = ext.components;
+        if (comps && comps.length) {
+          comps.forEach(function(c) {
+            if (c.type === 'lib' && c.filename) {
+              prompt += 'Load the library:\n```html\n';
+              prompt += '<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/' + encodeURIComponent(c.filename) + '"></' + 'script>\n';
+              prompt += '```\n';
+              if (c.api_surface) {
+                prompt += 'API Surface:\n```\n' + c.api_surface + '\n```\n';
+              }
+            } else if (c.type === 'schema') {
+              prompt += 'Data schema: `' + (c.key_pattern || '') + '` — data is validated automatically.\n';
+            } else if (c.type === 'prompt') {
+              prompt += 'Prompt template: ' + (c.name || '') + '\n';
+            }
+          });
+        } else {
+          // Fallback: only list-level type info
+          var types = ext.component_types || [];
+          if (types.indexOf('lib') !== -1) {
+            prompt += 'Includes a JS library (load via `<script src="' + nodeUrl + '/v1/cortex/' + encodeURIComponent(ext.name) + '/libs/...">`).\n';
+          }
+          if (types.indexOf('schema') !== -1) {
+            prompt += 'Provides validated data schemas.\n';
+          }
+          if (types.indexOf('prompt') !== -1) {
+            prompt += 'Includes prompt templates.\n';
+          }
         }
         prompt += '\n';
       });
@@ -3377,6 +3827,77 @@
     }
   }
 
+  // ── Drag & Drop Reordering ─────────────────────
+
+  var dragSourceId = null;
+
+  function onCardDragStart(e) {
+    var card = e.target.closest('.app-card');
+    if (!card) return;
+    dragSourceId = card.dataset.id;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSourceId);
+  }
+
+  function onCardDragEnd(e) {
+    var card = e.target.closest('.app-card');
+    if (card) card.classList.remove('dragging');
+    // Remove all drag-over highlights
+    var cards = document.querySelectorAll('.app-card.drag-over');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+    dragSourceId = null;
+  }
+
+  function onCardDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var card = e.target.closest('.app-card');
+    if (!card || card.dataset.id === dragSourceId) return;
+    // Remove highlight from others
+    var cards = document.querySelectorAll('.app-card.drag-over');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
+    card.classList.add('drag-over');
+  }
+
+  function onCardDrop(e) {
+    e.preventDefault();
+    var targetCard = e.target.closest('.app-card');
+    if (!targetCard) return;
+    var targetId = targetCard.dataset.id;
+    if (!dragSourceId || dragSourceId === targetId) return;
+
+    // Find indexes in the currently rendered/sorted allApps
+    var srcIdx = -1, tgtIdx = -1;
+    for (var i = 0; i < allApps.length; i++) {
+      if (allApps[i].id === dragSourceId) srcIdx = i;
+      if (allApps[i].id === targetId) tgtIdx = i;
+    }
+    if (srcIdx === -1 || tgtIdx === -1) return;
+
+    // Move the source app to the target position
+    var moved = allApps.splice(srcIdx, 1)[0];
+    allApps.splice(tgtIdx, 0, moved);
+
+    // Assign sortOrder values based on new positions
+    var saves = [];
+    for (var j = 0; j < allApps.length; j++) {
+      allApps[j].sortOrder = j;
+      saves.push(saveApp(allApps[j]));
+    }
+
+    // Re-render immediately (no animation delay for reorder)
+    var grid = document.getElementById('app-grid');
+    var cards = grid.querySelectorAll('.app-card');
+    for (var k = 0; k < cards.length; k++) {
+      cards[k].classList.remove('drag-over', 'dragging');
+    }
+
+    Promise.all(saves).then(function () {
+      renderApps();
+    });
+  }
+
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
@@ -3425,8 +3946,19 @@
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,
     cortexCopy: cortexCopy,
+    openCortexEditor: openCortexEditor,
+    closeCortexEditor: closeCortexEditor,
+    cortexEditorAddLib: cortexEditorAddLib,
+    cortexEditorSave: cortexEditorSave,
+    cortexEditorExport: cortexEditorExport,
     openPromptBuilder: openPromptBuilder,
-    closePbPanel: closePbPanel
+    closePbPanel: closePbPanel,
+    onCardDragStart: onCardDragStart,
+    onCardDragEnd: onCardDragEnd,
+    onCardDragOver: onCardDragOver,
+    onCardDrop: onCardDrop,
+    syncConfigToServer: syncConfigToServer,
+    loadConfigFromServer: loadConfigFromServer
   };
 
   // Expose cortex functions globally for inline onclick handlers
@@ -3442,6 +3974,7 @@
     renderApps();
     loadPublishedApps();
     loadCortexExtensions();
+    loadConfigFromServer();
 
     // ── Search input ─────────────────────────────────
     document.getElementById('search-input').addEventListener('input', function (e) {
@@ -3506,6 +4039,13 @@
     document.getElementById('cortex-popup-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.style.display = 'none';
+      }
+    });
+
+    // ── Click cortex editor overlay to close ────────
+    document.getElementById('cortex-editor-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        closeCortexEditor();
       }
     });
 
@@ -3580,6 +4120,40 @@
       });
     });
 
+    // ── PostMessage auth protocol for sandboxed iframes ──
+    window.addEventListener('message', function(e) {
+      var iframe = document.getElementById('app-iframe');
+      if (!iframe || !iframe.contentWindow) return;
+      // Only respond to messages from our iframe
+      if (e.source !== iframe.contentWindow) return;
+      if (!e.data || e.data.type !== 'aimeat-request-auth') return;
+
+      // Get JWT from aimeat-auth library if available, else from localStorage
+      var jwt = null;
+      var nodeUrl = '';
+      try {
+        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+          var session = window.AIMEAT.auth.getSession();
+          jwt = session.jwt;
+          nodeUrl = session.nodeUrl || '';
+        } else {
+          var stored = localStorage.getItem('aimeat_session');
+          if (stored) {
+            var parsed = JSON.parse(stored);
+            jwt = parsed.jwt || null;
+          }
+          var config = loadConfig();
+          nodeUrl = config.aimeatUrl || '';
+        }
+      } catch(err) { /* ignore parse errors */ }
+
+      iframe.contentWindow.postMessage({
+        type: 'aimeat-auth',
+        jwt: jwt,
+        nodeUrl: nodeUrl
+      }, '*');
+    });
+
     // ── Click anywhere to close context menu ────────
     document.addEventListener('click', function () {
       hideContextMenu();
@@ -3589,7 +4163,9 @@
     document.addEventListener('keydown', function (e) {
       // Escape — close modals / overlays (source-overlay first in cascade)
       if (e.key === 'Escape') {
-        if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
+        if (document.getElementById('cortex-editor-overlay').style.display === 'flex') {
+          closeCortexEditor();
+        } else if (document.getElementById('prompt-builder-overlay').style.display === 'flex') {
           closePbPanel();
         } else if (!document.getElementById('source-overlay').hidden) {
           document.getElementById('source-overlay').hidden = true;

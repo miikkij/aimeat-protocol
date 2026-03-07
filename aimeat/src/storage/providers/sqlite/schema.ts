@@ -684,6 +684,50 @@ export function initializeSchema(db: Database.Database): void {
       email           TEXT
     );
 
+    -- ── App Catalog (versioned apps with manifest) ──
+    CREATE TABLE IF NOT EXISTS apps (
+      ownerGaii      TEXT NOT NULL,
+      ownerName      TEXT NOT NULL,
+      filename       TEXT NOT NULL,
+      versionNumber  INTEGER NOT NULL DEFAULT 1,
+      manifest       TEXT NOT NULL DEFAULT '{}',
+      mimeType       TEXT NOT NULL DEFAULT 'text/html',
+      size           INTEGER NOT NULL DEFAULT 0,
+      data           BLOB,
+      accessCode     TEXT,
+      createdAt      TEXT NOT NULL,
+      PRIMARY KEY (ownerGaii, filename, versionNumber)
+    );
+
+    CREATE TABLE IF NOT EXISTS app_downloads (
+      ownerGaii      TEXT NOT NULL,
+      filename       TEXT NOT NULL,
+      downloads      INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (ownerGaii, filename)
+    );
+
+    -- ── App Marketplace Purchases (immutable receipts) ──
+    CREATE TABLE IF NOT EXISTS app_purchases (
+      transactionId           TEXT PRIMARY KEY,
+      buyerGaii               TEXT NOT NULL,
+      buyerOwner              TEXT NOT NULL,
+      sellerGaii              TEXT NOT NULL,
+      sellerOwner             TEXT NOT NULL,
+      appFilename             TEXT NOT NULL,
+      appName                 TEXT NOT NULL,
+      appVersionNumber        INTEGER NOT NULL,
+      licenseType             TEXT NOT NULL DEFAULT 'single',
+      priceMorsels            INTEGER NOT NULL,
+      transactionFeeMorsels   INTEGER NOT NULL DEFAULT 0,
+      purchasedAt             TEXT NOT NULL,
+      appContent              TEXT NOT NULL,
+      appManifest             TEXT NOT NULL DEFAULT '{}',
+      appScreenshot           TEXT,
+      signature               TEXT NOT NULL,
+      nodeId                  TEXT NOT NULL,
+      nodePublicKey           TEXT NOT NULL
+    );
+
     -- ═══════════════════════════════════════════════════════
     -- Indexes
     -- ═══════════════════════════════════════════════════════
@@ -723,6 +767,11 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_pps_nodeId ON personal_push_subscriptions(personalNodeId);
     CREATE INDEX IF NOT EXISTS idx_pps_ownerName ON personal_push_subscriptions(ownerName);
     CREATE INDEX IF NOT EXISTS idx_revoked_expires ON revoked_tokens(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_apps_ownerName ON apps(ownerName);
+    CREATE INDEX IF NOT EXISTS idx_apps_filename ON apps(filename);
+    CREATE INDEX IF NOT EXISTS idx_app_purchases_buyer ON app_purchases(buyerGaii);
+    CREATE INDEX IF NOT EXISTS idx_app_purchases_seller ON app_purchases(sellerGaii);
+    CREATE INDEX IF NOT EXISTS idx_app_purchases_app ON app_purchases(sellerGaii, appFilename);
 
   `);
 

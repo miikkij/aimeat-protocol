@@ -605,6 +605,72 @@ const auth = {
     listeners[event] = listeners[event].filter(f => f !== fn);
   },
 
+  /** Check if running inside a sandboxed iframe (no localStorage access) */
+  get inSandbox() {
+    try { localStorage.getItem('_test'); return false; } catch(e) { return true; }
+  },
+
+  /**
+   * Request auth credentials from the parent window via postMessage.
+   * Use this when the app runs in a sandboxed iframe without localStorage access.
+   * The parent (app-catalog) listens for { type: 'aimeat-request-auth' }
+   * and responds with { type: 'aimeat-auth', jwt, nodeUrl }.
+   * @param {number} [timeout=3000] - Max ms to wait for response
+   * @returns {Promise<object|null>} Session-like object with .jwt and .fetch(), or null
+   */
+  requestParentAuth(timeout = 3000) {
+    return new Promise((resolve) => {
+      if (window === window.parent) { resolve(null); return; }
+
+      let resolved = false;
+      const timer = setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, timeout);
+
+      function handler(e) {
+        if (resolved) return;
+        if (!e.data || e.data.type !== 'aimeat-auth') return;
+        resolved = true;
+        clearTimeout(timer);
+        window.removeEventListener('message', handler);
+
+        const jwt = e.data.jwt;
+        const parentNodeUrl = e.data.nodeUrl;
+        if (!jwt) { resolve(null); return; }
+
+        // Override NODE_URL if parent provided one
+        const effectiveNodeUrl = parentNodeUrl || NODE_URL;
+
+        const session = {
+          jwt,
+          nodeUrl: effectiveNodeUrl,
+          owner: null,
+          gaii: null,
+          ghii: null,
+          get valid() { return jwt && !isExpired(jwt); },
+          async fetch(path, opts = {}) {
+            const url = effectiveNodeUrl + path;
+            const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt, ...(opts.headers || {}) };
+            const resp = await fetch(url, { ...opts, headers });
+            return resp.json();
+          },
+        };
+
+        // Parse JWT to extract identity info
+        const payload = parseJwt(jwt);
+        if (payload) {
+          session.gaii = payload.sub || null;
+          session.owner = payload.owner || null;
+        }
+
+        currentSession = session;
+        emit('login', session);
+        resolve(session);
+      }
+
+      window.addEventListener('message', handler);
+      window.parent.postMessage({ type: 'aimeat-request-auth' }, '*');
+    });
+  },
+
   /**
    * Mount a login/register button that handles the full flow.
    * @param {string} selector - CSS selector for the container element

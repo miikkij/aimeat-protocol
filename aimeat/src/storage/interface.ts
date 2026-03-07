@@ -168,6 +168,65 @@ export interface StorageFileRecord {
   createdAt: string;
 }
 
+export interface AppManifest {
+  name: string;
+  description: string;
+  version: string;              // semver string (display-only)
+  category: string;
+  tags: string[];
+  icon?: string;
+  authorDisplay: string;
+  usesCortex: string[];         // cortex extension names used
+  priceMorsels?: number;        // 0 or absent = free
+  licenseType?: 'single' | 'lifetime';
+}
+
+export interface AppRecord {
+  ownerGaii: string;
+  ownerName: string;
+  filename: string;
+  versionNumber: number;        // auto-incremented per filename+owner
+  manifest: AppManifest;
+  mimeType: string;
+  size: number;
+  data: Buffer;
+  accessCode?: string;
+  createdAt: string;
+}
+
+export interface AppListOptions {
+  ownerGaii?: string;
+  category?: string;
+  q?: string;
+  tag?: string;
+  sort?: 'newest' | 'popular';
+  limit?: number;
+  offset?: number;
+  freeOnly?: boolean;
+}
+
+// Phase E — App Marketplace purchase receipts (immutable, self-contained)
+export interface AppPurchaseRecord {
+  transactionId: string;          // "mktx_..."
+  buyerGaii: string;
+  buyerOwner: string;
+  sellerGaii: string;
+  sellerOwner: string;
+  appFilename: string;
+  appName: string;                // from manifest at purchase time
+  appVersionNumber: number;
+  licenseType: 'single' | 'lifetime';
+  priceMorsels: number;
+  transactionFeeMorsels: number;
+  purchasedAt: string;            // ISO timestamp
+  appContent: string;             // base64-encoded full app content
+  appManifest: AppManifest;       // manifest snapshot at purchase time
+  appScreenshot?: string;         // base64-encoded screenshot if any
+  signature: string;              // Ed25519 signature over transaction fields
+  nodeId: string;                 // originating node
+  nodePublicKey: string;          // node public key for verification
+}
+
 export interface PeeringRequestRecord {
   id: string;
   fromNodeUrl: string;
@@ -786,6 +845,8 @@ import type { NodeRepository } from './repositories/node.repository.js';
 import type { NotificationRepository } from './repositories/notification.repository.js';
 import type { AuthRepository } from './repositories/auth.repository.js';
 import type { SessionRepository } from './repositories/session.repository.js';
+import type { AppRepository } from './repositories/app.repository.js';
+import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -795,4 +856,5 @@ export interface Storage extends
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
-  AuthRepository, SessionRepository { }
+  AuthRepository, SessionRepository,
+  AppRepository, AppMarketplaceRepository { }

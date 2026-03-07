@@ -1,0 +1,80 @@
+import { h } from 'preact';
+import { useState } from 'preact/hooks';
+import htm from 'htm';
+const html = htm.bind(h);
+import { t } from '/js/i18n.js';
+import { escHtml } from '/js/utils.js';
+import { num, EconRow, StatsGrid } from './shared.js';
+import { mintMorsels } from '/js/services/admin.js';
+
+export default function EconomyTab({ data, reload }) {
+  const e = data.dash?.economy;
+  if (!e) return html`<div class="empty">${t('dashboard.loading')}</div>`;
+
+  const [mintGaii, setMintGaii] = useState('');
+  const [mintAmount, setMintAmount] = useState('');
+  const [mintResult, setMintResult] = useState(null);
+
+  async function doMint() {
+    const amount = parseInt(mintAmount);
+    if (!mintGaii || !amount || amount < 1) {
+      setMintResult({ ok: false, msg: t('dashboard.mintGaiiRequired') });
+      return;
+    }
+    try {
+      const r = await mintMorsels(mintGaii, amount);
+      setMintResult({ ok: true, msg: t('dashboard.mintedSuccess').replace('{amount}', num(r.data.minted)).replace('{balance}', num(r.data.new_balance)) });
+      reload();
+    } catch (err) {
+      setMintResult({ ok: false, msg: err.message });
+    }
+  }
+
+  return html`
+    <div class="adm-grid adm-grid-2">
+      <div class="adm-card">
+        <h2>${t('dashboard.morselSupply')}</h2>
+        <${EconRow} label=${t('dashboard.inCirculation')} value=${num(e.total_morsels_in_circulation)} />
+        <${EconRow} label=${t('dashboard.totalMintedAllTime')} value=${num(e.total_minted_all_time)} />
+        <${EconRow} label=${t('dashboard.totalBurnedAllTime')} value=${num(e.total_burned_all_time)} />
+        <${EconRow} label=${t('dashboard.inflationRate30d')} value=${e.inflation_rate_30d_percent + '%'} />
+        <${EconRow} label=${t('dashboard.burnMintRatio')} value=${e.burn_mint_ratio} />
+      </div>
+      <div class="adm-card">
+        <h2>${t('dashboard.todayActivity')}</h2>
+        <${EconRow} label=${t('dashboard.transactionsToday')} value=${num(e.transactions_today)} />
+        <${EconRow} label=${t('dashboard.morselsMovedToday')} value=${num(e.morsels_transacted_today)} />
+        <${EconRow} label=${t('dashboard.networkFees')} value=${num(e.network_fees_today)} />
+        <${EconRow} label=${t('dashboard.burned')} value=${num(e.burned_today)} />
+        <${EconRow} label=${t('dashboard.dailyAllowancesIssued')} value=${num(e.daily_allowances_issued_today)} />
+      </div>
+    </div>
+
+    <div class="adm-card">
+      <h2>${t('dashboard.morselPolicy')}</h2>
+      <${EconRow} label=${t('dashboard.welcomeBonus')} value=${num(e.welcome_bonus) + ' ' + t('dashboard.morselUnit')} />
+      <${EconRow} label=${t('dashboard.dailyAllowance')} value=${num(e.daily_allowance) + ' ' + t('dashboard.morselUnit')} />
+      <${EconRow} label=${t('dashboard.allowanceCap')} value=${num(e.daily_allowance_cap) + ' ' + t('dashboard.morselUnit')} />
+      <${EconRow} label=${t('dashboard.burnRate')} value=${e.burn_rate} />
+      <${EconRow} label=${t('dashboard.maxOperatorMint')} value=${num(e.max_operator_mint_per_day) + ' ' + t('dashboard.morselUnit')} />
+    </div>
+
+    <!-- Mint form -->
+    <div class="adm-card" style="margin-top:16px">
+      <h2>${t('dashboard.mintMorsels')}</h2>
+      <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:10px">${t('dashboard.issueToAgent').replace('{cap}', num(e.max_operator_mint_per_day))}</p>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:2;min-width:200px">
+          <label style="color:var(--text-dim);font-size:.75rem;margin-bottom:2px;display:block">${t('dashboard.gaii')}</label>
+          <input type="text" value=${mintGaii} onInput=${e => setMintGaii(e.target.value)} placeholder="agent#owner@node" style="width:100%" />
+        </div>
+        <div style="flex:1;min-width:100px">
+          <label style="color:var(--text-dim);font-size:.75rem;margin-bottom:2px;display:block">${t('dashboard.amount')}</label>
+          <input type="number" value=${mintAmount} onInput=${e => setMintAmount(e.target.value)} placeholder="100" min="1" style="width:100%" />
+        </div>
+        <button class="adm-btn" style="height:38px;white-space:nowrap" onClick=${doMint}>${t('dashboard.mint')}</button>
+      </div>
+      ${mintResult && html`<div style="margin-top:8px;font-size:.85rem;color:${mintResult.ok ? '#22c55e' : '#ef4444'}">${escHtml(mintResult.msg)}</div>`}
+    </div>
+  `;
+}

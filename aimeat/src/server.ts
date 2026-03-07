@@ -47,6 +47,7 @@ import { chatInstancesRouter } from './routes/chat-instances.js';
 import { totpRouter } from './routes/totp.js';
 import { libsRouter } from './routes/libs.js';
 import { appsRouter } from './routes/apps.js';
+import { appMarketplaceRouter } from './routes/marketplace.js';
 import { flagsRouter } from './routes/flags.js';
 import { appealsRouter } from './routes/appeals.js';
 import { matchesRouter } from './routes/matches.js';
@@ -145,17 +146,17 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
       res.locals.cspNonce = nonce;
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com`,
+        `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
         `style-src 'self' 'nonce-${nonce}'`,
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self'",
-        "frame-src 'none'",
+        "frame-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
       ].join('; '));
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
       res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
       // SECURITY: HSTS — instruct browsers to always use HTTPS
       if (config.baseUrl?.startsWith('https://')) {
@@ -602,7 +603,8 @@ export async function createServer(config: AimeatConfig): Promise<ServerResult> 
   app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange));
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
-  app.use(appsRouter(config, storage));
+  app.use(appsRouter(config, storage, peers));
+  app.use(appMarketplaceRouter(config, storage));
   // Node Extensions (V8 Isolates)
   if (config.extensionsEnabled) {
     app.use(extensionsRouter(config, storage));

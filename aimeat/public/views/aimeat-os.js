@@ -535,6 +535,78 @@ body {
   a.click();
 }`}</${CodeBlock}>
 
+      <h3>Self-Publish Pattern</h3>
+      <p>Include a "Publish to AIMEAT" button so the app can upload itself to the node's app catalog:</p>
+      <${CodeBlock} lang="javascript">${`async function publishSelf() {
+  // Capture the complete HTML
+  var html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+  var content = btoa(unescape(encodeURIComponent(html)));
+
+  // Get auth token (user must be logged in)
+  var token = AIMEAT.auth.getToken();
+  if (!token) { alert('Please log in first'); return; }
+
+  var filename = 'my-app.html'; // Change to your app's filename
+  var res = await fetch('${nodeUrl}/v1/apps', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      filename: filename,
+      content: content,
+      mime_type: 'text/html',
+      name: 'My App',
+      description: 'Description of my app',
+      category: 'utility',
+      tags: ['tag1', 'tag2']
+    })
+  });
+  var data = await res.json();
+  if (data.status === 'ok') {
+    alert('Published! Version ' + data.data.version_number);
+  } else {
+    alert('Error: ' + (data.error_description || 'Unknown error'));
+  }
+}`}</${CodeBlock}>
+      <p>The app captures its own HTML with <code>document.documentElement.outerHTML</code>, base64-encodes it, and uploads via <code>POST /v1/apps</code>. Each publish auto-increments the version number, so previous versions are preserved.</p>
+
+      <h3>"Share This App" Prompt</h3>
+      <p>Generate a prompt that describes your app so another user can paste it into any AI and get a functionally equivalent app regenerated:</p>
+      <${CodeBlock} lang="javascript">${`function generateSharePrompt() {
+  var html = document.documentElement.outerHTML;
+  var prompt = 'Recreate this HTML app. It should do the following:\\n\\n';
+  prompt += '[DESCRIBE WHAT YOUR APP DOES HERE]\\n\\n';
+  prompt += 'The app connects to an AIMEAT node at ' + window.location.origin + '.\\n';
+  prompt += 'Use the AIMEAT client libraries (aimeat-auth, aimeat-data, etc.).\\n\\n';
+  prompt += 'Here is the source code for reference:\\n\\n';
+  prompt += html;
+  navigator.clipboard.writeText(prompt);
+  alert('Share prompt copied to clipboard!');
+}`}</${CodeBlock}>
+      <p>This enables <strong>prompt-based app distribution</strong> — instead of sharing files, share a prompt that any AI can use to regenerate the app.</p>
+
+      <h3>Sandbox Iframe Auth (postMessage)</h3>
+      <p>When your app runs inside the App Catalog's sandboxed iframe, <code>localStorage</code> is not accessible. Use <code>requestParentAuth()</code> to get a JWT from the parent window:</p>
+      <${CodeBlock} lang="javascript">${`// Detect sandbox mode and request auth from the parent
+async function init() {
+  if (AIMEAT.auth.inSandbox) {
+    // Running in sandboxed iframe — request JWT from parent
+    var session = await AIMEAT.auth.requestParentAuth();
+    if (session) {
+      console.log('Got auth from parent:', session.owner);
+      // Use session.fetch() for authenticated API calls
+      var data = await session.fetch('/v1/memory/my-key');
+    }
+  } else {
+    // Running standalone — use normal login
+    var session = await AIMEAT.auth.login();
+  }
+}
+init();`}</${CodeBlock}>
+      <p>The parent responds with the user's current JWT and node URL. The returned session has a <code>.fetch()</code> method for authenticated API calls. If no auth is available, <code>null</code> is returned.</p>
+
       <h3>Responsive Design</h3>
       <p>Always include the viewport meta tag and design for mobile-first:</p>
       <${CodeBlock} lang="html">${`<meta name="viewport" content="width=device-width, initial-scale=1.0">`}</${CodeBlock}>
