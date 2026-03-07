@@ -36,6 +36,15 @@ export interface RateLimitsConfig {
   work: RateLimitTier;
   memory: RateLimitTier;
   boards: RateLimitTier;
+  // Per-endpoint overrides (fall back to global when not configured)
+  owners: RateLimitTier;
+  ghii: RateLimitTier;
+  flags: RateLimitTier;
+  appeals: RateLimitTier;
+  adminSetup: RateLimitTier;
+  federation: RateLimitTier;
+  catalogue: RateLimitTier;
+  authChallenge: RateLimitTier;
   roleMultipliers: RoleMultipliers;
 }
 
@@ -92,6 +101,21 @@ export interface AimeatConfig {
   indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
+
+  // Per-endpoint rate limits (individual keys for config-schema compatibility)
+  rlGlobal: number;
+  rlAuth: number;
+  rlWork: number;
+  rlMemory: number;
+  rlBoards: number;
+  rlOwners: number;
+  rlGhii: number;
+  rlFlags: number;
+  rlAppeals: number;
+  rlAdminSetup: number;
+  rlFederation: number;
+  rlCatalogue: number;
+  rlAuthChallenge: number;
 
   // Federation role
   federationRole: FederationRole;
@@ -317,6 +341,21 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
   const port = parseInt(process.env.AIMEAT_PORT ?? '40050', 10);
 
+  // Rate limits — parse individual values, per-endpoint falls back to global
+  const rlGlobal = Math.max(1, parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10));
+  const rlAuth = Math.max(1, parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10));
+  const rlWork = Math.max(1, parseInt(process.env.AIMEAT_RL_WORK ?? '60', 10));
+  const rlMemory = Math.max(1, parseInt(process.env.AIMEAT_RL_MEMORY ?? '120', 10));
+  const rlBoards = Math.max(1, parseInt(process.env.AIMEAT_RL_BOARDS ?? '60', 10));
+  const rlOwners = Math.max(1, parseInt(process.env.AIMEAT_RL_OWNERS ?? String(rlGlobal), 10));
+  const rlGhii = Math.max(1, parseInt(process.env.AIMEAT_RL_GHII ?? String(rlGlobal), 10));
+  const rlFlags = Math.max(1, parseInt(process.env.AIMEAT_RL_FLAGS ?? String(rlGlobal), 10));
+  const rlAppeals = Math.max(1, parseInt(process.env.AIMEAT_RL_APPEALS ?? String(rlGlobal), 10));
+  const rlAdminSetup = Math.max(1, parseInt(process.env.AIMEAT_RL_ADMIN_SETUP ?? String(rlGlobal), 10));
+  const rlFederation = Math.max(1, parseInt(process.env.AIMEAT_RL_FEDERATION ?? String(rlGlobal), 10));
+  const rlCatalogue = Math.max(1, parseInt(process.env.AIMEAT_RL_CATALOGUE ?? String(rlGlobal), 10));
+  const rlAuthChallenge = Math.max(1, parseInt(process.env.AIMEAT_RL_AUTH_CHALLENGE ?? String(rlGlobal), 10));
+
   const config: AimeatConfig = {
     port,
     baseUrl: process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`,
@@ -503,12 +542,34 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     consulWatchIntervalSeconds: parseInt(process.env.AIMEAT_CONSUL_WATCH_INTERVAL ?? '30', 10),
     consulDatacenter: process.env.AIMEAT_CONSUL_DATACENTER ?? '',
 
+    rlGlobal,
+    rlAuth,
+    rlWork,
+    rlMemory,
+    rlBoards,
+    rlOwners,
+    rlGhii,
+    rlFlags,
+    rlAppeals,
+    rlAdminSetup,
+    rlFederation,
+    rlCatalogue,
+    rlAuthChallenge,
+
     rateLimits: {
-      global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
-      auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },
-      work: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_WORK ?? '60', 10) },
-      memory: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_MEMORY ?? '120', 10) },
-      boards: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_BOARDS ?? '60', 10) },
+      global: { windowMs: 1_000, max: rlGlobal },
+      auth: { windowMs: 1_000, max: rlAuth },
+      work: { windowMs: 1_000, max: rlWork },
+      memory: { windowMs: 1_000, max: rlMemory },
+      boards: { windowMs: 1_000, max: rlBoards },
+      owners: { windowMs: 1_000, max: rlOwners },
+      ghii: { windowMs: 1_000, max: rlGhii },
+      flags: { windowMs: 1_000, max: rlFlags },
+      appeals: { windowMs: 1_000, max: rlAppeals },
+      adminSetup: { windowMs: 1_000, max: rlAdminSetup },
+      federation: { windowMs: 1_000, max: rlFederation },
+      catalogue: { windowMs: 1_000, max: rlCatalogue },
+      authChallenge: { windowMs: 1_000, max: rlAuthChallenge },
       roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },
   };
@@ -553,6 +614,29 @@ export async function applyConfigOverrides(
       applied.push(dotPath);
     } catch {
       skipped.push(dotPath);
+    }
+  }
+
+  // Sync rl* individual keys back to rateLimits tiers
+  const rlKeys: Array<{ key: keyof AimeatConfig; tier: keyof Omit<RateLimitsConfig, 'roleMultipliers'> }> = [
+    { key: 'rlGlobal', tier: 'global' },
+    { key: 'rlAuth', tier: 'auth' },
+    { key: 'rlWork', tier: 'work' },
+    { key: 'rlMemory', tier: 'memory' },
+    { key: 'rlBoards', tier: 'boards' },
+    { key: 'rlOwners', tier: 'owners' },
+    { key: 'rlGhii', tier: 'ghii' },
+    { key: 'rlFlags', tier: 'flags' },
+    { key: 'rlAppeals', tier: 'appeals' },
+    { key: 'rlAdminSetup', tier: 'adminSetup' },
+    { key: 'rlFederation', tier: 'federation' },
+    { key: 'rlCatalogue', tier: 'catalogue' },
+    { key: 'rlAuthChallenge', tier: 'authChallenge' },
+  ];
+  for (const { key, tier } of rlKeys) {
+    const val = config[key] as number;
+    if (typeof val === 'number' && val >= 1) {
+      (config.rateLimits[tier] as RateLimitTier).max = val;
     }
   }
 

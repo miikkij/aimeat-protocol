@@ -50,6 +50,8 @@ export const mintMorsels     = (gaii, amount) => apiPost('/v1/admin/mint', { gai
 
 // ── Chat Instances ──
 export const getChatInstances = ()      => apiGet('/v1/chat-instances');
+export const createChatChannel = (name, platform) => apiPost('/v1/chat-instances', { app_name: name, platform: platform || 'admin' });
+export const deleteChatInstance = (id)  => apiDelete(`/v1/chat-instances/${encodeURIComponent(id)}`);
 
 // ── Realtime ──
 export const getRealtime     = ()       => apiGet('/v1/admin/realtime');
