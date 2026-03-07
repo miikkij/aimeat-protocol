@@ -18,7 +18,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         const actions = await storage.listActions();
 
         const storedPrompt = await storage.getSystemPrompt('tier0');
-        const systemPrompt = storedPrompt
+        const systemPrompt = storedPrompt?.active
           ? renderPromptTemplate(storedPrompt.content, {
               nodeId: config.nodeId,
               agentCount: agents.length,
@@ -42,7 +42,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       case '0.5': {
         const storedPrompt05 = await storage.getSystemPrompt('tier0.5');
-        const systemPrompt05 = storedPrompt05
+        const systemPrompt05 = storedPrompt05?.active
           ? renderPromptTemplate(storedPrompt05.content, {
               nodeId: config.nodeId,
               keyedBrowseEnabled: String(config.keyedBrowseEnabled),
@@ -63,7 +63,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         const agent = req.auth?.sub ? await storage.getAgent(req.auth.sub) : null;
 
         const storedPrompt1 = await storage.getSystemPrompt('tier1');
-        const systemPrompt1 = storedPrompt1
+        const systemPrompt1 = storedPrompt1?.active
           ? renderPromptTemplate(storedPrompt1.content, {
               nodeId: config.nodeId,
               gaii,
@@ -91,7 +91,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         const actions = await storage.listActions();
 
         const storedPrompt2 = await storage.getSystemPrompt('tier2');
-        const systemPrompt2 = storedPrompt2
+        const systemPrompt2 = storedPrompt2?.active
           ? renderPromptTemplate(storedPrompt2.content, {
               nodeId: config.nodeId,
               owner,
@@ -120,7 +120,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
         const storedPromptAnon = await storage.getSystemPrompt('anonymous');
         const systemPrompt = config.anonymousMode
-          ? (storedPromptAnon
+          ? (storedPromptAnon?.active
             ? renderPromptTemplate(storedPromptAnon.content, {
                 nodeId: config.nodeId,
                 baseUrl,
@@ -472,7 +472,7 @@ Check "anonymous.agents.roster" periodically to see who's active.`)
         const authMode = config.anonymousMode ? 'anonymous' : 'otk-or-jwt';
 
         const storedPromptOc = await storage.getSystemPrompt('openclaw');
-        const systemPromptOc = storedPromptOc
+        const systemPromptOc = storedPromptOc?.active
           ? renderPromptTemplate(storedPromptOc.content, {
               nodeId: config.nodeId,
               baseUrl,
@@ -817,7 +817,7 @@ Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
     } catch { /* cortex not available */ }
 
     const storedPrompt = await storage.getSystemPrompt(promptId);
-    const prompt = storedPrompt
+    const prompt = storedPrompt?.active
       ? renderPromptTemplate(storedPrompt.content, {
           baseUrl,
           ownerName,

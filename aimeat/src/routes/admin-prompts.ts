@@ -145,6 +145,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
       const body = req.body as Record<string, unknown>;
       const content = body.content as string;
       const tags = (body.tags as string[]) ?? undefined;
+      const active = body.active;
 
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'content (non-empty string) is required'));
@@ -164,6 +165,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
         ...prompt,
         content,
         tags: tags ?? prompt.tags,
+        active: typeof active === 'boolean' ? active : prompt.active,
         version: newVersion,
         updatedAt: now,
       };
