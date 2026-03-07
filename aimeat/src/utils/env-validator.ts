@@ -1,8 +1,11 @@
 /**
- * CLI .env validator — checks environment configuration for errors, warnings, and info.
+ * CLI config validator — checks environment, file configs, and DB for errors, warnings, and info.
  * Usage: aimeat validate (or aimeat check)
  * Exit 0 = pass (warnings/info only), Exit 1 = errors found
  */
+
+import { ALL_CONFIG_MAP, parseConfigValue } from '../services/config-schema.js';
+import { loadFileSource } from '../services/config-loader.js';
 
 interface ValidationResult {
   level: 'error' | 'warning' | 'info';
@@ -267,6 +270,30 @@ export function validateEnv(): ValidationResult[] {
   const statsAccess = env.AIMEAT_STATS_ACCESS;
   if (statsAccess && !['public', 'authenticated', 'operator'].includes(statsAccess)) {
     results.push({ level: 'error', variable: 'AIMEAT_STATS_ACCESS', message: `Invalid value "${statsAccess}". Must be: public, authenticated, or operator.` });
+  }
+
+  // ── Config File Validation (aimeat.ini / aimeat.json) ─────────
+  const fileSource = loadFileSource();
+  if (fileSource) {
+    results.push({ level: 'info', variable: 'CONFIG_FILE', message: `Config file found: ${fileSource.name}` });
+
+    for (const [dotPath, rawValue] of Object.entries(fileSource.values)) {
+      const field = ALL_CONFIG_MAP[dotPath];
+      if (!field) {
+        results.push({ level: 'warning', variable: `file:${dotPath}`, message: `Unknown config key "${dotPath}" in ${fileSource.name}. Will be ignored.` });
+        continue;
+      }
+
+      // Validate type
+      try {
+        const parsed = parseConfigValue(field, rawValue);
+        if (!field.validate(parsed)) {
+          results.push({ level: 'error', variable: `file:${dotPath}`, message: `Invalid value "${rawValue}" for ${dotPath} in ${fileSource.name}. Validation failed.` });
+        }
+      } catch {
+        results.push({ level: 'error', variable: `file:${dotPath}`, message: `Cannot parse "${rawValue}" as ${field.type} for ${dotPath} in ${fileSource.name}.` });
+      }
+    }
   }
 
   return results;

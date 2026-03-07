@@ -13,9 +13,17 @@ const { values, positionals } = parseArgs({
   options: {
     port: { type: 'string', short: 'p' },
     db: { type: 'string' },
+    'db-url': { type: 'string' },
+    'db-path': { type: 'string' },
     'node-id': { type: 'string' },
     'admin-password': { type: 'string' },
     config: { type: 'string', short: 'c' },
+    consul: { type: 'string' },
+    'consul-prefix': { type: 'string' },
+    'consul-token': { type: 'string' },
+    format: { type: 'string' },
+    file: { type: 'string' },
+    from: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -25,36 +33,63 @@ const HELP_TEXT = `
 aimeat — AI Memory Exchange and Action Transfer protocol node
 
 USAGE
-  aimeat start [options]      Start the node
-  aimeat serve [options]      Alias for start
-  aimeat config               Show all settings and their current values
-  aimeat validate             Validate .env configuration
-  aimeat check                Alias for validate
-  aimeat init                 Interactive config wizard
-  aimeat join [URL]            Join a federation network
-  aimeat maintenance on [MSG]  Enable maintenance mode (optional message)
-  aimeat maintenance off       Disable maintenance mode
-  aimeat maintenance           Show maintenance status
-  aimeat backup  [FILE]       Export all data to JSON
-  aimeat restore <FILE>       Import data from JSON backup
+  aimeat start [options]         Start the node
+  aimeat serve [options]         Alias for start
+  aimeat config                  Show all settings and their current values
+  aimeat config export [opts]    Export config (--format env|ini|json|consul)
+  aimeat config import [opts]    Import config to database (--file <path> | --from consul)
+  aimeat validate                Validate configuration (env, files, database)
+  aimeat check                   Alias for validate
+  aimeat init                    Interactive config wizard (generates .env, .ini, or .json)
+  aimeat join [URL]              Join a federation network
+  aimeat maintenance on [MSG]    Enable maintenance mode (optional message)
+  aimeat maintenance off         Disable maintenance mode
+  aimeat maintenance             Show maintenance status
+  aimeat backup  [FILE]          Export all data to JSON
+  aimeat restore <FILE>          Import data from JSON backup
 
-OPTIONS
-  -p, --port <port>          HTTP port (default: 40050)
-  --db <url>                 MongoDB connection URL
-  --node-id <id>             Node identity string
-  --admin-password <pw>      Operator admin secret
-  -c, --config <path>        Config file path (JSON)
-  -h, --help                 Show this help
-  -v, --version              Show version
+START OPTIONS
+  --db <type>              Storage type: mongodb, sqlite, memory
+  --db-url <url>           Database connection URL (MongoDB)
+  --db-path <path>         SQLite database file path
+  -p, --port <port>        HTTP port (default: 40050)
+  --node-id <id>           Node identity string
+  --admin-password <pw>    Operator admin secret
+  -c, --config <path>      Config file path (JSON)
+  --consul <url>           Enable Consul and set URL (e.g., http://consul:8500)
+  --consul-prefix <prefix> Consul KV prefix (default: aimeat/config)
+  --consul-token <token>   Consul ACL token
+  -h, --help               Show this help
+  -v, --version            Show version
+
+CONFIG EXPORT OPTIONS
+  --format <fmt>           Output format: env, ini, json, consul
+
+CONFIG IMPORT OPTIONS
+  --file <path>            Import from file (.env, .ini, or .json)
+  --from consul            Import from Consul KV into database
 
 QUICK START
   1. Run "aimeat init" to create a config (interactive wizard)
   2. Run "aimeat validate" to check for problems
   3. Run "aimeat start" to launch the node
 
+MIGRATION: .env to database
+  1. aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
+  2. aimeat config import --file .env
+  3. Manage config via admin dashboard (changes persist to database)
+
+CONFIG SOURCES (highest priority first)
+  1. CLI args (--port, --db, etc.)
+  2. Database (admin dashboard changes, persistent)
+  3. Consul KV (fleet management, live reload)
+  4. aimeat.ini / aimeat.json (in working directory)
+  5. .env file / environment variables
+  6. Built-in defaults
+
 MULTIPLE ENVIRONMENTS
-  aimeat init creates .env (default) or named JSON config files.
-  Use JSON configs to manage multiple environments on one machine:
+  aimeat init creates .env (default) or named config files.
+  Use config files to manage multiple environments on one machine:
     aimeat start --config production.json
     aimeat start --config staging.json
 `;
@@ -103,44 +138,61 @@ if (envPath) {
   }
 }
 
-// Load config file: explicit --config flag, or auto-detect aimeat.config.json in CWD
-let fileConfig: Record<string, string> = {};
-const configPath = values.config ?? (existsSync('aimeat.config.json') ? 'aimeat.config.json' : null);
-if (configPath) {
-  try {
-    fileConfig = JSON.parse(readFileSync(configPath, 'utf-8'));
-  } catch (err) {
-    console.error(`Error reading config file: ${configPath}`);
-    process.exit(1);
-  }
+// Build CLI overrides from flags (dot-path keyed for unified config)
+const cliOverrides: Record<string, string> = {};
+if (values.port) cliOverrides['node.port'] = values.port;
+if (values.db) cliOverrides['storage.type'] = values.db;
+if (values['db-url']) cliOverrides['database_url'] = values['db-url'];
+if (values['db-path']) cliOverrides['sqlite_path'] = values['db-path'];
+if (values['node-id']) cliOverrides['node.id'] = values['node-id'];
+if (values['admin-password']) cliOverrides['admin_password'] = values['admin-password'];
+if (values.consul) {
+  cliOverrides['consul.enabled'] = 'true';
+  cliOverrides['consul.url'] = values.consul;
 }
+if (values['consul-prefix']) cliOverrides['consul.prefix'] = values['consul-prefix'];
+if (values['consul-token']) cliOverrides['consul.token'] = values['consul-token'];
 
-// CLI flags override config file override env vars
-if (values.port) process.env.AIMEAT_PORT = values.port;
-else if (fileConfig.port) process.env.AIMEAT_PORT = String(fileConfig.port);
-
-if (values.db) process.env.DATABASE_URL = values.db;
-else if (fileConfig.db) process.env.DATABASE_URL = fileConfig.db;
-
-if (values['node-id']) process.env.AIMEAT_NODE_ID = values['node-id'];
-else if (fileConfig.nodeId) process.env.AIMEAT_NODE_ID = fileConfig.nodeId;
-
-if (values['admin-password']) process.env.AIMEAT_ADMIN_PASSWORD = values['admin-password'];
-else if (fileConfig.adminPassword) process.env.AIMEAT_ADMIN_PASSWORD = fileConfig.adminPassword;
-
-if (fileConfig.jwtTtlSeconds) process.env.AIMEAT_JWT_TTL = String(fileConfig.jwtTtlSeconds);
-if (fileConfig.welcomeBonus) process.env.AIMEAT_WELCOME_BONUS = String(fileConfig.welcomeBonus);
-if (fileConfig.dailyAllowance) process.env.AIMEAT_DAILY_ALLOWANCE = String(fileConfig.dailyAllowance);
-if (fileConfig.dailyAllowanceCap) process.env.AIMEAT_DAILY_ALLOWANCE_CAP = String(fileConfig.dailyAllowanceCap);
-if (fileConfig.burnRate) process.env.AIMEAT_BURN_RATE = String(fileConfig.burnRate);
-
-const config = loadConfig();
+const { config, envKeys, fileKeys, cliKeys, fileName } = loadConfig({
+  configPath: values.config,
+  cliOverrides: Object.keys(cliOverrides).length > 0 ? cliOverrides : undefined,
+});
 const subcommand = positionals[0];
 
 // Handle subcommands
 if (subcommand === 'config') {
+  const configAction = positionals[1]; // export | import | undefined (show)
+
+  if (configAction === 'export') {
+    const format = (values.format as string) || 'env';
+    if (!['env', 'ini', 'json', 'consul'].includes(format)) {
+      console.error(`Unknown export format: ${format}. Use: env, ini, json, consul`);
+      process.exit(1);
+    }
+    const { runConfigExport } = await import('./cli/config-export.js');
+    await runConfigExport(config, format as 'env' | 'ini' | 'json' | 'consul');
+    process.exit(0);
+  }
+
+  if (configAction === 'import') {
+    const { runConfigImport } = await import('./cli/config-import.js');
+    await runConfigImport(config, {
+      file: values.file as string | undefined,
+      from: values.from as string | undefined,
+    });
+    process.exit(0);
+  }
+
+  // Default: show config
   const { formatConfig } = await import('./utils/env-config.js');
-  console.log(formatConfig(config));
+  const { ConfigProvenance } = await import('./services/config-provenance.js');
+  const { ALL_CONFIG_MAP } = await import('./services/config-schema.js');
+  const prov = new ConfigProvenance();
+  prov.initDefaults(Object.keys(ALL_CONFIG_MAP));
+  if (envKeys.length > 0) prov.markEnv(envKeys);
+  if (fileKeys.length > 0) prov.markFile(fileKeys);
+  if (cliKeys.length > 0) prov.markEnv(cliKeys); // CLI overrides show as 'env' in display
+  console.log(formatConfig(config, prov));
   process.exit(0);
 } else if (subcommand === 'init') {
   const { runInitWizard } = await import('./cli/init-wizard.js');
@@ -254,7 +306,7 @@ if (subcommand === 'config') {
   if (!config.adminPassword) {
     config.adminPassword = randomBytes(16).toString('base64url');
   }
-  const { app, tunnelManager, realtimeManager, storage } = await createServer(config);
+  const { app, tunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
   const server = app.listen(config.port, () => {
     // ── Node type banner ──
     const bannerLabel =

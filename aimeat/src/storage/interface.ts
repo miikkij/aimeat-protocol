@@ -847,6 +847,7 @@ import type { AuthRepository } from './repositories/auth.repository.js';
 import type { SessionRepository } from './repositories/session.repository.js';
 import type { AppRepository } from './repositories/app.repository.js';
 import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
+import type { ConfigRepository } from './repositories/config.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -857,4 +858,4 @@ export interface Storage extends
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
   AuthRepository, SessionRepository,
-  AppRepository, AppMarketplaceRepository { }
+  AppRepository, AppMarketplaceRepository, ConfigRepository { }

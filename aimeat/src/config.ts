@@ -1,3 +1,7 @@
+import { loadFileSource } from './services/config-loader.js';
+import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
+import type { ConfigProvenance } from './services/config-provenance.js';
+
 export interface ExtensionHooks {
   pre_owner_registration: string[];
   post_owner_registration: string[];
@@ -237,9 +241,75 @@ export interface AimeatConfig {
 
   // CORS
   corsAllowedOrigins: string[];
+
+  // Consul (fleet management)
+  consulEnabled: boolean;
+  consulUrl: string;
+  consulPrefix: string;
+  consulToken: string;
+  consulWatchIntervalSeconds: number;
+  consulDatacenter: string;
 }
 
-export function loadConfig(): AimeatConfig {
+export interface LoadConfigOptions {
+  /** Path to config file (from --config CLI arg) */
+  configPath?: string;
+  /** CLI bootstrap overrides keyed by dot-path (e.g. { 'node.port': '8080' }) */
+  cliOverrides?: Record<string, string>;
+}
+
+export interface LoadConfigResult {
+  config: AimeatConfig;
+  /** Dot-paths that resolved from env vars */
+  envKeys: string[];
+  /** Dot-paths that resolved from file config (aimeat.ini / aimeat.json) */
+  fileKeys: string[];
+  /** Dot-paths that resolved from CLI args */
+  cliKeys: string[];
+  /** Name of the file source (e.g. 'file:/path/to/aimeat.ini'), null if no file found */
+  fileName: string | null;
+}
+
+export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
+  const { configPath, cliOverrides } = options ?? {};
+
+  // ── Source tracking for provenance ──
+  const cliKeys: string[] = [];
+  const envKeys: string[] = [];
+  const fileKeys: string[] = [];
+
+  // 1. Apply CLI overrides to process.env (highest non-DB priority)
+  if (cliOverrides) {
+    for (const [dotPath, value] of Object.entries(cliOverrides)) {
+      const envVar = DOT_PATH_TO_ENV[dotPath];
+      if (envVar) {
+        process.env[envVar] = value;
+        cliKeys.push(dotPath);
+      }
+    }
+  }
+
+  // 2. Track which env vars are already set (before file population)
+  for (const field of CONFIG_FIELDS) {
+    if (process.env[field.envVar] !== undefined && !cliKeys.includes(field.dotPath)) {
+      envKeys.push(field.dotPath);
+    }
+  }
+
+  // 3. Load file config and populate process.env for unset values
+  const fileSource = loadFileSource(configPath);
+  if (fileSource) {
+    for (const [dotPath, value] of Object.entries(fileSource.values)) {
+      const envVar = DOT_PATH_TO_ENV[dotPath];
+      if (envVar && process.env[envVar] === undefined) {
+        process.env[envVar] = value;
+        fileKeys.push(dotPath);
+      }
+    }
+    console.log(`[config] Loaded ${Object.keys(fileSource.values).length} values from ${fileSource.name}`);
+  }
+
+  // ── Build config from process.env (now includes CLI + env + file layers) ──
   const nodeType = (process.env.AIMEAT_NODE_TYPE ?? 'full') as NodeType;
   if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
@@ -247,7 +317,7 @@ export function loadConfig(): AimeatConfig {
 
   const port = parseInt(process.env.AIMEAT_PORT ?? '40050', 10);
 
-  return {
+  const config: AimeatConfig = {
     port,
     baseUrl: process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`,
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
@@ -425,6 +495,14 @@ export function loadConfig(): AimeatConfig {
     // CORS
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
 
+    // Consul
+    consulEnabled: process.env.AIMEAT_CONSUL_ENABLED === 'true',
+    consulUrl: process.env.AIMEAT_CONSUL_URL ?? 'http://localhost:8500',
+    consulPrefix: process.env.AIMEAT_CONSUL_PREFIX ?? 'aimeat/config',
+    consulToken: process.env.AIMEAT_CONSUL_TOKEN ?? '',
+    consulWatchIntervalSeconds: parseInt(process.env.AIMEAT_CONSUL_WATCH_INTERVAL ?? '30', 10),
+    consulDatacenter: process.env.AIMEAT_CONSUL_DATACENTER ?? '',
+
     rateLimits: {
       global: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_GLOBAL ?? '300', 10) },
       auth: { windowMs: 1_000, max: parseInt(process.env.AIMEAT_RL_AUTH ?? '20', 10) },
@@ -434,4 +512,50 @@ export function loadConfig(): AimeatConfig {
       roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },
   };
+
+  return { config, envKeys, fileKeys, cliKeys, fileName: fileSource?.name ?? null };
+}
+
+// ── Database Config Overrides ──
+
+import type { Storage } from './storage/interface.js';
+
+/**
+ * Apply config overrides from database (called after storage is initialized).
+ * Only applies to mutable fields — immutable fields are ignored.
+ * Updates provenance registry.
+ */
+export async function applyConfigOverrides(
+  config: AimeatConfig,
+  storage: Storage,
+  provenance: ConfigProvenance,
+): Promise<{ applied: string[]; skipped: string[] }> {
+  if (!storage.supportsConfigPersistence()) {
+    return { applied: [], skipped: [] };
+  }
+
+  const dbValues = await storage.getAllConfigValues();
+  const applied: string[] = [];
+  const skipped: string[] = [];
+
+  for (const [dotPath, rawValue] of Object.entries(dbValues)) {
+    if (isImmutable(dotPath)) {
+      skipped.push(dotPath);
+      continue;
+    }
+    const field = MUTABLE_CONFIG_MAP[dotPath];
+    if (!field) { skipped.push(dotPath); continue; }
+
+    try {
+      const value = parseConfigValue(field, rawValue);
+      if (!field.validate(value)) { skipped.push(dotPath); continue; }
+      (config as any)[field.key] = value;
+      applied.push(dotPath);
+    } catch {
+      skipped.push(dotPath);
+    }
+  }
+
+  if (applied.length > 0) provenance.markDatabase(applied);
+  return { applied, skipped };
 }

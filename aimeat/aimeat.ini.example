@@ -1,0 +1,68 @@
+; AIMEAT Node Configuration
+; Copy to aimeat.ini and adjust values.
+; Precedence: Database > Consul > this file > .env > defaults
+; Note: In-memory nodes cannot persist config to database.
+;       Use this file or .env for in-memory node configuration.
+
+[node]
+id = aimeat-local-001-dev
+port = 40050
+type = full
+
+[storage]
+type = mongodb
+; database_url = mongodb://localhost:27017/aimeat
+; sqlite_path = ./data/aimeat.db
+
+[auth]
+jwt_ttl_seconds = 3600
+
+[morsel_policy]
+welcome_bonus = 100
+daily_allowance = 50
+daily_allowance_cap = 500
+burn_rate = 0.10
+max_operator_mint_per_day = 10000
+board_post_base_cost = 5
+board_post_cost_per_kb = 2
+
+[features]
+keyed_browse_enabled = true
+extended_features_enabled = true
+
+[work]
+queue_max_pending = 10
+webhook_max_retries = 5
+
+[quota]
+memory_mb = 10
+storage_mb = 100
+micro_memory_kb = 500
+
+[federation]
+max_relay_hops = 3
+
+[email]
+enabled = false
+; smtp_host = smtp.example.com
+; smtp_port = 587
+
+[totp]
+enabled = true
+
+[matching]
+enabled = false
+
+[marketplace]
+enabled = false
+
+[push]
+enabled = false
+
+[consul]
+; enabled = false
+; url = http://localhost:8500
+; prefix = aimeat/config
+; token =
+; watch_interval_seconds = 30
+; datacenter =

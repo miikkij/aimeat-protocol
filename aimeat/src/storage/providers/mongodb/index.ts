@@ -2901,6 +2901,40 @@ export class MongoStorage implements Storage {
         }
         return false;
     }
+
+    // ── Config Persistence ──────────────────────────────────
+
+    supportsConfigPersistence(): boolean { return true; }
+
+    async getConfigValue(key: string): Promise<string | null> {
+        this.ensureReady();
+        const row = await this.prisma.systemSetting.findUnique({ where: { key: `config:${key}` } });
+        return row?.value ?? null;
+    }
+
+    async setConfigValue(key: string, value: string): Promise<void> {
+        this.ensureReady();
+        await this.prisma.systemSetting.upsert({
+            where: { key: `config:${key}` },
+            update: { value },
+            create: { key: `config:${key}`, value },
+        });
+    }
+
+    async deleteConfigValue(key: string): Promise<void> {
+        this.ensureReady();
+        await this.prisma.systemSetting.deleteMany({ where: { key: `config:${key}` } });
+    }
+
+    async getAllConfigValues(): Promise<Record<string, string>> {
+        this.ensureReady();
+        const rows = await this.prisma.systemSetting.findMany({
+            where: { key: { startsWith: 'config:' } },
+        });
+        const result: Record<string, string> = {};
+        for (const r of rows) result[r.key.replace('config:', '')] = r.value;
+        return result;
+    }
 }
 
 /**
