@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty } from './shared.js';
+import { dt, Empty, ExpandableHelp } from './shared.js';
 import { getCsmDetail } from '/js/services/admin.js';
 
 export default function CsmTab({ data }) {
@@ -49,6 +49,11 @@ export default function CsmTab({ data }) {
   if (!templates.length) return html`<${Empty} text=${t('dashboard.noCsmTemplates')} />`;
 
   return html`
+    <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.csmExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.csmHelpTitle')}>
+      ${t('dashboard.csmHelpDetail')}
+    <//>
+
     <div class="adm-card">
       <div class="scrollable">
         <table>

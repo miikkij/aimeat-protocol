@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, StatsGrid } from './shared.js';
+import { num, StatsGrid, ExpandableHelp } from './shared.js';
 import { runMatching } from '/js/services/admin.js';
 
 export default function MatchingTab({ data }) {
@@ -24,6 +24,9 @@ export default function MatchingTab({ data }) {
   }
 
   return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.matchingExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.matchingHelpTitle')}>${t('dashboard.matchingHelpDetail')}</${ExpandableHelp}>
+
     <${StatsGrid} items=${[
       { label: t('dashboard.totalProfiles'), value: m?.total_profiles || 0, color: '#06b6d4' },
       { label: t('dashboard.activeMatches'), value: m?.active_matches || 0, color: '#22c55e' },

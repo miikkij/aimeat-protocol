@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, StatsGrid } from './shared.js';
+import { num, StatsGrid, ExpandableHelp } from './shared.js';
 import { rebuildDirectory } from '/js/services/admin.js';
 
 export default function DirectoryTab({ data }) {
@@ -24,6 +24,9 @@ export default function DirectoryTab({ data }) {
   }
 
   return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.directoryExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.directoryHelpTitle')}>${t('dashboard.directoryHelpDetail')}</${ExpandableHelp}>
+
     <${StatsGrid} items=${[
       { label: t('dashboard.totalEntries'), value: dir?.total || 0, color: '#06b6d4' },
       { label: t('dashboard.cities'), value: dir?.cities || 0, color: '#22c55e' },

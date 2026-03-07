@@ -3,7 +3,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, Empty } from './shared.js';
+import { dt, Badge, StatsGrid, Empty, ExpandableHelp } from './shared.js';
 import { updateGhiiLevel, deleteGhii } from '/js/services/admin.js';
 
 export default function GhiiTab({ data, reload }) {
@@ -23,22 +23,19 @@ export default function GhiiTab({ data, reload }) {
   return html`
     <div class="adm-card" style="margin-bottom:12px">
       <h2>GHII <span style="font-weight:400;font-size:.85rem;color:var(--text-dim)">— ${t('dashboard.ghiiExplain')}</span></h2>
-      <details style="margin-top:8px">
-        <summary style="cursor:pointer;color:var(--text-dim);font-size:.85rem">${t('dashboard.ghiiLevelsTitle')}</summary>
-        <div style="margin-top:8px;font-size:.85rem;color:var(--text-dim);line-height:1.6">
+      <${ExpandableHelp} title=${t('dashboard.ghiiLevelsTitle')}>
+        <div>
           <div style="margin-bottom:4px"><${Badge} type="critical" /> ${t('dashboard.ghiiLevelL0')}</div>
           <div style="margin-bottom:4px"><${Badge} type="watch" /> ${t('dashboard.ghiiLevelL1')}</div>
           <div style="margin-bottom:4px"><${Badge} type="healthy" /> ${t('dashboard.ghiiLevelL2')}</div>
         </div>
-      </details>
-      <details style="margin-top:6px">
-        <summary style="cursor:pointer;color:var(--text-dim);font-size:.85rem">TOTP</summary>
-        <p style="margin-top:6px;font-size:.85rem;color:var(--text-dim);line-height:1.5">${t('dashboard.ghiiTotpExplain')}</p>
-      </details>
-      <details style="margin-top:6px">
-        <summary style="cursor:pointer;color:var(--text-dim);font-size:.85rem">${t('dashboard.ghiiVerificationExplain').split('.')[0]}</summary>
-        <p style="margin-top:6px;font-size:.85rem;color:var(--text-dim);line-height:1.5">${t('dashboard.ghiiVerificationExplain')}</p>
-      </details>
+      </${ExpandableHelp}>
+      <${ExpandableHelp} title="TOTP">
+        <p>${t('dashboard.ghiiTotpExplain')}</p>
+      </${ExpandableHelp}>
+      <${ExpandableHelp} title=${t('dashboard.ghiiVerificationExplain').split('.')[0]}>
+        <p>${t('dashboard.ghiiVerificationExplain')}</p>
+      </${ExpandableHelp}>
     </div>
 
     <${StatsGrid} items=${[

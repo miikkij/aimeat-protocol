@@ -257,6 +257,42 @@
   border-radius: 8px;
 }
 
+/* Expandable help sections */
+.adm-help {
+  margin-bottom: 12px;
+  border: 1px solid var(--glass-border, #334155);
+  border-radius: 8px;
+  background: var(--bg-deep, #0f172a);
+}
+.adm-help-summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  color: var(--accent, #06b6d4);
+  font-size: .85rem;
+  font-weight: 600;
+  user-select: none;
+}
+.adm-help-summary:hover { color: var(--text-bright, #e2e8f0); }
+.adm-help-body {
+  padding: 0 14px 12px;
+  color: var(--text-dim, #94a3b8);
+  font-size: .82rem;
+  line-height: 1.6;
+}
+.adm-help-body p { margin: 0 0 8px; }
+.adm-help-body ul { margin: 4px 0 8px; padding-left: 20px; }
+.adm-help-body li { margin-bottom: 4px; }
+.adm-help-body code {
+  background: var(--glass-border, #334155);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: .78rem;
+}
+.adm-help-body strong { color: var(--text-bright, #e2e8f0); }
+
+/* Card grid for card-based layouts */
+.adm-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+
 /* Responsive */
 @media (max-width: 768px) {
   .adm-sidebar { display: none; }

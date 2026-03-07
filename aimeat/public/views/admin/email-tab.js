@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { EconRow, Empty } from './shared.js';
+import { EconRow, Empty, ExpandableHelp } from './shared.js';
 import { sendTestEmail } from '/js/services/admin.js';
 
 export default function EmailTab({ data }) {
@@ -29,6 +29,9 @@ export default function EmailTab({ data }) {
   }
 
   return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.emailExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.emailSmtpHelp')}>${t('dashboard.emailSmtpHelpDetail')}</${ExpandableHelp}>
+
     <div class="adm-card">
       <h4 style="margin:0 0 12px">${t('dashboard.smtpConfig')}</h4>
       <${EconRow} label=${t('dashboard.host')} value=${email.host || '\u2014'} />
@@ -48,6 +51,20 @@ export default function EmailTab({ data }) {
         </button>
       </div>
       ${result && html`<div style="margin-top:8px;font-size:.85rem;color:${result.ok ? '#22c55e' : '#ef4444'}">${result.msg}</div>`}
+    </div>
+
+    <div class="adm-card" style="margin-top:12px">
+      <h4 style="margin:0 0 12px">${t('dashboard.emailTemplatesTitle')}</h4>
+      <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 12px">${t('dashboard.emailTemplatesExplain')}</p>
+      <table style="width:100%">
+        <thead><tr>
+          <th>${t('dashboard.emailTemplateWelcome')}</th>
+          <th>${t('dashboard.emailTemplateReset')}</th>
+          <th>${t('dashboard.emailTemplateNotification')}</th>
+          <th>${t('dashboard.emailTemplateVerification')}</th>
+        </tr></thead>
+      </table>
+      <p style="color:var(--text-dim);font-size:.85rem;margin-top:8px">${t('dashboard.emailNoTemplates')}</p>
     </div>
   `;
 }

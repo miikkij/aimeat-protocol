@@ -84,6 +84,14 @@ export function ErrorBox({ message }) {
   return html`<div class="error-box"><strong>Error</strong><br/>${escHtml(message)}</div>`;
 }
 
+/** Expandable/collapsible help section — reusable across all tabs and portal pages */
+export function ExpandableHelp({ title, children }) {
+  return html`<details class="adm-help">
+    <summary class="adm-help-summary">${title}</summary>
+    <div class="adm-help-body">${children}</div>
+  </details>`;
+}
+
 /** Simple data table */
 export function DataTable({ headers, rows, scroll }) {
   return html`<div class="adm-card">

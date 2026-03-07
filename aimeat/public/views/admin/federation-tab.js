@@ -3,7 +3,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, EconRow, Empty } from './shared.js';
+import { dt, Badge, EconRow, Empty, ExpandableHelp } from './shared.js';
 
 export default function FederationTab({ data }) {
   const fed = data.federation;
@@ -12,6 +12,11 @@ export default function FederationTab({ data }) {
   const peers = fed.peers || [];
 
   return html`
+    <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.federationExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.federationHelpTitle')}>
+      ${t('dashboard.federationHelpDetail')}
+    <//>
+
     <div class="adm-card">
       <h4 style="margin:0 0 12px">${t('dashboard.federationInfo')}</h4>
       <${EconRow} label=${t('dashboard.nodeId')} value=${fed.node_id || '\u2014'} />

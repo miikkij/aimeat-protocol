@@ -3,7 +3,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, Empty } from './shared.js';
+import { dt, Badge, StatsGrid, Empty, ExpandableHelp } from './shared.js';
 import { approveGenesisPeer, suspendGenesisPeer, removeGenesisPeer } from '/js/services/admin.js';
 
 export default function GenesisTab({ data, reload }) {
@@ -19,6 +19,11 @@ export default function GenesisTab({ data, reload }) {
   }
 
   return html`
+    <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.genesisExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.genesisHelpTitle')}>
+      ${t('dashboard.genesisHelpDetail')}
+    <//>
+
     <${StatsGrid} items=${[
       { label: t('dashboard.totalPeers'), value: peers.length, color: '#06b6d4' },
       { label: t('dashboard.approved'), value: peers.filter(p => p.status === 'approved' || p.status === 'active').length, color: '#22c55e' },

@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge } from './shared.js';
+import { dt, Badge, ExpandableHelp } from './shared.js';
 import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
   getSiteMemoryKeys, getSitePrompt, addMemory, deleteMemory, triggerLbSync,
@@ -111,22 +111,19 @@ export default function PortalTab({ data, reload }) {
     <!-- Template editor -->
     <div class="adm-card">
       <h3>${t('dashboard.portalTemplate')}</h3>
-      <details style="margin-bottom:8px;color:var(--text-dim);font-size:.85rem">
-        <summary style="cursor:pointer;color:var(--text-bright)">${t('dashboard.portalTagHelpTitle')}</summary>
-        <div style="margin-top:8px">
-          <p style="margin-bottom:8px">${t('dashboard.portalTagHelpDetail')}</p>
-          <table>
-            <thead><tr><th>Tag</th><th>${t('dashboard.details')}</th></tr></thead>
-            <tbody>
-              <tr><td><code>\{\{config:node_id\}\}</code></td><td>${t('dashboard.tagExConfig')}</td></tr>
-              <tr><td><code>\{\{memory:portal/welcome\}\}</code></td><td>${t('dashboard.tagExMemory')}</td></tr>
-              <tr><td><code>\{\{storage:type\}\}</code></td><td>${t('dashboard.tagExStorage')}</td></tr>
-              <tr><td><code>\{\{kv:site_name\}\}</code></td><td>${t('dashboard.tagExKv')}</td></tr>
-              <tr><td><code>\{\{board:general\}\}</code></td><td>${t('dashboard.tagExBoard')}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </details>
+      <${ExpandableHelp} title=${t('dashboard.portalTagHelpTitle')}>
+        <p>${t('dashboard.portalTagHelpDetail')}</p>
+        <table>
+          <thead><tr><th>Tag</th><th>${t('dashboard.details')}</th></tr></thead>
+          <tbody>
+            <tr><td><code>\{\{config:node_id\}\}</code></td><td>${t('dashboard.tagExConfig')}</td></tr>
+            <tr><td><code>\{\{memory:portal/welcome\}\}</code></td><td>${t('dashboard.tagExMemory')}</td></tr>
+            <tr><td><code>\{\{storage:type\}\}</code></td><td>${t('dashboard.tagExStorage')}</td></tr>
+            <tr><td><code>\{\{kv:site_name\}\}</code></td><td>${t('dashboard.tagExKv')}</td></tr>
+            <tr><td><code>\{\{board:general\}\}</code></td><td>${t('dashboard.tagExBoard')}</td></tr>
+          </tbody>
+        </table>
+      </${ExpandableHelp}>
       <textarea rows="20" value=${template} onInput=${e => setTemplate(e.target.value)}
         style="width:100%;font-family:monospace;font-size:13px;padding:12px;border:1px solid var(--glass-border);border-radius:8px;background:var(--glass-bg);color:var(--text-bright);resize:vertical"></textarea>
       <div style="margin-top:8px;display:flex;gap:8px">

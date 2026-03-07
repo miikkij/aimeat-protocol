@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty } from './shared.js';
+import { dt, Badge, Empty, ExpandableHelp } from './shared.js';
 import { getMsmDetail } from '/js/services/admin.js';
 
 export default function MsmTab({ data }) {
@@ -43,6 +43,11 @@ export default function MsmTab({ data }) {
   if (!integrations.length) return html`<${Empty} text=${t('dashboard.noMsmIntegrations')} />`;
 
   return html`
+    <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.msmExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.msmHelpTitle')}>
+      ${t('dashboard.msmHelpDetail')}
+    <//>
+
     <div class="adm-card">
       <div class="scrollable">
         <table>

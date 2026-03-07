@@ -3,6 +3,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { ExpandableHelp } from './shared.js';
 import { deleteHook } from '/js/services/admin.js';
 
 export default function HooksTab({ data, reload }) {
@@ -34,10 +35,9 @@ export default function HooksTab({ data, reload }) {
     <div class="adm-card">
       <h2>${t('dashboard.extensionHooks')}</h2>
       <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:8px">${t('dashboard.hooksExplain')}</p>
-      <details style="margin-bottom:12px">
-        <summary style="cursor:pointer;color:var(--text-dim);font-size:.8rem">${t('dashboard.hooksWhatAre')}</summary>
-        <p style="color:var(--text-dim);font-size:.8rem;margin-top:6px;line-height:1.5">${t('dashboard.hooksWhatAreDetail')}</p>
-      </details>
+      <${ExpandableHelp} title=${t('dashboard.hooksWhatAre')}>
+        <p>${t('dashboard.hooksWhatAreDetail')}</p>
+      </${ExpandableHelp}>
       <div class="scrollable">
         <table>
           <thead><tr><th>${t('dashboard.hook')}</th><th>${t('dashboard.details')}</th><th>${t('dashboard.boundActions')}</th><th></th></tr></thead>

@@ -3,7 +3,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { num, dt, StatsGrid, Empty } from './shared.js';
+import { num, dt, StatsGrid, Empty, ExpandableHelp } from './shared.js';
 
 export default function PushTab({ data }) {
   const push = data.push;
@@ -12,6 +12,9 @@ export default function PushTab({ data }) {
   const subs = push.subscriptions || [];
 
   return html`
+    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.pushExplain')}</p>
+    <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
+
     <${StatsGrid} items=${[
       { label: t('dashboard.totalSubscriptions'), value: push.total || subs.length, color: '#06b6d4' },
       { label: t('dashboard.activeSubscriptions'), value: subs.filter(s => s.active !== false).length, color: '#22c55e' },
