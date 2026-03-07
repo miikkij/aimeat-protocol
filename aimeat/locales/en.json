@@ -2619,5 +2619,109 @@
     "importConfirm": "Import {mutable} mutable values to database? ({immutable} immutable and {unknown} unknown will be skipped)",
     "exportSuccess": "Exported {count} config values in {format} format",
     "migrationHint": "Tip: To migrate .env to database, run: aimeat config import --file .env"
+  },
+  "knowledge": {
+    "tabLabel": "Knowledge",
+    "actionBar": {
+      "copyHumanPrompt": "Copy Prompt for AI Chat",
+      "copyAgentPrompt": "Copy Prompt for OpenClaw",
+      "description": "Use these prompts to package research, ideas, or any content into structured knowledge. Paste the prompt into your AI Chat or give it to your OpenClaw agent."
+    },
+    "import": {
+      "title": "Import Knowledge Package",
+      "placeholder": "Paste what your AI Chat produced here",
+      "uploadFile": "Upload File",
+      "agentNote": "Agents upload automatically — you don't need to paste anything if you used OpenClaw.",
+      "preview": "Package Preview",
+      "ghiiConfirm": "This will be stored under: {ghii}",
+      "ghiiMismatch": "This package was created for {ghii}. Import anyway as your own?",
+      "catalogToggle": "List in shared knowledge catalog?",
+      "organismShare": "Share with an organism?",
+      "confirmImport": "Confirm Import",
+      "willCreate": "Will create {entries} memories and {consents} consent grants",
+      "success": "Package imported successfully!",
+      "error": "Failed to import package"
+    },
+    "myKnowledge": {
+      "title": "My Knowledge",
+      "empty": "No knowledge packages yet. Use the prompts above to create your first package!",
+      "cloned": "Cloned",
+      "draft": "Draft",
+      "entries": "{count} entries",
+      "clones": "{count} clones",
+      "viewEdit": "View / Edit",
+      "shareSettings": "Share Settings",
+      "export": "Export"
+    },
+    "sharedWithMe": {
+      "title": "Shared With Me",
+      "empty": "No one has shared knowledge packages with you yet.",
+      "cloneToMine": "Clone to My Knowledge",
+      "viewOriginal": "View Original"
+    },
+    "organisms": {
+      "title": "Knowledge Organisms",
+      "empty": "You're not part of any knowledge-sharing organisms.",
+      "contribute": "Contribute",
+      "packages": "{count} packages",
+      "members": "{count} members"
+    },
+    "discover": {
+      "title": "Discover",
+      "search": "Search knowledge...",
+      "empty": "No shared knowledge packages found.",
+      "cloneToMine": "Clone to My Knowledge",
+      "viewDetails": "View Details",
+      "trustAdvisory": "Verify critical information independently before relying on it."
+    },
+    "contentTypes": {
+      "idea": "Idea",
+      "research": "Research",
+      "plan": "Plan",
+      "dataset": "Dataset",
+      "document": "Document",
+      "tutorial": "Tutorial",
+      "collection": "Collection",
+      "article": "Article",
+      "story": "Story",
+      "fiction": "Fiction"
+    },
+    "synthesis": {
+      "original": "Original",
+      "assisted": "AI Assisted",
+      "synthesized": "AI Synthesized",
+      "ai-generated": "AI Generated"
+    },
+    "maturity": {
+      "draft": "Draft",
+      "review": "In Review",
+      "published": "Published"
+    },
+    "visibility": {
+      "public": "Public",
+      "private": "Private",
+      "owner": "Shared"
+    },
+    "operator": {
+      "tabLabel": "Knowledge",
+      "review": "Review",
+      "reasons": {
+        "routine_review": "Routine review",
+        "legal_compliance": "Legal compliance check",
+        "community_report": "Community report",
+        "content_quality": "Content quality check",
+        "storage_issue": "Storage issue",
+        "custom": "Custom"
+      },
+      "actions": {
+        "approve": "Approve",
+        "flag": "Flag",
+        "delist": "Delist",
+        "restrict": "Restrict",
+        "note": "Add Note"
+      },
+      "reviewedBy": "Reviewed by {operator} on {date}",
+      "reason": "Reason: {reason}"
+    }
   }
 }

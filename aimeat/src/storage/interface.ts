@@ -836,6 +836,94 @@ export interface CortexExtensionRecord {
   activationArtifacts: CortexActivationArtifacts;
 }
 
+// ── Knowledge System types ──────────────────────────────────────────
+
+export type KnowledgeContentType =
+  | 'idea' | 'research' | 'plan' | 'dataset' | 'document'
+  | 'tutorial' | 'collection' | 'article' | 'story' | 'fiction';
+
+export type KnowledgeSynthesisLevel = 'original' | 'assisted' | 'synthesized' | 'ai-generated';
+export type KnowledgeMaturity = 'draft' | 'review' | 'published';
+export type KnowledgeLinkRelation = 'related-to' | 'extends' | 'derived-from' | 'contradicts' | 'supersedes' | 'references';
+
+export interface KnowledgeReference {
+  url: string;
+  title: string;
+  accessed: string;           // ISO 8601
+  verified: boolean;
+  note?: string;
+}
+
+export interface KnowledgeEntryDescriptor {
+  key: string;
+  title: string;
+  visibility: 'private' | 'owner' | 'public';
+  schema?: string;
+}
+
+export interface KnowledgeLink {
+  target: string;
+  relation: KnowledgeLinkRelation;
+  description: string;
+  linked_at: string;          // ISO 8601
+}
+
+export interface KnowledgeSynthesis {
+  level: KnowledgeSynthesisLevel;
+  description: string;
+  model?: string;
+}
+
+export interface KnowledgeSharing {
+  catalog_listed: boolean;
+  allow_clone: boolean;
+  license?: string;
+  morsel_price: number;       // 0 = free
+}
+
+export interface KnowledgeManifest {
+  type: 'knowledge-package';
+  name: string;
+  version: string;
+  author: string;             // GHII of the package creator
+  created: string;            // ISO 8601
+  updated: string;            // ISO 8601
+  content_type: KnowledgeContentType;
+  tags: string[];
+  language: string;           // ISO 639-1
+  maturity: KnowledgeMaturity;
+  synthesis: KnowledgeSynthesis;
+  references: KnowledgeReference[];
+  entries: KnowledgeEntryDescriptor[];
+  links: KnowledgeLink[];
+  sharing: KnowledgeSharing;
+}
+
+export interface MemoryLinkRecord {
+  source: string;             // Source memory key
+  target: string;             // Target memory key
+  relation: KnowledgeLinkRelation;
+  description: string;
+  linked_at: string;          // ISO 8601
+  linked_by: string;          // GHII of who created the link
+}
+
+export type OperatorReviewReason =
+  | 'routine_review' | 'legal_compliance' | 'community_report'
+  | 'content_quality' | 'storage_issue' | 'custom';
+
+export type OperatorReviewAction = 'approve' | 'flag' | 'delist' | 'restrict' | 'note';
+
+export interface OperatorReviewRecord {
+  id: string;                 // UUID
+  packageId: string;          // The packages/{uuid}/manifest key
+  operatorGaii: string;       // Operator who reviewed
+  reason: OperatorReviewReason;
+  customText?: string;        // For 'custom' reason
+  action: OperatorReviewAction;
+  timestamp: string;          // ISO 8601
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -864,6 +952,7 @@ import type { AppRepository } from './repositories/app.repository.js';
 import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
 import type { ConfigRepository } from './repositories/config.repository.js';
 import type { NotificationTemplateRepository } from './repositories/notification-template.repository.js';
+import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -875,4 +964,5 @@ export interface Storage extends
   FederationRepository, NodeRepository, NotificationRepository,
   AuthRepository, SessionRepository,
   AppRepository, AppMarketplaceRepository, ConfigRepository,
-  NotificationTemplateRepository { }
+  NotificationTemplateRepository,
+  KnowledgeRepository { }

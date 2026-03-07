@@ -24,12 +24,14 @@ import AccessTab from './profile/access-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import SecurityTab from './profile/security-tab.js';
+import KnowledgeTab from './profile/knowledge-tab.js';
 
 const TABS = [
   { id: 'portfolio',    key: 'portfolio.tabLabel',         component: PortfolioTab },
   { id: 'agents',       key: 'profile.tabs.agents',        component: AgentsTab },
   { id: 'chatsessions', key: 'profile.tabs.chatSessions',  component: ChatSessionsTab },
   { id: 'wallet',       key: 'profile.tabs.wallet',        component: WalletTab },
+  { id: 'knowledge',    key: 'knowledge.tabLabel',          component: KnowledgeTab },
   { id: 'memory',       key: 'profile.tabs.memory',        component: MemoryTab },
   { id: 'work',         key: 'profile.tabs.work',          component: WorkTab },
   { id: 'actions',      key: 'profile.tabs.services',      component: ServicesTab },

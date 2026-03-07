@@ -39,6 +39,7 @@ import MsmTab          from './admin/msm-tab.js';
 import FederationTab   from './admin/federation-tab.js';
 import GenesisTab      from './admin/genesis-tab.js';
 import ConsulTab       from './admin/consul-tab.js';
+import KnowledgeAdminTab from './admin/knowledge-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -74,6 +75,7 @@ const NAV_GROUPS = [
     { id: 'matching',    icon: '\u{1F91D}', key: 'dashboard.matching',       component: MatchingTab },
     { id: 'marketplace', icon: '\u{1F6D2}', key: 'dashboard.marketplace',    component: MarketplaceTab },
     { id: 'csm',         icon: '\u{1F4E6}', key: 'dashboard.csmManagement',  component: CsmTab },
+    { id: 'knowledge',   icon: '\u{1F9E0}', key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
   ]},
   { key: 'dashboard.navIntegrations', items: [
     { id: 'msm', icon: '\u{1F50C}', key: 'dashboard.msmManagement', component: MsmTab, count: 'msm' },

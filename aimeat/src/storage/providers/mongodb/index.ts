@@ -44,6 +44,7 @@ import type {
     PersonalPushSubscriptionRecord, NotificationPreferences,
     AppRecord, AppListOptions, AppPurchaseRecord,
     NotificationTemplateRecord,
+    MemoryLinkRecord, OperatorReviewRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -2958,6 +2959,73 @@ export class MongoStorage implements Storage {
         const result: Record<string, string> = {};
         for (const r of rows) result[r.key.replace('config:', '')] = r.value;
         return result;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Knowledge: Memory Links ──
+    // ══════════════════════════════════════════════════════════
+
+    private knowledgeLinks = new Map<string, MemoryLinkRecord>();
+    private knowledgeReviews = new Map<string, OperatorReviewRecord>();
+
+    async createLink(record: MemoryLinkRecord): Promise<MemoryLinkRecord> {
+        const key = `${record.source}::${record.target}`;
+        this.knowledgeLinks.set(key, record);
+        return record;
+    }
+
+    async getLink(source: string, target: string): Promise<MemoryLinkRecord | null> {
+        return this.knowledgeLinks.get(`${source}::${target}`) ?? null;
+    }
+
+    async listLinks(key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {
+        const dir = opts?.direction ?? 'both';
+        const results: MemoryLinkRecord[] = [];
+        for (const link of this.knowledgeLinks.values()) {
+            const matchDir = dir === 'both'
+                ? (link.source === key || link.target === key)
+                : dir === 'outgoing' ? link.source === key : link.target === key;
+            if (!matchDir) continue;
+            if (opts?.relation && link.relation !== opts.relation) continue;
+            results.push(link);
+        }
+        return results;
+    }
+
+    async deleteLink(source: string, target: string): Promise<boolean> {
+        return this.knowledgeLinks.delete(`${source}::${target}`);
+    }
+
+    async findBrokenLinks(ownerGaii: string): Promise<MemoryLinkRecord[]> {
+        const broken: MemoryLinkRecord[] = [];
+        for (const link of this.knowledgeLinks.values()) {
+            if (link.linked_by !== ownerGaii) continue;
+            const sourceExists = await this.getMemory(ownerGaii, link.source);
+            const targetExists = await this.getMemory(ownerGaii, link.target);
+            if (!sourceExists || !targetExists) broken.push(link);
+        }
+        return broken;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Knowledge: Operator Reviews ──
+    // ══════════════════════════════════════════════════════════
+
+    async createReview(record: OperatorReviewRecord): Promise<OperatorReviewRecord> {
+        this.knowledgeReviews.set(record.id, record);
+        return record;
+    }
+
+    async listReviews(packageId: string): Promise<OperatorReviewRecord[]> {
+        return [...this.knowledgeReviews.values()].filter(r => r.packageId === packageId);
+    }
+
+    async listAllReviews(opts?: { page?: number; perPage?: number }): Promise<OperatorReviewRecord[]> {
+        const all = [...this.knowledgeReviews.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const start = (page - 1) * perPage;
+        return all.slice(start, start + perPage);
     }
 }
 

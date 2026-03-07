@@ -20,6 +20,7 @@ import type {
   PersonalPushSubscriptionRecord, NotificationPreferences,
   AppRecord, AppListOptions, AppPurchaseRecord,
   NotificationTemplateRecord,
+  MemoryLinkRecord, OperatorReviewRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -3856,5 +3857,88 @@ export class SqliteStorage implements Storage {
     const result: Record<string, string> = {};
     for (const r of rows) result[r.key.replace('config:', '')] = r.value;
     return result;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Knowledge: Memory Links ──
+  // ══════════════════════════════════════════════════════════
+
+  async createLink(record: MemoryLinkRecord): Promise<MemoryLinkRecord> {
+    this.db.prepare(`
+      INSERT INTO knowledge_links (source, target, relation, description, linked_at, linked_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source, target) DO UPDATE SET
+        relation = excluded.relation, description = excluded.description,
+        linked_at = excluded.linked_at, linked_by = excluded.linked_by
+    `).run(record.source, record.target, record.relation, record.description, record.linked_at, record.linked_by);
+    return record;
+  }
+
+  async getLink(source: string, target: string): Promise<MemoryLinkRecord | null> {
+    const row = this.db.prepare('SELECT * FROM knowledge_links WHERE source = ? AND target = ?').get(source, target) as any;
+    return row ?? null;
+  }
+
+  async listLinks(key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {
+    const dir = opts?.direction ?? 'both';
+    let sql: string;
+    const params: string[] = [];
+
+    if (dir === 'outgoing') {
+      sql = 'SELECT * FROM knowledge_links WHERE source = ?';
+      params.push(key);
+    } else if (dir === 'incoming') {
+      sql = 'SELECT * FROM knowledge_links WHERE target = ?';
+      params.push(key);
+    } else {
+      sql = 'SELECT * FROM knowledge_links WHERE source = ? OR target = ?';
+      params.push(key, key);
+    }
+
+    if (opts?.relation) {
+      sql += ' AND relation = ?';
+      params.push(opts.relation);
+    }
+
+    return this.db.prepare(sql).all(...params) as MemoryLinkRecord[];
+  }
+
+  async deleteLink(source: string, target: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM knowledge_links WHERE source = ? AND target = ?').run(source, target);
+    return result.changes > 0;
+  }
+
+  async findBrokenLinks(ownerGaii: string): Promise<MemoryLinkRecord[]> {
+    const links = this.db.prepare('SELECT * FROM knowledge_links WHERE linked_by = ?').all(ownerGaii) as MemoryLinkRecord[];
+    const broken: MemoryLinkRecord[] = [];
+    for (const link of links) {
+      const sourceExists = await this.getMemory(ownerGaii, link.source);
+      const targetExists = await this.getMemory(ownerGaii, link.target);
+      if (!sourceExists || !targetExists) broken.push(link);
+    }
+    return broken;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Knowledge: Operator Reviews ──
+  // ══════════════════════════════════════════════════════════
+
+  async createReview(record: OperatorReviewRecord): Promise<OperatorReviewRecord> {
+    this.db.prepare(`
+      INSERT INTO knowledge_reviews (id, packageId, operatorGaii, reason, customText, action, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(record.id, record.packageId, record.operatorGaii, record.reason, record.customText ?? null, record.action, record.timestamp);
+    return record;
+  }
+
+  async listReviews(packageId: string): Promise<OperatorReviewRecord[]> {
+    return this.db.prepare('SELECT * FROM knowledge_reviews WHERE packageId = ? ORDER BY timestamp ASC').all(packageId) as OperatorReviewRecord[];
+  }
+
+  async listAllReviews(opts?: { page?: number; perPage?: number }): Promise<OperatorReviewRecord[]> {
+    const page = opts?.page ?? 1;
+    const perPage = opts?.perPage ?? 20;
+    const offset = (page - 1) * perPage;
+    return this.db.prepare('SELECT * FROM knowledge_reviews ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(perPage, offset) as OperatorReviewRecord[];
   }
 }
