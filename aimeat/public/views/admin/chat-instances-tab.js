@@ -86,6 +86,7 @@ export default function ChatInstancesTab({ data, reload }) {
   const [name, setName] = useState('');
   const [channels, setChannels] = useState([]);
   const [openChats, setOpenChats] = useState(new Set());
+  const nameRef = useRef(null);
 
   async function loadChannels() {
     try {
@@ -97,7 +98,7 @@ export default function ChatInstancesTab({ data, reload }) {
   useEffect(() => { loadChannels(); }, []);
 
   async function doCreateChannel() {
-    if (!name.trim()) return;
+    if (!name.trim()) { nameRef.current?.focus(); return; }
     const channelName = name.trim().startsWith('ops:') ? name.trim() : 'ops:' + name.trim();
     try {
       await createBoard(channelName, 'shared', t('dashboard.chatOperatorChannelsExplain'));
@@ -131,7 +132,7 @@ export default function ChatInstancesTab({ data, reload }) {
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
         <div style="flex:1;min-width:160px">
           <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.chatChannelName')}</label>
-          <input class="adm-inp" value=${name} onInput=${e => setName(e.target.value)}
+          <input ref=${nameRef} class="adm-inp" value=${name} onInput=${e => setName(e.target.value)}
             placeholder=${t('dashboard.chatChannelNamePlaceholder')}
             onKeyDown=${e => e.key === 'Enter' && doCreateChannel()}
             style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
