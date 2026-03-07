@@ -23,3 +23,4 @@ export type { AppRepository } from './app.repository.js';
 export type { AppMarketplaceRepository } from './app-marketplace.repository.js';
 export type { NotificationTemplateRepository } from './notification-template.repository.js';
 export type { KnowledgeRepository } from './knowledge.repository.js';
+export type { ExtensionInstanceRepository } from './extension-instance.repository.js';

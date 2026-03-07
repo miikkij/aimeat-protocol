@@ -46,6 +46,7 @@ import type {
     NotificationTemplateRecord,
     MemoryLinkRecord, OperatorReviewRecord,
     ScheduledJobRecord,
+    ExtensionInstanceRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3062,6 +3063,38 @@ export class MongoStorage implements Storage {
 
     async deleteScheduledJob(id: string): Promise<boolean> {
         return this.scheduledJobs.delete(id);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Extension Instances ──
+    // ══════════════════════════════════════════════════════════
+
+    private extensionInstances = new Map<string, ExtensionInstanceRecord>();
+
+    async createExtensionInstance(record: ExtensionInstanceRecord): Promise<ExtensionInstanceRecord> {
+        this.extensionInstances.set(`${record.extensionName}:${record.id}`, record);
+        return record;
+    }
+
+    async getExtensionInstance(extensionName: string, instanceId: string): Promise<ExtensionInstanceRecord | null> {
+        return this.extensionInstances.get(`${extensionName}:${instanceId}`) ?? null;
+    }
+
+    async listExtensionInstances(extensionName: string): Promise<ExtensionInstanceRecord[]> {
+        return [...this.extensionInstances.values()].filter(r => r.extensionName === extensionName);
+    }
+
+    async updateExtensionInstance(extensionName: string, instanceId: string, updates: Partial<ExtensionInstanceRecord>): Promise<ExtensionInstanceRecord | null> {
+        const key = `${extensionName}:${instanceId}`;
+        const existing = this.extensionInstances.get(key);
+        if (!existing) return null;
+        const updated = { ...existing, ...updates, extensionName, id: instanceId };
+        this.extensionInstances.set(key, updated);
+        return updated;
+    }
+
+    async deleteExtensionInstance(extensionName: string, instanceId: string): Promise<boolean> {
+        return this.extensionInstances.delete(`${extensionName}:${instanceId}`);
     }
 }
 

@@ -13,14 +13,17 @@ import type {
   CortexActivationArtifacts,
 } from '../storage/interface.js';
 
-// CJS-ESM interop: ajv is a CJS package
+// CJS-ESM interop: ajv and ajv-formats are CJS packages
 const require = createRequire(import.meta.url);
 /* eslint-disable @typescript-eslint/no-require-imports */
 const ajvPkg = require('ajv');
+const formatsPkg = require('ajv-formats');
 /* eslint-enable @typescript-eslint/no-require-imports */
 const AjvClass = ajvPkg.default ?? ajvPkg;
+const addFormats = formatsPkg.default ?? formatsPkg;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
 const ajv = new AjvClass({ allErrors: true, verbose: true }) as { compile: (schema: object) => unknown };
+addFormats(ajv);
 
 export interface ParseResult {
   ok: boolean;

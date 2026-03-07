@@ -29,6 +29,10 @@ export interface ExtensionCtx {
     };
     caller: { gaii: string; owner: string; roles: string[] };
     config: Record<string, unknown>;
+    instance?: {
+        id: string;
+        config: Record<string, unknown>;
+    };
     log: {
         info(msg: string, data?: Record<string, unknown>): void;
         warn(msg: string, data?: Record<string, unknown>): void;
@@ -141,6 +145,7 @@ ${userFnDecl}
         },
         caller: JSON.parse(__callerJson),
         config: JSON.parse(__configJson),
+        instance: __instanceJson ? JSON.parse(__instanceJson) : undefined,
         log: {
             info:  (msg, data) => __logCall(__log_info, msg, data),
             warn:  (msg, data) => __logCall(__log_warn, msg, data),
@@ -176,6 +181,7 @@ export async function executeExtensionAction(
         jail.setSync('__inputJson', JSON.stringify(input));
         jail.setSync('__callerJson', JSON.stringify(ctx.caller));
         jail.setSync('__configJson', JSON.stringify(ctx.config));
+        jail.setSync('__instanceJson', ctx.instance ? JSON.stringify(ctx.instance) : null);
 
         // ── Memory API references ────────────────────────────
         jail.setSync('__memory_get', makeRef(

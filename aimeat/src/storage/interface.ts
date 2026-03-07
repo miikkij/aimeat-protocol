@@ -717,6 +717,10 @@ export interface ExtensionRecord {
     advertise: boolean;
     capabilities: string[];
   };
+  instances?: {
+    supported: boolean;
+    configSchema?: Record<string, unknown>;  // JSON Schema for per-instance config
+  };
   installedBy: string;
   installedAt: string;
   activatedAt?: string;
@@ -740,6 +744,18 @@ export interface ScheduledJobRecord {
   lastRunError?: string;
   lastRunDurationMs?: number;
   nextRunAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Extension Instances ──────────────────────────────────────────────
+
+export interface ExtensionInstanceRecord {
+  id: string;
+  extensionName: string;
+  config: Record<string, unknown>;
+  status: 'active' | 'paused';
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -977,6 +993,7 @@ import type { ConfigRepository } from './repositories/config.repository.js';
 import type { NotificationTemplateRepository } from './repositories/notification-template.repository.js';
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
 import type { SchedulerRepository } from './repositories/scheduler.repository.js';
+import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -989,4 +1006,5 @@ export interface Storage extends
   AuthRepository, SessionRepository,
   AppRepository, AppMarketplaceRepository, ConfigRepository,
   NotificationTemplateRepository,
-  KnowledgeRepository, SchedulerRepository { }
+  KnowledgeRepository, SchedulerRepository,
+  ExtensionInstanceRepository { }

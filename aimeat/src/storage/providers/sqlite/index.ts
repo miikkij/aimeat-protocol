@@ -22,6 +22,7 @@ import type {
   NotificationTemplateRecord,
   MemoryLinkRecord, OperatorReviewRecord,
   ScheduledJobRecord,
+  ExtensionInstanceRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -4037,5 +4038,75 @@ export class SqliteStorage implements Storage {
     if (row.lastRunDurationMs !== null && row.lastRunDurationMs !== undefined) record.lastRunDurationMs = row.lastRunDurationMs as number;
     if (row.nextRunAt) record.nextRunAt = row.nextRunAt as string;
     return record;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Extension Instances ──
+  // ══════════════════════════════════════════════════════════
+
+  async createExtensionInstance(record: ExtensionInstanceRecord): Promise<ExtensionInstanceRecord> {
+    try {
+      this.db.prepare(
+        `INSERT INTO extension_instances (id, extensionName, config, status, createdBy, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        record.id, record.extensionName, JSON.stringify(record.config),
+        record.status, record.createdBy, record.createdAt, record.updatedAt,
+      );
+      return record;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) {
+        throw new Error(`Extension instance "${record.id}" already exists for "${record.extensionName}"`);
+      }
+      throw err;
+    }
+  }
+
+  async getExtensionInstance(extensionName: string, instanceId: string): Promise<ExtensionInstanceRecord | null> {
+    const row = this.db.prepare(
+      'SELECT * FROM extension_instances WHERE extensionName = ? AND id = ?'
+    ).get(extensionName, instanceId) as Record<string, unknown> | undefined;
+    return row ? this.deserializeExtensionInstance(row) : null;
+  }
+
+  async listExtensionInstances(extensionName: string): Promise<ExtensionInstanceRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM extension_instances WHERE extensionName = ?'
+    ).all(extensionName) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeExtensionInstance(r));
+  }
+
+  async updateExtensionInstance(extensionName: string, instanceId: string, updates: Partial<ExtensionInstanceRecord>): Promise<ExtensionInstanceRecord | null> {
+    const existing = await this.getExtensionInstance(extensionName, instanceId);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.db.prepare(
+      `UPDATE extension_instances SET config = ?, status = ?, createdBy = ?, createdAt = ?, updatedAt = ?
+       WHERE extensionName = ? AND id = ?`
+    ).run(
+      JSON.stringify(updated.config), updated.status,
+      updated.createdBy, updated.createdAt, updated.updatedAt,
+      extensionName, instanceId,
+    );
+    return updated;
+  }
+
+  async deleteExtensionInstance(extensionName: string, instanceId: string): Promise<boolean> {
+    const result = this.db.prepare(
+      'DELETE FROM extension_instances WHERE extensionName = ? AND id = ?'
+    ).run(extensionName, instanceId);
+    return result.changes > 0;
+  }
+
+  private deserializeExtensionInstance(row: Record<string, unknown>): ExtensionInstanceRecord {
+    return {
+      id: row.id as string,
+      extensionName: row.extensionName as string,
+      config: JSON.parse(row.config as string),
+      status: row.status as ExtensionInstanceRecord['status'],
+      createdBy: row.createdBy as string,
+      createdAt: row.createdAt as string,
+      updatedAt: row.updatedAt as string,
+    };
   }
 }

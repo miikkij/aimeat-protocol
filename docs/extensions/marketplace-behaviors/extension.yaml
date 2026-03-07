@@ -2,8 +2,8 @@ extension: "1.0"
 
 metadata:
   name: "marketplace-behaviors"
-  version: "1.0.0"
-  description: "Purchase workflow with escrow, delivery confirmation, and ratings"
+  version: "2.0.0"
+  description: "Multi-instance marketplace with purchase workflow, delivery confirmation, and ratings"
   author: "aimeat-core"
   license: "MIT"
   aimeat: ">=1.5"
@@ -14,29 +14,131 @@ required_apis:
   - consent
   - trust
 
+instances:
+  supported: true
+  config_per_instance:
+    type: object
+    properties:
+      visibility:
+        type: string
+        enum: [public, password, invite]
+        default: public
+      password:
+        type: string
+      allowed_users:
+        type: array
+        items: { type: string }
+      categories:
+        type: array
+        items: { type: string }
+        default: ["general"]
+      listing_fee_morsels:
+        type: integer
+        default: 2
+      transaction_fee_percent:
+        type: integer
+        default: 5
+
 actions:
-  - id: purchase
-    description: "Purchase a listing with morsel escrow"
+  - id: create-listing
+    description: "Create a new marketplace listing"
     method: POST
-    path: "/v1/ext/marketplace-behaviors/purchase"
+    path: "/v1/ext/marketplace-behaviors/:instanceId/create-listing"
     auth: required
     input:
-      listingKey:
+      title:
         type: string
         required: true
-        description: "Memory key of the listing to purchase"
+      description:
+        type: string
+        required: true
+      price:
+        type: number
+        required: true
+      category:
+        type: string
+    output:
+      listingId:
+        type: string
+    script: "actions/create-listing.js"
+
+  - id: update-listing
+    description: "Update an existing listing"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/:instanceId/update-listing"
+    auth: required
+    input:
+      listingId:
+        type: string
+        required: true
+      title:
+        type: string
+      description:
+        type: string
+      price:
+        type: number
+      category:
+        type: string
+      status:
+        type: string
+        enum: [active, paused]
+    output:
+      listing:
+        type: object
+    script: "actions/update-listing.js"
+
+  - id: browse
+    description: "Browse marketplace listings with filters and pagination"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/:instanceId/browse"
+    auth: required
+    input:
+      category:
+        type: string
+      minPrice:
+        type: number
+      maxPrice:
+        type: number
+      status:
+        type: string
+      offset:
+        type: integer
+      limit:
+        type: integer
+    output:
+      listings:
+        type: array
+      total:
+        type: integer
+      offset:
+        type: integer
+      limit:
+        type: integer
+    script: "actions/browse.js"
+
+  - id: purchase
+    description: "Purchase a listing"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/:instanceId/purchase"
+    auth: required
+    input:
+      listingId:
+        type: string
+        required: true
     output:
       purchaseId:
         type: string
+      total:
+        type: number
       status:
         type: string
         enum: [purchased]
     script: "actions/purchase.js"
 
   - id: deliver
-    description: "Confirm delivery and release escrow to seller"
+    description: "Confirm delivery of a purchased item"
     method: POST
-    path: "/v1/ext/marketplace-behaviors/deliver"
+    path: "/v1/ext/marketplace-behaviors/:instanceId/deliver"
     auth: required
     input:
       purchaseId:
@@ -51,7 +153,7 @@ actions:
   - id: rate
     description: "Rate a completed purchase (1-5 stars)"
     method: POST
-    path: "/v1/ext/marketplace-behaviors/rate"
+    path: "/v1/ext/marketplace-behaviors/:instanceId/rate"
     auth: required
     input:
       purchaseId:
@@ -69,6 +171,21 @@ actions:
         type: boolean
     script: "actions/rate.js"
 
+  - id: delist
+    description: "Remove a listing from the marketplace"
+    method: POST
+    path: "/v1/ext/marketplace-behaviors/:instanceId/delist"
+    auth: required
+    input:
+      listingId:
+        type: string
+        required: true
+    output:
+      status:
+        type: string
+        enum: [delisted]
+    script: "actions/delist.js"
+
 limits:
   memory_mb: 64
   timeout_ms: 5000
@@ -78,19 +195,15 @@ config:
   listing_fee_morsels:
     type: integer
     default: 2
-    description: "Fee charged to create a listing"
+    description: "Global default fee charged to create a listing"
   transaction_fee_percent:
     type: integer
     default: 5
-    description: "Percentage fee on each transaction"
-  escrow_enabled:
-    type: boolean
-    default: true
-    description: "Whether to hold funds in escrow during purchase"
+    description: "Global default percentage fee on each transaction"
 
 federation:
   advertise: true
   capabilities:
-    - "escrow"
+    - "multi-instance"
     - "purchase-workflow"
     - "ratings"

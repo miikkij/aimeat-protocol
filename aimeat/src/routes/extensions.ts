@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord, ExtensionInstanceRecord, ScheduledJobRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -94,6 +94,22 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         }
       }
 
+      // Validate instances section if present
+      const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
+      if (manifestInstances) {
+        if (typeof manifestInstances.supported !== 'boolean') {
+          res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST',
+            'instances.supported must be a boolean'));
+          return;
+        }
+        if (manifestInstances.config_per_instance !== undefined
+          && (typeof manifestInstances.config_per_instance !== 'object' || manifestInstances.config_per_instance === null)) {
+          res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST',
+            'instances.config_per_instance must be an object (JSON Schema)'));
+          return;
+        }
+      }
+
       // Enforce max installed limit
       const existing = await storage.listExtensions();
       if (existing.length >= config.extensionMaxInstalled) {
@@ -173,6 +189,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           advertise: (manifestFederation?.advertise as boolean) ?? false,
           capabilities: (manifestFederation?.capabilities as string[]) ?? [],
         },
+        ...(manifestInstances?.supported ? {
+          instances: {
+            supported: true,
+            configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
+          },
+        } : {}),
         installedBy: req.auth!.sub,
         installedAt: new Date().toISOString(),
       };
@@ -333,6 +355,366 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
     } catch (err) {
       logger.error('Failed to deactivate extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to deactivate extension'));
+    }
+  });
+
+  // ── POST /v1/extensions/:name/instances — Create instance ──────────
+  router.post('/v1/extensions/:name/instances', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+      if (ext.status !== 'active') {
+        res.status(409).json(error(config.nodeId, 'EXTENSION_INACTIVE', `Extension "${name}" is not active`));
+        return;
+      }
+      if (!ext.instances?.supported) {
+        res.status(400).json(error(config.nodeId, 'INSTANCES_NOT_SUPPORTED',
+          `Extension "${name}" does not support multi-instance mode`));
+        return;
+      }
+
+      const { id, config: instanceConfig } = req.body as { id?: string; config?: Record<string, unknown> };
+
+      if (!id || typeof id !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'id is required'));
+        return;
+      }
+      if (!/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(id)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          'id must be 3-64 chars, lowercase alphanumeric and hyphens, must start and end with alphanumeric'));
+        return;
+      }
+      if (instanceConfig !== undefined && (typeof instanceConfig !== 'object' || instanceConfig === null || Array.isArray(instanceConfig))) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'config must be an object'));
+        return;
+      }
+
+      const existing = await storage.getExtensionInstance(name, id);
+      if (existing) {
+        res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS',
+          `Instance "${id}" already exists for extension "${name}"`));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const record: ExtensionInstanceRecord = {
+        id,
+        extensionName: name,
+        config: instanceConfig ?? {},
+        status: 'active',
+        createdBy: req.auth!.sub,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const created = await storage.createExtensionInstance(record);
+      logger.info(`Extension instance created: ${name}/${id}`, { by: req.auth!.sub });
+
+      res.status(201).json(success(config.nodeId, { instance: created }, [
+        { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
+        { description: 'Execute action on instance', method: 'POST', url: `/v1/ext/${name}/${id}/<actionId>` },
+      ]));
+    } catch (err) {
+      logger.error('Failed to create extension instance', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create extension instance'));
+    }
+  });
+
+  // ── GET /v1/extensions/:name/instances — List instances ───────────
+  router.get('/v1/extensions/:name/instances', requireAuth(), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+
+      const instances = await storage.listExtensionInstances(name);
+      res.json(success(config.nodeId, {
+        instances,
+        total: instances.length,
+      }, [
+        { description: 'Create instance', method: 'POST', url: `/v1/extensions/${name}/instances` },
+        { description: 'View extension', method: 'GET', url: `/v1/extensions/${name}` },
+      ]));
+    } catch (err) {
+      logger.error('Failed to list extension instances', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list extension instances'));
+    }
+  });
+
+  // ── GET /v1/extensions/:name/instances/:instanceId — Get instance detail ──
+  router.get('/v1/extensions/:name/instances/:instanceId', requireAuth(), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const instanceId = req.params.instanceId as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+
+      const instance = await storage.getExtensionInstance(name, instanceId);
+      if (!instance) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+          `Instance "${instanceId}" not found for extension "${name}"`));
+        return;
+      }
+
+      res.json(success(config.nodeId, { instance }, [
+        { description: 'Update instance', method: 'PATCH', url: `/v1/extensions/${name}/instances/${instanceId}` },
+        { description: 'Delete instance', method: 'DELETE', url: `/v1/extensions/${name}/instances/${instanceId}` },
+        { description: 'Execute action on instance', method: 'POST', url: `/v1/ext/${name}/${instanceId}/<actionId>` },
+      ]));
+    } catch (err) {
+      logger.error('Failed to get extension instance', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get extension instance'));
+    }
+  });
+
+  // ── PATCH /v1/extensions/:name/instances/:instanceId — Update instance ──
+  router.patch('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const instanceId = req.params.instanceId as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+
+      const instance = await storage.getExtensionInstance(name, instanceId);
+      if (!instance) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+          `Instance "${instanceId}" not found for extension "${name}"`));
+        return;
+      }
+
+      const { config: newConfig, status } = req.body as {
+        config?: Record<string, unknown>;
+        status?: 'active' | 'paused';
+      };
+
+      if (newConfig !== undefined && (typeof newConfig !== 'object' || newConfig === null || Array.isArray(newConfig))) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'config must be an object'));
+        return;
+      }
+      if (status !== undefined && status !== 'active' && status !== 'paused') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'status must be "active" or "paused"'));
+        return;
+      }
+
+      const updates: Partial<ExtensionInstanceRecord> = {
+        updatedAt: new Date().toISOString(),
+      };
+      if (newConfig !== undefined) updates.config = newConfig;
+      if (status !== undefined) updates.status = status;
+
+      const updated = await storage.updateExtensionInstance(name, instanceId, updates);
+      if (!updated) {
+        res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update instance'));
+        return;
+      }
+
+      logger.info(`Extension instance updated: ${name}/${instanceId}`, { by: req.auth!.sub });
+
+      res.json(success(config.nodeId, { instance: updated }, [
+        { description: 'View instance', method: 'GET', url: `/v1/extensions/${name}/instances/${instanceId}` },
+        { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
+      ]));
+    } catch (err) {
+      logger.error('Failed to update extension instance', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update extension instance'));
+    }
+  });
+
+  // ── DELETE /v1/extensions/:name/instances/:instanceId — Delete instance ──
+  router.delete('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const instanceId = req.params.instanceId as string;
+      const ext = await storage.getExtension(name);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+
+      const instance = await storage.getExtensionInstance(name, instanceId);
+      if (!instance) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+          `Instance "${instanceId}" not found for extension "${name}"`));
+        return;
+      }
+
+      await storage.deleteExtensionInstance(name, instanceId);
+      logger.info(`Extension instance deleted: ${name}/${instanceId}`, { by: req.auth!.sub });
+
+      res.json(success(config.nodeId, { deleted: instanceId }, [
+        { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
+        { description: 'View extension', method: 'GET', url: `/v1/extensions/${name}` },
+      ]));
+    } catch (err) {
+      logger.error('Failed to delete extension instance', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete extension instance'));
+    }
+  });
+
+  // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
+  router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), async (req, res) => {
+    const extName = req.params.extName as string;
+    const instanceId = req.params.instanceId as string;
+    const actionId = req.params.actionId as string;
+    const callerGaii = req.auth!.sub;
+
+    try {
+      // Look up the extension
+      const ext = await storage.getExtension(extName);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${extName}" not found`));
+        return;
+      }
+
+      // Extension must be active
+      if (ext.status !== 'active') {
+        res.status(503).json(error(config.nodeId, 'EXTENSION_INACTIVE',
+          `Extension "${extName}" is not active`));
+        return;
+      }
+
+      // Look up the instance
+      const instance = await storage.getExtensionInstance(extName, instanceId);
+      if (!instance) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+          `Instance "${instanceId}" not found for extension "${extName}"`));
+        return;
+      }
+
+      // Instance must be active
+      if (instance.status !== 'active') {
+        res.status(503).json(error(config.nodeId, 'INSTANCE_INACTIVE',
+          `Instance "${instanceId}" of extension "${extName}" is not active`));
+        return;
+      }
+
+      // Find the action
+      const action = ext.actions.find(a => a.id === actionId);
+      if (!action) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+          `Action "${actionId}" not found in extension "${extName}"`));
+        return;
+      }
+
+      // Validate HTTP method matches
+      if (action.method !== 'POST' && action.method !== req.method) {
+        res.status(405).json(error(config.nodeId, 'METHOD_NOT_ALLOWED',
+          `Action "${actionId}" requires ${action.method}, got ${req.method}`));
+        return;
+      }
+
+      // Build the ExtensionCtx with instance-scoped memory namespace
+      const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
+      const ctx: ExtensionCtx = {
+        memory: {
+          get: async (key) => {
+            const record = await storage.getMemory(extMemoryOwner, key);
+            return record ? record.value : null;
+          },
+          set: async (key, value) => {
+            await storage.setMemory({
+              key,
+              ownerGaii: extMemoryOwner,
+              value,
+              visibility: 'public',
+              tags: [],
+              ttlHours: null,
+              version: 1,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          },
+          search: async (prefix) => {
+            const records = await storage.listMemory(extMemoryOwner, { prefix });
+            return records.map(r => ({ key: r.key, value: r.value }));
+          },
+          delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
+        },
+        wallet: {
+          consume: async (amount: number, reason: string) => {
+            const debited = await storage.debitBalance(callerGaii, amount);
+            if (!debited) return { success: false, error: 'Insufficient balance' };
+            await storage.addTransaction({
+              id: `ext-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              gaii: callerGaii,
+              type: 'extension_consume',
+              amount: -amount,
+              trackingCode: `ext:${ext.name}:${instanceId}:${reason}`,
+              timestamp: new Date().toISOString(),
+            });
+            return { success: true };
+          },
+          getBalance: async () => {
+            const agent = await storage.getAgent(callerGaii);
+            return agent?.morselBalance ?? 0;
+          },
+        },
+        consent: {
+          check: async (gaii, scope) => {
+            const consents = await storage.listConsents(gaii, { status: 'active' });
+            return consents.some(c => c.purpose === scope);
+          },
+          require: async (gaii, scope) => {
+            const consents = await storage.listConsents(gaii, { status: 'active' });
+            if (!consents.some(c => c.purpose === scope)) {
+              throw new Error(`CONSENT_REQUIRED: ${scope}`);
+            }
+          },
+        },
+        trust: {
+          getScore: async (gaii: string) => {
+            const agent = await storage.getAgent(gaii);
+            return agent?.trustScore ?? 0;
+          },
+        },
+        caller: {
+          gaii: callerGaii,
+          owner: req.auth!.owner,
+          roles: req.auth!.roles,
+        },
+        config: ext.config,
+        instance: { id: instanceId, config: instance.config },
+        log: {
+          info: (msg, data) => logger.info(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
+          warn: (msg, data) => logger.warn(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
+          error: (msg, data) => logger.error(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
+        },
+      };
+
+      // Execute the action in the V8 isolate sandbox
+      const limits = ext.limits;
+      const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
+
+      res.json(success(config.nodeId, result, [
+        { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
+      ]));
+    } catch (err) {
+      const message = (err as Error).message;
+      logger.error(`Extension action failed: ${extName}/${instanceId}/${actionId}`, { error: message, caller: callerGaii });
+
+      if (message.includes('Script execution timed out')) {
+        res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
+          `Action "${actionId}" timed out`));
+      } else if (message.includes('API call limit exceeded')) {
+        res.status(500).json(error(config.nodeId, 'API_LIMIT_EXCEEDED',
+          `Action "${actionId}" exceeded API call limit`));
+      } else {
+        res.status(500).json(error(config.nodeId, 'EXTENSION_ERROR',
+          `Action "${actionId}" failed: ${message}`));
+      }
     }
   });
 

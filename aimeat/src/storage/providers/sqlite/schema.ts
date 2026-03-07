@@ -841,6 +841,17 @@ export function initializeSchema(db: Database.Database): void {
       updatedAt       TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS extension_instances (
+      id              TEXT NOT NULL,
+      extensionName   TEXT NOT NULL,
+      config          TEXT NOT NULL DEFAULT '{}',
+      status          TEXT NOT NULL DEFAULT 'active',
+      createdBy       TEXT NOT NULL,
+      createdAt       TEXT NOT NULL,
+      updatedAt       TEXT NOT NULL,
+      PRIMARY KEY (extensionName, id)
+    );
+
   `);
 
   // ── Schema migrations for existing databases ──

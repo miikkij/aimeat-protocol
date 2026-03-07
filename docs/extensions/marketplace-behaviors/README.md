@@ -1,11 +1,10 @@
 # marketplace-behaviors Extension
 
-Purchase workflow extension for AIMEAT nodes. Provides escrow-backed purchases, delivery confirmation, and seller ratings using the morsel economy.
+Multi-instance marketplace extension for AIMEAT nodes. Supports access-controlled marketplaces with listing management, purchase workflow, delivery confirmation, and buyer ratings.
 
 ## Prerequisites
 
 - AIMEAT node running v1.5 or later
-- A marketplace CSM template installed on the node (defines listing data shape, consent scopes, and directory rules)
 - Wallet API enabled with morsel balances for buyers
 - Trust API enabled for seller reputation scoring
 
@@ -20,7 +19,7 @@ Authorization: Bearer <operator-token>
 
 {
   "name": "marketplace-behaviors",
-  "source": "https://extensions.aimeat.io/marketplace-behaviors-1.0.0.tar.gz"
+  "source": "https://extensions.aimeat.io/marketplace-behaviors-2.0.0.tar.gz"
 }
 ```
 
@@ -31,55 +30,134 @@ POST /v1/extensions/marketplace-behaviors/activate
 Authorization: Bearer <operator-token>
 ```
 
-## Purchase Flow
+## Multi-Instance Support
 
-The extension implements a three-step workflow:
+A single node can host multiple independent marketplaces. Each instance has its own configuration for visibility, categories, and fees. Create an instance:
 
-### 1. Purchase
+```
+POST /v1/extensions/marketplace-behaviors/instances
+Authorization: Bearer <operator-token>
 
-The buyer calls `POST /v1/ext/marketplace-behaviors/purchase` with the memory key of the listing they want to buy. The extension:
+{
+  "id": "vintage-books",
+  "config": {
+    "visibility": "public",
+    "categories": ["fiction", "non-fiction", "rare"],
+    "listing_fee_morsels": 3,
+    "transaction_fee_percent": 8
+  }
+}
+```
 
-- Reads the listing from memory and verifies it is active
-- Checks the buyer has granted `marketplace-listing` consent
-- Calculates the total price including the transaction fee
-- Places a morsel hold (escrow) on the buyer's wallet
-- Creates a purchase record in memory with status `purchased`
-- Updates the listing status to `purchased` so no one else can buy it
-
-### 2. Deliver
-
-The seller calls `POST /v1/ext/marketplace-behaviors/deliver` with the purchase ID. The extension:
-
-- Verifies the caller is the seller listed on the purchase
-- Releases the escrowed morsels to the seller's wallet
-- Updates the purchase status to `delivered`
-
-### 3. Rate
-
-The buyer calls `POST /v1/ext/marketplace-behaviors/rate` with the purchase ID and a score from 1 to 5. The extension:
-
-- Verifies the caller is the buyer and the purchase is delivered
-- Adjusts the seller's trust score: 5 stars gives +4, 4 stars +2, 3 stars 0, 2 stars -3, 1 star -6
-- Stores the rating (score and optional comment) in memory
-- Marks the purchase as `completed`
-
-## Configuration
-
-These values can be set when activating the extension or updated via `PATCH /v1/extensions/marketplace-behaviors/config`:
+### Instance Configuration
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `listing_fee_morsels` | integer | 2 | Fee charged to create a listing |
-| `transaction_fee_percent` | integer | 5 | Percentage fee added to each purchase |
-| `escrow_enabled` | boolean | true | Whether to hold funds in escrow during the purchase window |
+| `visibility` | string | `public` | Access control: `public`, `password`, or `invite` |
+| `password` | string | - | Required password when visibility is `password` |
+| `allowed_users` | array | `[]` | List of GAIIs allowed when visibility is `invite` |
+| `categories` | array | `["general"]` | Allowed listing categories |
+| `listing_fee_morsels` | integer | `2` | Morsel fee charged to create a listing |
+| `transaction_fee_percent` | integer | `5` | Percentage fee added to each purchase |
+
+### Visibility Modes
+
+- **public** -- Anyone can browse and create listings.
+- **password** -- Users must include `_password` in their request body to access the marketplace.
+- **invite** -- Only GAIIs listed in `allowed_users` (and operators) can access the marketplace.
+
+## Actions
+
+All action endpoints are instance-scoped: `/v1/ext/marketplace-behaviors/:instanceId/<action>`
+
+### create-listing
+
+Create a new listing in the marketplace.
+
+- Checks instance access (visibility/password/invite)
+- Validates title, description, and price (must be > 0)
+- Validates category against instance-configured categories
+- Charges listing fee from caller's wallet
+- Returns `{ listingId }`
+
+### update-listing
+
+Update an existing listing. Only the seller can update. Only `active` or `paused` listings can be modified. Updatable fields: `title`, `description`, `price`, `category`, `status` (active/paused).
+
+### browse
+
+Browse listings with filters and pagination.
+
+- Checks instance access
+- Filter by: `category`, `minPrice`, `maxPrice`, `status` (default: `active`)
+- Sorted by creation date, newest first
+- Pagination via `offset` (default 0) and `limit` (default 20, max 100)
+- Returns `{ listings, total, offset, limit }`
+
+### purchase
+
+Purchase a listing.
+
+- Checks instance access
+- Verifies listing is active and buyer is not the seller
+- Calculates total: price + transaction fee percentage
+- Debits buyer's wallet via `ctx.wallet.consume`
+- Creates purchase record and sets listing status to `reserved`
+- Returns `{ purchaseId, total, status: 'purchased' }`
+
+### deliver
+
+Confirm delivery. Only the seller can call this on a `purchased` order.
+
+- Updates purchase status to `delivered` with timestamp
+- Returns `{ status: 'delivered' }`
+
+### rate
+
+Rate a delivered purchase (1-5 stars). Only the buyer can rate, and only once.
+
+- Stores rating record with score and optional comment
+- Marks purchase as `completed`
+- Returns `{ rated: true }`
+
+### delist
+
+Remove a listing. The seller or any operator can delist.
+
+- Sets listing status to `delisted` with timestamp
+- Returns `{ status: 'delisted' }`
+
+## Purchase Lifecycle
+
+```
+active  -->  reserved  -->  purchased  -->  delivered  -->  completed
+                                                  \
+                                                   --> delisted
+```
+
+1. Seller creates a listing (status: `active`)
+2. Buyer purchases (listing: `reserved`, purchase: `purchased`)
+3. Seller confirms delivery (purchase: `delivered`)
+4. Buyer rates (purchase: `completed`)
+
+At any point, the seller or an operator can delist a listing.
+
+## Global Configuration
+
+These values serve as defaults when instance config does not override them:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `listing_fee_morsels` | integer | 2 | Default fee charged to create a listing |
+| `transaction_fee_percent` | integer | 5 | Default percentage fee on each transaction |
 
 ## Federation
 
-When `federation.advertise` is enabled (the default), the node advertises the following capabilities to peers:
+When `federation.advertise` is enabled (the default), the node advertises these capabilities to peers:
 
-- `escrow` -- morsel escrow support for purchases
-- `purchase-workflow` -- the full purchase/deliver/rate lifecycle
-- `ratings` -- seller trust score adjustments based on buyer ratings
+- `multi-instance` -- supports multiple independent marketplace instances
+- `purchase-workflow` -- the full create/purchase/deliver/rate lifecycle
+- `ratings` -- buyer rating system
 
 ## Resource Limits
 

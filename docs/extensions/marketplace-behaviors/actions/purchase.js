@@ -1,44 +1,52 @@
 export default async function(ctx, input) {
-  // 1. Read the listing from memory
-  const listing = await ctx.memory.get(input.listingKey);
-  if (!listing) throw new Error('Listing not found');
-  if (listing.status && listing.status !== 'active') {
-    throw new Error('Listing not available');
+  // Check instance access
+  const visibility = ctx.instance.config.visibility || 'public';
+  if (visibility === 'password') {
+    if (input._password !== ctx.instance.config.password) {
+      throw new Error('Invalid marketplace password');
+    }
+  } else if (visibility === 'invite') {
+    const allowed = ctx.instance.config.allowed_users || [];
+    if (!allowed.includes(ctx.caller.gaii) && !ctx.caller.roles.includes('operator')) {
+      throw new Error('You are not invited to this marketplace');
+    }
   }
 
-  // 2. Verify buyer has marketplace consent
-  await ctx.consent.require(ctx.caller.gaii, 'marketplace-listing');
+  if (!input.listingId) throw new Error('listingId is required');
 
-  // 3. Calculate total with transaction fee
-  const feePercent = ctx.config.transaction_fee_percent || 5;
-  const fee = ctx.config.escrow_enabled !== false
-    ? Math.ceil(listing.price_morsels * (feePercent / 100))
-    : 0;
-  const total = listing.price_morsels + fee;
+  // Read listing
+  const listing = await ctx.memory.get('listing.' + input.listingId);
+  if (!listing) throw new Error('Listing not found');
+  if (listing.status !== 'active') throw new Error('Listing is not available');
+  if (listing.seller === ctx.caller.gaii) throw new Error('Cannot purchase your own listing');
 
-  // 4. Hold funds in escrow
-  const hold = await ctx.wallet.hold(ctx.caller.gaii, total, 'marketplace_purchase');
+  // Calculate total with transaction fee
+  const feePercent = ctx.instance.config.transaction_fee_percent ?? ctx.config.transaction_fee_percent ?? 5;
+  const total = listing.price + Math.ceil(listing.price * feePercent / 100);
 
-  // 5. Create purchase record in memory
-  const purchaseId = hold.holdId;
-  await ctx.memory.set(`marketplace.purchases.${purchaseId}`, {
-    listingKey: input.listingKey,
-    buyerGaii: ctx.caller.gaii,
-    sellerGaii: listing.seller_ghii,
-    price: listing.price_morsels,
-    fee: fee,
+  // Debit buyer
+  const result = await ctx.wallet.consume(total, 'marketplace_purchase');
+  if (!result.success) throw new Error(result.error || 'Insufficient morsels for purchase');
+
+  // Create purchase record
+  const purchaseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await ctx.memory.set('purchase.' + purchaseId, {
+    purchaseId,
+    listingId: input.listingId,
+    buyer: ctx.caller.gaii,
+    seller: listing.seller,
+    price: listing.price,
+    fee: total - listing.price,
+    total,
     status: 'purchased',
     purchasedAt: new Date().toISOString(),
   });
 
-  // 6. Update listing status
-  await ctx.memory.set(input.listingKey, { ...listing, status: 'purchased' });
+  // Reserve listing
+  listing.status = 'reserved';
+  await ctx.memory.set('listing.' + input.listingId, listing);
 
-  ctx.log.info('Purchase completed', {
-    purchaseId,
-    buyer: ctx.caller.gaii,
-    price: listing.price_morsels,
-  });
+  ctx.log.info('Purchase completed', { purchaseId, buyer: ctx.caller.gaii, total });
 
-  return { purchaseId, status: 'purchased' };
+  return { purchaseId, total, status: 'purchased' };
 }

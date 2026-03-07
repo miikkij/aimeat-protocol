@@ -73,7 +73,7 @@ import type { Storage, MaintenanceState } from './storage/interface.js';
 import { startHeartbeatJob } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
 import { TunnelManager } from './services/personal-tunnel.js';
-import { startConsentExpiryJob } from './services/consent.js';
+// consent.js expireConsents is imported dynamically in runConsentExpiryJob
 import { seedProfileSchemas } from './services/profile-schemas.js';
 import { seedCsmTemplates } from './services/csm-seed.js';
 import { seedKnowledgeTemplates } from './services/knowledge.js';
@@ -379,6 +379,9 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
   }
+  if (config.personalNodesEnabled) {
+    scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
+  }
 
   // Seed standardized profile schemas — Phase 0.4
   seedProfileSchemas(storage, `system@${config.nodeId}`)
@@ -416,9 +419,6 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     tunnelManager = new TunnelManager(config, storage);
     tunnelManager.startHeartbeatMonitor();
     logger.info('Personal node support enabled', { maxSlots: config.personalNodeMaxSlots });
-
-    // Start mailbox cleanup job (every 10m)
-    startMailboxCleanupJob(storage);
   }
 
   // Mailbox push notification service (REQ-007)
@@ -747,222 +747,206 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   return { app, tunnelManager, realtimeManager, scheduler, storage };
 }
 
-// Daily allowance: credit all agents every 24 hours (or on first activity)
-function startDailyAllowanceJob(config: AimeatConfig, storage: Storage): void {
-  const creditAllAgents = async () => {
-    try {
-      const agents = await storage.listAgents();
-      for (const agent of agents) {
-        // Atomic capped credit prevents race conditions
-        await storage.creditBalanceCapped(agent.gaii, config.dailyAllowance, config.dailyAllowanceCap);
-      }
-      logger.info(`Daily allowance credited to ${agents.length} agents`);
-    } catch (err) {
-      logger.error('Daily allowance job failed', { error: err });
-    }
-  };
+// ── Core Job Handlers (pure async, no setInterval) ─────────────────
 
-  // Run daily (every 24 hours)
-  setInterval(creditAllAgents, 24 * 3600_000);
-  logger.info('Daily allowance job scheduled (every 24h)');
+async function runDailyAllowanceJob(config: AimeatConfig, storage: Storage): Promise<void> {
+  const agents = await storage.listAgents();
+  for (const agent of agents) {
+    await storage.creditBalanceCapped(agent.gaii, config.dailyAllowance, config.dailyAllowanceCap);
+  }
+  logger.info(`Daily allowance credited to ${agents.length} agents`);
 }
 
-// Work timeout: expire work items whose TTL has passed, return escrow
-function startWorkTimeoutJob(config: AimeatConfig, storage: Storage): void {
-  const expireTimedOutWork = async () => {
-    try {
-      const allWork = await storage.listAllWork();
-      const now = Date.now();
-      for (const work of allWork) {
-        if (['pending', 'accepted', 'in_progress'].includes(work.status)) {
-          if (new Date(work.ttlExpiresAt).getTime() < now) {
-            // Return escrow to requester
-            const { returnEscrow } = await import('./services/morsel.js');
-            await returnEscrow(storage, work);
-            await storage.updateWork(work.trackingCode, {
-              status: 'expired',
-              updatedAt: new Date().toISOString(),
-            });
+async function runWorkTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {
+  const allWork = await storage.listAllWork();
+  const now = Date.now();
+  for (const work of allWork) {
+    if (['pending', 'accepted', 'in_progress'].includes(work.status)) {
+      if (new Date(work.ttlExpiresAt).getTime() < now) {
+        const { returnEscrow } = await import('./services/morsel.js');
+        await returnEscrow(storage, work);
+        await storage.updateWork(work.trackingCode, {
+          status: 'expired',
+          updatedAt: new Date().toISOString(),
+        });
 
-            // Fire callback webhook if provided
-            if (work.callbackUrl) {
-              const body = JSON.stringify({
-                event: 'work.expired',
-                tracking_code: work.trackingCode,
-                status: 'expired',
-                timestamp: new Date().toISOString(),
-              });
-              fetch(work.callbackUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body,
-                signal: AbortSignal.timeout(10_000),
-              }).catch(() => { /* fire and forget */ });
-            }
-
-            logger.info(`Work ${work.trackingCode} expired (TTL exceeded)`);
-          }
-        }
-      }
-    } catch (err) {
-      logger.error('Work timeout job failed', { error: err });
-    }
-  };
-
-  // Check every 60 seconds
-  setInterval(expireTimedOutWork, 60_000);
-  logger.info('Work timeout job scheduled (every 60s)');
-}
-
-// Memory TTL cleanup: remove expired memory entries
-function startMemoryTtlCleanupJob(storage: Storage): void {
-  const cleanup = async () => {
-    try {
-      const now = Date.now();
-      const allAgents = await storage.listAgents();
-      for (const agent of allAgents) {
-        const memories = await storage.listMemory(agent.gaii);
-        for (const mem of memories) {
-          if (mem.ttlHours) {
-            const expiresAt = new Date(mem.createdAt).getTime() + mem.ttlHours * 3_600_000;
-            if (now > expiresAt) {
-              await storage.deleteMemory(agent.gaii, mem.key);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      logger.error('Memory TTL cleanup job failed', { error: err });
-    }
-  };
-
-  setInterval(cleanup, 5 * 60_000); // Every 5 minutes
-  logger.info('Memory TTL cleanup job scheduled (every 5m)');
-}
-
-// Board post TTL cleanup: remove expired board posts
-function startBoardPostTtlCleanupJob(storage: Storage): void {
-  const cleanup = async () => {
-    try {
-      const boards = await storage.listBoards();
-      for (const board of boards) {
-        // listPosts filters expired posts in-memory and deletes them
-        await storage.listPosts(board.id, { limit: 10000 });
-      }
-    } catch (err) {
-      logger.error('Board post TTL cleanup job failed', { error: err });
-    }
-  };
-
-  setInterval(cleanup, 10 * 60_000); // Every 10 minutes
-  logger.info('Board post TTL cleanup job scheduled (every 10m)');
-}
-
-// Dispute auto-escalation and timeout (RFC 10.8)
-function startDisputeTimeoutJob(config: AimeatConfig, storage: Storage): void {
-  const processDisputes = async () => {
-    try {
-      const now = Date.now();
-      const SEVEN_DAYS = 7 * 24 * 3_600_000;
-      const THIRTY_DAYS = 30 * 24 * 3_600_000;
-
-      const allWork = await storage.listAllWork();
-      for (const work of allWork) {
-        if (work.status !== 'disputed' && work.status !== 'contested' && work.status !== 'escalated') continue;
-
-        const dispute = await storage.getDisputeByTrackingCode(work.trackingCode);
-        if (!dispute) continue;
-
-        const disputeAge = now - new Date(dispute.createdAt).getTime();
-
-        // Auto-escalate after 7 days if still open/contested
-        if ((dispute.status === 'open' || dispute.status === 'contested') && disputeAge > SEVEN_DAYS) {
-          await storage.updateDispute(dispute.id, {
-            status: 'escalated',
-            updatedAt: new Date().toISOString(),
-          });
-
-          const log = await storage.getDisputeAuditLog(dispute.id);
-          const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
-          const { createHash } = await import('node:crypto');
-          const entryData = JSON.stringify({ event: 'auto_escalated', actor: 'system', timestamp: new Date().toISOString() });
-          const hash = createHash('sha256').update(prevHash + entryData).digest('hex');
-
-          await storage.addDisputeAuditEntry(dispute.id, {
-            sequence: log.length + 1,
-            event: 'escalated',
-            actor: 'system',
+        if (work.callbackUrl) {
+          const body = JSON.stringify({
+            event: 'work.expired',
+            tracking_code: work.trackingCode,
+            status: 'expired',
             timestamp: new Date().toISOString(),
-            data: { reason: 'Auto-escalated after 7 days without resolution' },
-            hash,
-            previousHash: prevHash,
           });
-
-          logger.info(`Dispute ${dispute.id} auto-escalated after 7 days`);
+          fetch(work.callbackUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body,
+            signal: AbortSignal.timeout(10_000),
+          }).catch(() => { /* fire and forget */ });
         }
 
-        // Auto-resolve (timeout) after 30 days if still escalated
-        if (dispute.status === 'escalated' && disputeAge > THIRTY_DAYS) {
-          // Return escrow to requester
-          const { returnEscrow } = await import('./services/morsel.js');
-          await returnEscrow(storage, work);
-
-          await storage.updateDispute(dispute.id, {
-            status: 'resolved',
-            ruling: {
-              ruling: 'timeout',
-              distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 },
-              reason: 'Auto-resolved: dispute timed out after 30 days',
-            },
-            updatedAt: new Date().toISOString(),
-          });
-
-          await storage.updateWork(work.trackingCode, {
-            status: 'settled',
-            updatedAt: new Date().toISOString(),
-          });
-
-          const log = await storage.getDisputeAuditLog(dispute.id);
-          const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
-          const { createHash } = await import('node:crypto');
-          const entryData = JSON.stringify({ event: 'timeout_resolved', actor: 'system', timestamp: new Date().toISOString() });
-          const hash = createHash('sha256').update(prevHash + entryData).digest('hex');
-
-          await storage.addDisputeAuditEntry(dispute.id, {
-            sequence: log.length + 1,
-            event: 'timeout_resolved',
-            actor: 'system',
-            timestamp: new Date().toISOString(),
-            data: { reason: 'Auto-resolved after 30 days without operator ruling' },
-            hash,
-            previousHash: prevHash,
-          });
-
-          logger.info(`Dispute ${dispute.id} auto-resolved (timeout after 30 days)`);
-        }
+        logger.info(`Work ${work.trackingCode} expired (TTL exceeded)`);
       }
-    } catch (err) {
-      logger.error('Dispute timeout job failed', { error: err });
     }
-  };
-
-  setInterval(processDisputes, 3_600_000); // Every hour
-  logger.info('Dispute timeout job scheduled (every 1h)');
+  }
 }
 
-// Mailbox cleanup: remove expired mailbox items for offline personal nodes
-function startMailboxCleanupJob(storage: Storage): void {
-  const cleanup = async () => {
-    try {
-      const removed = await storage.cleanExpiredMailboxItems();
-      if (removed > 0) logger.info(`Mailbox cleanup: removed ${removed} expired items`);
-    } catch (err) {
-      logger.error('Mailbox cleanup job failed', { error: err });
+async function runMemoryTtlCleanupJob(storage: Storage): Promise<void> {
+  const now = Date.now();
+  const allAgents = await storage.listAgents();
+  for (const agent of allAgents) {
+    const memories = await storage.listMemory(agent.gaii);
+    for (const mem of memories) {
+      if (mem.ttlHours) {
+        const expiresAt = new Date(mem.createdAt).getTime() + mem.ttlHours * 3_600_000;
+        if (now > expiresAt) {
+          await storage.deleteMemory(agent.gaii, mem.key);
+        }
+      }
     }
-  };
+  }
+}
 
-  setInterval(cleanup, 10 * 60_000); // Every 10 minutes
-  logger.info('Mailbox cleanup job scheduled (every 10m)');
+async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {
+  const boards = await storage.listBoards();
+  for (const board of boards) {
+    await storage.listPosts(board.id, { limit: 10000 });
+  }
+}
+
+async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {
+  const now = Date.now();
+  const SEVEN_DAYS = 7 * 24 * 3_600_000;
+  const THIRTY_DAYS = 30 * 24 * 3_600_000;
+
+  const allWork = await storage.listAllWork();
+  for (const work of allWork) {
+    if (work.status !== 'disputed' && work.status !== 'contested' && work.status !== 'escalated') continue;
+
+    const dispute = await storage.getDisputeByTrackingCode(work.trackingCode);
+    if (!dispute) continue;
+
+    const disputeAge = now - new Date(dispute.createdAt).getTime();
+
+    if ((dispute.status === 'open' || dispute.status === 'contested') && disputeAge > SEVEN_DAYS) {
+      await storage.updateDispute(dispute.id, {
+        status: 'escalated',
+        updatedAt: new Date().toISOString(),
+      });
+
+      const log = await storage.getDisputeAuditLog(dispute.id);
+      const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
+      const { createHash } = await import('node:crypto');
+      const entryData = JSON.stringify({ event: 'auto_escalated', actor: 'system', timestamp: new Date().toISOString() });
+      const hash = createHash('sha256').update(prevHash + entryData).digest('hex');
+
+      await storage.addDisputeAuditEntry(dispute.id, {
+        sequence: log.length + 1,
+        event: 'escalated',
+        actor: 'system',
+        timestamp: new Date().toISOString(),
+        data: { reason: 'Auto-escalated after 7 days without resolution' },
+        hash,
+        previousHash: prevHash,
+      });
+
+      logger.info(`Dispute ${dispute.id} auto-escalated after 7 days`);
+    }
+
+    if (dispute.status === 'escalated' && disputeAge > THIRTY_DAYS) {
+      const { returnEscrow } = await import('./services/morsel.js');
+      await returnEscrow(storage, work);
+
+      await storage.updateDispute(dispute.id, {
+        status: 'resolved',
+        ruling: {
+          ruling: 'timeout',
+          distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 },
+          reason: 'Auto-resolved: dispute timed out after 30 days',
+        },
+        updatedAt: new Date().toISOString(),
+      });
+
+      await storage.updateWork(work.trackingCode, {
+        status: 'settled',
+        updatedAt: new Date().toISOString(),
+      });
+
+      const log = await storage.getDisputeAuditLog(dispute.id);
+      const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
+      const { createHash } = await import('node:crypto');
+      const entryData = JSON.stringify({ event: 'timeout_resolved', actor: 'system', timestamp: new Date().toISOString() });
+      const hash = createHash('sha256').update(prevHash + entryData).digest('hex');
+
+      await storage.addDisputeAuditEntry(dispute.id, {
+        sequence: log.length + 1,
+        event: 'timeout_resolved',
+        actor: 'system',
+        timestamp: new Date().toISOString(),
+        data: { reason: 'Auto-resolved after 30 days without operator ruling' },
+        hash,
+        previousHash: prevHash,
+      });
+
+      logger.info(`Dispute ${dispute.id} auto-resolved (timeout after 30 days)`);
+    }
+  }
+}
+
+async function runMailboxCleanupJob(storage: Storage): Promise<void> {
+  const removed = await storage.cleanExpiredMailboxItems();
+  if (removed > 0) logger.info(`Mailbox cleanup: removed ${removed} expired items`);
+}
+
+async function runConsentExpiryJob(storage: Storage): Promise<void> {
+  const { expireConsents } = await import('./services/consent.js');
+  await expireConsents(storage);
+}
+
+// ── Seed Core Scheduled Jobs ───────────────────────────────────────
+
+interface CoreJobDef {
+  id: string;
+  name: string;
+  coreHandler: string;
+  cron: string;
+}
+
+async function seedCoreScheduledJobs(config: AimeatConfig, storage: Storage): Promise<void> {
+  const jobs: CoreJobDef[] = [
+    { id: 'core:daily-allowance', name: 'Daily Allowance', coreHandler: 'daily-allowance', cron: '0 0 * * *' },
+    { id: 'core:work-timeout', name: 'Work Timeout Expiry', coreHandler: 'work-timeout', cron: '* * * * *' },
+    { id: 'core:memory-ttl-cleanup', name: 'Memory TTL Cleanup', coreHandler: 'memory-ttl-cleanup', cron: '*/5 * * * *' },
+    { id: 'core:board-post-ttl-cleanup', name: 'Board Post TTL Cleanup', coreHandler: 'board-post-ttl-cleanup', cron: '*/10 * * * *' },
+    { id: 'core:dispute-timeout', name: 'Dispute Auto-Escalation', coreHandler: 'dispute-timeout', cron: '0 * * * *' },
+  ];
+
+  if (config.consentEnabled) {
+    jobs.push({ id: 'core:consent-expiry', name: 'Consent Expiry', coreHandler: 'consent-expiry', cron: '*/10 * * * *' });
+  }
+
+  if (config.personalNodesEnabled) {
+    jobs.push({ id: 'core:mailbox-cleanup', name: 'Mailbox Cleanup', coreHandler: 'mailbox-cleanup', cron: '*/10 * * * *' });
+  }
+
+  const now = new Date().toISOString();
+  for (const def of jobs) {
+    const existing = await storage.getScheduledJob(def.id);
+    if (!existing) {
+      await storage.createScheduledJob({
+        id: def.id,
+        name: def.name,
+        type: 'core',
+        coreHandler: def.coreHandler,
+        cron: def.cron,
+        enabled: true,
+        createdBy: `system@${config.nodeId}`,
+        createdAt: now,
+        updatedAt: now,
+      });
+      logger.info(`Seeded core scheduled job: ${def.id} (${def.cron})`);
+    }
+  }
 }
 
 /** Set up the anonymous owner + agent + GHII for anonymous mode. Normal auth still works alongside. */

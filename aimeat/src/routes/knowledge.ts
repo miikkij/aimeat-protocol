@@ -6,9 +6,18 @@ import type { Storage, KnowledgeManifest, MemoryLinkRecord, OperatorReviewRecord
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { ManifestSchema } from '../schemas/knowledge-package.js';
-import Ajv from 'ajv';
+import { createRequire } from 'node:module';
 
-const ajv = new (Ajv as any)({ allErrors: true });
+const require = createRequire(import.meta.url);
+/* eslint-disable @typescript-eslint/no-require-imports */
+const ajvPkg = require('ajv');
+const formatsPkg = require('ajv-formats');
+/* eslint-enable @typescript-eslint/no-require-imports */
+const AjvClass = ajvPkg.default ?? ajvPkg;
+const addFormats = formatsPkg.default ?? formatsPkg;
+
+const ajv = new AjvClass({ allErrors: true });
+addFormats(ajv);
 const validateManifest = ajv.compile(ManifestSchema);
 
 export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router {
