@@ -439,7 +439,8 @@ export function adminRouter(
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
     // Schema is built dynamically from the shared CONFIG_FIELDS definitions
     router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
-        const schema: Record<string, { value: unknown; type: string; description: string; range?: string; mutable: boolean; path: string }> = {};
+        const editable = storage.supportsConfigPersistence();
+        const schema: Record<string, { value: unknown; type: string; description: string; range?: string; mutable: boolean; editable: boolean; path: string }> = {};
 
         for (const field of CONFIG_FIELDS) {
             if (field.adminDisplay === 'hidden') continue;
@@ -452,6 +453,7 @@ export function adminRouter(
                     type: 'boolean',
                     description: `Whether ${field.description.toLowerCase().replace(' (secret)', '')} is configured (read-only secret)`,
                     mutable: false,
+                    editable: false,
                     path: configuredPath,
                 };
                 continue;
@@ -465,6 +467,7 @@ export function adminRouter(
                 description: field.description,
                 ...(field.range ? { range: field.range } : {}),
                 mutable: !field.immutable,
+                editable: editable && !field.immutable,
                 path: field.dotPath,
             };
         }
@@ -475,16 +478,29 @@ export function adminRouter(
             type: 'boolean',
             description: 'Whether VAPID keys are configured (read-only secret)',
             mutable: false,
+            editable: false,
             path: 'push.vapid_configured',
         };
 
-        res.json(success(config.nodeId, { schema }));
+        res.json(success(config.nodeId, {
+            editable,
+            storageType: config.storageProvider,
+            note: editable ? undefined : 'In-memory storage detected. Config is read-only. Use .env or aimeat.ini to configure this node.',
+            schema,
+        }));
     });
 
     // PUT /v1/admin/config — atomic config update with dot-path addressing (§14.2, Appendix B)
     // Body format: {"changes": [{"path": "morsel_policy.daily_allowance", "value": 75}, ...]}
     // Mutable field lookup comes from the shared config-schema module (single source of truth)
     router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
+        // In-memory guard — config editing requires persistent storage
+        if (!storage.supportsConfigPersistence()) {
+            res.status(403).json(error(config.nodeId, 'READONLY_CONFIG',
+                'Config editing requires a persistent database (MongoDB or SQLite). Use .env or aimeat.ini created with "aimeat init".'));
+            return;
+        }
+
         const { changes } = req.body ?? {};
 
         if (!Array.isArray(changes) || changes.length === 0) {

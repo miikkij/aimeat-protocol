@@ -3578,4 +3578,36 @@ export class SqliteStorage implements Storage {
     if (row.appScreenshot) record.appScreenshot = row.appScreenshot as string;
     return record;
   }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Config Persistence ──
+  // ══════════════════════════════════════════════════════════
+
+  supportsConfigPersistence(): boolean {
+    // In-memory SQLite (:memory:) does not persist across restarts
+    return this.db.name !== ':memory:';
+  }
+
+  async getConfigValue(key: string): Promise<string | null> {
+    const row = this.db.prepare('SELECT value FROM system_settings WHERE key = ?').get(`config:${key}`) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  async setConfigValue(key: string, value: string): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO system_settings (key, value, updatedAt) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = datetime('now')
+    `).run(`config:${key}`, value);
+  }
+
+  async deleteConfigValue(key: string): Promise<void> {
+    this.db.prepare('DELETE FROM system_settings WHERE key = ?').run(`config:${key}`);
+  }
+
+  async getAllConfigValues(): Promise<Record<string, string>> {
+    const rows = this.db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'config:%'").all() as { key: string; value: string }[];
+    const result: Record<string, string> = {};
+    for (const r of rows) result[r.key.replace('config:', '')] = r.value;
+    return result;
+  }
 }

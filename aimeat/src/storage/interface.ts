@@ -845,6 +845,7 @@ import type { NodeRepository } from './repositories/node.repository.js';
 import type { NotificationRepository } from './repositories/notification.repository.js';
 import type { AppRepository } from './repositories/app.repository.js';
 import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
+import type { ConfigRepository } from './repositories/config.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -854,4 +855,4 @@ export interface Storage extends
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
-  AppRepository, AppMarketplaceRepository { }
+  AppRepository, AppMarketplaceRepository, ConfigRepository { }
