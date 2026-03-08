@@ -1913,6 +1913,41 @@ await test('Cleanup — delete second owner', async () => {
     assert(body.ok === true, `delete owner2: ${JSON.stringify(body.error)}`);
 });
 
+// ── Phase 8: Connectivity Key ──────────────────────────────────────
+console.log('\n── Phase 8: Connectivity Key ──');
+
+let connectivityKey: string;
+
+await test('Owner generates connectivity key', async () => {
+  const r = await json('/v1/auth/connectivity-key', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agent_name: 'connected-bot', description: 'Test agent via connectivity key' }),
+  });
+  assert(r.status === 201, `Expected 201, got ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(r.body.data.connectivity_key, 'Missing connectivity_key');
+  connectivityKey = r.body.data.connectivity_key;
+});
+
+await test('Agent registers via connectivity key', async () => {
+  const r = await json('/v1/agents/connect', {
+    method: 'POST',
+    body: JSON.stringify({ connectivity_key: connectivityKey }),
+  });
+  assert(r.status === 201, `Expected 201, got ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(r.body.data.agent.gaii.includes('connected-bot'), 'GAII should contain agent name');
+  assert(r.body.data.private_key, 'Missing private_key');
+  assert(r.body.data.public_key, 'Missing public_key');
+});
+
+await test('Connectivity key cannot be reused', async () => {
+  const r = await json('/v1/agents/connect', {
+    method: 'POST',
+    body: JSON.stringify({ connectivity_key: connectivityKey }),
+  });
+  assert(r.status === 404 || r.status === 409, `Expected 404 or 409, got ${r.status}`);
+});
+
 // ─── GDPR ───
 console.log('GDPR');
 

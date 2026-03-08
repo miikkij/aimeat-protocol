@@ -117,7 +117,7 @@ export interface BoardPostRecord {
 export interface OtkRecord {
   key: string;
   ownerGaii: string;
-  action: string;         // 'write_memory' | 'post_board' | 'session' | 'initial'
+  action: string;         // 'write_memory' | 'post_board' | 'session' | 'initial' | 'register_agent'
   params: Record<string, unknown>;
   expiresAt: string;      // ISO timestamp; for initial OTKs, set to far-future until first use
   initial: boolean;       // true = timer starts on first use, not at creation
