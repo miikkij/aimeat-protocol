@@ -2126,6 +2126,21 @@ components:
                       code:
                         example: NOT_FOUND
 
+    UnprocessableEntity:
+      description: Validation failed (invalid template or bundle)
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        example: VALIDATION_FAILED
+
     RateLimited:
       description: Too many requests
       headers:

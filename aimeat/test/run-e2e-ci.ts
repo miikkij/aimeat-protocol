@@ -18,14 +18,24 @@ import { resolve, basename } from 'node:path';
 
 const ALL_SUITES = [
     'test/e2e-full.ts',
-    'test/e2e-micro-memory.ts',
+    'test/e2e-admin-features.ts',
+    'test/e2e-anonymous.ts',
+    'test/e2e-auth-lib.ts',
+    'test/e2e-board-ttl.ts',
     'test/e2e-concurrency.ts',
     'test/e2e-disputes.ts',
+    'test/e2e-extensions.ts',
     'test/e2e-federation.ts',
     'test/e2e-hooks.ts',
+    'test/e2e-knowledge.ts',
+    'test/e2e-libs.ts',
     'test/e2e-mcp.ts',
+    'test/e2e-micro-memory.ts',
+    'test/e2e-personal-node.ts',
+    'test/e2e-phase0.ts',
+    'test/e2e-portal.ts',
+    'test/e2e-security.ts',
     'test/e2e-storage-visibility.ts',
-    'test/e2e-board-ttl.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';

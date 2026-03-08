@@ -225,7 +225,7 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB',
           description: 'Maximum single memory value size (KB)',
           value: String(config.memoryMaxValueSizeKb),
-          defaultVal: '64',
+          defaultVal: '1024',
         },
         {
           envVar: 'AIMEAT_MEMORY_MAX_KEYS',
@@ -267,7 +267,7 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           envVar: 'AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE',
           description: 'Maximum micro-memory value size (bytes)',
           value: String(config.microMemoryMaxValueSizeBytes),
-          defaultVal: '1024',
+          defaultVal: '16384',
         },
         {
           envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT',
