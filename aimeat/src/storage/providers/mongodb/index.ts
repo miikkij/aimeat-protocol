@@ -8,6 +8,8 @@
  *   4. Start with: aimeat --db mongodb://localhost:27017/aimeat
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type {
     Storage,
     OwnerRecord,
@@ -47,7 +49,7 @@ import type {
     MemoryLinkRecord, OperatorReviewRecord,
     ScheduledJobRecord,
     ExtensionInstanceRecord,
-    SystemPromptRecord, SystemPromptVersionRecord,
+    ReplicationQueueEntry,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3595,110 +3597,67 @@ export class MongoStorage implements Storage {
     }
 
     // ══════════════════════════════════════════════════════════
-    // ── System Prompts ──
+    // ── Replication Queue (B.1) — in-memory (transient queue)
     // ══════════════════════════════════════════════════════════
 
-    private toSystemPromptRecord(row: any): SystemPromptRecord {
-        return {
-            id: row.id,
-            category: row.category,
-            name: row.name,
-            description: row.description,
-            content: row.content,
-            variables: row.variables ?? [],
-            version: row.version,
-            active: row.active,
-            tags: row.tags ?? [],
-            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
-            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+    private replicationQueue = new Map<string, ReplicationQueueEntry>();
+
+    async enqueueReplication(entry: Omit<ReplicationQueueEntry, 'id' | 'attempts' | 'lastAttemptAt' | 'status'>): Promise<string> {
+        const id = randomUUID();
+        const full: ReplicationQueueEntry = {
+            ...entry,
+            id,
+            attempts: 0,
+            lastAttemptAt: null,
+            status: 'pending',
         };
+        this.replicationQueue.set(id, full);
+        return id;
     }
 
-    private toSystemPromptVersionRecord(row: any): SystemPromptVersionRecord {
-        return {
-            promptId: row.promptId,
-            version: row.version,
-            content: row.content,
-            tags: row.tags ?? [],
-            savedBy: row.savedBy,
-            savedAt: row.savedAt instanceof Date ? row.savedAt.toISOString() : row.savedAt,
-        };
+    async dequeueReplication(peerId: string, limit: number): Promise<ReplicationQueueEntry[]> {
+        const results: ReplicationQueueEntry[] = [];
+        // Iterate in insertion order (Map preserves insertion order)
+        for (const entry of this.replicationQueue.values()) {
+            if (entry.status === 'pending' && entry.targetPeers.includes(peerId)) {
+                results.push(entry);
+                if (results.length >= limit) break;
+            }
+        }
+        return results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     }
 
-    async listSystemPrompts(): Promise<SystemPromptRecord[]> {
-        this.ensureReady();
-        const rows = await this.prisma.systemPrompt.findMany({
-            orderBy: [{ category: 'asc' }, { id: 'asc' }],
-        });
-        return rows.map((r: any) => this.toSystemPromptRecord(r));
+    async markReplicationSent(ids: string[]): Promise<void> {
+        for (const id of ids) {
+            const entry = this.replicationQueue.get(id);
+            if (entry) entry.status = 'sent';
+        }
     }
 
-    async getSystemPrompt(id: string): Promise<SystemPromptRecord | null> {
-        this.ensureReady();
-        const row = await this.prisma.systemPrompt.findUnique({ where: { id } });
-        return row ? this.toSystemPromptRecord(row) : null;
+    async markReplicationFailed(ids: string[]): Promise<void> {
+        for (const id of ids) {
+            const entry = this.replicationQueue.get(id);
+            if (entry) {
+                entry.status = 'failed';
+                entry.attempts++;
+                entry.lastAttemptAt = new Date().toISOString();
+            }
+        }
     }
 
-    async upsertSystemPrompt(record: SystemPromptRecord): Promise<void> {
-        this.ensureReady();
-        await this.prisma.systemPrompt.upsert({
-            where: { id: record.id },
-            create: {
-                id: record.id,
-                category: record.category,
-                name: record.name,
-                description: record.description,
-                content: record.content,
-                variables: record.variables,
-                version: record.version,
-                active: record.active,
-                tags: record.tags,
-                createdAt: new Date(record.createdAt),
-                updatedAt: new Date(record.updatedAt),
-            },
-            update: {
-                category: record.category,
-                name: record.name,
-                description: record.description,
-                content: record.content,
-                variables: record.variables,
-                version: record.version,
-                active: record.active,
-                tags: record.tags,
-                updatedAt: new Date(record.updatedAt),
-            },
-        });
+    async pruneReplicationQueue(maxAge: Date): Promise<number> {
+        let pruned = 0;
+        for (const [id, entry] of this.replicationQueue) {
+            if (new Date(entry.createdAt) < maxAge || entry.status === 'sent') {
+                this.replicationQueue.delete(id);
+                pruned++;
+            }
+        }
+        return pruned;
     }
 
-    async listSystemPromptVersions(promptId: string): Promise<SystemPromptVersionRecord[]> {
-        this.ensureReady();
-        const rows = await this.prisma.systemPromptVersion.findMany({
-            where: { promptId },
-            orderBy: { version: 'desc' },
-        });
-        return rows.map((r: any) => this.toSystemPromptVersionRecord(r));
-    }
-
-    async getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null> {
-        this.ensureReady();
-        const row = await this.prisma.systemPromptVersion.findUnique({
-            where: { promptId_version: { promptId, version } },
-        });
-        return row ? this.toSystemPromptVersionRecord(row) : null;
-    }
-
-    async saveSystemPromptVersion(record: SystemPromptVersionRecord): Promise<void> {
-        this.ensureReady();
-        await this.prisma.systemPromptVersion.create({
-            data: {
-                promptId: record.promptId,
-                version: record.version,
-                content: record.content,
-                tags: record.tags,
-                savedBy: record.savedBy,
-                savedAt: new Date(record.savedAt),
-            },
-        });
+    async replicationQueueSize(): Promise<number> {
+        return this.replicationQueue.size;
     }
 }
 

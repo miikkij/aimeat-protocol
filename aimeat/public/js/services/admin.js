@@ -158,9 +158,6 @@ export const scaffoldExtension       = (body)           => apiPost('/v1/admin/ex
 export const getDiskScript           = (name, actionId) => apiGet(`/v1/admin/extensions/available/${encodeURIComponent(name)}/scripts/${encodeURIComponent(actionId)}`);
 export const saveDiskScript          = (name, actionId, scriptContent) => apiPut(`/v1/admin/extensions/available/${encodeURIComponent(name)}/scripts/${encodeURIComponent(actionId)}`, { scriptContent });
 export const addDiskAction           = (name, body)      => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/actions`, body);
-export const deleteDiskAction        = (name, actionId)  => apiDelete(`/v1/admin/extensions/available/${encodeURIComponent(name)}/actions/${encodeURIComponent(actionId)}`);
-export const getDiskManifest         = (name)            => apiGet(`/v1/admin/extensions/available/${encodeURIComponent(name)}/manifest`);
-export const saveDiskManifest        = (name, manifest)  => apiPut(`/v1/admin/extensions/available/${encodeURIComponent(name)}/manifest`, { manifest });
 export const reinstallExtension      = (name)           => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/reinstall`);
 
 // ── Scheduler ──
@@ -186,11 +183,3 @@ export const reviewKnowledgePackage = (packageId, reason, action, customText) =>
   apiPost(`/v1/admin/knowledge/${encodeURIComponent(packageId)}/review`, {
     reason, action, custom_text: customText,
   });
-
-// ── System Prompts ──
-export const getSystemPrompts      = ()               => apiGet('/v1/admin/prompts');
-export const getSystemPrompt       = (id)             => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}`);
-export const updateSystemPrompt    = (id, content, tags) => apiPut(`/v1/admin/prompts/${encodeURIComponent(id)}`, { content, tags });
-export const getPromptVersions     = (id)             => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}/versions`);
-export const getPromptVersion      = (id, ver)        => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}/versions/${ver}`);
-export const activatePromptVersion = (id, ver)        => apiPut(`/v1/admin/prompts/${encodeURIComponent(id)}/activate/${ver}`, {});

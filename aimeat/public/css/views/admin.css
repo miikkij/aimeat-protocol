@@ -317,18 +317,6 @@
 /* Card grid for card-based layouts */
 .adm-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 
-/* System Prompts toast */
-.adm-toast {
-  position: fixed; top: 16px; right: 16px; z-index: 1000;
-  background: var(--accent, #ff6b9d); color: #fff;
-  padding: 10px 20px; border-radius: 8px;
-  font-size: .9em; animation: adm-toast-in .3s ease;
-}
-@keyframes adm-toast-in {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   .adm-sidebar { display: none; }

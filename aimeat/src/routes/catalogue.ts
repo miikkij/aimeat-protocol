@@ -16,9 +16,16 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
+    const includeFederated = req.query.include_federated !== 'false'; // default true
     const actions = await storage.listActions({ search, category });
+
+    // B.5: Optionally exclude federated entries
+    const filteredActions = includeFederated
+      ? actions
+      : actions.filter(a => !a.tags.some(t => t.startsWith('federated:')));
+
     const start = (page - 1) * perPage;
-    const paged = actions.slice(start, start + perPage);
+    const paged = filteredActions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
       '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
@@ -37,12 +44,13 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         },
         tags: a.tags,
         semantic: a.semantic,
+        source_node: a.tags.find(t => t.startsWith('federated:'))?.replace('federated:', '') ?? config.nodeId,
       })),
-      total: actions.length,
+      total: filteredActions.length,
     }, [
       { description: 'View node bootstrap info', method: 'GET', url: '/' },
       { description: 'Register as an owner to start using actions', method: 'POST', url: '/v1/owners' },
-    ], { page, per_page: perPage, total: actions.length }));
+    ], { page, per_page: perPage, total: filteredActions.length }));
   });
 
   // GET /v1/catalogue/actions — actions sub-catalogue (Tier 0)
@@ -51,9 +59,16 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(50, Math.max(1, parseInt(req.query.per_page as string ?? '20', 10)));
 
+    const includeFederated = req.query.include_federated !== 'false'; // default true
     const actions = await storage.listActions({ category });
+
+    // B.5: Optionally exclude federated entries
+    const filteredActions = includeFederated
+      ? actions
+      : actions.filter(a => !a.tags.some(t => t.startsWith('federated:')));
+
     const start = (page - 1) * perPage;
-    const paged = actions.slice(start, start + perPage);
+    const paged = filteredActions.slice(start, start + perPage);
 
     res.json(success(config.nodeId, {
       '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
@@ -66,9 +81,10 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         pricing: { base_morsels: a.pricing.baseMorsels },
         tags: a.tags,
         semantic: a.semantic,
+        source_node: a.tags.find(t => t.startsWith('federated:'))?.replace('federated:', '') ?? config.nodeId,
       })),
-      total: actions.length,
-    }, undefined, { page, per_page: perPage, total: actions.length }));
+      total: filteredActions.length,
+    }, undefined, { page, per_page: perPage, total: filteredActions.length }));
   });
 
   // GET /v1/catalogue/agents — agent directory (Tier 0)
@@ -351,6 +367,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       estimated_time_seconds: action.estimatedTimeSeconds,
       tags: action.tags,
       semantic: action.semantic,
+      source_node: action.tags.find(t => t.startsWith('federated:'))?.replace('federated:', '') ?? config.nodeId,
       created_at: action.createdAt,
     }));
   });

@@ -8,6 +8,7 @@ import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
+import { enqueueMemoryReplication } from '../services/memory-replication.js';
 
 /** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." */
 function isAnonymousGaii(gaii: string): boolean {
@@ -26,7 +27,7 @@ function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' 
   }
 }
 
-export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
+export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void, peers?: Map<string, import('../services/federation.js').PeerInfo>): Router {
   const router = Router();
 
   // Phase 2.3 — Workspace access middleware for organism.* namespace keys
@@ -130,6 +131,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
+
+    // C.3: Event-driven replication queue integration
+    if (peers) {
+      enqueueMemoryReplication(gaii, key, config, storage, peers).catch(() => {
+        // Non-critical — will be picked up by scheduled sync
+      });
+    }
 
     // Charge overage morsels if over quota (§15)
     if (quotaCheck.overageMorsels > 0) {
@@ -400,6 +408,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       updatedAt: now,
     });
 
+    // C.3: Event-driven replication queue integration
+    if (peers) {
+      enqueueMemoryReplication(gaii, key, config, storage, peers).catch(() => {
+        // Non-critical — will be picked up by scheduled sync
+      });
+    }
+
     // Charge overage morsels if over quota (§15)
     if (quotaCheck.overageMorsels > 0) {
       await chargeOverage(storage, gaii, quotaCheck.overageMorsels, 'memory_overage');
@@ -498,6 +513,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     record.allowedOrigins = allowed_origins === null ? undefined : allowed_origins;
     record.updatedAt = new Date().toISOString();
     await storage.setMemory(record);
+
+    // C.3: Event-driven replication queue integration
+    if (peers) {
+      enqueueMemoryReplication(record.ownerGaii, record.key, config, storage, peers).catch(() => {
+        // Non-critical — will be picked up by scheduled sync
+      });
+    }
 
     res.json(success(config.nodeId, {
       key: record.key,

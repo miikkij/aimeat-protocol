@@ -842,6 +842,20 @@ export function initializeSchema(db: Database.Database): void {
       updatedAt       TEXT NOT NULL
     );
 
+    -- ── Replication Queue (B.1) ──
+    CREATE TABLE IF NOT EXISTS replication_queue (
+      id              TEXT PRIMARY KEY,
+      type            TEXT NOT NULL,
+      targetPeers     TEXT NOT NULL DEFAULT '[]',
+      payload         TEXT,
+      createdAt       TEXT NOT NULL,
+      attempts        INTEGER NOT NULL DEFAULT 0,
+      lastAttemptAt   TEXT,
+      status          TEXT NOT NULL DEFAULT 'pending'
+    );
+    CREATE INDEX IF NOT EXISTS idx_repq_status ON replication_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_repq_createdAt ON replication_queue(createdAt);
+
     CREATE TABLE IF NOT EXISTS extension_instances (
       id              TEXT NOT NULL,
       extensionName   TEXT NOT NULL,
@@ -851,31 +865,6 @@ export function initializeSchema(db: Database.Database): void {
       createdAt       TEXT NOT NULL,
       updatedAt       TEXT NOT NULL,
       PRIMARY KEY (extensionName, id)
-    );
-
-    -- ── System Prompts ──
-    CREATE TABLE IF NOT EXISTS system_prompts (
-      id          TEXT PRIMARY KEY,
-      category    TEXT NOT NULL,
-      name        TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      content     TEXT NOT NULL,
-      variables   TEXT NOT NULL DEFAULT '[]',
-      version     INTEGER NOT NULL DEFAULT 1,
-      active      INTEGER NOT NULL DEFAULT 1,
-      tags        TEXT NOT NULL DEFAULT '[]',
-      createdAt   TEXT NOT NULL,
-      updatedAt   TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS system_prompt_versions (
-      promptId    TEXT NOT NULL,
-      version     INTEGER NOT NULL,
-      content     TEXT NOT NULL,
-      tags        TEXT NOT NULL DEFAULT '[]',
-      savedBy     TEXT NOT NULL DEFAULT 'system',
-      savedAt     TEXT NOT NULL,
-      PRIMARY KEY (promptId, version)
     );
 
   `);

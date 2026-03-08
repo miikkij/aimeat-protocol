@@ -14,8 +14,7 @@ import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance,
   deleteExtensionInstance, getAvailableExtensions, installBundledExtension,
   uninstallExtension, getActionScript, updateActionScript, scaffoldExtension,
-  getDiskScript, saveDiskScript, addDiskAction, deleteDiskAction,
-  getDiskManifest, saveDiskManifest, reinstallExtension,
+  getDiskScript, saveDiskScript, addDiskAction, reinstallExtension,
 } from '/js/services/admin.js';
 
 const inputStyle = 'background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px';
@@ -650,7 +649,7 @@ function ExtensionPanel({ ext, onUninstall }) {
   `;
 }
 
-// ── Available Extension Card (with disk script editor + add/delete action + manifest editor) ──
+// ── Available Extension Card (with disk script editor + add action) ──
 function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, reload, loadAvailable }) {
   const [showEditor, setShowEditor] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
@@ -663,10 +662,6 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
   const [newActionMethod, setNewActionMethod] = useState('POST');
   const [newActionDesc, setNewActionDesc] = useState('');
   const [adding, setAdding] = useState(false);
-  const [showManifest, setShowManifest] = useState(false);
-  const [manifest, setManifest] = useState('');
-  const [loadingManifest, setLoadingManifest] = useState(false);
-  const [savingManifest, setSavingManifest] = useState(false);
 
   const actions = ext.actions || [];
 
@@ -705,40 +700,9 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
       await addDiskAction(ext.name, { id: newActionId.trim(), method: newActionMethod, description: newActionDesc.trim() || undefined });
       setMsg({ ok: true, text: t('dashboard.servicesActionAdded') });
       setNewActionId(''); setNewActionDesc(''); setShowAddAction(false);
-      loadAvailable();
+      loadAvailable(); // refresh available list to get updated actions
     } catch (e) { setMsg({ ok: false, text: e.message }); }
     setAdding(false);
-  }
-
-  async function handleDeleteAction(actionId) {
-    if (!confirm(t('dashboard.servicesDeleteActionConfirm') + ': ' + actionId + '?')) return;
-    setMsg(null);
-    try {
-      await deleteDiskAction(ext.name, actionId);
-      if (selectedAction === actionId) setSelectedAction(null);
-      loadAvailable();
-    } catch (e) { setMsg({ ok: false, text: e.message }); }
-  }
-
-  async function toggleManifest() {
-    if (showManifest) { setShowManifest(false); return; }
-    setLoadingManifest(true); setMsg(null);
-    try {
-      const res = await getDiskManifest(ext.name);
-      setManifest(res.data?.manifest || '');
-      setShowManifest(true);
-    } catch (e) { setMsg({ ok: false, text: e.message }); }
-    setLoadingManifest(false);
-  }
-
-  async function handleSaveManifest() {
-    setSavingManifest(true); setMsg(null);
-    try {
-      await saveDiskManifest(ext.name, manifest);
-      setMsg({ ok: true, text: t('dashboard.servicesManifestSaved') });
-      loadAvailable();
-    } catch (e) { setMsg({ ok: false, text: e.message }); }
-    setSavingManifest(false);
   }
 
   return html`
@@ -771,67 +735,18 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
           style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
           \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
         </button>
-        <button class="adm-btn-sm" onClick=${toggleManifest}
-          style="font-size:.8rem${showManifest ? ';color:#f59e0b;border-color:rgba(245,158,11,0.4)' : ''}">
-          \u2699 extension.yaml
-        </button>
         ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
 
-      ${showManifest && html`
-        <div style="margin-top:4px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <strong style="font-size:.85rem">extension.yaml</strong>
-            <code style="font-size:.75rem;color:var(--text-dim)">${ext.name}/extension.yaml</code>
-          </div>
-          ${loadingManifest
-            ? html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`
-            : html`
-              <textarea value=${manifest} onInput=${e => setManifest(e.target.value)}
-                style="width:100%;height:400px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.3);color:var(--text-bright);resize:vertical;tab-size:2"
-                spellcheck="false"
-                onKeyDown=${e => {
-                  if (e.key === 'Tab') {
-                    e.preventDefault();
-                    const ta = e.target;
-                    const start = ta.selectionStart;
-                    const end = ta.selectionEnd;
-                    const val = ta.value;
-                    ta.value = val.substring(0, start) + '  ' + val.substring(end);
-                    ta.selectionStart = ta.selectionEnd = start + 2;
-                    setManifest(ta.value);
-                  }
-                  if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    handleSaveManifest();
-                  }
-                }}
-              />
-              <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-                <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSaveManifest} disabled=${savingManifest}>
-                  ${savingManifest ? '...' : t('dashboard.servicesScriptSave')}</button>
-                <span style="font-size:.75rem;color:var(--text-dim)">Ctrl+S</span>
-              </div>
-            `
-          }
-        </div>
-      `}
-
       ${showEditor && html`
         <div style="margin-top:4px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
             <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
             ${actions.map(a => html`
-              <span style="display:inline-flex;align-items:center;gap:2px">
-                <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
-                  style="font-size:.75rem;border-top-right-radius:0;border-bottom-right-radius:0${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
-                  ${a.method} ${escHtml(a.id)}
-                </button>
-                <button class="adm-btn-sm adm-btn-danger" onClick=${() => handleDeleteAction(a.id)}
-                  style="font-size:.7rem;padding:2px 5px;border-top-left-radius:0;border-bottom-left-radius:0" title=${t('dashboard.servicesDeleteAction')}>
-                  \u2715
-                </button>
-              </span>
+              <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
+                style="font-size:.75rem${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+                ${a.method} ${escHtml(a.id)}
+              </button>
             `)}
             <button class="adm-btn-sm" onClick=${() => setShowAddAction(!showAddAction)}
               style="font-size:.75rem;color:var(--green, #22c55e)${showAddAction ? ';border-color:var(--green, #22c55e)' : ''}">

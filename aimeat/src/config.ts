@@ -201,6 +201,17 @@ export interface AimeatConfig {
   maxGenesisPeers: number;
   genesisSyncIntervalHours: number;
 
+  // Federation Data Sync
+  syncMode: 'bulk' | 'instant' | 'hybrid';
+  syncIntervalHours: number;
+  syncBatchDelayMs: number;
+  replicationQueueMax: number;
+  replicationQueueTtlHours: number;
+  maxConcurrentSyncs: number;
+  federationTimeoutMs: number;
+  genesisMemoryCache: boolean;
+  genesisMemoryCacheTtlHours: number;
+
   // Cookie Consent (optional, for service builders)
   cookieConsentEnabled: boolean;
   cookieConsentCategories: string[];
@@ -478,6 +489,15 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),
+    syncMode: (process.env.AIMEAT_SYNC_MODE ?? 'hybrid') as 'bulk' | 'instant' | 'hybrid',
+    syncIntervalHours: parseInt(process.env.AIMEAT_SYNC_INTERVAL_HOURS ?? '6', 10),
+    syncBatchDelayMs: parseInt(process.env.AIMEAT_SYNC_BATCH_DELAY_MS ?? '5000', 10),
+    replicationQueueMax: parseInt(process.env.AIMEAT_REPLICATION_QUEUE_MAX ?? '10000', 10),
+    replicationQueueTtlHours: parseInt(process.env.AIMEAT_REPLICATION_QUEUE_TTL_HOURS ?? '72', 10),
+    maxConcurrentSyncs: parseInt(process.env.AIMEAT_MAX_CONCURRENT_SYNCS ?? '5', 10),
+    federationTimeoutMs: parseInt(process.env.AIMEAT_FEDERATION_TIMEOUT_MS ?? '10000', 10),
+    genesisMemoryCache: process.env.AIMEAT_GENESIS_MEMORY_CACHE === 'true',
+    genesisMemoryCacheTtlHours: parseInt(process.env.AIMEAT_GENESIS_MEMORY_CACHE_TTL_HOURS ?? '4', 10),
     cookieConsentEnabled: process.env.AIMEAT_COOKIE_CONSENT_ENABLED === 'true',
     cookieConsentCategories: (process.env.AIMEAT_COOKIE_CONSENT_CATEGORIES ?? 'necessary').split(',').map(s => s.trim()).filter(Boolean),
     cookieConsentPolicyUrl: process.env.AIMEAT_COOKIE_CONSENT_POLICY_URL ?? null,

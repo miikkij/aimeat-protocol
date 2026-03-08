@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type {
@@ -23,8 +24,7 @@ import type {
   MemoryLinkRecord, OperatorReviewRecord,
   ScheduledJobRecord,
   ExtensionInstanceRecord,
-  SystemPromptRecord,
-  SystemPromptVersionRecord,
+  ReplicationQueueEntry,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -4116,99 +4116,82 @@ export class SqliteStorage implements Storage {
   }
 
   // ══════════════════════════════════════════════════════════
-  // ── System Prompts ──
+  // ── Replication Queue (B.1) ──
   // ══════════════════════════════════════════════════════════
 
-  async listSystemPrompts(): Promise<SystemPromptRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM system_prompts ORDER BY category, id').all() as Record<string, unknown>[];
-    return rows.map(r => ({
-      id: r.id as string,
-      category: r.category as 'tier' | 'app-builder',
-      name: r.name as string,
-      description: r.description as string,
-      content: r.content as string,
-      variables: JSON.parse(r.variables as string),
-      version: r.version as number,
-      active: !!(r.active as number),
-      tags: JSON.parse(r.tags as string),
-      createdAt: r.createdAt as string,
-      updatedAt: r.updatedAt as string,
-    }));
-  }
-
-  async getSystemPrompt(id: string): Promise<SystemPromptRecord | null> {
-    const r = this.db.prepare('SELECT * FROM system_prompts WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    if (!r) return null;
-    return {
-      id: r.id as string,
-      category: r.category as 'tier' | 'app-builder',
-      name: r.name as string,
-      description: r.description as string,
-      content: r.content as string,
-      variables: JSON.parse(r.variables as string),
-      version: r.version as number,
-      active: !!(r.active as number),
-      tags: JSON.parse(r.tags as string),
-      createdAt: r.createdAt as string,
-      updatedAt: r.updatedAt as string,
-    };
-  }
-
-  async upsertSystemPrompt(record: SystemPromptRecord): Promise<void> {
-    this.db.prepare(`
-      INSERT INTO system_prompts (id, category, name, description, content, variables, version, active, tags, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        content = excluded.content,
-        variables = excluded.variables,
-        version = excluded.version,
-        active = excluded.active,
-        tags = excluded.tags,
-        updatedAt = excluded.updatedAt
-    `).run(
-      record.id, record.category, record.name, record.description,
-      record.content, JSON.stringify(record.variables),
-      record.version, record.active ? 1 : 0,
-      JSON.stringify(record.tags), record.createdAt, record.updatedAt,
+  async enqueueReplication(entry: Omit<ReplicationQueueEntry, 'id' | 'attempts' | 'lastAttemptAt' | 'status'>): Promise<string> {
+    const id = randomUUID();
+    this.db.prepare(
+      `INSERT INTO replication_queue (id, type, targetPeers, payload, createdAt, attempts, lastAttemptAt, status)
+       VALUES (?, ?, ?, ?, ?, 0, NULL, 'pending')`
+    ).run(
+      id,
+      entry.type,
+      JSON.stringify(entry.targetPeers),
+      JSON.stringify(entry.payload),
+      entry.createdAt,
     );
+    return id;
   }
 
-  async listSystemPromptVersions(promptId: string): Promise<SystemPromptVersionRecord[]> {
+  async dequeueReplication(peerId: string, limit: number): Promise<ReplicationQueueEntry[]> {
+    // Fetch all pending entries ordered by creation time
     const rows = this.db.prepare(
-      'SELECT * FROM system_prompt_versions WHERE promptId = ? ORDER BY version DESC'
-    ).all(promptId) as Record<string, unknown>[];
-    return rows.map(r => ({
-      promptId: r.promptId as string,
-      version: r.version as number,
-      content: r.content as string,
-      tags: JSON.parse(r.tags as string),
-      savedBy: r.savedBy as string,
-      savedAt: r.savedAt as string,
-    }));
+      `SELECT * FROM replication_queue WHERE status = 'pending' ORDER BY createdAt ASC`
+    ).all() as Record<string, unknown>[];
+    const results: ReplicationQueueEntry[] = [];
+    for (const row of rows) {
+      const peers = JSON.parse(row.targetPeers as string) as string[];
+      if (peers.includes(peerId)) {
+        results.push(this.deserializeReplicationEntry(row));
+        if (results.length >= limit) break;
+      }
+    }
+    return results;
   }
 
-  async getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null> {
-    const r = this.db.prepare(
-      'SELECT * FROM system_prompt_versions WHERE promptId = ? AND version = ?'
-    ).get(promptId, version) as Record<string, unknown> | undefined;
-    if (!r) return null;
-    return {
-      promptId: r.promptId as string,
-      version: r.version as number,
-      content: r.content as string,
-      tags: JSON.parse(r.tags as string),
-      savedBy: r.savedBy as string,
-      savedAt: r.savedAt as string,
-    };
+  async markReplicationSent(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    this.db.prepare(
+      `UPDATE replication_queue SET status = 'sent' WHERE id IN (${placeholders})`
+    ).run(...ids);
   }
 
-  async saveSystemPromptVersion(record: SystemPromptVersionRecord): Promise<void> {
-    this.db.prepare(`
-      INSERT INTO system_prompt_versions (promptId, version, content, tags, savedBy, savedAt)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      record.promptId, record.version, record.content,
-      JSON.stringify(record.tags), record.savedBy, record.savedAt,
+  async markReplicationFailed(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(
+      `UPDATE replication_queue SET status = 'failed', attempts = attempts + 1, lastAttemptAt = ? WHERE id = ?`
     );
+    for (const id of ids) {
+      stmt.run(now, id);
+    }
+  }
+
+  async pruneReplicationQueue(maxAge: Date): Promise<number> {
+    const maxAgeIso = maxAge.toISOString();
+    const result = this.db.prepare(
+      `DELETE FROM replication_queue WHERE createdAt < ? OR status = 'sent'`
+    ).run(maxAgeIso);
+    return result.changes;
+  }
+
+  async replicationQueueSize(): Promise<number> {
+    const row = this.db.prepare('SELECT COUNT(*) as cnt FROM replication_queue').get() as { cnt: number };
+    return row.cnt;
+  }
+
+  private deserializeReplicationEntry(row: Record<string, unknown>): ReplicationQueueEntry {
+    return {
+      id: row.id as string,
+      type: row.type as ReplicationQueueEntry['type'],
+      targetPeers: JSON.parse(row.targetPeers as string),
+      payload: row.payload ? JSON.parse(row.payload as string) : null,
+      createdAt: row.createdAt as string,
+      attempts: row.attempts as number,
+      lastAttemptAt: (row.lastAttemptAt as string) || null,
+      status: row.status as ReplicationQueueEntry['status'],
+    };
   }
 }

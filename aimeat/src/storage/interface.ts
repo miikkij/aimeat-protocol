@@ -655,6 +655,18 @@ export interface GenesisPeerRecord {
   updatedAt: string;
 }
 
+// Phase B.1 — Replication Queue (federation data sync)
+export interface ReplicationQueueEntry {
+  id: string;
+  type: 'catalogue_sync' | 'memory_replicate' | 'trust_advisory';
+  targetPeers: string[];    // peer IDs to send to
+  payload: unknown;          // serialized sync payload
+  createdAt: string;         // ISO timestamp
+  attempts: number;
+  lastAttemptAt: string | null;
+  status: 'pending' | 'sent' | 'failed';
+}
+
 // Phase 3.4 — Organism Reputation
 export interface OrganismReputationRecord {
   organismId: string;
@@ -967,31 +979,6 @@ export interface OperatorReviewRecord {
   timestamp: string;          // ISO 8601
 }
 
-// ── System Prompts ──────────────────────────────────────────────────
-
-export interface SystemPromptRecord {
-  id: string;
-  category: 'tier' | 'app-builder';
-  name: string;
-  description: string;
-  content: string;
-  variables: string[];
-  version: number;
-  active: boolean;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SystemPromptVersionRecord {
-  promptId: string;
-  version: number;
-  content: string;
-  tags: string[];
-  savedBy: string;
-  savedAt: string;
-}
-
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1023,7 +1010,7 @@ import type { NotificationTemplateRepository } from './repositories/notification
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
 import type { SchedulerRepository } from './repositories/scheduler.repository.js';
 import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
-import type { SystemPromptRepository } from './repositories/system-prompt.repository.js';
+import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1037,5 +1024,4 @@ export interface Storage extends
   AppRepository, AppMarketplaceRepository, ConfigRepository,
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
-  ExtensionInstanceRepository,
-  SystemPromptRepository { }
+  ExtensionInstanceRepository, ReplicationQueueRepository { }

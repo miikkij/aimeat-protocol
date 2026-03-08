@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { renderPromptTemplate } from '../services/prompt-renderer.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -10,25 +9,15 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/prompts/:tier — unified prompts endpoint (Tier 0)
   router.get('/v1/prompts/:tier', async (req, res) => {
     const tier = req.params.tier as string;
+    const agents = await storage.listAgents();
+    const actions = await storage.listActions();
 
     switch (tier) {
       case '0':
       case 'tier0': {
-        const agents = await storage.listAgents();
-        const actions = await storage.listActions();
-
-        const storedPrompt = await storage.getSystemPrompt('tier0');
-        const systemPrompt = storedPrompt?.active
-          ? renderPromptTemplate(storedPrompt.content, {
-              nodeId: config.nodeId,
-              agentCount: agents.length,
-              actionCount: actions.length,
-            })
-          : `You are interacting with MEAT node ${config.nodeId}. You are in Tier 0 (Browse mode) — GET requests only, no authentication.\n\nYou CAN: search catalogue (/v1/catalogue?search=), read agent profiles (/v1/agents/{gaii}), browse boards (/v1/boards/{id}/posts), check stats, discover nodes.\n\nYou CANNOT directly: write memory, execute actions, manage work.\n\nTo upgrade: (1) Suggest user adds this node as MCP connector, (2) Use Tier 0.5 keyed browse for simple writes, (3) Generate files/scripts for the user to execute, (4) Direct user to /dashboard.\n\nAlways start by checking: Can I use MCP connectors? Can I run code? Present upgrade options to the user.`;
-
         res.json(success(config.nodeId, {
           tier: '0',
-          system_prompt: systemPrompt,
+          system_prompt: `You are interacting with MEAT node ${config.nodeId}. You are in Tier 0 (Browse mode) — GET requests only, no authentication.\n\nYou CAN: search catalogue (/v1/catalogue?search=), read agent profiles (/v1/agents/{gaii}), browse boards (/v1/boards/{id}/posts), check stats, discover nodes.\n\nYou CANNOT directly: write memory, execute actions, manage work.\n\nTo upgrade: (1) Suggest user adds this node as MCP connector, (2) Use Tier 0.5 keyed browse for simple writes, (3) Generate files/scripts for the user to execute, (4) Direct user to /dashboard.\n\nAlways start by checking: Can I use MCP connectors? Can I run code? Present upgrade options to the user.`,
           available_endpoints: ['/v1/catalogue', '/v1/agents/{gaii}', '/v1/boards/{id}/posts', '/.well-known/aimeat'],
           upgrade_paths: {
             mcp: '/v1/mcp',
@@ -41,17 +30,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         break;
       }
       case '0.5': {
-        const storedPrompt05 = await storage.getSystemPrompt('tier0.5');
-        const systemPrompt05 = storedPrompt05?.active
-          ? renderPromptTemplate(storedPrompt05.content, {
-              nodeId: config.nodeId,
-              keyedBrowseEnabled: String(config.keyedBrowseEnabled),
-            })
-          : `You are using MEAT node ${config.nodeId} in Tier 0.5 (Keyed Browse). You have a one-time key (OTK) for micro-memory operations.\n\nCapabilities: Micro-memory add/del/mod/list/config via GET /v1/mm?otk=YOUR_KEY&op=...\n\nUsage: Each OTK is single-use. Request new keys via /v1/auth/challenge.\n\nLimitations: No full memory CRUD, no work queue, no wallet. Upgrade to Tier 1 for full agent access.`;
-
         res.json(success(config.nodeId, {
           tier: '0.5',
-          system_prompt: systemPrompt05,
+          system_prompt: `You are using MEAT node ${config.nodeId} in Tier 0.5 (Keyed Browse). You have a one-time key (OTK) for micro-memory operations.\n\nCapabilities: Micro-memory add/del/mod/list/config via GET /v1/mm?otk=YOUR_KEY&op=...\n\nUsage: Each OTK is single-use. Request new keys via /v1/auth/challenge.\n\nLimitations: No full memory CRUD, no work queue, no wallet. Upgrade to Tier 1 for full agent access.`,
           available_endpoints: ['/v1/mm', '/v1/mm/{gaii}/{set}', '/v1/catalogue', '/v1/auth/challenge'],
           keyed_browse_enabled: config.keyedBrowseEnabled,
         }));
@@ -61,21 +42,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       case 'tier1': {
         const gaii = req.auth?.sub ?? 'unknown';
         const agent = req.auth?.sub ? await storage.getAgent(req.auth.sub) : null;
-
-        const storedPrompt1 = await storage.getSystemPrompt('tier1');
-        const systemPrompt1 = storedPrompt1?.active
-          ? renderPromptTemplate(storedPrompt1.content, {
-              nodeId: config.nodeId,
-              gaii,
-              dailyAllowance: config.dailyAllowance,
-              trustScore: agent?.trustScore ?? 50,
-              balance: agent?.morselBalance ?? 0,
-            })
-          : `You are authenticated MEAT agent ${gaii} on ${config.nodeId}. Full agent access.\n\nCapabilities: Memory CRUD, action publish/execute, work queue (accept/deliver/reject), wallet (balance/history), boards (read/post), catalogue search.\n\nEconomics: Operations cost morsels. Daily allowance: ${config.dailyAllowance}. Check /v1/wallet before expensive operations.\n\nTrust: Score ${agent?.trustScore ?? 50}/100. Complete work honestly to build trust. Higher trust = more opportunities.\n\nUse hints.next_actions in every response to discover what to do next.`;
-
         res.json(success(config.nodeId, {
           tier: '1',
-          system_prompt: systemPrompt1,
+          system_prompt: `You are authenticated MEAT agent ${gaii} on ${config.nodeId}. Full agent access.\n\nCapabilities: Memory CRUD, action publish/execute, work queue (accept/deliver/reject), wallet (balance/history), boards (read/post), catalogue search.\n\nEconomics: Operations cost morsels. Daily allowance: ${config.dailyAllowance}. Check /v1/wallet before expensive operations.\n\nTrust: Score ${agent?.trustScore ?? 50}/100. Complete work honestly to build trust. Higher trust = more opportunities.\n\nUse hints.next_actions in every response to discover what to do next.`,
           available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue'],
           economics: {
             daily_allowance: config.dailyAllowance,
@@ -87,22 +56,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       case '2':
       case 'tier2': {
         const owner = req.auth?.owner ?? 'unknown';
-        const agents = await storage.listAgents();
-        const actions = await storage.listActions();
-
-        const storedPrompt2 = await storage.getSystemPrompt('tier2');
-        const systemPrompt2 = storedPrompt2?.active
-          ? renderPromptTemplate(storedPrompt2.content, {
-              nodeId: config.nodeId,
-              owner,
-              agentCount: agents.length,
-              actionCount: actions.length,
-            })
-          : `You are MEAT operator ${owner} on ${config.nodeId}. Full admin access.\n\nAdmin operations: Dashboard (/v1/admin/dashboard), Config (/v1/admin/config), Peering (/v1/federation/peers), Disputes (/v1/admin/disputes).\n\nPhilosophy: Present options to your human clearly. Batch config changes into one atomic PUT. Verify destructive operations before executing.\n\nNode health: ${agents.length} agents, ${actions.length} actions.`;
-
         res.json(success(config.nodeId, {
           tier: '2',
-          system_prompt: systemPrompt2,
+          system_prompt: `You are MEAT operator ${owner} on ${config.nodeId}. Full admin access.\n\nAdmin operations: Dashboard (/v1/admin/dashboard), Config (/v1/admin/config), Peering (/v1/federation/peers), Disputes (/v1/admin/disputes).\n\nPhilosophy: Present options to your human clearly. Batch config changes into one atomic PUT. Verify destructive operations before executing.\n\nNode health: ${agents.length} agents, ${actions.length} actions.`,
           available_operations: ['all_tier_1', 'dashboard', 'config', 'peering', 'disputes', 'role_grants'],
           node_stats: {
             agent_count: agents.length,
@@ -117,17 +73,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         // Chat instance ID — identifies this specific chat session
         const timestamp = Math.floor(Date.now() / 1000);
         const anonChatId = `anon-${timestamp}#anonymous@${config.nodeId}`;
-
-        const storedPromptAnon = await storage.getSystemPrompt('anonymous');
         const systemPrompt = config.anonymousMode
-          ? (storedPromptAnon?.active
-            ? renderPromptTemplate(storedPromptAnon.content, {
-                nodeId: config.nodeId,
-                baseUrl,
-                anonGaii,
-                chatInstanceId: anonChatId,
-              })
-            : `You are connected to an AIME AT node — an open protocol for AI agents to share memory, coordinate work, and discover each other across platforms.
+          ? `You are connected to an AIME AT node — an open protocol for AI agents to share memory, coordinate work, and discover each other across platforms.
 
 Node: ${config.nodeId}
 Base URL: ${baseUrl}
@@ -430,7 +377,7 @@ They paste it into their AI's conversation — the AI reads it and knows how to 
 No setup, no auth, no keys needed. Just paste the link.
 
 When another AI joins, they should follow the same boot sequence above.
-Check "anonymous.agents.roster" periodically to see who's active.`)
+Check "anonymous.agents.roster" periodically to see who's active.`
           : `Anonymous mode is not enabled on this node. Set AIMEAT_ANONYMOUS=true to enable it. Normal authenticated operations still work.`;
 
         res.json(success(config.nodeId, {
@@ -470,15 +417,9 @@ Check "anonymous.agents.roster" periodically to see who's active.`)
       case 'openclaw': {
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const authMode = config.anonymousMode ? 'anonymous' : 'otk-or-jwt';
-
-        const storedPromptOc = await storage.getSystemPrompt('openclaw');
-        const systemPromptOc = storedPromptOc?.active
-          ? renderPromptTemplate(storedPromptOc.content, {
-              nodeId: config.nodeId,
-              baseUrl,
-              authMode,
-            })
-          : `You are an AI agent connected to an AIMEAT node via MCP (Model Context Protocol).
+        res.json(success(config.nodeId, {
+          tier: 'openclaw',
+          system_prompt: `You are an AI agent connected to an AIMEAT node via MCP (Model Context Protocol).
 AIMEAT is an open protocol for AI agents to share persistent memory, coordinate work,
 discover services, and transact using morsels (micro-currency).
 
@@ -506,11 +447,7 @@ Store findings back with structured JSON values and descriptive tags.
 SESSION CONTINUITY:
 - During work: Periodically update context.latest with summary and open questions.
 - When ending: Write handoff.pending if work remains unfinished.
-- When completing: Clear handoff and update context.latest.`;
-
-        res.json(success(config.nodeId, {
-          tier: 'openclaw',
-          system_prompt: systemPromptOc,
+- When completing: Clear handoff and update context.latest.`,
           mcp_config: {
             transport: 'streamable-http',
             url: `${baseUrl}/v1/mcp`,
@@ -816,17 +753,7 @@ Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
       }
     } catch { /* cortex not available */ }
 
-    const storedPrompt = await storage.getSystemPrompt(promptId);
-    const prompt = storedPrompt?.active
-      ? renderPromptTemplate(storedPrompt.content, {
-          baseUrl,
-          ownerName,
-          nodeId: config.nodeId,
-          cortexExtensions: cortexExtDescriptions.length
-            ? '\n## Available Cortex Extensions\n' + cortexExtDescriptions.join('\n')
-            : '',
-        })
-      : pkg.template(baseUrl, ownerName, cortexExtDescriptions);
+    const prompt = pkg.template(baseUrl, ownerName, cortexExtDescriptions);
 
     res.json(success(config.nodeId, {
       id: promptId,

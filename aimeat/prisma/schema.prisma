@@ -882,29 +882,3 @@ model ScheduledJob {
   @@index([extensionName])
   @@index([enabled])
 }
-
-model SystemPrompt {
-  id          String   @id @map("_id")
-  category    String
-  name        String
-  description String   @default("")
-  content     String
-  variables   String[] @default([])
-  version     Int      @default(1)
-  active      Boolean  @default(true)
-  tags        String[] @default([])
-  createdAt   DateTime
-  updatedAt   DateTime
-}
-
-model SystemPromptVersion {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  promptId  String
-  version   Int
-  content   String
-  tags      String[] @default([])
-  savedBy   String   @default("system")
-  savedAt   DateTime
-
-  @@unique([promptId, version])
-}
