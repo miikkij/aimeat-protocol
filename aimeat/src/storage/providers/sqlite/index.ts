@@ -23,6 +23,8 @@ import type {
   MemoryLinkRecord, OperatorReviewRecord,
   ScheduledJobRecord,
   ExtensionInstanceRecord,
+  SystemPromptRecord,
+  SystemPromptVersionRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -4111,5 +4113,102 @@ export class SqliteStorage implements Storage {
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── System Prompts ──
+  // ══════════════════════════════════════════════════════════
+
+  async listSystemPrompts(): Promise<SystemPromptRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM system_prompts ORDER BY category, id').all() as Record<string, unknown>[];
+    return rows.map(r => ({
+      id: r.id as string,
+      category: r.category as 'tier' | 'app-builder',
+      name: r.name as string,
+      description: r.description as string,
+      content: r.content as string,
+      variables: JSON.parse(r.variables as string),
+      version: r.version as number,
+      active: !!(r.active as number),
+      tags: JSON.parse(r.tags as string),
+      createdAt: r.createdAt as string,
+      updatedAt: r.updatedAt as string,
+    }));
+  }
+
+  async getSystemPrompt(id: string): Promise<SystemPromptRecord | null> {
+    const r = this.db.prepare('SELECT * FROM system_prompts WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    if (!r) return null;
+    return {
+      id: r.id as string,
+      category: r.category as 'tier' | 'app-builder',
+      name: r.name as string,
+      description: r.description as string,
+      content: r.content as string,
+      variables: JSON.parse(r.variables as string),
+      version: r.version as number,
+      active: !!(r.active as number),
+      tags: JSON.parse(r.tags as string),
+      createdAt: r.createdAt as string,
+      updatedAt: r.updatedAt as string,
+    };
+  }
+
+  async upsertSystemPrompt(record: SystemPromptRecord): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO system_prompts (id, category, name, description, content, variables, version, active, tags, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        content = excluded.content,
+        variables = excluded.variables,
+        version = excluded.version,
+        active = excluded.active,
+        tags = excluded.tags,
+        updatedAt = excluded.updatedAt
+    `).run(
+      record.id, record.category, record.name, record.description,
+      record.content, JSON.stringify(record.variables),
+      record.version, record.active ? 1 : 0,
+      JSON.stringify(record.tags), record.createdAt, record.updatedAt,
+    );
+  }
+
+  async listSystemPromptVersions(promptId: string): Promise<SystemPromptVersionRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM system_prompt_versions WHERE promptId = ? ORDER BY version DESC'
+    ).all(promptId) as Record<string, unknown>[];
+    return rows.map(r => ({
+      promptId: r.promptId as string,
+      version: r.version as number,
+      content: r.content as string,
+      tags: JSON.parse(r.tags as string),
+      savedBy: r.savedBy as string,
+      savedAt: r.savedAt as string,
+    }));
+  }
+
+  async getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null> {
+    const r = this.db.prepare(
+      'SELECT * FROM system_prompt_versions WHERE promptId = ? AND version = ?'
+    ).get(promptId, version) as Record<string, unknown> | undefined;
+    if (!r) return null;
+    return {
+      promptId: r.promptId as string,
+      version: r.version as number,
+      content: r.content as string,
+      tags: JSON.parse(r.tags as string),
+      savedBy: r.savedBy as string,
+      savedAt: r.savedAt as string,
+    };
+  }
+
+  async saveSystemPromptVersion(record: SystemPromptVersionRecord): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO system_prompt_versions (promptId, version, content, tags, savedBy, savedAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      record.promptId, record.version, record.content,
+      JSON.stringify(record.tags), record.savedBy, record.savedAt,
+    );
   }
 }

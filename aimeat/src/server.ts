@@ -101,6 +101,8 @@ import { MailboxNotificationService } from './services/mailbox-notification.js';
 import { Scheduler } from './services/scheduler.js';
 import { adminSchedulerRouter } from './routes/admin-scheduler.js';
 import { adminExtensionsRouter } from './routes/admin-extensions.js';
+import { adminPromptsRouter } from './routes/admin-prompts.js';
+import { seedSystemPrompts } from './services/prompt-seed.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -698,6 +700,12 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));
+
+  // System prompts admin routes
+  app.use(adminPromptsRouter(config, storage));
+
+  // Seed system prompts (idempotent — only creates if not already present)
+  await seedSystemPrompts(storage);
 
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>
