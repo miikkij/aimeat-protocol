@@ -132,6 +132,26 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_EMAIL_RATE_LIMIT_MIN: '30',
   AIMEAT_METRICS_ENABLED: 'false',
   AIMEAT_METRICS_ACCESS: 'operator',
+  AIMEAT_CORS_ALLOWED_ORIGINS: '*',
+  AIMEAT_TOTP_ENABLED: 'true',
+  AIMEAT_TOTP_ISSUER: 'AIMEAT',
+  AIMEAT_TOTP_MAX_FAILED: '5',
+  AIMEAT_TOTP_LOCKOUT_SECONDS: '300',
+  AIMEAT_MATCHING_ENABLED: 'true',
+  AIMEAT_MATCH_INTERVAL_HOURS: '24',
+  AIMEAT_MATCH_THRESHOLD: '0.5',
+  AIMEAT_MATCH_MAX_SUGGESTIONS: '5',
+  AIMEAT_MATCH_MAX_DISTANCE_KM: '100',
+  AIMEAT_MARKETPLACE_ENABLED: 'true',
+  AIMEAT_MARKETPLACE_LISTING_FEE: '2',
+  AIMEAT_MARKETPLACE_TX_FEE_PERCENT: '5',
+  AIMEAT_MARKETPLACE_ESCROW: 'true',
+  AIMEAT_REALTIME_ENABLED: 'true',
+  AIMEAT_REALTIME_MAX_ROOMS: '100',
+  AIMEAT_REALTIME_MAX_PEERS_PER_ROOM: '20',
+  AIMEAT_EXTENSIONS_ENABLED: 'false',
+  AIMEAT_EXT_MAX_MEMORY_MB: '64',
+  AIMEAT_EXT_TIMEOUT_MS: '5000',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -346,6 +366,56 @@ function generateEnvContent(settings: Record<string, string>): string {
       vars: [
         { key: 'AIMEAT_METRICS_ENABLED', comment: 'Enable Prometheus metrics at GET /v1/metrics' },
         { key: 'AIMEAT_METRICS_ACCESS', comment: 'public | authenticated | operator' },
+      ],
+    },
+    {
+      title: 'CORS',
+      vars: [
+        { key: 'AIMEAT_CORS_ALLOWED_ORIGINS', comment: 'Comma-separated origins, or * for all' },
+      ],
+    },
+    {
+      title: 'TOTP / 2FA',
+      vars: [
+        { key: 'AIMEAT_TOTP_ENABLED', comment: 'Enable TOTP two-factor authentication' },
+        { key: 'AIMEAT_TOTP_ISSUER', comment: 'Issuer name shown in authenticator apps' },
+        { key: 'AIMEAT_TOTP_MAX_FAILED', comment: 'Max failed attempts before lockout' },
+        { key: 'AIMEAT_TOTP_LOCKOUT_SECONDS', comment: 'Lockout duration (seconds)' },
+      ],
+    },
+    {
+      title: 'AI Matching',
+      vars: [
+        { key: 'AIMEAT_MATCHING_ENABLED', comment: 'Enable AI-powered interest matching' },
+        { key: 'AIMEAT_MATCH_INTERVAL_HOURS', comment: 'Hours between matching runs' },
+        { key: 'AIMEAT_MATCH_THRESHOLD', comment: 'Min similarity score (0-1)' },
+        { key: 'AIMEAT_MATCH_MAX_SUGGESTIONS', comment: 'Max match suggestions per user' },
+        { key: 'AIMEAT_MATCH_MAX_DISTANCE_KM', comment: 'Max distance for location matching (km)' },
+      ],
+    },
+    {
+      title: 'Marketplace',
+      vars: [
+        { key: 'AIMEAT_MARKETPLACE_ENABLED', comment: 'Enable marketplace features' },
+        { key: 'AIMEAT_MARKETPLACE_LISTING_FEE', comment: 'Morsels charged to list an item' },
+        { key: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', comment: 'Transaction fee percentage' },
+        { key: 'AIMEAT_MARKETPLACE_ESCROW', comment: 'Enable escrow for transactions' },
+      ],
+    },
+    {
+      title: 'Realtime P2P',
+      vars: [
+        { key: 'AIMEAT_REALTIME_ENABLED', comment: 'Enable realtime P2P signaling (WebRTC)' },
+        { key: 'AIMEAT_REALTIME_MAX_ROOMS', comment: 'Max concurrent rooms' },
+        { key: 'AIMEAT_REALTIME_MAX_PEERS_PER_ROOM', comment: 'Max peers per room' },
+      ],
+    },
+    {
+      title: 'Node Extensions (V8 Isolates)',
+      vars: [
+        { key: 'AIMEAT_EXTENSIONS_ENABLED', comment: 'Enable V8 isolate extension system' },
+        { key: 'AIMEAT_EXT_MAX_MEMORY_MB', comment: 'Max memory per extension isolate (MB)' },
+        { key: 'AIMEAT_EXT_TIMEOUT_MS', comment: 'Extension execution timeout (ms)' },
       ],
     },
   ];
@@ -1235,6 +1305,204 @@ async function askAllAdvancedSettings(
     t,
   );
   if (corsOrigins !== '*') settings.AIMEAT_CORS_ALLOWED_ORIGINS = corsOrigins;
+
+  // ── TOTP / 2FA ──
+  const totpEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.totpEnabled'),
+      initialValue: cfg.totpEnabled,
+    }),
+    t,
+  );
+  if (!totpEnabled) settings.AIMEAT_TOTP_ENABLED = 'false';
+
+  if (totpEnabled) {
+    const totpIssuer = checkCancel(
+      await p.text({
+        message: t('init.totpIssuer'),
+        defaultValue: cfg.totpIssuer,
+      }),
+      t,
+    );
+    if (totpIssuer !== 'AIMEAT') settings.AIMEAT_TOTP_ISSUER = totpIssuer;
+
+    const totpMaxFailed = checkCancel(
+      await p.text({
+        message: t('init.totpMaxFailed'),
+        defaultValue: String(cfg.totpMaxFailedAttempts),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (totpMaxFailed !== '5') settings.AIMEAT_TOTP_MAX_FAILED = totpMaxFailed;
+
+    const totpLockout = checkCancel(
+      await p.text({
+        message: t('init.totpLockoutSeconds'),
+        defaultValue: String(cfg.totpLockoutSeconds),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (totpLockout !== '300') settings.AIMEAT_TOTP_LOCKOUT_SECONDS = totpLockout;
+  }
+
+  // ── AI Matching ──
+  const matchingEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.matchingEnabled'),
+      initialValue: cfg.matchingEnabled,
+    }),
+    t,
+  );
+  if (!matchingEnabled) settings.AIMEAT_MATCHING_ENABLED = 'false';
+
+  if (matchingEnabled) {
+    const matchInterval = checkCancel(
+      await p.text({
+        message: t('init.matchIntervalHours'),
+        defaultValue: String(cfg.matchIntervalHours),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (matchInterval !== '24') settings.AIMEAT_MATCH_INTERVAL_HOURS = matchInterval;
+
+    const matchThreshold = checkCancel(
+      await p.text({
+        message: t('init.matchThreshold'),
+        defaultValue: String(cfg.matchThreshold),
+        validate: val => validateBurnRate(val, t),
+      }),
+      t,
+    );
+    if (matchThreshold !== '0.5') settings.AIMEAT_MATCH_THRESHOLD = matchThreshold;
+
+    const matchMaxSuggestions = checkCancel(
+      await p.text({
+        message: t('init.matchMaxSuggestions'),
+        defaultValue: String(cfg.matchMaxSuggestions),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (matchMaxSuggestions !== '5') settings.AIMEAT_MATCH_MAX_SUGGESTIONS = matchMaxSuggestions;
+
+    const matchMaxDistance = checkCancel(
+      await p.text({
+        message: t('init.matchMaxDistanceKm'),
+        defaultValue: String(cfg.matchMaxDistanceKm),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (matchMaxDistance !== '100') settings.AIMEAT_MATCH_MAX_DISTANCE_KM = matchMaxDistance;
+  }
+
+  // ── Marketplace ──
+  const marketplaceEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.marketplaceEnabled'),
+      initialValue: cfg.marketplaceEnabled,
+    }),
+    t,
+  );
+  if (!marketplaceEnabled) settings.AIMEAT_MARKETPLACE_ENABLED = 'false';
+
+  if (marketplaceEnabled) {
+    const listingFee = checkCancel(
+      await p.text({
+        message: t('init.marketplaceListingFee'),
+        defaultValue: String(cfg.marketplaceListingFeeMorsels),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (listingFee !== '2') settings.AIMEAT_MARKETPLACE_LISTING_FEE = listingFee;
+
+    const txFee = checkCancel(
+      await p.text({
+        message: t('init.marketplaceTxFeePercent'),
+        defaultValue: String(cfg.marketplaceTransactionFeePercent),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (txFee !== '5') settings.AIMEAT_MARKETPLACE_TX_FEE_PERCENT = txFee;
+
+    const escrow = checkCancel(
+      await p.confirm({
+        message: t('init.marketplaceEscrow'),
+        initialValue: cfg.marketplaceEscrowEnabled,
+      }),
+      t,
+    );
+    if (!escrow) settings.AIMEAT_MARKETPLACE_ESCROW = 'false';
+  }
+
+  // ── Realtime P2P ──
+  const realtimeEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.realtimeEnabled'),
+      initialValue: cfg.realtimeEnabled,
+    }),
+    t,
+  );
+  if (!realtimeEnabled) settings.AIMEAT_REALTIME_ENABLED = 'false';
+
+  if (realtimeEnabled) {
+    const maxRooms = checkCancel(
+      await p.text({
+        message: t('init.realtimeMaxRooms'),
+        defaultValue: String(cfg.realtimeMaxRooms),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (maxRooms !== '100') settings.AIMEAT_REALTIME_MAX_ROOMS = maxRooms;
+
+    const maxPeersRoom = checkCancel(
+      await p.text({
+        message: t('init.realtimeMaxPeersPerRoom'),
+        defaultValue: String(cfg.realtimeMaxPeersPerRoom),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (maxPeersRoom !== '20') settings.AIMEAT_REALTIME_MAX_PEERS_PER_ROOM = maxPeersRoom;
+  }
+
+  // ── Extensions ──
+  const extensionsEnabled = checkCancel(
+    await p.confirm({
+      message: t('init.extensionsEnabled'),
+      initialValue: cfg.extensionsEnabled,
+    }),
+    t,
+  );
+  if (extensionsEnabled) {
+    settings.AIMEAT_EXTENSIONS_ENABLED = 'true';
+
+    const extMemory = checkCancel(
+      await p.text({
+        message: t('init.extensionMaxMemoryMb'),
+        defaultValue: String(cfg.extensionMaxMemoryMb),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (extMemory !== '64') settings.AIMEAT_EXT_MAX_MEMORY_MB = extMemory;
+
+    const extTimeout = checkCancel(
+      await p.text({
+        message: t('init.extensionTimeoutMs'),
+        defaultValue: String(cfg.extensionTimeoutMs),
+        validate: val => validatePositiveNum(val, t),
+      }),
+      t,
+    );
+    if (extTimeout !== '5000') settings.AIMEAT_EXT_TIMEOUT_MS = extTimeout;
+  }
 
   return settings;
 }
