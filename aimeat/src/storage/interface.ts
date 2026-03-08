@@ -655,6 +655,18 @@ export interface GenesisPeerRecord {
   updatedAt: string;
 }
 
+// Phase B.1 — Replication Queue (federation data sync)
+export interface ReplicationQueueEntry {
+  id: string;
+  type: 'catalogue_sync' | 'memory_replicate' | 'trust_advisory';
+  targetPeers: string[];    // peer IDs to send to
+  payload: unknown;          // serialized sync payload
+  createdAt: string;         // ISO timestamp
+  attempts: number;
+  lastAttemptAt: string | null;
+  status: 'pending' | 'sent' | 'failed';
+}
+
 // Phase 3.4 — Organism Reputation
 export interface OrganismReputationRecord {
   organismId: string;
@@ -998,6 +1010,7 @@ import type { NotificationTemplateRepository } from './repositories/notification
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
 import type { SchedulerRepository } from './repositories/scheduler.repository.js';
 import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
+import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1011,4 +1024,4 @@ export interface Storage extends
   AppRepository, AppMarketplaceRepository, ConfigRepository,
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
-  ExtensionInstanceRepository { }
+  ExtensionInstanceRepository, ReplicationQueueRepository { }

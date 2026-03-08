@@ -13,6 +13,134 @@ import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { sign, verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import type { RouteHop, RouteManifest } from '../types/route-manifest.js';
+import { buildHopSigningMessage, computeRelayFeeDistribution } from '../types/route-manifest.js';
+import type { RelayFeeDistribution } from '../types/route-manifest.js';
+
+// ── E.4: Keyword matching helpers for cross-catalogue filtering ──
+
+function matchesKeyword(csm: { name: string; serviceType?: string }, keyword: string): boolean {
+    const lk = keyword.toLowerCase();
+    return csm.name.toLowerCase().includes(lk) ||
+        (csm.serviceType?.toLowerCase().includes(lk) ?? false);
+}
+
+function matchesActionKeyword(action: { displayName: string; description: string; category?: string; tags: string[] }, keyword: string): boolean {
+    const lk = keyword.toLowerCase();
+    return action.displayName.toLowerCase().includes(lk) ||
+        action.description.toLowerCase().includes(lk) ||
+        (action.category?.toLowerCase().includes(lk) ?? false) ||
+        action.tags.some(t => t.toLowerCase().includes(lk));
+}
+
+function matchesGenesisKeyword(val: Record<string, unknown>, keyword: string): boolean {
+    const lk = keyword.toLowerCase();
+    const searchFields = ['name', 'display_name', 'displayName', 'description', 'category', 'service_type', 'serviceType'];
+    return searchFields.some(f => {
+        const v = val[f];
+        return typeof v === 'string' && v.toLowerCase().includes(lk);
+    });
+}
+
+function matchesLocation(val: Record<string, unknown>, location: string): boolean {
+    const ll = location.toLowerCase();
+    const locationFields = ['location', 'city', 'region', 'country'];
+    return locationFields.some(f => {
+        const v = val[f];
+        return typeof v === 'string' && v.toLowerCase().includes(ll);
+    });
+}
+
+// ── A.3: Peer Key Cache ──
+// Caches peer node + agent public keys with TTL for signature verification
+export interface PeerKeyEntry {
+    publicKey: string;
+    agentKeys: Map<string, string>;  // gaii → publicKey
+    expiresAt: number;
+}
+
+export const peerKeyCache = new Map<string, PeerKeyEntry>();
+
+/**
+ * Perform outbound key exchange with a peer node.
+ * Sends this node's public key + agent keys, receives and caches the peer's keys.
+ * Reusable from peering activation (A.3) and recovery callback (A.4).
+ */
+export async function performKeyExchange(
+    peerUrl: string,
+    config: AimeatConfig,
+    storage: Storage,
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const nodeKey = await storage.getNodeKey();
+        if (!nodeKey) {
+            return { success: false, error: 'No node key available' };
+        }
+
+        const agents = await storage.listAgents();
+        const agentKeys = agents
+            .filter(a => a.publicKey)
+            .map(a => ({ gaii: a.gaii, public_key: a.publicKey }));
+
+        const payload = {
+            node_id: config.nodeId,
+            node_public_key: nodeKey.publicKey,
+            agent_keys: agentKeys,
+            timestamp: new Date().toISOString(),
+        };
+
+        const resp = await fetch(`${peerUrl}/v1/federation/key-exchange`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(config.federationTimeoutMs),
+        });
+
+        if (!resp.ok) {
+            const body = await resp.text().catch(() => '');
+            return { success: false, error: `Peer returned ${resp.status}: ${body}` };
+        }
+
+        const data = await resp.json() as {
+            data?: {
+                node_id?: string;
+                node_public_key?: string;
+                agent_keys?: Array<{ gaii: string; public_key: string }>;
+            };
+        };
+
+        const peerData = data.data;
+        if (!peerData?.node_id || !peerData?.node_public_key) {
+            return { success: false, error: 'Peer returned incomplete key exchange data' };
+        }
+
+        // Cache peer keys with TTL
+        const ttlMs = config.keyCacheRefreshMinutes * 60_000;
+        const agentKeyMap = new Map<string, string>();
+        if (peerData.agent_keys) {
+            for (const ak of peerData.agent_keys) {
+                agentKeyMap.set(ak.gaii, ak.public_key);
+            }
+        }
+
+        peerKeyCache.set(peerData.node_id, {
+            publicKey: peerData.node_public_key,
+            agentKeys: agentKeyMap,
+            expiresAt: Date.now() + ttlMs,
+        });
+
+        logger.info(`Key exchange completed with peer ${peerData.node_id}`, {
+            agentKeysReceived: agentKeyMap.size,
+            ttlMinutes: config.keyCacheRefreshMinutes,
+        });
+
+        return { success: true };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'unknown error';
+        logger.warn(`Key exchange failed with ${peerUrl}: ${msg}`);
+        return { success: false, error: msg };
+    }
+}
 
 export function federationRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -344,10 +472,17 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         peer.status = 'active';
         peer.lastSeen = new Date().toISOString();
 
+        // A.3: Trigger key exchange on peering activation
+        const keyExchangeResult = await performKeyExchange(peer.url, config, storage);
+        if (!keyExchangeResult.success) {
+            logger.warn(`Key exchange failed during activation of peer ${peer_node_id}: ${keyExchangeResult.error}`);
+        }
+
         res.json(success(config.nodeId, {
             peer_node_id,
             status: 'active',
             activated_at: peer.lastSeen,
+            key_exchange: keyExchangeResult.success ? 'completed' : 'failed',
         }));
     });
 
@@ -555,6 +690,34 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 }
             }
 
+            // C.4: Rename replica entries to expiring for grace period
+            const allAgents = await storage.listAgents();
+            let expiredReplicas = 0;
+            for (const agent of allAgents) {
+                const memories = await storage.listMemory(agent.gaii, { prefix: `replica:${nodeId}:` });
+                for (const mem of memories) {
+                    const expiringKey = mem.key.replace(`replica:${nodeId}:`, `expiring:${nodeId}:`);
+                    await storage.setMemory({
+                        ...mem,
+                        key: expiringKey,
+                        tags: [...mem.tags.filter(t => !t.startsWith('replica:')), `expiring:${nodeId}`],
+                        updatedAt: new Date().toISOString(),
+                    });
+                    await storage.deleteMemory(agent.gaii, mem.key);
+                    expiredReplicas++;
+                }
+            }
+
+            // Remove peer keys from cache
+            peerKeyCache.delete(nodeId);
+
+            logger.info(`De-peering grace period started for peer ${nodeId}`, {
+                expiredActions,
+                expiredReplicas,
+                graceHours,
+                gracePeriodEnd: gracePeriodEnd,
+            });
+
             res.json(success(config.nodeId, {
                 deleted: false,
                 node_id: nodeId,
@@ -564,6 +727,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 grace_period_hours: graceHours,
                 grace_period_ends: gracePeriodEnd,
                 expiring_actions: expiredActions,
+                expiring_replicas: expiredReplicas,
                 note: `Peer set to depeering status. In-flight work may complete. Peer will be purged after ${graceHours}h grace period.`,
             }));
         }
@@ -582,6 +746,68 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         res.json(success(config.nodeId, {
             pong: true,
             node_id: config.nodeId,
+            timestamp: new Date().toISOString(),
+        }));
+    });
+
+    // ── A.3: Key Exchange Endpoint ──
+
+    // POST /v1/federation/key-exchange — Exchange public keys with a peer node
+    router.post('/v1/federation/key-exchange', async (req, res) => {
+        const { node_id, node_public_key, agent_keys, timestamp } = req.body ?? {};
+
+        if (!node_id || !node_public_key) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'node_id and node_public_key are required'));
+            return;
+        }
+
+        // Validate the sender is a known active peer
+        const peer = [...peers.values()].find(p => p.nodeId === node_id);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                `Node ${node_id} is not an active peer`));
+            return;
+        }
+
+        // Store the peer's keys with TTL
+        const ttlMs = config.keyCacheRefreshMinutes * 60_000;
+        const peerAgentKeys = new Map<string, string>();
+        if (Array.isArray(agent_keys)) {
+            for (const ak of agent_keys) {
+                if (ak.gaii && ak.public_key) {
+                    peerAgentKeys.set(ak.gaii, ak.public_key);
+                }
+            }
+        }
+
+        peerKeyCache.set(node_id, {
+            publicKey: node_public_key,
+            agentKeys: peerAgentKeys,
+            expiresAt: Date.now() + ttlMs,
+        });
+
+        // Also update the peer's public key in the peers map if it changed
+        if (node_public_key !== peer.publicKey) {
+            peer.publicKey = node_public_key;
+        }
+
+        logger.info(`Received key exchange from peer ${node_id}`, {
+            agentKeysReceived: peerAgentKeys.size,
+            timestamp,
+        });
+
+        // Return our own keys
+        const nodeKey = await storage.getNodeKey();
+        const agents = await storage.listAgents();
+        const ourAgentKeys = agents
+            .filter(a => a.publicKey)
+            .map(a => ({ gaii: a.gaii, public_key: a.publicKey }));
+
+        res.json(success(config.nodeId, {
+            node_id: config.nodeId,
+            node_public_key: nodeKey?.publicKey ?? '',
+            agent_keys: ourAgentKeys,
             timestamp: new Date().toISOString(),
         }));
     });
@@ -620,6 +846,53 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
 
         // Store replicated memory with cross-node prefix
         const replicaKey = `replica:${source_node}:${key}`;
+        const incomingUpdatedAt = timestamp ?? new Date().toISOString();
+
+        // C.2: LWW (Last-Writer-Wins) conflict resolution
+        const existing = await storage.getMemory(gaii, replicaKey);
+        if (existing) {
+            const existingTime = new Date(existing.updatedAt).getTime();
+            const incomingTime = new Date(incomingUpdatedAt).getTime();
+
+            if (incomingTime <= existingTime) {
+                // Incoming is older or equal — reject silently
+                res.json(success(config.nodeId, {
+                    replicated: true,
+                    key: replicaKey,
+                    source_node,
+                    version,
+                    conflict: true,
+                    conflict_resolution: 'incoming_older',
+                }));
+                return;
+            }
+
+            // Incoming is newer — preserve losing version as conflict backup
+            const conflictKey = `${key}._conflict_${Date.now()}`;
+            await storage.setMemory({
+                ...existing,
+                key: conflictKey,
+                visibility: 'private',
+                tags: [...existing.tags, `conflict:${source_node}`],
+                ttlHours: 168, // 7 days
+                updatedAt: new Date().toISOString(),
+            });
+
+            // Send mailbox notification about the conflict
+            await storage.createMailboxItem({
+                id: `conflict-${randomBytes(8).toString('hex')}`,
+                personalNodeId: '',
+                type: 'federation_sync',
+                fromGaii: `system@${config.nodeId}`,
+                toGaii: gaii,
+                payload: JSON.stringify({ type: 'conflict_resolved', key, winner: 'incoming', loser_key: conflictKey }),
+                sizeBytes: 0,
+                retentionDays: 7,
+                expiresAt: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+                createdAt: new Date().toISOString(),
+            });
+        }
+
         await storage.setMemory({
             key: replicaKey,
             ownerGaii: gaii,
@@ -629,7 +902,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             ttlHours: null,
             version,
             createdAt: timestamp ?? new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            updatedAt: incomingUpdatedAt,
         });
 
         res.json(success(config.nodeId, {
@@ -637,6 +910,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             key: replicaKey,
             source_node,
             version,
+            conflict: !!existing,
         }));
     });
 
@@ -774,57 +1048,6 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         }));
     });
 
-    // POST /v1/federation/key-exchange — Exchange public keys with peer
-    router.post('/v1/federation/key-exchange', async (req, res) => {
-        const { node_id, public_key, capabilities } = req.body ?? {};
-
-        if (!node_id || !public_key) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id and public_key are required'));
-            return;
-        }
-
-        let peer = [...peers.entries()].find(([, p]) => p.nodeId === node_id);
-
-        // Fallback: check approved peering requests in storage (e.g. operator approval via DB)
-        if (!peer) {
-            const requests = await storage.listPeeringRequests();
-            const approved = requests.find(r =>
-                r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'),
-            );
-            if (approved) {
-                const now = new Date().toISOString();
-                const newPeer = {
-                    nodeId: node_id,
-                    url: approved.fromNodeUrl ?? approved.targetUrl ?? '',
-                    publicKey: public_key,
-                    status: 'approved' as const,
-                    addedAt: now,
-                    lastSeen: now,
-                };
-                peers.set(node_id, newPeer);
-                peer = [node_id, newPeer];
-            }
-        }
-
-        if (!peer) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Peer not found in registry'));
-            return;
-        }
-
-        // Update peer's public key
-        peer[1].publicKey = public_key;
-
-        // Return our own public key
-        const nodeKey = await storage.getNodeKey();
-
-        res.json(success(config.nodeId, {
-            node_id: config.nodeId,
-            public_key: nodeKey?.publicKey ?? '',
-            capabilities: ['memory', 'micro_memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
-            accepted: true,
-        }));
-    });
-
     // ── Cross-Node Query Routing ──
 
     // POST /v1/federation/route — Forward a request to a peer node (multi-hop relay)
@@ -872,6 +1095,28 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             }
         }
 
+        // F.2: Build route hop for this relay node
+        async function buildLocalHop(forwardedTo: string | null, prevSignature: string): Promise<RouteHop> {
+            const receivedAt = new Date().toISOString();
+            const signingMessage = buildHopSigningMessage(config.nodeId, receivedAt, forwardedTo, prevSignature);
+            const nodeKey = await storage.getNodeKey();
+            const hopSignature = nodeKey?.privateKey
+                ? await sign(nodeKey.privateKey, signingMessage)
+                : '';
+            return {
+                node_id: config.nodeId,
+                received_at: receivedAt,
+                forwarded_to: forwardedTo,
+                signature: hopSignature,
+            };
+        }
+
+        // Parse incoming route manifest from headers or body
+        const inboundManifest: RouteManifest = req.body?.route_manifest ?? {
+            origin: req.headers['x-forwarded-from'] as string ?? config.nodeId,
+            hops: [],
+        };
+
         // 1. Check if target is a direct peer
         const targetPeer = [...peers.values()].find(p => p.nodeId === target_node && p.status === 'active');
 
@@ -901,6 +1146,10 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 const data = await response.json().catch(() => null);
                 await chargeRoutingFee();
 
+                // F.2: Add hop signing for direct peer routing
+                const hop = await buildLocalHop(target_node, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
+                inboundManifest.hops.push(hop);
+
                 res.status(response.status).json(success(config.nodeId, {
                     routed_to: target_node,
                     routed_via: config.nodeId,
@@ -908,6 +1157,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     hops_remaining: hops - 1,
                     response_status: response.status,
                     response_data: data,
+                    route_manifest: inboundManifest,
                 }));
             } catch (err) {
                 res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
@@ -955,12 +1205,17 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     const data = await response.json().catch(() => null);
                     await chargeRoutingFee();
 
+                    // F.2: Add hop signing for multi-hop relay routing
+                    const relayHop = await buildLocalHop(relay.nodeId, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
+                    inboundManifest.hops.push(relayHop);
+
                     res.json(success(config.nodeId, {
                         routed_to: target_node,
                         routed_via: relay.nodeId,
                         relay_path: relayPath.split(',').concat(relay.nodeId),
                         hops_remaining: hops - 1,
                         response_data: data,
+                        route_manifest: inboundManifest,
                     }));
                     return;
                 }
@@ -1198,6 +1453,64 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             return;
         }
 
+        // F.3: Route manifest verification and relay fee distribution
+        const routeManifest = req.body.route_manifest as RouteManifest | undefined;
+        let relayDistribution: RelayFeeDistribution | null = null;
+
+        if (routeManifest && routeManifest.hops.length > 0) {
+            // Verify signature chain contiguity
+            let chainValid = true;
+            for (let i = 0; i < routeManifest.hops.length; i++) {
+                const hop = routeManifest.hops[i];
+                const prevSig = i > 0 ? routeManifest.hops[i - 1].signature : '';
+                const expectedMessage = buildHopSigningMessage(hop.node_id, hop.received_at, hop.forwarded_to, prevSig);
+
+                // Look up peer key for this hop node
+                const hopPeer = [...peers.values()].find(p => p.nodeId === hop.node_id);
+                if (hopPeer?.publicKey) {
+                    const hopValid = await verify(hopPeer.publicKey, expectedMessage, hop.signature);
+                    if (!hopValid) {
+                        chainValid = false;
+                        logger.warn(`Route manifest hop ${i} signature invalid for node ${hop.node_id}`);
+                        break;
+                    }
+                }
+
+                // Verify contiguity
+                if (i < routeManifest.hops.length - 1) {
+                    if (hop.forwarded_to !== routeManifest.hops[i + 1].node_id) {
+                        chainValid = false;
+                        logger.warn(`Route manifest contiguity broken at hop ${i}`);
+                        break;
+                    }
+                }
+            }
+
+            if (chainValid) {
+                // Compute relay fee distribution
+                const networkFee = Math.floor(amount * 0.1); // 10% network fee
+                relayDistribution = computeRelayFeeDistribution(networkFee, routeManifest.hops);
+
+                // Credit relay nodes their shares
+                for (const share of relayDistribution.relay_shares) {
+                    const relayAgent = await storage.getAgent(share.node_id).catch(() => null);
+                    if (relayAgent) {
+                        await storage.creditBalance(relayAgent.gaii, share.amount);
+                        await storage.addTransaction({
+                            id: `txn-${randomBytes(8).toString('hex')}`,
+                            gaii: relayAgent.gaii,
+                            type: 'relay_fee',
+                            amount: share.amount,
+                            trackingCode: `relay:${tracking_code}`,
+                            timestamp: new Date().toISOString(),
+                        });
+                    }
+                }
+            } else {
+                logger.warn(`Route manifest verification failed for settlement ${tracking_code}`);
+            }
+        }
+
         // Apply the settlement: credit morsels to the target agent
         const credited = await storage.creditBalance(gaii, Math.floor(amount));
         if (!credited) {
@@ -1226,6 +1539,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             gaii,
             amount: Math.floor(amount),
             tracking_code,
+            relay_distribution: relayDistribution,
         }));
     });
 
@@ -1390,11 +1704,529 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         }
     });
 
-    // GET /v1/federation/cross-catalogue — Cross-federation catalogue
-    router.get('/v1/federation/cross-catalogue', async (_req, res) => {
+    // GET /v1/federation/cross-catalogue — E.4: Enhanced cross-federation catalogue
+    // Aggregates local CSMs + federated actions + genesis entries with filtering
+    router.get('/v1/federation/cross-catalogue', async (req, res) => {
         try {
-            const catalogue = await genesisPeeringService.getCrossCatalogue();
-            res.json(success(config.nodeId, { entries: catalogue, total: catalogue.length }));
+            const serviceType = req.query.service_type as string | undefined;
+            const location = req.query.location as string | undefined;
+            const keyword = req.query.keyword as string | undefined;
+            const sourceFilter = req.query.source as string | undefined; // 'local' | 'federated' | 'genesis' | undefined (all)
+
+            const entries: Array<Record<string, unknown>> = [];
+
+            // 1. Local federable CSMs (unless filtering to genesis/federated only)
+            if (!sourceFilter || sourceFilter === 'local') {
+                const localCsms = await storage.listCsms(
+                    serviceType ? { serviceType } : undefined,
+                );
+                for (const csm of localCsms) {
+                    if (!csm.federate) continue;
+                    if (keyword && !matchesKeyword(csm, keyword)) continue;
+                    entries.push({
+                        type: 'csm',
+                        id: csm.name,
+                        name: csm.name,
+                        service_type: csm.serviceType,
+                        source_node: config.nodeId,
+                        source_type: 'local',
+                        federated: true,
+                    });
+                }
+            }
+
+            // 2. Federated actions from same-genesis peers (tagged federated:*)
+            if (!sourceFilter || sourceFilter === 'federated') {
+                const allActions = await storage.listActions(
+                    serviceType ? { category: serviceType } : undefined,
+                );
+                for (const action of allActions) {
+                    const federatedTag = action.tags.find(t => t.startsWith('federated:'));
+                    if (!federatedTag) continue;
+                    if (keyword && !matchesActionKeyword(action, keyword)) continue;
+
+                    entries.push({
+                        type: 'action',
+                        id: action.id,
+                        display_name: action.displayName,
+                        description: action.description,
+                        category: action.category,
+                        source_node: federatedTag.replace('federated:', ''),
+                        source_type: 'federated',
+                        pricing: {
+                            base_morsels: action.pricing.baseMorsels,
+                            per_unit: action.pricing.perUnit,
+                        },
+                        tags: action.tags,
+                        semantic: action.semantic,
+                    });
+                }
+            }
+
+            // 3. Genesis entries (stored as memory with genesis:* prefix)
+            if (!sourceFilter || sourceFilter === 'genesis') {
+                try {
+                    const genesisMemories = await storage.listMemory('__genesis__', { prefix: 'genesis:' });
+                    for (const mem of genesisMemories) {
+                        // Skip subscription metadata entries
+                        if (mem.key.endsWith(':subscriptions')) continue;
+
+                        const val = mem.value as Record<string, unknown>;
+                        if (serviceType && val.service_type !== serviceType && val.category !== serviceType) continue;
+                        if (keyword && !matchesGenesisKeyword(val, keyword)) continue;
+                        if (location && !matchesLocation(val, location)) continue;
+
+                        entries.push({
+                            type: val.type ?? 'genesis_entry',
+                            id: mem.key,
+                            source_type: 'genesis',
+                            source_genesis: val.source_genesis,
+                            source_node: val.sourceNode ?? val.source_node,
+                            fetched_at: val.fetched_at,
+                            ...val,
+                        });
+                    }
+                } catch {
+                    // No genesis entries yet — that's fine
+                }
+            }
+
+            // 4. Add active genesis peer metadata
+            const activePeers = await storage.listGenesisPeers({ status: 'active' });
+            const peerSummary = activePeers.map(p => ({
+                node_id: p.genesisNodeId,
+                url: p.genesisUrl,
+                status: p.status,
+                last_sync_at: p.lastSyncAt,
+                catalogue_hash: p.catalogueHash,
+            }));
+
+            res.json(success(config.nodeId, {
+                entries,
+                total: entries.length,
+                genesis_peers: peerSummary,
+                catalogue_hash: await (async () => {
+                    const { computeCatalogueHash: computeHash } = await import('../utils/catalogue-hash.js');
+                    return computeHash(storage);
+                })(),
+                filters: {
+                    service_type: serviceType ?? null,
+                    location: location ?? null,
+                    keyword: keyword ?? null,
+                    source: sourceFilter ?? null,
+                },
+            }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // POST /v1/federation/genesis-catalogue-ingest — Receive catalogue push from genesis peer
+    router.post('/v1/federation/genesis-catalogue-ingest', async (req, res) => {
+        try {
+            const { source_node, entries: ingestEntries, csms: ingestCsms, catalogue_hash, signature } = req.body ?? {};
+
+            if (!source_node) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node required'));
+                return;
+            }
+
+            // Verify the source is an active genesis peer
+            const genesisPeer = await storage.getGenesisPeerByNodeId(source_node);
+            if (!genesisPeer || genesisPeer.status !== 'active') {
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source is not an active genesis peer'));
+                return;
+            }
+
+            // Verify signature if peer has a public key
+            if (signature && genesisPeer.publicKey) {
+                const payload = JSON.stringify({ source_node, entries: ingestEntries, csms: ingestCsms, catalogue_hash });
+                const isValid = await verify(genesisPeer.publicKey, payload, signature);
+                if (!isValid) {
+                    res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on genesis catalogue ingest'));
+                    return;
+                }
+            }
+
+            const now = new Date().toISOString();
+            let stored = 0;
+
+            // Ensure __genesis__ system agent exists
+            const agents = await storage.listAgents();
+            if (!agents.find(a => a.gaii === '__genesis__')) {
+                try {
+                    await storage.createAgent({
+                        name: '__genesis__',
+                        owner: '__system__',
+                        gaii: '__genesis__',
+                        publicKey: '',
+                        displayName: 'Genesis Sync System',
+                        capabilities: ['genesis-sync'],
+                        createdAt: now,
+                        lastSeen: now,
+                        trustScore: 100,
+                        morselBalance: 0,
+                    });
+                } catch { /* may already exist */ }
+            }
+
+            // Store received entries as genesis memory
+            const allEntries = [...(ingestEntries ?? []), ...(ingestCsms ?? [])];
+            for (const entry of allEntries) {
+                const entryId = (entry.id ?? entry.name ?? `ingest-${stored}`) as string;
+                const key = `genesis:${source_node}:${entryId}`;
+
+                await storage.setMemory({
+                    key,
+                    ownerGaii: '__genesis__',
+                    value: {
+                        ...entry,
+                        source_genesis: source_node,
+                        ingested_at: now,
+                    },
+                    visibility: 'public',
+                    tags: ['genesis', `genesis:${source_node}`],
+                    ttlHours: config.genesisMemoryCacheTtlHours || null,
+                    version: 1,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+                stored++;
+            }
+
+            // Update peer sync metadata
+            await storage.updateGenesisPeer(genesisPeer.id, {
+                lastSyncAt: now,
+                catalogueHash: catalogue_hash ?? '',
+                updatedAt: now,
+            });
+
+            res.json(success(config.nodeId, {
+                stored,
+                catalogue_hash: catalogue_hash ?? null,
+            }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // POST /v1/federation/genesis-memory-read — E.2: Cross-genesis memory routing
+    // Forwards memory read requests to genesis peers, aggregates responses
+    router.post('/v1/federation/genesis-memory-read', requireAuth(), async (req, res) => {
+        try {
+            const { target_gaii, key, prefix, target_scope } = req.body ?? {};
+
+            if (!target_gaii && !key && !prefix) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_gaii, key, or prefix required'));
+                return;
+            }
+
+            // Only process genesis-scoped requests
+            if (target_scope !== 'genesis') {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_scope must be "genesis"'));
+                return;
+            }
+
+            const activePeers = await storage.listGenesisPeers({ status: 'active' });
+            if (activePeers.length === 0) {
+                res.json(success(config.nodeId, { results: [], total: 0, peers_queried: 0 }));
+                return;
+            }
+
+            // Check local genesis cache first (if enabled)
+            if (config.genesisMemoryCache && key) {
+                try {
+                    const cachePrefix = 'genesis:';
+                    const cachedEntries = await storage.listMemory('__genesis__', { prefix: cachePrefix });
+                    const cached = cachedEntries.find(m => {
+                        const val = m.value as Record<string, unknown>;
+                        return val.key === key && (!target_gaii || val.gaii === target_gaii);
+                    });
+                    if (cached) {
+                        const val = cached.value as Record<string, unknown>;
+                        res.json(success(config.nodeId, {
+                            results: [{
+                                key: val.key,
+                                value: val.value,
+                                source_genesis: val.source_genesis,
+                                source_node: val.source_node,
+                                cached: true,
+                            }],
+                            total: 1,
+                            peers_queried: 0,
+                            from_cache: true,
+                        }));
+                        return;
+                    }
+                } catch {
+                    // Cache miss — proceed to query peers
+                }
+            }
+
+            // Forward to genesis peers
+            const results: Array<Record<string, unknown>> = [];
+            let peersQueried = 0;
+
+            const peerPromises = activePeers.map(async (peer) => {
+                try {
+                    const urlCheck = await validateOutboundUrl(peer.genesisUrl);
+                    if (!urlCheck.valid) return;
+
+                    const queryParams = new URLSearchParams();
+                    if (target_gaii) queryParams.set('gaii', target_gaii);
+                    if (key) queryParams.set('key', key);
+                    if (prefix) queryParams.set('prefix', prefix);
+
+                    const resp = await fetch(
+                        `${peer.genesisUrl}/v1/federation/genesis-memory-read?${queryParams}`,
+                        {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' },
+                            signal: AbortSignal.timeout(config.federationTimeoutMs),
+                        },
+                    );
+
+                    peersQueried++;
+
+                    if (!resp.ok) return;
+
+                    const body = await resp.json() as {
+                        data?: { results?: Array<Record<string, unknown>> };
+                    };
+
+                    if (body.data?.results) {
+                        for (const result of body.data.results) {
+                            results.push({
+                                ...result,
+                                source_genesis: peer.genesisNodeId,
+                            });
+                        }
+                    }
+                } catch {
+                    // Skip failed peer
+                }
+            });
+
+            await Promise.allSettled(peerPromises);
+
+            // Optionally cache results
+            if (config.genesisMemoryCache && results.length > 0) {
+                const now = new Date().toISOString();
+                for (const result of results) {
+                    try {
+                        const cacheKey = `genesis-cache:${result.source_genesis}:${result.key ?? 'unknown'}`;
+                        await storage.setMemory({
+                            key: cacheKey,
+                            ownerGaii: '__genesis__',
+                            value: result,
+                            visibility: 'public',
+                            tags: ['genesis-cache'],
+                            ttlHours: config.genesisMemoryCacheTtlHours,
+                            version: 1,
+                            createdAt: now,
+                            updatedAt: now,
+                        });
+                    } catch {
+                        // Cache write failure is non-critical
+                    }
+                }
+            }
+
+            res.json(success(config.nodeId, {
+                results,
+                total: results.length,
+                peers_queried: peersQueried,
+                from_cache: false,
+            }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // GET /v1/federation/genesis-memory-read — E.2: Local memory read handler for genesis peer queries
+    // Responds to incoming genesis peer memory read requests
+    router.get('/v1/federation/genesis-memory-read', async (req, res) => {
+        try {
+            const gaii = req.query.gaii as string | undefined;
+            const key = req.query.key as string | undefined;
+            const prefix = req.query.prefix as string | undefined;
+
+            if (!gaii && !key && !prefix) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'gaii, key, or prefix required'));
+                return;
+            }
+
+            const results: Array<Record<string, unknown>> = [];
+
+            if (gaii && key) {
+                // Direct lookup
+                const memory = await storage.getMemory(gaii, key);
+                if (memory && memory.visibility === 'public') {
+                    // Check for federation consent
+                    const consents = await storage.listConsents(gaii);
+                    const hasConsent = consents.some(c =>
+                        c.status === 'active' && c.scope === 'federation',
+                    );
+                    if (hasConsent) {
+                        results.push({
+                            key: memory.key,
+                            gaii: memory.ownerGaii,
+                            value: memory.value,
+                            visibility: memory.visibility,
+                            version: memory.version,
+                            source_node: config.nodeId,
+                            updated_at: memory.updatedAt,
+                        });
+                    }
+                }
+            } else if (gaii && prefix) {
+                // Prefix search for a specific agent
+                const memories = await storage.listMemory(gaii, { prefix, visibility: 'public' });
+                const consents = await storage.listConsents(gaii);
+                const hasConsent = consents.some(c =>
+                    c.status === 'active' && c.scope === 'federation',
+                );
+
+                if (hasConsent) {
+                    for (const memory of memories) {
+                        if (memory.key.startsWith('replica:') || memory.key.startsWith('genesis:') ||
+                            memory.key.startsWith('expiring:')) continue;
+
+                        results.push({
+                            key: memory.key,
+                            gaii: memory.ownerGaii,
+                            value: memory.value,
+                            visibility: memory.visibility,
+                            version: memory.version,
+                            source_node: config.nodeId,
+                            updated_at: memory.updatedAt,
+                        });
+                    }
+                }
+            } else if (prefix) {
+                // Prefix search across all agents
+                const agents = await storage.listAgents();
+                for (const agent of agents) {
+                    if (agent.gaii === '__genesis__') continue;
+                    try {
+                        const consents = await storage.listConsents(agent.gaii);
+                        const hasConsent = consents.some(c =>
+                            c.status === 'active' && c.scope === 'federation',
+                        );
+                        if (!hasConsent) continue;
+
+                        const memories = await storage.listMemory(agent.gaii, { prefix, visibility: 'public' });
+                        for (const memory of memories) {
+                            if (memory.key.startsWith('replica:') || memory.key.startsWith('genesis:') ||
+                                memory.key.startsWith('expiring:')) continue;
+
+                            results.push({
+                                key: memory.key,
+                                gaii: memory.ownerGaii,
+                                value: memory.value,
+                                visibility: memory.visibility,
+                                version: memory.version,
+                                source_node: config.nodeId,
+                                updated_at: memory.updatedAt,
+                            });
+                        }
+                    } catch { /* skip agent */ }
+                }
+            }
+
+            res.json(success(config.nodeId, {
+                results,
+                total: results.length,
+            }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // PUT /v1/federation/genesis-peer/:id/subscriptions — E.3: Set memory prefix subscriptions
+    router.put('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const id = req.params.id as string;
+            const { prefixes } = req.body ?? {};
+
+            if (!Array.isArray(prefixes)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'prefixes array required'));
+                return;
+            }
+
+            const peer = await storage.getGenesisPeer(id);
+            if (!peer) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Genesis peer not found'));
+                return;
+            }
+
+            // Store subscription preferences as memory
+            const now = new Date().toISOString();
+            const subscriptionKey = `genesis:${peer.genesisNodeId}:subscriptions`;
+
+            // Ensure __genesis__ system agent exists
+            const agents = await storage.listAgents();
+            if (!agents.find(a => a.gaii === '__genesis__')) {
+                try {
+                    await storage.createAgent({
+                        name: '__genesis__',
+                        owner: '__system__',
+                        gaii: '__genesis__',
+                        publicKey: '',
+                        displayName: 'Genesis Sync System',
+                        capabilities: ['genesis-sync'],
+                        createdAt: now,
+                        lastSeen: now,
+                        trustScore: 100,
+                        morselBalance: 0,
+                    });
+                } catch { /* may already exist */ }
+            }
+
+            await storage.setMemory({
+                key: subscriptionKey,
+                ownerGaii: '__genesis__',
+                value: { prefixes, updated_at: now },
+                visibility: 'public',
+                tags: ['genesis-subscriptions'],
+                ttlHours: null,
+                version: 1,
+                createdAt: now,
+                updatedAt: now,
+            });
+
+            res.json(success(config.nodeId, {
+                peer_id: id,
+                peer_node_id: peer.genesisNodeId,
+                subscribed_prefixes: prefixes,
+            }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
+        }
+    });
+
+    // GET /v1/federation/genesis-peer/:id/subscriptions — E.3: Get memory prefix subscriptions
+    router.get('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const id = req.params.id as string;
+            const peer = await storage.getGenesisPeer(id);
+            if (!peer) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Genesis peer not found'));
+                return;
+            }
+
+            const subscriptionKey = `genesis:${peer.genesisNodeId}:subscriptions`;
+            const record = await storage.getMemory('__genesis__', subscriptionKey);
+
+            const subscriptions = record
+                ? (record.value as { prefixes?: string[] }).prefixes ?? []
+                : [];
+
+            res.json(success(config.nodeId, {
+                peer_id: id,
+                peer_node_id: peer.genesisNodeId,
+                subscribed_prefixes: subscriptions,
+            }));
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }

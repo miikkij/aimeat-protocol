@@ -70,8 +70,9 @@ import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { workspaceAccessMiddleware } from './middleware/workspace-access.js';
 import type { Storage, MaintenanceState } from './storage/interface.js';
-import { startHeartbeatJob } from './services/federation.js';
+import { startHeartbeatJob, setOnPeerRecovery } from './services/federation.js';
 import type { PeerInfo } from './services/federation.js';
+import { performKeyExchange } from './routes/federation.js';
 import { TunnelManager } from './services/personal-tunnel.js';
 // consent.js expireConsents is imported dynamically in runConsentExpiryJob
 import { seedProfileSchemas } from './services/profile-schemas.js';
@@ -90,6 +91,9 @@ import { adminFeaturesRouter } from './routes/admin-features.js';
 import { setupRouter } from './routes/setup.js';
 import { createGenesisPeeringService } from './services/genesis-peering.js';
 import { createGenesisSyncService } from './services/genesis-sync.js';
+import { startCacheCleanupJob } from './services/cache-cleanup.js';
+import { startSyncScheduler, notifyCatalogueChange } from './services/sync-scheduler.js';
+import { syncCatalogueToPeer, enqueueCatalogueSync } from './services/catalogue-sync.js';
 import { initStats } from './services/stats.js';
 import { statsMiddleware } from './middleware/stats.js';
 import { statsRouter } from './routes/stats.js';
@@ -411,8 +415,36 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // Federation peer registry (shared between routes and heartbeat)
   const peers = new Map<string, PeerInfo>();
 
-  // Start federation heartbeat job (pings peers every 5 minutes)
-  startHeartbeatJob(config, peers);
+  // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
+  startHeartbeatJob(config, storage, peers);
+
+  // A.4: Wire peer recovery to key exchange + future full sync
+  setOnPeerRecovery((peerId: string) => {
+    const peer = peers.get(peerId);
+    if (!peer) return;
+
+    // Re-exchange keys with the recovered peer
+    performKeyExchange(peer.url, config, storage)
+      .then(result => {
+        if (result.success) {
+          logger.info(`Key exchange completed after recovery of peer ${peer.nodeId}`);
+        } else {
+          logger.warn(`Key exchange failed after recovery of peer ${peer.nodeId}: ${result.error}`);
+        }
+      })
+      .catch(err => {
+        logger.error(`Key exchange error after recovery of peer ${peer.nodeId}`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
+    // Phase B: Queue full catalogue sync for recovered peer
+    enqueueCatalogueSync(peerId, config, storage)
+      .then(() => logger.info(`Full catalogue sync queued for recovered peer ${peer.nodeId}`))
+      .catch(err => logger.warn(`Failed to queue sync for recovered peer ${peer.nodeId}`, {
+        error: err instanceof Error ? err.message : String(err),
+      }));
+  });
 
   // Realtime manager forward-declaration (initialized after route mounting)
   let realtimeManager: RealtimeManager | null = null;
@@ -575,7 +607,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   app.use(permissionsRouter(config, storage));  // Phase 0.3 — permission listing API
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
-  app.use(memoryRouter(config, storage, stats, notifyDirectoryChange));
+  app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
@@ -711,6 +743,12 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   if (genesisSyncService) {
     genesisSyncService.start();
   }
+
+  // Cache Cleanup Scheduler (G.1) — prunes expired federated/replica/genesis memory entries hourly
+  startCacheCleanupJob(config, storage);
+
+  // Sync Scheduler (B.4) — coordinates catalogue sync + memory replication based on syncMode
+  const syncScheduler = startSyncScheduler(config, storage, peers);
 
   app.use(specRouter());
 

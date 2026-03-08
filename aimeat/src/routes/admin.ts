@@ -1130,6 +1130,117 @@ export function adminRouter(
         }));
     });
 
+    // D.2: Trust advisory broadcast endpoint (operator only)
+    router.post('/v1/admin/federation/trust-advisory', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { target_node, advisory_type, reason, evidence_hash } = req.body ?? {};
+
+        if (!target_node || !advisory_type || !reason) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node, advisory_type, and reason are required'));
+            return;
+        }
+
+        const validTypes = ['warning', 'suspend', 'ban'];
+        if (!validTypes.includes(advisory_type)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${validTypes.join(', ')}`));
+            return;
+        }
+
+        // Note: Trust broadcast requires peers map which admin router doesn't have access to.
+        // Store the advisory and let the federation service pick it up.
+        const advisoryRecord = {
+            id: `adv-${randomBytes(8).toString('hex')}`,
+            target_node,
+            advisory_type,
+            reason,
+            evidence_hash: evidence_hash ?? null,
+            issued_by: config.nodeId,
+            created_at: new Date().toISOString(),
+            status: 'issued',
+        };
+
+        // Store as memory for persistence and querying
+        const systemGaii = `system@${config.nodeId}`;
+        await storage.setMemory({
+            key: `trust_advisory:${advisoryRecord.id}`,
+            ownerGaii: systemGaii,
+            value: advisoryRecord,
+            visibility: 'private',
+            tags: ['trust_advisory', `target:${target_node}`, `type:${advisory_type}`],
+            ttlHours: null,
+            version: 1,
+            createdAt: advisoryRecord.created_at,
+            updatedAt: advisoryRecord.created_at,
+        });
+
+        res.status(201).json(success(config.nodeId, {
+            advisory: advisoryRecord,
+            note: 'Advisory stored. It will be broadcast to peers during next sync cycle or can be manually triggered.',
+        }));
+    });
+
+    // D.2: List trust advisories (received + issued)
+    router.get('/v1/admin/federation/trust-advisories', requireAuth(), requireRole('operator'), async (req, res) => {
+        const systemGaii = `system@${config.nodeId}`;
+
+        // Query trust advisory memories
+        const memories = await storage.listMemory(systemGaii, { prefix: 'trust_advisory:' });
+
+        const advisories = memories.map(m => ({
+            id: (m.value as Record<string, unknown>)?.id ?? m.key.replace('trust_advisory:', ''),
+            ...(m.value as Record<string, unknown>),
+            stored_at: m.createdAt,
+        }));
+
+        // Sort by most recent first
+        advisories.sort((a, b) => {
+            const aTime = (a as { created_at?: string }).created_at ?? '';
+            const bTime = (b as { created_at?: string }).created_at ?? '';
+            return bTime.localeCompare(aTime);
+        });
+
+        res.json(success(config.nodeId, {
+            advisories,
+            total: advisories.length,
+        }));
+    });
+
+    // B.3: Sync health metrics (operator only)
+    router.get('/v1/admin/federation/sync-health', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const queueSize = await storage.replicationQueueSize();
+
+        res.json(success(config.nodeId, {
+            queue_depth: queueSize,
+            timestamp: new Date().toISOString(),
+        }));
+    });
+
+    // F.4: Relay earnings query (operator only)
+    router.get('/v1/admin/federation/relay-earnings', requireAuth(), requireRole('operator'), async (req, res) => {
+        const since = req.query.since as string | undefined;
+        const until = req.query.until as string | undefined;
+
+        const systemGaii = `system@${config.nodeId}`;
+        const memories = await storage.listMemory(systemGaii, { prefix: 'relay_earning:' });
+
+        let earnings = memories.map(m => m.value as Record<string, unknown>);
+
+        if (since) {
+            earnings = earnings.filter(e => (e.timestamp as string) >= since);
+        }
+        if (until) {
+            earnings = earnings.filter(e => (e.timestamp as string) <= until);
+        }
+
+        const totalMorsels = earnings.reduce((sum, e) => sum + ((e.amount as number) ?? 0), 0);
+
+        res.json(success(config.nodeId, {
+            earnings,
+            total_morsels: totalMorsels,
+            total_entries: earnings.length,
+            period: { since: since ?? null, until: until ?? null },
+        }));
+    });
+
     return router;
 }
 

@@ -8,6 +8,8 @@
  *   4. Start with: aimeat --db mongodb://localhost:27017/aimeat
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type {
     Storage,
     OwnerRecord,
@@ -47,6 +49,7 @@ import type {
     MemoryLinkRecord, OperatorReviewRecord,
     ScheduledJobRecord,
     ExtensionInstanceRecord,
+    ReplicationQueueEntry,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3591,6 +3594,70 @@ export class MongoStorage implements Storage {
         } catch {
             return false;
         }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Replication Queue (B.1) — in-memory (transient queue)
+    // ══════════════════════════════════════════════════════════
+
+    private replicationQueue = new Map<string, ReplicationQueueEntry>();
+
+    async enqueueReplication(entry: Omit<ReplicationQueueEntry, 'id' | 'attempts' | 'lastAttemptAt' | 'status'>): Promise<string> {
+        const id = randomUUID();
+        const full: ReplicationQueueEntry = {
+            ...entry,
+            id,
+            attempts: 0,
+            lastAttemptAt: null,
+            status: 'pending',
+        };
+        this.replicationQueue.set(id, full);
+        return id;
+    }
+
+    async dequeueReplication(peerId: string, limit: number): Promise<ReplicationQueueEntry[]> {
+        const results: ReplicationQueueEntry[] = [];
+        // Iterate in insertion order (Map preserves insertion order)
+        for (const entry of this.replicationQueue.values()) {
+            if (entry.status === 'pending' && entry.targetPeers.includes(peerId)) {
+                results.push(entry);
+                if (results.length >= limit) break;
+            }
+        }
+        return results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    }
+
+    async markReplicationSent(ids: string[]): Promise<void> {
+        for (const id of ids) {
+            const entry = this.replicationQueue.get(id);
+            if (entry) entry.status = 'sent';
+        }
+    }
+
+    async markReplicationFailed(ids: string[]): Promise<void> {
+        for (const id of ids) {
+            const entry = this.replicationQueue.get(id);
+            if (entry) {
+                entry.status = 'failed';
+                entry.attempts++;
+                entry.lastAttemptAt = new Date().toISOString();
+            }
+        }
+    }
+
+    async pruneReplicationQueue(maxAge: Date): Promise<number> {
+        let pruned = 0;
+        for (const [id, entry] of this.replicationQueue) {
+            if (new Date(entry.createdAt) < maxAge || entry.status === 'sent') {
+                this.replicationQueue.delete(id);
+                pruned++;
+            }
+        }
+        return pruned;
+    }
+
+    async replicationQueueSize(): Promise<number> {
+        return this.replicationQueue.size;
     }
 }
 

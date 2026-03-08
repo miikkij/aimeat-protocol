@@ -842,6 +842,20 @@ export function initializeSchema(db: Database.Database): void {
       updatedAt       TEXT NOT NULL
     );
 
+    -- ── Replication Queue (B.1) ──
+    CREATE TABLE IF NOT EXISTS replication_queue (
+      id              TEXT PRIMARY KEY,
+      type            TEXT NOT NULL,
+      targetPeers     TEXT NOT NULL DEFAULT '[]',
+      payload         TEXT,
+      createdAt       TEXT NOT NULL,
+      attempts        INTEGER NOT NULL DEFAULT 0,
+      lastAttemptAt   TEXT,
+      status          TEXT NOT NULL DEFAULT 'pending'
+    );
+    CREATE INDEX IF NOT EXISTS idx_repq_status ON replication_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_repq_createdAt ON replication_queue(createdAt);
+
     CREATE TABLE IF NOT EXISTS extension_instances (
       id              TEXT NOT NULL,
       extensionName   TEXT NOT NULL,
