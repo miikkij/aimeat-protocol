@@ -670,10 +670,10 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     });
     startSiteSyncJob(config, storage, siteService);
   }
-  app.use(portalRouter(config, storage));
   if (config.portfolioEnabled) {
     app.use(portfolioRouter(config, storage));
   }
+  app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));
   // Phase 1.1 — Email service for verification and magic links
   const emailService = createEmailService(config);
