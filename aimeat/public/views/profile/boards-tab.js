@@ -30,8 +30,14 @@ export default function BoardsTab({ session, showToast }) {
 
   async function handleCreate(name, desc, vis) {
     const resp = await boardsService.createBoard(name, desc, vis);
-    if (resp.ok !== false) { showToast(t('profile.boards.created')); setShowBrdForm(false); loadMyData(); }
-    else showToast(t('profile.boards.createFailed'), true);
+    if (resp.ok !== false) {
+      // Auto-subscribe owner to their own board so it appears in "my boards"
+      const boardId = resp.data?.id || resp.data?.board_id;
+      if (boardId) await boardsService.subscribe(boardId).catch(() => {});
+      showToast(t('profile.boards.created'));
+      setShowBrdForm(false);
+      loadMyData();
+    } else showToast(t('profile.boards.createFailed'), true);
   }
 
   async function handleSubscribe(boardId) {
@@ -39,6 +45,7 @@ export default function BoardsTab({ session, showToast }) {
       const resp = await boardsService.subscribe(boardId);
       if (resp.ok === false) throw new Error(resp.error?.message || 'Subscribe failed');
       showToast(t('profile.boards.subscribed'));
+      loadMyData();
     } catch(e) { showToast(e.message || t('profile.boards.subscribeFailed'), true); }
   }
 
@@ -61,6 +68,14 @@ export default function BoardsTab({ session, showToast }) {
     const resp = await boardsService.reactToPost(boardId, postId, emoji);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     viewPosts(boardId, boardView?.name);
+  }
+
+  async function handleDeleteBoard(boardId) {
+    if (!confirm(t('profile.boards.confirmDeleteBoard') || 'Delete this board and all its posts?')) return;
+    const resp = await boardsService.deleteBoard(boardId);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    showToast(t('profile.boards.boardDeleted') || 'Board deleted');
+    loadMyData();
   }
 
   async function handleDeletePost(boardId, postId) {
@@ -121,7 +136,10 @@ export default function BoardsTab({ session, showToast }) {
           <div class="card" style="cursor:pointer" onClick=${() => viewPosts(b.id || b.board_id, b.name)}>
             <div class="card-header">
               <div class="card-title">${escHtml(b.name)}</div>
-              <span class="badge ${b.visibility === 'public' ? 'badge-success' : 'badge-muted'}">${b.visibility || 'private'}</span>
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span class="badge ${b.visibility === 'public' ? 'badge-success' : 'badge-muted'}">${b.visibility || 'private'}</span>
+                <button class="btn-sm btn-danger" style="font-size:.7rem;padding:2px 8px" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(b.id || b.board_id); }}>${t('profile.boards.deleteBoard') || 'Delete'}</button>
+              </div>
             </div>
             <div class="card-subtitle">${escHtml(b.description || '')}</div>
           </div>

@@ -399,6 +399,26 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // DELETE /v1/boards/:boardId — delete own board
+  router.delete('/v1/boards/:boardId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const gaii = req.auth!.sub;
+
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+
+    if (board.ownerGaii !== gaii && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can delete this board'));
+      return;
+    }
+
+    await storage.deleteBoard(boardId);
+    res.json(success(config.nodeId, { deleted: true, board_id: boardId }));
+  });
+
   // DELETE /v1/boards/:boardId/posts/:postId — delete own post
   router.delete('/v1/boards/:boardId/posts/:postId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const boardId = req.params.boardId as string;

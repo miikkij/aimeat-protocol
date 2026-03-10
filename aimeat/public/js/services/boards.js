@@ -24,6 +24,11 @@ export async function createBoard(name, description, visibility) {
   });
 }
 
+/** Delete a board (owner only). */
+export async function deleteBoard(boardId) {
+  return apiDelete(`/v1/boards/${encodeURIComponent(boardId)}`);
+}
+
 /** Subscribe to a board. */
 export async function subscribe(boardId) {
   return apiPost(`/v1/boards/${encodeURIComponent(boardId)}/subscribe`);
