@@ -15,10 +15,19 @@ const RETRY_BASE_MS = 500;
 export async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
 
-  // Attach auth token if available
+  // Attach auth token — refresh if expired
   if (window.AIMEAT?.auth?.hasSession) {
     const session = window.AIMEAT.auth.getSession();
     if (session?.jwt) {
+      // If session has refresh() and token looks expired, refresh first
+      if (typeof session.refresh === 'function') {
+        try {
+          const payload = parseJwtPayload(session.jwt);
+          if (payload?.exp && Date.now() / 1000 > payload.exp - 60) {
+            await session.refresh();
+          }
+        } catch (_) { /* proceed with current token */ }
+      }
       headers['Authorization'] = 'Bearer ' + session.jwt;
     }
   }
@@ -27,6 +36,19 @@ export async function api(path, opts = {}) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const resp = await fetch(path, { ...opts, headers });
+
+      // On 401, try refreshing token once and retry
+      if (resp.status === 401 && attempt === 0) {
+        const session = window.AIMEAT?.auth?.getSession?.();
+        if (session?.refresh) {
+          try {
+            await session.refresh();
+            headers['Authorization'] = 'Bearer ' + session.jwt;
+            continue;
+          } catch (_) { /* refresh failed, return 401 */ }
+        }
+      }
+
       if (resp.status === 429 || (resp.status >= 500 && attempt < MAX_RETRIES)) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
@@ -41,6 +63,15 @@ export async function api(path, opts = {}) {
     }
   }
   return { ok: false, error: { code: 'NETWORK_ERROR', message: lastError?.message || 'Request failed' } };
+}
+
+/** Parse JWT payload without verification (for expiry check only) */
+function parseJwtPayload(jwt) {
+  try {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return null;
+    return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+  } catch { return null; }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
