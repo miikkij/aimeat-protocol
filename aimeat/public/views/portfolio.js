@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { escHtml, copyToClipboard, handleImgError } from '/js/utils.js';
 import { apiGet, apiPut } from '/js/api.js';
 
 const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
@@ -48,6 +48,8 @@ function buildPortfolioPrompt({ session, catalog, selectedImages, selectedApps, 
   let prompt = `You are a portfolio website builder for AIMEAT.
 
 The user wants to create a personal portfolio website. Generate a single, self-contained, downloadable HTML file.
+
+**CRITICAL RULE: Only use data that is explicitly provided below.** Do NOT invent, fabricate, or hallucinate ANY content — no fake projects, no fake work experience, no fake skills, no fake contact info, no fake social links. If a section has no data provided for it, either omit that section entirely or show a clear placeholder like "Add your [projects/experience/skills] here" that the user can edit later.
 
 ## User Context
 - GHII: ${ghii}
@@ -131,15 +133,26 @@ The user wants to create a personal portfolio website. Generate a single, self-c
     resourceNotes += `- NO resume/CV file was provided. Do NOT include a "Download Resume" link. Instead, omit the resume section entirely or show a placeholder note like "Resume available upon request."\n`;
   }
 
+  // Build section availability summary
+  let sectionNotes = '';
+  if (selectedApps.length === 0) {
+    sectionNotes += `- NO apps/projects were provided. Do NOT create a "Projects" section with fake projects. Either omit the section or show a single placeholder: "Projects coming soon."\n`;
+  }
+  if (selectedBoards.length === 0 && selectedMemories.length === 0 && selectedApps.length === 0) {
+    sectionNotes += `- Very little content was provided. Generate a clean, minimal portfolio with: header/hero with the display name, an "About" placeholder section the user can edit, and any selected images as a gallery. Do NOT fill empty space with invented content.\n`;
+  }
+
   prompt += `
 ## Technical Requirements
-- Generate a SINGLE downloadable HTML file with ALL CSS inline (no external dependencies)
+- Generate a SINGLE downloadable HTML file with ALL CSS and JS inline (no external dependencies)
+- **CRITICAL — No fabricated content:** ONLY show information that is explicitly provided in the sections above. Never invent projects, work history, skills, contact details, social links, testimonials, or any other content. If data for a section is not provided, omit the section or use an editable placeholder.
 - **CRITICAL — Images and files:** ONLY use URLs listed in the "Selected Images" section above. Do NOT invent, guess, or fabricate any URLs. If a resource (avatar, resume, screenshot, etc.) is not listed above, it does not exist.
-${resourceNotes}- For missing images: Use inline SVG placeholders, CSS gradients, or emoji — never a broken image URL
+${resourceNotes}${sectionNotes}- For missing images: Use inline SVG placeholders, CSS gradients, or emoji — never a broken image URL
 - For project screenshots: If no screenshot URL is provided for a project, use a styled CSS placeholder card instead of an <img> tag
 - If memory entries are selected: Fetch them live with fetch() calls to the node API URLs above
 - Mobile-responsive design (works on phone, tablet, desktop)
 - Include proper <meta> tags for SEO and social sharing (og:title, og:description, og:image)
+- **IMPORTANT — CSP compatibility:** The portfolio HTML will be rendered inside a sandboxed iframe. All JavaScript MUST be inside a single \`<script>\` tag at the end of \`<body>\`. Do NOT use inline event handlers (onclick=, onload=, etc.) — use addEventListener instead. Do NOT use external script/CSS CDN links.
 `;
 
   if (authGates.length > 0) {
@@ -170,13 +183,10 @@ For truly private data, use the AIMEAT consent system.
 
   prompt += `
 ## Debug Panel
-Include a hidden debug panel (toggle with Ctrl+Shift+D) that shows:
-- Auth state (logged in / anonymous)
-- Number of loaded images, their URLs and load status
-- API fetch activity log (if memory entries are used)
-- Section visibility states
-- Any JavaScript errors
-Style it as a fixed overlay, semi-transparent dark background, monospace font.
+Include a hidden debug panel (toggle with Ctrl+Shift+D keyboard shortcut via addEventListener).
+Show: auth state, image load status, API fetch log, section visibility, JS errors.
+Style: fixed overlay, semi-transparent dark background, monospace font.
+All debug JS must be in the single <script> block at end of body — no inline handlers.
 
 ## Delivery
 After generating the HTML, tell the user:
@@ -391,7 +401,7 @@ function PortfolioBuilder({ session, navigate }) {
                   <div class="portfolio-source-item portfolio-img-item">
                     <input type="checkbox" id=${'img-' + img.key} checked=${selectedImages.has(img.key)}
                       onChange=${() => toggleSet(setSelectedImages, img.key)} />
-                    <img class="portfolio-img-thumb" src=${img.url} alt=${img.key} loading="lazy" />
+                    <img class="portfolio-img-thumb" src=${img.url} alt=${img.key} loading="lazy" onError=${handleImgError} />
                     <label for=${'img-' + img.key}>${img.key}</label>
                     <span class="portfolio-source-meta">${Math.round(img.size / 1024)}KB · ${img.mimeType.split('/')[1]}</span>
                   </div>
@@ -617,9 +627,6 @@ function PortfolioViewer({ username, navigate }) {
 
   // If portfolio HTML exists, render it in a sandboxed iframe
   if (data.has_html && data.portfolio_html) {
-    const blob = new Blob([data.portfolio_html], { type: 'text/html' });
-    const blobUrl = URL.createObjectURL(blob);
-
     return html`
       <div class="portfolio-container portfolio-viewer">
         <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
@@ -628,8 +635,8 @@ function PortfolioViewer({ username, navigate }) {
           </button>
           <span style="color:var(--text-dim);">${escHtml(data.display_name || username)}'s portfolio</span>
         </div>
-        <iframe class="portfolio-viewer-frame" src=${blobUrl}
-          sandbox="allow-scripts allow-same-origin"
+        <iframe class="portfolio-viewer-frame" srcdoc=${data.portfolio_html}
+          sandbox="allow-scripts"
           onLoad=${(e) => {
             try {
               const h = e.target.contentDocument?.body?.scrollHeight;

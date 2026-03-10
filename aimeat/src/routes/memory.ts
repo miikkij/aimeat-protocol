@@ -191,6 +191,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     res.json(success(config.nodeId, {
       items: records.map(r => ({
         key: r.key,
+        value: r.value,
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),
         tags: r.tags,

@@ -175,7 +175,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self'",
-        "frame-src 'self' blob:",
+        "frame-src 'self' blob: data:",
         "object-src 'none'",
         "base-uri 'self'",
       ].join('; '));

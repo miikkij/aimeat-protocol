@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { RealtimeStats } from '../services/realtime-manager.js';
@@ -340,6 +341,57 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       per_page: perPage,
       pages: Math.ceil(total / perPage),
     }));
+  });
+
+  // POST /v1/catalogue — publish a service/action (owner/agent auth)
+  router.post('/v1/catalogue', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const { display_name, description, category, price_morsels, unit, webhook_url } = req.body ?? {};
+
+    if (!display_name || !description) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'display_name and description are required'));
+      return;
+    }
+
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const action = await storage.createAction({
+      id,
+      providerGaii: gaii,
+      displayName: display_name,
+      description,
+      category: category || 'general',
+      inputSchema: {},
+      outputSchema: {},
+      pricing: { baseMorsels: Number(price_morsels) || 0, perUnit: unit ? { unit, morselsPer1000: 0 } : undefined },
+      tags: [],
+      webhookUrl: webhook_url,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    res.status(201).json(success(config.nodeId, {
+      id: action.id,
+      display_name: action.displayName,
+      description: action.description,
+      category: action.category,
+      pricing: action.pricing,
+      created_at: action.createdAt,
+    }));
+  });
+
+  // DELETE /v1/catalogue/:actionId — unpublish a service (owner/agent auth)
+  router.delete('/v1/catalogue/:actionId', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const actionId = req.params.actionId as string;
+
+    const deleted = await storage.deleteAction(actionId, gaii);
+    if (!deleted) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action not found or not owned by you: ${actionId}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, { deleted: actionId }));
   });
 
   // GET /v1/catalogue/:actionId — action detail (Tier 0, no auth)

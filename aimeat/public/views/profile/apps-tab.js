@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, handleImgError } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { listApps, uploadApp } from '/js/services/apps.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -51,7 +51,7 @@ export default function AppsTab({ session, showToast, onStats }) {
     <div class="card" style="margin-bottom:1rem">
       <h3 style="color:var(--love1);font-size:1rem;margin-bottom:.5rem">\u{1F680} ${t('profile.apps.launcherTitle')}</h3>
       <p style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">${t('profile.apps.launcherDesc')}</p>
-      <a href="/v1/apps/launcher" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block">${t('profile.apps.launcherOpen')}</a>
+      <a href="/v1/aimeat-os" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block">${t('profile.apps.launcherOpen')}</a>
     </div>
 
     <!-- Create guide -->
@@ -94,7 +94,7 @@ export default function AppsTab({ session, showToast, onStats }) {
             return html`
               <div class="app-card">
                 <div class="app-screenshot">
-                  ${ssUrl ? html`<img src=${ssUrl} alt=${a.filename} onError=${e => { e.target.parentElement.innerHTML = '<div class="placeholder">\u{1F4F1}</div>'; }} />` : html`<div class="placeholder">\u{1F4F1}</div>`}
+                  ${ssUrl ? html`<img src=${ssUrl} alt=${a.filename} onError=${handleImgError} />` : html`<div class="placeholder">\u{1F4F1}</div>`}
                 </div>
                 <div class="app-info">
                   <div class="app-name">${escHtml(a.filename)}</div>

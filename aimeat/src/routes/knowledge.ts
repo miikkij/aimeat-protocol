@@ -34,6 +34,33 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
+    // Normalize AI chat output format → strict manifest format
+    if (!pkg.type && pkg.aimeat_knowledge_package) pkg.type = 'knowledge-package';
+    if (!pkg.type) pkg.type = 'knowledge-package';
+    if (!pkg.name && pkg.title) pkg.name = pkg.title;
+    if (!pkg.name && pkg.id) pkg.name = pkg.id;
+    if (!pkg.version) pkg.version = '1.0.0';
+    if (!pkg.author) pkg.author = ghii;
+    if (!pkg.synthesis) {
+      pkg.synthesis = { level: 'original', description: 'Imported from AI chat' };
+    }
+    if (!pkg.sharing) {
+      pkg.sharing = {
+        catalog_listed: overrides?.catalog_listed ?? false,
+        allow_clone: false,
+        morsel_price: 0,
+      };
+    }
+    if (!pkg.tags) pkg.tags = [];
+    if (!pkg.language) pkg.language = 'en';
+    // Normalize entries: ensure each has title, default visibility
+    if (Array.isArray(pkg.entries)) {
+      for (const entry of pkg.entries) {
+        if (!entry.title) entry.title = entry.key || 'Untitled';
+        if (!entry.visibility) entry.visibility = 'private';
+      }
+    }
+
     // Validate manifest structure
     const manifest = pkg as KnowledgeManifest;
     if (!validateManifest(manifest)) {
@@ -74,8 +101,18 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       updatedAt: now,
     });
 
-    // Store entries (entry content is in pkg.entry_data if provided)
+    // Store entries — content can be in pkg.entry_data, req.body.entry_data,
+    // or directly on each entry's .value field (AI chat output format)
     const entryData = (pkg as any).entry_data ?? (req.body.entry_data ?? {});
+    // Extract inline values from entries into entryData
+    for (const entry of manifest.entries) {
+      if ((entry as any).value !== undefined) {
+        const entryName = entry.key.split('/').pop() ?? entry.key;
+        if (!entryData[entry.key] && !entryData[entryName]) {
+          entryData[entryName] = (entry as any).value;
+        }
+      }
+    }
     const createdEntries: string[] = [];
     for (const entry of manifest.entries) {
       const entryKey = entry.key.startsWith('packages/')
@@ -252,19 +289,61 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { broken_links: broken, count: broken.length }));
   });
 
+  /* ── Built-in prompt templates (used when no custom template is stored) ── */
+  const DEFAULT_HUMAN_PROMPT = `You are a knowledge packager for AIMEAT node {node_id}.
+
+Take the research, notes, or content I provide and structure it as an AIMEAT knowledge package.
+
+Output a JSON object with this structure:
+\`\`\`json
+{
+  "aimeat_knowledge_package": true,
+  "package": {
+    "type": "knowledge-package",
+    "name": "Package Title",
+    "version": "1.0.0",
+    "author": "{ghii}",
+    "description": "Brief description",
+    "content_type": "research",
+    "language": "en",
+    "tags": ["tag1", "tag2"],
+    "synthesis": { "level": "original", "description": "How it was created" },
+    "sharing": { "catalog_listed": false, "allow_clone": false, "morsel_price": 0 },
+    "entries": [
+      { "key": "section-name", "title": "Section Name", "value": "content here", "visibility": "private" }
+    ]
+  }
+}
+\`\`\`
+
+Valid content_type values: idea, research, plan, dataset, document, tutorial, collection, article, story, fiction.
+Valid visibility values: private, owner, public.
+Valid synthesis levels: original, assisted, synthesized, ai-generated.
+
+Node URL: {node_url}
+Owner: {ghii}`;
+
+  const DEFAULT_AGENT_PROMPT = `You are an AIMEAT knowledge packager agent.
+
+Authenticate: POST {auth_endpoint}
+API Spec: {openapi_spec}
+Agent GAII: {agent_gaii}
+Node: {node_id} at {node_url}
+
+Import packages via POST {node_url}/v1/packages/import with body:
+{ "package": <knowledge_package_json>, "overrides": {} }
+
+Output structured AIMEAT knowledge packages as JSON.`;
+
   /* ── GET /v1/templates/knowledge-packager-human — Get human prompt template ── */
   router.get('/v1/templates/knowledge-packager-human', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
-    const prompt = await storage.getMemory(req.auth!.sub as string, 'templates/knowledge-packager-human');
+    const stored = await storage.getMemory(req.auth!.sub as string, 'templates/knowledge-packager-human');
 
-    if (!prompt) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Human prompt template not installed'));
-      return;
-    }
-
-    // Substitute placeholders
-    let text = typeof prompt.value === 'string' ? prompt.value : JSON.stringify(prompt.value);
+    let text = stored
+      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
+      : DEFAULT_HUMAN_PROMPT;
     text = text.replace(/\{ghii\}/g, ghii);
     text = text.replace(/\{node_url\}/g, nodeUrl);
     text = text.replace(/\{node_id\}/g, config.nodeId);
@@ -277,14 +356,11 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     const ghii = req.auth!.owner as string;
     const gaii = req.auth!.sub as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
-    const prompt = await storage.getMemory(gaii, 'templates/knowledge-packager-agent');
+    const stored = await storage.getMemory(gaii, 'templates/knowledge-packager-agent');
 
-    if (!prompt) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Agent prompt template not installed'));
-      return;
-    }
-
-    let text = typeof prompt.value === 'string' ? prompt.value : JSON.stringify(prompt.value);
+    let text = stored
+      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
+      : DEFAULT_AGENT_PROMPT;
     text = text.replace(/\{ghii\}/g, ghii);
     text = text.replace(/\{node_url\}/g, nodeUrl);
     text = text.replace(/\{node_id\}/g, config.nodeId);

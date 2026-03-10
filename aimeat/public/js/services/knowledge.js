@@ -14,8 +14,8 @@ export async function importPackage(pkg, overrides = {}) {
 
 export async function listMyPackages() {
   const data = await apiGet('/v1/memory?prefix=packages/&tags=knowledge-package');
-  const entries = data?.data?.entries || data?.data || [];
-  return Array.isArray(entries) ? entries : [];
+  const items = data?.data?.items || data?.data?.entries || [];
+  return Array.isArray(items) ? items : [];
 }
 
 export async function getPackage(packageId) {

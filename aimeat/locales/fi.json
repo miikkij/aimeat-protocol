@@ -607,7 +607,15 @@
       "status": "Tila",
       "edit": "Muokkaa",
       "nodeDefault": "solmun oletus",
-      "wildcard": "Kaikki alkuperät (*)"
+      "wildcard": "Kaikki alkuperät (*)",
+      "sessions": "Istuntojen hallinta",
+      "sessionsHint": "Peru kaikki aktiiviset istunnot. Sinun täytyy kirjautua uudelleen kaikilla laitteilla.",
+      "sessionsLabel": "Aktiiviset istunnot",
+      "sessionsDesc": "Kaikkien istuntojen peruminen mitätöi kaikki aktiiviset JWT-tunnisteet. Sinut ja kaikki agenttisi kirjataan ulos välittömästi.",
+      "revokeAll": "Peru kaikki istunnot",
+      "revoking": "Perutaan...",
+      "revokeConfirm": "Haluatko varmasti perua kaikki aktiiviset istunnot? Sinut kirjataan ulos.",
+      "sessionsRevoked": "Kaikki istunnot peruttu"
     },
     "notifications": {
       "title": "Push-ilmoitukset",
@@ -2940,7 +2948,11 @@
       "clones": "{count} kloonia",
       "viewEdit": "Näytä / Muokkaa",
       "shareSettings": "Jakamisasetukset",
-      "export": "Vie"
+      "export": "Vie",
+      "exportCopied": "Paketin JSON kopioitu leikepöydälle",
+      "confirmDelete": "Poista \"{name}\"? Tätä ei voi perua.",
+      "deleted": "Paketti poistettu",
+      "deleteError": "Paketin poisto epäonnistui"
     },
     "sharedWithMe": {
       "title": "Jaettu minulle",

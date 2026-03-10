@@ -607,7 +607,15 @@
       "status": "Status",
       "edit": "Edit",
       "nodeDefault": "node default",
-      "wildcard": "All origins (*)"
+      "wildcard": "All origins (*)",
+      "sessions": "Session Management",
+      "sessionsHint": "Revoke all active sessions. You will need to re-authenticate on all devices.",
+      "sessionsLabel": "Active Sessions",
+      "sessionsDesc": "Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.",
+      "revokeAll": "Revoke All Sessions",
+      "revoking": "Revoking...",
+      "revokeConfirm": "Are you sure you want to revoke all active sessions? You will be logged out.",
+      "sessionsRevoked": "All sessions revoked"
     },
     "notifications": {
       "title": "Push Notifications",
@@ -2941,7 +2949,11 @@
       "clones": "{count} clones",
       "viewEdit": "View / Edit",
       "shareSettings": "Share Settings",
-      "export": "Export"
+      "export": "Export",
+      "exportCopied": "Package JSON copied to clipboard",
+      "confirmDelete": "Delete \"{name}\"? This cannot be undone.",
+      "deleted": "Package deleted",
+      "deleteError": "Failed to delete package"
     },
     "sharedWithMe": {
       "title": "Shared With Me",

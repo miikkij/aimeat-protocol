@@ -23,13 +23,14 @@ let currentLocale = 'en';
 let translations = {};
 let fallback = {};
 const listeners = new Set();
+const _v = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : Date.now();
 
 /** Load translations for a locale. */
 export async function loadTranslations(locale) {
   currentLocale = locale || detectLocale();
 
-  // Always load English as fallback
-  const enRes = await fetch('/locales/en.json');
+  // Always load English as fallback (cache-bust with version)
+  const enRes = await fetch(`/locales/en.json?v=${_v}`);
   if (enRes.ok) {
     const enData = await enRes.json();
     fallback = flatten(enData);
@@ -38,7 +39,7 @@ export async function loadTranslations(locale) {
 
   if (currentLocale !== 'en') {
     try {
-      const locRes = await fetch(`/locales/${currentLocale}.json`);
+      const locRes = await fetch(`/locales/${currentLocale}.json?v=${_v}`);
       const locData = await locRes.json();
       translations = { ...fallback, ...flatten(locData) };
     } catch {

@@ -365,6 +365,26 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }));
   });
 
+  // GET /v1/work/sent — work items sent by requester (agent auth)
+  router.get('/v1/work/sent', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const items = await storage.listWorkByRequester(gaii);
+
+    res.json(success(config.nodeId, {
+      items: items.map(w => ({
+        tracking_code: w.trackingCode,
+        status: w.status,
+        action_id: w.actionId,
+        provider_gaii: w.providerGaii,
+        cost: w.cost,
+        rating: w.rating,
+        ttl_expires_at: w.ttlExpiresAt,
+        created_at: w.createdAt,
+      })),
+      total: items.length,
+    }));
+  });
+
   // GET /v1/work/:tc — work status (agent auth)
   router.get('/v1/work/:tc', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
     const tc = param(req.params.tc);

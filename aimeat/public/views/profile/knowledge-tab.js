@@ -4,6 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { apiGet } from '/js/api.js';
 import { Spinner } from './shared.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 
@@ -14,6 +15,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const [importPreview, setImportPreview] = useState(null);
   const [importError, setImportError] = useState('');
   const [importing, setImporting] = useState(false);
+
+  /* ── UI state ── */
+  const [expandedPkg, setExpandedPkg] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   /* ── Discovery state ── */
   const [discovered, setDiscovered] = useState([]);
@@ -31,8 +36,15 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     try {
       setLoading(true);
       const list = await knowledgeService.listMyPackages();
-      setPackages(list);
-      onStats?.({ knowledge: list.length });
+      const hydrated = await Promise.all(list.map(async (pkg) => {
+        if (pkg.value) return pkg;
+        try {
+          const resp = await apiGet('/v1/memory/' + encodeURIComponent(pkg.key));
+          return { ...pkg, value: resp?.data?.value };
+        } catch { return pkg; }
+      }));
+      setPackages(hydrated);
+      onStats?.({ knowledge: hydrated.length });
     } catch { setPackages([]); }
     finally { setLoading(false); }
   }, [onStats]);
@@ -151,6 +163,43 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     } finally { setImporting(false); }
   }, [importPreview, showToast, loadPackages]);
 
+  /* ── Delete ── */
+  const handleDelete = useCallback(async (pkg) => {
+    const manifest = pkg.value;
+    const name = manifest?.name || 'Untitled';
+    if (!confirm(t('knowledge.myKnowledge.confirmDelete')?.replace('{name}', name)
+        || `Delete "${name}"? This cannot be undone.`)) return;
+    setDeleting(pkg.key);
+    try {
+      await knowledgeService.deletePackage(ghii, manifest?.id || pkg.key.split('/')[1] || pkg.key);
+      showToast(t('knowledge.myKnowledge.deleted') || 'Package deleted');
+      setExpandedPkg(null);
+      loadPackages();
+    } catch {
+      showToast(t('knowledge.myKnowledge.deleteError') || 'Failed to delete package');
+    } finally { setDeleting(null); }
+  }, [ghii, showToast, loadPackages]);
+
+  /* ── Export ── */
+  const handleExport = useCallback(async (pkg) => {
+    const manifest = pkg.value;
+    const packageId = manifest?.id || pkg.key.split('/')[1] || pkg.key;
+    try {
+      const resp = await knowledgeService.exportPackage(packageId);
+      const json = JSON.stringify(resp?.data || manifest, null, 2);
+      await navigator.clipboard.writeText(json);
+      showToast(t('knowledge.myKnowledge.exportCopied') || 'Package JSON copied to clipboard');
+    } catch {
+      // Fallback: export the manifest we already have
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(manifest, null, 2));
+        showToast(t('knowledge.myKnowledge.exportCopied') || 'Package JSON copied to clipboard');
+      } catch {
+        showToast('Failed to export package');
+      }
+    }
+  }, [showToast]);
+
   /* ── Clone ── */
   const handleClone = useCallback(async (packageId) => {
     try {
@@ -163,6 +212,27 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       }
     } catch { showToast('Clone failed'); }
   }, [showToast, loadPackages]);
+
+  /* ── Toggle expand ── */
+  const toggleExpand = useCallback((key) => {
+    setExpandedPkg(prev => prev === key ? null : key);
+  }, []);
+
+  /* ── Render entry row ── */
+  const renderEntry = (entry, i) => {
+    const label = entry.title || entry.key || `Entry ${i + 1}`;
+    const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value, null, 2) : '');
+    return html`
+      <div class="kpkg-detail-entry" key=${i}>
+        <div class="kpkg-detail-entry-header">
+          <span class="kpkg-badge kpkg-badge-${entry.visibility || 'private'}">${t('knowledge.visibility.' + (entry.visibility || 'private'))}</span>
+          <strong>${escHtml(label)}</strong>
+          ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
+        </div>
+        ${val && html`<pre class="kpkg-detail-value">${escHtml(val)}</pre>`}
+      </div>
+    `;
+  };
 
   /* ── Render ── */
   return html`
@@ -201,26 +271,29 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
             <div class="kpkg-preview-meta">
               <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (importPreview.pkg.content_type || 'document'))}</span>
               <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (importPreview.pkg.synthesis?.level || 'original'))}</span>
-              <strong>${escHtml(importPreview.pkg.name || 'Untitled')}</strong>
+              <strong>${escHtml(importPreview.pkg.name || importPreview.pkg.title || importPreview.pkg.id || 'Untitled')}</strong>
             </div>
 
-            <!-- GHII Confirmation -->
             ${importPreview.ghiiMatch
               ? html`<p class="kpkg-ghii-ok">${t('knowledge.import.ghiiConfirm').replace('{ghii}', ghii)}</p>`
               : html`<p class="kpkg-ghii-warn">${t('knowledge.import.ghiiMismatch').replace('{ghii}', importPreview.targetGhii)}</p>`
             }
 
-            <!-- Entries with visibility -->
             <div class="kpkg-preview-entries">
-              ${(importPreview.pkg.entries || []).map((entry, i) => html`
-                <div class="kpkg-preview-entry" key=${i}>
-                  <span class="kpkg-badge kpkg-badge-${entry.visibility}">${t('knowledge.visibility.' + entry.visibility)}</span>
-                  <span>${escHtml(entry.title)}</span>
-                </div>
-              `)}
+              ${(importPreview.pkg.entries || []).map((entry, i) => {
+                const label = entry.title || entry.key || `Entry ${i + 1}`;
+                const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value) : '');
+                const truncVal = val.length > 120 ? val.slice(0, 120) + '\u2026' : val;
+                return html`
+                  <div class="kpkg-preview-entry" key=${i}>
+                    <span class="kpkg-badge kpkg-badge-${entry.visibility || 'private'}">${t('knowledge.visibility.' + (entry.visibility || 'private'))}</span>
+                    <strong class="kpkg-entry-key">${escHtml(label)}</strong>
+                    ${truncVal && html`<p class="kpkg-entry-value">${escHtml(truncVal)}</p>`}
+                  </div>
+                `;
+              })}
             </div>
 
-            <!-- References -->
             ${(importPreview.pkg.references || []).length > 0 && html`
               <div class="kpkg-preview-refs">
                 <strong>References:</strong>
@@ -232,7 +305,6 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               </div>
             `}
 
-            <!-- Catalog toggle -->
             <label class="kpkg-toggle">
               <input type="checkbox"
                 checked=${importPreview.catalogListed}
@@ -241,7 +313,6 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               ${t('knowledge.import.catalogToggle')}
             </label>
 
-            <!-- Confirm -->
             <div class="kpkg-preview-summary">
               ${t('knowledge.import.willCreate')
                 .replace('{entries}', String((importPreview.pkg.entries || []).length))
@@ -268,9 +339,12 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         ${!loading && packages.map(pkg => {
           const manifest = pkg.value;
           if (!manifest || manifest.type !== 'knowledge-package') return null;
+          const isExpanded = expandedPkg === pkg.key;
+          const entries = manifest.entries || [];
           return html`
-            <div class="kpkg-card" key=${pkg.key}>
-              <div class="kpkg-card-header">
+            <div class="kpkg-card ${isExpanded ? 'kpkg-card-expanded' : ''}" key=${pkg.key}>
+              <div class="kpkg-card-header kpkg-card-clickable" onClick=${() => toggleExpand(pkg.key)}>
+                <span class="kpkg-expand-icon">${isExpanded ? '\u25BC' : '\u25B6'}</span>
                 <strong>${escHtml(manifest.name || 'Untitled')}</strong>
                 <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (manifest.content_type || 'document'))}</span>
                 <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (manifest.synthesis?.level || 'original'))}</span>
@@ -279,9 +353,55 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               <div class="kpkg-card-tags">
                 ${(manifest.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}
               </div>
-              <div class="kpkg-card-stats">
-                <span>${t('knowledge.myKnowledge.entries').replace('{count}', String((manifest.entries || []).length))}</span>
+              <div class="kpkg-card-info">
+                <span>${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</span>
+                ${manifest.version ? html`<span>v${escHtml(manifest.version)}</span>` : null}
+                ${manifest.language ? html`<span>${escHtml(manifest.language.toUpperCase())}</span>` : null}
               </div>
+
+              <!-- Action buttons -->
+              <div class="kpkg-card-actions">
+                <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${(e) => { e.stopPropagation(); handleExport(pkg); }}>
+                  ${t('knowledge.myKnowledge.export')}
+                </button>
+                <button class="kpkg-btn kpkg-btn-danger kpkg-btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(pkg); }}
+                  disabled=${deleting === pkg.key}>
+                  ${deleting === pkg.key ? '...' : t('profile.delete')}
+                </button>
+              </div>
+
+              <!-- Expanded detail view -->
+              ${isExpanded && html`
+                <div class="kpkg-detail">
+                  ${manifest.synthesis?.description ? html`
+                    <p class="kpkg-detail-synthesis">${escHtml(manifest.synthesis.description)}</p>
+                  ` : null}
+
+                  <div class="kpkg-detail-entries">
+                    <h4>${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</h4>
+                    ${entries.map((entry, i) => renderEntry(entry, i))}
+                    ${entries.length === 0 && html`<p class="kpkg-empty">No entries</p>`}
+                  </div>
+
+                  ${(manifest.references || []).length > 0 && html`
+                    <div class="kpkg-detail-refs">
+                      <h4>References</h4>
+                      ${manifest.references.map((ref, i) => html`
+                        <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
+                          ${ref.verified ? '\u2713' : '?'} ${escHtml(ref.title || ref.url || 'Untitled')}
+                          ${ref.url ? html` <a href=${ref.url} target="_blank" class="kpkg-ref-link">\u2197</a>` : null}
+                        </div>
+                      `)}
+                    </div>
+                  `}
+
+                  <div class="kpkg-detail-meta">
+                    <span>ID: ${escHtml(manifest.id || pkg.key)}</span>
+                    ${manifest.author ? html`<span>Author: ${escHtml(manifest.author)}</span>` : null}
+                    ${manifest.sharing ? html`<span>Catalog: ${manifest.sharing.catalog_listed ? 'Listed' : 'Unlisted'}</span>` : null}
+                  </div>
+                </div>
+              `}
             </div>
           `;
         })}
@@ -336,11 +456,9 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               ${(pkg.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}
             </div>
             <div class="kpkg-card-actions">
-              ${pkg.sharing?.allow_clone && html`
-                <button class="kpkg-btn kpkg-btn-secondary" onClick=${() => handleClone(pkg.package_id)}>
-                  ${t('knowledge.discover.cloneToMine')}
-                </button>
-              `}
+              <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${() => handleClone(pkg.package_id)}>
+                ${t('knowledge.discover.cloneToMine')}
+              </button>
             </div>
             <p class="kpkg-trust-advisory">${t('knowledge.discover.trustAdvisory')}</p>
           </div>

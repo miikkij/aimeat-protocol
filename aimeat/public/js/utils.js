@@ -137,3 +137,48 @@ export function generateStars(container, count = 80) {
     container.appendChild(star);
   }
 }
+
+/**
+ * Broken image fallback handler.
+ * Probes the original URL with HEAD to determine the reason (auth vs not found),
+ * then replaces the <img> with an inline SVG placeholder.
+ *
+ * Usage in Preact/HTM:  onError=${handleImgError}
+ */
+export function handleImgError(e) {
+  const img = e.target;
+  if (img.dataset.fallback) return; // already handled
+  img.dataset.fallback = '1';
+
+  const src = img.src;
+  const w = img.width || img.clientWidth || 40;
+  const h = img.height || img.clientHeight || 40;
+
+  // Probe with HEAD to get status code
+  fetch(src, { method: 'HEAD' }).then(r => {
+    const status = r.status;
+    let label, icon;
+    if (status === 401 || status === 403) {
+      label = 'Login';
+      icon = `<path d="M12 2C9.24 2 7 4.24 7 7v3H5v10h14V10h-2V7c0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3v3H9V7c0-1.66 1.34-3 3-3zm-5 8h10v6H7v-6z" fill="currentColor" opacity=".7"/>`;
+    } else {
+      label = 'N/A';
+      icon = `<path d="M21 5v6.59l-3-3L13.41 13 9 8.59 3 14.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2zm0 14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-2.58l6-6L13.41 15 18 10.41l3 3V19z" fill="currentColor" opacity=".5"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="1.5" opacity=".5"/>`;
+    }
+    applyFallbackSvg(img, w, h, label, icon);
+  }).catch(() => {
+    applyFallbackSvg(img, w, h, 'N/A',
+      `<path d="M21 5v6.59l-3-3L13.41 13 9 8.59 3 14.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2zm0 14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-2.58l6-6L13.41 15 18 10.41l3 3V19z" fill="currentColor" opacity=".5"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="1.5" opacity=".5"/>`);
+  });
+}
+
+function applyFallbackSvg(img, w, h, label, iconPath) {
+  const fontSize = Math.max(8, Math.min(w * 0.2, 11));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<rect width="${w}" height="${h}" rx="4" fill="%23222" stroke="%23444" stroke-width="1"/>` +
+    `<g transform="translate(${w/2 - 12},${h/2 - 14})" color="%23888">${iconPath}</g>` +
+    `<text x="${w/2}" y="${h/2 + 14}" text-anchor="middle" fill="%23777" font-family="sans-serif" font-size="${fontSize}">${label}</text>` +
+    `</svg>`;
+  img.src = `data:image/svg+xml,${svg}`;
+  img.style.objectFit = 'contain';
+}
