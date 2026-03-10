@@ -260,22 +260,25 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     setExpandedPkg(prev => prev === key ? null : key);
   }, []);
 
+  /* ── Cycle visibility: private → owner → public → private ── */
+  const cycleVis = ['private', 'owner', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
+
   /* ── Render entry row ── */
   const renderEntry = (entry, i, pkg) => {
     const label = entry.title || entry.key || `Entry ${i + 1}`;
     const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value, null, 2) : '');
     const vis = entry.visibility || 'private';
-    const visOptions = ['private', 'owner', 'public'];
+    const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
     return html`
       <div class="kpkg-detail-entry" key=${i}>
         <div class="kpkg-detail-entry-header">
-          <select class="kpkg-vis-select" value=${vis}
-            onChange=${(e) => handleEntryVisibility(pkg, entry, e.target.value)}
-            style="font-size:.7rem;padding:1px 4px;border-radius:4px;border:1px solid rgba(255,107,157,.3);cursor:pointer;font-weight:600;
-              background:${vis === 'public' ? 'rgba(0,200,100,.15)' : vis === 'owner' ? 'rgba(100,150,255,.15)' : 'rgba(150,100,200,.15)'};
-              color:${vis === 'public' ? '#4ade80' : vis === 'owner' ? '#60a5fa' : '#c084fc'}">
-            ${visOptions.map(v => html`<option value=${v} key=${v}>${t('knowledge.visibility.' + v)}</option>`)}
-          </select>
+          <button class="kpkg-vis-pill"
+            onClick=${(e) => { e.stopPropagation(); handleEntryVisibility(pkg, entry, nextVis); }}
+            title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
+            style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
+          >${t('knowledge.visibility.' + vis)} ▾</button>
           <strong>${escHtml(label)}</strong>
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>

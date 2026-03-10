@@ -497,16 +497,15 @@ function PortfolioBuilder({ session, navigate }) {
               <div class="portfolio-source-list">
                 ${catalog.memories.map(mem => {
                   const displayKey = formatMemoryKey(mem.key);
-                  const isPackage = /^packages\/[0-9a-f-]+\//.test(mem.key);
-                  const metaLabel = isPackage
-                    ? mem.visibility
-                    : (mem.visibility + (mem.tags.length ? ' · ' + mem.tags.slice(0, 3).join(', ') + (mem.tags.length > 3 ? ` +${mem.tags.length - 3}` : '') : ''));
                   return html`
-                  <div class="portfolio-source-item portfolio-mem-item">
-                    <input type="checkbox" id=${'mem-' + mem.key} checked=${selectedMemories.has(mem.key)}
-                      onChange=${() => toggleSet(setSelectedMemories, mem.key)} />
-                    <label for=${'mem-' + mem.key} title=${mem.key}>${displayKey}</label>
-                    <span class="portfolio-source-meta">${metaLabel}</span>
+                  <div class="portfolio-mem-item">
+                    <div class="portfolio-mem-header">
+                      <input type="checkbox" id=${'mem-' + mem.key} checked=${selectedMemories.has(mem.key)}
+                        onChange=${() => toggleSet(setSelectedMemories, mem.key)} />
+                      <label for=${'mem-' + mem.key} title=${mem.key}>${displayKey}</label>
+                      <span class="portfolio-source-meta">${mem.visibility}</span>
+                    </div>
+                    ${mem.preview && html`<p class="portfolio-mem-preview">${mem.preview}</p>`}
                   </div>
                 `})}
               </div>

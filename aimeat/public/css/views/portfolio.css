@@ -79,7 +79,7 @@
 
 .portfolio-source-item label {
   cursor: pointer;
-  color: var(--text, #e0e0e0);
+  color: var(--text-bright, #fff);
   font-size: 0.9rem;
 }
 
@@ -123,12 +123,42 @@
   max-width: 50%;
 }
 
-.portfolio-mem-item label {
+.portfolio-mem-item {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.portfolio-mem-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.portfolio-mem-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.portfolio-mem-header label {
+  cursor: pointer;
+  color: var(--text-bright, #fff);
+  font-size: 0.9rem;
+  font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.portfolio-mem-preview {
+  margin: 0.25rem 0 0 1.75rem;
+  font-size: 0.8rem;
+  color: var(--text, #ccc);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Style Selector ── */

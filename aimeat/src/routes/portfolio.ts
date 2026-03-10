@@ -76,12 +76,24 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     // Gather public/owner memory entries (exclude system keys)
-    const memories: Array<{ key: string; visibility: string; tags: string[] }> = [];
+    const memories: Array<{ key: string; visibility: string; tags: string[]; preview: string }> = [];
     for (const agent of agents) {
       const mems = await storage.listMemory(agent.gaii);
       for (const m of mems) {
         if (m.visibility !== 'private' && !m.key.startsWith('_sys.')) {
-          memories.push({ key: m.key, visibility: m.visibility, tags: m.tags || [] });
+          // Extract a short text preview from the value
+          let preview = '';
+          if (typeof m.value === 'string') {
+            preview = m.value.slice(0, 120);
+          } else if (m.value && typeof m.value === 'object') {
+            const v = m.value as Record<string, unknown>;
+            // Try common text fields: description, summary, title, text, content
+            for (const f of ['description', 'summary', 'title', 'text', 'content', 'name']) {
+              if (typeof v[f] === 'string' && v[f]) { preview = (v[f] as string).slice(0, 120); break; }
+            }
+            if (!preview) preview = JSON.stringify(m.value).slice(0, 120);
+          }
+          memories.push({ key: m.key, visibility: m.visibility, tags: m.tags || [], preview });
         }
       }
     }
