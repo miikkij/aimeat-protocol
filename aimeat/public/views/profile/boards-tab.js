@@ -132,18 +132,18 @@ export default function BoardsTab({ session, showToast }) {
       ${showBrdForm && html`<${BoardForm} onCreate=${handleCreate} onCancel=${() => setShowBrdForm(false)} />`}
       ${!myBoards ? html`<${Spinner} text=${t('profile.boards.loading')} />`
         : myBoards.length === 0 ? html`<div class="empty">${t('profile.boards.empty')}</div>`
-        : myBoards.map(b => html`
-          <div class="card" style="cursor:pointer" onClick=${() => viewPosts(b.id || b.board_id, b.name)}>
+        : myBoards.map(b => { const bid = b.board_id || b.id; return html`
+          <div class="card" style="cursor:pointer" onClick=${() => viewPosts(bid, b.name)}>
             <div class="card-header">
               <div class="card-title">${escHtml(b.name)}</div>
               <div style="display:flex;align-items:center;gap:.5rem">
                 <span class="badge ${b.visibility === 'public' ? 'badge-success' : 'badge-muted'}">${b.visibility || 'private'}</span>
-                <button class="btn-sm btn-danger" style="font-size:.7rem;padding:2px 8px" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(b.id || b.board_id); }}>${t('profile.boards.deleteBoard') || 'Delete'}</button>
+                <button class="btn-sm btn-danger" style="font-size:.7rem;padding:2px 8px" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard') || 'Delete'}</button>
               </div>
             </div>
             <div class="card-subtitle">${escHtml(b.description || '')}</div>
           </div>
-        `)
+        `; })
       }
     ` : html`
       ${!allBoards ? html`<${Spinner} text=${t('profile.boards.browseLoading')} />`
