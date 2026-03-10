@@ -388,9 +388,10 @@ function PortfolioBuilder({ session, navigate }) {
               <summary>${t('portfolio.builder.imagesGroup')} (${catalog.images.length})</summary>
               <div class="portfolio-source-list">
                 ${catalog.images.map(img => html`
-                  <div class="portfolio-source-item">
+                  <div class="portfolio-source-item portfolio-img-item">
                     <input type="checkbox" id=${'img-' + img.key} checked=${selectedImages.has(img.key)}
                       onChange=${() => toggleSet(setSelectedImages, img.key)} />
+                    <img class="portfolio-img-thumb" src=${img.url} alt=${img.key} loading="lazy" />
                     <label for=${'img-' + img.key}>${img.key}</label>
                     <span class="portfolio-source-meta">${Math.round(img.size / 1024)}KB · ${img.mimeType.split('/')[1]}</span>
                   </div>

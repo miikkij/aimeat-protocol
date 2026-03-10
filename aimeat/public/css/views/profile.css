@@ -138,9 +138,10 @@
 .pf .file-dropzone{border:2px dashed var(--border,rgba(255,107,157,.3));border-radius:var(--radius,12px);padding:2rem 1.5rem;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,107,157,.03)}
 .pf .file-dropzone:hover{border-color:var(--love1,#ff6b9d);background:rgba(255,107,157,.06)}
 .pf .file-dropzone.dragover{border-color:var(--love1,#ff6b9d);background:rgba(255,107,157,.1);transform:scale(1.01)}
-.pf .file-dropzone.has-file{border-style:solid;border-color:rgba(80,200,120,.4);background:rgba(80,200,120,.05)}
+.pf .file-dropzone.has-file{border-color:var(--love1,#ff6b9d);background:rgba(255,107,157,.04)}
 .pf .file-dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--muted,#c4a6d0);font-size:.9rem}
-.pf .file-dropzone-selected{display:flex;align-items:center;gap:.75rem;justify-content:center;font-size:.9rem}
+.pf .file-upload-list{display:flex;flex-direction:column;gap:.5rem;margin:.75rem 0}
+.pf .file-upload-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:rgba(255,255,255,.03);border:1px solid var(--border,rgba(255,107,157,.15));border-radius:8px}
 .pf .btn-primary{background:linear-gradient(135deg,var(--love1,#ff6b9d),var(--love2,#c44569));color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s}
 .pf .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(255,107,157,.3)}
 .pf .btn-sm{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;background:var(--love2,#c44569);color:#fff;border:none;transition:all .2s}

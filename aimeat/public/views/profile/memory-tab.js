@@ -71,16 +71,28 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { showToast(t('profile.memory.searchFailed'), true); }
   }
 
-  async function handleUploadFile(key, file, visibility) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result.split(',')[1];
-      const resp = await memoryService.uploadFile(key || file.name, base64, file.type || 'application/octet-stream', visibility);
-      if (resp.ok !== false) { showToast(t('profile.files.uploaded')); setShowFileForm(false); loadFiles(); }
-      else showToast(t('profile.files.uploadFailed'), true);
-    };
-    reader.readAsDataURL(file);
+  async function handleUploadFiles(fileItems, visibility) {
+    if (!fileItems || fileItems.length === 0) return;
+    let ok = 0, fail = 0;
+    for (const item of fileItems) {
+      try {
+        const base64 = await readFileAsBase64(item.file);
+        const resp = await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility);
+        if (resp.ok !== false) ok++; else fail++;
+      } catch { fail++; }
+    }
+    if (ok > 0) showToast(ok === 1 ? t('profile.files.uploaded') : `${ok} ${t('profile.files.filesUploaded')}`);
+    if (fail > 0) showToast(`${fail} ${t('profile.files.uploadFailed')}`, true);
+    if (ok > 0) { setShowFileForm(false); loadFiles(); }
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   async function handleDeleteFile(key) {
@@ -160,7 +172,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <button class="btn-primary" onClick=${() => setShowFileForm(!showFileForm)}>${t('profile.files.uploadBtn')}</button>
         <span style="font-size:.75rem;color:var(--muted)">${t('profile.files.sizeLimit')}</span>
       </div>
-      ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFile} onCancel=${() => setShowFileForm(false)} />`}
+      ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} />`}
       ${files.length === 0
         ? html`<div class="empty">${t('profile.files.empty')}</div>`
         : html`<div class="file-grid">
@@ -224,53 +236,83 @@ function MemoryForm({ onSave, onCancel }) {
     </div>`;
 }
 
+function fileIcon(type) {
+  if (type?.startsWith('image')) return '\u{1F5BC}\uFE0F';
+  if (type?.includes('pdf')) return '\u{1F4C4}';
+  return '\u{1F4CE}';
+}
+
 function FileUploadForm({ onUpload, onCancel }) {
-  const [key, setKey] = useState('');
+  const [fileItems, setFileItems] = useState([]);
   const [vis, setVis] = useState('private');
   const [dragover, setDragover] = useState(false);
-  const [droppedFile, setDroppedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
 
-  const handleFile = (f) => {
-    if (!f) return;
-    setDroppedFile(f);
-    if (!key) setKey(f.name);
+  const addFiles = (newFiles) => {
+    if (!newFiles || newFiles.length === 0) return;
+    const existing = new Set(fileItems.map(i => i.file.name + i.file.size));
+    const additions = [];
+    for (const f of newFiles) {
+      if (!existing.has(f.name + f.size)) {
+        additions.push({ file: f, key: f.name });
+      }
+    }
+    if (additions.length > 0) setFileItems(prev => [...prev, ...additions]);
+  };
+
+  const removeFile = (idx) => {
+    setFileItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateKey = (idx, newKey) => {
+    setFileItems(prev => prev.map((item, i) => i === idx ? { ...item, key: newKey } : item));
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragover(false);
-    const f = e.dataTransfer?.files?.[0];
-    if (f) handleFile(f);
+    addFiles(Array.from(e.dataTransfer?.files || []));
   };
 
-  const selectedFile = droppedFile || fileRef.current?.files?.[0] || null;
+  const handleSubmit = async () => {
+    if (fileItems.length === 0 || uploading) return;
+    setUploading(true);
+    await onUpload(fileItems, vis);
+    setUploading(false);
+  };
 
   return html`
     <div class="create-form">
       <div class="form-row">
-        <div class="file-dropzone ${dragover ? 'dragover' : ''} ${selectedFile ? 'has-file' : ''}"
+        <div class="file-dropzone ${dragover ? 'dragover' : ''} ${fileItems.length > 0 ? 'has-file' : ''}"
           onClick=${() => fileRef.current?.click()}
           onDragOver=${(e) => { e.preventDefault(); setDragover(true); }}
           onDragLeave=${() => setDragover(false)}
           onDrop=${handleDrop}>
-          <input type="file" ref=${fileRef} style="display:none"
-            onChange=${e => { handleFile(e.target.files?.[0]); }} />
-          ${selectedFile
-            ? html`<div class="file-dropzone-selected">
-                <span style="font-size:1.5rem">${selectedFile.type?.startsWith('image') ? '\u{1F5BC}\uFE0F' : selectedFile.type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}'}</span>
-                <span>${selectedFile.name}</span>
-                <span style="color:var(--muted);font-size:.8rem">${Math.round(selectedFile.size / 1024)} KB</span>
-              </div>`
-            : html`<div class="file-dropzone-empty">
-                <span style="font-size:2rem;opacity:.5">\u{2B06}\uFE0F</span>
-                <span>${t('profile.files.dropHere')}</span>
-                <span style="color:var(--muted);font-size:.8rem">${t('profile.files.orClick')}</span>
-              </div>`
-          }
+          <input type="file" multiple ref=${fileRef} style="display:none"
+            onChange=${e => { addFiles(Array.from(e.target.files || [])); e.target.value = ''; }} />
+          <div class="file-dropzone-empty">
+            <span style="font-size:2rem;opacity:.5">\u{2B06}\uFE0F</span>
+            <span>${t('profile.files.dropHere')}</span>
+            <span style="color:var(--muted);font-size:.8rem">${t('profile.files.orClick')}</span>
+          </div>
         </div>
       </div>
-      <div class="form-row"><label>${t('profile.files.keyLabel')} <span style="font-weight:normal;font-size:.75rem;color:var(--muted)">${t('profile.files.nameNote')}</span></label><input class="input-field" placeholder=${t('profile.files.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
+      ${fileItems.length > 0 && html`
+        <div class="file-upload-list">
+          ${fileItems.map((item, idx) => html`
+            <div class="file-upload-item" key=${item.file.name + item.file.size}>
+              <span style="font-size:1.2rem;flex-shrink:0">${fileIcon(item.file.type)}</span>
+              <input class="input-field" style="flex:1;min-width:0" value=${item.key}
+                onInput=${e => updateKey(idx, e.target.value)}
+                onClick=${e => e.stopPropagation()} />
+              <span style="color:var(--muted);font-size:.8rem;flex-shrink:0;white-space:nowrap">${Math.round(item.file.size / 1024)} KB</span>
+              <button class="btn-sm btn-outline" style="flex-shrink:0;padding:4px 8px" onClick=${() => removeFile(idx)}>\u2715</button>
+            </div>
+          `)}
+        </div>
+      `}
       <div class="form-row"><label>${t('profile.files.visLabel')}</label>
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.files.visPrivate')}</option>
@@ -279,7 +321,10 @@ function FileUploadForm({ onUpload, onCancel }) {
         </select>
       </div>
       <div class="form-actions">
-        <button class="btn-primary" onClick=${() => { if (!selectedFile) return; onUpload(key || selectedFile.name, selectedFile, vis); }}>${t('profile.files.uploadSaveBtn')}</button>
+        <button class="btn-primary" disabled=${fileItems.length === 0 || uploading}
+          onClick=${handleSubmit}>
+          ${uploading ? '...' : fileItems.length > 1 ? `${t('profile.files.uploadSaveBtn')} (${fileItems.length})` : t('profile.files.uploadSaveBtn')}
+        </button>
         <button class="btn-outline" onClick=${onCancel}>${t('profile.files.cancelBtn')}</button>
       </div>
     </div>`;

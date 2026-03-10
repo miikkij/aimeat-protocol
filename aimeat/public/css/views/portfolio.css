@@ -89,10 +89,33 @@
   height: 16px;
 }
 
+.portfolio-img-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.03);
+}
+
+.portfolio-img-item {
+  padding: 0.25rem 0.5rem;
+}
+
+.portfolio-img-item label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .portfolio-source-meta {
   font-size: 0.75rem;
   color: var(--text-dim, #666);
   margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ── Style Selector ── */

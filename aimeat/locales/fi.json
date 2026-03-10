@@ -372,8 +372,9 @@
       "download": "Lataa",
       "delete": "Poista",
       "sizeLimit": "Max 10Mt per tiedosto",
-      "dropHere": "Pudota tiedosto tähän",
-      "orClick": "tai klikkaa selataksesi"
+      "dropHere": "Pudota tiedostot tähän",
+      "orClick": "tai klikkaa selataksesi",
+      "filesUploaded": "tiedostoa ladattu!"
     },
     "work": {
       "title": "Työhistoria",
