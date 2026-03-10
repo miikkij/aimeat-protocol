@@ -11,7 +11,7 @@ $env:AIMEAT_RL_MEMORY = "1000"
 $env:AIMEAT_RL_BOARDS = "1000"
 
 $tests = @(
-    "test/e2e-full.ts",
+    "test/api-full.ts",
     "test/e2e-micro-memory.ts",
     "test/e2e-concurrency.ts",
     "test/e2e-disputes.ts",

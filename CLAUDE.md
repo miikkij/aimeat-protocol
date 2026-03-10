@@ -28,8 +28,8 @@ pnpm dev
 # Type-check (no emit)
 npx tsc --noEmit
 
-# Run E2E tests (server must be running on :40251)
-npx tsx test/e2e-full.ts
+# Run API integration tests (server must be running on :40251)
+npx tsx test/api-full.ts
 
 # Build for production
 pnpm build
@@ -131,7 +131,7 @@ The frontend is a Preact + HTM SPA with no build step. See `docs/frontend-develo
 
 ## Testing
 
-The E2E test file (`test/e2e-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 40251. The test creates its own owner/agents and cleans up via cascade delete at the end.
+The API integration test file (`test/api-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 40251. The test creates its own owner/agents and cleans up via cascade delete at the end.
 
 **Always run `npx tsc --noEmit` after changes** to verify the build compiles cleanly.
 

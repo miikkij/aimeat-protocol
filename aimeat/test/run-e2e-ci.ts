@@ -5,7 +5,7 @@
  *   node --import tsx test/run-e2e-ci.ts                 # run all suites
  *   node --import tsx test/run-e2e-ci.ts --all           # run all suites
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp  # run one suite
- *   node --import tsx test/run-e2e-ci.ts --test=e2e-full --test=e2e-mcp  # run selected
+ *   node --import tsx test/run-e2e-ci.ts --test=api-full --test=e2e-mcp  # run selected
  *
  * Environment variables:
  *   AIMEAT_BASE_URL — base URL of a running server (skips auto-start)
@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 
 const ALL_SUITES = [
-    'test/e2e-full.ts',
+    'test/api-full.ts',
     'test/e2e-admin-features.ts',
     'test/e2e-anonymous.ts',
     'test/e2e-auth-lib.ts',

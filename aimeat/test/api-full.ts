@@ -1,5 +1,5 @@
-// Full E2E test for AIMEAT Phases 1-5
-// Run: cd aimeat && pnpm exec tsx test/e2e-full.ts
+// Full API integration test for AIMEAT Phases 1-5
+// Run: cd aimeat && pnpm exec tsx test/api-full.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';

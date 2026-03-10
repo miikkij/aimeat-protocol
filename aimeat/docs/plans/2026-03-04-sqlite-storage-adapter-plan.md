@@ -902,7 +902,7 @@ Wait for "AIMEAT node started" in output.
 
 **Step 2: Run E2E tests**
 
-Run: `cd aimeat && npx tsx test/e2e-full.ts`
+Run: `cd aimeat && npx tsx test/api-full.ts`
 Expected: All 396+ tests PASS
 
 **Step 3: Stop test server**
@@ -927,7 +927,7 @@ Wait for "AIMEAT node started" in output. Confirm log says "Using SQLite" storag
 
 **Step 2: Run E2E tests**
 
-Run: `cd aimeat && npx tsx test/e2e-full.ts`
+Run: `cd aimeat && npx tsx test/api-full.ts`
 Expected: All 396+ tests PASS
 
 **Step 3: Clean up**
