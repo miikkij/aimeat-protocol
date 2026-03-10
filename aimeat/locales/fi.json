@@ -416,7 +416,13 @@
       "sizeLimit": "Max 10Mt per tiedosto",
       "dropHere": "Pudota tiedostot tähän",
       "orClick": "tai klikkaa selataksesi",
-      "filesUploaded": "tiedostoa ladattu!"
+      "filesUploaded": "tiedostoa ladattu!",
+      "tagsLabel": "Tagit",
+      "tagsPlaceholder": "Lisää tagi ja paina Enter",
+      "copyUrls": "Kopioi URL:t",
+      "urlsCopied": "URL:t kopioitu leikepöydälle",
+      "clearFilter": "Tyhjennä",
+      "noMatch": "Ei tiedostoja valituilla tageilla"
     },
     "work": {
       "title": "Työhistoria",

@@ -316,6 +316,9 @@ Output a JSON object with this structure:
     "sharing": { "catalog_listed": false, "allow_clone": false, "morsel_price": 0 },
     "entries": [
       { "key": "section-name", "title": "Section Name", "value": "content here", "visibility": "private" }
+    ],
+    "references": [
+      { "title": "Source Title", "url": "https://example.com/source", "type": "article", "verified": false }
     ]
   }
 }
@@ -324,6 +327,9 @@ Output a JSON object with this structure:
 Valid content_type values: idea, research, plan, dataset, document, tutorial, collection, article, story, fiction.
 Valid visibility values: private, owner, public.
 Valid synthesis levels: original, assisted, synthesized, ai-generated.
+Valid reference types: article, paper, book, website, dataset, video, code, standard, patent, report.
+
+IMPORTANT: Always include a "references" array with any sources, citations, links, or references used. Each reference should have a title, url (if available), type, and verified: false (since you cannot verify links). Even if no explicit sources are provided, include any URLs or documents mentioned in the content.
 
 Node URL: {node_url}
 Owner: {ghii}`;
@@ -518,6 +524,74 @@ Owner: {ghii}`;
     res.json(success(config.nodeId, {
       package_id: packageId,
       sharing: manifest.sharing,
+    }));
+  });
+
+  /* ── PATCH /v1/packages/:id/entries/:entryKey/visibility — Change entry visibility ── */
+  router.patch('/v1/packages/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+    const ownerGaii = req.auth!.sub as string;
+    const packageId = req.params.id as string;
+    const entryKey = req.params.entryKey as string;
+    const { visibility } = req.body ?? {};
+
+    if (!['private', 'owner', 'public'].includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Visibility must be private, owner, or public'));
+      return;
+    }
+
+    const manifestKey = `packages/${packageId}/manifest`;
+    const existing = await storage.getMemory(ownerGaii, manifestKey);
+    if (!existing) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
+      return;
+    }
+
+    const manifest: Record<string, any> = typeof existing.value === 'string'
+      ? JSON.parse(existing.value as string)
+      : Object.assign({}, existing.value as Record<string, any>);
+
+    // Find and update the entry in the manifest
+    const entries = manifest.entries || [];
+    const entry = entries.find((e: any) => e.key === entryKey || e.key.endsWith('/' + entryKey));
+    if (!entry) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Entry not found in package'));
+      return;
+    }
+
+    entry.visibility = visibility;
+    manifest.updated = new Date().toISOString();
+
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: manifestKey,
+      ownerGaii,
+      value: manifest,
+      visibility: manifest.sharing?.catalog_listed ? 'public' : 'owner',
+      tags: existing.tags || ['knowledge-package'],
+      ttlHours: null,
+      version: (existing.version || 0) + 1,
+      createdAt: existing.createdAt || now,
+      updatedAt: now,
+    });
+
+    // Also update the individual entry's memory record visibility
+    const fullEntryKey = entry.key.startsWith('packages/')
+      ? entry.key
+      : `packages/${packageId}/${entry.key}`;
+    const entryRecord = await storage.getMemory(ownerGaii, fullEntryKey);
+    if (entryRecord) {
+      await storage.setMemory({
+        ...entryRecord,
+        visibility,
+        updatedAt: now,
+        version: (entryRecord.version || 0) + 1,
+      });
+    }
+
+    res.json(success(config.nodeId, {
+      package_id: packageId,
+      entry_key: entryKey,
+      visibility,
     }));
   });
 

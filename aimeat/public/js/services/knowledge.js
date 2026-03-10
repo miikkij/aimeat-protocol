@@ -85,6 +85,13 @@ export async function updateSharing(packageId, sharing) {
   });
 }
 
+export async function updateEntryVisibility(packageId, entryKey, visibility) {
+  return api(`/v1/packages/${encodeURIComponent(packageId)}/entries/${encodeURIComponent(entryKey)}/visibility`, {
+    method: 'PATCH',
+    body: JSON.stringify({ visibility }),
+  });
+}
+
 /* ── Clone ── */
 
 export async function clonePackage(packageId, targetPrefix, entries) {

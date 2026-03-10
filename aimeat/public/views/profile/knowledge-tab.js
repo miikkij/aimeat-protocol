@@ -237,19 +237,45 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     } finally { setSavingSharing(null); }
   }, [showToast, loadPackages]);
 
+  /* ── Change entry visibility ── */
+  const handleEntryVisibility = useCallback(async (pkg, entry, newVis) => {
+    const manifest = pkg.value;
+    const packageId = manifest?.id || pkg.key.split('/')[1] || pkg.key;
+    const entryKey = entry.key;
+    try {
+      const result = await knowledgeService.updateEntryVisibility(packageId, entryKey, newVis);
+      if (result?.data?.visibility) {
+        showToast(t('knowledge.myKnowledge.saved') || 'Saved');
+        loadPackages();
+      } else {
+        showToast(result?.error?.message || (t('knowledge.myKnowledge.saveError') || 'Failed'));
+      }
+    } catch {
+      showToast(t('knowledge.myKnowledge.saveError') || 'Failed');
+    }
+  }, [showToast, loadPackages]);
+
   /* ── Toggle expand ── */
   const toggleExpand = useCallback((key) => {
     setExpandedPkg(prev => prev === key ? null : key);
   }, []);
 
   /* ── Render entry row ── */
-  const renderEntry = (entry, i) => {
+  const renderEntry = (entry, i, pkg) => {
     const label = entry.title || entry.key || `Entry ${i + 1}`;
     const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value, null, 2) : '');
+    const vis = entry.visibility || 'private';
+    const visOptions = ['private', 'owner', 'public'];
     return html`
       <div class="kpkg-detail-entry" key=${i}>
         <div class="kpkg-detail-entry-header">
-          <span class="kpkg-badge kpkg-badge-${entry.visibility || 'private'}">${t('knowledge.visibility.' + (entry.visibility || 'private'))}</span>
+          <select class="kpkg-vis-select" value=${vis}
+            onChange=${(e) => handleEntryVisibility(pkg, entry, e.target.value)}
+            style="font-size:.7rem;padding:1px 4px;border-radius:4px;border:1px solid rgba(255,107,157,.3);cursor:pointer;font-weight:600;
+              background:${vis === 'public' ? 'rgba(0,200,100,.15)' : vis === 'owner' ? 'rgba(100,150,255,.15)' : 'rgba(150,100,200,.15)'};
+              color:${vis === 'public' ? '#4ade80' : vis === 'owner' ? '#60a5fa' : '#c084fc'}">
+            ${visOptions.map(v => html`<option value=${v} key=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+          </select>
           <strong>${escHtml(label)}</strong>
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>
@@ -424,7 +450,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
                   <div class="kpkg-detail-entries">
                     <h4>${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</h4>
-                    ${entries.map((entry, i) => renderEntry(entry, i))}
+                    ${entries.map((entry, i) => renderEntry(entry, i, pkg))}
                     ${entries.length === 0 && html`<p class="kpkg-empty">No entries</p>`}
                   </div>
 

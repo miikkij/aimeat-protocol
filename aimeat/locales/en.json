@@ -416,7 +416,13 @@
       "sizeLimit": "Max 10MB per file",
       "dropHere": "Drop files here",
       "orClick": "or click to browse",
-      "filesUploaded": "files uploaded!"
+      "filesUploaded": "files uploaded!",
+      "tagsLabel": "Tags",
+      "tagsPlaceholder": "Add tag and press Enter",
+      "copyUrls": "Copy URLs",
+      "urlsCopied": "URLs copied to clipboard",
+      "clearFilter": "Clear",
+      "noMatch": "No files match selected tags"
     },
     "work": {
       "title": "Work History",
