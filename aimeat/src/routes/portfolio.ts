@@ -31,7 +31,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
             gaii: agent.gaii,
             mimeType: f.mimeType,
             size: f.size,
-            url: `/v1/storage/${encodeURIComponent(agent.gaii)}/${encodeURIComponent(f.key)}`,
+            url: `/v1/pub/${encodeURIComponent(agent.gaii)}/${encodeURIComponent(f.key)}`,
           });
         }
       }
@@ -136,6 +136,51 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       updatedAt: now,
     });
     res.json(success(config.nodeId, { saved: true }));
+  });
+
+  /**
+   * PUT /v1/portfolio/upload
+   * Upload portfolio HTML file (owner auth, stores under agent's storage).
+   */
+  router.put('/v1/portfolio/upload', requireAuth(), async (req, res) => {
+    const ownerName = req.auth!.owner;
+    const agents = await storage.getAgentsByOwner(ownerName);
+    if (!agents.length) {
+      res.status(400).json(error(config.nodeId, 'NO_AGENT', 'No agent found for this owner'));
+      return;
+    }
+
+    const contentType = req.headers['content-type'] ?? '';
+    if (!contentType.includes('text/html')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Content-Type must be text/html'));
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+    const fileData = Buffer.concat(chunks);
+
+    const maxBytes = (config.portfolioMaxSizeKb ?? 512) * 1024;
+    if (fileData.length > maxBytes) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `File exceeds ${config.portfolioMaxSizeKb ?? 512}KB limit`));
+      return;
+    }
+
+    // Delete existing portfolio file if any (upsert)
+    await storage.deleteStorageFile(agents[0].gaii, 'portfolio/index.html');
+    await storage.createStorageFile({
+      key: 'portfolio/index.html',
+      ownerGaii: agents[0].gaii,
+      visibility: 'public',
+      mimeType: 'text/html',
+      size: fileData.length,
+      data: fileData,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json(success(config.nodeId, { uploaded: true, sizeKb: Math.round(fileData.length / 1024) }));
   });
 
   /**

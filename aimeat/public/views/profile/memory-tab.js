@@ -227,11 +227,50 @@ function MemoryForm({ onSave, onCancel }) {
 function FileUploadForm({ onUpload, onCancel }) {
   const [key, setKey] = useState('');
   const [vis, setVis] = useState('private');
+  const [dragover, setDragover] = useState(false);
+  const [droppedFile, setDroppedFile] = useState(null);
   const fileRef = useRef(null);
+
+  const handleFile = (f) => {
+    if (!f) return;
+    setDroppedFile(f);
+    if (!key) setKey(f.name);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragover(false);
+    const f = e.dataTransfer?.files?.[0];
+    if (f) handleFile(f);
+  };
+
+  const selectedFile = droppedFile || fileRef.current?.files?.[0] || null;
+
   return html`
     <div class="create-form">
+      <div class="form-row">
+        <div class="file-dropzone ${dragover ? 'dragover' : ''} ${selectedFile ? 'has-file' : ''}"
+          onClick=${() => fileRef.current?.click()}
+          onDragOver=${(e) => { e.preventDefault(); setDragover(true); }}
+          onDragLeave=${() => setDragover(false)}
+          onDrop=${handleDrop}>
+          <input type="file" ref=${fileRef} style="display:none"
+            onChange=${e => { handleFile(e.target.files?.[0]); }} />
+          ${selectedFile
+            ? html`<div class="file-dropzone-selected">
+                <span style="font-size:1.5rem">${selectedFile.type?.startsWith('image') ? '\u{1F5BC}\uFE0F' : selectedFile.type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}'}</span>
+                <span>${selectedFile.name}</span>
+                <span style="color:var(--muted);font-size:.8rem">${Math.round(selectedFile.size / 1024)} KB</span>
+              </div>`
+            : html`<div class="file-dropzone-empty">
+                <span style="font-size:2rem;opacity:.5">\u{2B06}\uFE0F</span>
+                <span>${t('profile.files.dropHere')}</span>
+                <span style="color:var(--muted);font-size:.8rem">${t('profile.files.orClick')}</span>
+              </div>`
+          }
+        </div>
+      </div>
       <div class="form-row"><label>${t('profile.files.keyLabel')} <span style="font-weight:normal;font-size:.75rem;color:var(--muted)">${t('profile.files.nameNote')}</span></label><input class="input-field" placeholder=${t('profile.files.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
-      <div class="form-row"><label>${t('profile.files.fileLabel')}</label><input type="file" ref=${fileRef} class="input-field" onChange=${e => { if (e.target.files[0] && !key) setKey(e.target.files[0].name); }} /></div>
       <div class="form-row"><label>${t('profile.files.visLabel')}</label>
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.files.visPrivate')}</option>
@@ -240,7 +279,7 @@ function FileUploadForm({ onUpload, onCancel }) {
         </select>
       </div>
       <div class="form-actions">
-        <button class="btn-primary" onClick=${() => { const f = fileRef.current?.files?.[0]; if (!f) return; onUpload(key || f.name, f, vis); }}>${t('profile.files.uploadSaveBtn')}</button>
+        <button class="btn-primary" onClick=${() => { if (!selectedFile) return; onUpload(key || selectedFile.name, selectedFile, vis); }}>${t('profile.files.uploadSaveBtn')}</button>
         <button class="btn-outline" onClick=${onCancel}>${t('profile.files.cancelBtn')}</button>
       </div>
     </div>`;

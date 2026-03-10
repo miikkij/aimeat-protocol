@@ -4,7 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
-import { checkMemoryQuota, chargeOverage } from '../services/quota.js';
+import { checkMemoryQuota, checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
@@ -245,6 +245,115 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       total: results.length,
       query: q,
     }));
+  });
+
+  // ── /v1/memory/files — File storage (MUST be before :key routes) ──
+
+  // POST /v1/memory/files — upload file (base64 JSON body)
+  router.post('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const { key, content, mime_type, visibility } = req.body ?? {};
+
+    if (!key || !content) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and content (base64) are required'));
+      return;
+    }
+
+    const fileData = Buffer.from(content, 'base64');
+
+    // Per-file size limit
+    if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `File size exceeds ${config.storageMaxFileSizeMb}MB limit`));
+      return;
+    }
+
+    // Total storage quota enforcement
+    const storageQuota = await checkStorageQuota(config, storage, gaii, fileData.length);
+    if (!storageQuota.allowed) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', storageQuota.reason!));
+      return;
+    }
+
+    const file = await storage.createStorageFile({
+      key,
+      ownerGaii: gaii,
+      visibility: (visibility as 'private' | 'owner' | 'public') ?? 'private',
+      mimeType: mime_type ?? 'application/octet-stream',
+      size: fileData.length,
+      data: fileData,
+      createdAt: new Date().toISOString(),
+    });
+
+    if (storageQuota.overageMorsels > 0) {
+      await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
+    }
+
+    emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
+    emitResourceListChanged(gaii);
+
+    res.status(201).json(success(config.nodeId, {
+      key: file.key,
+      size: file.size,
+      mime_type: file.mimeType,
+      visibility: file.visibility,
+      created_at: file.createdAt,
+    }));
+  });
+
+  // GET /v1/memory/files — list files
+  router.get('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const files = await storage.listStorageFiles(gaii);
+
+    res.json(success(config.nodeId, {
+      files: files.map(f => ({
+        key: f.key,
+        size: f.size,
+        mime_type: f.mimeType,
+        visibility: f.visibility,
+        created_at: f.createdAt,
+      })),
+      total: files.length,
+    }));
+  });
+
+  // GET /v1/memory/files/:key — download file
+  router.get('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const key = req.params.key as string;
+    const file = await storage.getStorageFile(gaii, key);
+
+    if (!file) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+      return;
+    }
+
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Length', file.size);
+    res.end(file.data);
+  });
+
+  // DELETE /v1/memory/files/:key — delete file
+  router.delete('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const key = req.params.key as string;
+
+    const existing = await storage.getStorageFile(gaii, key);
+    if (!existing) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+      return;
+    }
+    if (existing.ownerGaii !== gaii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own files'));
+      return;
+    }
+
+    await storage.deleteStorageFile(gaii, key);
+
+    emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
+    emitResourceListChanged(gaii);
+
+    res.json(success(config.nodeId, { deleted: key }));
   });
 
   // GET /v1/memory/:key — read a memory entry

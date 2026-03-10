@@ -770,7 +770,6 @@ function showLoginModal(opts, renderBtn) {
   document.body.appendChild(modal);
 
   document.getElementById('aimeat-cancel-btn').addEventListener('click', () => modal.remove());
-  modal.querySelector('div').addEventListener('click', (e) => { if (e.target === modal.querySelector('div')) modal.remove(); });
 
   document.getElementById('aimeat-go-btn').addEventListener('click', async () => {
     const username = document.getElementById('aimeat-username').value.trim().toLowerCase();

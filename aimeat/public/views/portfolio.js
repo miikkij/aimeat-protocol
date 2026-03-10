@@ -57,11 +57,13 @@ The user wants to create a personal portfolio website. Generate a single, self-c
 
   // Selected images
   if (selectedImages.length > 0) {
-    prompt += `\n## Selected Images (from AIMEAT storage)\n`;
+    prompt += `\n## Selected Images (from AIMEAT storage)\nThese are the ONLY image URLs you may use. Do NOT reference any other image URLs.\n`;
     for (const img of selectedImages) {
       const sizeKb = Math.round(img.size / 1024);
       prompt += `- ${img.key} (${sizeKb}KB, ${img.mimeType}) → ${url}${img.url}\n`;
     }
+  } else {
+    prompt += `\n## Images\nNo images were selected. You have NO image URLs available. Use inline SVG placeholders, CSS shapes, or gradients for all visual elements. Do NOT reference any image URLs.\n`;
   }
 
   // Selected apps
@@ -117,10 +119,24 @@ The user wants to create a personal portfolio website. Generate a single, self-c
     }
   }
 
+  // Build resource availability warnings
+  const hasAvatar = selectedImages.some(i => /avatar|profile|photo|headshot/i.test(i.key));
+  const hasResume = selectedImages.some(i => /resume|cv/i.test(i.key));
+
+  let resourceNotes = '';
+  if (!hasAvatar) {
+    resourceNotes += `- NO avatar/profile photo was provided. Generate an inline SVG placeholder avatar (e.g. colored circle with initials "${(session.displayName || session.owner).charAt(0).toUpperCase()}"). Do NOT reference any image URL for the avatar.\n`;
+  }
+  if (!hasResume) {
+    resourceNotes += `- NO resume/CV file was provided. Do NOT include a "Download Resume" link. Instead, omit the resume section entirely or show a placeholder note like "Resume available upon request."\n`;
+  }
+
   prompt += `
 ## Technical Requirements
 - Generate a SINGLE downloadable HTML file with ALL CSS inline (no external dependencies)
-- Images: Reference via absolute AIMEAT storage URLs (they are publicly accessible)
+- **CRITICAL — Images and files:** ONLY use URLs listed in the "Selected Images" section above. Do NOT invent, guess, or fabricate any URLs. If a resource (avatar, resume, screenshot, etc.) is not listed above, it does not exist.
+${resourceNotes}- For missing images: Use inline SVG placeholders, CSS gradients, or emoji — never a broken image URL
+- For project screenshots: If no screenshot URL is provided for a project, use a styled CSS placeholder card instead of an <img> tag
 - If memory entries are selected: Fetch them live with fetch() calls to the node API URLs above
 - Mobile-responsive design (works on phone, tablet, desktop)
 - Include proper <meta> tags for SEO and social sharing (og:title, og:description, og:image)
@@ -300,12 +316,11 @@ function PortfolioBuilder({ session, navigate }) {
     setUploadStatus(null);
 
     try {
-      const resp = await fetch('/v1/storage/portfolio/index.html', {
+      const resp = await fetch('/v1/portfolio/upload', {
         method: 'PUT',
         headers: {
           'Authorization': 'Bearer ' + session.jwt,
           'Content-Type': 'text/html',
-          'X-Visibility': 'public',
         },
         body: text,
       });

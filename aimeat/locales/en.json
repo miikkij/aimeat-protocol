@@ -371,7 +371,9 @@
       "deleted": "File deleted!",
       "download": "Download",
       "delete": "Delete",
-      "sizeLimit": "Max 10MB per file"
+      "sizeLimit": "Max 10MB per file",
+      "dropHere": "Drop file here",
+      "orClick": "or click to browse"
     },
     "work": {
       "title": "Work History",
