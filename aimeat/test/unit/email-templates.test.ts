@@ -33,8 +33,8 @@ describe('verificationEmailHtml', () => {
 
     it('uses Finnish text when locale is fi', () => {
         const { html, text } = verificationEmailHtml('123456', 'fi');
-        expect(html).toContain('Sahkopostivahvistus');
-        expect(text).toContain('Sahkopostivahvistus');
+        expect(html).toContain('Sähköpostivahvistus');
+        expect(text).toContain('Sähköpostivahvistus');
         expect(html).toContain('lang="fi"');
     });
 });
@@ -125,7 +125,7 @@ describe('matchSuggestionEmailHtml', () => {
         const { html, text } = matchSuggestionEmailHtml(singleMatch, 'fi');
         expect(html).toContain('Ehdotukset');
         expect(html).toContain('Yhteiset kiinnostukset:');
-        expect(html).toContain('Etaisyys:');
+        expect(html).toContain('Etäisyys:');
         expect(text).toContain('Ehdotukset');
     });
 });

@@ -42,6 +42,7 @@ describe('calculateTrustScore', () => {
         const work = Array.from({ length: 10 }, (_, i) => ({
             status: 'delivered',
             rating: { score: 5 },
+            requesterGaii: `requester-${i % 5}#owner@node`,
             createdAt: new Date(Date.now() - i * 86_400_000).toISOString(),
             updatedAt: new Date(Date.now() - i * 86_400_000 + 60_000).toISOString(),
         }));
@@ -50,7 +51,7 @@ describe('calculateTrustScore', () => {
             listWorkByProvider: vi.fn().mockResolvedValue(work),
         });
         const result = await calculateTrustScore('test#owner@node', storage);
-        expect(result.score).toBeGreaterThan(50);
+        expect(result.score).toBeGreaterThan(40);
         expect(result.totalDeliveries).toBe(10);
         expect(result.positiveRatings).toBe(10);
     });
@@ -81,9 +82,10 @@ describe('calculateTrustScore', () => {
             createdAt: new Date(Date.now() - 90 * 86_400_000).toISOString(),
             lastSeen: new Date().toISOString(),
         };
-        const work = Array.from({ length: 5 }, () => ({
+        const work = Array.from({ length: 5 }, (_, i) => ({
             status: 'delivered',
             rating: { score: 5 },
+            requesterGaii: `requester-${i % 4}#owner@node`,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         }));

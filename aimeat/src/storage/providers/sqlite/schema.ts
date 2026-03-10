@@ -195,6 +195,7 @@ export function initializeSchema(db: Database.Database): void {
       size           INTEGER NOT NULL DEFAULT 0,
       data           BLOB,
       accessCode     TEXT,
+      tags           TEXT NOT NULL DEFAULT '[]',
       createdAt      TEXT NOT NULL,
       PRIMARY KEY (ownerGaii, key)
     );

@@ -11,8 +11,8 @@ describe('anonymous mode config', () => {
             process.env.AIMEAT_ANONYMOUS = 'true';
             // Dynamically re-import to get fresh config
             const { loadConfig } = await import('../../src/config.js');
-            const config = loadConfig();
-            expect(config.anonymousMode).toBe(true);
+            const result = loadConfig();
+            expect(result.config.anonymousMode).toBe(true);
         } finally {
             if (origVal === undefined) delete process.env.AIMEAT_ANONYMOUS;
             else process.env.AIMEAT_ANONYMOUS = origVal;
@@ -24,8 +24,8 @@ describe('anonymous mode config', () => {
         try {
             delete process.env.AIMEAT_ANONYMOUS;
             const { loadConfig } = await import('../../src/config.js');
-            const config = loadConfig();
-            expect(config.anonymousMode).toBe(false);
+            const result = loadConfig();
+            expect(result.config.anonymousMode).toBe(false);
         } finally {
             if (origVal !== undefined) process.env.AIMEAT_ANONYMOUS = origVal;
         }

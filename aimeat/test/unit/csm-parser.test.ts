@@ -134,11 +134,11 @@ describe('validateCsm', () => {
     expect(errors).toContain('service.name is required');
   });
 
-  it('rejects invalid service type', () => {
-    const yaml = MINIMAL_CSM.replace('type: directory', 'type: invalid_type');
+  it('accepts any service type (free-form string)', () => {
+    const yaml = MINIMAL_CSM.replace('type: directory', 'type: custom_type');
     const def = parseCsm(yaml);
     const errors = validateCsm(def);
-    expect(errors.some(e => e.includes('service.type must be one of'))).toBe(true);
+    expect(errors.some(e => e.includes('service.type'))).toBe(false);
   });
 
   it('rejects missing required fields in data_schema', () => {
