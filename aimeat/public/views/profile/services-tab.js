@@ -6,8 +6,139 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
+import { apiGet } from '/js/api.js';
 
 const SERVICE_CATEGORIES = ['language','translation','analysis','generation','coding','data','image','audio','video','search','utility','other'];
+
+/** Fetch full detail for a single catalogue entry */
+async function fetchServiceDetail(id) {
+  const data = await apiGet('/v1/catalogue/' + encodeURIComponent(id));
+  return data?.data || data || {};
+}
+
+/** Format a date string for display */
+function fmtDate(s) {
+  if (!s) return null;
+  try { return new Date(s).toLocaleString(); } catch { return s; }
+}
+
+/** Render a JSON schema as a compact preview */
+function SchemaPreview({ schema, label }) {
+  if (!schema || typeof schema !== 'object' || Object.keys(schema).length === 0) return null;
+  let preview;
+  try { preview = JSON.stringify(schema, null, 2); } catch { preview = String(schema); }
+  return html`
+    <div class="svc-detail-row">
+      <span class="svc-detail-label">${label}</span>
+      <pre class="svc-detail-code">${preview}</pre>
+    </div>`;
+}
+
+/** Expandable service card used in both My Services and Catalogue */
+function ServiceCard({ svc, expanded, onToggle, actions }) {
+  const displayName = svc.display_name || svc.displayName || svc.name || '';
+  const category = svc.category || '';
+  const priceMorsels = svc.price_morsels ?? svc.pricing?.base_morsels ?? svc.pricing?.baseMorsels ?? 0;
+  const priceUnit = svc.unit || svc.pricing?.per_unit?.unit || '';
+
+  return html`
+    <div class="card ${expanded ? 'svc-card-expanded' : ''}" style="cursor:pointer" onClick=${onToggle}>
+      <div class="card-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="svc-expand-icon">${expanded ? '\u25BC' : '\u25B6'}</span>
+          <div class="card-title">${escHtml(displayName)}</div>
+        </div>
+        <div>
+          ${category && html`<span class="badge badge-info">${escHtml(category)}</span>`}
+          <span class="badge badge-success" style="margin-left:.25rem">${priceMorsels ? priceMorsels + ' \u2764\uFE0F' : t('profile.services.free')}</span>
+        </div>
+      </div>
+      <div class="card-subtitle">${escHtml(svc.description || '')}${svc.owner ? html` \u2502 ${escHtml(svc.owner)}` : ''}</div>
+      ${expanded && html`<${ServiceDetail} svc=${svc} />`}
+      ${expanded && actions && html`<div class="svc-detail-actions" onClick=${e => e.stopPropagation()}>${actions}</div>`}
+    </div>`;
+}
+
+/** Detail panel shown when a service card is expanded */
+function ServiceDetail({ svc }) {
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error_, setError] = useState(null);
+
+  const svcId = svc.id || svc.action_id;
+
+  useEffect(() => {
+    if (!svcId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchServiceDetail(svcId).then(d => {
+      if (!cancelled) { setDetail(d); setLoading(false); }
+    }).catch(err => {
+      if (!cancelled) { setError(err.message || 'Failed to load details'); setLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [svcId]);
+
+  if (loading) return html`<div class="svc-detail" onClick=${e => e.stopPropagation()}><${Spinner} text="Loading details..." /></div>`;
+  if (error_) return html`<div class="svc-detail" onClick=${e => e.stopPropagation()}><div class="svc-detail-error">${error_}</div></div>`;
+
+  // Merge local svc data with fetched detail (detail may have more fields)
+  const d = detail ? { ...svc, ...detail } : svc;
+
+  const description = d.description || '';
+  const webhookUrl = d.webhook_url || d.webhookUrl || '';
+  const priceMorsels = d.price_morsels ?? d.pricing?.base_morsels ?? d.pricing?.baseMorsels ?? 0;
+  const priceUnit = d.unit || d.pricing?.per_unit?.unit || '';
+  const tags = d.tags || [];
+  const inputSchema = d.input_schema || d.inputSchema || null;
+  const outputSchema = d.output_schema || d.outputSchema || null;
+  const createdAt = d.created_at || d.createdAt || '';
+  const estimatedTime = d.estimated_time_seconds || d.estimatedTimeSeconds || null;
+  const providerGaii = d.provider_gaii || d.providerGaii || '';
+
+  return html`
+    <div class="svc-detail" onClick=${e => e.stopPropagation()}>
+      ${description && html`
+        <div class="svc-detail-row">
+          <span class="svc-detail-label">${t('profile.services.descLabel')}</span>
+          <span class="svc-detail-value">${escHtml(description)}</span>
+        </div>`}
+      ${providerGaii && html`
+        <div class="svc-detail-row">
+          <span class="svc-detail-label">Provider</span>
+          <span class="svc-detail-value mono">${escHtml(providerGaii)}</span>
+        </div>`}
+      <div class="svc-detail-row">
+        <span class="svc-detail-label">${t('profile.services.priceLabel')}</span>
+        <span class="svc-detail-value">${priceMorsels} morsels${priceUnit ? ' / ' + priceUnit : ''}</span>
+      </div>
+      ${webhookUrl && html`
+        <div class="svc-detail-row">
+          <span class="svc-detail-label">${t('profile.services.webhookLabel')}</span>
+          <span class="svc-detail-value mono">${escHtml(webhookUrl)}</span>
+        </div>`}
+      ${estimatedTime && html`
+        <div class="svc-detail-row">
+          <span class="svc-detail-label">Est. time</span>
+          <span class="svc-detail-value">${estimatedTime}s</span>
+        </div>`}
+      ${tags.length > 0 && html`
+        <div class="svc-detail-row">
+          <span class="svc-detail-label">Tags</span>
+          <div class="svc-detail-tags">
+            ${tags.map(tag => html`<span class="badge badge-outline">${escHtml(tag)}</span>`)}
+          </div>
+        </div>`}
+      <${SchemaPreview} schema=${inputSchema} label="Input schema" />
+      <${SchemaPreview} schema=${outputSchema} label="Output schema" />
+      ${createdAt && html`
+        <div class="svc-detail-row">
+          <span class="svc-detail-label">Created</span>
+          <span class="svc-detail-value">${fmtDate(createdAt)}</span>
+        </div>`}
+    </div>`;
+}
 
 export default function ServicesTab({ session, showToast, onStats }) {
   const [myServices, setMyServices] = useState(null);
@@ -15,6 +146,8 @@ export default function ServicesTab({ session, showToast, onStats }) {
   const [svcSubTab, setSvcSubTab] = useState('mine');
   const [catFilter, setCatFilter] = useState('');
   const [showPubForm, setShowPubForm] = useState(false);
+  const [expandedMine, setExpandedMine] = useState({});
+  const [expandedCat, setExpandedCat] = useState({});
 
   useEffect(() => {
     if (session) loadMyData();
@@ -49,6 +182,14 @@ export default function ServicesTab({ session, showToast, onStats }) {
     loadMyData();
   }
 
+  function toggleMineExpand(id) {
+    setExpandedMine(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleCatExpand(id) {
+    setExpandedCat(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
   const renderMyServices = () => {
     if (!myServices) return html`<${Spinner} text=${t('profile.services.loading')} />`;
     return html`
@@ -56,19 +197,15 @@ export default function ServicesTab({ session, showToast, onStats }) {
       ${showPubForm && html`<${PublishForm} onPublish=${publishService} onCancel=${() => setShowPubForm(false)} />`}
       ${myServices.length === 0
         ? html`<div class="empty">${t('profile.services.empty')}</div>`
-        : myServices.map(s => html`
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">${escHtml(s.display_name || s.name)}</div>
-              <div>
-                <span class="badge badge-info">${escHtml(s.category || '')}</span>
-                <span class="badge badge-success" style="margin-left:.25rem">${s.price_morsels ? s.price_morsels + ' \u2764\uFE0F' : t('profile.services.free')}</span>
-              </div>
-            </div>
-            <div class="card-subtitle">${escHtml(s.description || '')}</div>
-            <button class="btn-danger" style="margin-top:.5rem" onClick=${() => unpublishService(s.id || s.action_id)}>${t('profile.delete')}</button>
-          </div>
-        `)
+        : myServices.map(s => {
+            const svcId = s.id || s.action_id;
+            return html`<${ServiceCard}
+              svc=${s}
+              expanded=${!!expandedMine[svcId]}
+              onToggle=${() => toggleMineExpand(svcId)}
+              actions=${html`<button class="btn-danger" onClick=${() => unpublishService(svcId)}>${t('profile.delete')}</button>`}
+            />`;
+          })
       }`;
   };
 
@@ -81,18 +218,14 @@ export default function ServicesTab({ session, showToast, onStats }) {
     </div>
     ${!catalogue ? html`<${Spinner} text=${t('profile.services.loading')} />`
       : catalogue.length === 0 ? html`<div class="empty">${t('profile.services.catalogueEmpty')}</div>`
-      : catalogue.map(s => html`
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">${escHtml(s.display_name || s.name)}</div>
-            <div>
-              <span class="badge badge-info">${escHtml(s.category || '')}</span>
-              <span class="badge badge-success" style="margin-left:.25rem">${s.price_morsels ? s.price_morsels + ' \u2764\uFE0F' : t('profile.services.free')}</span>
-            </div>
-          </div>
-          <div class="card-subtitle">${escHtml(s.description || '')} \u2502 ${escHtml(s.owner || '')}</div>
-        </div>
-      `)
+      : catalogue.map(s => {
+          const svcId = s.id || s.action_id;
+          return html`<${ServiceCard}
+            svc=${s}
+            expanded=${!!expandedCat[svcId]}
+            onToggle=${() => toggleCatExpand(svcId)}
+          />`;
+        })
     }`;
 
   return html`

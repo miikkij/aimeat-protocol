@@ -153,6 +153,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [platExpand, setPlatExpand] = useState(false);
   const [activePlat, setActivePlat] = useState('windows');
   const [scopesModal, setScopesModal] = useState(null);
+  const [expandedAgent, setExpandedAgent] = useState(null);
+  const [gaiiCopied, setGaiiCopied] = useState(null);
+  const [keyCopied, setKeyCopied] = useState(null);
 
   useEffect(() => {
     if (session) loadData();
@@ -164,6 +167,36 @@ export default function AgentsTab({ session, showToast, onStats }) {
       setAgents(list);
       onStats?.({ agents: list.length });
     } catch { setAgents([]); }
+  }
+
+  function toggleAgent(name) {
+    setExpandedAgent(prev => prev === name ? null : name);
+  }
+
+  function truncateKey(key) {
+    if (!key) return '-';
+    if (key.length <= 20) return key;
+    return key.slice(0, 10) + '...' + key.slice(-10);
+  }
+
+  function handleCopyGaii(gaii) {
+    copyToClipboard(gaii).then(() => {
+      setGaiiCopied(gaii);
+      setTimeout(() => setGaiiCopied(null), 2000);
+    });
+  }
+
+  function handleCopyKey(key) {
+    copyToClipboard(key).then(() => {
+      setKeyCopied(key);
+      setTimeout(() => setKeyCopied(null), 2000);
+    });
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '-';
+    try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch { return '-'; }
   }
 
   async function handleSaveScopes(agentName, newScopes) {
@@ -220,21 +253,103 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
     ${agents.length === 0
       ? html`<div class="empty">${t('profile.agents.empty')}</div>`
-      : agents.map(a => html`
-        <div class="card agent-card">
-          <div class="card-header">
-            <div class="card-title">${escHtml(a.display_name || a.name)}</div>
-            <span class="badge badge-info">${escHtml(a.name)}</span>
+      : agents.map(a => {
+        const isExpanded = expandedAgent === a.name;
+        return html`
+        <div class="card agent-card ${isExpanded ? 'agent-card-expanded' : ''}">
+          <div class="agent-card-header-clickable" onClick=${() => toggleAgent(a.name)}>
+            <div class="card-header" style="margin-bottom:0">
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span class="agent-expand-icon" style="transition:transform .2s;${isExpanded ? 'transform:rotate(90deg)' : ''}">\u25B6</span>
+                <div class="card-title">${escHtml(a.display_name || a.name)}</div>
+              </div>
+              <span class="badge badge-info">${escHtml(a.name)}</span>
+            </div>
+            <div class="card-subtitle" style="margin-top:.35rem">
+              ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502
+              ${t('profile.agents.balance')}: ${a.balance ?? '-'} \u2502
+              ${t('profile.agents.lastSeen')}: ${a.last_seen ? timeAgo(a.last_seen) : '-'}
+            </div>
           </div>
-          <div class="gaii">${escHtml(a.gaii || '')}</div>
-          <div class="card-subtitle">
-            ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502
-            ${t('profile.agents.balance')}: ${a.balance ?? '-'} \u2502
-            ${t('profile.agents.lastSeen')}: ${a.last_seen ? timeAgo(a.last_seen) : '-'}
-          </div>
-          ${a.capabilities?.length > 0 && html`
-            <div class="caps">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
+
+          ${isExpanded && html`
+            <div class="agent-details">
+              <div class="agent-detail-row">
+                <span class="agent-detail-label">GAII</span>
+                <span class="agent-detail-value" style="display:flex;align-items:center;gap:.5rem">
+                  <span style="font-family:monospace;word-break:break-all">${escHtml(a.gaii || '-')}</span>
+                  ${a.gaii && html`
+                    <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyGaii(a.gaii); }}>
+                      ${gaiiCopied === a.gaii ? '\u2713 Copied' : 'Copy GAII'}
+                    </button>
+                  `}
+                </span>
+              </div>
+
+              ${a.description ? html`
+                <div class="agent-detail-row">
+                  <span class="agent-detail-label">${t('profile.agents.description') || 'Description'}</span>
+                  <span class="agent-detail-value">${escHtml(a.description)}</span>
+                </div>
+              ` : ''}
+
+              <div class="agent-detail-row">
+                <span class="agent-detail-label">${t('profile.agents.roles') || 'Roles'}</span>
+                <span class="agent-detail-value">
+                  ${(a.roles && a.roles.length > 0)
+                    ? a.roles.map(r => html`<span class="badge badge-muted" style="margin-right:.3rem">${escHtml(r)}</span>`)
+                    : html`<span class="badge badge-muted">agent</span>`
+                  }
+                </span>
+              </div>
+
+              <div class="agent-detail-row">
+                <span class="agent-detail-label">${t('profile.agents.trust')}</span>
+                <span class="agent-detail-value">${a.trust_score ?? '-'}</span>
+              </div>
+
+              <div class="agent-detail-row">
+                <span class="agent-detail-label">${t('profile.agents.balance')}</span>
+                <span class="agent-detail-value">${a.balance ?? '-'}</span>
+              </div>
+
+              <div class="agent-detail-row">
+                <span class="agent-detail-label">${t('profile.agents.lastSeen')}</span>
+                <span class="agent-detail-value">${a.last_seen ? timeAgo(a.last_seen) + ' (' + formatDate(a.last_seen) + ')' : '-'}</span>
+              </div>
+
+              <div class="agent-detail-row">
+                <span class="agent-detail-label">${t('profile.agents.created') || 'Created'}</span>
+                <span class="agent-detail-value">${a.created_at ? formatDate(a.created_at) : '-'}</span>
+              </div>
+
+              ${a.public_key ? html`
+                <div class="agent-detail-row">
+                  <span class="agent-detail-label">${t('profile.agents.publicKey') || 'Public Key'}</span>
+                  <span class="agent-detail-value" style="display:flex;align-items:center;gap:.5rem">
+                    <code class="agent-pubkey">${escHtml(truncateKey(a.public_key))}</code>
+                    <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyKey(a.public_key); }}>
+                      ${keyCopied === a.public_key ? '\u2713 Copied' : 'Copy'}
+                    </button>
+                  </span>
+                </div>
+              ` : ''}
+
+              ${a.capabilities?.length > 0 && html`
+                <div class="agent-detail-row">
+                  <span class="agent-detail-label">${t('profile.agents.capabilities') || 'Capabilities'}</span>
+                  <span class="agent-detail-value">
+                    <div class="caps">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
+                  </span>
+                </div>
+              `}
+            </div>
           `}
+
+          ${!isExpanded && a.capabilities?.length > 0 && html`
+            <div class="caps" style="margin-top:.5rem">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
+          `}
+
           ${(() => {
             const scopes = a.default_scopes ?? ['*'];
             const tpl = detectTemplate(scopes);
@@ -253,7 +368,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
               </div>`;
           })()}
         </div>
-      `)
+      `; })
     }
 
     ${scopesModal && html`<${ScopesModal}

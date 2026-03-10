@@ -24,7 +24,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
   const router = Router();
 
   /* ── POST /v1/packages/import — Import a knowledge package from AI Chat output ── */
-  router.post('/v1/packages/import', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/packages/import', requireAuth(), async (req, res) => {
     const ownerGaii = req.auth!.sub as string;
     const ghii = req.auth!.owner as string;
     const { package: pkg, overrides } = req.body;
@@ -372,7 +372,7 @@ Output structured AIMEAT knowledge packages as JSON.`;
   });
 
   /* ── POST /v1/packages/:id/clone — Clone public entries to your own namespace ── */
-  router.post('/v1/packages/:id/clone', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/packages/:id/clone', requireAuth(), async (req, res) => {
     const requesterGaii = req.auth!.sub as string;
     const requesterGhii = req.auth!.owner as string;
     const sourcePackageId = req.params.id as string;

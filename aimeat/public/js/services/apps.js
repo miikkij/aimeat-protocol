@@ -2,7 +2,7 @@
  * AIMEAT Apps Service
  * App listing and upload.
  */
-import { apiGet, api } from '/js/api.js';
+import { apiGet, apiDelete, apiPatch, api } from '/js/api.js';
 
 /** List all apps. Returns array. */
 export async function listApps() {
@@ -22,4 +22,14 @@ export async function uploadApp(filename, contentBase64, mimeType, opts = {}) {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+/** Delete an app by filename. */
+export async function deleteApp(filename) {
+  return apiDelete('/v1/apps/' + encodeURIComponent(filename));
+}
+
+/** Update app metadata (e.g. access_code, protected). */
+export async function patchApp(filename, updates) {
+  return apiPatch('/v1/apps/' + encodeURIComponent(filename), updates);
 }

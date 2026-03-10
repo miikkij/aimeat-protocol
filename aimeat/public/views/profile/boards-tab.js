@@ -63,6 +63,19 @@ export default function BoardsTab({ session, showToast }) {
     viewPosts(boardId, boardView?.name);
   }
 
+  async function handleDeletePost(boardId, postId) {
+    if (!confirm(t('profile.boards.confirmDelete') || 'Delete this post?')) return;
+    const resp = await boardsService.deletePost(boardId, postId);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    showToast(t('profile.boards.postDeleted') || 'Post deleted');
+    viewPosts(boardId, boardView?.name);
+  }
+
+  function isMyPost(post) {
+    const author = post.author_gaii || post.author || '';
+    return author === session?.ghii || author === session?.owner || author === session?.gaii;
+  }
+
   if (boardView) {
     const postRef = useRef(null);
     return html`
@@ -80,6 +93,7 @@ export default function BoardsTab({ session, showToast }) {
             <div class="post-meta">
               <span>${escHtml(p.author_gaii || p.author || '-')}</span>
               <span>${p.created_at ? timeAgo(p.created_at) : ''}</span>
+              ${isMyPost(p) ? html`<button class="btn-sm btn-danger" style="margin-left:auto;font-size:.75rem;padding:2px 8px" onClick=${(e) => { e.stopPropagation(); handleDeletePost(boardView.id, p.id || p.post_id); }}>${t('profile.boards.deletePost') || 'Delete'}</button>` : null}
             </div>
             <div class="post-reactions">
               ${['\u{1F44D}','\u2764\uFE0F','\u{1F525}','\u{1F4A1}','\u{1F602}'].map(emoji => html`

@@ -2,7 +2,7 @@
  * AIMEAT Boards Service
  * Board CRUD, subscriptions, posts, reactions.
  */
-import { api, apiGet, apiPost } from '/js/api.js';
+import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
 /** List boards the user is subscribed to. Returns array. */
 export async function listSubscriptions() {
@@ -41,6 +41,11 @@ export async function createPost(boardId, content) {
     method: 'POST',
     body: JSON.stringify({ content }),
   });
+}
+
+/** Delete a post. */
+export async function deletePost(boardId, postId) {
+  return apiDelete(`/v1/boards/${encodeURIComponent(boardId)}/posts/${encodeURIComponent(postId)}`);
 }
 
 /** React to a post with an emoji. */

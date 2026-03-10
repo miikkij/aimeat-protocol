@@ -313,13 +313,20 @@ function PortfolioBuilder({ session, navigate }) {
     URL.revokeObjectURL(u);
   };
 
-  // Upload HTML
-  const handleUpload = async (file) => {
-    if (!file || !file.name.endsWith('.html')) {
-      setUploadStatus({ ok: false, msg: 'Please select an HTML file' });
+  // Paste HTML
+  const [pastedHtml, setPastedHtml] = useState('');
+
+  const handlePublishPaste = async () => {
+    const text = pastedHtml.trim();
+    if (!text) {
+      setUploadStatus({ ok: false, msg: t('portfolio.builder.pasteEmpty') || 'Paste HTML content first' });
       return;
     }
-    const text = await file.text();
+    await publishHtml(text);
+  };
+
+  // Publish raw HTML text to API
+  const publishHtml = async (text) => {
     const sizeKb = Math.round(text.length / 1024);
 
     setUploading(true);
@@ -349,6 +356,7 @@ function PortfolioBuilder({ session, navigate }) {
         });
         setExistingConfig({ ...(existingConfig || {}), enabled: true });
         setUploadStatus({ ok: true, msg: t('portfolio.builder.uploadSuccess') });
+        setPastedHtml('');
       } else {
         setUploadStatus({ ok: false, msg: result.error?.message || 'Upload failed' });
       }
@@ -356,6 +364,16 @@ function PortfolioBuilder({ session, navigate }) {
       setUploadStatus({ ok: false, msg: err.message || 'Network error' });
     }
     setUploading(false);
+  };
+
+  // Upload HTML file (reads text from file, then publishes)
+  const handleUpload = async (file) => {
+    if (!file || !file.name.endsWith('.html')) {
+      setUploadStatus({ ok: false, msg: 'Please select an HTML file' });
+      return;
+    }
+    const text = await file.text();
+    await publishHtml(text);
   };
 
   const handleDrop = (e) => {
@@ -563,6 +581,25 @@ function PortfolioBuilder({ session, navigate }) {
               ${uploading ? '...' : t('portfolio.builder.uploadDragDrop')}
             </p>
           </div>
+
+          <div style="display:flex; align-items:center; gap:0.75rem; margin:1rem 0; color:var(--text-dim); font-size:0.9rem;">
+            <hr style="flex:1; border:none; border-top:1px solid var(--border-dim);" />
+            <span>${t('portfolio.builder.orPaste') || 'or paste HTML directly'}</span>
+            <hr style="flex:1; border:none; border-top:1px solid var(--border-dim);" />
+          </div>
+
+          <textarea class="portfolio-paste-area"
+            placeholder=${t('portfolio.builder.pasteHint') || 'Paste your portfolio HTML here from AI chat...'}
+            value=${pastedHtml}
+            onInput=${(e) => setPastedHtml(e.target.value)}
+            rows="6"
+          ></textarea>
+          ${pastedHtml.trim() && html`
+            <button class="btn btn-primary" style="margin-top:0.5rem;"
+              onClick=${handlePublishPaste} disabled=${uploading}>
+              ${uploading ? '...' : (t('portfolio.builder.publishPaste') || 'Publish pasted HTML')}
+            </button>
+          `}
 
           ${uploadStatus && html`
             <div style="margin-top:0.75rem; padding:0.5rem 1rem; border-radius:8px;

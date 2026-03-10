@@ -5,7 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, handleImgError } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { listApps, uploadApp } from '/js/services/apps.js';
+import { listApps, uploadApp, deleteApp, patchApp } from '/js/services/apps.js';
 import { getNodeUrl } from '/js/services/auth.js';
 
 export default function AppsTab({ session, showToast, onStats }) {
@@ -13,6 +13,8 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [myApps, setMyApps] = useState(null);
   const [allApps, setAllApps] = useState(null);
   const [showAppUpload, setShowAppUpload] = useState(false);
+  const [editingApp, setEditingApp] = useState(null);
+  const [editCode, setEditCode] = useState('');
 
   useEffect(() => {
     if (session) loadData();
@@ -41,6 +43,36 @@ export default function AppsTab({ session, showToast, onStats }) {
     const resp = await uploadApp(file.name, contentBase64, file.type || 'text/html', opts);
     if (resp.ok !== false) { showToast(t('profile.apps.uploaded')); setShowAppUpload(false); loadData(); }
     else showToast(t('profile.apps.uploadFailed'), true);
+  }
+
+  async function handleDelete(filename) {
+    if (!confirm(t('profile.apps.confirmDelete') || 'Delete this app?')) return;
+    const resp = await deleteApp(filename);
+    if (resp.ok !== false) { showToast(t('profile.apps.deleted') || 'App deleted'); loadData(); }
+    else showToast(resp?.error?.message || t('profile.apps.deleteFailed') || 'Delete failed', true);
+  }
+
+  function startEdit(app) {
+    setEditingApp(app.filename);
+    setEditCode(app.access_code || '');
+  }
+
+  function cancelEdit() {
+    setEditingApp(null);
+    setEditCode('');
+  }
+
+  async function handleSaveAccessCode(filename) {
+    const body = editCode.trim() ? { access_code: editCode.trim() } : { access_code: null };
+    const resp = await patchApp(filename, body);
+    if (resp.ok !== false) {
+      showToast(t('profile.apps.updated') || 'App updated');
+      setEditingApp(null);
+      setEditCode('');
+      loadData();
+    } else {
+      showToast(resp?.error?.message || t('profile.apps.updateFailed') || 'Update failed', true);
+    }
   }
 
   return html`
@@ -74,12 +106,30 @@ export default function AppsTab({ session, showToast, onStats }) {
         <div class="card">
           <div class="card-header">
             <div class="card-title">${escHtml(a.filename || a.name)}</div>
-            <span class="badge badge-info">${escHtml(a.content_type || 'html')}</span>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <span class="badge badge-info">${escHtml(a.content_type || 'html')}</span>
+              ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
+            </div>
           </div>
           <div class="card-subtitle">
             <a href="${NODE_URL}/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}" target="_blank">${t('profile.apps.download')}</a>
             ${a.size ? ' \u2022 ' + Math.round(a.size / 1024) + ' KB' : ''}
           </div>
+          <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+            <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
+            <button class="btn-sm btn-danger" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
+          </div>
+          ${editingApp === a.filename ? html`
+            <div style="margin-top:.75rem;padding:.75rem;background:var(--bg2,#f5f5f5);border-radius:8px">
+              <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:.25rem">${t('profile.apps.accessCodeLabel') || 'Access Code'}</label>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <input class="input-field" style="flex:1" placeholder=${t('profile.apps.accessCodePlaceholder') || 'Leave empty to remove protection'} value=${editCode} onInput=${e => setEditCode(e.target.value)} />
+                <button class="btn-primary btn-sm" onClick=${() => handleSaveAccessCode(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
+                <button class="btn-sm btn-outline" onClick=${cancelEdit}>${t('profile.cancel') || 'Cancel'}</button>
+              </div>
+              ${editCode.trim() === '' ? html`<div style="font-size:.75rem;color:var(--muted);margin-top:.25rem">${t('profile.apps.removeProtectionHint') || 'Save empty to remove access code protection'}</div>` : ''}
+            </div>
+          ` : ''}
         </div>
       `)
     }

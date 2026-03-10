@@ -23,3 +23,29 @@ export async function submitRating(workId, rating, comment) {
     body: JSON.stringify({ rating, comment }),
   });
 }
+
+/** Accept a pending/offered work request. */
+export async function acceptWork(tc) {
+  return api(`/v1/work/${encodeURIComponent(tc)}/accept`, { method: 'POST' });
+}
+
+/** Reject a pending/offered work request. */
+export async function rejectWork(tc) {
+  return api(`/v1/work/${encodeURIComponent(tc)}/reject`, { method: 'POST' });
+}
+
+/** Deliver completed work with optional result. */
+export async function deliverWork(tc, result) {
+  return api(`/v1/work/${encodeURIComponent(tc)}/deliver`, {
+    method: 'POST',
+    body: JSON.stringify({ result }),
+  });
+}
+
+/** Update work progress. */
+export async function updateProgress(tc, progress, note) {
+  return api(`/v1/work/${encodeURIComponent(tc)}/progress`, {
+    method: 'POST',
+    body: JSON.stringify({ progress, note }),
+  });
+}

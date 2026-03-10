@@ -1,8 +1,8 @@
 /**
  * AIMEAT Wallet Service
- * Balance, transactions.
+ * Balance, transactions, morsel requests.
  */
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost } from '/js/api.js';
 
 /** Get wallet balance and info. Returns wallet object or null. */
 export async function getWallet() {
@@ -14,4 +14,11 @@ export async function getWallet() {
 export async function getTransactions(limit = 20) {
   const data = await apiGet(`/v1/wallet/transactions?limit=${limit}`);
   return data?.data?.transactions || data?.data || [];
+}
+
+/** Request morsels (daily allowance top-up). Returns response data or throws. */
+export async function requestMorsels(amount, reason) {
+  const data = await apiPost('/v1/wallet/request', { amount, reason });
+  if (data?.ok === false) throw new Error(data?.error?.message || 'Request failed');
+  return data?.data || data;
 }

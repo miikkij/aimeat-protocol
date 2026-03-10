@@ -5,13 +5,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { listInbox, listSent, submitRating } from '/js/services/work.js';
+import { listInbox, listSent, submitRating, acceptWork, rejectWork, deliverWork, updateProgress } from '/js/services/work.js';
 
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
   const [workSent, setWorkSent] = useState(null);
   const [workSubTab, setWorkSubTab] = useState('inbox');
   const [rateModal, setRateModal] = useState(null);
+  const [deliverModal, setDeliverModal] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     if (session) loadData();
@@ -38,25 +40,110 @@ export default function WorkTab({ session, showToast, onStats }) {
     loadData();
   }
 
+  async function handleAccept(tc) {
+    setActionLoading(tc);
+    try {
+      const resp = await acceptWork(tc);
+      if (resp.ok === false) { showToast(resp.error?.message || 'Failed to accept work', true); return; }
+      showToast('Work accepted');
+      loadData();
+    } catch (e) {
+      showToast(e.message || 'Failed to accept work', true);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReject(tc) {
+    setActionLoading(tc);
+    try {
+      const resp = await rejectWork(tc);
+      if (resp.ok === false) { showToast(resp.error?.message || 'Failed to decline work', true); return; }
+      showToast('Work declined');
+      loadData();
+    } catch (e) {
+      showToast(e.message || 'Failed to decline work', true);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeliver(tc, result) {
+    setActionLoading(tc);
+    try {
+      const resp = await deliverWork(tc, result);
+      if (resp.ok === false) { showToast(resp.error?.message || 'Failed to deliver work', true); return; }
+      showToast('Work delivered');
+      setDeliverModal(null);
+      loadData();
+    } catch (e) {
+      showToast(e.message || 'Failed to deliver work', true);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  function statusBadgeClass(status) {
+    switch (status) {
+      case 'completed': return 'badge-success';
+      case 'accepted':
+      case 'in_progress': return 'badge-info';
+      case 'delivered': return 'badge-warn';
+      case 'pending':
+      case 'offered': return 'badge-muted';
+      case 'rejected':
+      case 'cancelled': return 'badge-danger';
+      default: return 'badge-muted';
+    }
+  }
+
   function renderList(items, type) {
     if (!items) return html`<${Spinner} text=${t('profile.work.loading')} />`;
     if (items.length === 0) return html`<div class="empty">${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}</div>`;
-    return items.map(w => html`
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">${escHtml(w.description || w.action_name || '-')}</div>
-          <span class="badge ${w.status === 'completed' ? 'badge-success' : w.status === 'accepted' ? 'badge-info' : w.status === 'delivered' ? 'badge-warn' : 'badge-muted'}">${w.status || '-'}</span>
+    return items.map(w => {
+      const tc = w.tc || w.id || w.work_id;
+      const isLoading = actionLoading === tc;
+      const status = w.status || '-';
+      const isPending = status === 'pending' || status === 'offered';
+      const isActive = status === 'accepted' || status === 'in_progress';
+
+      return html`
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">${escHtml(w.description || w.action_name || '-')}</div>
+            <span class="badge ${statusBadgeClass(status)}">${status}</span>
+          </div>
+          <div class="card-subtitle">
+            ${type === 'sent' ? t('profile.work.provider') + ': ' + escHtml(w.provider_gaii || '-') : t('profile.work.from') + ': ' + escHtml(w.requester_gaii || '-')}
+            ${w.price_morsels != null ? ' \u2502 ' + t('profile.work.cost') + ': ' + w.price_morsels + ' \u2764\uFE0F' : ''}
+            ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
+          </div>
+
+          ${type === 'inbox' && isPending && html`
+            <div class="card-actions" style="margin-top:.5rem;display:flex;gap:.5rem">
+              <button class="btn-sm btn-primary" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
+                ${isLoading ? '...' : 'Accept'}
+              </button>
+              <button class="btn-sm btn-outline" disabled=${isLoading} onClick=${() => handleReject(tc)}>
+                ${isLoading ? '...' : 'Decline'}
+              </button>
+            </div>
+          `}
+
+          ${type === 'inbox' && isActive && html`
+            <div class="card-actions" style="margin-top:.5rem;display:flex;gap:.5rem">
+              <button class="btn-sm btn-primary" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
+                Deliver
+              </button>
+            </div>
+          `}
+
+          ${type === 'sent' && w.status === 'delivered' && html`
+            <button class="btn-sm" style="margin-top:.5rem" onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
+          `}
         </div>
-        <div class="card-subtitle">
-          ${type === 'sent' ? t('profile.work.provider') + ': ' + escHtml(w.provider_gaii || '-') : t('profile.work.from') + ': ' + escHtml(w.requester_gaii || '-')}
-          ${w.price_morsels != null ? ' \u2502 ' + t('profile.work.cost') + ': ' + w.price_morsels + ' \u2764\uFE0F' : ''}
-          ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
-        </div>
-        ${type === 'sent' && w.status === 'delivered' && html`
-          <button class="btn-sm" style="margin-top:.5rem" onClick=${() => setRateModal({ workId: w.id || w.work_id, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
-        `}
-      </div>
-    `);
+      `;
+    });
   }
 
   return html`
@@ -71,6 +158,11 @@ export default function WorkTab({ session, showToast, onStats }) {
     ${rateModal && html`<${RateModal} desc=${rateModal.desc}
       onSubmit=${(r, c) => handleRate(rateModal.workId, r, c)}
       onCancel=${() => setRateModal(null)} />`}
+
+    ${deliverModal && html`<${DeliverModal} desc=${deliverModal.desc}
+      loading=${actionLoading === deliverModal.tc}
+      onSubmit=${(result) => handleDeliver(deliverModal.tc, result)}
+      onCancel=${() => setDeliverModal(null)} />`}
   `;
 }
 
@@ -91,6 +183,28 @@ function RateModal({ desc, onSubmit, onCancel }) {
         <div class="form-actions">
           <button class="btn-primary" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function DeliverModal({ desc, loading, onSubmit, onCancel }) {
+  const [result, setResult] = useState('');
+  return html`
+    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
+      <div class="modal">
+        <h3>Deliver Work</h3>
+        <p style="color:var(--muted);margin-bottom:1rem">Delivering: ${escHtml(desc || '')}</p>
+        <div class="form-row">
+          <label>Result / notes (optional)</label>
+          <textarea class="input-field" rows="4" placeholder="Describe the completed work or attach results..."
+            value=${result} onInput=${e => setResult(e.target.value)}></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
+            ${loading ? 'Delivering...' : 'Deliver'}
+          </button>
+          <button class="btn-outline" disabled=${loading} onClick=${onCancel}>Cancel</button>
         </div>
       </div>
     </div>`;
