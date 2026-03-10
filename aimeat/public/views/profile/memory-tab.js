@@ -71,13 +71,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { showToast(t('profile.memory.searchFailed'), true); }
   }
 
-  async function handleUploadFiles(fileItems, visibility) {
+  async function handleUploadFiles(fileItems, visibility, tags) {
     if (!fileItems || fileItems.length === 0) return;
     let ok = 0, fail = 0;
     for (const item of fileItems) {
       try {
         const base64 = await readFileAsBase64(item.file);
-        const resp = await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility);
+        const resp = await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility, tags);
         if (resp.ok !== false) ok++; else fail++;
       } catch { fail++; }
     }
@@ -165,18 +165,60 @@ export default function MemoryTab({ session, showToast, onStats }) {
       }`;
   };
 
+  const [fileTagFilter, setFileTagFilter] = useState(new Set());
+
   const renderFilesList = () => {
     if (!files) return html`<${Spinner} text=${t('profile.files.loading')} />`;
+
+    // Collect all unique tags across files
+    const allTags = new Set();
+    for (const f of files) {
+      if (f.tags) for (const tag of f.tags) allTags.add(tag);
+    }
+
+    // Filter files by selected tags
+    const filtered = fileTagFilter.size === 0 ? files : files.filter(f =>
+      f.tags && [...fileTagFilter].every(tag => f.tags.includes(tag))
+    );
+
+    const toggleTag = (tag) => {
+      setFileTagFilter(prev => {
+        const next = new Set(prev);
+        if (next.has(tag)) next.delete(tag); else next.add(tag);
+        return next;
+      });
+    };
+
+    const copyFileUrls = () => {
+      const urls = filtered.map(f => `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`).join('\n');
+      navigator.clipboard.writeText(urls).then(() => showToast(t('profile.files.urlsCopied') || `${filtered.length} URLs copied`));
+    };
+
     return html`
       <div class="action-bar">
         <button class="btn-primary" onClick=${() => setShowFileForm(!showFileForm)}>${t('profile.files.uploadBtn')}</button>
+        ${filtered.length > 0 && html`<button class="btn-sm btn-outline" onClick=${copyFileUrls} title="Copy file URLs">\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})</button>`}
         <span style="font-size:.75rem;color:var(--muted)">${t('profile.files.sizeLimit')}</span>
       </div>
+      ${allTags.size > 0 && html`
+        <div class="file-tag-cloud">
+          ${[...allTags].sort().map(tag => html`
+            <button key=${tag}
+              class="file-tag-btn ${fileTagFilter.has(tag) ? 'active' : ''}"
+              onClick=${() => toggleTag(tag)}>
+              ${escHtml(tag)}
+            </button>
+          `)}
+          ${fileTagFilter.size > 0 && html`
+            <button class="file-tag-btn file-tag-clear" onClick=${() => setFileTagFilter(new Set())}>\u2715 ${t('profile.files.clearFilter') || 'Clear'}</button>
+          `}
+        </div>
+      `}
       ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} />`}
-      ${files.length === 0
-        ? html`<div class="empty">${t('profile.files.empty')}</div>`
+      ${filtered.length === 0
+        ? html`<div class="empty">${files.length > 0 ? (t('profile.files.noMatch') || 'No files match selected tags') : t('profile.files.empty')}</div>`
         : html`<div class="file-grid">
-            ${files.map(f => {
+            ${filtered.map(f => {
               const icon = f.mime_type?.startsWith('image') ? '\u{1F5BC}\uFE0F' : f.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}';
               return html`
                 <div class="file-card">
@@ -184,6 +226,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                   <div class="file-info">
                     <div class="file-name">${escHtml(f.key || f.name)}</div>
                     <div class="file-meta">${f.size ? Math.round(f.size / 1024) + ' KB' : ''} \u2502 ${f.visibility || 'private'}</div>
+                    ${f.tags?.length > 0 && html`<div class="file-tags">${f.tags.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}</div>`}
                   </div>
                   <div class="file-actions">
                     <a class="btn-sm" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}" target="_blank" style="text-decoration:none">${t('profile.files.download')}</a>
@@ -245,9 +288,20 @@ function fileIcon(type) {
 function FileUploadForm({ onUpload, onCancel }) {
   const [fileItems, setFileItems] = useState([]);
   const [vis, setVis] = useState('private');
+  const [tagInput, setTagInput] = useState('');
+  const [fileTags, setFileTags] = useState([]);
   const [dragover, setDragover] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+
+  const addTag = () => {
+    const tag = tagInput.trim().toLowerCase();
+    if (tag && !fileTags.includes(tag)) {
+      setFileTags(prev => [...prev, tag]);
+    }
+    setTagInput('');
+  };
+  const removeTag = (tag) => setFileTags(prev => prev.filter(t => t !== tag));
 
   const addFiles = (newFiles) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -278,7 +332,7 @@ function FileUploadForm({ onUpload, onCancel }) {
   const handleSubmit = async () => {
     if (fileItems.length === 0 || uploading) return;
     setUploading(true);
-    await onUpload(fileItems, vis);
+    await onUpload(fileItems, vis, fileTags);
     setUploading(false);
   };
 
@@ -319,6 +373,23 @@ function FileUploadForm({ onUpload, onCancel }) {
           <option value="owner">${t('profile.files.visOwner')}</option>
           <option value="public">${t('profile.files.visPublic')}</option>
         </select>
+      </div>
+      <div class="form-row"><label>${t('profile.files.tagsLabel') || 'Tags'}</label>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input class="input-field" style="flex:1" placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
+            value=${tagInput} onInput=${e => setTagInput(e.target.value)}
+            onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
+          <button type="button" class="btn-sm" onClick=${addTag}>+</button>
+        </div>
+        ${fileTags.length > 0 && html`
+          <div class="file-tag-cloud" style="margin-top:.5rem">
+            ${fileTags.map(tag => html`
+              <span class="file-tag-btn active" key=${tag} onClick=${() => removeTag(tag)}>
+                ${tag} \u2715
+              </span>
+            `)}
+          </div>
+        `}
       </div>
       <div class="form-actions">
         <button class="btn-primary" disabled=${fileItems.length === 0 || uploading}

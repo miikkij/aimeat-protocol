@@ -7,7 +7,7 @@ import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 /** List all memory entries. Returns array. */
 export async function listMemories() {
   const data = await apiGet('/v1/memory');
-  const list = data?.data?.entries || data?.data || [];
+  const list = data?.data?.items || data?.data?.entries || [];
   return Array.isArray(list) ? list : [];
 }
 
@@ -49,15 +49,17 @@ export async function listFiles() {
 }
 
 /** Upload a file (base64). */
-export async function uploadFile(key, base64Content, mimeType, visibility) {
+export async function uploadFile(key, base64Content, mimeType, visibility, tags) {
+  const body = {
+    key,
+    content: base64Content,
+    mime_type: mimeType || 'application/octet-stream',
+    visibility: visibility || 'private',
+  };
+  if (tags && tags.length > 0) body.tags = tags;
   return api('/v1/memory/files', {
     method: 'POST',
-    body: JSON.stringify({
-      key,
-      content: base64Content,
-      mime_type: mimeType || 'application/octet-stream',
-      visibility: visibility || 'private',
-    }),
+    body: JSON.stringify(body),
   });
 }
 

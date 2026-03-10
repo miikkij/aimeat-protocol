@@ -165,6 +165,7 @@ export interface StorageFileRecord {
   size: number;
   data: Buffer;
   accessCode?: string;
+  tags?: string[];
   createdAt: string;
 }
 

@@ -1083,6 +1083,7 @@ export class MongoStorage implements Storage {
                 mimeType: file.mimeType,
                 size: file.size,
                 data: file.data,
+                tags: file.tags || [],
                 createdAt: new Date(file.createdAt),
             },
         });
@@ -1095,17 +1096,17 @@ export class MongoStorage implements Storage {
             where: { ownerGaii_key: { ownerGaii, key } },
         });
         if (!row) return null;
-        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), createdAt: row.createdAt.toISOString() };
+        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], createdAt: row.createdAt.toISOString() };
     }
 
     async listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.storageFile.findMany({
             where: { ownerGaii },
-            select: { key: true, ownerGaii: true, visibility: true, mimeType: true, size: true, createdAt: true },
+            select: { key: true, ownerGaii: true, visibility: true, mimeType: true, size: true, tags: true, createdAt: true },
         });
         return rows.map((r: any) => ({
-            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), createdAt: r.createdAt.toISOString(),
+            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], createdAt: r.createdAt.toISOString(),
         }));
     }
 

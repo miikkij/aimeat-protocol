@@ -253,7 +253,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // POST /v1/memory/files — upload file (base64 JSON body)
   router.post('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
     const gaii = req.auth!.sub;
-    const { key, content, mime_type, visibility } = req.body ?? {};
+    const { key, content, mime_type, visibility, tags } = req.body ?? {};
 
     if (!key || !content) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and content (base64) are required'));
@@ -275,6 +275,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
+    const parsedTags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []);
     const file = await storage.createStorageFile({
       key,
       ownerGaii: gaii,
@@ -282,6 +283,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       mimeType: mime_type ?? 'application/octet-stream',
       size: fileData.length,
       data: fileData,
+      tags: parsedTags.length > 0 ? parsedTags : undefined,
       createdAt: new Date().toISOString(),
     });
 
@@ -297,6 +299,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       size: file.size,
       mime_type: file.mimeType,
       visibility: file.visibility,
+      tags: file.tags || [],
       created_at: file.createdAt,
     }));
   });
@@ -312,6 +315,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         size: f.size,
         mime_type: f.mimeType,
         visibility: f.visibility,
+        tags: f.tags || [],
         created_at: f.createdAt,
       })),
       total: files.length,

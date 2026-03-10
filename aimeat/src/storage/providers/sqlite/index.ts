@@ -1163,12 +1163,12 @@ export class SqliteStorage implements Storage {
 
   async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, mimeType, size, data, accessCode, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, mimeType, size, data, accessCode, tags, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       file.ownerGaii, file.key, file.visibility,
       file.mimeType, file.size, file.data,
-      file.accessCode ?? null, file.createdAt,
+      file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
     );
     return file;
   }
@@ -1183,6 +1183,7 @@ export class SqliteStorage implements Storage {
       mimeType: row.mimeType as string,
       size: row.size as number,
       data: row.data as Buffer,
+      tags: row.tags ? JSON.parse(row.tags as string) : [],
       createdAt: row.createdAt as string,
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
@@ -1199,6 +1200,7 @@ export class SqliteStorage implements Storage {
         mimeType: r.mimeType as string,
         size: r.size as number,
         data: r.data as Buffer,
+        tags: r.tags ? JSON.parse(r.tags as string) : [],
         createdAt: r.createdAt as string,
       };
       if (r.accessCode) record.accessCode = r.accessCode as string;

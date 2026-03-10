@@ -208,6 +208,7 @@ model StorageFile {
   mimeType   String
   size       Int
   data       Bytes
+  tags       String[] @default([])
   createdAt  DateTime @default(now())
 
   @@unique([ownerGaii, key])
