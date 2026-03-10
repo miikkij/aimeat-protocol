@@ -36,6 +36,7 @@ import { boardsRouter } from './routes/boards.js';
 import { promptsRouter } from './routes/prompts.js';
 import { adminRouter } from './routes/admin.js';
 import { federationRouter } from './routes/federation.js';
+import { organismsRouter } from './routes/organisms.js';
 import { specRouter } from './routes/spec.js';
 import { disputesRouter } from './routes/disputes.js';
 import { microMemoryRouter } from './routes/micro-memory.js';
@@ -646,6 +647,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     get: () => maintenanceCache,
     set: (state: MaintenanceState) => { maintenanceCache = state; },
   }, provenance, consulService));
+  app.use(organismsRouter(config, storage));
   app.use(federationRouter(config, storage, peers));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));

@@ -229,7 +229,8 @@
       "nodeStats": "Node Stats",
       "extensions": "Extensions",
       "security": "Security",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "organisms": "Organisms"
     },
     "agents": {
       "title": "Your Agents",
@@ -304,7 +305,15 @@
       "remove": "Remove Session",
       "confirmDelete": "Remove this chat session? The session agent will be deleted.",
       "deleted": "Session removed",
-      "deleteError": "Failed to remove session"
+      "deleteError": "Failed to remove session",
+      "createTitle": "Create a Chat Session",
+      "createDesc": "Copy a prompt below and paste it into your AI chat (Claude, ChatGPT, Grok, etc.) to create a new chat session connected to your AIMEAT node.",
+      "copyQuickPrompt": "Copy Quick Prompt",
+      "copyDetailedPrompt": "Copy Detailed Prompt",
+      "createHint": "Quick Prompt works with AIs that can browse the web. Detailed Prompt includes full connection instructions for any AI.",
+      "promptCopied": "Prompt copied to clipboard",
+      "promptError": "Could not load prompt template",
+      "activeSessions": "Active Sessions"
     },
     "wallet": {
       "title": "Wallet",
@@ -2927,7 +2936,11 @@
       "disabled": "Portfolio hidden",
       "viewPublic": "View public portfolio",
       "regenerate": "Regenerate",
-      "delete": "Delete portfolio"
+      "delete": "Delete portfolio",
+      "orPaste": "or paste HTML directly",
+      "pasteHint": "Paste your portfolio HTML here from AI chat...",
+      "pasteEmpty": "Paste HTML content first",
+      "publishPaste": "Publish pasted HTML"
     },
     "viewer": {
       "notFound": "Portfolio not found",
@@ -2986,7 +2999,12 @@
       "exportCopied": "Package JSON copied to clipboard",
       "confirmDelete": "Delete \"{name}\"? This cannot be undone.",
       "deleted": "Package deleted",
-      "deleteError": "Failed to delete package"
+      "deleteError": "Failed to delete package",
+      "catalogListed": "Listed in catalogue",
+      "allowClone": "Allow cloning",
+      "saved": "Settings saved",
+      "saveError": "Failed to save settings",
+      "references": "References"
     },
     "sharedWithMe": {
       "title": "Shared With Me",
@@ -3006,6 +3024,7 @@
       "search": "Search knowledge...",
       "empty": "No shared knowledge packages found.",
       "cloneToMine": "Clone to My Knowledge",
+      "cloneDisabled": "Cloning not available",
       "viewDetails": "View Details",
       "trustAdvisory": "Verify critical information independently before relying on it."
     },
@@ -3088,6 +3107,55 @@
       "actionLabel": "Action",
       "customReason": "Custom reason...",
       "submitReview": "Submit Review"
+    }
+  },
+  "organisms": {
+    "title": "Organisms",
+    "desc": "Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.",
+    "loading": "Loading organisms...",
+    "empty": "You are not part of any organisms yet.",
+    "myOrganisms": "My Organisms",
+    "discover": "Discover",
+    "createNew": "Create Organism",
+    "createTitle": "Create New Organism",
+    "namePlaceholder": "Name",
+    "descPlaceholder": "Description",
+    "interestsPlaceholder": "Interests (comma separated)",
+    "nameRequired": "Name is required",
+    "created": "Organism created!",
+    "createError": "Failed to create",
+    "join": "Join",
+    "joined": "Joined!",
+    "joinPending": "Join request sent — waiting for approval",
+    "joinError": "Failed to join",
+    "leave": "Leave",
+    "confirmLeave": "Leave \"{name}\"?",
+    "left": "Left organism",
+    "leaveError": "Failed to leave",
+    "delete": "Delete",
+    "confirmDelete": "Delete \"{name}\"? This cannot be undone.",
+    "deleted": "Organism deleted",
+    "deleteError": "Failed to delete",
+    "creator": "Creator",
+    "admins": "Admins",
+    "members": "members",
+    "memberCount": "Members",
+    "board": "Board",
+    "createdAt": "Created",
+    "cancel": "Cancel",
+    "create": "Create",
+    "policyOpen": "Open",
+    "policyApproval": "Approval required",
+    "policyInvite": "Invite only",
+    "visPublic": "Public",
+    "visListed": "Listed",
+    "visPrivate": "Private",
+    "types": {
+      "community": "Community",
+      "team": "Team",
+      "club": "Club",
+      "cooperative": "Cooperative",
+      "project": "Project"
     }
   }
 }

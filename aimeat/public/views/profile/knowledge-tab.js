@@ -19,6 +19,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   /* ── UI state ── */
   const [expandedPkg, setExpandedPkg] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [savingSharing, setSavingSharing] = useState(null);
 
   /* ── Discovery state ── */
   const [discovered, setDiscovered] = useState([]);
@@ -213,6 +214,29 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     } catch { showToast('Clone failed'); }
   }, [showToast, loadPackages]);
 
+  /* ── Update sharing settings ── */
+  const handleSharingChange = useCallback(async (pkg, field, value) => {
+    const manifest = pkg.value;
+    const packageId = manifest?.id || pkg.key.split('/')[1] || pkg.key;
+    setSavingSharing(pkg.key);
+    try {
+      const update = { [field]: value };
+      // If enabling catalog_listed, also enable allow_clone
+      if (field === 'catalog_listed' && value && !manifest.sharing?.allow_clone) {
+        update.allow_clone = true;
+      }
+      const result = await knowledgeService.updateSharing(packageId, update);
+      if (result?.data?.sharing) {
+        showToast(t('knowledge.myKnowledge.saved') || 'Settings saved');
+        loadPackages();
+      } else {
+        showToast(t('knowledge.myKnowledge.saveError') || 'Failed to save settings');
+      }
+    } catch {
+      showToast(t('knowledge.myKnowledge.saveError') || 'Failed to save settings');
+    } finally { setSavingSharing(null); }
+  }, [showToast, loadPackages]);
+
   /* ── Toggle expand ── */
   const toggleExpand = useCallback((key) => {
     setExpandedPkg(prev => prev === key ? null : key);
@@ -377,6 +401,27 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                     <p class="kpkg-detail-synthesis">${escHtml(manifest.synthesis.description)}</p>
                   ` : null}
 
+                  <!-- Sharing settings -->
+                  <div class="kpkg-sharing-settings" style="margin-bottom:.75rem;padding:.5rem .75rem;border:1px solid rgba(255,107,157,.15);border-radius:8px;background:rgba(255,107,157,.03)">
+                    <h4 style="margin:0 0 .5rem;font-size:.8rem">${t('knowledge.myKnowledge.shareSettings')}</h4>
+                    <label class="kpkg-toggle" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;font-size:.8rem;cursor:pointer">
+                      <input type="checkbox"
+                        checked=${manifest.sharing?.catalog_listed}
+                        disabled=${savingSharing === pkg.key}
+                        onChange=${(e) => handleSharingChange(pkg, 'catalog_listed', e.target.checked)}
+                      />
+                      ${t('knowledge.myKnowledge.catalogListed')}
+                    </label>
+                    <label class="kpkg-toggle" style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;cursor:pointer">
+                      <input type="checkbox"
+                        checked=${manifest.sharing?.allow_clone}
+                        disabled=${savingSharing === pkg.key}
+                        onChange=${(e) => handleSharingChange(pkg, 'allow_clone', e.target.checked)}
+                      />
+                      ${t('knowledge.myKnowledge.allowClone')}
+                    </label>
+                  </div>
+
                   <div class="kpkg-detail-entries">
                     <h4>${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</h4>
                     ${entries.map((entry, i) => renderEntry(entry, i))}
@@ -385,11 +430,17 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
                   ${(manifest.references || []).length > 0 && html`
                     <div class="kpkg-detail-refs">
-                      <h4>References</h4>
+                      <h4>${t('knowledge.myKnowledge.references') || 'References'}</h4>
                       ${manifest.references.map((ref, i) => html`
-                        <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
-                          ${ref.verified ? '\u2713' : '?'} ${escHtml(ref.title || ref.url || 'Untitled')}
-                          ${ref.url ? html` <a href=${ref.url} target="_blank" class="kpkg-ref-link">\u2197</a>` : null}
+                        <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0">
+                          <span>${ref.verified ? '\u2705' : '\u2753'}</span>
+                          ${ref.url ? html`
+                            <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link" style="color:var(--love1,#ff6b9d);text-decoration:none">
+                              ${escHtml(ref.title || ref.url)}
+                              <span style="font-size:.7rem;opacity:.6"> \u2197</span>
+                            </a>
+                          ` : html`<span>${escHtml(ref.title || 'Untitled')}</span>`}
+                          ${ref.type ? html`<span class="kpkg-badge" style="font-size:.6rem">${escHtml(ref.type)}</span>` : null}
                         </div>
                       `)}
                     </div>
@@ -398,7 +449,6 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                   <div class="kpkg-detail-meta">
                     <span>ID: ${escHtml(manifest.id || pkg.key)}</span>
                     ${manifest.author ? html`<span>Author: ${escHtml(manifest.author)}</span>` : null}
-                    ${manifest.sharing ? html`<span>Catalog: ${manifest.sharing.catalog_listed ? 'Listed' : 'Unlisted'}</span>` : null}
                   </div>
                 </div>
               `}

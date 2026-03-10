@@ -376,6 +376,151 @@ Output structured AIMEAT knowledge packages as JSON.`;
     res.json(success(config.nodeId, { prompt: text, ghii, gaii, node_url: nodeUrl, node_id: config.nodeId }));
   });
 
+  /* ── Chat session prompt templates ── */
+  const DEFAULT_CHAT_SESSION_PROMPT = `You are about to connect to an AIMEAT node as a chat session agent.
+
+This lets your conversation be registered on the AIMEAT network, giving you access to the user's memory, knowledge packages, wallet, and other AIMEAT services.
+
+## How to Connect
+
+### Step 1: Get a connectivity key
+The user needs to generate one from their profile, or you can request one:
+
+\`\`\`
+POST {node_url}/v1/auth/connectivity-key
+Authorization: Bearer <owner_jwt>
+Content-Type: application/json
+
+{
+  "agent_name": "session-<platform>-<timestamp>",
+  "description": "Chat session from <platform>"
+}
+\`\`\`
+
+### Step 2: Register using the connectivity key
+\`\`\`
+POST {node_url}/v1/agents/connect
+Content-Type: application/json
+
+{
+  "connectivity_key": "<key_from_step_1>",
+  "agent_name": "session-<platform>-<timestamp>",
+  "display_name": "Chat Session — <Platform Name>"
+}
+\`\`\`
+
+This returns your agent credentials (GAII + private key). Store the private key — it's shown only once.
+
+### Step 3: Authenticate
+Sign your GAII + timestamp with your Ed25519 private key:
+\`\`\`
+POST {node_url}/v1/auth/token
+Content-Type: application/json
+
+{
+  "gaii": "<your_gaii>",
+  "timestamp": "<ISO_timestamp>",
+  "signature": "<base64_ed25519_signature>"
+}
+\`\`\`
+
+### Step 4: Use AIMEAT services
+With your JWT token, you can now:
+- Read/write memory: GET/POST {node_url}/v1/memory
+- Access knowledge: GET {node_url}/v1/packages
+- Check wallet: GET {node_url}/v1/wallet
+- Browse catalogue: GET {node_url}/v1/catalogue
+- Post to boards: POST {node_url}/v1/boards/:id/posts
+
+Node: {node_id}
+Node URL: {node_url}
+Owner: {ghii}
+API Spec: {node_url}/v1/openapi.yaml`;
+
+  const DEFAULT_CHAT_SESSION_QUICK_PROMPT = `Read this URL and follow the instructions: {node_url}/v1/prompts/anonymous/share
+
+This will connect you to my AIMEAT node ({node_id}) where you can access my memory, knowledge, and other AI services.
+
+Node: {node_url}
+Owner: {ghii}`;
+
+  /* ── GET /v1/templates/chat-session-human — Get chat session human prompt ── */
+  router.get('/v1/templates/chat-session-human', requireAuth(), async (req, res) => {
+    const ghii = req.auth!.owner as string;
+    const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
+    const stored = await storage.getMemory(req.auth!.sub as string, 'templates/chat-session-human');
+
+    let text = stored
+      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
+      : DEFAULT_CHAT_SESSION_PROMPT;
+    text = text.replace(/\{ghii\}/g, ghii);
+    text = text.replace(/\{node_url\}/g, nodeUrl);
+    text = text.replace(/\{node_id\}/g, config.nodeId);
+
+    res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
+  });
+
+  /* ── GET /v1/templates/chat-session-quick — Get quick session prompt (paste into any AI) ── */
+  router.get('/v1/templates/chat-session-quick', requireAuth(), async (req, res) => {
+    const ghii = req.auth!.owner as string;
+    const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
+    const stored = await storage.getMemory(req.auth!.sub as string, 'templates/chat-session-quick');
+
+    let text = stored
+      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
+      : DEFAULT_CHAT_SESSION_QUICK_PROMPT;
+    text = text.replace(/\{ghii\}/g, ghii);
+    text = text.replace(/\{node_url\}/g, nodeUrl);
+    text = text.replace(/\{node_id\}/g, config.nodeId);
+
+    res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
+  });
+
+  /* ── PATCH /v1/packages/:id/sharing — Update package sharing settings ── */
+  router.patch('/v1/packages/:id/sharing', requireAuth(), requireRole('agent'), async (req, res) => {
+    const ownerGaii = req.auth!.sub as string;
+    const packageId = req.params.id as string;
+    const { catalog_listed, allow_clone } = req.body ?? {};
+
+    const manifestKey = `packages/${packageId}/manifest`;
+    const existing = await storage.getMemory(ownerGaii, manifestKey);
+    if (!existing) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
+      return;
+    }
+
+    const manifest: Record<string, any> = typeof existing.value === 'string'
+      ? JSON.parse(existing.value as string)
+      : Object.assign({}, existing.value as Record<string, any>);
+    if (!manifest.sharing) manifest.sharing = { catalog_listed: false, allow_clone: false, morsel_price: 0 };
+
+    if (catalog_listed !== undefined) manifest.sharing.catalog_listed = !!catalog_listed;
+    if (allow_clone !== undefined) manifest.sharing.allow_clone = !!allow_clone;
+    // If catalog_listed enabled, ensure allow_clone is also enabled
+    if (manifest.sharing.catalog_listed && !manifest.sharing.allow_clone && allow_clone === undefined) {
+      manifest.sharing.allow_clone = true;
+    }
+    manifest.updated = new Date().toISOString();
+
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: manifestKey,
+      ownerGaii,
+      value: manifest,
+      visibility: manifest.sharing.catalog_listed ? 'public' : 'owner',
+      tags: existing.tags || ['knowledge-package'],
+      ttlHours: null,
+      version: (existing.version || 0) + 1,
+      createdAt: existing.createdAt || now,
+      updatedAt: now,
+    });
+
+    res.json(success(config.nodeId, {
+      package_id: packageId,
+      sharing: manifest.sharing,
+    }));
+  });
+
   /* ── POST /v1/packages/:id/clone — Clone public entries to your own namespace ── */
   router.post('/v1/packages/:id/clone', requireAuth(), async (req, res) => {
     const requesterGaii = req.auth!.sub as string;

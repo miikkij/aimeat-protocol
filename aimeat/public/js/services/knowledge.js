@@ -76,6 +76,15 @@ export async function discoverPackages(opts = {}) {
   return apiGet(`/v1/catalogue/knowledge?${params.toString()}`);
 }
 
+/* ── Sharing Settings ── */
+
+export async function updateSharing(packageId, sharing) {
+  return api(`/v1/packages/${encodeURIComponent(packageId)}/sharing`, {
+    method: 'PATCH',
+    body: JSON.stringify(sharing),
+  });
+}
+
 /* ── Clone ── */
 
 export async function clonePackage(packageId, targetPrefix, entries) {

@@ -229,7 +229,8 @@
       "nodeStats": "Solmutilastot",
       "extensions": "Laajennukset",
       "security": "Turvallisuus",
-      "notifications": "Ilmoitukset"
+      "notifications": "Ilmoitukset",
+      "organisms": "Organismit"
     },
     "agents": {
       "title": "Agenttisi",
@@ -304,7 +305,15 @@
       "remove": "Poista sessio",
       "confirmDelete": "Poista tämä keskustelusessio? Session agentti poistetaan.",
       "deleted": "Sessio poistettu",
-      "deleteError": "Session poisto epäonnistui"
+      "deleteError": "Session poisto epäonnistui",
+      "createTitle": "Luo keskustelusessio",
+      "createDesc": "Kopioi alla oleva kehote ja liitä se AI-chattiisi (Claude, ChatGPT, Grok, jne.) luodaksesi uuden keskustelusession AIMEAT-solmuusi.",
+      "copyQuickPrompt": "Kopioi pikakehote",
+      "copyDetailedPrompt": "Kopioi yksityiskohtainen kehote",
+      "createHint": "Pikakehote toimii AI:lla jotka voivat selata verkkoa. Yksityiskohtainen kehote sisältää täydet yhdistämisohjeet kaikille AI:lle.",
+      "promptCopied": "Kehote kopioitu leikepöydälle",
+      "promptError": "Kehotteen lataus epäonnistui",
+      "activeSessions": "Aktiiviset sessiot"
     },
     "wallet": {
       "title": "Lompakko",
@@ -2926,7 +2935,11 @@
       "disabled": "Portfolio piilotettu",
       "viewPublic": "Näytä julkinen portfolio",
       "regenerate": "Luo uudelleen",
-      "delete": "Poista portfolio"
+      "delete": "Poista portfolio",
+      "orPaste": "tai liitä HTML suoraan",
+      "pasteHint": "Liitä portfolion HTML-koodi tähän AI-chatista...",
+      "pasteEmpty": "Liitä ensin HTML-sisältö",
+      "publishPaste": "Julkaise liitetty HTML"
     },
     "viewer": {
       "notFound": "Portfoliota ei löytynyt",
@@ -2985,7 +2998,12 @@
       "exportCopied": "Paketin JSON kopioitu leikepöydälle",
       "confirmDelete": "Poista \"{name}\"? Tätä ei voi perua.",
       "deleted": "Paketti poistettu",
-      "deleteError": "Paketin poisto epäonnistui"
+      "deleteError": "Paketin poisto epäonnistui",
+      "catalogListed": "Näkyy katalogissa",
+      "allowClone": "Salli kloonaus",
+      "saved": "Asetukset tallennettu",
+      "saveError": "Tallennus epäonnistui",
+      "references": "Viitteet"
     },
     "sharedWithMe": {
       "title": "Jaettu minulle",
@@ -3005,6 +3023,7 @@
       "search": "Hae tietoa...",
       "empty": "Ei jaettuja tietopaketteja.",
       "cloneToMine": "Kloonaa omiin tietoihin",
+      "cloneDisabled": "Kloonaus ei saatavilla",
       "viewDetails": "Näytä tiedot",
       "trustAdvisory": "Vahvista kriittinen tieto itsenäisesti ennen sen käyttämistä."
     },
@@ -3087,6 +3106,55 @@
       "actionLabel": "Toiminto",
       "customReason": "Mukautettu syy...",
       "submitReview": "Lähetä arviointi"
+    }
+  },
+  "organisms": {
+    "title": "Organismit",
+    "desc": "Organismit ovat ryhmiä — yhteisöjä, tiimejä, kerhoja tai projekteja. Luo oma tai liity olemassa oleviin jakaaksesi tietoa, koordinoidaksesi työtä ja rakentaaksesi yhdessä.",
+    "loading": "Ladataan organismeja...",
+    "empty": "Et kuulu vielä yhteenkään organismiin.",
+    "myOrganisms": "Omat organismit",
+    "discover": "Löydä",
+    "createNew": "Luo organismi",
+    "createTitle": "Luo uusi organismi",
+    "namePlaceholder": "Nimi",
+    "descPlaceholder": "Kuvaus",
+    "interestsPlaceholder": "Kiinnostukset (pilkuilla erotettuna)",
+    "nameRequired": "Nimi vaaditaan",
+    "created": "Organismi luotu!",
+    "createError": "Luonti epäonnistui",
+    "join": "Liity",
+    "joined": "Liitytty!",
+    "joinPending": "Liittymispyyntö lähetetty — odottaa hyväksyntää",
+    "joinError": "Liittyminen epäonnistui",
+    "leave": "Poistu",
+    "confirmLeave": "Poistu ryhmästä \"{name}\"?",
+    "left": "Poistuttu organismista",
+    "leaveError": "Poistuminen epäonnistui",
+    "delete": "Poista",
+    "confirmDelete": "Poista \"{name}\"? Tätä ei voi perua.",
+    "deleted": "Organismi poistettu",
+    "deleteError": "Poistaminen epäonnistui",
+    "creator": "Luoja",
+    "admins": "Ylläpitäjät",
+    "members": "jäsentä",
+    "memberCount": "Jäsenet",
+    "board": "Taulu",
+    "createdAt": "Luotu",
+    "cancel": "Peruuta",
+    "create": "Luo",
+    "policyOpen": "Avoin",
+    "policyApproval": "Hyväksyntä vaaditaan",
+    "policyInvite": "Vain kutsulla",
+    "visPublic": "Julkinen",
+    "visListed": "Listattu",
+    "visPrivate": "Yksityinen",
+    "types": {
+      "community": "Yhteisö",
+      "team": "Tiimi",
+      "club": "Kerho",
+      "cooperative": "Osuuskunta",
+      "project": "Projekti"
     }
   }
 }
