@@ -13,6 +13,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [expanded, setExpanded] = useState(null);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({});
 
   /* ── Create form state ── */
   const [formName, setFormName] = useState('');
@@ -27,12 +30,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const loadData = useCallback(async () => {
     try {
       const [myResp, pubResp] = await Promise.all([
-        orgService.listOrganisms({ visibility: 'public' }),
+        ghii ? orgService.listOrganisms({ member: ghii }) : Promise.resolve({ data: { organisms: [] } }),
         orgService.listOrganisms({ visibility: 'public' }),
       ]);
-      const all = pubResp?.data?.organisms || [];
-      const mine = all.filter(o => o.creatorGhii === ghii || o.admins?.includes(ghii) || o.members?.includes(ghii));
-      const discover = all.filter(o => !o.members?.includes(ghii));
+      const mine = myResp?.data?.organisms || [];
+      const mineIds = new Set(mine.map(o => o.id));
+      const discover = (pubResp?.data?.organisms || []).filter(o => !mineIds.has(o.id));
       setMyOrganisms(mine);
       setPublicOrganisms(discover);
       onStats?.({ organisms: mine.length });
@@ -118,11 +121,102 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     setExpanded(prev => prev === id ? null : id);
   }, []);
 
+  const startEdit = useCallback((org) => {
+    setEditing(org.id);
+    setEditForm({
+      name: org.name,
+      description: org.description || '',
+      type: org.type,
+      join_policy: org.joinPolicy,
+      visibility: org.visibility,
+      interests: (org.interests || []).join(', '),
+    });
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditing(null);
+    setEditForm({});
+  }, []);
+
+  const handleUpdate = useCallback(async (id) => {
+    if (!editForm.name?.trim()) {
+      showToast(t('organisms.nameRequired') || 'Name is required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const interests = editForm.interests.split(',').map(s => s.trim()).filter(Boolean);
+      const result = await orgService.updateOrganism(id, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+        type: editForm.type,
+        join_policy: editForm.join_policy,
+        visibility: editForm.visibility,
+        interests,
+      });
+      if (result?.ok !== false) {
+        showToast(t('organisms.updated') || 'Organism updated');
+        setEditing(null);
+        setEditForm({});
+        loadData();
+      } else {
+        showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
+      }
+    } catch {
+      showToast(t('organisms.updateError') || 'Failed to update');
+    } finally { setSaving(false); }
+  }, [editForm, showToast, loadData]);
+
+  const inputStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:transparent;color:var(--text,#e8d5f5);font-size:.85rem';
+  const selectStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:var(--bg2,#1a0a2e);color:var(--text,#e8d5f5);font-size:.8rem';
+
+  const renderEditForm = (org) => html`
+    <div class="card-detail" onClick=${(e) => e.stopPropagation()}>
+      <div style="display:flex;flex-direction:column;gap:.5rem;padding:.25rem 0">
+        <input type="text" value=${editForm.name} onInput=${(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+          placeholder=${t('organisms.namePlaceholder') || 'Name'} style=${inputStyle} />
+        <textarea value=${editForm.description} onInput=${(e) => setEditForm(f => ({ ...f, description: e.target.value }))} rows="2"
+          placeholder=${t('organisms.descPlaceholder') || 'Description'} style=${inputStyle + ';resize:vertical'} />
+        <input type="text" value=${editForm.interests} onInput=${(e) => setEditForm(f => ({ ...f, interests: e.target.value }))}
+          placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} style=${inputStyle} />
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <select value=${editForm.type} onChange=${(e) => setEditForm(f => ({ ...f, type: e.target.value }))} style=${selectStyle}>
+            <option value="community">${t('organisms.types.community') || 'Community'}</option>
+            <option value="team">${t('organisms.types.team') || 'Team'}</option>
+            <option value="club">${t('organisms.types.club') || 'Club'}</option>
+            <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
+            <option value="project">${t('organisms.types.project') || 'Project'}</option>
+          </select>
+          <select value=${editForm.join_policy} onChange=${(e) => setEditForm(f => ({ ...f, join_policy: e.target.value }))} style=${selectStyle}>
+            <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
+            <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
+            <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
+          </select>
+          <select value=${editForm.visibility} onChange=${(e) => setEditForm(f => ({ ...f, visibility: e.target.value }))} style=${selectStyle}>
+            <option value="public">${t('organisms.visPublic') || 'Public'}</option>
+            <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
+            <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-sm btn-copy" onClick=${() => handleUpdate(org.id)} disabled=${saving}>
+            ${saving ? '...' : (t('organisms.save') || 'Save')}
+          </button>
+          <button class="btn-sm" onClick=${cancelEdit} style="opacity:.7">
+            ${t('organisms.cancel') || 'Cancel'}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
   const renderOrgCard = (org, isMine) => {
     const isExpanded = expanded === org.id;
+    const isEditing = editing === org.id;
     const isCreator = org.creatorGhii === ghii;
     const isAdmin = org.admins?.includes(ghii);
     const isMember = org.members?.includes(ghii);
+    const canEdit = isCreator || isAdmin;
     const policyLabel = {
       open: t('organisms.policyOpen') || 'Open',
       approval_required: t('organisms.policyApproval') || 'Approval',
@@ -150,7 +244,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           </div>
         `}
 
-        ${isExpanded && html`
+        ${isExpanded && !isEditing && html`
           <div class="card-detail">
             <div class="detail-grid">
               <div class="detail-item">
@@ -180,6 +274,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             </div>
 
             <div class="card-actions" style="margin-top:.75rem">
+              ${canEdit ? html`
+                <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); startEdit(org); }}>
+                  ${t('organisms.edit') || 'Edit'}
+                </button>
+              ` : null}
               ${isMine && !isCreator ? html`
                 <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleLeave(org.id, org.name); }}>
                   ${t('organisms.leave') || 'Leave'}
@@ -198,6 +297,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             </div>
           </div>
         `}
+
+        ${isExpanded && isEditing && renderEditForm(org)}
       </div>
     `;
   };

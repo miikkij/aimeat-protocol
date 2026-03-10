@@ -21,7 +21,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     // Gather images from storage files
-    const images: Array<{ key: string; gaii: string; mimeType: string; size: number; url: string }> = [];
+    const images: Array<{ key: string; gaii: string; mimeType: string; size: number; url: string; tags: string[] }> = [];
     for (const agent of agents) {
       const files = await storage.listStorageFiles(agent.gaii);
       for (const f of files) {
@@ -32,6 +32,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
             mimeType: f.mimeType,
             size: f.size,
             url: `/v1/pub/${encodeURIComponent(agent.gaii)}/${encodeURIComponent(f.key)}`,
+            tags: f.tags || [],
           });
         }
       }

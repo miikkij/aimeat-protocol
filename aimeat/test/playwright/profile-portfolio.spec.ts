@@ -7,7 +7,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const TS = Date.now();
 const USERNAME = `pw-portfolio-${TS}`;
-const PASSWORD = 'testpass42';
+const PASSWORD = 'TestPass42!';
 
 /** Load the AIMEAT test harness page (loads all client libs). */
 async function loadHarness(page: Page) {

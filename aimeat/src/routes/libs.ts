@@ -118,6 +118,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/test-harness — HTML page that loads all libraries (dev mode only)
   if (config.devMode) {
     router.get('/v1/libs/test-harness', (_req, res) => {
+      const nonce = res.locals.cspNonce as string;
       res.type('text/html').send(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -133,7 +134,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 <body>
 <h1 id="title">AIMEAT Test Harness</h1>
 <pre id="log"></pre>
-<script>
+<script nonce="${nonce}">
 window.__testLog = [];
 window.tlog = function(msg) {
   window.__testLog.push(msg);

@@ -1213,6 +1213,14 @@ export class SqliteStorage implements Storage {
     return result.changes > 0;
   }
 
+  async updateFileTagsByKey(ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null> {
+    const result = this.db.prepare(
+      'UPDATE storage_files SET tags = ? WHERE ownerGaii = ? AND key = ?'
+    ).run(JSON.stringify(tags), ownerGaii, key);
+    if (result.changes === 0) return null;
+    return this.getStorageFile(ownerGaii, key);
+  }
+
   // ══════════════════════════════════════════════════════════
   // ── Peering Requests ──
   // ══════════════════════════════════════════════════════════
@@ -2408,7 +2416,7 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeOrganism(row) : null;
   }
 
-  async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<OrganismRecord[]> {
+  async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number }): Promise<OrganismRecord[]> {
     const page = opts?.page ?? 1;
     const perPage = opts?.perPage ?? 20;
 
@@ -2418,6 +2426,7 @@ export class SqliteStorage implements Storage {
     if (opts?.type) results = results.filter(o => o.type === opts.type);
     if (opts?.city) results = results.filter(o => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
     if (opts?.interest) results = results.filter(o => o.interests.some(i => i.toLowerCase() === opts.interest!.toLowerCase()));
+    if (opts?.member) results = results.filter(o => o.members.includes(opts.member!));
     if (opts?.visibility) results = results.filter(o => o.visibility === opts.visibility);
 
     const start = (page - 1) * perPage;

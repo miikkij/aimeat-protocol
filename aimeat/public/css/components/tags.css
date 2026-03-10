@@ -1,0 +1,67 @@
+/* ── Shared Tag Components ── */
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 0;
+}
+
+.tag-pill {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255,107,157,0.25));
+  background: transparent;
+  color: var(--text, #e8d5f5);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-pill:hover {
+  border-color: var(--love1, #ff6b9d);
+  background: rgba(255,107,157,0.1);
+}
+
+.tag-pill.active {
+  background: var(--love1, #ff6b9d);
+  color: #fff;
+  border-color: var(--love1, #ff6b9d);
+}
+
+.tag-clear {
+  color: var(--muted, #c4a6d0);
+  font-style: italic;
+}
+
+.tag-clear.active {
+  background: transparent;
+  color: var(--muted, #c4a6d0);
+  border-color: var(--border, rgba(255,107,157,0.25));
+}
+
+/* ── Tag Editor ── */
+
+.tag-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tag-editor-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.tag-editor-input {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tag-editor-input input {
+  flex: 1;
+  font-size: 0.8rem;
+  padding: 3px 8px;
+}

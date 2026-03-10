@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard, handleImgError } from '/js/utils.js';
 import { apiGet, apiPut } from '/js/api.js';
+import TagCloud from '/js/components/tag-cloud.js';
 
 const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -227,6 +228,8 @@ function PortfolioBuilder({ session, navigate }) {
   const [selectedBoards, setSelectedBoards] = useState(new Set());
   const [selectedCortex, setSelectedCortex] = useState(new Set());
   const [selectedMemories, setSelectedMemories] = useState(new Set());
+  const [imageTagFilter, setImageTagFilter] = useState(new Set());
+  const [memoryTagFilter, setMemoryTagFilter] = useState(new Set());
 
   // Style
   const [portfolioType, setPortfolioType] = useState('dev');
@@ -429,17 +432,39 @@ function PortfolioBuilder({ session, navigate }) {
           ${catalog.images.length > 0 && html`
             <details class="portfolio-source-group" open>
               <summary>${t('portfolio.builder.imagesGroup')} (${catalog.images.length})</summary>
-              <div class="portfolio-source-list">
-                ${catalog.images.map(img => html`
-                  <div class="portfolio-source-item portfolio-img-item">
-                    <input type="checkbox" id=${'img-' + img.key} checked=${selectedImages.has(img.key)}
-                      onChange=${() => toggleSet(setSelectedImages, img.key)} />
-                    <img class="portfolio-img-thumb" src=${img.url} alt=${img.key} loading="lazy" onError=${handleImgError} />
-                    <label for=${'img-' + img.key}>${img.key}</label>
-                    <span class="portfolio-source-meta">${Math.round(img.size / 1024)}KB · ${img.mimeType.split('/')[1]}</span>
+              ${(() => {
+                const allImgTags = new Set();
+                for (const img of catalog.images) {
+                  if (img.tags) for (const tag of img.tags) allImgTags.add(tag);
+                }
+                const filteredImgs = imageTagFilter.size === 0 ? catalog.images : catalog.images.filter(img =>
+                  img.tags && [...imageTagFilter].every(tag => img.tags.includes(tag))
+                );
+                const toggleImgTag = (tag) => {
+                  setImageTagFilter(prev => {
+                    const next = new Set(prev);
+                    if (next.has(tag)) next.delete(tag); else next.add(tag);
+                    return next;
+                  });
+                };
+                return html`
+                  <${TagCloud} tags=${[...allImgTags]} selected=${imageTagFilter} onToggle=${toggleImgTag} onClear=${() => setImageTagFilter(new Set())} />
+                  <div class="portfolio-source-list">
+                    ${filteredImgs.map(img => html`
+                      <div class="portfolio-source-item portfolio-img-item">
+                        <input type="checkbox" id=${'img-' + img.key} checked=${selectedImages.has(img.key)}
+                          onChange=${() => toggleSet(setSelectedImages, img.key)} />
+                        <img class="portfolio-img-thumb" src=${img.url} alt=${img.key} loading="lazy" onError=${handleImgError} />
+                        <label for=${'img-' + img.key}>${img.key}</label>
+                        <span class="portfolio-source-meta">${Math.round(img.size / 1024)}KB \u00B7 ${img.mimeType.split('/')[1]}</span>
+                      </div>
+                    `)}
+                    ${filteredImgs.length === 0 && imageTagFilter.size > 0 && html`
+                      <div style="padding:.5rem;font-size:.8rem;color:var(--text-dim)">${t('tags.noMatch') || 'No items match selected tags'}</div>
+                    `}
                   </div>
-                `)}
-              </div>
+                `;
+              })()}
             </details>
           `}
 
@@ -494,21 +519,44 @@ function PortfolioBuilder({ session, navigate }) {
           ${catalog.memories.length > 0 && html`
             <details class="portfolio-source-group">
               <summary>${t('portfolio.builder.memoriesGroup')} (${catalog.memories.length})</summary>
-              <div class="portfolio-source-list">
-                ${catalog.memories.map(mem => {
-                  const displayKey = formatMemoryKey(mem.key);
-                  return html`
-                  <div class="portfolio-mem-item">
-                    <div class="portfolio-mem-header">
-                      <input type="checkbox" id=${'mem-' + mem.key} checked=${selectedMemories.has(mem.key)}
-                        onChange=${() => toggleSet(setSelectedMemories, mem.key)} />
-                      <label for=${'mem-' + mem.key} title=${mem.key}>${displayKey}</label>
-                      <span class="portfolio-source-meta">${mem.visibility}</span>
-                    </div>
-                    ${mem.preview && html`<p class="portfolio-mem-preview">${mem.preview}</p>`}
+              ${(() => {
+                const allMemTags = new Set();
+                for (const mem of catalog.memories) {
+                  if (mem.tags) for (const tag of mem.tags) allMemTags.add(tag);
+                }
+                const filteredMems = memoryTagFilter.size === 0 ? catalog.memories : catalog.memories.filter(mem =>
+                  mem.tags && [...memoryTagFilter].every(tag => mem.tags.includes(tag))
+                );
+                const toggleMemTag = (tag) => {
+                  setMemoryTagFilter(prev => {
+                    const next = new Set(prev);
+                    if (next.has(tag)) next.delete(tag); else next.add(tag);
+                    return next;
+                  });
+                };
+                return html`
+                  <${TagCloud} tags=${[...allMemTags]} selected=${memoryTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemoryTagFilter(new Set())} />
+                  <div class="portfolio-source-list">
+                    ${filteredMems.map(mem => {
+                      const displayKey = formatMemoryKey(mem.key);
+                      return html`
+                        <div class="portfolio-mem-item">
+                          <div class="portfolio-mem-header">
+                            <input type="checkbox" id=${'mem-' + mem.key} checked=${selectedMemories.has(mem.key)}
+                              onChange=${() => toggleSet(setSelectedMemories, mem.key)} />
+                            <label for=${'mem-' + mem.key} title=${mem.key}>${displayKey}</label>
+                            <span class="portfolio-source-meta">${mem.visibility}</span>
+                          </div>
+                          ${mem.preview && html`<p class="portfolio-mem-preview">${mem.preview}</p>`}
+                        </div>
+                      `;
+                    })}
+                    ${filteredMems.length === 0 && memoryTagFilter.size > 0 && html`
+                      <div style="padding:.5rem;font-size:.8rem;color:var(--text-dim)">${t('tags.noMatch') || 'No items match selected tags'}</div>
+                    `}
                   </div>
-                `})}
-              </div>
+                `;
+              })()}
             </details>
           `}
         </div>

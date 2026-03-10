@@ -3163,5 +3163,11 @@
       "cooperative": "Cooperative",
       "project": "Project"
     }
+  },
+  "tags": {
+    "clear": "Clear",
+    "addPlaceholder": "Add tag...",
+    "editTags": "Edit tags",
+    "noMatch": "No items match selected tags"
   }
 }

@@ -81,12 +81,13 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── GET /v1/organisms — List organisms ── */
   router.get('/v1/organisms', async (req, res) => {
-    const { type, city, interest, visibility, page, per_page } = req.query;
+    const { type, city, interest, visibility, member, page, per_page } = req.query;
     const organisms = await storage.listOrganisms({
       type: type as string,
       city: city as string,
       interest: interest as string,
-      visibility: (visibility as string) || 'public',
+      member: member as string,
+      visibility: member ? (visibility as string) : ((visibility as string) || 'public'),
       page: page ? Number(page) : 1,
       perPage: per_page ? Number(per_page) : 20,
     });

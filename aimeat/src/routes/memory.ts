@@ -304,6 +304,38 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }));
   });
 
+  // PATCH /v1/memory/files/:key — update file tags
+  router.patch('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = req.auth!.sub;
+    const key = req.params.key as string;
+    const { tags } = req.body ?? {};
+
+    if (!Array.isArray(tags)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'tags must be an array of strings'));
+      return;
+    }
+
+    if (tags.length > 20 || tags.some((t: unknown) => typeof t !== 'string' || (t as string).length > 64)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Max 20 tags, each max 64 characters'));
+      return;
+    }
+
+    const updated = await storage.updateFileTagsByKey(gaii, key, tags);
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      key: updated.key,
+      size: updated.size,
+      mime_type: updated.mimeType,
+      visibility: updated.visibility,
+      tags: updated.tags || [],
+      created_at: updated.createdAt,
+    }));
+  });
+
   // GET /v1/memory/files — list files
   router.get('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
     const gaii = req.auth!.sub;

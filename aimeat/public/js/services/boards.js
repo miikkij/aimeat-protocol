@@ -37,9 +37,10 @@ export async function listPosts(boardId) {
 
 /** Create a post in a board. */
 export async function createPost(boardId, content) {
+  const title = content.trim().slice(0, 80) || 'Post';
   return api(`/v1/boards/${encodeURIComponent(boardId)}/posts`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ title, body: content }),
   });
 }
 

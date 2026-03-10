@@ -36,6 +36,22 @@ export async function updateMemory(key, value) {
   });
 }
 
+/** Update tags on a memory entry. */
+export async function updateMemoryTags(key, tags) {
+  return api(`/v1/memory/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ tags }),
+  });
+}
+
+/** Update tags on a file. */
+export async function updateFileTags(key, tags) {
+  return api(`/v1/memory/files/${encodeURIComponent(key)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ tags }),
+  });
+}
+
 /** Delete a memory entry. */
 export async function deleteMemory(key) {
   return apiDelete(`/v1/memory/${encodeURIComponent(key)}`);

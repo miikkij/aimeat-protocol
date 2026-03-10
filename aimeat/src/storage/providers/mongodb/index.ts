@@ -1118,6 +1118,16 @@ export class MongoStorage implements Storage {
         } catch { return false; }
     }
 
+    async updateFileTagsByKey(ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null> {
+        this.ensureReady();
+        const updated = await this.prisma.storageFile.updateMany({
+            where: { ownerGaii, key },
+            data: { tags },
+        });
+        if (updated.count === 0) return null;
+        return this.getStorageFile(ownerGaii, key);
+    }
+
     // ── Peering Requests ────────────────────────────────────────
 
     async createPeeringRequest(req: PeeringRequestRecord): Promise<PeeringRequestRecord> {
@@ -2024,7 +2034,7 @@ export class MongoStorage implements Storage {
         return row ? this.toOrganismRecord(row) : null;
     }
 
-    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').OrganismRecord[]> {
+    async listOrganisms(opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number }): Promise<import('../../interface.js').OrganismRecord[]> {
         this.ensureReady();
         const page = opts?.page ?? 1;
         const perPage = opts?.perPage ?? 20;
@@ -2036,6 +2046,7 @@ export class MongoStorage implements Storage {
         let results = rows.map((r: any) => this.toOrganismRecord(r));
         if (opts?.city) results = results.filter((o: any) => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
         if (opts?.interest) results = results.filter((o: any) => o.interests.some((i: string) => i.toLowerCase() === opts.interest!.toLowerCase()));
+        if (opts?.member) results = results.filter((o: any) => o.members.includes(opts.member!));
         const start = (page - 1) * perPage;
         return results.slice(start, start + perPage);
     }

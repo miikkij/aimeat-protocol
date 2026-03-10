@@ -11,6 +11,7 @@ export async function listOrganisms(opts = {}) {
   if (opts.city) params.set('city', opts.city);
   if (opts.interest) params.set('interest', opts.interest);
   if (opts.visibility) params.set('visibility', opts.visibility);
+  if (opts.member) params.set('member', opts.member);
   return apiGet(`/v1/organisms?${params.toString()}`);
 }
 

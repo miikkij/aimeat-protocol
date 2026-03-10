@@ -3162,5 +3162,11 @@
       "cooperative": "Osuuskunta",
       "project": "Projekti"
     }
+  },
+  "tags": {
+    "clear": "Tyhjennä",
+    "addPlaceholder": "Lisää tagi...",
+    "editTags": "Muokkaa tageja",
+    "noMatch": "Ei tuloksia valituilla tageilla"
   }
 }

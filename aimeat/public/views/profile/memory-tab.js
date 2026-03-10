@@ -8,6 +8,8 @@ import { Spinner, recipientBadge } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import { getKeyPermissions } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
+import TagCloud from '/js/components/tag-cloud.js';
+import TagEditor from '/js/components/tag-editor.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
   const NODE_URL = getNodeUrl();
@@ -19,6 +21,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [expandedMem, setExpandedMem] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [keyRulesPopover, setKeyRulesPopover] = useState(null);
+  const [memTagFilter, setMemTagFilter] = useState(new Set());
+  const [editingMemTags, setEditingMemTags] = useState(null);
+  const [editingFileTags, setEditingFileTags] = useState(null);
 
   useEffect(() => {
     if (session) { loadMemories(); loadFiles(); }
@@ -110,9 +115,41 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setKeyRulesPopover(null); }
   }
 
+  async function handleUpdateMemoryTags(key, tags) {
+    const resp = await memoryService.updateMemoryTags(key, tags);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    loadMemories();
+  }
+
+  async function handleUpdateFileTags(key, tags) {
+    const resp = await memoryService.updateFileTags(key, tags);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    loadFiles();
+  }
+
   const renderEntries = () => {
     const searchRef = useRef(null);
     if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
+
+    // Collect all unique tags across memories
+    const allMemTags = new Set();
+    for (const m of memories) {
+      if (m.tags) for (const tag of m.tags) allMemTags.add(tag);
+    }
+
+    // Filter by selected tags
+    const filtered = memTagFilter.size === 0 ? memories : memories.filter(m =>
+      m.tags && [...memTagFilter].every(tag => m.tags.includes(tag))
+    );
+
+    const toggleMemTag = (tag) => {
+      setMemTagFilter(prev => {
+        const next = new Set(prev);
+        if (next.has(tag)) next.delete(tag); else next.add(tag);
+        return next;
+      });
+    };
+
     return html`
       <div class="action-bar">
         <div class="search-bar">
@@ -122,10 +159,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
         </div>
         <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
       </div>
+      <${TagCloud} tags=${[...allMemTags]} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} />
       ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} />`}
-      ${memories.length === 0
-        ? html`<div class="empty">${t('profile.memory.empty')}</div>`
-        : memories.map(m => html`
+      ${filtered.length === 0
+        ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
+        : filtered.map(m => html`
           <div>
             <div class="mem-item" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
               <span class="mem-key">${escHtml(m.key)}</span>
@@ -135,7 +173,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
             ${expandedMem === m.key && html`
               <div class="mem-detail">
                 <pre>${escHtml(typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''))}</pre>
-                ${m.tags?.length > 0 && html`<div style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${m.tags.join(', ')}</div>`}
+                <div style="margin-top:.5rem">
+                  <button class="btn-sm btn-outline" style="font-size:.7rem" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
+                    ${t('tags.editTags') || 'Edit tags'}
+                  </button>
+                </div>
+                ${editingMemTags === m.key && html`
+                  <div style="margin-top:.5rem">
+                    <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags)} />
+                  </div>
+                `}
+                ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${m.tags.join(', ')}</div>`}
                 ${keyRulesPopover && keyRulesPopover.key === m.key && html`
                   <div class="key-rules-box">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
@@ -200,20 +248,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         ${filtered.length > 0 && html`<button class="btn-sm btn-outline" onClick=${copyFileUrls} title="Copy file URLs">\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})</button>`}
         <span style="font-size:.75rem;color:var(--muted)">${t('profile.files.sizeLimit')}</span>
       </div>
-      ${allTags.size > 0 && html`
-        <div class="file-tag-cloud">
-          ${[...allTags].sort().map(tag => html`
-            <button key=${tag}
-              class="file-tag-btn ${fileTagFilter.has(tag) ? 'active' : ''}"
-              onClick=${() => toggleTag(tag)}>
-              ${escHtml(tag)}
-            </button>
-          `)}
-          ${fileTagFilter.size > 0 && html`
-            <button class="file-tag-btn file-tag-clear" onClick=${() => setFileTagFilter(new Set())}>\u2715 ${t('profile.files.clearFilter') || 'Clear'}</button>
-          `}
-        </div>
-      `}
+      <${TagCloud} tags=${[...allTags]} selected=${fileTagFilter} onToggle=${toggleTag} onClear=${() => setFileTagFilter(new Set())} />
       ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} />`}
       ${filtered.length === 0
         ? html`<div class="empty">${files.length > 0 ? (t('profile.files.noMatch') || 'No files match selected tags') : t('profile.files.empty')}</div>`
@@ -226,7 +261,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
                   <div class="file-info">
                     <div class="file-name">${escHtml(f.key || f.name)}</div>
                     <div class="file-meta">${f.size ? Math.round(f.size / 1024) + ' KB' : ''} \u2502 ${f.visibility || 'private'}</div>
-                    ${f.tags?.length > 0 && html`<div class="file-tags">${f.tags.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}</div>`}
+                    ${editingFileTags === (f.key || f.name)
+                      ? html`<${TagEditor} tags=${f.tags || []} onSave=${(tags) => handleUpdateFileTags(f.key || f.name, tags)} />`
+                      : html`
+                        ${f.tags?.length > 0 && html`<div class="file-tags">${f.tags.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}</div>`}
+                        <button class="btn-sm btn-outline" style="font-size:.65rem;margin-top:.25rem;padding:1px 6px" onClick=${() => setEditingFileTags(f.key || f.name)}>
+                          ${t('tags.editTags') || 'Edit tags'}
+                        </button>
+                      `}
                   </div>
                   <div class="file-actions">
                     <a class="btn-sm" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}" target="_blank" style="text-decoration:none">${t('profile.files.download')}</a>
