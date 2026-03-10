@@ -40,6 +40,21 @@ const AUTH_GATES = [
   { id: 'custom', key: 'portfolio.builder.gateCustom' },
 ];
 
+/* ── Memory key formatting ── */
+function formatMemoryKey(key) {
+  // packages/UUID/section → section (capitalize)
+  const pkgMatch = key.match(/^packages\/[0-9a-f-]+\/(.+)$/);
+  if (pkgMatch) {
+    return pkgMatch[1].replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  // For other slash-separated keys, show last segment
+  if (key.includes('/')) {
+    const last = key.split('/').pop();
+    return last.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return key;
+}
+
 /* ── Prompt Builder ── */
 function buildPortfolioPrompt({ session, catalog, selectedImages, selectedApps, selectedBoards, selectedCortex, selectedMemories, portfolioType, designStyle, authGates }) {
   const ghii = session.ghii || (session.owner + '@unknown');
@@ -480,14 +495,20 @@ function PortfolioBuilder({ session, navigate }) {
             <details class="portfolio-source-group">
               <summary>${t('portfolio.builder.memoriesGroup')} (${catalog.memories.length})</summary>
               <div class="portfolio-source-list">
-                ${catalog.memories.map(mem => html`
-                  <div class="portfolio-source-item">
+                ${catalog.memories.map(mem => {
+                  const displayKey = formatMemoryKey(mem.key);
+                  const isPackage = /^packages\/[0-9a-f-]+\//.test(mem.key);
+                  const metaLabel = isPackage
+                    ? mem.visibility
+                    : (mem.visibility + (mem.tags.length ? ' · ' + mem.tags.slice(0, 3).join(', ') + (mem.tags.length > 3 ? ` +${mem.tags.length - 3}` : '') : ''));
+                  return html`
+                  <div class="portfolio-source-item portfolio-mem-item">
                     <input type="checkbox" id=${'mem-' + mem.key} checked=${selectedMemories.has(mem.key)}
                       onChange=${() => toggleSet(setSelectedMemories, mem.key)} />
-                    <label for=${'mem-' + mem.key}>${mem.key}</label>
-                    <span class="portfolio-source-meta">${mem.visibility}${mem.tags.length ? ' · ' + mem.tags.join(', ') : ''}</span>
+                    <label for=${'mem-' + mem.key} title=${mem.key}>${displayKey}</label>
+                    <span class="portfolio-source-meta">${metaLabel}</span>
                   </div>
-                `)}
+                `})}
               </div>
             </details>
           `}
