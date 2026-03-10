@@ -456,9 +456,13 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               ${(pkg.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}
             </div>
             <div class="kpkg-card-actions">
-              <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${() => handleClone(pkg.package_id)}>
-                ${t('knowledge.discover.cloneToMine')}
-              </button>
+              ${pkg.sharing?.allow_clone !== false ? html`
+                <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${() => handleClone(pkg.package_id)}>
+                  ${t('knowledge.discover.cloneToMine')}
+                </button>
+              ` : html`
+                <span class="kpkg-clone-disabled">${t('knowledge.discover.cloneDisabled') || 'Cloning not available'}</span>
+              `}
             </div>
             <p class="kpkg-trust-advisory">${t('knowledge.discover.trustAdvisory')}</p>
           </div>

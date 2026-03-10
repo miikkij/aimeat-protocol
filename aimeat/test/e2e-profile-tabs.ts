@@ -537,6 +537,46 @@ await test('POST /v1/packages/:id/clone — clone with allow_clone=false should 
     assert(status === 403 || status === 404 || body.error?.code === 'CLONE_DISABLED', `expected 403/404, got ${status}: ${JSON.stringify(body)}`);
 });
 
+// Test default allow_clone behavior — catalog_listed should imply allow_clone
+let defaultClonePackageId = '';
+await test('POST /v1/packages/import — catalog_listed=true defaults allow_clone=true', async () => {
+    const { body } = await authJson('/v1/packages/import', agentToken, {
+        method: 'POST',
+        body: JSON.stringify({
+            package: {
+                type: 'knowledge-package',
+                name: 'E2E Default Clone Test',
+                version: '1.0.0',
+                content_type: 'document',
+                language: 'en',
+                tags: ['e2e', 'default-clone'],
+                entries: [
+                    { key: 'default-entry', title: 'Default Clone', value: 'Should be clonable by default', visibility: 'public' },
+                ],
+            },
+            overrides: { catalog_listed: true },
+        }),
+    });
+    assert(body.ok === true, `import default clone: ${JSON.stringify(body.error)}`);
+    defaultClonePackageId = body.data?.package_id || '';
+    assert(defaultClonePackageId.length > 0, 'got package_id');
+});
+
+await test('POST /v1/packages/:id/clone — clone catalog-listed package (default allow_clone)', async () => {
+    if (!defaultClonePackageId) { assert(false, 'no package to clone'); return; }
+    const { body } = await authJson(`/v1/packages/${encodeURIComponent(defaultClonePackageId)}/clone`, agentToken, {
+        method: 'POST',
+        body: JSON.stringify({ target_prefix: 'default-cloned' }),
+    });
+    assert(body.ok === true, `clone default: ${JSON.stringify(body.error)}`);
+    assert(body.data?.cloned_package_id, 'got cloned_package_id');
+    // Clean up
+    const manifestKey = `packages/${defaultClonePackageId}/manifest`;
+    await authJson(`/v1/memory/${encodeURIComponent(manifestKey)}`, agentToken, { method: 'DELETE' });
+    const entryKey = `packages/${defaultClonePackageId}/default-entry`;
+    await authJson(`/v1/memory/${encodeURIComponent(entryKey)}`, agentToken, { method: 'DELETE' });
+});
+
 await test('POST /v1/packages/import — import with owner token (regression: was 403)', async () => {
     const { body } = await authJson('/v1/packages/import', ownerToken, {
         method: 'POST',

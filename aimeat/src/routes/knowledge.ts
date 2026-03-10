@@ -45,9 +45,10 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       pkg.synthesis = { level: 'original', description: 'Imported from AI chat' };
     }
     if (!pkg.sharing) {
+      const catalogListed = overrides?.catalog_listed ?? false;
       pkg.sharing = {
-        catalog_listed: overrides?.catalog_listed ?? false,
-        allow_clone: false,
+        catalog_listed: catalogListed,
+        allow_clone: catalogListed,
         morsel_price: 0,
       };
     }
@@ -84,6 +85,10 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
     if (overrides?.catalog_listed !== undefined) {
       manifest.sharing.catalog_listed = overrides.catalog_listed;
+      // If catalog_listed is enabled and allow_clone wasn't explicitly set, enable cloning
+      if (overrides.catalog_listed && !manifest.sharing.allow_clone) {
+        manifest.sharing.allow_clone = true;
+      }
     }
 
     // Store manifest
