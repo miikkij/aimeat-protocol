@@ -8,8 +8,6 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  console.log('[organisms] Router created, registering routes...');
-
   /* ── POST /v1/organisms — Create a new organism ── */
   router.post('/v1/organisms', requireAuth(), requireRole('agent'), async (req, res) => {
     const ghii = req.auth!.owner as string;
