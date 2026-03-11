@@ -53,8 +53,18 @@ export async function api(path, opts = {}) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
       }
-      return resp.json();
+      const json = await resp.json();
+      if (json && json.ok === false && json.error) {
+        const err = new Error(json.error.message || json.error.code || 'Request failed');
+        err.code = json.error.code;
+        err.status = resp.status;
+        err.response = json;
+        throw err;
+      }
+      return json;
     } catch (err) {
+      // Don't retry client errors (4xx) — only retry network/server errors
+      if (err.status && err.status >= 400 && err.status < 500) throw err;
       lastError = err;
       if (attempt < MAX_RETRIES) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
@@ -62,7 +72,9 @@ export async function api(path, opts = {}) {
       }
     }
   }
-  return { ok: false, error: { code: 'NETWORK_ERROR', message: lastError?.message || 'Request failed' } };
+  const err = new Error(lastError?.message || 'Request failed');
+  err.code = 'NETWORK_ERROR';
+  throw err;
 }
 
 /** Parse JWT payload without verification (for expiry check only) */
