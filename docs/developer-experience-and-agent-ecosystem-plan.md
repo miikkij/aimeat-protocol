@@ -756,7 +756,7 @@ aimeat prompt validate --tier tier1
 │                                                            │
 │  1. Lisää MCP-serveri: https://node.example.com/v1/mcp     │
 │  2. OAuth-autentikointi automaattisesti                     │
-│  3. 14 MCP-työkalua käytettävissä                         │
+│  3. 18 MCP-työkalua käytettävissä                         │
 │  4. SSE-tilaukset reaaliaikaisiin päivityksiin             │
 │                                                            │
 │  → Saumattomin kokemus, ei copy-pastea                    │

@@ -205,7 +205,7 @@ The `aimeat/` directory contains a fully functional Node.js reference implementa
 | Express | 5.2 | HTTP framework |
 | @noble/ed25519 | 3.0 | Ed25519 signing |
 | jose | 6.1 | EdDSA JWT tokens |
-| @modelcontextprotocol/sdk | 1.27 | MCP server (14 tools) |
+| @modelcontextprotocol/sdk | 1.27 | MCP server (18 tools) |
 | Prisma | 6.9 | MongoDB ORM (optional) |
 | Zod | 4.3 | Schema validation |
 | Winston | 3.19 | Structured logging |
@@ -258,7 +258,7 @@ node --import tsx test/run-e2e-ci.ts --test=micro-memory
 | Boards (CRUD, posts, reactions, replies, single post) | 7 | Done |
 | Catalogue (actions, agents, boards, hash, stats) | 7 | Done |
 | Prompts (per-tier AI system prompts + anonymous) | 2 | Done |
-| MCP (Model Context Protocol — 14 tools) | 1 | Done |
+| MCP (Model Context Protocol — 18 tools) | 1 | Done |
 | Admin (dashboard UI, setup wizard, config, backup, maintenance) | 8 | Done |
 | Federation (peering lifecycle, heartbeat, directory) | 11 | Done |
 | Storage (binary upload/download, chunked, Range) | 5 | Done |
@@ -320,7 +320,7 @@ AIMEAT/
 │   │   │   ├── catalogue.ts               # Public catalogue (actions/agents/boards/hash/stats)
 │   │   │   ├── disputes.ts                # 13 dispute resolution endpoints + audit trail
 │   │   │   ├── federation.ts              # Peering lifecycle, heartbeat, directory
-│   │   │   ├── mcp.ts                     # MCP server (14 tools, StreamableHTTP)
+│   │   │   ├── mcp.ts                     # MCP server (18 tools, StreamableHTTP)
 │   │   │   ├── memory.ts                  # Memory CRUD, search, optimistic locking
 │   │   │   ├── micro-memory.ts            # Tier 0.5 — OTK micro-memory (5 access modes)
 │   │   │   ├── owners.ts                  # Owner registration, trust profile, GDPR

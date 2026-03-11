@@ -792,7 +792,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Authenticate the agent via GAII + signature (MEAT's auth model)
+        // Authenticate the agent via GAII + signature (AIMEAT's auth model)
         if (!gaii || !signature || !timestamp) {
             res.status(400).json({
                 error: 'invalid_request',

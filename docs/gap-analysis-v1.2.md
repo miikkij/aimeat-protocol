@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The reference implementation covers **~95% of the RFC v1.2 specification**. All 8 protocol pillars are implemented with 150+ endpoints across 20 route files, 60 storage interface methods, Zod validation on all write endpoints, MCP integration with 14 tools + OAuth 2.1, and a tamper-evident dispute resolution system.
+The reference implementation covers **~95% of the RFC v1.2 specification**. All 8 protocol pillars are implemented with 150+ endpoints across 20 route files, 60 storage interface methods, Zod validation on all write endpoints, MCP integration with 18 tools (14 user + 4 admin) + OAuth 2.1, and a tamper-evident dispute resolution system.
 
 **Remaining gaps fall into 4 categories:**
 1. **Federation completeness** — relay/mirror node types, cross-node catalogue sync, webhook delivery
@@ -267,7 +267,7 @@ The reference implementation covers **~95% of the RFC v1.2 specification**. All 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Streamable HTTP transport | ✅ | POST/GET/DELETE at `/v1/mcp` |
-| 14 MCP tools | ✅ | catalogue, agent, memory, action, work, wallet, board, storage |
+| 18 MCP tools (14 user + 4 admin) | ✅ | catalogue, agent, memory, action, work, wallet, board, storage + admin stats/agents/config/mint |
 | OAuth 2.1 Dynamic Client Registration | ✅ | `/v1/mcp/register` |
 | OAuth authorization + token exchange | ✅ | `/v1/mcp/authorize`, `/v1/mcp/token` |
 | Token revocation | ✅ | `/v1/mcp/token/revoke` |

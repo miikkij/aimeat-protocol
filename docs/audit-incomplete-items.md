@@ -11,7 +11,7 @@
 | Phase | Planned | Done | Gaps |
 |-------|---------|------|------|
 | 1 — Enforcement Fixes | 3 items | 2.5 | Board post cleanup interval wrong (5min vs 10min) |
-| 2 — OpenAPI Spec | 3 sections | 1 of 3 | MCP OAuth paths + wallet alias missing |
+| 2 — OpenAPI Spec | 3 sections | 2.5 of 3 | MCP OAuth paths done; wallet alias missing |
 | 3 — Validation Layer | 2 items | 0.5 | Schemas created but **never wired into routes** |
 | 4 — Developer Tooling | 4 items | 3 of 4 | OpenAPI type generation missing entirely |
 | 5 — Rate Limiting | 4 items | 3 of 4 | Rate limits not updatable via admin API |
@@ -38,11 +38,11 @@
 
 | # | Item | Status | Description |
 |---|------|--------|-------------|
-| 2.2a | `/v1/mcp/register` POST | ❌ MISSING | MCP OAuth client registration not in openapi.yaml |
-| 2.2b | `/v1/mcp/authorize` GET | ❌ MISSING | MCP OAuth authorization endpoint not in openapi.yaml |
-| 2.2c | `/v1/mcp/token` POST | ❌ MISSING | MCP OAuth token endpoint not in openapi.yaml |
-| 2.2d | `/v1/mcp/token/revoke` POST | ❌ MISSING | MCP OAuth token revocation not in openapi.yaml |
-| 2.2e | `/.well-known/oauth-authorization-server` GET | ❌ MISSING | OAuth discovery endpoint not in openapi.yaml |
+| 2.2a | `/v1/mcp/register` POST | ✅ DONE | MCP OAuth client registration in openapi.yaml |
+| 2.2b | `/v1/mcp/authorize` GET | ✅ DONE | MCP OAuth authorization endpoint in openapi.yaml |
+| 2.2c | `/v1/mcp/token` POST | ✅ DONE | MCP OAuth token endpoint in openapi.yaml |
+| 2.2d | `/v1/mcp/token/revoke` POST | ✅ DONE | MCP OAuth token revocation in openapi.yaml |
+| 2.2e | `/.well-known/oauth-authorization-server` GET | ✅ DONE | OAuth discovery endpoint in openapi.yaml |
 | 2.3 | `/v1/wallet/history` alias | ❌ MISSING | Alias for `/v1/wallet/transactions` not documented |
 
 ---
@@ -140,7 +140,7 @@
 4. **Phase 8.1** — GAII port endpoint (portability is export/import only, not protocol-level)
 5. **Phase 8.3** — Core/Extended tagging (RFC compliance)
 6. **Phase 6.1** — Add Prisma deps + db scripts to package.json
-7. **Phase 2.2** — Document MCP OAuth paths in openapi.yaml
+7. ~~**Phase 2.2** — Document MCP OAuth paths in openapi.yaml~~ ✅ DONE
 8. **Phase 5.1** — Make rate limits runtime-configurable + tier-aware
 9. **Phase 9** — Missing unit tests (trust, otk) + all 9 E2E additions
 

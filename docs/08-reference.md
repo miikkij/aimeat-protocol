@@ -376,7 +376,7 @@ Build the MCP endpoint at `/v1/mcp` and test:
 ```
 1. Add aimeat node as Claude.ai connector (Settings → Connectors)
 2. Verify OAuth flow works
-3. Test all 14 MCP tools from Claude chat
+3. Test all 18 MCP tools from Claude chat
 4. Add same node as ChatGPT app (Settings → Apps → Developer Mode)
 5. Verify same tools work from ChatGPT
 6. Cross-platform: Claude writes memory via MCP, ChatGPT reads it via MCP

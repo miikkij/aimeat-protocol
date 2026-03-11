@@ -146,19 +146,43 @@ function BgSelector({ activeBg, onChange }) {
 /* ══════════════════════════════════════════════
    PANELS (MCP, API, Browse, Prompt Package)
    ══════════════════════════════════════════════ */
-function McpPanel({ locale }) {
+function McpPanel({ locale, isLoggedIn, session }) {
   return html`
     <div class="dv-panel">
       <h3>${dt('panel.mcpBadge', locale)}</h3>
+
+      ${!isLoggedIn && html`
+        <div class="dv-mcp-prereq" style="background:rgba(255,180,0,.08);border:1px solid rgba(255,180,0,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
+          <strong>${dt('panel.mcpPrereqTitle', locale)}</strong>
+          <p style="margin:.5rem 0 0;font-size:.9rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpPrereqDesc', locale)) }}></p>
+        </div>
+      `}
+
+      ${isLoggedIn && session?.gaii && html`
+        <div style="background:rgba(100,255,150,.08);border:1px solid rgba(100,255,150,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
+          <strong>${dt('panel.mcpReady', locale)}</strong>
+          <div style="margin-top:.5rem;font-size:.85rem">
+            <div><strong>GHII:</strong> ${session.ghii || '-'}</div>
+            <div><strong>Agent GAII:</strong> <code>${session.gaii}</code></div>
+          </div>
+          <p style="margin:.5rem 0 0;font-size:.85rem;color:var(--muted)" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpReadyDesc', locale)) }}></p>
+        </div>
+      `}
+
       <div class="dv-instructions">
         <ol>
           <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep1', locale)) }}></li>
           <li>${dt('panel.mcpStep2', locale)}<br/><code>${NODE_URL}/v1/mcp</code></li>
-          <li>${dt('panel.mcpStep3', locale)}</li>
+          <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep3', locale)) }}></li>
           <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep4', locale)) }}></li>
         </ol>
         <p dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpTools', locale)) }}></p>
       </div>
+
+      <details style="margin-top:.75rem;font-size:.85rem">
+        <summary style="cursor:pointer;color:var(--muted)">${dt('panel.mcpAuthDetails', locale)}</summary>
+        <div style="margin-top:.5rem;padding:.5rem;background:rgba(255,255,255,.03);border-radius:.25rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpAuthExplain', locale)) }}></div>
+      </details>
     </div>
   `;
 }
@@ -256,7 +280,7 @@ function PromptPackagePanel({ locale, platform, variant, isLoggedIn }) {
 /* ══════════════════════════════════════════════
    CAPABILITY TABS
    ══════════════════════════════════════════════ */
-function CapTabs({ variant, platform, locale, isLoggedIn }) {
+function CapTabs({ variant, platform, locale, isLoggedIn, session }) {
   const [activeTab, setActiveTab] = useState('apps');
 
   const hasMcp = variant.path === 'mcp';
@@ -286,7 +310,7 @@ function CapTabs({ variant, platform, locale, isLoggedIn }) {
         <${PromptPackagePanel} locale=${locale} platform=${platform} variant=${variant} isLoggedIn=${isLoggedIn} />
       `}
       ${activeTab === 'mcp' && (hasMcp
-        ? html`<${McpPanel} locale=${locale} />`
+        ? html`<${McpPanel} locale=${locale} isLoggedIn=${isLoggedIn} session=${session} />`
         : html`<div class="dv-unavail-notice"><div class="dv-unavail-icon">\ud83d\udd12</div><p>${dt('tabs.unavailable', locale)}</p><p style="font-size:.8rem;margin-top:.5rem">${dt('tabs.upgradeForMcp', locale)}</p></div>`
       )}
       ${activeTab === 'api' && (hasApi
@@ -638,7 +662,7 @@ export default function PortalDevView({ navigate, locale }) {
             <div class="dv-step-num">3</div>
             <div class="dv-step-label">${dt('step3.label', locale)}</div>
           </div>
-          <${CapTabs} variant=${selectedVariant} platform=${selectedPlatform} locale=${locale} isLoggedIn=${isLoggedIn} />
+          <${CapTabs} variant=${selectedVariant} platform=${selectedPlatform} locale=${locale} isLoggedIn=${isLoggedIn} session=${session} />
         </div>
       `}
 
