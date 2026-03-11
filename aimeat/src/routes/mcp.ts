@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -48,6 +48,8 @@ interface AuthorizationCode {
     owner: string;
     roles: string[];
     redirectUri: string;
+    codeChallenge?: string;
+    codeChallengeMethod?: string;
     expiresAt: number;
 }
 
@@ -645,10 +647,23 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
     // POST /v1/mcp — MCP Streamable HTTP endpoint (handles JSON-RPC requests)
     router.post('/v1/mcp', async (req: Request, res: Response) => {
-        // Extract auth: support Bearer token or query param
+        // Origin validation (MCP spec: REQUIRED to prevent DNS rebinding)
+        const origin = req.headers.origin;
+        if (origin) {
+            const allowed = config.corsAllowedOrigins;
+            if (!allowed.includes('*') && !allowed.includes(origin)) {
+                res.status(403).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32001, message: 'Origin not allowed' },
+                    id: req.body?.id ?? null,
+                });
+                return;
+            }
+        }
+
+        // Extract auth: Bearer token only (spec: token MUST NOT be in query string)
         const authHeader = req.headers.authorization;
-        const tokenParam = req.query._token as string | undefined;
-        const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : tokenParam;
+        const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
         // Determine session ID from header
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -714,6 +729,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 });
                 return;
             }
+
+            // GHII account is required for MCP access
+            const ghiiRecord = await storage.getGHIIByOwner(agent.owner);
+            if (!ghiiRecord) {
+                res.status(403).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32004, message: 'GHII account required for MCP access. Create one at /v1/ghii first.' },
+                    id: req.body?.id ?? null,
+                });
+                return;
+            }
             sessionOwner = agent.owner;
 
             // Create ChatInstanceRecord for session tracking
@@ -747,7 +773,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
         // Create transport and MCP server for this session
         const transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => `mcp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
         const mcpServer = createMcpServer(agentGaii);
@@ -837,12 +863,20 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         const responseType = req.query.response_type as string;
         const state = req.query.state as string | undefined;
         const scope = req.query.scope as string | undefined;
+        const codeChallenge = req.query.code_challenge as string | undefined;
+        const codeChallengeMethod = req.query.code_challenge_method as string | undefined;
         const gaii = req.query.gaii as string | undefined;
         const signature = req.query.signature as string | undefined;
         const timestamp = req.query.timestamp as string | undefined;
 
         if (responseType !== 'code') {
             res.status(400).json({ error: 'unsupported_response_type', error_description: 'Only "code" is supported' });
+            return;
+        }
+
+        // PKCE validation (OAuth 2.1 requires S256)
+        if (codeChallengeMethod && codeChallengeMethod !== 'S256') {
+            res.status(400).json({ error: 'invalid_request', error_description: 'Only S256 code_challenge_method is supported' });
             return;
         }
 
@@ -892,6 +926,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 owner: parsed.owner,
                 roles: ['agent'],
                 redirectUri: redirectUri ?? client.redirectUris[0] ?? '',
+                codeChallenge,
+                codeChallengeMethod: codeChallenge ? 'S256' : undefined,
                 expiresAt: Date.now() + 600_000,
             };
             authCodes.set(code, authCode);
@@ -915,13 +951,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         if (redirectUri) consentUrl.searchParams.set('redirect_uri', redirectUri);
         if (state) consentUrl.searchParams.set('state', state);
         if (scope) consentUrl.searchParams.set('scope', scope);
+        if (codeChallenge) consentUrl.searchParams.set('code_challenge', codeChallenge);
         res.redirect(302, consentUrl.toString());
     });
 
     // POST /v1/mcp/authorize-consent — Browser consent form submission
     // Called by the consent page after user logs in, selects an agent, and clicks "Approve"
     router.post('/v1/mcp/authorize-consent', async (req: Request, res: Response) => {
-        const { client_id, redirect_uri, state, gaii, owner_token } = req.body ?? {};
+        const { client_id, redirect_uri, state, gaii, owner_token, code_challenge } = req.body ?? {};
 
         if (!client_id || !gaii || !owner_token) {
             res.status(400).json({ error: 'invalid_request', error_description: 'Missing required fields (client_id, gaii, owner_token)' });
@@ -976,6 +1013,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             owner: parsed?.owner || agent.owner,
             roles: ['agent'],
             redirectUri: finalRedirect ?? '',
+            codeChallenge: code_challenge,
+            codeChallengeMethod: code_challenge ? 'S256' : undefined,
             expiresAt: Date.now() + 600_000,
         });
 
@@ -1001,7 +1040,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
     // POST /v1/mcp/token — Token exchange endpoint
     router.post('/v1/mcp/token', async (req: Request, res: Response) => {
-        const { grant_type, code, client_id, client_secret, redirect_uri, refresh_token } = req.body ?? {};
+        const { grant_type, code, client_id, client_secret, redirect_uri, refresh_token, code_verifier } = req.body ?? {};
 
         if (grant_type === 'authorization_code') {
             if (!code || !client_id) {
@@ -1031,6 +1070,25 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
             if (authCode.clientId !== client_id) {
                 res.status(400).json({ error: 'invalid_grant', error_description: 'Code was issued to a different client' });
+                return;
+            }
+
+            // PKCE validation (OAuth 2.1 §4.4.3)
+            if (authCode.codeChallenge) {
+                if (!code_verifier) {
+                    res.status(400).json({ error: 'invalid_request', error_description: 'code_verifier is required (PKCE)' });
+                    return;
+                }
+                const computed = createHash('sha256').update(code_verifier).digest('base64url');
+                if (computed !== authCode.codeChallenge) {
+                    res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE code_verifier does not match code_challenge' });
+                    return;
+                }
+            }
+
+            // redirect_uri must match if it was provided during authorization (OAuth 2.1 §4.1.3)
+            if (authCode.redirectUri && redirect_uri && authCode.redirectUri !== redirect_uri) {
+                res.status(400).json({ error: 'invalid_grant', error_description: 'redirect_uri does not match the authorization request' });
                 return;
             }
 
