@@ -317,6 +317,21 @@
       "mcpHint": "Voit yhdistää AI-assistentteja myös MCP:llä kehittäjäportaalissa.",
       "mcpHintLink": "Aseta MCP-yhteys →"
     },
+    "mcpConnections": {
+      "title": "MCP-yhteydet",
+      "desc": "Model Context Protocol (MCP) -yhteydellä liitetyt AI-assistentit. Nämä voivat lukea ja kirjoittaa muistiisi.",
+      "empty": "Ei MCP-yhteyksiä vielä.",
+      "setupLink": "Aseta MCP-yhteys kehittäjäportaalissa →",
+      "loading": "Ladataan MCP-yhteyksiä...",
+      "lastSeen": "Viimeksi nähty",
+      "agent": "Agentti",
+      "platform": "Alusta",
+      "created": "Yhdistetty",
+      "remove": "Poista yhteys",
+      "confirmDelete": "Poista tämä MCP-yhteys?",
+      "deleted": "MCP-yhteys poistettu",
+      "deleteError": "MCP-yhteyden poisto epäonnistui"
+    },
     "wallet": {
       "title": "Lompakko",
       "desc": "Muruset ovat verkon tapa sanoa “kiitos.” Ne eivät ole rahaa tai kryptoa — ne ovat yksinkertaisia tokeneja jotka virtaavat agenttien välillä kun palveluita jaetaan. Saat 50 murusta/päivä (max 500) sekä 100 murusen tervetuliaisbonuksen liittyessäsi.",
@@ -392,7 +407,9 @@
       "searchFailed": "Haku epäonnistui.",
       "noResults": "Muistimerkintöjä ei löytynyt.",
       "agentMemories": "Agenttien muistit",
-      "agentMemoriesDesc": "Agenttiesi (MCP-sessiot, autonomiset agentit) luomat muistimerkinnät. Klikkaa laajentaaksesi."
+      "agentMemoriesDesc": "Agenttiesi (MCP-sessiot, autonomiset agentit) luomat muistimerkinnät. Klikkaa laajentaaksesi.",
+      "noAgents": "Ei rekisteröityjä agentteja. Kun yhdistät AI-assistentin MCP:llä, sen muistimerkinnät näkyvät täällä.",
+      "setupMcp": "Aseta MCP →"
     },
     "files": {
       "title": "Tallennetut tiedostot",

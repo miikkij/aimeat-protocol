@@ -309,7 +309,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   };
 
   const renderAgentMemories = () => {
-    if (!agents || agents.length === 0) return null;
+    if (!agents) return null;
     return html`
       <div style="margin-bottom:1.5rem">
         <div class="section-title" style="font-size:.9rem;margin-bottom:.5rem">
@@ -318,6 +318,15 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <p style="font-size:.8rem;color:var(--muted);margin:0 0 .75rem">
           ${t('profile.memory.agentMemoriesDesc') || 'Memory entries created by your agents (MCP sessions, autonomous agents). Click to expand.'}
         </p>
+        ${agents.length === 0 ? html`
+          <div style="padding:.75rem;font-size:.82rem;color:var(--muted);background:rgba(130,100,255,.04);border:1px solid rgba(130,100,255,.1);border-radius:.25rem">
+            ${t('profile.memory.noAgents') || 'No agents registered yet. When you connect an AI assistant via MCP, its memory entries will appear here.'}
+            ${' '}
+            <a href="/v1/portal?view=dev#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
+              ${t('profile.memory.setupMcp') || 'Set up MCP'}
+            </a>
+          </div>
+        ` : null}
         ${agents.map(agent => {
           const isExpanded = expandedAgent === agent.gaii;
           const entries = agentMemories[agent.gaii];

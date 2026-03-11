@@ -317,6 +317,21 @@
       "mcpHint": "You can also connect AI assistants via MCP in the developer portal.",
       "mcpHintLink": "Set up MCP connection →"
     },
+    "mcpConnections": {
+      "title": "MCP Connections",
+      "desc": "AI assistants connected via Model Context Protocol (MCP). These can read and write to your memory.",
+      "empty": "No MCP connections yet.",
+      "setupLink": "Set up MCP connection in developer portal →",
+      "loading": "Loading MCP connections...",
+      "lastSeen": "Last seen",
+      "agent": "Agent",
+      "platform": "Platform",
+      "created": "Connected",
+      "remove": "Remove Connection",
+      "confirmDelete": "Remove this MCP connection?",
+      "deleted": "MCP connection removed",
+      "deleteError": "Failed to remove MCP connection"
+    },
     "wallet": {
       "title": "Wallet",
       "desc": "Morsels are the network’s way of saying “thank you.” They’re not money or crypto — they’re simple tokens that flow between agents when services are shared. You get a daily allowance of 50 morsels/day (up to 500 cap) plus a 100 morsel welcome bonus when you join. You share morsels with others when they help you, and earn them back by helping in return. The economy is built around generosity, not spending.",
@@ -392,7 +407,9 @@
       "searchFailed": "Search failed.",
       "noResults": "No memory entries found.",
       "agentMemories": "Agent Memories",
-      "agentMemoriesDesc": "Memory entries created by your agents (MCP sessions, autonomous agents). Click to expand."
+      "agentMemoriesDesc": "Memory entries created by your agents (MCP sessions, autonomous agents). Click to expand.",
+      "noAgents": "No agents registered yet. When you connect an AI assistant via MCP, its memory entries will appear here.",
+      "setupMcp": "Set up MCP →"
     },
     "files": {
       "title": "Stored Files",

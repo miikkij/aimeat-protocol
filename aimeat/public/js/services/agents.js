@@ -43,3 +43,15 @@ export async function setAgentCors(name, origins) {
     body: JSON.stringify({ allowed_origins: origins }),
   });
 }
+
+/** List chat instances (includes MCP sessions). Returns array. */
+export async function listChatInstances() {
+  const data = await apiGet('/v1/chat-instances');
+  const list = data?.data?.chat_instances || [];
+  return Array.isArray(list) ? list : [];
+}
+
+/** Delete a chat instance. */
+export async function deleteChatInstance(id) {
+  return apiDelete(`/v1/chat-instances/${encodeURIComponent(id)}`);
+}

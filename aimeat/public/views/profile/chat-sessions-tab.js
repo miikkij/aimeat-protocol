@@ -5,7 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { listAgents, deleteAgent } from '/js/services/agents.js';
+import { listAgents, deleteAgent, listChatInstances, deleteChatInstance } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
 
 export default function ChatSessionsTab({ session, showToast, onStats }) {
@@ -13,6 +13,9 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
   const [expanded, setExpanded] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [copying, setCopying] = useState(null);
+  const [mcpConnections, setMcpConnections] = useState(null);
+  const [expandedMcp, setExpandedMcp] = useState(null);
+  const [deletingMcp, setDeletingMcp] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -21,6 +24,13 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
       setChatSessions(sessions);
       onStats?.({ chatSessions: sessions.length });
     } catch { setChatSessions([]); }
+    // Load MCP connections (ChatInstanceRecords with mcp-* prefix)
+    try {
+      const instances = await listChatInstances();
+      const mcp = instances.filter(ci => ci.app_name?.startsWith('mcp-') || ci.id?.startsWith('mcp-'));
+      setMcpConnections(mcp);
+      onStats?.({ mcpConnections: mcp.length });
+    } catch { setMcpConnections([]); }
   }, [session?.owner, onStats]);
 
   useEffect(() => {
@@ -65,10 +75,97 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     } finally { setCopying(null); }
   }, [showToast]);
 
+  const handleDeleteMcp = useCallback(async (ci) => {
+    if (!confirm(t('profile.mcpConnections.confirmDelete') || `Remove MCP connection "${ci.app_name || ci.id}"?`)) return;
+    setDeletingMcp(ci.id);
+    try {
+      await deleteChatInstance(ci.id);
+      showToast(t('profile.mcpConnections.deleted') || 'MCP connection removed');
+      setExpandedMcp(null);
+      loadData();
+    } catch {
+      showToast(t('profile.mcpConnections.deleteError') || 'Failed to remove MCP connection', true);
+    } finally { setDeletingMcp(null); }
+  }, [showToast, loadData]);
+
+  const platformLabel = (p) => {
+    const labels = { claude: 'Claude', chatgpt: 'ChatGPT', copilot: 'GitHub Copilot', cursor: 'Cursor', gemini: 'Gemini' };
+    return labels[p] || p || 'Unknown';
+  };
+
   if (!chatSessions) return html`<${Spinner} text=${t('profile.chatSessions.loading')} />`;
   return html`
     <div class="section-title">${t('profile.chatSessions.title')}</div>
     <div class="section-desc">${t('profile.chatSessions.desc')}</div>
+
+    <!-- MCP Connections section -->
+    <div class="section-title" style="font-size:.95rem;margin-top:.5rem;margin-bottom:.5rem">
+      ${t('profile.mcpConnections.title') || 'MCP Connections'}
+    </div>
+    <p style="font-size:.82rem;color:var(--muted,#c4a6d0);margin:0 0 .75rem">
+      ${t('profile.mcpConnections.desc') || 'AI assistants connected via Model Context Protocol (MCP). These can read and write to your memory.'}
+    </p>
+    ${mcpConnections === null ? html`<${Spinner} text=${t('profile.mcpConnections.loading') || 'Loading MCP connections...'} />`
+      : mcpConnections.length === 0
+        ? html`
+          <div class="card" style="margin-bottom:1rem">
+            <div style="padding:.75rem 1rem;font-size:.85rem;color:var(--muted,#c4a6d0)">
+              <p style="margin:0 0 .5rem">${t('profile.mcpConnections.empty') || 'No MCP connections yet.'}</p>
+              <a href="/v1/portal?view=dev#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
+                ${t('profile.mcpConnections.setupLink') || 'Set up MCP connection in developer portal'}
+              </a>
+            </div>
+          </div>`
+        : html`
+          <div style="margin-bottom:1.5rem">
+            ${mcpConnections.map(ci => {
+              const isExpanded = expandedMcp === ci.id;
+              return html`
+                <div class="card ${isExpanded ? 'card-expanded' : ''}" key=${ci.id} style="margin-bottom:.5rem">
+                  <div class="card-header card-clickable" onClick=${() => setExpandedMcp(isExpanded ? null : ci.id)}>
+                    <span class="expand-icon">${isExpanded ? '\u25BC' : '\u25B6'}</span>
+                    <div class="card-title">${platformLabel(ci.platform)}</div>
+                    <span class="badge badge-info" style="font-size:.7rem">${escHtml(ci.app_name || '')}</span>
+                    ${ci.agent_gaii ? html`<span class="badge badge-muted" style="font-size:.65rem">${escHtml(ci.agent_gaii.split('#')[0] || '')}</span>` : null}
+                  </div>
+                  <div class="card-subtitle">${t('profile.mcpConnections.lastSeen') || 'Last seen'}: ${ci.last_seen ? timeAgo(ci.last_seen) : '-'}</div>
+
+                  ${isExpanded && html`
+                    <div class="card-detail">
+                      <div class="detail-grid">
+                        ${ci.agent_gaii ? html`
+                          <div class="detail-item">
+                            <span class="detail-label">${t('profile.mcpConnections.agent') || 'Agent'}</span>
+                            <span class="detail-value mono">${escHtml(ci.agent_gaii)}</span>
+                          </div>
+                        ` : null}
+                        <div class="detail-item">
+                          <span class="detail-label">${t('profile.mcpConnections.platform') || 'Platform'}</span>
+                          <span class="detail-value">${platformLabel(ci.platform)}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">${t('profile.mcpConnections.created') || 'Connected'}</span>
+                          <span class="detail-value">${ci.created_at ? new Date(ci.created_at).toLocaleString() : '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">ID</span>
+                          <span class="detail-value mono" style="font-size:.7rem;word-break:break-all">${escHtml(ci.id)}</span>
+                        </div>
+                      </div>
+                      <div class="card-actions" style="margin-top:.75rem">
+                        <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleDeleteMcp(ci); }}
+                          disabled=${deletingMcp === ci.id}>
+                          ${deletingMcp === ci.id ? '...' : (t('profile.mcpConnections.remove') || 'Remove Connection')}
+                        </button>
+                      </div>
+                    </div>
+                  `}
+                </div>
+              `;
+            })}
+          </div>
+        `
+    }
 
     <div style="margin-bottom:1rem;padding:.5rem .75rem;background:rgba(130,100,255,.06);border:1px solid rgba(130,100,255,.15);border-radius:.25rem;font-size:.82rem">
       <span>${t('profile.chatSessions.mcpHint') || 'You can connect AI assistants via MCP in the developer portal.'}</span>

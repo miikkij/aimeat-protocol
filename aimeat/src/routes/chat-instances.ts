@@ -73,6 +73,8 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
         is_anonymous: r.isAnonymous,
         created_at: r.createdAt,
         last_seen: r.lastSeen,
+        agent_gaii: r.agentGaii || null,
+        mcp_client_id: r.mcpClientId || null,
       })),
       total: instances.length,
     }));
