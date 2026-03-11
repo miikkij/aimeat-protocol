@@ -228,16 +228,23 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   ];
   const pwaStaticDir = pwaCandidates.find(p => existsSync(p));
   if (pwaStaticDir) {
-    // Serve app-catalog.html with CSP nonce injection (static serving would block inline scripts)
+    // Serve app-catalog.html with relaxed CSP — self-contained SPA with many inline event handlers
     const appCatalogPath = join(pwaStaticDir, 'app-catalog.html');
     if (existsSync(appCatalogPath)) {
       app.get('/app-catalog.html', (_req, res) => {
-        let html = readFileSync(appCatalogPath, 'utf-8');
-        const nonce = res.locals.cspNonce as string || '';
-        if (nonce) {
-          html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
-          html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
-        }
+        const html = readFileSync(appCatalogPath, 'utf-8');
+        // Override CSP: allow 'unsafe-inline' for scripts (40+ inline onclick handlers + dynamic HTML)
+        res.setHeader('Content-Security-Policy', [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+          "style-src 'self' 'unsafe-inline'",
+          "connect-src 'self' wss: ws:",
+          "img-src 'self' data: blob:",
+          "font-src 'self'",
+          "frame-src 'self' blob: data:",
+          "object-src 'none'",
+          "base-uri 'self'",
+        ].join('; '));
         res.type('html').send(html);
       });
     }
