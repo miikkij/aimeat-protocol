@@ -234,6 +234,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               client_id: clientId,
+              client_name: clientName || undefined,
               redirect_uri: redirectUri,
               state,
               gaii: selectedAgent.gaii,

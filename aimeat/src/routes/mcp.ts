@@ -700,6 +700,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // MCP ALWAYS requires GHII authentication — no anonymous access allowed
         let agentGaii: string | undefined;
         let sessionOwner: string | undefined;
+        let mcpClientName: string | undefined;
 
         if (token) {
             try {
@@ -708,6 +709,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 if (payload) {
                     agentGaii = payload.sub as string;
                     sessionOwner = payload.owner as string;
+                    mcpClientName = payload.mcp_client;
                 }
             } catch {
                 // Token was provided but is invalid/expired — return 401
@@ -772,14 +774,26 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             sessionOwner = agent.owner;
 
             // Upsert ChatInstanceRecord for session tracking
-            // Use stable ID (platform + agent GAII) so reconnects reuse the same record
-            const ua = (req.headers['user-agent'] || '').toLowerCase();
+            // Prefer mcp_client from JWT (set during OAuth consent) over User-Agent sniffing
             let platform = 'unknown';
-            if (ua.includes('claude')) platform = 'claude';
-            else if (ua.includes('chatgpt') || ua.includes('openai')) platform = 'chatgpt';
-            else if (ua.includes('copilot')) platform = 'copilot';
-            else if (ua.includes('cursor')) platform = 'cursor';
-            else if (ua.includes('gemini')) platform = 'gemini';
+            if (mcpClientName) {
+                const cn = mcpClientName.toLowerCase();
+                if (cn.includes('claude code') || cn.includes('claude-code')) platform = 'claude-code';
+                else if (cn.includes('claude desktop') || cn.includes('claude-desktop')) platform = 'claude-desktop';
+                else if (cn.includes('claude')) platform = 'claude';
+                else if (cn.includes('chatgpt') || cn.includes('openai')) platform = 'chatgpt';
+                else if (cn.includes('copilot')) platform = 'copilot';
+                else if (cn.includes('cursor')) platform = 'cursor';
+                else if (cn.includes('gemini')) platform = 'gemini';
+                else platform = mcpClientName.slice(0, 32);
+            } else {
+                const ua = (req.headers['user-agent'] || '').toLowerCase();
+                if (ua.includes('claude')) platform = 'claude';
+                else if (ua.includes('chatgpt') || ua.includes('openai')) platform = 'chatgpt';
+                else if (ua.includes('copilot')) platform = 'copilot';
+                else if (ua.includes('cursor')) platform = 'cursor';
+                else if (ua.includes('gemini')) platform = 'gemini';
+            }
 
             chatInstanceId = `mcp-${platform}#${sessionOwner}@${config.nodeId}`;
             try {
@@ -957,6 +971,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             const authCode: AuthorizationCode = {
                 code,
                 clientId,
+                clientName: client.clientName,
                 gaii,
                 owner: parsed.owner,
                 roles: ['agent'],
@@ -1039,9 +1054,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // Issue authorization code
         const parsed = parseGAII(gaii);
         const code = randomBytes(32).toString('hex');
+        const resolvedClientName = clientNameBody || client?.clientName || client_id;
         authCodes.set(code, {
             code,
             clientId: client_id,
+            clientName: resolvedClientName,
             gaii,
             owner: parsed?.owner || agent.owner,
             roles: ['agent'],
@@ -1133,6 +1150,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 owner: authCode.owner,
                 node: config.nodeId,
                 roles: authCode.roles,
+                mcp_client: authCode.clientName || client_id,
             }, config.jwtTtlSeconds);
 
             const refreshTok = randomBytes(32).toString('hex');

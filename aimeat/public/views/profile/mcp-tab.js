@@ -39,7 +39,10 @@ export default function McpTab({ session, showToast, onStats }) {
   }, [showToast, loadData]);
 
   const platformLabel = (p) => {
-    const labels = { claude: 'Claude', chatgpt: 'ChatGPT', copilot: 'GitHub Copilot', cursor: 'Cursor', gemini: 'Gemini' };
+    const labels = {
+      claude: 'Claude', 'claude-code': 'Claude Code', 'claude-desktop': 'Claude Desktop',
+      chatgpt: 'ChatGPT', copilot: 'GitHub Copilot', cursor: 'Cursor', gemini: 'Gemini',
+    };
     return labels[p] || p || 'Unknown';
   };
 

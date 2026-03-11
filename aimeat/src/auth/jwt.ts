@@ -36,6 +36,7 @@ export interface JWTPayload {
   node: string;
   roles: string[];
   scopes?: string[];  // omitted = ['*'] for backward compat
+  mcp_client?: string; // OAuth client name for MCP sessions (e.g. "Claude", "Cursor")
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -51,6 +52,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     node: payload.node,
     roles: payload.roles,
     scopes: payload.scopes ?? ['*'],
+    ...(payload.mcp_client ? { mcp_client: payload.mcp_client } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -74,6 +76,7 @@ export interface VerifiedToken {
   scopes: string[];
   anonymous?: boolean;
   sessionId?: string;  // P3-7: Server-side session tracking
+  mcp_client?: string; // OAuth client name for MCP sessions
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -91,6 +94,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       exp: payload.exp as number,
       scopes: (payload.scopes as string[]) ?? ['*'],
       sessionId: payload.jti as string | undefined,
+      mcp_client: payload.mcp_client as string | undefined,
     };
   } catch {
     return null;
