@@ -42,6 +42,18 @@
     .btn-deny { background:transparent; border:1px solid var(--border); color:var(--muted); }
     .btn:disabled { opacity:.4; cursor:not-allowed; }
     .error-msg { color:var(--danger); font-size:.85rem; margin-top:.5rem; min-height:1.2em; }
+    .create-agent-row { display:flex; align-items:center; gap:.5rem; padding:.5rem .75rem;
+      margin-bottom:.4rem; cursor:pointer; border:1px dashed var(--border); border-radius:.5rem;
+      color:var(--accent); font-size:.85rem; transition:border-color .15s; }
+    .create-agent-row:hover { border-color:var(--accent); }
+    .create-agent-form { padding:.6rem .75rem; background:rgba(130,100,255,.06);
+      border:1px solid rgba(130,100,255,.2); border-radius:.5rem; margin-bottom:.4rem; }
+    .create-agent-form input { margin-bottom:.4rem; }
+    .create-agent-form .btn-row { margin-top:.5rem; }
+    .btn-sm { padding:.4rem .75rem; border:none; border-radius:.35rem; font-size:.8rem;
+      font-weight:600; cursor:pointer; }
+    .btn-sm-accent { background:var(--accent); color:#000; }
+    .btn-sm-muted { background:transparent; border:1px solid var(--border); color:var(--muted); }
   </style>
 </head>
 <body>
@@ -112,6 +124,17 @@
       return d.data?.agents || d.data || [];
     }
 
+    async function createAgent(name, displayName, jwt, ownerName) {
+      const r = await fetch('/v1/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+        body: JSON.stringify({ name, owner: ownerName, display_name: displayName || name }),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error?.message || 'Failed to create agent');
+      return d.data?.agent;
+    }
+
     function deny() {
       if (redirectUri) {
         const url = new URL(redirectUri);
@@ -166,16 +189,59 @@
       });
     }
 
+    function renderCreateForm(container, onCreated) {
+      container.innerHTML = `
+        <div class="create-agent-form">
+          <label>${escHtml(t('newAgentName'))}</label>
+          <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" pattern="[a-z0-9][a-z0-9_-]*" required />
+          <label>${escHtml(t('newAgentDisplayName'))}</label>
+          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint'))}" />
+          <div id="createError" class="error-msg"></div>
+          <div class="btn-row" style="margin-top:.5rem">
+            <button type="button" class="btn-sm btn-sm-muted" id="cancelCreate">${escHtml(t('cancelBtn'))}</button>
+            <button type="button" class="btn-sm btn-sm-accent" id="confirmCreate">${escHtml(t('createBtn'))}</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('cancelCreate').addEventListener('click', () => renderApproval());
+      document.getElementById('confirmCreate').addEventListener('click', async () => {
+        const nameVal = document.getElementById('newAgentName').value.trim().toLowerCase();
+        const displayVal = document.getElementById('newAgentDisplayName').value.trim();
+        const errEl = document.getElementById('createError');
+        errEl.textContent = '';
+        if (!nameVal || !/^[a-z0-9][a-z0-9_-]*$/.test(nameVal)) {
+          errEl.textContent = t('newAgentNameError');
+          return;
+        }
+        const btn = document.getElementById('confirmCreate');
+        btn.disabled = true;
+        btn.textContent = '...';
+        try {
+          const jwt = session.jwt || session.token;
+          const ownerName = session.owner || session.username;
+          const newAgent = await createAgent(nameVal, displayVal || nameVal, jwt, ownerName);
+          agents = await fetchAgents(ownerName, jwt);
+          onCreated(newAgent);
+        } catch (err) {
+          errEl.textContent = err.message;
+          btn.disabled = false;
+          btn.textContent = t('createBtn');
+        }
+      });
+    }
+
     function renderApproval() {
       if (agents.length === 0) {
         app.innerHTML = `
           <h1>${escHtml(t('title'))}</h1>
-          <p class="subtitle">${escHtml(t('noAgents'))}</p>
-          <div class="btn-row">
+          <p class="subtitle">${escHtml(t('noAgentsCreate'))}</p>
+          <div id="createContainer"></div>
+          <div class="btn-row" style="margin-top:1rem">
             <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
           </div>
         `;
         document.getElementById('denyBtn').addEventListener('click', deny);
+        renderCreateForm(document.getElementById('createContainer'), () => renderApproval());
         return;
       }
 
@@ -199,6 +265,8 @@
         </div>
         <p style="font-size:.9rem;margin-bottom:.5rem;font-weight:600">${escHtml(t('selectAgent'))}</p>
         <div id="agentList">${agentListHtml}</div>
+        <div class="create-agent-row" id="showCreateBtn">+ ${escHtml(t('createNewAgent'))}</div>
+        <div id="inlineCreateContainer" style="display:none"></div>
         <div class="scope-list">
           <strong>${escHtml(t('scopeLabel'))}</strong><br/>
           ${escHtml(t('scopeFull'))}
@@ -217,6 +285,17 @@
           document.querySelectorAll('.agent-option').forEach(e => e.classList.remove('selected'));
           el.classList.add('selected');
           selectedAgent = agents[parseInt(el.dataset.idx)];
+        });
+      });
+
+      document.getElementById('showCreateBtn').addEventListener('click', () => {
+        document.getElementById('showCreateBtn').style.display = 'none';
+        const container = document.getElementById('inlineCreateContainer');
+        container.style.display = 'block';
+        renderCreateForm(container, (newAgent) => {
+          // Re-render with new agent auto-selected
+          selectedAgent = agents.find(a => a.gaii === newAgent?.gaii) || agents[agents.length - 1];
+          renderApproval();
         });
       });
 
