@@ -7,7 +7,8 @@
 /**
  * Make an authenticated API call.
  * Automatically attaches JWT if a session exists.
- * Returns the parsed AIMEAT envelope: { ok, data, error, hints }
+ * Returns the parsed AIMEAT envelope: { ok, data, hints }
+ * Throws on error responses (ok: false) with err.message from the server.
  */
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 500;

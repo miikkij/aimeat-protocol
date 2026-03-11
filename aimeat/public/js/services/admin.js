@@ -112,6 +112,7 @@ export const deleteCsm         = (name)   => apiDelete(`/v1/admin/csm/${encodeUR
 export const createCsm         = (yaml)   => apiPost('/v1/csm', { yaml });
 export const getCsmFileTemplates = ()     => apiGet('/v1/csm/templates');
 export const getCsmFileTemplate  = (type) => fetch(`/v1/csm/templates/${encodeURIComponent(type)}`, { headers: { 'Accept': 'application/x-yaml' } }).then(r => r.text());
+export const getCsmBuilderPrompt = ()     => apiGet('/v1/portal/prompts/csm-builder');
 
 // ── MSM ──
 export const getMsmIntegrations = ()    => apiGet('/v1/admin/msm');

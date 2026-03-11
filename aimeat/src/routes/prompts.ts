@@ -708,6 +708,88 @@ ${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
 ## Design
 Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
     },
+    'csm-builder': {
+      name: 'CSM Builder',
+      description: 'Create a Contextual Service Model (CSM) via AI conversation',
+      category: 'builder',
+      cortexHints: [],
+      template: (nodeUrl, ownerName, _cortexExts) => `You are helping "${ownerName}" design a CSM (Contextual Service Model) for AIMEAT node ${nodeUrl}.
+
+## What is a CSM?
+
+A CSM is a YAML document that defines a service's data model for an AIMEAT node. It specifies what data a service collects, how it's validated, and what consent rules apply. Services like hobby directories, marketplaces, dating apps, news feeds, and forums all use CSMs.
+
+## CSM YAML Format
+
+\`\`\`yaml
+csm: "1.0"
+service:
+  name: "service-name"           # unique identifier (kebab-case)
+  type: "directory"              # directory | marketplace | forum | social | feed | auction
+  description: "What this service does"
+  locale: "en"                   # primary locale
+
+schema_mode: "open"              # open = flexible, strict = exact match, locked = no changes
+
+data_schema:
+  required:
+    field_name:
+      type: string               # string | number | boolean | array | object
+      maxLength: 200             # optional constraints
+    tags:
+      type: array
+      items: { type: string }
+      minItems: 1
+    location:
+      type: object
+      properties:
+        city: { type: string }
+        country: { type: string, default: "US" }
+      required: [city]
+  optional:
+    bio: { type: string, maxLength: 500 }
+    rating: { type: number, minimum: 0, maximum: 5 }
+    status: { type: string, enum: ["active", "paused", "closed"] }
+
+consent_requirements:
+  visibility_default: "federation"    # public | node | federation | private
+  requires_consent: true
+  consent_purpose: "community-discovery"  # describe why data is collected
+  data_retention: "until_revoked"     # until_revoked | 30_days | 90_days | 1_year
+
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: false
+
+ui_hints:
+  list_view: ["displayName", "tags", "location.city"]
+  detail_view: ["displayName", "bio", "tags", "location", "status"]
+  search_fields: ["tags", "location.city"]
+\`\`\`
+
+## Your Task
+
+1. Ask the user what kind of service they want to create
+2. Ask about the data fields they need (required vs optional)
+3. Ask about consent and moderation requirements
+4. Generate the complete CSM YAML
+
+## Rules
+- Service name must be unique and kebab-case
+- Include at least one required field in data_schema
+- Always include consent_requirements
+- Choose appropriate schema_mode (open for flexibility, strict for data integrity)
+- Include ui_hints to help frontends render the data
+
+## Registration
+
+Once the user is happy with the CSM, they can register it by:
+- Pasting the YAML in the admin dashboard CSM Management tab
+- Or via API: POST ${nodeUrl}/v1/csm with Content-Type: text/yaml
+
+The node will validate the CSM, generate a JSON Schema, and register it for use.`,
+    },
   };
 
   // GET /v1/portal/prompts — List available prompt packages

@@ -42,26 +42,28 @@ export default function DataWalletTab({ session, showToast }) {
   }
 
   async function handleGrant(body) {
-    const resp = await consentService.grantConsent(body);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('permissions.granted'));
-    setShowConsentForm(false);
-    loadConsents();
-    loadPermSummary();
+    try {
+      await consentService.grantConsent(body);
+      showToast(t('permissions.granted'));
+      setShowConsentForm(false);
+      loadConsents();
+      loadPermSummary();
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
   async function handleRevoke(id) {
-    const resp = await consentService.revokeConsent(id);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('wallet.consents.revoked'));
-    loadConsents();
+    try {
+      await consentService.revokeConsent(id);
+      showToast(t('wallet.consents.revoked'));
+      loadConsents();
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
   async function handleBulkRevoke(ids) {
-    const results = await consentService.bulkRevoke([...ids]);
-    const failed = results.filter(r => r.ok === false);
-    if (failed.length > 0) { showToast(failed[0].error?.message || t('profile.error'), true); }
-    else showToast(t('wallet.consents.revoked'));
+    try {
+      await consentService.bulkRevoke([...ids]);
+      showToast(t('wallet.consents.revoked'));
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
     setSelectedConsents(new Set());
     loadConsents();
     loadPermSummary();

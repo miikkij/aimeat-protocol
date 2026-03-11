@@ -16,8 +16,8 @@ export async function listExtensions() {
 /** Get full extension detail, including prompt content + ontology. */
 export async function getExtensionDetail(name) {
   const enc = encodeURIComponent(name);
-  const data = await apiGet(`/v1/cortex/${enc}`);
-  if (data.ok === false) return null;
+  let data;
+  try { data = await apiGet(`/v1/cortex/${enc}`); } catch { return null; }
   const ext = data.data?.extension || data.data;
 
   // Fetch prompt content for each prompt component

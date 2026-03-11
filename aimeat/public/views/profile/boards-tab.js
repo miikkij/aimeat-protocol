@@ -58,32 +58,36 @@ export default function BoardsTab({ session, showToast }) {
 
   async function handlePost(boardId, content) {
     if (!content?.trim()) { showToast(t('profile.boards.writeFirst'), true); return; }
-    const resp = await boardsService.createPost(boardId, content);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.boards.posted'));
-    viewPosts(boardId, boardView?.name);
+    try {
+      await boardsService.createPost(boardId, content);
+      showToast(t('profile.boards.posted'));
+      viewPosts(boardId, boardView?.name);
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
   async function handleReact(boardId, postId, emoji) {
-    const resp = await boardsService.reactToPost(boardId, postId, emoji);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    viewPosts(boardId, boardView?.name);
+    try {
+      await boardsService.reactToPost(boardId, postId, emoji);
+      viewPosts(boardId, boardView?.name);
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
   async function handleDeleteBoard(boardId) {
     if (!confirm(t('profile.boards.confirmDeleteBoard') || 'Delete this board and all its posts?')) return;
-    const resp = await boardsService.deleteBoard(boardId);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.boards.boardDeleted') || 'Board deleted');
-    loadMyData();
+    try {
+      await boardsService.deleteBoard(boardId);
+      showToast(t('profile.boards.boardDeleted') || 'Board deleted');
+      loadMyData();
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
   async function handleDeletePost(boardId, postId) {
     if (!confirm(t('profile.boards.confirmDelete') || 'Delete this post?')) return;
-    const resp = await boardsService.deletePost(boardId, postId);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.boards.postDeleted') || 'Post deleted');
-    viewPosts(boardId, boardView?.name);
+    try {
+      await boardsService.deletePost(boardId, postId);
+      showToast(t('profile.boards.postDeleted') || 'Post deleted');
+      viewPosts(boardId, boardView?.name);
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
   function isMyPost(post) {

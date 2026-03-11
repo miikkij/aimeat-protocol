@@ -23,13 +23,11 @@ export async function revokeConsent(consentId) {
   return api('/v1/consent/' + encodeURIComponent(consentId), { method: 'DELETE' });
 }
 
-/** Revoke multiple consents by IDs. */
+/** Revoke multiple consents by IDs. Throws on first failure. */
 export async function bulkRevoke(consentIds) {
-  const results = [];
   for (const id of consentIds) {
-    results.push(await api('/v1/consent/' + encodeURIComponent(id), { method: 'DELETE' }));
+    await api('/v1/consent/' + encodeURIComponent(id), { method: 'DELETE' });
   }
-  return results;
 }
 
 /** Load audit log entries for a given number of days. Returns array. */
