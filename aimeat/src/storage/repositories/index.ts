@@ -25,3 +25,4 @@ export type { NotificationTemplateRepository } from './notification-template.rep
 export type { KnowledgeRepository } from './knowledge.repository.js';
 export type { ExtensionInstanceRepository } from './extension-instance.repository.js';
 export type { ReplicationQueueRepository } from './replication-queue.repository.js';
+export type { DeviceAuthRepository } from './device-auth.repository.js';

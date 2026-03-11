@@ -127,6 +127,27 @@ export interface OtkRecord {
   createdAt: string;
 }
 
+export interface DeviceAuthorizationRecord {
+  deviceCode: string;
+  userCode: string;
+  ownerName: string;
+  agentName: string;
+  displayName?: string;
+  description?: string;
+  status: 'pending' | 'approved' | 'denied' | 'expired';
+  scopes?: string[];
+  createdAt: string;
+  expiresAt: string;
+  lastPolledAt?: string;
+  pollInterval: number;
+  approvedBy?: string;
+  agentCredentials?: {
+    gaii: string;
+    privateKey: string;
+    publicKey: string;
+  };
+}
+
 export interface DisputeRecord {
   id: string;
   trackingCode: string;
@@ -1014,6 +1035,7 @@ import type { KnowledgeRepository } from './repositories/knowledge.repository.js
 import type { SchedulerRepository } from './repositories/scheduler.repository.js';
 import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
 import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
+import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1027,4 +1049,5 @@ export interface Storage extends
   AppRepository, AppMarketplaceRepository, ConfigRepository,
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
-  ExtensionInstanceRepository, ReplicationQueueRepository { }
+  ExtensionInstanceRepository, ReplicationQueueRepository,
+  DeviceAuthRepository { }
