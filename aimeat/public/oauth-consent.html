@@ -193,7 +193,7 @@
       container.innerHTML = `
         <div class="create-agent-form">
           <label>${escHtml(t('newAgentName'))}</label>
-          <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" pattern="[a-z0-9][a-z0-9_-]*" required />
+          <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" minlength="3" maxlength="64" required />
           <label>${escHtml(t('newAgentDisplayName'))}</label>
           <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint'))}" />
           <div id="createError" class="error-msg"></div>
@@ -209,7 +209,7 @@
         const displayVal = document.getElementById('newAgentDisplayName').value.trim();
         const errEl = document.getElementById('createError');
         errEl.textContent = '';
-        if (!nameVal || !/^[a-z0-9][a-z0-9_-]*$/.test(nameVal)) {
+        if (!nameVal || nameVal.length < 3 || !/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(nameVal)) {
           errEl.textContent = t('newAgentNameError');
           return;
         }
