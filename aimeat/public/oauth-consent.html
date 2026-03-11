@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize — AIMEAT</title>
+  <style>
+    :root { --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
+      --muted:#8888aa; --accent:#a78bfa; --success:#4ade80; --danger:#ff6b6b;
+      --love1:#ff6b9d; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif;
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .consent-card { background:var(--card); border:1px solid var(--border); border-radius:1rem;
+      padding:2rem; max-width:480px; width:100%; }
+    h1 { font-size:1.4rem; margin-bottom:.5rem; }
+    .subtitle { color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
+    .platform-badge { background:rgba(130,100,255,.1); border:1px solid rgba(130,100,255,.3);
+      border-radius:.5rem; padding:.75rem 1rem; margin-bottom:1.5rem; font-size:.9rem; }
+    .platform-name { font-weight:700; color:var(--accent); }
+    label { display:block; font-size:.85rem; color:var(--muted); margin-bottom:.25rem; }
+    input, select { width:100%; padding:.6rem .75rem; background:var(--bg); border:1px solid var(--border);
+      border-radius:.5rem; color:var(--text); font-size:.9rem; margin-bottom:.75rem; }
+    input:focus, select:focus { outline:none; border-color:var(--accent); }
+    .agent-option { display:flex; justify-content:space-between; align-items:center; padding:.6rem .75rem;
+      background:rgba(255,255,255,.03); border:1px solid transparent; border-radius:.5rem;
+      margin-bottom:.4rem; cursor:pointer; transition:border-color .15s; }
+    .agent-option:hover { border-color:var(--border); }
+    .agent-option.selected { background:rgba(130,100,255,.12); border-color:rgba(130,100,255,.3); }
+    .agent-name { font-weight:600; }
+    .agent-gaii { font-size:.75rem; color:var(--muted); font-family:monospace; }
+    .agent-balance { font-size:.8rem; color:var(--muted); }
+    .scope-list { background:rgba(255,255,255,.03); border-radius:.5rem; padding:.75rem 1rem;
+      margin:.75rem 0; font-size:.85rem; }
+    .wallet-note { background:rgba(255,180,0,.08); border:1px solid rgba(255,180,0,.25);
+      border-radius:.5rem; padding:.6rem .75rem; font-size:.82rem; margin-bottom:1rem; color:var(--muted); }
+    .btn-row { display:flex; gap:.75rem; margin-top:1.25rem; }
+    .btn { flex:1; padding:.65rem 1rem; border:none; border-radius:.5rem; font-size:.9rem;
+      font-weight:600; cursor:pointer; transition:opacity .15s; }
+    .btn:hover { opacity:.85; }
+    .btn-approve { background:var(--success); color:#000; }
+    .btn-deny { background:transparent; border:1px solid var(--border); color:var(--muted); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .error-msg { color:var(--danger); font-size:.85rem; margin-top:.5rem; min-height:1.2em; }
+  </style>
+</head>
+<body>
+  <div class="consent-card" id="app">
+    <div id="loading" style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>
+  </div>
+
+  <script type="module">
+    // XSS-safe HTML escape
+    const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    // Parse URL params
+    const params = new URLSearchParams(location.search);
+    const clientId = params.get('client_id') || '';
+    const clientName = params.get('client_name') || clientId;
+    const redirectUri = params.get('redirect_uri') || '';
+    const state = params.get('state') || '';
+
+    // i18n
+    const lang = (navigator.language || 'en').startsWith('fi') ? 'fi' : 'en';
+    let T = {};
+    try {
+      const resp = await fetch(`/locales/${lang}.json`);
+      const all = await resp.json();
+      T = all.oauthConsent || {};
+    } catch {}
+    const t = (key) => T[key] || key;
+
+    const app = document.getElementById('app');
+
+    if (!clientId) {
+      app.innerHTML = '<h1>Error</h1><p>Missing client_id parameter.</p>';
+    }
+
+    let session = null;
+    let agents = [];
+    let selectedAgent = null;
+
+    async function checkSession() {
+      try {
+        const r = await fetch('/v1/auth/session', { credentials: 'include' });
+        const d = await r.json();
+        if (d.ok && d.data?.jwt) return d.data;
+      } catch {}
+      return null;
+    }
+
+    async function doLogin(username, password, totp) {
+      const body = { username, password };
+      if (totp) body.totp_code = totp;
+      const r = await fetch('/v1/ghii/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error?.message || 'Login failed');
+      return d.data;
+    }
+
+    async function fetchAgents(ownerName, jwt) {
+      const r = await fetch(`/v1/agents?owner=${encodeURIComponent(ownerName)}`, {
+        headers: { Authorization: 'Bearer ' + jwt },
+      });
+      const d = await r.json();
+      if (!d.ok) return [];
+      return d.data?.agents || d.data || [];
+    }
+
+    function deny() {
+      if (redirectUri) {
+        const url = new URL(redirectUri);
+        url.searchParams.set('error', 'access_denied');
+        url.searchParams.set('error_description', 'User denied the request');
+        if (state) url.searchParams.set('state', state);
+        location.href = url.toString();
+      } else {
+        app.innerHTML = '<h1>' + escHtml(t('denied')) + '</h1>';
+      }
+    }
+
+    function renderLogin() {
+      app.innerHTML = `
+        <h1>${escHtml(t('title'))}</h1>
+        <p class="subtitle">${escHtml(t('subtitle'))}</p>
+        <div class="platform-badge">
+          ${escHtml(t('platformLabel'))} <span class="platform-name">${escHtml(clientName)}</span>
+        </div>
+        <p style="margin-bottom:1rem;font-size:.9rem">${escHtml(t('loginRequired'))}</p>
+        <form id="loginForm">
+          <label>${escHtml(t('usernameLabel'))}</label>
+          <input type="text" id="username" required autocomplete="username" />
+          <label>${escHtml(t('passwordLabel'))}</label>
+          <input type="password" id="password" required autocomplete="current-password" />
+          <label>${escHtml(t('totpLabel'))}</label>
+          <input type="text" id="totp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" />
+          <div id="loginError" class="error-msg"></div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
+            <button type="submit" class="btn btn-approve">${escHtml(t('loginBtn'))}</button>
+          </div>
+        </form>
+      `;
+      document.getElementById('denyBtn').addEventListener('click', deny);
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('loginError');
+        errEl.textContent = '';
+        try {
+          const data = await doLogin(
+            document.getElementById('username').value.trim(),
+            document.getElementById('password').value,
+            document.getElementById('totp').value.trim() || undefined,
+          );
+          session = data;
+          agents = await fetchAgents(data.owner || data.username, data.jwt || data.token);
+          renderApproval();
+        } catch (err) {
+          errEl.textContent = err.message;
+        }
+      });
+    }
+
+    function renderApproval() {
+      if (agents.length === 0) {
+        app.innerHTML = `
+          <h1>${escHtml(t('title'))}</h1>
+          <p class="subtitle">${escHtml(t('noAgents'))}</p>
+          <div class="btn-row">
+            <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
+          </div>
+        `;
+        document.getElementById('denyBtn').addEventListener('click', deny);
+        return;
+      }
+
+      selectedAgent = agents[0];
+
+      const agentListHtml = agents.map((a, i) => `
+        <div class="agent-option ${i === 0 ? 'selected' : ''}" data-idx="${i}">
+          <div>
+            <div class="agent-name">${escHtml(a.displayName || a.name)}</div>
+            <div class="agent-gaii">${escHtml(a.gaii)}</div>
+          </div>
+          <div class="agent-balance">${escHtml(a.morselBalance || 0)} ${escHtml(t('morsels'))}</div>
+        </div>
+      `).join('');
+
+      app.innerHTML = `
+        <h1>${escHtml(t('title'))}</h1>
+        <p class="subtitle">${escHtml(t('subtitle'))}</p>
+        <div class="platform-badge">
+          ${escHtml(t('platformLabel'))} <span class="platform-name">${escHtml(clientName)}</span>
+        </div>
+        <p style="font-size:.9rem;margin-bottom:.5rem;font-weight:600">${escHtml(t('selectAgent'))}</p>
+        <div id="agentList">${agentListHtml}</div>
+        <div class="scope-list">
+          <strong>${escHtml(t('scopeLabel'))}</strong><br/>
+          ${escHtml(t('scopeFull'))}
+        </div>
+        <div class="wallet-note">${escHtml(t('walletNote'))}</div>
+        <div id="approveError" class="error-msg"></div>
+        <div class="btn-row">
+          <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
+          <button class="btn btn-approve" id="approveBtn">${escHtml(t('approveBtn'))}</button>
+        </div>
+      `;
+
+      // Agent selection
+      document.querySelectorAll('.agent-option').forEach(el => {
+        el.addEventListener('click', () => {
+          document.querySelectorAll('.agent-option').forEach(e => e.classList.remove('selected'));
+          el.classList.add('selected');
+          selectedAgent = agents[parseInt(el.dataset.idx)];
+        });
+      });
+
+      document.getElementById('denyBtn').addEventListener('click', deny);
+      document.getElementById('approveBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('approveBtn');
+        const errEl = document.getElementById('approveError');
+        btn.disabled = true;
+        btn.textContent = t('approving');
+        errEl.textContent = '';
+        try {
+          const jwt = session.jwt || session.token;
+          const r = await fetch('/v1/mcp/authorize-consent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: clientId,
+              redirect_uri: redirectUri,
+              state,
+              gaii: selectedAgent.gaii,
+              owner_token: jwt,
+            }),
+          });
+          const d = await r.json();
+          if (d.redirect_url) {
+            location.href = d.redirect_url;
+          } else if (d.code) {
+            // Fallback: manual redirect construction
+            if (redirectUri) {
+              const url = new URL(redirectUri);
+              url.searchParams.set('code', d.code);
+              if (d.state) url.searchParams.set('state', d.state);
+              location.href = url.toString();
+            } else {
+              app.innerHTML = '<h1>Done</h1><p>Authorization code: <code>' + escHtml(d.code) + '</code></p>';
+            }
+          } else {
+            throw new Error(d.error_description || d.error || t('errorGeneric'));
+          }
+        } catch (err) {
+          errEl.textContent = err.message;
+          btn.disabled = false;
+          btn.textContent = t('approveBtn');
+        }
+      });
+    }
+
+    // Boot
+    session = await checkSession();
+    if (session) {
+      const ownerName = session.owner || session.username;
+      const jwt = session.jwt || session.token;
+      agents = await fetchAgents(ownerName, jwt);
+      renderApproval();
+    } else {
+      renderLogin();
+    }
+  </script>
+</body>
+</html>

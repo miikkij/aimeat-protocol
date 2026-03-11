@@ -702,5 +702,16 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     });
   }
 
+  // OAuth consent page — standalone HTML (not SPA)
+  router.get('/v1/oauth/consent', (_req, res) => {
+    const htmlPath = resolvePublicFile('oauth-consent.html');
+    if (htmlPath) {
+      const html = readFileSync(htmlPath, 'utf-8');
+      res.type('text/html').send(html);
+    } else {
+      res.status(404).type('text/plain').send('Consent page not found');
+    }
+  });
+
   return router;
 }

@@ -3192,5 +3192,26 @@
     "addPlaceholder": "Lisää tagi...",
     "editTags": "Muokkaa tageja",
     "noMatch": "Ei tuloksia valituilla tageilla"
+  },
+  "oauthConsent": {
+    "title": "Hyväksy AI-yhteys",
+    "subtitle": "AI-alusta haluaa yhdistää AIMEAT-solmuusi",
+    "platformLabel": "Yhdistävä alusta:",
+    "loginRequired": "Kirjaudu sisään hyväksyäksesi yhteyden",
+    "loginBtn": "Kirjaudu",
+    "selectAgent": "Mitä agenttia tämän alustan tulisi käyttää?",
+    "noAgents": "Sinulla ei ole agentteja. Luo ensin yksi profiilissasi.",
+    "scopeLabel": "Pyydetyt oikeudet:",
+    "scopeFull": "Täysi pääsy — muisti, lompakko, toiminnot, taulut, tallennus",
+    "walletNote": "Tämän agentin morselilompakkoa käytetään kaikissa tapahtumissa",
+    "approveBtn": "Hyväksy yhteys",
+    "denyBtn": "Hylkää",
+    "approving": "Hyväksytään...",
+    "errorGeneric": "Jokin meni pieleen. Yritä uudelleen.",
+    "denied": "Yhteys hylätty. Voit sulkea tämän ikkunan.",
+    "usernameLabel": "Käyttäjänimi",
+    "passwordLabel": "Salasana",
+    "totpLabel": "2FA-koodi (jos käytössä)",
+    "morsels": "morselia"
   }
 }

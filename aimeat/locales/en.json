@@ -3193,5 +3193,26 @@
     "addPlaceholder": "Add tag...",
     "editTags": "Edit tags",
     "noMatch": "No items match selected tags"
+  },
+  "oauthConsent": {
+    "title": "Authorize AI Connection",
+    "subtitle": "An AI platform wants to connect to your AIMEAT node",
+    "platformLabel": "Platform requesting access:",
+    "loginRequired": "Sign in to approve this connection",
+    "loginBtn": "Sign In",
+    "selectAgent": "Which agent should this platform use?",
+    "noAgents": "You have no agents. Create one first in your profile.",
+    "scopeLabel": "Permissions requested:",
+    "scopeFull": "Full access — memory, wallet, actions, boards, storage",
+    "walletNote": "This agent's morsel wallet will be used for all transactions",
+    "approveBtn": "Approve Connection",
+    "denyBtn": "Deny",
+    "approving": "Approving...",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "denied": "Connection denied. You can close this window.",
+    "usernameLabel": "Username",
+    "passwordLabel": "Password",
+    "totpLabel": "2FA Code (if enabled)",
+    "morsels": "morsels"
   }
 }
