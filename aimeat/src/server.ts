@@ -228,6 +228,20 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   ];
   const pwaStaticDir = pwaCandidates.find(p => existsSync(p));
   if (pwaStaticDir) {
+    // Serve app-catalog.html with CSP nonce injection (static serving would block inline scripts)
+    const appCatalogPath = join(pwaStaticDir, 'app-catalog.html');
+    if (existsSync(appCatalogPath)) {
+      app.get('/app-catalog.html', (_req, res) => {
+        let html = readFileSync(appCatalogPath, 'utf-8');
+        const nonce = res.locals.cspNonce as string || '';
+        if (nonce) {
+          html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+          html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+        }
+        res.type('html').send(html);
+      });
+    }
+
     app.use(express.static(pwaStaticDir, { maxAge: '1d' }));
   }
 
