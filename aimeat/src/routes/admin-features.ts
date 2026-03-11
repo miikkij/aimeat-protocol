@@ -512,6 +512,40 @@ export function adminFeaturesRouter(
         }));
     }));
 
+    // GET /v1/admin/csm/:name — CSM detail for admin dashboard
+    router.get('/v1/admin/csm/:name', ...auth, handle(async (req, res) => {
+        const name = req.params.name as string;
+        const csm = await storage.getCsm(name);
+        if (!csm) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `CSM "${name}" not found`));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            name: csm.name,
+            service_type: csm.serviceType,
+            json_schema_key: csm.jsonSchemaKey,
+            registered_by: csm.registeredBy,
+            registered_at: csm.registeredAt,
+            updated_at: csm.updatedAt,
+            definition: csm.definition,
+            semantic: csm.semantic ?? null,
+            federate: csm.federate ?? false,
+        }));
+    }));
+
+    // DELETE /v1/admin/csm/:name — Delete CSM from admin dashboard
+    router.delete('/v1/admin/csm/:name', ...auth, handle(async (req, res) => {
+        const name = req.params.name as string;
+        const csm = await storage.getCsm(name);
+        if (!csm) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `CSM "${name}" not found`));
+            return;
+        }
+        await storage.deleteSchema(csm.jsonSchemaKey);
+        await storage.deleteCsm(name);
+        res.json(success(config.nodeId, { deleted: true, name }));
+    }));
+
     // ── MSM Integrations ────────────────────────────────────
 
     router.get('/v1/admin/msm', ...auth, handle(async (_req, res) => {

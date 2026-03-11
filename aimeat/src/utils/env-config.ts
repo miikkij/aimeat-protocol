@@ -210,6 +210,12 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           value: config.personalNodesEnabled ? 'true' : 'false',
           defaultVal: 'true',
         },
+        {
+          envVar: 'AIMEAT_EXTENSIONS_ENABLED',
+          description: 'Enable V8 isolate extension system',
+          value: config.extensionsEnabled ? 'true' : 'false',
+          defaultVal: 'true',
+        },
       ],
     },
     {
@@ -1005,7 +1011,7 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           envVar: 'AIMEAT_EXTENSIONS_ENABLED',
           description: 'Enable V8 isolate extension system',
           value: config.extensionsEnabled ? 'true' : 'false',
-          defaultVal: 'false',
+          defaultVal: 'true',
         },
         {
           envVar: 'AIMEAT_EXT_MAX_MEMORY_MB',

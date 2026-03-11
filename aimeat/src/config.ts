@@ -536,7 +536,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
 
     // Node Extensions (V8 Isolates)
-    extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED === 'true',
+    extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED !== 'false',
     extensionMaxMemoryMb: parseInt(process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '64', 10),
     extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '50', 10),

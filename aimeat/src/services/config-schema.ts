@@ -137,6 +137,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'marketplaceTransactionFeePercent', dotPath: 'marketplace.tx_fee_percent', envVar: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50, immutable: false, description: 'Transaction fee percentage', range: '0-50' },
   { key: 'marketplaceEscrowEnabled', dotPath: 'marketplace.escrow_enabled', envVar: 'AIMEAT_MARKETPLACE_ESCROW', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Escrow for marketplace transactions' },
 
+  // ── Extensions (Phase 2.7, mutable) ──
+  { key: 'extensionsEnabled', dotPath: 'extensions.enabled', envVar: 'AIMEAT_EXTENSIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'V8 isolate extension system enabled' },
+  { key: 'extensionMaxMemoryMb', dotPath: 'extensions.max_memory_mb', envVar: 'AIMEAT_EXT_MAX_MEMORY_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 8 && (v as number) <= 512, immutable: false, description: 'Max memory per extension isolate (MB)', range: '8-512' },
+  { key: 'extensionTimeoutMs', dotPath: 'extensions.timeout_ms', envVar: 'AIMEAT_EXT_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 60000, immutable: false, description: 'Extension execution timeout (ms)', range: '100-60000' },
+  { key: 'extensionMaxApiCalls', dotPath: 'extensions.max_api_calls', envVar: 'AIMEAT_EXT_MAX_API_CALLS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 500, immutable: false, description: 'Max API calls per extension execution', range: '1-500' },
+  { key: 'extensionMaxCodeSizeKb', dotPath: 'extensions.max_code_size_kb', envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16 && (v as number) <= 2048, immutable: false, description: 'Max code size per extension (KB)', range: '16-2048' },
+  { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max installed extensions', range: '1-100' },
+
   // ── Push Notifications (Phase 3.1, mutable) ──
   { key: 'pushEnabled', dotPath: 'push.enabled', envVar: 'AIMEAT_PUSH_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Web push notifications enabled' },
 

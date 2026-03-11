@@ -106,8 +106,12 @@ export const subscribePush       = (endpoint, keys)     => apiPost('/v1/push/sub
 export const unsubscribePush     = ()                   => apiDelete('/v1/push/subscribe');
 
 // ── CSM ──
-export const getCsmTemplates = ()       => apiGet('/v1/admin/csm');
-export const getCsmDetail    = (name)   => apiGet(`/v1/admin/csm/${encodeURIComponent(name)}`);
+export const getCsmTemplates   = ()       => apiGet('/v1/admin/csm');
+export const getCsmDetail      = (name)   => apiGet(`/v1/admin/csm/${encodeURIComponent(name)}`);
+export const deleteCsm         = (name)   => apiDelete(`/v1/admin/csm/${encodeURIComponent(name)}`);
+export const createCsm         = (yaml)   => apiPost('/v1/csm', { yaml });
+export const getCsmFileTemplates = ()     => apiGet('/v1/csm/templates');
+export const getCsmFileTemplate  = (type) => fetch(`/v1/csm/templates/${encodeURIComponent(type)}`, { headers: { 'Accept': 'application/x-yaml' } }).then(r => r.text());
 
 // ── MSM ──
 export const getMsmIntegrations = ()    => apiGet('/v1/admin/msm');
