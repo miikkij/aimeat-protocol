@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -8,7 +8,6 @@ import { Spinner, recipientBadge } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import { getKeyPermissions } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { listAgents } from '/js/services/agents.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
 
@@ -26,36 +25,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [editingMemTags, setEditingMemTags] = useState(null);
   const [editingFileTags, setEditingFileTags] = useState(null);
 
-  // Agent memory browser
-  const [agents, setAgents] = useState(null);
-  const [expandedAgent, setExpandedAgent] = useState(null);
-  const [agentMemories, setAgentMemories] = useState({});
-  const [loadingAgent, setLoadingAgent] = useState(null);
-
   useEffect(() => {
-    if (session) { loadMemories(); loadFiles(); loadAgents(); }
+    if (session) { loadMemories(); loadFiles(); }
   }, [session]);
-
-  async function loadAgents() {
-    try {
-      const all = await listAgents(session.owner);
-      // Exclude the current session agent — its memory is shown below
-      setAgents(all.filter(a => a.gaii !== session.gaii));
-    } catch { setAgents([]); }
-  }
-
-  const toggleAgent = useCallback(async (gaii) => {
-    if (expandedAgent === gaii) { setExpandedAgent(null); return; }
-    setExpandedAgent(gaii);
-    if (!agentMemories[gaii]) {
-      setLoadingAgent(gaii);
-      try {
-        const list = await memoryService.listMemories(gaii);
-        setAgentMemories(prev => ({ ...prev, [gaii]: Array.isArray(list) ? list : [] }));
-      } catch { setAgentMemories(prev => ({ ...prev, [gaii]: [] })); }
-      finally { setLoadingAgent(null); }
-    }
-  }, [expandedAgent, agentMemories]);
 
   async function loadMemories() {
     try {
@@ -308,77 +280,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
       }`;
   };
 
-  const renderAgentMemories = () => {
-    if (!agents) return null;
-    return html`
-      <div style="margin-bottom:1.5rem">
-        <div class="section-title" style="font-size:.9rem;margin-bottom:.5rem">
-          ${t('profile.memory.agentMemories') || 'Agent Memories'}
-        </div>
-        <p style="font-size:.8rem;color:var(--muted);margin:0 0 .75rem">
-          ${t('profile.memory.agentMemoriesDesc') || 'Memory entries created by your agents (MCP sessions, autonomous agents). Click to expand.'}
-        </p>
-        ${agents.length === 0 ? html`
-          <div style="padding:.75rem;font-size:.82rem;color:var(--muted);background:rgba(130,100,255,.04);border:1px solid rgba(130,100,255,.1);border-radius:.25rem">
-            ${t('profile.memory.noAgents') || 'No agents registered yet. When you connect an AI assistant via MCP, its memory entries will appear here.'}
-            ${' '}
-            <a href="/v1/portal?view=dev#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
-              ${t('profile.memory.setupMcp') || 'Set up MCP'}
-            </a>
-          </div>
-        ` : null}
-        ${agents.map(agent => {
-          const isExpanded = expandedAgent === agent.gaii;
-          const entries = agentMemories[agent.gaii];
-          const isLoading = loadingAgent === agent.gaii;
-          const entryCount = entries ? entries.length : null;
-          return html`
-            <div class="card" style="margin-bottom:.5rem" key=${agent.gaii}>
-              <div class="card-header card-clickable" onClick=${() => toggleAgent(agent.gaii)}
-                style="padding:.5rem .75rem;cursor:pointer;display:flex;align-items:center;gap:.5rem">
-                <span style="font-size:.7rem;opacity:.6">${isExpanded ? '\u25BC' : '\u25B6'}</span>
-                <span style="font-weight:600;font-size:.85rem">${escHtml(agent.display_name || agent.name)}</span>
-                <span class="badge badge-info" style="font-size:.7rem">${escHtml(agent.name)}</span>
-                ${entryCount !== null && html`
-                  <span style="margin-left:auto;font-size:.75rem;color:var(--muted)">${entryCount} ${entryCount === 1 ? 'entry' : 'entries'}</span>
-                `}
-              </div>
-              ${isExpanded && html`
-                <div style="padding:.5rem .75rem .75rem;border-top:1px solid var(--border,rgba(255,255,255,.08))">
-                  ${isLoading && html`<${Spinner} text=${t('profile.memory.loading')} />`}
-                  ${entries && entries.length === 0 && html`
-                    <div style="font-size:.8rem;color:var(--muted);font-style:italic;padding:.25rem 0">
-                      ${t('profile.memory.empty')}
-                    </div>
-                  `}
-                  ${entries && entries.length > 0 && html`
-                    <div style="max-height:20rem;overflow-y:auto">
-                      ${entries.map(m => html`
-                        <div style="border-bottom:1px solid var(--border,rgba(255,255,255,.05));padding:.4rem 0">
-                          <div style="display:flex;align-items:center;gap:.5rem">
-                            <span style="font-family:monospace;font-size:.8rem;font-weight:600">${escHtml(m.key)}</span>
-                            <span class="badge ${m.visibility === 'public' ? 'badge-success' : m.visibility === 'shared' ? 'badge-info' : 'badge-muted'}" style="font-size:.65rem">${m.visibility || 'private'}</span>
-                          </div>
-                          <pre style="margin:.25rem 0 0;font-size:.75rem;color:var(--muted);white-space:pre-wrap;max-height:8rem;overflow-y:auto">${escHtml(typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''))}</pre>
-                          ${m.tags?.length > 0 && html`<div style="margin-top:.25rem;font-size:.7rem;color:var(--muted)">${m.tags.join(', ')}</div>`}
-                        </div>
-                      `)}
-                    </div>
-                  `}
-                </div>
-              `}
-            </div>
-          `;
-        })}
-      </div>
-    `;
-  };
-
   return html`
     <div class="section-title">${t('profile.memory.title')}</div>
     <div class="section-desc">${t('profile.memory.desc')}</div>
-
-    ${renderAgentMemories()}
 
     <div class="sub-tabs">
       <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>
