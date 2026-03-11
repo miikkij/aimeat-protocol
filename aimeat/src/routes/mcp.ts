@@ -830,12 +830,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         });
     });
 
-    // GET /v1/mcp/authorize — Authorization endpoint (returns auth code)
+    // GET /v1/mcp/authorize — Authorization endpoint (dual-path: signature or browser consent)
     router.get('/v1/mcp/authorize', async (req: Request, res: Response) => {
         const clientId = req.query.client_id as string;
         const redirectUri = req.query.redirect_uri as string;
         const responseType = req.query.response_type as string;
         const state = req.query.state as string | undefined;
+        const scope = req.query.scope as string | undefined;
         const gaii = req.query.gaii as string | undefined;
         const signature = req.query.signature as string | undefined;
         const timestamp = req.query.timestamp as string | undefined;
@@ -861,53 +862,129 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Authenticate the agent via GAII + signature (AIMEAT's auth model)
-        if (!gaii || !signature || !timestamp) {
-            res.status(400).json({
-                error: 'invalid_request',
-                error_description: 'gaii, signature, and timestamp are required for authentication',
-                auth_hint: 'Sign: base64(Ed25519_sign(private_key, gaii + node_id + timestamp))',
-            });
+        // === PATH A: Direct agent auth (CLI/Code agents with private key) ===
+        if (gaii && signature && timestamp) {
+            const parsed = parseGAII(gaii);
+            if (!parsed) {
+                res.status(400).json({ error: 'invalid_request', error_description: 'Invalid GAII format' });
+                return;
+            }
+
+            const agent = await storage.getAgent(gaii);
+            if (!agent) {
+                res.status(400).json({ error: 'invalid_request', error_description: 'Agent not found' });
+                return;
+            }
+
+            const message = gaii + config.nodeId + timestamp;
+            const isValid = await verify(agent.publicKey, message, signature);
+            if (!isValid) {
+                res.status(401).json({ error: 'access_denied', error_description: 'Invalid signature' });
+                return;
+            }
+
+            // Issue authorization code directly
+            const code = randomBytes(32).toString('hex');
+            const authCode: AuthorizationCode = {
+                code,
+                clientId,
+                gaii,
+                owner: parsed.owner,
+                roles: ['agent'],
+                redirectUri: redirectUri ?? client.redirectUris[0] ?? '',
+                expiresAt: Date.now() + 600_000,
+            };
+            authCodes.set(code, authCode);
+
+            if (redirectUri) {
+                const url = new URL(redirectUri);
+                url.searchParams.set('code', code);
+                if (state) url.searchParams.set('state', state);
+                res.redirect(302, url.toString());
+            } else {
+                res.json({ code, state });
+            }
             return;
         }
 
-        const parsed = parseGAII(gaii);
-        if (!parsed) {
-            res.status(400).json({ error: 'invalid_request', error_description: 'Invalid GAII format' });
+        // === PATH B: Browser consent flow (Claude.ai Connectors, ChatGPT, etc.) ===
+        // Redirect to consent page where user logs in and selects which agent to authorize
+        const consentUrl = new URL('/v1/oauth/consent', `${req.protocol}://${req.get('host')}`);
+        consentUrl.searchParams.set('client_id', clientId);
+        consentUrl.searchParams.set('client_name', client.clientName);
+        if (redirectUri) consentUrl.searchParams.set('redirect_uri', redirectUri);
+        if (state) consentUrl.searchParams.set('state', state);
+        if (scope) consentUrl.searchParams.set('scope', scope);
+        res.redirect(302, consentUrl.toString());
+    });
+
+    // POST /v1/mcp/authorize-consent — Browser consent form submission
+    // Called by the consent page after user logs in, selects an agent, and clicks "Approve"
+    router.post('/v1/mcp/authorize-consent', async (req: Request, res: Response) => {
+        const { client_id, redirect_uri, state, gaii, owner_token } = req.body ?? {};
+
+        if (!client_id || !gaii || !owner_token) {
+            res.status(400).json({ error: 'invalid_request', error_description: 'Missing required fields (client_id, gaii, owner_token)' });
             return;
         }
 
+        const client = oauthClients.get(client_id);
+        if (!client) {
+            res.status(400).json({ error: 'invalid_client', error_description: 'Unknown client_id' });
+            return;
+        }
+
+        // Validate redirect_uri matches registered URIs (prevent open redirect)
+        const finalRedirect = redirect_uri ?? client.redirectUris[0];
+        if (finalRedirect && client.redirectUris.length > 0 && !client.redirectUris.includes(finalRedirect)) {
+            res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
+            return;
+        }
+
+        // Verify owner's JWT (the browser session token)
+        let ownerPayload;
+        try {
+            const { verifyJWT } = await import('../auth/jwt.js');
+            ownerPayload = await verifyJWT(owner_token);
+        } catch {
+            res.status(401).json({ error: 'access_denied', error_description: 'Invalid or expired session' });
+            return;
+        }
+        if (!ownerPayload || !ownerPayload.owner) {
+            res.status(401).json({ error: 'access_denied', error_description: 'Invalid session token' });
+            return;
+        }
+
+        // Verify the agent belongs to this owner
         const agent = await storage.getAgent(gaii);
         if (!agent) {
             res.status(400).json({ error: 'invalid_request', error_description: 'Agent not found' });
             return;
         }
-
-        const message = gaii + config.nodeId + timestamp;
-        const isValid = await verify(agent.publicKey, message, signature);
-        if (!isValid) {
-            res.status(401).json({ error: 'access_denied', error_description: 'Invalid signature' });
+        if (agent.owner !== ownerPayload.owner) {
+            res.status(403).json({ error: 'access_denied', error_description: 'Agent does not belong to you' });
             return;
         }
 
         // Issue authorization code
+        const parsed = parseGAII(gaii);
         const code = randomBytes(32).toString('hex');
-        const authCode: AuthorizationCode = {
+        authCodes.set(code, {
             code,
-            clientId,
+            clientId: client_id,
             gaii,
-            owner: parsed.owner,
+            owner: parsed?.owner || agent.owner,
             roles: ['agent'],
-            redirectUri: redirectUri ?? client.redirectUris[0] ?? '',
-            expiresAt: Date.now() + 600_000, // 10 minutes
-        };
-        authCodes.set(code, authCode);
+            redirectUri: finalRedirect ?? '',
+            expiresAt: Date.now() + 600_000,
+        });
 
-        if (redirectUri) {
-            const url = new URL(redirectUri);
+        // Return JSON with redirect URL (caller is fetch(), not form submission)
+        if (finalRedirect) {
+            const url = new URL(finalRedirect);
             url.searchParams.set('code', code);
             if (state) url.searchParams.set('state', state);
-            res.redirect(302, url.toString());
+            res.json({ redirect_url: url.toString() });
         } else {
             res.json({ code, state });
         }
