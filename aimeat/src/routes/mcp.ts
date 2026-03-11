@@ -1053,6 +1053,15 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             expiresAt: Date.now() + 600_000,
         });
 
+        // Remember this approval so future authorizations skip the consent screen
+        await storage.createOAuthApproval({
+            clientId: client_id,
+            gaii,
+            owner: parsed?.owner || agent.owner,
+            scope: 'aimeat:full',
+            approvedAt: new Date().toISOString(),
+        });
+
         // Build redirect URL with authorization code
         if (finalRedirect) {
             const url = new URL(finalRedirect);
@@ -1073,6 +1082,19 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         }
     });
 
+    // GET /v1/mcp/approval-check — Check if a client+agent pair has a remembered approval
+    // Used by the consent page to auto-submit when the user has previously approved this client
+    router.get('/v1/mcp/approval-check', async (req: Request, res: Response) => {
+        const clientId = req.query.client_id as string;
+        const gaii = req.query.gaii as string;
+        if (!clientId || !gaii) {
+            res.json({ approved: false });
+            return;
+        }
+        const approval = await storage.getOAuthApproval(clientId, gaii);
+        res.json({ approved: !!approval });
+    });
+
     // POST /v1/mcp/token — Token exchange endpoint
     router.post('/v1/mcp/token', async (req: Request, res: Response) => {
         const { grant_type, code, client_id, client_secret, redirect_uri, refresh_token, code_verifier } = req.body ?? {};
@@ -1083,10 +1105,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 return;
             }
 
-            const client = oauthClients.get(client_id);
-            // If client exists, verify secret. If client was lost (server restart),
-            // allow if PKCE code_verifier is provided (public client per OAuth 2.1).
-            if (client && client_secret && client.clientSecret !== client_secret) {
+            const client = await storage.getOAuthClient(client_id);
+            if (client && client_secret && client.clientSecret !== hashToken(client_secret)) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
@@ -1140,17 +1160,15 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
             const refreshTok = randomBytes(32).toString('hex');
 
-            const tokenRecord: OAuthToken = {
-                accessToken,
-                refreshToken: refreshTok,
+            // Persist refresh token (hashed) to storage
+            await storage.createOAuthRefreshToken({
+                tokenHash: hashToken(refreshTok),
                 clientId: client_id,
                 gaii: authCode.gaii,
                 owner: authCode.owner,
                 roles: authCode.roles,
-                expiresAt: Date.now() + config.jwtTtlSeconds * 1000,
-            };
-            oauthTokens.set(accessToken, tokenRecord);
-            refreshTokenIndex.set(refreshTok, tokenRecord);
+                createdAt: new Date().toISOString(),
+            });
 
             res.json({
                 access_token: accessToken,
@@ -1166,21 +1184,20 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 return;
             }
 
-            const client = oauthClients.get(client_id);
-            if (client && client_secret && client.clientSecret !== client_secret) {
+            const client = await storage.getOAuthClient(client_id);
+            if (client && client_secret && client.clientSecret !== hashToken(client_secret)) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
 
-            const existing = refreshTokenIndex.get(refresh_token);
+            const existing = await storage.getOAuthRefreshToken(hashToken(refresh_token));
             if (!existing || existing.clientId !== client_id) {
                 res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid refresh token' });
                 return;
             }
 
             // Rotate: revoke old, issue new
-            oauthTokens.delete(existing.accessToken);
-            refreshTokenIndex.delete(refresh_token);
+            await storage.deleteOAuthRefreshToken(hashToken(refresh_token));
 
             const newAccessToken = await issueJWT({
                 sub: existing.gaii,
@@ -1191,17 +1208,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
             const newRefreshTok = randomBytes(32).toString('hex');
 
-            const newRecord: OAuthToken = {
-                accessToken: newAccessToken,
-                refreshToken: newRefreshTok,
+            await storage.createOAuthRefreshToken({
+                tokenHash: hashToken(newRefreshTok),
                 clientId: client_id,
                 gaii: existing.gaii,
                 owner: existing.owner,
                 roles: existing.roles,
-                expiresAt: Date.now() + config.jwtTtlSeconds * 1000,
-            };
-            oauthTokens.set(newAccessToken, newRecord);
-            refreshTokenIndex.set(newRefreshTok, newRecord);
+                createdAt: new Date().toISOString(),
+            });
 
             res.json({
                 access_token: newAccessToken,
@@ -1217,7 +1231,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/mcp/token/revoke — Token revocation (RFC 7009)
-    router.post('/v1/mcp/token/revoke', (req: Request, res: Response) => {
+    router.post('/v1/mcp/token/revoke', async (req: Request, res: Response) => {
         const { token, token_type_hint } = req.body ?? {};
 
         if (!token) {
@@ -1225,22 +1239,22 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Try as access token first
+        // Try as access token (JWT) — add to JWT revocation list
         if (token_type_hint !== 'refresh_token') {
-            const record = oauthTokens.get(token);
-            if (record) {
-                oauthTokens.delete(token);
-                refreshTokenIndex.delete(record.refreshToken);
-                res.status(200).json({ revoked: true });
-                return;
-            }
+            try {
+                const { verifyJWT, revokeToken } = await import('../auth/jwt.js');
+                const payload = await verifyJWT(token);
+                if (payload && payload.exp) {
+                    await revokeToken(token, payload.exp);
+                    res.status(200).json({ revoked: true });
+                    return;
+                }
+            } catch { /* not a valid JWT, try as refresh token */ }
         }
 
-        // Try as refresh token
-        const record = refreshTokenIndex.get(token);
-        if (record) {
-            refreshTokenIndex.delete(token);
-            oauthTokens.delete(record.accessToken);
+        // Try as refresh token (hash and look up in storage)
+        const deleted = await storage.deleteOAuthRefreshToken(hashToken(token));
+        if (deleted) {
             res.status(200).json({ revoked: true });
             return;
         }
