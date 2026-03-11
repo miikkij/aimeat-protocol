@@ -59,6 +59,7 @@
     const clientName = params.get('client_name') || clientId;
     const redirectUri = params.get('redirect_uri') || '';
     const state = params.get('state') || '';
+    const codeChallenge = params.get('code_challenge') || '';
 
     // i18n
     const lang = (navigator.language || 'en').startsWith('fi') ? 'fi' : 'en';
@@ -237,6 +238,7 @@
               state,
               gaii: selectedAgent.gaii,
               owner_token: jwt,
+              code_challenge: codeChallenge || undefined,
             }),
           });
           const d = await r.json();

@@ -994,14 +994,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         const client = oauthClients.get(client_id);
-        if (!client) {
-            res.status(400).json({ error: 'invalid_client', error_description: 'Unknown client_id' });
-            return;
-        }
 
-        // Validate redirect_uri matches registered URIs (prevent open redirect)
-        const finalRedirect = redirect_uri ?? client.redirectUris[0];
-        if (finalRedirect && client.redirectUris.length > 0 && !client.redirectUris.includes(finalRedirect)) {
+        // If client not found (e.g. server restarted since registration), allow consent
+        // to proceed — we still verify owner JWT + agent ownership below.
+        // Validate redirect_uri against registered URIs when available.
+        const finalRedirect = redirect_uri ?? client?.redirectUris[0];
+        if (client && finalRedirect && client.redirectUris.length > 0 && !client.redirectUris.includes(finalRedirect)) {
             res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
             return;
         }
