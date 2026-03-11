@@ -165,47 +165,58 @@ function McpPanel({ locale, isLoggedIn, session }) {
       if (resp.ok === false) throw new Error(resp.error?.message || 'Failed to generate key');
       const key = data.connectivity_key;
       if (!key) throw new Error('No connectivity key in response');
+      const nodeId = document.querySelector('meta[name="aimeat-node-id"]')?.content || 'unknown';
       const prompt = [
-        `Connect me to the AIMEAT node at ${NODE_URL} via MCP.`,
+        `# AIMEAT MCP Setup — for Claude Code / code-capable AI assistants`,
         ``,
-        `CONNECTIVITY KEY: ${key}`,
-        `(Single-use. Do NOT share this key with anyone else.)`,
+        `> ⚠️ This prompt requires an AI assistant that can execute shell commands and write files (Claude Code, Cursor, VS Code Copilot). It will NOT work in Claude.ai chat.`,
+        ``,
+        `Connect me to the AIMEAT node at ${NODE_URL}. Follow these steps exactly:`,
         ``,
         `## Step 1: Register as an agent`,
-        `POST ${NODE_URL}/v1/agents/connect`,
-        `Body: { "connectivity_key": "${key}", "agent_name": "assistant" }`,
-        `→ Response contains private_key and agent.gaii — save both securely.`,
+        `Run this curl command:`,
+        '```bash',
+        `curl -s -X POST ${NODE_URL}/v1/agents/connect \\`,
+        `  -H "Content-Type: application/json" \\`,
+        `  -d '{"connectivity_key": "${key}", "agent_name": "claude-assistant"}'`,
+        '```',
+        `Save the response — you need \`data.agent.gaii\` and \`data.private_key\` from it.`,
         ``,
-        `## Step 2: Authenticate (get JWT)`,
-        `Use Ed25519 to sign the message: gaii + nodeId + ISO_timestamp`,
-        `The nodeId for this node is: "${document.querySelector('meta[name="aimeat-node-id"]')?.content || 'unknown'}"`,
-        `The private_key from Step 1 is the signing key (hex-encoded Ed25519 seed).`,
-        `POST ${NODE_URL}/v1/auth/token`,
-        `Body: { "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex_signature>" }`,
-        `→ Response contains a JWT token.`,
+        `## Step 2: Get a JWT token`,
+        `The node ID is: \`${nodeId}\``,
+        `To authenticate, you need to Ed25519-sign the string: gaii + nodeId + ISO_timestamp`,
+        `The private_key from Step 1 is a hex-encoded Ed25519 seed (32 bytes).`,
         ``,
-        `## Step 3: Configure MCP`,
-        `Add to .vscode/mcp.json (or ~/.claude/mcp_servers.json):`,
+        `Write a small Node.js script (or use your tools) to:`,
+        `1. Import @noble/ed25519 or use node:crypto Ed25519`,
+        `2. Sign the message: \`<gaii>${nodeId}<current ISO timestamp>\``,
+        `3. POST to ${NODE_URL}/v1/auth/token with body: \`{ "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex>" }\``,
+        `4. Extract the JWT from the response.`,
+        ``,
+        `## Step 3: Configure MCP server`,
+        `Write this to \`.vscode/mcp.json\` in the current project (create if missing):`,
+        '```json',
         `{`,
         `  "servers": {`,
         `    "aimeat": {`,
         `      "type": "http",`,
         `      "url": "${NODE_URL}/v1/mcp",`,
-        `      "headers": { "Authorization": "Bearer <jwt_token>" }`,
+        `      "headers": { "Authorization": "Bearer <JWT_FROM_STEP_2>" }`,
         `    }`,
         `  }`,
         `}`,
+        '```',
         ``,
-        `## Step 4: Test`,
-        `After configuring, use the aimeat_catalogue_search tool to verify the connection works.`,
+        `## Step 4: Verify`,
+        `After configuring, use the \`aimeat_catalogue_search\` MCP tool to verify the connection works.`,
         ``,
-        `## Important`,
-        `- The JWT expires. Store the private_key so you can re-authenticate later.`,
-        `- The node has 18 MCP tools: catalogue, agent profile, memory (read/write/list),`,
+        `## Important notes`,
+        `- The JWT expires after 24h. Save the private_key and gaii so you can re-authenticate.`,
+        `- Store credentials securely (e.g. \`.env\` file, not committed to git).`,
+        `- 18 MCP tools available: catalogue, agent profile, memory (read/write/list),`,
         `  action execute, work queue (inbox/accept/deliver), wallet, boards (read/post),`,
         `  storage (upload/download), and 4 admin tools (operator only).`,
         `- Full API spec: ${NODE_URL}/v1/spec`,
-        `- Operating instructions: ${NODE_URL}/v1/prompts/tier1`,
       ].join('\n');
       setSetupPrompt(prompt);
     } catch (err) {
@@ -255,6 +266,7 @@ function McpPanel({ locale, isLoggedIn, session }) {
             </div>
             <p style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${dt('panel.mcpSetupNote', locale)}</p>
           `}
+          <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpSetupChatNote', locale)}</p>
         </div>
       `}
 
