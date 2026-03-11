@@ -147,6 +147,72 @@ function BgSelector({ activeBg, onChange }) {
    PANELS (MCP, API, Browse, Prompt Package)
    ══════════════════════════════════════════════ */
 function McpPanel({ locale, isLoggedIn, session }) {
+  const [setupPrompt, setSetupPrompt] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState(null);
+
+  const generateSetupPrompt = useCallback(async () => {
+    if (!session) return;
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const resp = await session.fetch('/v1/auth/connectivity-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: 'MCP agent for AI assistant' }),
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error?.message || 'Failed to generate key');
+      const key = data.data.connectivity_key;
+      const prompt = [
+        `Connect me to the AIMEAT node at ${NODE_URL} via MCP.`,
+        ``,
+        `CONNECTIVITY KEY: ${key}`,
+        `(Single-use. Do NOT share this key with anyone else.)`,
+        ``,
+        `## Step 1: Register as an agent`,
+        `POST ${NODE_URL}/v1/agents/connect`,
+        `Body: { "connectivity_key": "${key}", "agent_name": "assistant" }`,
+        `→ Response contains private_key and agent.gaii — save both securely.`,
+        ``,
+        `## Step 2: Authenticate (get JWT)`,
+        `Use Ed25519 to sign the message: gaii + "${location.hostname.includes('aimeat.io') ? 'aimeat-finland-001-genesis' : ''}" + ISO_timestamp`,
+        `The private_key from Step 1 is the signing key (hex-encoded Ed25519 seed).`,
+        `POST ${NODE_URL}/v1/auth/token`,
+        `Body: { "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex_signature>" }`,
+        `→ Response contains a JWT token.`,
+        ``,
+        `## Step 3: Configure MCP`,
+        `Add to .vscode/mcp.json (or ~/.claude/mcp_servers.json):`,
+        `{`,
+        `  "servers": {`,
+        `    "aimeat": {`,
+        `      "type": "http",`,
+        `      "url": "${NODE_URL}/v1/mcp",`,
+        `      "headers": { "Authorization": "Bearer <jwt_token>" }`,
+        `    }`,
+        `  }`,
+        `}`,
+        ``,
+        `## Step 4: Test`,
+        `After configuring, use the aimeat_catalogue_search tool to verify the connection works.`,
+        ``,
+        `## Important`,
+        `- The JWT expires. Store the private_key so you can re-authenticate later.`,
+        `- The node has 18 MCP tools: catalogue, agent profile, memory (read/write/list),`,
+        `  action execute, work queue (inbox/accept/deliver), wallet, boards (read/post),`,
+        `  storage (upload/download), and 4 admin tools (operator only).`,
+        `- Full API spec: ${NODE_URL}/v1/spec`,
+        `- Operating instructions: ${NODE_URL}/v1/prompts/tier1`,
+      ].join('\n');
+      setSetupPrompt(prompt);
+    } catch (err) {
+      setGenError(err.message || 'Failed');
+    } finally {
+      setGenerating(false);
+    }
+  }, [session]);
+
   return html`
     <div class="dv-panel">
       <h3>${dt('panel.mcpBadge', locale)}</h3>
@@ -166,6 +232,27 @@ function McpPanel({ locale, isLoggedIn, session }) {
             <div><strong>Agent GAII:</strong> <code>${session.gaii}</code></div>
           </div>
           <p style="margin:.5rem 0 0;font-size:.85rem;color:var(--muted)" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpReadyDesc', locale)) }}></p>
+        </div>
+      `}
+
+      ${isLoggedIn && html`
+        <div style="background:rgba(130,100,255,.08);border:1px solid rgba(130,100,255,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
+          <strong>${dt('panel.mcpSetupTitle', locale)}</strong>
+          <p style="margin:.5rem 0 0;font-size:.85rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpSetupDesc', locale)) }}></p>
+          ${!setupPrompt && html`
+            <button type="button" onClick=${generateSetupPrompt} disabled=${generating}
+              style="margin-top:.75rem;padding:.5rem 1rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.85rem">
+              ${generating ? dt('panel.mcpSetupGenerating', locale) : dt('panel.mcpSetupBtn', locale)}
+            </button>
+            ${genError && html`<p style="color:#ff6b6b;margin-top:.5rem;font-size:.8rem">${genError}</p>`}
+          `}
+          ${setupPrompt && html`
+            <div class="dv-prompt-output" style="margin-top:.75rem">
+              <${CopyBtn} text=${setupPrompt} locale=${locale} />
+              <div class="dv-prompt-text" style="max-height:20rem;overflow-y:auto;white-space:pre-wrap;font-size:.8rem">${setupPrompt}</div>
+            </div>
+            <p style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${dt('panel.mcpSetupNote', locale)}</p>
+          `}
         </div>
       `}
 

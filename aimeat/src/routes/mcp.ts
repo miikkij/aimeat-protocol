@@ -906,7 +906,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 token_type: 'Bearer',
                 expires_in: config.jwtTtlSeconds,
                 refresh_token: refreshTok,
-                scope: 'meat:full',
+                scope: 'aimeat:full',
             });
 
         } else if (grant_type === 'refresh_token') {
@@ -957,7 +957,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 token_type: 'Bearer',
                 expires_in: config.jwtTtlSeconds,
                 refresh_token: newRefreshTok,
-                scope: 'meat:full',
+                scope: 'aimeat:full',
             });
 
         } else {
@@ -1011,7 +1011,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             grant_types_supported: ['authorization_code', 'refresh_token'],
             token_endpoint_auth_methods_supported: ['client_secret_post'],
             code_challenge_methods_supported: ['S256'],
-            scopes_supported: ['meat:full'],
+            scopes_supported: ['aimeat:full'],
         });
     });
 
