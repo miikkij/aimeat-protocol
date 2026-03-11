@@ -695,10 +695,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             // If method IS 'initialize', allow fall-through to create a new session
         }
 
-        // New session: authenticate the agent
-        let agentGaii = config.anonymousMode
-            ? `shared#anonymous@${config.nodeId}`
-            : 'anonymous';
+        // New session: authenticate the agent via OAuth token
+        // MCP ALWAYS requires GHII authentication — no anonymous access allowed
+        let agentGaii: string | undefined;
         let sessionOwner: string | undefined;
 
         if (token) {
@@ -710,7 +709,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     sessionOwner = payload.owner as string;
                 }
             } catch {
-                // Token was provided but is invalid/expired — return 401, do NOT silently downgrade to anonymous
+                // Token was provided but is invalid/expired — return 401
                 res.status(401).json({
                     jsonrpc: '2.0',
                     error: { code: -32001, message: 'Token expired or invalid. Please refresh your access token via /v1/mcp/token.' },
@@ -720,20 +719,27 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             }
         }
 
-        // If there's a gaii/owner/sig in the body for inline auth
-        if (req.body && !Array.isArray(req.body) && req.body.method === 'initialize') {
-            const params = req.body.params;
-            if (params?.clientInfo?.gaii) {
-                agentGaii = params.clientInfo.gaii;
-            }
+        if (!agentGaii) {
+            // No token — challenge client to authenticate via OAuth (MCP spec §5.3)
+            const resourceMetadataUrl = `${config.baseUrl}/.well-known/oauth-protected-resource`;
+            res.status(401)
+                .setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl}"`)
+                .json({
+                    jsonrpc: '2.0',
+                    error: { code: -32001, message: 'Authentication required. MCP requires a GHII account. Use OAuth 2.1 to obtain an access token.' },
+                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
+                });
+            return;
         }
 
-        // Validate agent exists and has a real owner (unless anonymous mode)
-        const isAnon = agentGaii === `shared#anonymous@${config.nodeId}` || agentGaii === 'anonymous';
+        // agentGaii is guaranteed to be a string here (401 returned above if not)
+        const authenticatedGaii: string = agentGaii;
+
+        // Validate agent exists and has a real owner
         let chatInstanceId: string | undefined;
 
-        if (!isAnon) {
-            const agent = await storage.getAgent(agentGaii);
+        {
+            const agent = await storage.getAgent(authenticatedGaii);
             if (!agent) {
                 res.status(401).json({
                     jsonrpc: '2.0',
@@ -783,7 +789,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     ghii: `${sessionOwner}@${config.nodeId}`,
                     nodeId: config.nodeId,
                     isAnonymous: false,
-                    agentGaii,
+                    agentGaii: authenticatedGaii,
                     createdAt: new Date().toISOString(),
                     lastSeen: new Date().toISOString(),
                 });
@@ -798,7 +804,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
-        const mcpServer = createMcpServer(agentGaii);
+        const mcpServer = createMcpServer(authenticatedGaii);
 
         transport.onclose = () => {
             if (transport.sessionId) {
@@ -1231,6 +1237,19 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
         // RFC 7009: always return 200, even if token not found
         res.status(200).json({ revoked: true });
+    });
+
+    // GET /.well-known/oauth-protected-resource — Resource metadata (RFC 9728)
+    // MCP clients discover this URL from the WWW-Authenticate header on 401 responses.
+    // It tells them WHERE the authorization server is and WHAT scopes are needed.
+    router.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
+        const baseUrl = config.baseUrl;
+        res.json({
+            resource: `${baseUrl}/v1/mcp`,
+            authorization_servers: [baseUrl],
+            scopes_supported: ['aimeat:full'],
+            bearer_methods_supported: ['header'],
+        });
     });
 
     // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414)
