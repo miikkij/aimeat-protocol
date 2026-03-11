@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { apiPost } from '/js/api.js';
 import { listAgents, updateAgentScopes } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 
@@ -65,17 +66,25 @@ My GHII: ${ghii}
 My owner name (for API calls): ${sess.owner}
 Node URL: ${url}
 
-Steps:
-1. First, authenticate as my owner:
-   POST ${url}/v1/auth/token
-   You need my owner private key to sign (ownerName + nodeId + timestamp) with Ed25519.
-   My owner key is stored in my browser (I will provide it if needed).
+Preferred method (Device Authorization):
+1. POST ${url}/v1/agents/device-authorize
+   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
+2. Show the verification_uri_complete URL to the user to open in their browser
+3. Poll POST ${url}/v1/agents/device-token
+   Body: { "device_code": "...", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
+   Every {interval} seconds until you get a 200 response
+4. On success, store the returned privateKey securely
+5. Authenticate: POST ${url}/v1/auth/token with Ed25519 signature
 
-2. Register a new agent under my account:
+Alternative method (Direct API registration):
+1. Authenticate as my owner:
+   POST ${url}/v1/auth/token
+   Sign (ownerName + nodeId + timestamp) with Ed25519 owner private key.
+
+2. Register a new agent:
    POST ${url}/v1/agents
    Header: Authorization: Bearer <owner_jwt>
    Body: {"name": "<choose-a-name>", "owner": "${sess.owner}", "display_name": "<Your Agent Name>", "description": "<What this agent does>"}
-   The new agent will get a GAII in the format: <name>#${ghii}
    SAVE the private_key from the response!
 
 3. Authenticate as the new agent:
@@ -156,10 +165,55 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [gaiiCopied, setGaiiCopied] = useState(null);
   const [keyCopied, setKeyCopied] = useState(null);
+  const [deviceAuthResult, setDeviceAuthResult] = useState(null);
+  const [deviceAuthStatus, setDeviceAuthStatus] = useState(null);
+  const [deviceAuthCountdown, setDeviceAuthCountdown] = useState(0);
+  const [deviceAgentName, setDeviceAgentName] = useState('');
+  const [deviceAuthLoading, setDeviceAuthLoading] = useState(false);
+  const [deviceUrlCopied, setDeviceUrlCopied] = useState(false);
 
   useEffect(() => {
     if (session) loadData();
   }, [session]);
+
+  // Device auth countdown timer
+  useEffect(() => {
+    if (!deviceAuthResult || deviceAuthStatus !== 'pending') return;
+    const timer = setInterval(() => {
+      setDeviceAuthCountdown(prev => {
+        if (prev <= 1) {
+          setDeviceAuthStatus('expired');
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [deviceAuthResult, deviceAuthStatus]);
+
+  // Device auth status polling
+  useEffect(() => {
+    if (!deviceAuthResult || deviceAuthStatus !== 'pending') return;
+    const poller = setInterval(async () => {
+      try {
+        const resp = await fetch(`/v1/agents/verify/info/${deviceAuthResult.user_code}`);
+        const data = await resp.json();
+        if (data?.status === 'approved') {
+          setDeviceAuthStatus('approved');
+          clearInterval(poller);
+          loadData();
+        } else if (data?.status === 'denied') {
+          setDeviceAuthStatus('denied');
+          clearInterval(poller);
+        } else if (data?.status === 'expired') {
+          setDeviceAuthStatus('expired');
+          clearInterval(poller);
+        }
+      } catch { /* ignore poll errors */ }
+    }, 5000);
+    return () => clearInterval(poller);
+  }, [deviceAuthResult, deviceAuthStatus]);
 
   async function loadData() {
     try {
@@ -214,11 +268,95 @@ export default function AgentsTab({ session, showToast, onStats }) {
     }
   }
 
+  async function handleCreateDeviceAuth() {
+    setDeviceAuthLoading(true);
+    try {
+      const body = { owner: session.owner };
+      if (deviceAgentName.trim()) body.agent_name = deviceAgentName.trim();
+      const resp = await apiPost('/v1/agents/device-authorize', body);
+      if (resp?.data) {
+        setDeviceAuthResult(resp.data);
+        setDeviceAuthStatus('pending');
+        setDeviceAuthCountdown(resp.data.expires_in || 600);
+      } else {
+        showToast(resp?.error?.message || 'Failed to create device auth request', true);
+      }
+    } catch {
+      showToast('Failed to create device auth request', true);
+    }
+    setDeviceAuthLoading(false);
+  }
+
   if (!agents) return html`<${Spinner} text=${t('profile.agents.loadingAgents')} />`;
 
   return html`
     <div class="section-title">${t('profile.agents.title')}</div>
     <div class="section-desc">${t('profile.agents.desc')}</div>
+
+    <div class="agent-cta" style="margin-bottom:1.5rem">
+      <h3>${t('profile.agents.deviceAuth.title')}</h3>
+      <p>${t('profile.agents.deviceAuth.desc')}</p>
+
+      ${!deviceAuthResult ? html`
+        <div style="display:flex;gap:.75rem;align-items:flex-end;margin-top:1rem">
+          <div style="flex:1">
+            <label style="display:block;font-size:.85rem;margin-bottom:.35rem;color:var(--muted)">${t('profile.agents.deviceAuth.agentNameLabel')}</label>
+            <input type="text" class="input" placeholder=${t('profile.agents.deviceAuth.agentNamePlaceholder')}
+              value=${deviceAgentName} onInput=${e => setDeviceAgentName(e.target.value)}
+              style="width:100%" maxlength="64" />
+          </div>
+          <button class="btn-primary" onClick=${handleCreateDeviceAuth} disabled=${deviceAuthLoading}>
+            ${deviceAuthLoading ? '...' : t('profile.agents.deviceAuth.createLink')}
+          </button>
+        </div>
+      ` : html`
+        <div class="card" style="margin-top:1rem;padding:1.25rem">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+            ${deviceAuthStatus === 'pending' ? html`
+              <span class="badge badge-info">${t('profile.agents.deviceAuth.statusPending')}</span>
+            ` : deviceAuthStatus === 'approved' ? html`
+              <span class="badge badge-success">${t('profile.agents.deviceAuth.statusApproved')}</span>
+            ` : deviceAuthStatus === 'denied' ? html`
+              <span class="badge badge-error">${t('profile.agents.deviceAuth.statusDenied')}</span>
+            ` : html`
+              <span class="badge badge-muted">${t('profile.agents.deviceAuth.statusExpired')}</span>
+            `}
+          </div>
+
+          <div style="margin-bottom:1rem">
+            <div style="font-size:.85rem;color:var(--muted);margin-bottom:.35rem">${t('profile.agents.deviceAuth.userCode')}</div>
+            <div style="font-size:2rem;font-weight:700;font-family:monospace;letter-spacing:.15em">${deviceAuthResult.user_code}</div>
+          </div>
+
+          <div style="margin-bottom:1rem">
+            <div style="font-size:.85rem;color:var(--muted);margin-bottom:.35rem">${t('profile.agents.deviceAuth.verifyUrl')}</div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <code style="font-size:.85rem;word-break:break-all">${deviceAuthResult.verification_uri_complete}</code>
+              <button class="btn-outline" style="white-space:nowrap" onClick=${() => {
+                copyToClipboard(deviceAuthResult.verification_uri_complete).then(() => {
+                  setDeviceUrlCopied(true);
+                  setTimeout(() => setDeviceUrlCopied(false), 2000);
+                });
+              }}>${deviceUrlCopied ? '\u2713' : t('profile.agents.deviceAuth.copyUrl')}</button>
+            </div>
+          </div>
+
+          ${deviceAuthStatus === 'pending' && html`
+            <div style="font-size:.85rem;color:var(--muted)">
+              ${t('profile.agents.deviceAuth.expiresIn')}: ${Math.floor(deviceAuthCountdown / 60)}:${String(deviceAuthCountdown % 60).padStart(2, '0')}
+            </div>
+          `}
+
+          ${deviceAuthStatus !== 'pending' && html`
+            <button class="btn-outline" style="margin-top:.75rem" onClick=${() => {
+              setDeviceAuthResult(null);
+              setDeviceAuthStatus(null);
+              setDeviceAuthCountdown(0);
+            }}>${t('profile.agents.deviceAuth.createLink')}</button>
+          `}
+        </div>
+      `}
+    </div>
 
     <div class="agent-cta">
       <h3>${t('profile.agents.connect')}</h3>
