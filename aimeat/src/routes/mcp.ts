@@ -10,6 +10,7 @@ import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
+import { logger } from '../utils/logger.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
 
@@ -65,6 +66,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Per-session transports
     const transports = new Map<string, StreamableHTTPServerTransport>();
+    // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
+    const sessionChatInstances = new Map<string, string>();
 
     // OAuth 2.1 stores
     const oauthClients = new Map<string, OAuthClient>();
@@ -651,7 +654,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
         if (sessionId && transports.has(sessionId)) {
-            // Existing session
+            // Existing session — update lastSeen for session tracking
+            const ciId = sessionChatInstances.get(sessionId);
+            if (ciId) {
+                storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(() => {});
+            }
             const transport = transports.get(sessionId)!;
             await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
             return;
@@ -661,22 +668,80 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         let agentGaii = config.anonymousMode
             ? `shared#anonymous@${config.nodeId}`
             : 'anonymous';
+        let sessionOwner: string | undefined;
+
         if (token) {
             try {
                 const { verifyJWT } = await import('../auth/jwt.js');
                 const payload = await verifyJWT(token);
-                if (payload) agentGaii = payload.sub as string;
+                if (payload) {
+                    agentGaii = payload.sub as string;
+                    sessionOwner = payload.owner as string;
+                }
             } catch {
-                // Allow anonymous for initialization
+                // Token invalid — fall through to anonymous check
             }
         }
 
         // If there's a gaii/owner/sig in the body for inline auth
         if (req.body && !Array.isArray(req.body) && req.body.method === 'initialize') {
-            // Authentication via MCP initialize params
             const params = req.body.params;
             if (params?.clientInfo?.gaii) {
                 agentGaii = params.clientInfo.gaii;
+            }
+        }
+
+        // Validate agent exists and has a real owner (unless anonymous mode)
+        const isAnon = agentGaii === `shared#anonymous@${config.nodeId}` || agentGaii === 'anonymous';
+        let chatInstanceId: string | undefined;
+
+        if (!isAnon) {
+            const agent = await storage.getAgent(agentGaii);
+            if (!agent) {
+                res.status(401).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32001, message: 'Agent not found. Register via /v1/agents/connect first.' },
+                    id: req.body?.id ?? null,
+                });
+                return;
+            }
+            const owner = await storage.getOwner(agent.owner);
+            if (!owner) {
+                res.status(403).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32003, message: 'Agent has no valid owner profile. Owner approval required.' },
+                    id: req.body?.id ?? null,
+                });
+                return;
+            }
+            sessionOwner = agent.owner;
+
+            // Create ChatInstanceRecord for session tracking
+            const ua = (req.headers['user-agent'] || '').toLowerCase();
+            let platform = 'unknown';
+            if (ua.includes('claude')) platform = 'claude';
+            else if (ua.includes('chatgpt') || ua.includes('openai')) platform = 'chatgpt';
+            else if (ua.includes('copilot')) platform = 'copilot';
+            else if (ua.includes('cursor')) platform = 'cursor';
+            else if (ua.includes('gemini')) platform = 'gemini';
+
+            chatInstanceId = `mcp-${platform}-${Date.now()}#${sessionOwner}@${config.nodeId}`;
+            try {
+                await storage.createChatInstance({
+                    id: chatInstanceId,
+                    platform,
+                    appName: `mcp-${platform}`,
+                    ownerName: sessionOwner,
+                    ghii: `${sessionOwner}@${config.nodeId}`,
+                    nodeId: config.nodeId,
+                    isAnonymous: false,
+                    agentGaii,
+                    createdAt: new Date().toISOString(),
+                    lastSeen: new Date().toISOString(),
+                });
+            } catch (err) {
+                logger.warn('Failed to create ChatInstance for MCP session', { error: (err as Error).message });
+                chatInstanceId = undefined;
             }
         }
 
@@ -690,6 +755,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         transport.onclose = () => {
             if (transport.sessionId) {
                 transports.delete(transport.sessionId);
+                sessionChatInstances.delete(transport.sessionId);
             }
         };
 
@@ -700,6 +766,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // Store transport for session reuse (sessionId is generated during handleRequest)
         if (transport.sessionId) {
             transports.set(transport.sessionId, transport);
+            if (chatInstanceId) {
+                sessionChatInstances.set(transport.sessionId, chatInstanceId);
+            }
         }
     });
 
