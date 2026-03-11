@@ -2045,6 +2045,34 @@ components:
         releasedTo:
           type: string
 
+    # === System Prompts ===
+    SystemPromptRecord:
+      type: object
+      properties:
+        id: { type: string }
+        group: { type: string }
+        name: { type: string }
+        description: { type: string }
+        content: { type: string }
+        locales: { type: object, additionalProperties: { type: string } }
+        active: { type: boolean }
+        variables: { type: array, items: { type: string } }
+        usedIn: { type: array, items: { type: string } }
+        version: { type: integer }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+
+    SystemPromptVersionRecord:
+      type: object
+      properties:
+        promptId: { type: string }
+        version: { type: integer }
+        content: { type: string }
+        locales: { type: object, additionalProperties: { type: string } }
+        changedBy: { type: string }
+        changedAt: { type: string, format: date-time }
+        changeNote: { type: string }
+
   # === Reusable Response Wrappers ===
   responses:
     AimeatSuccess:
@@ -5589,6 +5617,290 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  # ── System Prompts ─────────────────────────────────────────
+
+  /v1/admin/prompts:
+    get:
+      operationId: listSystemPrompts
+      summary: List all system prompts
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: group
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter prompts by group
+      responses:
+        '200':
+          description: List of system prompts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompts:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SystemPromptRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/prompts/{id}:
+    get:
+      operationId: getSystemPrompt
+      summary: Get single system prompt
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Prompt identifier
+      responses:
+        '200':
+          description: System prompt record
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt:
+                            $ref: '#/components/schemas/SystemPromptRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      operationId: updateSystemPrompt
+      summary: Update system prompt
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Prompt identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                locales:
+                  type: object
+                  additionalProperties:
+                    type: string
+                active:
+                  type: boolean
+                changeNote:
+                  type: string
+      responses:
+        '200':
+          description: Updated system prompt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt:
+                            $ref: '#/components/schemas/SystemPromptRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/prompts/{id}/reset:
+    post:
+      operationId: resetSystemPrompt
+      summary: Reset prompt to factory default
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Prompt identifier
+      responses:
+        '200':
+          description: Prompt reset to factory default
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt:
+                            $ref: '#/components/schemas/SystemPromptRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/prompts/{id}/versions:
+    get:
+      operationId: listSystemPromptVersions
+      summary: List version history of a system prompt
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Prompt identifier
+      responses:
+        '200':
+          description: Version history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          versions:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SystemPromptVersionRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/prompts/{id}/versions/{version}:
+    get:
+      operationId: getSystemPromptVersion
+      summary: Get a specific version of a system prompt
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Prompt identifier
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Version number
+      responses:
+        '200':
+          description: Specific version record
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          version:
+                            $ref: '#/components/schemas/SystemPromptVersionRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/prompts/{id}/versions/{version}/restore:
+    post:
+      operationId: restoreSystemPromptVersion
+      summary: Restore a specific version as the current prompt
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Prompt identifier
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Version number to restore
+      responses:
+        '200':
+          description: Prompt restored from version
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt:
+                            $ref: '#/components/schemas/SystemPromptRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ── MCP (Model Context Protocol) ───────────────────────────
 
