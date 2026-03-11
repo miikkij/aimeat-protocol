@@ -770,7 +770,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             }
             sessionOwner = agent.owner;
 
-            // Create ChatInstanceRecord for session tracking
+            // Upsert ChatInstanceRecord for session tracking
+            // Use stable ID (platform + agent GAII) so reconnects reuse the same record
             const ua = (req.headers['user-agent'] || '').toLowerCase();
             let platform = 'unknown';
             if (ua.includes('claude')) platform = 'claude';
@@ -779,22 +780,27 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             else if (ua.includes('cursor')) platform = 'cursor';
             else if (ua.includes('gemini')) platform = 'gemini';
 
-            chatInstanceId = `mcp-${platform}-${Date.now()}#${sessionOwner}@${config.nodeId}`;
+            chatInstanceId = `mcp-${platform}#${sessionOwner}@${config.nodeId}`;
             try {
-                await storage.createChatInstance({
-                    id: chatInstanceId,
-                    platform,
-                    appName: `mcp-${platform}`,
-                    ownerName: sessionOwner,
-                    ghii: `${sessionOwner}@${config.nodeId}`,
-                    nodeId: config.nodeId,
-                    isAnonymous: false,
-                    agentGaii: authenticatedGaii,
-                    createdAt: new Date().toISOString(),
-                    lastSeen: new Date().toISOString(),
-                });
+                const existing = await storage.getChatInstance(chatInstanceId);
+                if (existing) {
+                    await storage.updateChatInstance(chatInstanceId, { lastSeen: new Date().toISOString() });
+                } else {
+                    await storage.createChatInstance({
+                        id: chatInstanceId,
+                        platform,
+                        appName: `mcp-${platform}`,
+                        ownerName: sessionOwner,
+                        ghii: `${sessionOwner}@${config.nodeId}`,
+                        nodeId: config.nodeId,
+                        isAnonymous: false,
+                        agentGaii: authenticatedGaii,
+                        createdAt: new Date().toISOString(),
+                        lastSeen: new Date().toISOString(),
+                    });
+                }
             } catch (err) {
-                logger.warn('Failed to create ChatInstance for MCP session', { error: (err as Error).message });
+                logger.warn('Failed to upsert ChatInstance for MCP session', { error: (err as Error).message });
                 chatInstanceId = undefined;
             }
         }
