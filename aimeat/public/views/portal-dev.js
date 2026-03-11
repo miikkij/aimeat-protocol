@@ -161,9 +161,10 @@ function McpPanel({ locale, isLoggedIn, session }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: 'MCP agent for AI assistant' }),
       });
-      const data = await resp.json();
-      if (!data.ok) throw new Error(data.error?.message || 'Failed to generate key');
-      const key = data.data.connectivity_key;
+      const data = resp.data || resp;
+      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed to generate key');
+      const key = data.connectivity_key;
+      if (!key) throw new Error('No connectivity key in response');
       const prompt = [
         `Connect me to the AIMEAT node at ${NODE_URL} via MCP.`,
         ``,
@@ -176,7 +177,8 @@ function McpPanel({ locale, isLoggedIn, session }) {
         `→ Response contains private_key and agent.gaii — save both securely.`,
         ``,
         `## Step 2: Authenticate (get JWT)`,
-        `Use Ed25519 to sign the message: gaii + "${location.hostname.includes('aimeat.io') ? 'aimeat-finland-001-genesis' : ''}" + ISO_timestamp`,
+        `Use Ed25519 to sign the message: gaii + nodeId + ISO_timestamp`,
+        `The nodeId for this node is: "${document.querySelector('meta[name="aimeat-node-id"]')?.content || 'unknown'}"`,
         `The private_key from Step 1 is the signing key (hex-encoded Ed25519 seed).`,
         `POST ${NODE_URL}/v1/auth/token`,
         `Body: { "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex_signature>" }`,
