@@ -216,6 +216,7 @@
     "tabs": {
       "agents": "Agents",
       "chatSessions": "Chat Sessions",
+      "mcp": "MCP",
       "wallet": "Wallet",
       "memory": "Memory",
       "work": "Work",
@@ -317,11 +318,13 @@
       "mcpHint": "You can also connect AI assistants via MCP in the developer portal.",
       "mcpHintLink": "Set up MCP connection →"
     },
-    "mcpConnections": {
+    "mcp": {
       "title": "MCP Connections",
-      "desc": "AI assistants connected via Model Context Protocol (MCP). These can read and write to your memory.",
+      "desc": "AI assistants connected to your node via Model Context Protocol (MCP). These can read and write to your memory, use tools, and act on your behalf.",
       "empty": "No MCP connections yet.",
-      "setupLink": "Set up MCP connection in developer portal →",
+      "emptyDesc": "When you connect an AI assistant (Claude, ChatGPT, Cursor, etc.) via MCP, it will appear here. All memory entries written by MCP tools appear in your Memory tab.",
+      "setupHint": "Connect a new AI assistant via the developer portal.",
+      "setupLink": "Set up MCP connection",
       "loading": "Loading MCP connections...",
       "lastSeen": "Last seen",
       "agent": "Agent",

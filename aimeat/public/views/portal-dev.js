@@ -287,7 +287,7 @@ function McpPanel({ locale, isLoggedIn, session }) {
         <div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(100,200,255,.06);border:1px solid rgba(100,200,255,.15);border-radius:.25rem;font-size:.82rem">
           <span dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpProfileLink', locale)) }}></span>
           ${' '}
-          <a href="/v1/profile#chatsessions" style="color:var(--accent,#a78bfa);text-decoration:underline">
+          <a href="/v1/profile#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
             ${dt('panel.mcpProfileLinkAction', locale)}
           </a>
         </div>

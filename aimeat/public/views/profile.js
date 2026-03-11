@@ -11,6 +11,7 @@ import { getSession, getNodeUrl, onAuthChange } from '/js/services/auth.js';
 import PortfolioTab from './profile/portfolio-tab.js';
 import AgentsTab from './profile/agents-tab.js';
 import ChatSessionsTab from './profile/chat-sessions-tab.js';
+import McpTab from './profile/mcp-tab.js';
 import WalletTab from './profile/wallet-tab.js';
 import MemoryTab from './profile/memory-tab.js';
 import WorkTab from './profile/work-tab.js';
@@ -32,6 +33,7 @@ const TABS = [
   { id: 'portfolio',    key: 'portfolio.tabLabel',         component: PortfolioTab },
   { id: 'agents',       key: 'profile.tabs.agents',        component: AgentsTab },
   { id: 'chatsessions', key: 'profile.tabs.chatSessions',  component: ChatSessionsTab },
+  { id: 'mcp',          key: 'profile.tabs.mcp',            component: McpTab },
   { id: 'wallet',       key: 'profile.tabs.wallet',        component: WalletTab },
   { id: 'knowledge',    key: 'knowledge.tabLabel',          component: KnowledgeTab },
   { id: 'organisms',    key: 'profile.tabs.organisms',      component: OrganismsTab },

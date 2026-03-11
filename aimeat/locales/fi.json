@@ -216,6 +216,7 @@
     "tabs": {
       "agents": "Agentit",
       "chatSessions": "Keskustelusessiot",
+      "mcp": "MCP",
       "wallet": "Lompakko",
       "memory": "Muisti",
       "work": "Työt",
@@ -317,11 +318,13 @@
       "mcpHint": "Voit yhdistää AI-assistentteja myös MCP:llä kehittäjäportaalissa.",
       "mcpHintLink": "Aseta MCP-yhteys →"
     },
-    "mcpConnections": {
+    "mcp": {
       "title": "MCP-yhteydet",
-      "desc": "Model Context Protocol (MCP) -yhteydellä liitetyt AI-assistentit. Nämä voivat lukea ja kirjoittaa muistiisi.",
+      "desc": "AI-assistentit jotka ovat yhdistetty solmuusi Model Context Protocol (MCP) -yhteydellä. Nämä voivat lukea ja kirjoittaa muistiisi, käyttää työkaluja ja toimia puolestasi.",
       "empty": "Ei MCP-yhteyksiä vielä.",
-      "setupLink": "Aseta MCP-yhteys kehittäjäportaalissa →",
+      "emptyDesc": "Kun yhdistät AI-assistentin (Claude, ChatGPT, Cursor jne.) MCP:llä, se näkyy täällä. Kaikki MCP-työkalujen kirjoittamat muistimerkinnät näkyvät Muisti-välilehdessä.",
+      "setupHint": "Yhdistä uusi AI-assistentti kehittäjäportaalissa.",
+      "setupLink": "Aseta MCP-yhteys",
       "loading": "Ladataan MCP-yhteyksiä...",
       "lastSeen": "Viimeksi nähty",
       "agent": "Agentti",
