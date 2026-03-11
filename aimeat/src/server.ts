@@ -79,6 +79,7 @@ import { TunnelManager } from './services/personal-tunnel.js';
 import { seedProfileSchemas } from './services/profile-schemas.js';
 import { seedCsmTemplates } from './services/csm-seed.js';
 import { seedKnowledgeTemplates } from './services/knowledge.js';
+import { seedSystemPrompts } from './services/prompt-seeder.js';
 import { createEmailService } from './services/email.js';
 import { DirectoryService } from './services/directory.js';
 import { siteRouter } from './routes/site.js';
@@ -107,6 +108,7 @@ import { MailboxNotificationService } from './services/mailbox-notification.js';
 import { Scheduler } from './services/scheduler.js';
 import { adminSchedulerRouter } from './routes/admin-scheduler.js';
 import { adminExtensionsRouter } from './routes/admin-extensions.js';
+import { adminPromptsRouter } from './routes/admin-prompts.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -429,6 +431,10 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   seedKnowledgeTemplates(storage, `system@${config.nodeId}`)
     .then(() => logger.info('Knowledge prompt templates seeded'))
     .catch(err => logger.error('Failed to seed knowledge templates', { error: err }));
+
+  seedSystemPrompts(storage)
+    .then(() => {})
+    .catch(err => logger.error('Failed to seed system prompts', { error: String(err) }));
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);
@@ -756,6 +762,9 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));
+
+  // System prompts admin routes
+  app.use(adminPromptsRouter(config, storage));
 
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>
