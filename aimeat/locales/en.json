@@ -283,6 +283,22 @@
         "permManage": "Manage",
         "permConnect": "Connect",
         "permRegister": "Register"
+      },
+      "deviceAuth": {
+        "title": "Device Authorization",
+        "desc": "Create an approval link for an AI agent to register under your account.",
+        "createLink": "Create approval link",
+        "agentNameLabel": "Agent name",
+        "agentNamePlaceholder": "my-assistant",
+        "userCode": "Verification code",
+        "verifyUrl": "Approval link",
+        "expiresIn": "Expires in",
+        "statusPending": "Waiting for approval...",
+        "statusApproved": "Agent connected!",
+        "statusDenied": "Request denied",
+        "statusExpired": "Request expired",
+        "copyUrl": "Copy link",
+        "copyPrompt": "Copy prompt"
       }
     },
     "scopes": {
@@ -3228,6 +3244,40 @@
     "addPlaceholder": "Add tag...",
     "editTags": "Edit tags",
     "noMatch": "No items match selected tags"
+  },
+  "agentConsent": {
+    "title": "Agent Authorization",
+    "codeLabel": "Verification Code",
+    "codeHint": "Confirm this code matches what the agent showed you",
+    "agentDetails": "Agent Details",
+    "agentName": "Name",
+    "agentDisplayName": "Display name",
+    "agentDescription": "Description",
+    "scopeLabel": "Permissions",
+    "scopeReadonly": "Read only",
+    "scopeReadonlyDesc": "Can read memory and wallet but cannot modify anything",
+    "scopeStandard": "Standard",
+    "scopeStandardDesc": "Can read and write memory, manage work, and read wallet",
+    "scopeFull": "Full access",
+    "scopeFullDesc": "Full access to all features",
+    "scopeCustom": "Custom",
+    "approve": "Approve",
+    "deny": "Deny",
+    "successTitle": "Agent Approved",
+    "successMessage": "The agent has been registered and will connect shortly.",
+    "deniedTitle": "Request Denied",
+    "deniedMessage": "The authorization request has been denied.",
+    "expiredTitle": "Request Expired",
+    "expiredMessage": "This authorization request has expired. Please generate a new one.",
+    "ownerMismatch": "This request is for a different account. Please log in as the correct user.",
+    "invalidCode": "Invalid or expired verification code.",
+    "login": {
+      "title": "Sign in to approve",
+      "username": "Username",
+      "password": "Password",
+      "totp": "TOTP code (if enabled)",
+      "submit": "Sign in"
+    }
   },
   "oauthConsent": {
     "title": "Authorize AI Connection",

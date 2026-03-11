@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 // GAII format: agent#owner@node
 // agent: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
 // owner: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
@@ -85,6 +87,21 @@ export interface ParsedChatInstanceId {
 
 export function buildChatInstanceId(platform: string, appName: string, owner: string, node: string): string {
   return `${platform}-${appName}#${owner}@${node}`;
+}
+
+/**
+ * Generate a human-readable user code for device authorization (RFC 8628).
+ * Format: XXXX-XXXX using unambiguous characters.
+ */
+export function generateUserCode(): string {
+  const CHARS = 'CDFGHJKMNPQRTVWXYZ2346789';
+  const bytes = randomBytes(8);
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += CHARS[bytes[i] % CHARS.length];
+    if (i === 3) code += '-';
+  }
+  return code;
 }
 
 export function parseChatInstanceId(id: string): ParsedChatInstanceId | null {

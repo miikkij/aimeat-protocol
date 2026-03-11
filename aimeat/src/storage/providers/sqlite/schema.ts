@@ -870,6 +870,27 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (extensionName, id)
     );
 
+    -- ── Device Authorization (RFC 8628) ──
+    CREATE TABLE IF NOT EXISTS device_auth (
+      deviceCode    TEXT PRIMARY KEY,
+      userCode      TEXT NOT NULL UNIQUE,
+      ownerName     TEXT NOT NULL,
+      agentName     TEXT NOT NULL,
+      displayName   TEXT,
+      description   TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      scopes        TEXT,
+      createdAt     TEXT NOT NULL,
+      expiresAt     TEXT NOT NULL,
+      lastPolledAt  TEXT,
+      pollInterval  INTEGER NOT NULL DEFAULT 5,
+      approvedBy    TEXT,
+      agentCredentials TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_device_auth_userCode ON device_auth(userCode);
+    CREATE INDEX IF NOT EXISTS idx_device_auth_ownerName ON device_auth(ownerName);
+    CREATE INDEX IF NOT EXISTS idx_device_auth_status ON device_auth(status);
+
   `);
 
   // ── Schema migrations for existing databases ──

@@ -886,3 +886,21 @@ model ScheduledJob {
   @@index([extensionName])
   @@index([enabled])
 }
+
+model DeviceAuth {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  deviceCode       String   @unique
+  userCode         String   @unique
+  ownerName        String
+  agentName        String
+  displayName      String?
+  description      String?
+  status           String   @default("pending")
+  scopes           String[]
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime
+  lastPolledAt     DateTime?
+  pollInterval     Int      @default(5)
+  approvedBy       String?
+  agentCredentials Json?
+}
