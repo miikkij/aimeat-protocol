@@ -60,7 +60,8 @@ export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage 
 function setCorsHeaders(res: { setHeader(name: string, value: string): void }, origin: string): void {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key, mcp-session-id');
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
 }
 
 /**

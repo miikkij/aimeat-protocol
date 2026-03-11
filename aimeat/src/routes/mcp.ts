@@ -979,12 +979,21 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             expiresAt: Date.now() + 600_000,
         });
 
-        // Return JSON with redirect URL (caller is fetch(), not form submission)
+        // Build redirect URL with authorization code
         if (finalRedirect) {
             const url = new URL(finalRedirect);
             url.searchParams.set('code', code);
             if (state) url.searchParams.set('state', state);
-            res.json({ redirect_url: url.toString() });
+
+            // If caller wants JSON (fetch from consent page), return redirect_url
+            // If caller is a form POST or non-JSON, do a 302 redirect
+            const acceptsJson = req.headers.accept?.includes('application/json')
+                || req.headers['content-type']?.includes('application/json');
+            if (acceptsJson) {
+                res.json({ redirect_url: url.toString() });
+            } else {
+                res.redirect(302, url.toString());
+            }
         } else {
             res.json({ code, state });
         }
