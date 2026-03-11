@@ -245,10 +245,14 @@
         return;
       }
 
-      selectedAgent = agents[0];
+      // Keep previous selection if valid, otherwise default to first
+      const prevGaii = selectedAgent?.gaii;
+      const prevIdx = prevGaii ? agents.findIndex(a => a.gaii === prevGaii) : -1;
+      const selIdx = prevIdx >= 0 ? prevIdx : 0;
+      selectedAgent = agents[selIdx];
 
       const agentListHtml = agents.map((a, i) => `
-        <div class="agent-option ${i === 0 ? 'selected' : ''}" data-idx="${i}">
+        <div class="agent-option ${i === selIdx ? 'selected' : ''}" data-idx="${i}">
           <div>
             <div class="agent-name">${escHtml(a.displayName || a.name)}</div>
             <div class="agent-gaii">${escHtml(a.gaii)}</div>
