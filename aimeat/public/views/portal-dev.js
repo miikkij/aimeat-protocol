@@ -147,11 +147,14 @@ function BgSelector({ activeBg, onChange }) {
    PANELS (MCP, API, Browse, Prompt Package)
    ══════════════════════════════════════════════ */
 function McpPanel({ locale, isLoggedIn, session }) {
+  const [setupTab, setSetupTab] = useState('code'); // 'code' | 'cowork' | 'chat'
   const [setupPrompt, setSetupPrompt] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(null);
 
-  const generateSetupPrompt = useCallback(async () => {
+  const nodeId = document.querySelector('meta[name="aimeat-node-id"]')?.content || 'unknown';
+
+  const generateSetupPrompt = useCallback(async (target) => {
     if (!session) return;
     setGenerating(true);
     setGenError(null);
@@ -159,72 +162,126 @@ function McpPanel({ locale, isLoggedIn, session }) {
       const resp = await session.fetch('/v1/auth/connectivity-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: 'MCP agent for AI assistant' }),
+        body: JSON.stringify({ description: `MCP agent for ${target}` }),
       });
       const data = resp.data || resp;
       if (resp.ok === false) throw new Error(resp.error?.message || 'Failed to generate key');
       const key = data.connectivity_key;
       if (!key) throw new Error('No connectivity key in response');
-      const nodeId = document.querySelector('meta[name="aimeat-node-id"]')?.content || 'unknown';
-      const prompt = [
-        `# AIMEAT MCP Setup — for Claude Code / code-capable AI assistants`,
-        ``,
-        `> ⚠️ This prompt requires an AI assistant that can execute shell commands and write files (Claude Code, Cursor, VS Code Copilot). It will NOT work in Claude.ai chat.`,
-        ``,
-        `Connect me to the AIMEAT node at ${NODE_URL}. Follow these steps exactly:`,
-        ``,
-        `## Step 1: Register as an agent`,
-        `Run this curl command:`,
-        '```bash',
-        `curl -s -X POST ${NODE_URL}/v1/agents/connect \\`,
-        `  -H "Content-Type: application/json" \\`,
-        `  -d '{"connectivity_key": "${key}", "agent_name": "claude-assistant"}'`,
-        '```',
-        `Save the response — you need \`data.agent.gaii\` and \`data.private_key\` from it.`,
-        ``,
-        `## Step 2: Get a JWT token`,
-        `The node ID is: \`${nodeId}\``,
-        `To authenticate, you need to Ed25519-sign the string: gaii + nodeId + ISO_timestamp`,
-        `The private_key from Step 1 is a hex-encoded Ed25519 seed (32 bytes).`,
-        ``,
-        `Write a small Node.js script (or use your tools) to:`,
-        `1. Import @noble/ed25519 or use node:crypto Ed25519`,
-        `2. Sign the message: \`<gaii>${nodeId}<current ISO timestamp>\``,
-        `3. POST to ${NODE_URL}/v1/auth/token with body: \`{ "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex>" }\``,
-        `4. Extract the JWT from the response.`,
-        ``,
-        `## Step 3: Configure MCP server`,
-        `Write this to \`.vscode/mcp.json\` in the current project (create if missing):`,
-        '```json',
-        `{`,
-        `  "servers": {`,
-        `    "aimeat": {`,
-        `      "type": "http",`,
-        `      "url": "${NODE_URL}/v1/mcp",`,
-        `      "headers": { "Authorization": "Bearer <JWT_FROM_STEP_2>" }`,
-        `    }`,
-        `  }`,
-        `}`,
-        '```',
-        ``,
-        `## Step 4: Verify`,
-        `After configuring, use the \`aimeat_catalogue_search\` MCP tool to verify the connection works.`,
-        ``,
-        `## Important notes`,
-        `- The JWT expires after 24h. Save the private_key and gaii so you can re-authenticate.`,
-        `- Store credentials securely (e.g. \`.env\` file, not committed to git).`,
-        `- 18 MCP tools available: catalogue, agent profile, memory (read/write/list),`,
-        `  action execute, work queue (inbox/accept/deliver), wallet, boards (read/post),`,
-        `  storage (upload/download), and 4 admin tools (operator only).`,
-        `- Full API spec: ${NODE_URL}/v1/spec`,
-      ].join('\n');
+
+      let prompt;
+      if (target === 'code') {
+        prompt = [
+          `# AIMEAT MCP Setup — Claude Code`,
+          ``,
+          `Connect me to the AIMEAT node at ${NODE_URL}. Follow these steps exactly.`,
+          ``,
+          `## Step 1: Register as an agent`,
+          `Run this curl command:`,
+          '```bash',
+          `curl -s -X POST ${NODE_URL}/v1/agents/connect \\`,
+          `  -H "Content-Type: application/json" \\`,
+          `  -d '{"connectivity_key": "${key}", "agent_name": "claude-code-agent"}'`,
+          '```',
+          `Save the response — you need \`data.agent.gaii\` and \`data.private_key\` from it.`,
+          ``,
+          `## Step 2: Get a JWT token`,
+          `The node ID is: \`${nodeId}\``,
+          `To authenticate, Ed25519-sign the string: gaii + nodeId + ISO_timestamp`,
+          `The private_key from Step 1 is a hex-encoded Ed25519 seed (32 bytes).`,
+          ``,
+          `Write a small Node.js script to:`,
+          `1. Import @noble/ed25519 or use node:crypto Ed25519`,
+          `2. Sign the message: \`<gaii>${nodeId}<current ISO timestamp>\``,
+          `3. POST to ${NODE_URL}/v1/auth/token with body: \`{ "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex>" }\``,
+          `4. Extract the JWT from the response.`,
+          ``,
+          `## Step 3: Configure MCP server`,
+          `Run: \`claude mcp add aimeat --transport http --scope user ${NODE_URL}/v1/mcp\``,
+          `Or write this to \`.mcp.json\` in the project root:`,
+          '```json',
+          `{`,
+          `  "servers": {`,
+          `    "aimeat": {`,
+          `      "type": "http",`,
+          `      "url": "${NODE_URL}/v1/mcp",`,
+          `      "headers": { "Authorization": "Bearer <JWT_FROM_STEP_2>" }`,
+          `    }`,
+          `  }`,
+          `}`,
+          '```',
+          ``,
+          `## Step 4: Verify`,
+          `Use the \`aimeat_catalogue_search\` MCP tool to verify the connection works.`,
+          ``,
+          `## Notes`,
+          `- JWT expires after 24h. Save the private_key and gaii to re-authenticate.`,
+          `- Store credentials in \`.env\` (not committed to git).`,
+          `- 18 MCP tools: catalogue, agent profile, memory (read/write/list),`,
+          `  action execute, work queue (inbox/accept/deliver), wallet, boards (read/post),`,
+          `  storage (upload/download), and 4 admin tools (operator only).`,
+          `- Full API spec: ${NODE_URL}/v1/spec`,
+        ].join('\n');
+      } else if (target === 'cowork') {
+        prompt = [
+          `# AIMEAT MCP Setup — Claude Cowork (Desktop)`,
+          ``,
+          `Connect me to the AIMEAT node at ${NODE_URL}. I need you to set up the MCP connection.`,
+          ``,
+          `## Step 1: Register as an agent`,
+          `Run this command in your sandbox terminal:`,
+          '```bash',
+          `curl -s -X POST ${NODE_URL}/v1/agents/connect \\`,
+          `  -H "Content-Type: application/json" \\`,
+          `  -d '{"connectivity_key": "${key}", "agent_name": "claude-cowork-agent"}'`,
+          '```',
+          `Save the \`data.agent.gaii\` and \`data.private_key\` from the response.`,
+          ``,
+          `## Step 2: Get a JWT token`,
+          `The node ID is: \`${nodeId}\``,
+          `Sign the string \`<gaii>${nodeId}<ISO_timestamp>\` with Ed25519 using the private_key (hex-encoded seed).`,
+          `Then POST to ${NODE_URL}/v1/auth/token with body: \`{ "gaii": "...", "timestamp": "...", "signature": "..." }\``,
+          ``,
+          `## Step 3: Add MCP server to Claude Desktop config`,
+          `Edit the Claude Desktop config file:`,
+          `- macOS: ~/Library/Application Support/Claude/claude_desktop_config.json`,
+          `- Windows: %APPDATA%\\Claude\\claude_desktop_config.json`,
+          ``,
+          `Add under "mcpServers":`,
+          '```json',
+          `{`,
+          `  "mcpServers": {`,
+          `    "aimeat": {`,
+          `      "url": "${NODE_URL}/v1/mcp",`,
+          `      "headers": { "Authorization": "Bearer <JWT_FROM_STEP_2>" }`,
+          `    }`,
+          `  }`,
+          `}`,
+          '```',
+          `After editing, tell me to restart Claude Desktop to pick up the new MCP server.`,
+          ``,
+          `## Step 4: Verify`,
+          `After restart, use the aimeat_catalogue_search tool to test the connection.`,
+          ``,
+          `## Notes`,
+          `- JWT expires after 24h. Save gaii + private_key for re-authentication.`,
+          `- 18 MCP tools available after connection.`,
+          `- Full API spec: ${NODE_URL}/v1/spec`,
+        ].join('\n');
+      }
       setSetupPrompt(prompt);
     } catch (err) {
       setGenError(err.message || 'Failed');
     } finally {
       setGenerating(false);
     }
-  }, [session]);
+  }, [session, nodeId]);
+
+  const tabStyle = (tab) => `padding:.4rem .75rem;border:none;border-radius:.25rem .25rem 0 0;cursor:pointer;font-size:.8rem;font-weight:600;${
+    setupTab === tab
+      ? 'background:rgba(130,100,255,.15);color:var(--accent,#a78bfa)'
+      : 'background:transparent;color:var(--muted)'
+  }`;
 
   return html`
     <div class="dv-panel">
@@ -252,21 +309,70 @@ function McpPanel({ locale, isLoggedIn, session }) {
         <div style="background:rgba(130,100,255,.08);border:1px solid rgba(130,100,255,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
           <strong>${dt('panel.mcpSetupTitle', locale)}</strong>
           <p style="margin:.5rem 0 0;font-size:.85rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpSetupDesc', locale)) }}></p>
-          ${!setupPrompt && html`
-            <button type="button" onClick=${generateSetupPrompt} disabled=${generating}
-              style="margin-top:.75rem;padding:.5rem 1rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.85rem">
-              ${generating ? dt('panel.mcpSetupGenerating', locale) : dt('panel.mcpSetupBtn', locale)}
+
+          <!-- Platform tabs -->
+          <div style="display:flex;gap:2px;margin-top:.75rem;border-bottom:1px solid rgba(130,100,255,.2)">
+            <button type="button" style="${tabStyle('code')}" onClick=${() => { setSetupTab('code'); setSetupPrompt(null); }}>
+              Claude Code
             </button>
-            ${genError && html`<p style="color:#ff6b6b;margin-top:.5rem;font-size:.8rem">${genError}</p>`}
-          `}
-          ${setupPrompt && html`
-            <div class="dv-prompt-output" style="margin-top:.75rem">
-              <${CopyBtn} text=${setupPrompt} locale=${locale} />
-              <div class="dv-prompt-text" style="max-height:20rem;overflow-y:auto;white-space:pre-wrap;font-size:.8rem">${setupPrompt}</div>
-            </div>
-            <p style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${dt('panel.mcpSetupNote', locale)}</p>
-          `}
-          <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpSetupChatNote', locale)}</p>
+            <button type="button" style="${tabStyle('cowork')}" onClick=${() => { setSetupTab('cowork'); setSetupPrompt(null); }}>
+              Claude Cowork
+            </button>
+            <button type="button" style="${tabStyle('chat')}" onClick=${() => { setSetupTab('chat'); setSetupPrompt(null); }}>
+              Claude.ai Chat
+            </button>
+          </div>
+
+          <!-- Tab content -->
+          <div style="padding:.75rem 0 0">
+            ${setupTab === 'code' && html`
+              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .5rem">
+                ${dt('panel.mcpSetupCodeDesc', locale)}
+              </p>
+              ${!setupPrompt && html`
+                <button type="button" onClick=${() => generateSetupPrompt('code')} disabled=${generating}
+                  style="padding:.4rem .75rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.82rem">
+                  ${generating ? dt('panel.mcpSetupGenerating', locale) : dt('panel.mcpSetupBtn', locale)}
+                </button>
+                ${genError && html`<p style="color:#ff6b6b;margin-top:.5rem;font-size:.8rem">${genError}</p>`}
+              `}
+            `}
+
+            ${setupTab === 'cowork' && html`
+              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .5rem">
+                ${dt('panel.mcpSetupCoworkDesc', locale)}
+              </p>
+              ${!setupPrompt && html`
+                <button type="button" onClick=${() => generateSetupPrompt('cowork')} disabled=${generating}
+                  style="padding:.4rem .75rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.82rem">
+                  ${generating ? dt('panel.mcpSetupGenerating', locale) : dt('panel.mcpSetupBtn', locale)}
+                </button>
+                ${genError && html`<p style="color:#ff6b6b;margin-top:.5rem;font-size:.8rem">${genError}</p>`}
+              `}
+            `}
+
+            ${setupTab === 'chat' && html`
+              <div style="font-size:.85rem">
+                <p style="margin:0 0 .75rem;color:var(--muted)">${dt('panel.mcpSetupChatDesc', locale)}</p>
+                <ol style="margin:0;padding-left:1.25rem;line-height:1.6">
+                  <li>${dt('panel.mcpChatStep1', locale)}</li>
+                  <li>${dt('panel.mcpChatStep2', locale)}</li>
+                  <li>${dt('panel.mcpChatStep3', locale)} <code style="font-size:.8rem">${NODE_URL}/v1/mcp</code></li>
+                  <li>${dt('panel.mcpChatStep4', locale)}</li>
+                  <li>${dt('panel.mcpChatStep5', locale)}</li>
+                </ol>
+                <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpChatNote', locale)}</p>
+              </div>
+            `}
+
+            ${setupPrompt && html`
+              <div class="dv-prompt-output" style="margin-top:.75rem">
+                <${CopyBtn} text=${setupPrompt} locale=${locale} />
+                <div class="dv-prompt-text" style="max-height:20rem;overflow-y:auto;white-space:pre-wrap;font-size:.8rem">${setupPrompt}</div>
+              </div>
+              <p style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${dt('panel.mcpSetupNote', locale)}</p>
+            `}
+          </div>
         </div>
       `}
 
@@ -683,8 +789,6 @@ export default function PortalDevView({ navigate, locale }) {
     setSelectedVariant(null);
     if (p.variants.length === 1) setSelectedVariant(p.variants[0]);
   }, []);
-
-  const nodeId = document.querySelector('meta[name="aimeat-node-id"]')?.content || 'aimeat-node';
 
   return html`
     <${BackgroundLayer} activeBg=${activeBg} />
