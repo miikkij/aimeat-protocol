@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, ExtensionInstanceRecord, ScheduledJobRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import type { Scheduler } from '../services/scheduler.js';
@@ -208,6 +209,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to install extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to install extension'));
@@ -323,6 +325,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           scriptContent,
         },
       }));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to update action script', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update action script'));
@@ -345,6 +348,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       res.json(success(config.nodeId, { deleted: name }, [
         { description: 'List extensions', method: 'GET', url: '/v1/extensions' },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to uninstall extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to uninstall extension'));
@@ -399,6 +403,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
         { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${name}/deactivate` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to activate extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to activate extension'));
@@ -436,6 +441,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       res.json(success(config.nodeId, { extension: updated }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to deactivate extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to deactivate extension'));
@@ -502,6 +508,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
         { description: 'Execute action on instance', method: 'POST', url: `/v1/ext/${name}/${id}/<actionId>` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to create extension instance', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create extension instance'));
@@ -613,6 +620,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         { description: 'View instance', method: 'GET', url: `/v1/extensions/${name}/instances/${instanceId}` },
         { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to update extension instance', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update extension instance'));
@@ -644,6 +652,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         { description: 'List instances', method: 'GET', url: `/v1/extensions/${name}/instances` },
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${name}` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to delete extension instance', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete extension instance'));
@@ -809,6 +818,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       res.json(success(config.nodeId, result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       const message = (err as Error).message;
       logger.error(`Extension action failed: ${extName}/${instanceId}/${actionId}`, { error: message, caller: callerGaii });
@@ -952,6 +962,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       res.json(success(config.nodeId, result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
       ]));
+      emitChange('extensions');
     } catch (err) {
       const message = (err as Error).message;
       logger.error(`Extension action failed: ${extName}/${actionId}`, { error: message, caller: callerGaii });

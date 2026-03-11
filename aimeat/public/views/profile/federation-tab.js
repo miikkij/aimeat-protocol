@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -20,6 +20,15 @@ export default function FederationTab({ session, showToast }) {
       setFederation(peers);
     } catch { setFederation([]); }
   }
+
+  // Live update listener
+  const loadRef = useRef(loadData);
+  loadRef.current = loadData;
+  useEffect(() => {
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
 
   return html`
     <div class="section-title">${t('profile.federation.title')}</div>

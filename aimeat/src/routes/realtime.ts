@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import type { RealtimeManager } from '../services/realtime-manager.js';
 import type { PeerInfo } from '../services/federation.js';
 
@@ -51,6 +52,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
         { description: 'Connect via WebSocket', method: 'GET', url: `/v1/realtime/ws?room=${room.id}` },
         { description: 'List rooms', method: 'GET', url: '/v1/realtime/rooms' },
       ]));
+      emitChange('realtime');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg === 'ROOM_LIMIT_REACHED') {
@@ -155,6 +157,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
     res.json(success(config.nodeId, { deleted: true }, [
       { description: 'List rooms', method: 'GET', url: '/v1/realtime/rooms' },
     ]));
+    emitChange('realtime');
   });
 
   // GET /v1/realtime/ice-servers — return ICE server configuration for WebRTC
@@ -272,6 +275,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
       remote_node_url,
       remote_room_id,
     }));
+    emitChange('realtime');
   });
 
   // DELETE /v1/realtime/relay — disconnect a federation relay (operator only)
@@ -294,6 +298,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
       local_room_id,
       remote_room_id,
     }));
+    emitChange('realtime');
   });
 
   // GET /v1/admin/realtime — full realtime overview for admin dashboard (operator only)

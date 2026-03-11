@@ -13,6 +13,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+import { emitChange } from '../services/event-bus.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events

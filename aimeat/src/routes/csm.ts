@@ -7,6 +7,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseCsm, validateCsm, csmToJsonSchema } from '../services/csm-parser.js';
+import { emitChange } from '../services/event-bus.js';
 import type { CsmDefinition } from '../services/csm-parser.js';
 
 // Load CSM templates at startup
@@ -180,6 +181,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'View this CSM service', method: 'GET', url: `/v1/csm/${encodeURIComponent(record.name)}` },
       { description: 'Write data matching this schema', method: 'POST', url: '/v1/memory' },
     ]));
+    emitChange('csm');
   });
 
   // GET /v1/csm — List registered CSM services
@@ -291,6 +293,7 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Register a new CSM service', method: 'POST', url: '/v1/csm' },
       { description: 'List remaining CSM services', method: 'GET', url: '/v1/csm' },
     ]));
+    emitChange('csm');
   });
 
   return router;

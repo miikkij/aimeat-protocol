@@ -18,6 +18,7 @@ import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValu
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -181,6 +182,7 @@ export function adminRouter(
         }
 
         res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey, has_password: hasPassword });
+        emitChange('config');
     });
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
@@ -588,6 +590,7 @@ export function adminRouter(
                 status: introBody.data?.status ?? 'pending',
                 message: introBody.data?.message ?? 'Introduction sent. Awaiting genesis operator approval.',
             }));
+            emitChange('config');
         } catch (e) {
             res.status(502).json(error(config.nodeId, 'INTRODUCTION_FAILED',
                 `Failed to introduce to ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
@@ -720,6 +723,7 @@ export function adminRouter(
             errors: errors.length > 0 ? errors : undefined,
             note: 'Config updated and persisted to database. Changes survive restart.',
         }));
+        emitChange('config');
     });
 
     // DELETE /v1/admin/config/:path — remove a DB override (revert to file/env/default)
@@ -753,6 +757,7 @@ export function adminRouter(
             newSource: provenance?.getSource(path) ?? 'default',
             note: 'DB override removed. Value reverts to file/env/default on next restart.',
         }));
+        emitChange('config');
     });
 
     // ── Consul Integration Endpoints ──
@@ -798,6 +803,7 @@ export function adminRouter(
         }
 
         res.json(success(config.nodeId, { exported, total: Object.keys(MUTABLE_CONFIG_MAP).length }));
+        emitChange('config');
     });
 
     // POST /v1/admin/consul/import — pull config from Consul KV and apply to runtime + DB
@@ -819,6 +825,7 @@ export function adminRouter(
         }
 
         res.json(success(config.nodeId, { imported: applied.length, total: Object.keys(values).length }));
+        emitChange('config');
     });
 
     // GET /v1/admin/agents — list all agents with full details (operator only)
@@ -874,6 +881,7 @@ export function adminRouter(
             gaii: updated.gaii,
             allowed_origins: updated.allowedOrigins ?? null,
         }));
+        emitChange('config');
     });
 
     // GET /v1/admin/stats — aggregate statistics (operator only)
@@ -972,6 +980,7 @@ export function adminRouter(
             restored: true,
             imported,
         }));
+        emitChange('config');
     });
 
     // POST /v1/admin/roles/grant — grant operator role (operator only)
@@ -996,6 +1005,7 @@ export function adminRouter(
             role: 'operator',
             granted: true,
         }));
+        emitChange('config');
     });
 
     // GET /v1/admin/hooks — list all extension hooks
@@ -1034,6 +1044,7 @@ export function adminRouter(
             actions: config.extensionHooks[hookName as HookName],
             updated: true,
         }));
+        emitChange('config');
     });
 
     // DELETE /v1/admin/hooks/:hookName — clear all actions from a hook
@@ -1051,6 +1062,7 @@ export function adminRouter(
             actions: [],
             cleared: true,
         }));
+        emitChange('config');
     });
 
     // GET /v1/admin/maintenance — get maintenance mode status (operator only)
@@ -1075,6 +1087,7 @@ export function adminRouter(
         await storage.setMaintenanceMode(state);
         if (maintenanceCache) maintenanceCache.set(state);
         res.json(success(config.nodeId, state));
+        emitChange('maintenance');
     });
 
     // POST /v1/admin/mint — operator mints morsels for an agent (§16.1)
@@ -1128,6 +1141,7 @@ export function adminRouter(
             daily_minted: mintedToday + amount,
             daily_cap: config.maxOperatorMintPerDay,
         }));
+        emitChange('config');
     });
 
     // D.2: Trust advisory broadcast endpoint (operator only)
@@ -1176,6 +1190,7 @@ export function adminRouter(
             advisory: advisoryRecord,
             note: 'Advisory stored. It will be broadcast to peers during next sync cycle or can be manually triggered.',
         }));
+        emitChange('config');
     });
 
     // D.2: List trust advisories (received + issued)

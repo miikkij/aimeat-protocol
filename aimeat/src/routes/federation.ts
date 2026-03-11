@@ -16,6 +16,7 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { RouteHop, RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage, computeRelayFeeDistribution } from '../types/route-manifest.js';
 import type { RelayFeeDistribution } from '../types/route-manifest.js';
+import { emitChange } from '../services/event-bus.js';
 
 // ── E.4: Keyword matching helpers for cross-catalogue filtering ──
 
@@ -274,6 +275,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         }, [
             { description: 'Check introduction status', method: 'GET', url: `/v1/federation/peer/introduce/${id}/status` },
         ]));
+        emitChange('federation');
     });
 
     // GET /v1/federation/peer/introduce/:id/status — check introduction status (no auth, request_id acts as bearer)
@@ -326,6 +328,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         }, [
             { description: 'Check request status', method: 'GET', url: `/v1/federation/peer/request/${id}/status` },
         ]));
+        emitChange('federation');
     });
 
     // GET /v1/federation/peer/request/:id/status — check peering request status
@@ -397,6 +400,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             checks,
             tested_at: new Date().toISOString(),
         }));
+        emitChange('federation');
     });
 
     // GET /v1/admin/peering/requests — list pending peering requests (operator)
@@ -453,6 +457,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             reason,
             status: newStatus,
         }));
+        emitChange('federation');
     });
 
     // POST /v1/federation/peer/activate — activate approved peering
@@ -484,6 +489,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             activated_at: peer.lastSeen,
             key_exchange: keyExchangeResult.success ? 'completed' : 'failed',
         }));
+        emitChange('federation');
     });
 
     // POST /v1/federation/heartbeat — peer health heartbeat
@@ -522,6 +528,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 uptime_seconds: Math.floor(process.uptime()),
             },
         }));
+        emitChange('federation');
     });
 
     // GET /v1/federation/peers — list active peers (operator auth)
@@ -575,6 +582,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
         }, [
             { description: 'View peer directory', method: 'GET', url: '/v1/federation/directory' },
         ]));
+        emitChange('federation');
     });
 
     // PUT /v1/federation/peers/:nodeId — update peer config (operator only)
@@ -597,6 +605,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             status: peer.status,
             updated: true,
         }));
+        emitChange('federation');
     });
 
     // DELETE /v1/federation/peers/:nodeId — de-peer (operator only)
@@ -670,6 +679,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 network_notified: notifyNetwork,
                 note: 'Peer immediately de-peered — all in-flight work cancelled, escrow returned',
             }));
+            emitChange('federation');
         } else {
             // ── Normal de-peering: grace period ──
             const graceHours = config.depeeringGracePeriodHours;
@@ -730,6 +740,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 expiring_replicas: expiredReplicas,
                 note: `Peer set to depeering status. In-flight work may complete. Peer will be purged after ${graceHours}h grace period.`,
             }));
+            emitChange('federation');
         }
     });
 
@@ -748,6 +759,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             node_id: config.nodeId,
             timestamp: new Date().toISOString(),
         }));
+        emitChange('federation');
     });
 
     // ── A.3: Key Exchange Endpoint ──
@@ -810,6 +822,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             agent_keys: ourAgentKeys,
             timestamp: new Date().toISOString(),
         }));
+        emitChange('federation');
     });
 
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
@@ -864,6 +877,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     conflict: true,
                     conflict_resolution: 'incoming_older',
                 }));
+                emitChange('federation');
                 return;
             }
 
@@ -912,6 +926,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             version,
             conflict: !!existing,
         }));
+        emitChange('federation');
     });
 
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
@@ -1005,6 +1020,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             incremental: !!since_timestamp,
             catalogue_hash: catalogue_hash ?? null,
         }));
+        emitChange('federation');
     });
 
     // POST /v1/federation/trust-advisory — Receive trust advisory about a node
@@ -1046,6 +1062,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             '@type': 'aimeat:TrustAdvisory',
             ...advisory,
         }));
+        emitChange('federation');
     });
 
     // ── Cross-Node Query Routing ──
@@ -1159,6 +1176,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     response_data: data,
                     route_manifest: inboundManifest,
                 }));
+                emitChange('federation');
             } catch (err) {
                 res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
                     `Failed to reach peer ${target_node}: ${err instanceof Error ? err.message : 'unknown error'}`));
@@ -1217,6 +1235,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                         response_data: data,
                         route_manifest: inboundManifest,
                     }));
+                    emitChange('federation');
                     return;
                 }
             } catch {
@@ -1365,6 +1384,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 routed_to: target_node,
                 response_data: data,
             }));
+            emitChange('federation');
         } catch (err) {
             res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
                 `Failed to submit cross-node work: ${err instanceof Error ? err.message : 'unknown error'}`));
@@ -1541,6 +1561,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
             tracking_code,
             relay_distribution: relayDistribution,
         }));
+        emitChange('federation');
     });
 
     // POST /v1/federation/settle/outbound — Send a signed settlement to a peer node (operator only)
@@ -1621,6 +1642,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     tracking_code,
                     response_data: data,
                 }));
+                emitChange('federation');
             } else {
                 res.status(response.status).json(error(config.nodeId, 'FEDERATION_ERROR',
                     `Settlement rejected by peer: ${JSON.stringify(data)}`));
@@ -1650,6 +1672,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                     'schema:memberOf': 'aimeat:CrossFederation',
                 },
             }));
+            emitChange('federation');
         } catch (err) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', String(err)));
         }
@@ -1684,6 +1707,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 return;
             }
             res.json(success(config.nodeId, { peer }));
+            emitChange('federation');
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }
@@ -1699,6 +1723,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 return;
             }
             res.json(success(config.nodeId, { removed: true }));
+            emitChange('federation');
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }
@@ -1905,6 +1930,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 stored,
                 catalogue_hash: catalogue_hash ?? null,
             }));
+            emitChange('federation');
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }
@@ -2200,6 +2226,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 peer_node_id: peer.genesisNodeId,
                 subscribed_prefixes: prefixes,
             }));
+            emitChange('federation');
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }
@@ -2252,6 +2279,7 @@ export function federationRouter(config: AimeatConfig, storage: Storage, peers: 
                 return;
             }
             res.json(success(config.nodeId, { peer }));
+            emitChange('federation');
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
         }

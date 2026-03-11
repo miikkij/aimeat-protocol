@@ -8,6 +8,7 @@ import { isAllowedPushEndpoint } from '../services/mailbox-notification.js';
 import { MailboxService } from '../services/mailbox.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 
@@ -89,6 +90,7 @@ export function personalRouter(
           url: '/v1/personal/status',
         },
       ]));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to anchor personal node', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to register personal node'));
@@ -195,6 +197,7 @@ export function personalRouter(
         visibility: updated!.visibility,
         updated_at: updated!.updatedAt,
       }));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to update personal node', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update personal node'));
@@ -244,6 +247,7 @@ export function personalRouter(
           url: '/v1/personal/anchor',
         },
       ]));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to deregister personal node', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to deregister personal node'));
@@ -364,6 +368,7 @@ export function personalRouter(
           url: `/v1/personal/push/test/${encodeURIComponent(personalNodeId)}`,
         },
       ]));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to create push subscription', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create push subscription'));
@@ -395,6 +400,7 @@ export function personalRouter(
         id: subId,
         deleted: true,
       }));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to delete push subscription', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete push subscription'));
@@ -484,6 +490,7 @@ export function personalRouter(
         channel: result.channel ?? null,
         reason: result.reason ?? null,
       }));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to send test push notification', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to send test push notification'));
@@ -651,6 +658,7 @@ export function personalRouter(
           url: `/v1/personal/anchor/${encodeURIComponent(nodeId)}/notifications`,
         },
       ]));
+      emitChange('personal');
     } catch (err) {
       logger.error('Failed to update notification preferences', { error: err });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update notification preferences'));

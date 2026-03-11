@@ -1,7 +1,7 @@
 # System Prompts Management — Design Spec
 
 **Date:** 2026-03-11
-**Status:** Draft
+**Status:** Approved
 
 ## Overview
 
@@ -273,6 +273,7 @@ New file: `public/views/admin/prompts-tab.js`
 | `src/routes/site.ts` | `getPrompt()` reads from storage |
 | `src/routes/bootstrap.ts` | Bootstrap instructions from storage |
 | `src/services/knowledge.ts` | Remove memory-based prompt seeding (replaced by system prompt storage) |
+| `src/routes/knowledge.ts` | Update template endpoints to read from system prompt storage |
 | `public/js/services/admin.js` | Add 6 prompt API functions |
 | `public/views/admin.js` | Register Prompts tab in `NAV_GROUPS`, load prompt stats in dashboard fetch |
 | `public/css/views/admin.css` | Prompt editor styles (`adm-prompt-*` prefix) |

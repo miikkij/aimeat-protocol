@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 
 /**
@@ -189,6 +190,7 @@ export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Ro
             { description: 'View purchase details', method: 'GET', url: `/v1/marketplace/purchases/${txId}` },
             { description: 'List all purchases', method: 'GET', url: '/v1/marketplace/purchases' },
         ]));
+        emitChange('marketplace');
     });
 
     // GET /v1/marketplace/purchases — List buyer's purchases

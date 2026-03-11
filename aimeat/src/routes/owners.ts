@@ -8,6 +8,7 @@ import { validateOwnerName } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -92,6 +93,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
         },
       },
     ]));
+    emitChange('owners');
   });
 
   // GET /v1/owners/:name — public owner profile
@@ -624,6 +626,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       owner: name,
       agents_deleted: agents.length,
     }));
+    emitChange('owners');
   });
 
   // POST /v1/owners/:name/recover — Owner key recovery (operator-assisted)
@@ -649,6 +652,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       public_key: keyPair.publicKey,
       note: 'New keys generated. Store the private key securely. Old keys are invalidated.',
     }));
+    emitChange('owners');
   });
 
   return router;

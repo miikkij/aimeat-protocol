@@ -10,6 +10,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { auditDataAccess } from '../services/consent.js';
+import { emitChange } from '../services/event-bus.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -241,6 +242,7 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, updated, [
       { description: 'View all match suggestions', method: 'GET', url: '/v1/matches' },
     ]));
+    emitChange('matches');
   });
 
   return router;

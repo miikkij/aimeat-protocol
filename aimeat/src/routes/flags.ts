@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 
 const VALID_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent'] as const;
 const VALID_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other'] as const;
@@ -117,6 +118,7 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             { description: 'View flag summary for this target', method: 'GET', url: `/v1/flags/summary/${targetType}/${targetId}` },
             ...(hidden ? [{ description: 'Appeal this flag', method: 'POST', url: `/v1/flags/${id}/appeal` }] : []),
         ]));
+        emitChange('flags');
     });
 
     // ── GET /v1/flags/summary/:targetType/:targetId — Public flag summary (Tier 0) ──
@@ -218,6 +220,7 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             { description: 'View all flags', method: 'GET', url: '/v1/flags' },
             { description: 'View flag summary for this target', method: 'GET', url: `/v1/flags/summary/${existing.targetType}/${existing.targetId}` },
         ]));
+        emitChange('flags');
     });
 
     return router;

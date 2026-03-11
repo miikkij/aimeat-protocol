@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { ActionPublishSchema, ActionUpdateSchema, validateBody } from '../models/schemas.js';
+import { emitChange } from '../services/event-bus.js';
 
 const ALLOWED_CATEGORIES = [
   'language', 'translation', 'analysis', 'generation', 'coding',
@@ -83,6 +84,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         { description: 'View in catalogue', method: 'GET', url: `/v1/catalogue/${action.id}` },
         { description: 'Update this action', method: 'PUT', url: `/v1/actions/${action.id}` },
       ]));
+      emitChange('actions');
     } catch (e: any) {
       if (e.message === 'ACTION_EXISTS') {
         res.status(409).json(error(config.nodeId, 'CONFLICT', `Action "${id}" already exists for this agent`));
@@ -104,6 +106,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { deleted: true, id: req.params.id }, [
       { description: 'View catalogue', method: 'GET', url: '/v1/catalogue' },
     ]));
+    emitChange('actions');
   });
 
   // GET /v1/actions — discover actions (Tier 0, no auth)
@@ -175,6 +178,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
       description: updated.description,
       updated_at: updated.updatedAt,
     }));
+    emitChange('actions');
   });
 
   // GET /v1/actions/:gaii/:id — action detail by provider GAII (Tier 0, no auth)

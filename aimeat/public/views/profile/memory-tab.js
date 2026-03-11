@@ -36,6 +36,15 @@ export default function MemoryTab({ session, showToast, onStats }) {
     if (session) { loadMemories(); }
   }, [selectedAgent]);
 
+  // Live update listener
+  const liveRef = useRef(loadMemories);
+  liveRef.current = loadMemories;
+  useEffect(() => {
+    const handler = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+
   async function loadAgents() {
     try {
       const list = await listAgents();

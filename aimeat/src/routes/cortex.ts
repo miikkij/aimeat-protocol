@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { logger } from '../utils/logger.js';
 
@@ -129,6 +130,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(record.name)}` },
       ]));
+      emitChange('cortex');
     } catch (e: unknown) {
       const msg = (e as Error).message;
       if (msg.includes('already exists')) {
@@ -221,6 +223,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'List extensions', method: 'GET', url: '/v1/cortex' },
     ]));
+    emitChange('cortex');
   });
 
   // ── POST /v1/cortex/:name/activate — activate extension ──
@@ -241,6 +244,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         activated_at: ext.activatedAt,
         message: 'Extension is already active',
       }));
+      emitChange('cortex');
       return;
     }
 
@@ -263,6 +267,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Deactivate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/deactivate` },
       { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(name)}` },
     ]));
+    emitChange('cortex');
   });
 
   // ── POST /v1/cortex/:name/deactivate — deactivate extension ──
@@ -282,6 +287,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         status: 'inactive',
         message: 'Extension is already inactive',
       }));
+      emitChange('cortex');
       return;
     }
 
@@ -307,6 +313,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/activate` },
     ]));
+    emitChange('cortex');
   });
 
   // ── POST /v1/cortex/:name/visibility — toggle visibility ──
@@ -328,6 +335,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const updated = await storage.updateCortexExtension(name, { visibility });
     res.json(success(config.nodeId, { name, visibility: updated?.visibility }));
+    emitChange('cortex');
   });
 
   // ── GET /v1/cortex/:name/prompts — list prompts from extension ──

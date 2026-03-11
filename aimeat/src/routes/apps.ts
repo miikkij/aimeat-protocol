@@ -4,6 +4,7 @@ import type { Storage, AppManifest } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -372,6 +373,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }, [
             { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
         ]));
+        emitChange('apps');
     });
 
     // PATCH /v1/apps/:filename — Update access code on an app you own (requires auth)
@@ -403,6 +405,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 ? 'Access code updated. Share the new code with recipients.'
                 : 'Access code removed. The app is now publicly downloadable.',
         }));
+        emitChange('apps');
     });
 
     // DELETE /v1/apps/:filename — Remove an app you own (supports ?version=N)
@@ -439,6 +442,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             version_deleted: version ?? 'all',
             note: version ? `Version ${version} deleted.` : 'App deleted (all versions).',
         }));
+        emitChange('apps');
     });
 
     return router;

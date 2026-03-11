@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
 
 export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService): Router {
@@ -79,6 +80,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
                 tags_found: result.tagsFound,
                 unresolvable_tags: result.unresolvableTags,
             }));
+            emitChange('site');
         } catch (err) {
             if (err instanceof SiteError) {
                 res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
@@ -92,6 +94,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     router.delete('/v1/site/template', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
         await site.deleteTemplate(req.auth!.sub);
         res.json(success(config.nodeId, { deleted: true, reverted_to: 'default' }));
+        emitChange('site');
     });
 
     // POST /v1/site/import — Import portal bundle (operator)
@@ -133,6 +136,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
                 kv_pairs_updated: result.kvPairsUpdated,
                 changelog_entry_id: result.changelogEntryId,
             }));
+            emitChange('site');
         } catch (err) {
             if (err instanceof SiteError) {
                 res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
@@ -154,6 +158,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     router.post('/v1/site/cache-invalidate', requireAuth(), requireRole('operator'), async (req, res) => {
         await site.invalidateCacheAction(req.auth!.sub);
         res.json(success(config.nodeId, { cache_cleared: true }));
+        emitChange('site');
     });
 
     // GET /v1/site/prompt — AI navigation prompt

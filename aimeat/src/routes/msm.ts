@@ -7,6 +7,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseMsm, validateMsm } from '../services/msm-parser.js';
+import { emitChange } from '../services/event-bus.js';
 import type { MsmDefinition } from '../services/msm-parser.js';
 
 // Load MSM templates at startup
@@ -156,6 +157,7 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'List all MSM integrations', method: 'GET', url: '/v1/msm' },
       { description: 'View this MSM integration', method: 'GET', url: `/v1/msm/${encodeURIComponent(record.name)}` },
     ]));
+    emitChange('msm');
   });
 
   // GET /v1/msm — List registered MSM integrations
@@ -270,6 +272,7 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Register a new MSM integration', method: 'POST', url: '/v1/msm' },
       { description: 'List remaining MSM integrations', method: 'GET', url: '/v1/msm' },
     ]));
+    emitChange('msm');
   });
 
   return router;

@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -40,6 +40,15 @@ export default function DataWalletTab({ session, showToast }) {
       setPermSummary(data || null);
     } catch { setPermSummary(null); }
   }
+
+  // Live update listener
+  const loadAllRef = useRef(() => { loadConsents(); loadAudit(auditDays); loadPermSummary(); });
+  loadAllRef.current = () => { loadConsents(); loadAudit(auditDays); loadPermSummary(); };
+  useEffect(() => {
+    const handler = () => loadAllRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
 
   async function handleGrant(body) {
     try {

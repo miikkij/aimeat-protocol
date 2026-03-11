@@ -11,6 +11,7 @@ import { executeHooks } from '../services/hooks.js';
 import { AgentRegistrationSchema, validateBody } from '../models/schemas.js';
 import { verifyJWT } from '../auth/jwt.js';
 import { rateLimit } from '../middleware/rate-limit.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -88,6 +89,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Open this URL in a browser', method: 'GET', url: `/v1/agents/verify?code=${userCode}` },
       { description: 'Poll for authorization result', method: 'POST', url: '/v1/agents/device-token' },
     ]));
+    emitChange('agents');
   });
 
   // POST /v1/agents/device-token — poll for device authorization result (RFC 8628)
@@ -240,6 +242,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     if (action === 'deny') {
       await storage.updateDeviceAuth(request.deviceCode, { status: 'denied' });
       res.json(success(config.nodeId, { status: 'denied' }));
+      emitChange('agents');
       return;
     }
 
@@ -333,6 +336,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       gaii,
       agent_name: request.agentName,
     }));
+    emitChange('agents');
   });
 
   // POST /v1/agents/connect — register an agent via connectivity key (no auth required)
@@ -443,6 +447,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         },
       },
     ]));
+    emitChange('agents');
   });
 
   // POST /v1/agents — register a new agent (requires owner JWT)
@@ -571,6 +576,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         },
       },
     ]));
+    emitChange('agents');
   });
 
   // GET /v1/agents/:gaii — public agent profile (no auth)
@@ -673,6 +679,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       trust_score: agent.trustScore,
       morsel_balance: agent.morselBalance,
     }));
+    emitChange('agents');
   });
 
   // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)
@@ -738,6 +745,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Import to another node', method: 'POST', url: '/v1/agents/import' },
     ]));
+    emitChange('agents');
   });
 
   // POST /v1/agents/import — Import agent from another node (owner auth)
@@ -843,6 +851,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       public_key: keyPair.publicKey,
       note: 'Agent imported with new keys. Store the private key securely.',
     }));
+    emitChange('agents');
   });
 
   // POST /v1/agents/:gaii/rekey — Rotate agent keys (owner auth)
@@ -874,6 +883,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       public_key: keyPair.publicKey,
       note: 'New keys generated. Store the private key securely. Old JWT tokens are invalidated.',
     }));
+    emitChange('agents');
   });
 
   // POST /v1/agents/:gaii/port — Port agent to another node (owner auth)
@@ -934,6 +944,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Export agent data', method: 'POST', url: `/v1/agents/${encodeURIComponent(gaii)}/export` },
     ]));
+    emitChange('agents');
   });
 
   // PATCH /v1/agents/:name/scopes — update agent scopes (owner only)
@@ -993,6 +1004,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Re-authenticate to get a new JWT with updated scopes', method: 'POST', url: '/v1/auth/token' },
     ]));
+    emitChange('agents');
   });
 
   // ── CORS per-agent management ──
@@ -1077,6 +1089,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       gaii: updated.gaii,
       allowed_origins: updated.allowedOrigins ?? null,
     }));
+    emitChange('agents');
   });
 
   return router;

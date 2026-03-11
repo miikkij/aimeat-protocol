@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { RealtimeStats } from '../services/realtime-manager.js';
 
@@ -378,6 +379,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       pricing: action.pricing,
       created_at: action.createdAt,
     }));
+    emitChange('catalogue');
   });
 
   // DELETE /v1/catalogue/:actionId — unpublish a service (owner/agent auth)
@@ -392,6 +394,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     }
 
     res.json(success(config.nodeId, { deleted: actionId }));
+    emitChange('catalogue');
   });
 
   // GET /v1/catalogue/:actionId — action detail (Tier 0, no auth)

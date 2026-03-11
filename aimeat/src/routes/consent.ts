@@ -5,6 +5,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { StatsCollector } from '../services/stats.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
@@ -88,6 +89,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             { description: 'List all consents', method: 'GET', url: '/v1/consent' },
             { description: 'Audit log', method: 'GET', url: '/v1/consent/audit' },
         ]));
+        emitChange('consent');
     });
 
     // GET /v1/consent — List own consents
@@ -216,6 +218,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             { description: 'List all consents', method: 'GET', url: '/v1/consent' },
             { description: 'Audit log', method: 'GET', url: '/v1/consent/audit' },
         ]));
+        emitChange('consent');
     });
 
     return router;

@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -24,6 +24,15 @@ export default function McpTab({ session, showToast, onStats }) {
   useEffect(() => {
     if (session) loadData();
   }, [session, loadData]);
+
+  // Live update listener
+  const liveRef = useRef(loadData);
+  liveRef.current = loadData;
+  useEffect(() => {
+    const handler = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
 
   const handleDelete = useCallback(async (ci) => {
     if (!confirm(t('profile.mcp.confirmDelete') || `Remove MCP connection "${ci.app_name || ci.id}"?`)) return;

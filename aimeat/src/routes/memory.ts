@@ -16,6 +16,7 @@ function isAnonymousGaii(gaii: string): boolean {
 }
 import type { StatsCollector } from '../services/stats.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
+import { emitChange } from '../services/event-bus.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
@@ -168,6 +169,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       { description: 'List all memory keys', method: 'GET', url: '/v1/memory' },
       { description: 'Delete this memory entry', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
+    emitChange('memory');
   });
 
   // GET /v1/memory — list memory keys (agent auth required)
@@ -326,6 +328,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       tags: file.tags || [],
       created_at: file.createdAt,
     }));
+    emitChange('memory');
   });
 
   // PATCH /v1/memory/files/:key — update file tags
@@ -358,6 +361,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       tags: updated.tags || [],
       created_at: updated.createdAt,
     }));
+    emitChange('memory');
   });
 
   // GET /v1/memory/files — list files
@@ -415,6 +419,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     emitResourceListChanged(gaii);
 
     res.json(success(config.nodeId, { deleted: key }));
+    emitChange('memory');
   });
 
   // GET /v1/memory/:key — read a memory entry
@@ -504,6 +509,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       { description: 'List remaining memory keys', method: 'GET', url: '/v1/memory' },
       { description: 'Write a new memory entry', method: 'POST', url: '/v1/memory' },
     ]));
+    emitChange('memory');
   });
 
   // PUT /v1/memory/:key — update memory with optimistic locking
@@ -605,6 +611,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }, [
       { description: 'Read this memory entry', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
+    emitChange('memory');
   });
 
   // ── CORS per-memory-key management ──
@@ -695,6 +702,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       key: record.key,
       allowed_origins: record.allowedOrigins ?? null,
     }));
+    emitChange('memory');
   });
 
   // GET /v1/memory/:gaii/:key — public memory read (no auth for public entries)

@@ -7,6 +7,7 @@ import type { VcIssuerService } from '../services/vc-issuer.js';
 import type { MyDataReceiptService } from '../services/mydata-receipt.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function verificationRouter(
   config: AimeatConfig,
@@ -76,6 +77,7 @@ export function verificationRouter(
         issuer: result.issuer,
         verifiedAt: new Date().toISOString(),
       }));
+      emitChange('verification');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }
@@ -147,6 +149,7 @@ export function verificationRouter(
         issuer: result.issuer,
         verifiedAt: new Date().toISOString(),
       }));
+      emitChange('verification');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }
@@ -188,6 +191,7 @@ export function verificationRouter(
         ftnVerified: true,
         verifiedAt: new Date().toISOString(),
       }));
+      emitChange('verification');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }
@@ -267,6 +271,7 @@ export function verificationRouter(
         createdAt: new Date().toISOString(),
       });
       res.status(201).json(success(config.nodeId, { issuer: record }));
+      emitChange('verification');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }

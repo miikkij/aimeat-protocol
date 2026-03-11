@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 
 export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
@@ -58,6 +59,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
         triggered: true,
         job: updated,
       }));
+      emitChange('scheduler');
     } catch (err) {
       logger.error('Failed to trigger scheduled job', { jobId: id, error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'TRIGGER_FAILED', `Job execution failed: ${(err as Error).message}`));
@@ -84,6 +86,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
       await scheduler.reschedule(id);
 
       res.json(success(config.nodeId, { job: updated }));
+      emitChange('scheduler');
     } catch (err) {
       logger.error('Failed to update scheduled job', { jobId: id, error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update scheduled job'));
@@ -104,6 +107,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
       await storage.deleteScheduledJob(id);
 
       res.json(success(config.nodeId, { deleted: id }));
+      emitChange('scheduler');
     } catch (err) {
       logger.error('Failed to delete scheduled job', { jobId: id, error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete scheduled job'));

@@ -8,6 +8,7 @@ import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -286,6 +287,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
           actionsCount: created.actions.length,
         },
       }));
+      emitChange('admin-extensions');
     } catch (err) {
       logger.error('Failed to install bundled extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to install bundled extension'));
@@ -445,6 +447,7 @@ actions:
         directory: extDir,
         files: ['extension.yaml', 'actions/list.js', 'actions/create.js'],
       }));
+      emitChange('admin-extensions');
     } catch (err) {
       logger.error('Failed to scaffold extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to scaffold extension'));
@@ -503,6 +506,7 @@ actions:
 
       logger.info(`Extension script saved: ${name}/actions/${actionId}.js`, { by: req.auth!.sub });
       res.json(success(config.nodeId, { actionId, saved: true }));
+      emitChange('admin-extensions');
     } catch (err) {
       logger.error('Failed to write extension script', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to write extension script'));
@@ -585,6 +589,7 @@ return { ok: true };
 
       logger.info(`New action added: ${name}/${id}`, { by: req.auth!.sub });
       res.json(success(config.nodeId, { id, method: actionMethod, created: true }));
+      emitChange('admin-extensions');
     } catch (err) {
       logger.error('Failed to add action', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to add action'));
@@ -693,6 +698,7 @@ return { ok: true };
         extension: { name, version: record.version, status: 'active', actionsCount: record.actions.length },
         reinstalled: !!existingExt,
       }));
+      emitChange('admin-extensions');
     } catch (err) {
       logger.error('Failed to reinstall extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to reinstall extension'));

@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PushService } from '../services/push.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function pushRouter(config: AimeatConfig, storage: Storage, pushService: PushService): Router {
   const router = Router();
@@ -22,6 +23,7 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
         { description: 'Test push notification', method: 'POST', url: '/v1/push/test' },
         { description: 'Unsubscribe', method: 'DELETE', url: '/v1/push/subscribe' },
       ]));
+      emitChange('push');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }
@@ -37,6 +39,7 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
         return;
       }
       res.json(success(config.nodeId, { unsubscribed: true }));
+      emitChange('push');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }
@@ -58,6 +61,7 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
         return;
       }
       res.json(success(config.nodeId, { sent: true }));
+      emitChange('push');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }

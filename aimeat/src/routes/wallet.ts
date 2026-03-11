@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -147,6 +148,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       new_balance: updatedAgent?.morselBalance ?? 0,
       reason,
     }));
+    emitChange('wallet');
   });
 
   return router;

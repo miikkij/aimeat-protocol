@@ -127,6 +127,31 @@ export interface OtkRecord {
   createdAt: string;
 }
 
+export interface OAuthClientRecord {
+  clientId: string;           // primary key
+  clientSecret: string;       // stored hashed (SHA-256)
+  clientName: string;
+  redirectUris: string[];
+  createdAt: string;
+}
+
+export interface OAuthRefreshTokenRecord {
+  tokenHash: string;          // primary key — SHA-256 of the raw refresh token
+  clientId: string;
+  gaii: string;
+  owner: string;
+  roles: string[];
+  createdAt: string;
+}
+
+export interface OAuthApprovalRecord {
+  clientId: string;           // compound key: clientId + gaii
+  gaii: string;
+  owner: string;
+  scope: string;              // e.g. 'aimeat:full'
+  approvedAt: string;
+}
+
 export interface DeviceAuthorizationRecord {
   deviceCode: string;
   userCode: string;

@@ -11,6 +11,7 @@ import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
+import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 
 // ── Tab components (loaded eagerly — admin pages are lightweight) ──
 import OverviewTab     from './admin/overview-tab.js';
@@ -281,6 +282,17 @@ export default function Admin({ navigate, locale }) {
   // Load on mount when session is ready — server decides if user is authorized
   useEffect(() => {
     if (session) loadAll();
+  }, [session, loadAll]);
+
+  // SSE live updates — auto-reload on server-side data changes
+  useEffect(() => {
+    if (!session) return;
+    connect(() => getSession()?.jwt);
+    onUpdate(loadAll);
+    return () => {
+      offUpdate(loadAll);
+      disconnect();
+    };
   }, [session, loadAll]);
 
   // Switch page

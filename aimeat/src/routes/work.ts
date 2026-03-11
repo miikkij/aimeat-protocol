@@ -13,6 +13,7 @@ import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { emitChange } from '../services/event-bus.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -294,6 +295,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       { description: 'Check work status', method: 'GET', url: `/v1/work/${work.trackingCode}` },
       { description: 'View your work inbox', method: 'GET', url: '/v1/work/inbox' },
     ]));
+    emitChange('work');
   });
 
   // POST /v1/work — legacy submit path (alias)
@@ -320,6 +322,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }, [
       { description: 'Check work status', method: 'GET', url: `/v1/work/${work.trackingCode}` },
     ]));
+    emitChange('work');
   });
 
   // POST /v1/work/batch — batch work requests
@@ -343,6 +346,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }
 
     res.status(201).json(success(config.nodeId, { results, total: results.length }));
+    emitChange('work');
   });
 
   // GET /v1/work/inbox — pending work items for provider (agent auth)
@@ -445,6 +449,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       { description: 'Mark work in progress', method: 'POST', url: `/v1/work/${tc}/progress` },
       { description: 'Deliver the work result', method: 'POST', url: `/v1/work/${tc}/deliver` },
     ]));
+    emitChange('work');
   });
 
   // POST /v1/work/:tc/progress — transition accepted → in_progress (§10.3)
@@ -485,6 +490,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }, [
       { description: 'Deliver the work result', method: 'POST', url: `/v1/work/${tc}/deliver` },
     ]));
+    emitChange('work');
   });
 
   // POST /v1/work/:tc/reject — reject work (provider, agent auth)
@@ -520,6 +526,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       status: updated!.status,
       reason,
     }));
+    emitChange('work');
   });
 
   // POST /v1/work/:tc/deliver — deliver work output (provider, agent auth)
@@ -579,6 +586,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }, [
       { description: 'Rate this delivery', method: 'POST', url: `/v1/work/${tc}/rate` },
     ]));
+    emitChange('work');
   });
 
   // POST /v1/work/:tc/rate — rate delivered work (requester, agent auth)
@@ -611,6 +619,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       status: updated!.status,
       rating: { rating, comment },
     }));
+    emitChange('work');
   });
 
   // -----------------------------------------------

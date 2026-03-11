@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -222,6 +222,15 @@ export default function AgentsTab({ session, showToast, onStats }) {
       onStats?.({ agents: list.length });
     } catch { setAgents([]); }
   }
+
+  // Live update listener
+  const loadRef = useRef(loadData);
+  loadRef.current = loadData;
+  useEffect(() => {
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
 
   function toggleAgent(name) {
     setExpandedAgent(prev => prev === name ? null : name);

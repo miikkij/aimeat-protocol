@@ -5,6 +5,7 @@ import type { EmailService } from '../services/email.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { createHash, randomBytes } from 'node:crypto';
@@ -170,6 +171,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             { description: 'Update your GHII profile', method: 'PUT', url: '/v1/ghii' },
             { description: 'View your public profile', method: 'GET', url: `/v1/ghii/${encodeURIComponent(ghii)}` },
         ]));
+        emitChange('ghii');
     });
 
     // TOTP config for login 2FA verification (Phase 0.5)
@@ -386,6 +388,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
             { description: 'Upload an app', method: 'POST', url: '/v1/apps' },
         ]));
+        emitChange('ghii');
     });
 
     // ── Phase 1.3 — Web Registration, Email Verification, Magic Link ──
@@ -532,6 +535,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             { description: 'Create an agent', method: 'POST' as const, url: '/v1/agents' },
             { description: 'View your profile', method: 'GET' as const, url: `/v1/ghii/${encodeURIComponent(ghii)}` },
         ]));
+        emitChange('ghii');
     });
 
     // POST /v1/ghii/verify-email — Verify email code (no auth)
@@ -650,6 +654,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
             { description: 'View your profile', method: 'GET', url: `/v1/ghii/${encodeURIComponent(ghii)}` },
         ]));
+        emitChange('ghii');
     });
 
     // POST /v1/ghii/magic-link — Request magic link login (no auth)
@@ -691,6 +696,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             sent: true,
             note: 'If an account with that email exists, a magic link has been sent.',
         }));
+        emitChange('ghii');
     });
 
     // GET /v1/ghii/magic-link/verify — Verify magic link (query param: token)
@@ -888,6 +894,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             effective: updated.allowedOrigins ?? config.corsAllowedOrigins,
             inherited: !updated.allowedOrigins,
         }));
+        emitChange('ghii');
     });
 
     // GET /v1/ghii/:ghii — Public profile (Tier 0, no auth)
@@ -956,6 +963,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verification_level: updated.verificationLevel,
             updated_at: updated.updatedAt,
         }));
+        emitChange('ghii');
 
         // Notify directory of profile changes (Phase 1.4 — event-driven refresh)
         if (onDirectoryChange) onDirectoryChange();
@@ -977,6 +985,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             ghii: ghiiRecord.ghii,
             note: 'GHII profile deleted. Your owner account and agents are not affected.',
         }));
+        emitChange('ghii');
     });
 
     return router;

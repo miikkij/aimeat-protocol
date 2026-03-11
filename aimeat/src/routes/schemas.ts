@@ -5,6 +5,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateSchemaItself, removeFromCache } from '../services/schema-validator.js';
 import { SchemaSetSchema } from '../models/schemas.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -74,6 +75,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Delete this schema', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}/schema` },
       { description: 'List all schemas', method: 'GET', url: '/v1/schemas' },
     ]));
+    emitChange('schemas');
   });
 
   // GET /v1/memory/:key/schema — read schema for a memory key (Tier 0, no auth)
@@ -125,6 +127,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'List all schemas', method: 'GET', url: '/v1/schemas' },
     ]));
+    emitChange('schemas');
   });
 
   // GET /v1/schemas — list all schemas (Tier 0, no auth)

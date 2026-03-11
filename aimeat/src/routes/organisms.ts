@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -77,6 +78,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'View organism', method: 'GET', url: `/v1/organisms/${id}` },
       { description: 'List members', method: 'GET', url: `/v1/organisms/${id}/members` },
     ]));
+    emitChange('organisms');
   });
 
   /* ── GET /v1/organisms — List organisms ── */
@@ -160,6 +162,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
 
     const updated = await storage.updateOrganism(id, updates);
     res.json(success(config.nodeId, { organism: updated }));
+    emitChange('organisms');
   });
 
   /* ── DELETE /v1/organisms/:id — Delete organism ── */
@@ -180,6 +183,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
 
     await storage.deleteOrganism(id);
     res.json(success(config.nodeId, { deleted: true }));
+    emitChange('organisms');
   });
 
   /* ── POST /v1/organisms/:id/join — Join an organism ── */
@@ -232,6 +236,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       });
 
       res.status(201).json(success(config.nodeId, { membership, status: 'joined' }));
+      emitChange('organisms');
     } else if (organism.joinPolicy === 'approval_required') {
       // Create join request
       const request = await storage.createJoinRequest({
@@ -244,6 +249,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       });
 
       res.status(202).json(success(config.nodeId, { join_request: request, status: 'pending' }));
+      emitChange('organisms');
     } else {
       // invite_only
       res.status(403).json(error(config.nodeId, 'INVITE_ONLY', 'This organism requires an invitation to join'));
@@ -285,6 +291,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     await storage.updateOrganism(id, updates);
 
     res.json(success(config.nodeId, { left: true }));
+    emitChange('organisms');
   });
 
   /* ── GET /v1/organisms/:id/members — List members ── */
@@ -384,6 +391,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     res.json(success(config.nodeId, { decision, request_id: requestId }));
+    emitChange('organisms');
   });
 
   /* ── POST /v1/organisms/:id/admins — Add an admin ── */
@@ -426,6 +434,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     });
 
     res.json(success(config.nodeId, { promoted: target_ghii, role: 'admin' }));
+    emitChange('organisms');
   });
 
   /* ── DELETE /v1/organisms/:id/admins/:ghii — Remove admin role ── */
@@ -463,6 +472,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     });
 
     res.json(success(config.nodeId, { demoted: targetGhii, role: 'member' }));
+    emitChange('organisms');
   });
 
   return router;

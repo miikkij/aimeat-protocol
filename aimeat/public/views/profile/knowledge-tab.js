@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -51,6 +51,15 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   }, [onStats]);
 
   useEffect(() => { loadPackages(); }, [loadPackages]);
+
+  // Live update listener
+  const loadRef = useRef(loadPackages);
+  loadRef.current = loadPackages;
+  useEffect(() => {
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
 
   /* ── Load Discover ── */
   const loadDiscover = useCallback(async () => {

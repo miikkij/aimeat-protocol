@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import type { EmailService } from '../services/email.js';
 import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml, matchSuggestionEmailHtml } from '../services/email-templates.js';
 import type { DirectoryService } from '../services/directory.js';
@@ -77,6 +78,7 @@ export function adminFeaturesRouter(
         }
 
         res.json(success(config.nodeId, { ghii_user: updated }));
+        emitChange('features');
     }));
 
     router.delete('/v1/admin/ghii/:ghii', ...auth, handle(async (req, res) => {
@@ -87,6 +89,7 @@ export function adminFeaturesRouter(
             return;
         }
         res.json(success(config.nodeId, { deleted: true, ghii }));
+        emitChange('features');
     }));
 
     // PUT /v1/admin/ghii/:ghii/cors — Operator sets/clears CORS for any GHII user
@@ -123,6 +126,7 @@ export function adminFeaturesRouter(
             ghii: updated.ghii,
             allowed_origins: updated.allowedOrigins ?? null,
         }));
+        emitChange('features');
     }));
 
     // ── Email Status ────────────────────────────────────────
@@ -177,6 +181,7 @@ export function adminFeaturesRouter(
         }
         const sent = await services.emailService.sendRaw(to, subject, html, text);
         res.json(success(config.nodeId, { sent, template: template || 'notification' }));
+        emitChange('features');
     }));
 
     router.post('/v1/admin/email/send-group', ...auth, handle(async (req, res) => {
@@ -215,6 +220,7 @@ export function adminFeaturesRouter(
             if (ok) sent++;
         }
         res.json(success(config.nodeId, { sent, total: recipients.length, group }));
+        emitChange('features');
     }));
 
     /** Generate code-default templates for a given locale */
@@ -280,6 +286,7 @@ export function adminFeaturesRouter(
             }
         }
         res.json(success(config.nodeId, { seeded: true, count }));
+        emitChange('features');
     }));
 
     // POST /v1/admin/email/templates/reset — Delete all custom, re-seed defaults
@@ -300,6 +307,7 @@ export function adminFeaturesRouter(
             }
         }
         res.json(success(config.nodeId, { reset: true, count }));
+        emitChange('features');
     }));
 
     // PUT /v1/admin/email/templates/:id — Save custom template
@@ -316,6 +324,7 @@ export function adminFeaturesRouter(
 
         await writeEmailTplToMemory(id, locale, htmlContent ?? '', textContent ?? '');
         res.json(success(config.nodeId, { saved: true, id, locale }));
+        emitChange('features');
     }));
 
     // DELETE /v1/admin/email/templates/:id — Reset single template to default
@@ -334,6 +343,7 @@ export function adminFeaturesRouter(
         }
 
         res.json(success(config.nodeId, { reset: true, id, locale }));
+        emitChange('features');
     }));
 
     // ── Directory Stats ─────────────────────────────────────
@@ -347,6 +357,7 @@ export function adminFeaturesRouter(
         await services.directoryService.rebuildIndex();
         const stats = services.directoryService.getStats();
         res.json(success(config.nodeId, { rebuilt: true, stats }));
+        emitChange('features');
     }));
 
     // ── Matching ────────────────────────────────────────────
@@ -365,6 +376,7 @@ export function adminFeaturesRouter(
     router.post('/v1/admin/matching/run', ...auth, handle(async (_req, res) => {
         const result = await services.matchingEngine.runMatchingRound();
         res.json(success(config.nodeId, result));
+        emitChange('features');
     }));
 
     // ── Marketplace ─────────────────────────────────────────
@@ -470,6 +482,7 @@ export function adminFeaturesRouter(
             updatedBy: req.auth!.owner,
         });
         res.json(success(config.nodeId, { template: record }));
+        emitChange('features');
     }));
 
     // POST /v1/admin/push/test — Send test notification to operator
@@ -487,12 +500,14 @@ export function adminFeaturesRouter(
             return;
         }
         res.json(success(config.nodeId, { sent: true }));
+        emitChange('features');
     }));
 
     // POST /v1/admin/push/templates/reset — Reset all templates to defaults
     router.post('/v1/admin/push/templates/reset', ...auth, handle(async (req, res) => {
         const count = await seedDefaultTemplates(storage, req.auth!.owner);
         res.json(success(config.nodeId, { reset: true, count }));
+        emitChange('features');
     }));
 
     // ── CSM Templates ───────────────────────────────────────
@@ -544,6 +559,7 @@ export function adminFeaturesRouter(
         await storage.deleteSchema(csm.jsonSchemaKey);
         await storage.deleteCsm(name);
         res.json(success(config.nodeId, { deleted: true, name }));
+        emitChange('features');
     }));
 
     // ── MSM Integrations ────────────────────────────────────
@@ -624,6 +640,7 @@ export function adminFeaturesRouter(
             updated_at: updated.updatedAt,
             federate: updated.federate ?? false,
         }));
+        emitChange('features');
     }));
 
     // DELETE /v1/admin/msm/:name — Delete MSM from admin dashboard
@@ -636,6 +653,7 @@ export function adminFeaturesRouter(
         }
         await storage.deleteMsm(name);
         res.json(success(config.nodeId, { deleted: true, name }));
+        emitChange('features');
     }));
 
     // ── Genesis Peers (Cross-Federation) ────────────────────
@@ -666,6 +684,7 @@ export function adminFeaturesRouter(
             return;
         }
         res.json(success(config.nodeId, { peer, status: 'approved' }));
+        emitChange('features');
     }));
 
     router.post('/v1/admin/genesis-peers/:id/suspend', ...auth, handle(async (req, res) => {
@@ -676,6 +695,7 @@ export function adminFeaturesRouter(
             return;
         }
         res.json(success(config.nodeId, { peer, status: 'suspended' }));
+        emitChange('features');
     }));
 
     router.delete('/v1/admin/genesis-peers/:id', ...auth, handle(async (req, res) => {
@@ -686,6 +706,7 @@ export function adminFeaturesRouter(
             return;
         }
         res.json(success(config.nodeId, { deleted: true, id }));
+        emitChange('features');
     }));
 
     return router;

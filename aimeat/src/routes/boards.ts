@@ -10,6 +10,7 @@ import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySche
 import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -80,6 +81,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Post to this board', method: 'POST', url: `/v1/boards/${board.id}/posts` },
       { description: 'View posts', method: 'GET', url: `/v1/boards/${board.id}/posts` },
     ]));
+    emitChange('boards');
   });
 
   // GET /v1/boards — list boards (public boards no auth, private/shared need auth)
@@ -222,6 +224,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'View this post', method: 'GET', url: `/v1/boards/${boardId}/posts` },
     ]));
+    emitChange('boards');
 
     // §12.3: Notify board subscribers (fire-and-forget)
     notifySubscribers(boardId, { id: post.id, authorGaii: gaii, title: post.title, category: post.category, tags: post.tags ?? [] });
@@ -417,6 +420,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     await storage.deleteBoard(boardId);
     res.json(success(config.nodeId, { deleted: true, board_id: boardId }));
+    emitChange('boards');
   });
 
   // DELETE /v1/boards/:boardId/posts/:postId — delete own post
@@ -440,6 +444,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     await storage.deletePost(boardId, postId);
     res.json(success(config.nodeId, { deleted: true, post_id: postId }));
+    emitChange('boards');
   });
 
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post
@@ -455,6 +460,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.json(success(config.nodeId, { reacted: true, reaction }));
+    emitChange('boards');
   });
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
@@ -488,6 +494,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       body: reply.body,
       created_at: reply.createdAt,
     }));
+    emitChange('boards');
   });
 
   // ───────────────────────────────────────────────
@@ -540,6 +547,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Unsubscribe', method: 'DELETE', url: `/v1/boards/${boardId}/subscribe` },
       { description: 'View board posts', method: 'GET', url: `/v1/boards/${boardId}/posts` },
     ]));
+    emitChange('boards');
   });
 
   // DELETE /v1/boards/:boardId/subscribe — unsubscribe from a board
@@ -554,6 +562,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.json(success(config.nodeId, { unsubscribed: true, board_id: boardId }));
+    emitChange('boards');
   });
 
   // GET /v1/boards/:boardId/subscribers — list subscribers (board owner / operator only)

@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function portfolioRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -149,6 +150,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       updatedAt: now,
     });
     res.json(success(config.nodeId, { saved: true }));
+    emitChange('portfolio');
   });
 
   /**
@@ -194,6 +196,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     });
 
     res.json(success(config.nodeId, { uploaded: true, sizeKb: Math.round(fileData.length / 1024) }));
+    emitChange('portfolio');
   });
 
   /**

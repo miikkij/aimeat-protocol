@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { randomBytes } from 'node:crypto';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
@@ -111,6 +112,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(key)}` },
             { description: 'List all files', method: 'GET', url: '/v1/storage' },
         ]));
+        emitChange('files');
     });
 
     // GET /v1/storage — list storage items (agent auth)
@@ -181,6 +183,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             { description: 'Upload chunk', method: 'PUT', url: `/v1/storage/upload/${uploadId}/0` },
             { description: 'Complete upload', method: 'POST', url: `/v1/storage/upload/${uploadId}/complete` },
         ]));
+        emitChange('files');
     });
 
     // PUT /v1/storage/upload/:id/:chunk — upload a single chunk
@@ -231,6 +234,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             chunk_size: data.length,
             received: true,
         }));
+        emitChange('files');
     });
 
     // POST /v1/storage/upload/:id/complete — assemble chunks into final file
@@ -314,6 +318,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }, [
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(file.key)}` },
         ]));
+        emitChange('files');
     });
 
     // DELETE /v1/storage/upload/:id — abort chunked upload
@@ -332,6 +337,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         await storage.deleteChunkedUpload(uploadId);
 
         res.json(success(config.nodeId, { upload_id: uploadId, aborted: true }));
+        emitChange('files');
     });
 
     // -----------------------------------------------
@@ -517,6 +523,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         emitResourceListChanged(gaii);
 
         res.json(success(config.nodeId, { deleted: true, key }));
+        emitChange('files');
     });
 
     return router;

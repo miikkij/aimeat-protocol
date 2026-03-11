@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 
@@ -56,6 +57,7 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Verify and activate TOTP', method: 'POST', url: '/v1/ghii/totp/verify' },
     ]));
+    emitChange('totp');
   });
 
   // POST /v1/ghii/totp/verify — Verify and activate TOTP
@@ -99,6 +101,7 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Regenerate backup codes', method: 'POST', url: '/v1/ghii/totp/backup-codes' },
       { description: 'Disable TOTP', method: 'DELETE', url: '/v1/ghii/totp' },
     ]));
+    emitChange('totp');
   });
 
   // DELETE /v1/ghii/totp — Disable TOTP
@@ -146,6 +149,7 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Re-enable TOTP', method: 'POST', url: '/v1/ghii/totp/setup' },
     ]));
+    emitChange('totp');
   });
 
   // POST /v1/ghii/totp/backup-codes — Regenerate backup codes
@@ -188,6 +192,7 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       backup_codes: newCodes.plain,
       note: 'Save these backup codes in a secure location. Previous backup codes are now invalid.',
     }));
+    emitChange('totp');
   });
 
   return router;

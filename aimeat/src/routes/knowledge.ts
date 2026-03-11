@@ -5,6 +5,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, KnowledgeManifest, MemoryLinkRecord, OperatorReviewRecord, OperatorReviewAction } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { ManifestSchema } from '../schemas/knowledge-package.js';
 import { createRequire } from 'node:module';
 
@@ -176,6 +177,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'View package manifest', method: 'GET', url: `/v1/memory/${encodeURIComponent(manifestKey)}` },
       { description: 'List your packages', method: 'GET', url: '/v1/memory?prefix=packages/&tags=knowledge-package' },
     ]));
+    emitChange('knowledge');
   });
 
   /* ── GET /v1/packages/:id — Get package manifest ── */
@@ -250,6 +252,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.status(201).json(success(config.nodeId, { link }, [
       { description: 'List package links', method: 'GET', url: `/v1/packages/${packageId}/links` },
     ]));
+    emitChange('knowledge');
   });
 
   /* ── GET /v1/packages/:id/links — List links for a package ── */
@@ -284,6 +287,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     res.json(success(config.nodeId, { deleted: true }));
+    emitChange('knowledge');
   });
 
   /* ── GET /v1/packages/:id/broken-links — Find broken links ── */
@@ -525,6 +529,7 @@ Owner: {ghii}`;
       package_id: packageId,
       sharing: manifest.sharing,
     }));
+    emitChange('knowledge');
   });
 
   /* ── PATCH /v1/packages/:id/entries/:entryKey/visibility — Change entry visibility ── */
@@ -593,6 +598,7 @@ Owner: {ghii}`;
       entry_key: entryKey,
       visibility,
     }));
+    emitChange('knowledge');
   });
 
   /* ── POST /v1/packages/:id/clone — Clone public entries to your own namespace ── */
@@ -715,6 +721,7 @@ Owner: {ghii}`;
     }, [
       { description: 'View cloned package', method: 'GET', url: `/v1/packages/${newPackageId}` },
     ]));
+    emitChange('knowledge');
   });
 
   /* ── GET /v1/packages/:id/export — Export package as portable JSON ── */
@@ -849,6 +856,7 @@ Owner: {ghii}`;
       organism_id,
       contributed: true,
     }));
+    emitChange('knowledge');
   });
 
   /* ── GET /v1/packages/organism/:id — List packages shared with an organism ── */
@@ -1127,6 +1135,7 @@ Owner: {ghii}`;
       visibility,
       catalog_listed: manifest.sharing.catalog_listed,
     }));
+    emitChange('knowledge');
   });
 
   /* ── DELETE /v1/admin/knowledge/:id — Operator deletes a package ── */
@@ -1170,6 +1179,7 @@ Owner: {ghii}`;
     }
 
     res.json(success(config.nodeId, { deleted: packageId }));
+    emitChange('knowledge');
   });
 
   /* ── POST /v1/admin/knowledge/:id/review — Operator reviews a package ── */
@@ -1264,6 +1274,7 @@ Owner: {ghii}`;
       reason,
       package_id: packageId,
     }));
+    emitChange('knowledge');
   });
 
   /* ── GET /v1/packages/:id/reviews — List operator reviews for a package ── */

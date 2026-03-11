@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
@@ -102,6 +103,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             { description: 'Provider can accept fault', method: 'POST', url: `/v1/work/${tc}/accept-fault` },
             { description: 'Withdraw dispute', method: 'POST', url: `/v1/work/${tc}/withdraw-dispute` },
         ]));
+        emitChange('disputes');
     });
 
     // GET /v1/work/:tc/dispute — View dispute thread
@@ -166,6 +168,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             { description: 'Escalate to operator', method: 'POST', url: `/v1/work/${tc}/escalate` },
             { description: 'Offer partial refund', method: 'POST', url: `/v1/work/${tc}/offer-partial` },
         ]));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/redeliver — Re-deliver after dispute
@@ -187,6 +190,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, { tracking_code: tc, redelivered: true }, [
             { description: 'Requester can accept re-delivery', method: 'POST', url: `/v1/work/${tc}/accept-redelivery` },
         ]));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/accept-fault — Provider accepts fault
@@ -207,6 +211,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         await appendAuditEntry(storage, dispute.id, 'accept_fault', req.auth!.sub, { full_refund: true });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'requester_refunded' }));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/offer-partial — Provider offers partial refund
@@ -227,6 +232,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             { description: 'Requester accepts partial', method: 'POST', url: `/v1/work/${tc}/accept-partial` },
             { description: 'Requester rejects partial', method: 'POST', url: `/v1/work/${tc}/reject-partial` },
         ]));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/accept-redelivery — Requester accepts re-delivery
@@ -247,6 +253,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         await appendAuditEntry(storage, dispute.id, 'accept_redelivery', req.auth!.sub, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'redelivery_accepted' }));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/accept-partial — Requester accepts partial offer
@@ -289,6 +296,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         await appendAuditEntry(storage, dispute.id, 'partial_accepted', req.auth!.sub, { refund_morsels: refundAmount });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', refund_morsels: refundAmount }));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/reject-partial — Requester rejects partial offer
@@ -306,6 +314,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: dispute.status, partial_rejected: true }, [
             { description: 'Escalate to operator', method: 'POST', url: `/v1/work/${tc}/escalate` },
         ]));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/withdraw-dispute — Requester withdraws dispute
@@ -326,6 +335,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         await appendAuditEntry(storage, dispute.id, 'withdraw_dispute', req.auth!.sub, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'withdrawn' }));
+        emitChange('disputes');
     });
 
     // POST /v1/work/:tc/escalate — Escalate to operator
@@ -350,6 +360,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'escalated' }, [
             { description: 'View dispute thread', method: 'GET', url: `/v1/work/${tc}/dispute` },
         ]));
+        emitChange('disputes');
     });
 
     // POST /v1/admin/disputes/:id/rule — Operator rules on dispute
@@ -408,6 +419,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             status: 'resolved',
             ruling: { ruling, distribution: { to_requester, to_provider, burned }, reason },
         }));
+        emitChange('disputes');
     });
 
     // GET /v1/admin/disputes/:id/audit-log — Tamper-evident audit trail

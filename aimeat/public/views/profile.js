@@ -6,6 +6,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { getSession, getNodeUrl, onAuthChange } from '/js/services/auth.js';
+import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 
 // === Tab modules (lazy-loaded on first visit, stay mounted) ===
 import PortfolioTab from './profile/portfolio-tab.js';
@@ -99,6 +100,20 @@ export default function Profile({ navigate, locale }) {
   }, []);
 
   useViewCSS('/css/views/profile.css');
+
+  // SSE live updates — broadcast custom event so tabs can re-fetch
+  useEffect(() => {
+    if (!session) return;
+    const notifyTabs = () => {
+      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+    };
+    connect(() => getSession()?.jwt);
+    onUpdate(notifyTabs);
+    return () => {
+      offUpdate(notifyTabs);
+      disconnect();
+    };
+  }, [session]);
 
   // Tab switching
   function switchTab(tabId) {

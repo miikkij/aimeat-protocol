@@ -23,6 +23,15 @@ export default function BoardsTab({ session, showToast }) {
     catch { setMyBoards([]); }
   }
 
+  // Live update listener
+  const loadRef = useRef(loadMyData);
+  loadRef.current = loadMyData;
+  useEffect(() => {
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+
   async function loadAllData() {
     try { setAllBoards(await boardsService.listAllBoards()); }
     catch { setAllBoards([]); }

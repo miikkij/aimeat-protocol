@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { buildChatInstanceId } from '../utils/gaii.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -55,6 +56,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
       { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
       { description: 'List chat instances', method: 'GET', url: '/v1/chat-instances' },
     ]));
+    emitChange('chat');
   });
 
   // GET /v1/chat-instances — List chat instances
@@ -131,6 +133,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
         last_seen: updated!.lastSeen,
       },
     }));
+    emitChange('chat');
   });
 
   // DELETE /v1/chat-instances/:id — End chat session
@@ -144,6 +147,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
     }
 
     res.json(success(config.nodeId, { deleted: true, id }));
+    emitChange('chat');
   });
 
   return router;

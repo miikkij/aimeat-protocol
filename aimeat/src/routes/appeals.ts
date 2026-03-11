@@ -4,6 +4,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { emitChange } from '../services/event-bus.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -129,6 +130,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(201).json(success(config.nodeId, appeal, [
             { description: 'View all appeals', method: 'GET', url: '/v1/appeals' },
         ]));
+        emitChange('appeals');
     });
 
     // ── GET /v1/appeals — List appeals (operator sees all; organism admin sees their organism's) ──
@@ -275,6 +277,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             { description: 'View all appeals', method: 'GET', url: '/v1/appeals' },
             { description: 'View the related flag', method: 'GET', url: `/v1/flags/summary/${(await storage.getFlag(appeal.flagId))?.targetType}/${(await storage.getFlag(appeal.flagId))?.targetId}` },
         ]));
+        emitChange('appeals');
     });
 
     return router;
