@@ -1396,7 +1396,7 @@ export class MongoStorage implements Storage {
     async createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord> {
         this.ensureReady();
         await this.prisma.chatInstance.create({
-            data: { id: record.id, platform: record.platform, appName: record.appName, ownerName: record.ownerName, ghii: record.ghii, nodeId: record.nodeId, isAnonymous: record.isAnonymous, createdAt: new Date(record.createdAt), lastSeen: new Date(record.lastSeen) },
+            data: { id: record.id, platform: record.platform, appName: record.appName, ownerName: record.ownerName, ghii: record.ghii, nodeId: record.nodeId, isAnonymous: record.isAnonymous, createdAt: new Date(record.createdAt), lastSeen: new Date(record.lastSeen), agentGaii: record.agentGaii ?? null, mcpClientId: record.mcpClientId ?? null },
         });
         return record;
     }
@@ -1424,6 +1424,8 @@ export class MongoStorage implements Storage {
             if (updates.lastSeen) data.lastSeen = new Date(updates.lastSeen);
             if (updates.platform) data.platform = updates.platform;
             if (updates.appName) data.appName = updates.appName;
+            if (updates.agentGaii !== undefined) data.agentGaii = updates.agentGaii;
+            if (updates.mcpClientId !== undefined) data.mcpClientId = updates.mcpClientId;
             const row = await this.prisma.chatInstance.update({ where: { id }, data });
             return this.toChatInstanceRecord(row);
         } catch { return null; }
@@ -1435,7 +1437,7 @@ export class MongoStorage implements Storage {
     }
 
     private toChatInstanceRecord(row: any): ChatInstanceRecord {
-        return { id: row.id, platform: row.platform, appName: row.appName, ownerName: row.ownerName, ghii: row.ghii, nodeId: row.nodeId, isAnonymous: row.isAnonymous, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen };
+        return { id: row.id, platform: row.platform, appName: row.appName, ownerName: row.ownerName, ghii: row.ghii, nodeId: row.nodeId, isAnonymous: row.isAnonymous, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen, agentGaii: row.agentGaii || undefined, mcpClientId: row.mcpClientId || undefined };
     }
 
     // ── Personal Nodes ──

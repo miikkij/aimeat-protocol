@@ -262,7 +262,9 @@ export function initializeSchema(db: Database.Database): void {
       nodeId         TEXT NOT NULL,
       isAnonymous    INTEGER NOT NULL DEFAULT 0,
       createdAt      TEXT NOT NULL,
-      lastSeen       TEXT NOT NULL
+      lastSeen       TEXT NOT NULL,
+      agentGaii      TEXT,
+      mcpClientId    TEXT
     );
 
     -- ── Email Verifications ──
@@ -885,4 +887,8 @@ export function initializeSchema(db: Database.Database): void {
 
   // Phase 4 CORS — Memory-level allowed origins
   safeAddColumn('memory', 'allowedOrigins', 'TEXT');
+
+  // MCP session tracking — agent and OAuth client binding
+  safeAddColumn('chat_instances', 'agentGaii', 'TEXT');
+  safeAddColumn('chat_instances', 'mcpClientId', 'TEXT');
 }

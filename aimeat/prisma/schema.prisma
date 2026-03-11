@@ -420,18 +420,21 @@ model MailboxItem {
 }
 
 model ChatInstance {
-  id        String   @id @map("_id")
-  platform  String
-  appName   String
-  ownerName String
-  ghii      String
-  nodeId    String
-  isAnonymous Boolean @default(false)
-  createdAt DateTime @default(now())
-  lastSeen  DateTime @default(now())
+  id          String   @id @map("_id")
+  platform    String
+  appName     String
+  ownerName   String
+  ghii        String
+  nodeId      String
+  isAnonymous Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  lastSeen    DateTime @default(now())
+  agentGaii   String?
+  mcpClientId String?
 
   @@index([ownerName])
   @@index([ghii])
+  @@index([agentGaii])
 }
 
 model SchemaLock {

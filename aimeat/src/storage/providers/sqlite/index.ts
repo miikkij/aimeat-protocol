@@ -1479,12 +1479,13 @@ export class SqliteStorage implements Storage {
   async createChatInstance(record: ChatInstanceRecord): Promise<ChatInstanceRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO chat_instances (id, platform, appName, ownerName, ghii, nodeId, isAnonymous, createdAt, lastSeen)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO chat_instances (id, platform, appName, ownerName, ghii, nodeId, isAnonymous, createdAt, lastSeen, agentGaii, mcpClientId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.id, record.platform, record.appName, record.ownerName,
         record.ghii, record.nodeId, record.isAnonymous ? 1 : 0,
         record.createdAt, record.lastSeen,
+        record.agentGaii ?? null, record.mcpClientId ?? null,
       );
       return record;
     } catch (err: unknown) {
@@ -1514,11 +1515,12 @@ export class SqliteStorage implements Storage {
     const updated = { ...existing, ...updates };
     this.db.prepare(
       `UPDATE chat_instances SET platform = ?, appName = ?, ownerName = ?, ghii = ?,
-       nodeId = ?, isAnonymous = ?, createdAt = ?, lastSeen = ? WHERE id = ?`
+       nodeId = ?, isAnonymous = ?, createdAt = ?, lastSeen = ?, agentGaii = ?, mcpClientId = ? WHERE id = ?`
     ).run(
       updated.platform, updated.appName, updated.ownerName, updated.ghii,
       updated.nodeId, updated.isAnonymous ? 1 : 0,
-      updated.createdAt, updated.lastSeen, id,
+      updated.createdAt, updated.lastSeen,
+      updated.agentGaii ?? null, updated.mcpClientId ?? null, id,
     );
     return updated;
   }
@@ -1539,6 +1541,8 @@ export class SqliteStorage implements Storage {
       isAnonymous: (row.isAnonymous as number) === 1,
       createdAt: row.createdAt as string,
       lastSeen: row.lastSeen as string,
+      agentGaii: (row.agentGaii as string) || undefined,
+      mcpClientId: (row.mcpClientId as string) || undefined,
     };
   }
 

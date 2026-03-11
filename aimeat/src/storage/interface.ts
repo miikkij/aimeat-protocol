@@ -315,6 +315,8 @@ export interface ChatInstanceRecord {
   isAnonymous: boolean;    // true = anonymous session
   createdAt: string;       // ISO timestamp — session start
   lastSeen: string;        // ISO timestamp — last activity
+  agentGaii?: string;      // Which agent is bound to this session (MCP sessions)
+  mcpClientId?: string;    // OAuth client ID for audit trail (MCP sessions)
 }
 
 export interface PersonalNodeRecord {
