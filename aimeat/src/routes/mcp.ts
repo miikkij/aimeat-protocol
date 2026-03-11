@@ -679,6 +679,22 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
+        // Session ID was provided but session doesn't exist (server restart, expired, etc.)
+        // MCP spec: MUST return 404 so client knows to re-initialize
+        if (sessionId) {
+            const body = req.body;
+            const method = Array.isArray(body) ? body[0]?.method : body?.method;
+            if (method !== 'initialize') {
+                res.status(404).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32600, message: 'Session not found. Please re-initialize.' },
+                    id: (Array.isArray(body) ? body[0]?.id : body?.id) ?? null,
+                });
+                return;
+            }
+            // If method IS 'initialize', allow fall-through to create a new session
+        }
+
         // New session: authenticate the agent
         let agentGaii = config.anonymousMode
             ? `shared#anonymous@${config.nodeId}`
@@ -694,7 +710,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     sessionOwner = payload.owner as string;
                 }
             } catch {
-                // Token invalid — fall through to anonymous check
+                // Token was provided but is invalid/expired — return 401, do NOT silently downgrade to anonymous
+                res.status(401).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32001, message: 'Token expired or invalid. Please refresh your access token via /v1/mcp/token.' },
+                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
+                });
+                return;
             }
         }
 
