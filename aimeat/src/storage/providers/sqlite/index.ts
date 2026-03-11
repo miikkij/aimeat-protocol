@@ -25,6 +25,7 @@ import type {
   ScheduledJobRecord,
   ExtensionInstanceRecord,
   ReplicationQueueEntry,
+  DeviceAuthorizationRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -4207,6 +4208,81 @@ export class SqliteStorage implements Storage {
       attempts: row.attempts as number,
       lastAttemptAt: (row.lastAttemptAt as string) || null,
       status: row.status as ReplicationQueueEntry['status'],
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Device Authorization (RFC 8628) ──
+  // ══════════════════════════════════════════════════════════
+
+  async createDeviceAuth(req: DeviceAuthorizationRecord): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO device_auth (deviceCode, userCode, ownerName, agentName, displayName, description, status, scopes, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, agentCredentials)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      req.deviceCode, req.userCode, req.ownerName, req.agentName,
+      req.displayName ?? null, req.description ?? null,
+      req.status, req.scopes ? JSON.stringify(req.scopes) : null,
+      req.createdAt, req.expiresAt, req.lastPolledAt ?? null,
+      req.pollInterval, req.approvedBy ?? null,
+      req.agentCredentials ? JSON.stringify(req.agentCredentials) : null,
+    );
+  }
+
+  async getDeviceAuthByDeviceCode(deviceCode: string): Promise<DeviceAuthorizationRecord | null> {
+    const row = this.db.prepare('SELECT * FROM device_auth WHERE deviceCode = ?').get(deviceCode) as Record<string, unknown> | undefined;
+    return row ? this.deserializeDeviceAuth(row) : null;
+  }
+
+  async getDeviceAuthByUserCode(userCode: string): Promise<DeviceAuthorizationRecord | null> {
+    const row = this.db.prepare('SELECT * FROM device_auth WHERE userCode = ?').get(userCode) as Record<string, unknown> | undefined;
+    return row ? this.deserializeDeviceAuth(row) : null;
+  }
+
+  async updateDeviceAuth(deviceCode: string, updates: Partial<DeviceAuthorizationRecord>): Promise<void> {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
+    if (updates.scopes !== undefined) { fields.push('scopes = ?'); values.push(JSON.stringify(updates.scopes)); }
+    if (updates.lastPolledAt !== undefined) { fields.push('lastPolledAt = ?'); values.push(updates.lastPolledAt); }
+    if (updates.pollInterval !== undefined) { fields.push('pollInterval = ?'); values.push(updates.pollInterval); }
+    if (updates.approvedBy !== undefined) { fields.push('approvedBy = ?'); values.push(updates.approvedBy); }
+    if ('agentCredentials' in updates) { fields.push('agentCredentials = ?'); values.push(updates.agentCredentials ? JSON.stringify(updates.agentCredentials) : null); }
+    if (fields.length === 0) return;
+    values.push(deviceCode);
+    this.db.prepare(`UPDATE device_auth SET ${fields.join(', ')} WHERE deviceCode = ?`).run(...values);
+  }
+
+  async countPendingDeviceAuthByOwner(ownerName: string): Promise<number> {
+    const row = this.db.prepare(
+      `SELECT COUNT(*) as cnt FROM device_auth WHERE ownerName = ? AND status = 'pending' AND expiresAt > ?`
+    ).get(ownerName, new Date().toISOString()) as { cnt: number };
+    return row.cnt;
+  }
+
+  async cleanupExpiredDeviceAuth(): Promise<number> {
+    const result = this.db.prepare(
+      `DELETE FROM device_auth WHERE status = 'pending' AND expiresAt <= ?`
+    ).run(new Date().toISOString());
+    return result.changes;
+  }
+
+  private deserializeDeviceAuth(row: Record<string, unknown>): DeviceAuthorizationRecord {
+    return {
+      deviceCode: row.deviceCode as string,
+      userCode: row.userCode as string,
+      ownerName: row.ownerName as string,
+      agentName: row.agentName as string,
+      displayName: row.displayName as string | undefined,
+      description: row.description as string | undefined,
+      status: row.status as DeviceAuthorizationRecord['status'],
+      scopes: row.scopes ? JSON.parse(row.scopes as string) : undefined,
+      createdAt: row.createdAt as string,
+      expiresAt: row.expiresAt as string,
+      lastPolledAt: row.lastPolledAt as string | undefined,
+      pollInterval: row.pollInterval as number,
+      approvedBy: row.approvedBy as string | undefined,
+      agentCredentials: row.agentCredentials ? JSON.parse(row.agentCredentials as string) : undefined,
     };
   }
 }
