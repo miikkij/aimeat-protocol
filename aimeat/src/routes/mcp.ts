@@ -44,6 +44,7 @@ interface OAuthClient {
 interface AuthorizationCode {
     code: string;
     clientId: string;
+    clientName?: string;
     gaii: string;
     owner: string;
     roles: string[];
@@ -992,7 +993,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     // POST /v1/mcp/authorize-consent — Browser consent form submission
     // Called by the consent page after user logs in, selects an agent, and clicks "Approve"
     router.post('/v1/mcp/authorize-consent', async (req: Request, res: Response) => {
-        const { client_id, redirect_uri, state, gaii, owner_token, code_challenge } = req.body ?? {};
+        const { client_id, client_name: clientNameBody, redirect_uri, state, gaii, owner_token, code_challenge } = req.body ?? {};
 
         if (!client_id || !gaii || !owner_token) {
             res.status(400).json({ error: 'invalid_request', error_description: 'Missing required fields (client_id, gaii, owner_token)' });
