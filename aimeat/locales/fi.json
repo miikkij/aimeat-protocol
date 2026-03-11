@@ -3383,6 +3383,8 @@
     "promptsSaved": "Kehote tallennettu",
     "promptsResetDone": "Kehote palautettu tehdasasetuksiin",
     "promptsRestored": "Versio palautettu",
-    "promptsHelp": "Järjestelmäkehotteet ovat tekoälyohjetekstejä, jotka tarjotaan agenteille ja käyttäjille. Muokkaa niitä täällä mukauttaaksesi toimintaa ilman koodimuutoksia. Jokaisessa kehotteessa voi käyttää {{muuttuja}}-paikkamerkkejä."
+    "promptsHelp": "Järjestelmäkehotteet ovat tekoälyohjetekstejä, jotka tarjotaan agenteille ja käyttäjille. Muokkaa niitä täällä mukauttaaksesi toimintaa ilman koodimuutoksia. Jokaisessa kehotteessa voi käyttää {{muuttuja}}-paikkamerkkejä.",
+    "promptsHelpTitle": "Tietoa järjestelmäkehotteista",
+    "promptsEmpty": "Järjestelmäkehotteita ei löytynyt. Ne luodaan seuraavassa palvelimen uudelleenkäynnistyksessä."
   }
 }

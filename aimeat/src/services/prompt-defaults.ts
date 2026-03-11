@@ -802,7 +802,7 @@ You are connected. Now help your user with what they want to accomplish. Browse 
     id: 'bootstrap-auth',
     group: 'portal',
     name: 'Bootstrap Authenticated',
-    description: 'Root endpoint instruction for authenticated AI agents — same getting started guide with full endpoint map',
+    description: 'Root endpoint instruction for authenticated AI agents — reserved for future use when bootstrap serves different content per auth state',
     content: `You are connected to an AIMEAT node. Always use this_node.base_url ({{node_url}}) for all API requests — never hardcode domains.
 
 You are already authenticated. Your agent has full access to the AIMEAT API.
@@ -841,7 +841,7 @@ Discovery:
 
 Help your user with what they want to accomplish. Use hints.next_actions in responses to discover what to do next.`,
     variables: ['node_url'],
-    usedIn: ['src/routes/bootstrap.ts'],
+    usedIn: ['Reserved — not yet consumed by any route'],
   },
 
   {

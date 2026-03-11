@@ -3384,6 +3384,8 @@
     "promptsSaved": "Prompt saved successfully",
     "promptsResetDone": "Prompt reset to factory default",
     "promptsRestored": "Version restored successfully",
-    "promptsHelp": "System prompts are the AI instruction texts served to agents and users. Edit them here to customize behavior without code changes. Each prompt supports {{variable}} placeholders that are filled at serve time."
+    "promptsHelp": "System prompts are the AI instruction texts served to agents and users. Edit them here to customize behavior without code changes. Each prompt supports {{variable}} placeholders that are filled at serve time.",
+    "promptsHelpTitle": "About System Prompts",
+    "promptsEmpty": "No system prompts found. They will be seeded on next server restart."
   }
 }
