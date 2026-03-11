@@ -891,6 +891,37 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_device_auth_ownerName ON device_auth(ownerName);
     CREATE INDEX IF NOT EXISTS idx_device_auth_status ON device_auth(status);
 
+    -- ── OAuth 2.1 Persistent State ──
+    CREATE TABLE IF NOT EXISTS oauth_clients (
+      clientId      TEXT PRIMARY KEY,
+      clientSecret  TEXT NOT NULL,
+      clientName    TEXT NOT NULL,
+      redirectUris  TEXT NOT NULL DEFAULT '[]',
+      createdAt     TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+      tokenHash     TEXT PRIMARY KEY,
+      clientId      TEXT NOT NULL,
+      gaii          TEXT NOT NULL,
+      owner         TEXT NOT NULL,
+      roles         TEXT NOT NULL DEFAULT '[]',
+      createdAt     TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_clientId ON oauth_refresh_tokens(clientId);
+    CREATE INDEX IF NOT EXISTS idx_oauth_refresh_tokens_gaii ON oauth_refresh_tokens(gaii);
+
+    CREATE TABLE IF NOT EXISTS oauth_approvals (
+      clientId      TEXT NOT NULL,
+      gaii          TEXT NOT NULL,
+      owner         TEXT NOT NULL,
+      scope         TEXT NOT NULL DEFAULT 'aimeat:full',
+      approvedAt    TEXT NOT NULL,
+      PRIMARY KEY (clientId, gaii)
+    );
+    CREATE INDEX IF NOT EXISTS idx_oauth_approvals_gaii ON oauth_approvals(gaii);
+    CREATE INDEX IF NOT EXISTS idx_oauth_approvals_owner ON oauth_approvals(owner);
+
   `);
 
   // ── Schema migrations for existing databases ──

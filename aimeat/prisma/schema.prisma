@@ -904,3 +904,33 @@ model DeviceAuth {
   approvedBy       String?
   agentCredentials Json?
 }
+
+model OAuthClient {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientId     String   @unique
+  clientSecret String
+  clientName   String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+model OAuthRefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  tokenHash String   @unique
+  clientId  String
+  gaii      String
+  owner     String
+  roles     String[]
+  createdAt DateTime @default(now())
+}
+
+model OAuthApproval {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientId   String
+  gaii       String
+  owner      String
+  scope      String   @default("aimeat:full")
+  approvedAt DateTime @default(now())
+
+  @@unique([clientId, gaii])
+}

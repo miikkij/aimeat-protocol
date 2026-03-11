@@ -51,6 +51,9 @@ import type {
     ExtensionInstanceRecord,
     ReplicationQueueEntry,
     DeviceAuthorizationRecord,
+    OAuthClientRecord,
+    OAuthRefreshTokenRecord,
+    OAuthApprovalRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -273,6 +276,9 @@ export class MongoStorage implements Storage {
         await this.prisma.escrowHold.deleteMany({ where: { fromGaii: gaii } });
         // OTKs (Prisma)
         await this.prisma.otk.deleteMany({ where: { ownerGaii: gaii } });
+        // OAuth refresh tokens and approvals for this agent
+        await this.prisma.oAuthRefreshToken.deleteMany({ where: { gaii } });
+        await this.prisma.oAuthApproval.deleteMany({ where: { gaii } });
     }
 
     async listAgents(): Promise<AgentRecord[]> {
@@ -3755,6 +3761,164 @@ export class MongoStorage implements Storage {
             approvedBy: row.approvedBy ?? undefined,
             agentCredentials: row.agentCredentials ?? undefined,
         };
+    }
+
+    // ── OAuth 2.1 Persistent State ──
+
+    async createOAuthClient(client: OAuthClientRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.oAuthClient.create({
+            data: {
+                clientId: client.clientId,
+                clientSecret: client.clientSecret,
+                clientName: client.clientName,
+                redirectUris: client.redirectUris,
+                createdAt: new Date(client.createdAt),
+            },
+        });
+    }
+
+    async getOAuthClient(clientId: string): Promise<OAuthClientRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.oAuthClient.findUnique({ where: { clientId } });
+        if (!row) return null;
+        return {
+            clientId: row.clientId,
+            clientSecret: row.clientSecret,
+            clientName: row.clientName,
+            redirectUris: row.redirectUris,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+    }
+
+    async deleteOAuthClient(clientId: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.oAuthRefreshToken.deleteMany({ where: { clientId } });
+            await this.prisma.oAuthApproval.deleteMany({ where: { clientId } });
+            await this.prisma.oAuthClient.delete({ where: { clientId } });
+            return true;
+        } catch { return false; }
+    }
+
+    async listOAuthClients(): Promise<OAuthClientRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.oAuthClient.findMany({ orderBy: { createdAt: 'desc' } });
+        return rows.map((row: any) => ({
+            clientId: row.clientId,
+            clientSecret: row.clientSecret,
+            clientName: row.clientName,
+            redirectUris: row.redirectUris,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        }));
+    }
+
+    async createOAuthRefreshToken(token: OAuthRefreshTokenRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.oAuthRefreshToken.create({
+            data: {
+                tokenHash: token.tokenHash,
+                clientId: token.clientId,
+                gaii: token.gaii,
+                owner: token.owner,
+                roles: token.roles,
+                createdAt: new Date(token.createdAt),
+            },
+        });
+    }
+
+    async getOAuthRefreshToken(tokenHash: string): Promise<OAuthRefreshTokenRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.oAuthRefreshToken.findUnique({ where: { tokenHash } });
+        if (!row) return null;
+        return {
+            tokenHash: row.tokenHash,
+            clientId: row.clientId,
+            gaii: row.gaii,
+            owner: row.owner,
+            roles: row.roles,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+    }
+
+    async deleteOAuthRefreshToken(tokenHash: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.oAuthRefreshToken.delete({ where: { tokenHash } });
+            return true;
+        } catch { return false; }
+    }
+
+    async deleteOAuthRefreshTokensByClient(clientId: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.oAuthRefreshToken.deleteMany({ where: { clientId } });
+        return result.count;
+    }
+
+    async deleteOAuthRefreshTokensByGaii(gaii: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.oAuthRefreshToken.deleteMany({ where: { gaii } });
+        return result.count;
+    }
+
+    async createOAuthApproval(approval: OAuthApprovalRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.oAuthApproval.upsert({
+            where: { clientId_gaii: { clientId: approval.clientId, gaii: approval.gaii } },
+            update: { scope: approval.scope, approvedAt: new Date(approval.approvedAt) },
+            create: {
+                clientId: approval.clientId,
+                gaii: approval.gaii,
+                owner: approval.owner,
+                scope: approval.scope,
+                approvedAt: new Date(approval.approvedAt),
+            },
+        });
+    }
+
+    async getOAuthApproval(clientId: string, gaii: string): Promise<OAuthApprovalRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.oAuthApproval.findUnique({ where: { clientId_gaii: { clientId, gaii } } });
+        if (!row) return null;
+        return {
+            clientId: row.clientId,
+            gaii: row.gaii,
+            owner: row.owner,
+            scope: row.scope,
+            approvedAt: row.approvedAt instanceof Date ? row.approvedAt.toISOString() : row.approvedAt,
+        };
+    }
+
+    async deleteOAuthApproval(clientId: string, gaii: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.oAuthApproval.delete({ where: { clientId_gaii: { clientId, gaii } } });
+            return true;
+        } catch { return false; }
+    }
+
+    async deleteOAuthApprovalsByClient(clientId: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.oAuthApproval.deleteMany({ where: { clientId } });
+        return result.count;
+    }
+
+    async deleteOAuthApprovalsByGaii(gaii: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.oAuthApproval.deleteMany({ where: { gaii } });
+        return result.count;
+    }
+
+    async listOAuthApprovalsByOwner(owner: string): Promise<OAuthApprovalRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.oAuthApproval.findMany({ where: { owner }, orderBy: { approvedAt: 'desc' } });
+        return rows.map((row: any) => ({
+            clientId: row.clientId,
+            gaii: row.gaii,
+            owner: row.owner,
+            scope: row.scope,
+            approvedAt: row.approvedAt instanceof Date ? row.approvedAt.toISOString() : row.approvedAt,
+        }));
     }
 }
 

@@ -1061,6 +1061,7 @@ import type { SchedulerRepository } from './repositories/scheduler.repository.js
 import type { ExtensionInstanceRepository } from './repositories/extension-instance.repository.js';
 import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
+import type { OAuthRepository } from './repositories/oauth.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1075,4 +1076,5 @@ export interface Storage extends
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,
-  DeviceAuthRepository { }
+  DeviceAuthRepository,
+  OAuthRepository { }

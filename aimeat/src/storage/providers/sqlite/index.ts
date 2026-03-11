@@ -26,6 +26,9 @@ import type {
   ExtensionInstanceRecord,
   ReplicationQueueEntry,
   DeviceAuthorizationRecord,
+  OAuthClientRecord,
+  OAuthRefreshTokenRecord,
+  OAuthApprovalRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -195,6 +198,9 @@ export class SqliteStorage implements Storage {
     this.db.prepare('DELETE FROM escrow_holds WHERE fromGaii = ?').run(gaii);
     // OTKs (one-time keys)
     this.db.prepare('DELETE FROM otks WHERE ownerGaii = ?').run(gaii);
+    // OAuth refresh tokens and approvals for this agent
+    this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE gaii = ?').run(gaii);
+    this.db.prepare('DELETE FROM oauth_approvals WHERE gaii = ?').run(gaii);
   }
 
   private deserializeOwner(row: Record<string, unknown>): OwnerRecord {
@@ -4284,5 +4290,144 @@ export class SqliteStorage implements Storage {
       approvedBy: row.approvedBy as string | undefined,
       agentCredentials: row.agentCredentials ? JSON.parse(row.agentCredentials as string) : undefined,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── OAuth 2.1 Persistent State ──
+  // ══════════════════════════════════════════════════════════
+
+  // ── Clients ──
+
+  async createOAuthClient(client: OAuthClientRecord): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO oauth_clients (clientId, clientSecret, clientName, redirectUris, createdAt)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      client.clientId, client.clientSecret, client.clientName,
+      JSON.stringify(client.redirectUris), client.createdAt,
+    );
+  }
+
+  async getOAuthClient(clientId: string): Promise<OAuthClientRecord | null> {
+    const row = this.db.prepare('SELECT * FROM oauth_clients WHERE clientId = ?').get(clientId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      clientId: row.clientId as string,
+      clientSecret: row.clientSecret as string,
+      clientName: row.clientName as string,
+      redirectUris: JSON.parse(row.redirectUris as string),
+      createdAt: row.createdAt as string,
+    };
+  }
+
+  async deleteOAuthClient(clientId: string): Promise<boolean> {
+    const txn = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE clientId = ?').run(clientId);
+      this.db.prepare('DELETE FROM oauth_approvals WHERE clientId = ?').run(clientId);
+      const result = this.db.prepare('DELETE FROM oauth_clients WHERE clientId = ?').run(clientId);
+      return result.changes > 0;
+    });
+    return txn();
+  }
+
+  async listOAuthClients(): Promise<OAuthClientRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM oauth_clients ORDER BY createdAt DESC').all() as Record<string, unknown>[];
+    return rows.map(row => ({
+      clientId: row.clientId as string,
+      clientSecret: row.clientSecret as string,
+      clientName: row.clientName as string,
+      redirectUris: JSON.parse(row.redirectUris as string),
+      createdAt: row.createdAt as string,
+    }));
+  }
+
+  // ── Refresh Tokens ──
+
+  async createOAuthRefreshToken(token: OAuthRefreshTokenRecord): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO oauth_refresh_tokens (tokenHash, clientId, gaii, owner, roles, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      token.tokenHash, token.clientId, token.gaii, token.owner,
+      JSON.stringify(token.roles), token.createdAt,
+    );
+  }
+
+  async getOAuthRefreshToken(tokenHash: string): Promise<OAuthRefreshTokenRecord | null> {
+    const row = this.db.prepare('SELECT * FROM oauth_refresh_tokens WHERE tokenHash = ?').get(tokenHash) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      tokenHash: row.tokenHash as string,
+      clientId: row.clientId as string,
+      gaii: row.gaii as string,
+      owner: row.owner as string,
+      roles: JSON.parse(row.roles as string),
+      createdAt: row.createdAt as string,
+    };
+  }
+
+  async deleteOAuthRefreshToken(tokenHash: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE tokenHash = ?').run(tokenHash);
+    return result.changes > 0;
+  }
+
+  async deleteOAuthRefreshTokensByClient(clientId: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE clientId = ?').run(clientId);
+    return result.changes;
+  }
+
+  async deleteOAuthRefreshTokensByGaii(gaii: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE gaii = ?').run(gaii);
+    return result.changes;
+  }
+
+  // ── Approvals ──
+
+  async createOAuthApproval(approval: OAuthApprovalRecord): Promise<void> {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO oauth_approvals (clientId, gaii, owner, scope, approvedAt)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(
+      approval.clientId, approval.gaii, approval.owner,
+      approval.scope, approval.approvedAt,
+    );
+  }
+
+  async getOAuthApproval(clientId: string, gaii: string): Promise<OAuthApprovalRecord | null> {
+    const row = this.db.prepare('SELECT * FROM oauth_approvals WHERE clientId = ? AND gaii = ?').get(clientId, gaii) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      clientId: row.clientId as string,
+      gaii: row.gaii as string,
+      owner: row.owner as string,
+      scope: row.scope as string,
+      approvedAt: row.approvedAt as string,
+    };
+  }
+
+  async deleteOAuthApproval(clientId: string, gaii: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM oauth_approvals WHERE clientId = ? AND gaii = ?').run(clientId, gaii);
+    return result.changes > 0;
+  }
+
+  async deleteOAuthApprovalsByClient(clientId: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM oauth_approvals WHERE clientId = ?').run(clientId);
+    return result.changes;
+  }
+
+  async deleteOAuthApprovalsByGaii(gaii: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM oauth_approvals WHERE gaii = ?').run(gaii);
+    return result.changes;
+  }
+
+  async listOAuthApprovalsByOwner(owner: string): Promise<OAuthApprovalRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM oauth_approvals WHERE owner = ? ORDER BY approvedAt DESC').all(owner) as Record<string, unknown>[];
+    return rows.map(row => ({
+      clientId: row.clientId as string,
+      gaii: row.gaii as string,
+      owner: row.owner as string,
+      scope: row.scope as string,
+      approvedAt: row.approvedAt as string,
+    }));
   }
 }

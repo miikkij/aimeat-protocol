@@ -574,8 +574,14 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
     if (content !== undefined && Buffer.byteLength(content, 'utf8') > 65536) {
       return res.status(400).json(error(config.nodeId, 'CONTENT_TOO_LARGE', 'Prompt content must be under 64 KB'));
     }
-    // Validate locale count (max 10) and locale content size
+    // Validate and sanitize locale overrides
     if (locales !== undefined) {
+      // Strip empty keys and empty-string values (spec: empty override = absent)
+      for (const lk of Object.keys(locales)) {
+        if (!lk || (typeof locales[lk] === 'string' && locales[lk].length === 0)) {
+          delete locales[lk];
+        }
+      }
       const localeKeys = Object.keys(locales);
       if (localeKeys.length > 10) {
         return res.status(400).json(error(config.nodeId, 'TOO_MANY_LOCALES', 'Maximum 10 locale overrides allowed'));
@@ -650,6 +656,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
       changedAt: now,
       changeNote: 'Reset to factory default',
     });
+    await storage.pruneSystemPromptVersions(id, 50);
 
     res.json(success(config.nodeId, { prompt: updated }));
   });

@@ -33,15 +33,8 @@ export function emitResourceListChanged(agentGaii: string): void {
     resourceEvents.emit('resource:listChanged', { agentGaii } as { agentGaii: string });
 }
 
-// OAuth 2.1 state — in-memory (per RFC, clients register dynamically)
-interface OAuthClient {
-    clientId: string;
-    clientSecret: string;
-    clientName: string;
-    redirectUris: string[];
-    createdAt: string;
-}
-
+// OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
+// Clients, refresh tokens, and approvals are persisted to storage.
 interface AuthorizationCode {
     code: string;
     clientId: string;
@@ -55,14 +48,9 @@ interface AuthorizationCode {
     expiresAt: number;
 }
 
-interface OAuthToken {
-    accessToken: string;
-    refreshToken: string;
-    clientId: string;
-    gaii: string;
-    owner: string;
-    roles: string[];
-    expiresAt: number;
+/** SHA-256 hash a raw token for storage lookup */
+function hashToken(raw: string): string {
+    return createHash('sha256').update(raw).digest('hex');
 }
 
 export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
@@ -73,11 +61,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
     const sessionChatInstances = new Map<string, string>();
 
-    // OAuth 2.1 stores
-    const oauthClients = new Map<string, OAuthClient>();
+    // OAuth 2.1 — only auth codes are in-memory (short-lived, single-use)
     const authCodes = new Map<string, AuthorizationCode>();
-    const oauthTokens = new Map<string, OAuthToken>();       // keyed by access token
-    const refreshTokenIndex = new Map<string, OAuthToken>();  // keyed by refresh token
 
     function createMcpServer(agentGaii: string): McpServer {
         const mcp = new McpServer(
@@ -875,7 +860,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     // ── OAuth 2.1 Endpoints ──
 
     // POST /v1/mcp/register — Dynamic Client Registration (RFC 7591)
-    router.post('/v1/mcp/register', (req: Request, res: Response) => {
+    router.post('/v1/mcp/register', async (req: Request, res: Response) => {
         const { client_name, redirect_uris } = req.body ?? {};
 
         if (!client_name) {
@@ -887,20 +872,19 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         const clientId = `mcp-client-${randomBytes(16).toString('hex')}`;
         const clientSecret = randomBytes(32).toString('hex');
 
-        const client: OAuthClient = {
+        await storage.createOAuthClient({
             clientId,
-            clientSecret,
+            clientSecret: hashToken(clientSecret),
             clientName: client_name,
-            redirectUris: redirectUris,
+            redirectUris,
             createdAt: new Date().toISOString(),
-        };
-        oauthClients.set(clientId, client);
+        });
 
         res.status(201).json({
             client_id: clientId,
             client_secret: clientSecret,
-            client_name: client.clientName,
-            redirect_uris: client.redirectUris,
+            client_name,
+            redirect_uris: redirectUris,
             token_endpoint_auth_method: 'client_secret_post',
             grant_types: ['authorization_code', 'refresh_token'],
         });
@@ -935,7 +919,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        const client = oauthClients.get(clientId);
+        const client = await storage.getOAuthClient(clientId);
         if (!client) {
             res.status(400).json({ error: 'invalid_client', error_description: 'Unknown client_id' });
             return;
@@ -1016,7 +1000,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        const client = oauthClients.get(client_id);
+        const client = await storage.getOAuthClient(client_id);
 
         // If client not found (e.g. server restarted since registration), allow consent
         // to proceed — we still verify owner JWT + agent ownership below.
