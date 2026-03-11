@@ -141,6 +141,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Global middleware
   app.use(express.json({ limit: '15mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(express.text({ limit: '1mb', type: ['text/yaml', 'application/x-yaml'] }));
 
   // Serve static assets (platform icons, etc.)

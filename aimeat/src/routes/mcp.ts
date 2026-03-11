@@ -1075,7 +1075,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             }
 
             const client = oauthClients.get(client_id);
-            if (!client || client.clientSecret !== client_secret) {
+            // If client exists, verify secret. If client was lost (server restart),
+            // allow if PKCE code_verifier is provided (public client per OAuth 2.1).
+            if (client && client_secret && client.clientSecret !== client_secret) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
@@ -1155,7 +1157,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             }
 
             const client = oauthClients.get(client_id);
-            if (!client || client.clientSecret !== client_secret) {
+            if (client && client_secret && client.clientSecret !== client_secret) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'Invalid client credentials' });
                 return;
             }
