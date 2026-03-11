@@ -237,7 +237,12 @@ function McpPanel({ locale, isLoggedIn, session }) {
               </p>
               <div style="font-size:.85rem">
                 <ol style="margin:0;padding-left:1.25rem;line-height:1.8">
-                  <li>${dt('panel.mcpDesktopStep1', locale)}</li>
+                  <li>${dt('panel.mcpDesktopStep1', locale)}
+                    <div style="margin:.5rem 0">
+                      <img src="/assets/mcp_1_add_custom_connector.png" alt="Add custom connector dialog"
+                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                    </div>
+                  </li>
                   <li>${dt('panel.mcpDesktopStep2', locale)}
                     <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
                       <code style="font-size:.78rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
@@ -247,7 +252,12 @@ function McpPanel({ locale, isLoggedIn, session }) {
                       </button>
                     </div>
                   </li>
-                  <li>${dt('panel.mcpDesktopStep3', locale)}</li>
+                  <li>${dt('panel.mcpDesktopStep3', locale)}
+                    <div style="margin:.5rem 0">
+                      <img src="/assets/mcp_2_connect_disconnect_connector.png" alt="Connected connector with options"
+                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                    </div>
+                  </li>
                   <li>${dt('panel.mcpDesktopStep4', locale)}</li>
                 </ol>
                 <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpDesktopNote', locale)}</p>
@@ -259,7 +269,12 @@ function McpPanel({ locale, isLoggedIn, session }) {
                 <p style="margin:0 0 .75rem;color:var(--muted)">${dt('panel.mcpSetupChatDesc', locale)}</p>
                 <ol style="margin:0;padding-left:1.25rem;line-height:1.6">
                   <li>${dt('panel.mcpChatStep1', locale)}</li>
-                  <li>${dt('panel.mcpChatStep2', locale)}</li>
+                  <li>${dt('panel.mcpChatStep2', locale)}
+                    <div style="margin:.5rem 0">
+                      <img src="/assets/mcp_1_add_custom_connector.png" alt="Add custom connector dialog"
+                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                    </div>
+                  </li>
                   <li>${dt('panel.mcpChatStep3', locale)}
                     <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
                       <code style="font-size:.8rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
@@ -270,7 +285,12 @@ function McpPanel({ locale, isLoggedIn, session }) {
                     </div>
                   </li>
                   <li>${dt('panel.mcpChatStep4', locale)}</li>
-                  <li>${dt('panel.mcpChatStep5', locale)}</li>
+                  <li>${dt('panel.mcpChatStep5', locale)}
+                    <div style="margin:.5rem 0">
+                      <img src="/assets/mcp_2_connect_disconnect_connector.png" alt="Connected connector ready to use"
+                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                    </div>
+                  </li>
                 </ol>
                 <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpChatNote', locale)}</p>
               </div>
