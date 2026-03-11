@@ -93,6 +93,12 @@
     let agents = [];
     let selectedAgent = null;
 
+    // session.owner may be a string or { name: string } depending on the endpoint
+    const getOwnerName = () => {
+      const o = session?.owner;
+      return typeof o === 'string' ? o : o?.name || session?.username || '';
+    };
+
     async function checkSession() {
       try {
         const r = await fetch('/v1/auth/session', { credentials: 'include' });
@@ -181,7 +187,8 @@
             document.getElementById('totp').value.trim() || undefined,
           );
           session = data;
-          agents = await fetchAgents(data.owner || data.username, data.jwt || data.token);
+          const loginOwner = typeof data.owner === 'string' ? data.owner : data.owner?.name || data.username;
+          agents = await fetchAgents(loginOwner, data.jwt || data.token);
           renderApproval();
         } catch (err) {
           errEl.textContent = err.message;
@@ -218,7 +225,7 @@
         btn.textContent = '...';
         try {
           const jwt = session.jwt || session.token;
-          const ownerName = session.owner || session.username;
+          const ownerName = getOwnerName();
           const newAgent = await createAgent(nameVal, displayVal || nameVal, jwt, ownerName);
           agents = await fetchAgents(ownerName, jwt);
           onCreated(newAgent);
@@ -352,7 +359,7 @@
     // Boot
     session = await checkSession();
     if (session) {
-      const ownerName = session.owner || session.username;
+      const ownerName = getOwnerName();
       const jwt = session.jwt || session.token;
       agents = await fetchAgents(ownerName, jwt);
       renderApproval();
