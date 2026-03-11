@@ -6,6 +6,7 @@ import type { Storage, KnowledgeManifest, MemoryLinkRecord, OperatorReviewRecord
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { ManifestSchema } from '../schemas/knowledge-package.js';
 import { createRequire } from 'node:module';
 
@@ -354,14 +355,28 @@ Output structured AIMEAT knowledge packages as JSON.`;
   router.get('/v1/templates/knowledge-packager-human', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
-    const stored = await storage.getMemory(req.auth!.sub as string, 'templates/knowledge-packager-human');
 
-    let text = stored
-      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
-      : DEFAULT_HUMAN_PROMPT;
-    text = text.replace(/\{ghii\}/g, ghii);
-    text = text.replace(/\{node_url\}/g, nodeUrl);
-    text = text.replace(/\{node_id\}/g, config.nodeId);
+    // Try storage-backed system prompt first
+    const record = await storage.getSystemPrompt('knowledge-packager-human');
+    let text: string;
+    if (record && record.active) {
+      const content = resolvePromptContent(record, req.headers['accept-language'] as string);
+      text = substituteVariables(content, {
+        owner_name: ghii,
+        node_url: nodeUrl,
+        node_id: config.nodeId,
+        gaii: req.auth!.sub as string,
+      });
+    } else {
+      // Fallback: check memory, then hardcoded default
+      const stored = await storage.getMemory(req.auth!.sub as string, 'templates/knowledge-packager-human');
+      text = stored
+        ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
+        : DEFAULT_HUMAN_PROMPT;
+      text = text.replace(/\{ghii\}/g, ghii);
+      text = text.replace(/\{node_url\}/g, nodeUrl);
+      text = text.replace(/\{node_id\}/g, config.nodeId);
+    }
 
     res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
   });
@@ -371,17 +386,31 @@ Output structured AIMEAT knowledge packages as JSON.`;
     const ghii = req.auth!.owner as string;
     const gaii = req.auth!.sub as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
-    const stored = await storage.getMemory(gaii, 'templates/knowledge-packager-agent');
 
-    let text = stored
-      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
-      : DEFAULT_AGENT_PROMPT;
-    text = text.replace(/\{ghii\}/g, ghii);
-    text = text.replace(/\{node_url\}/g, nodeUrl);
-    text = text.replace(/\{node_id\}/g, config.nodeId);
-    text = text.replace(/\{agent_gaii\}/g, gaii);
-    text = text.replace(/\{auth_endpoint\}/g, `${nodeUrl}/v1/auth/token`);
-    text = text.replace(/\{openapi_spec\}/g, `${nodeUrl}/v1/openapi.yaml`);
+    // Try storage-backed system prompt first
+    const record = await storage.getSystemPrompt('knowledge-packager-agent');
+    let text: string;
+    if (record && record.active) {
+      const content = resolvePromptContent(record, req.headers['accept-language'] as string);
+      text = substituteVariables(content, {
+        owner_name: ghii,
+        node_url: nodeUrl,
+        node_id: config.nodeId,
+        gaii,
+      });
+    } else {
+      // Fallback: check memory, then hardcoded default
+      const stored = await storage.getMemory(gaii, 'templates/knowledge-packager-agent');
+      text = stored
+        ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
+        : DEFAULT_AGENT_PROMPT;
+      text = text.replace(/\{ghii\}/g, ghii);
+      text = text.replace(/\{node_url\}/g, nodeUrl);
+      text = text.replace(/\{node_id\}/g, config.nodeId);
+      text = text.replace(/\{agent_gaii\}/g, gaii);
+      text = text.replace(/\{auth_endpoint\}/g, `${nodeUrl}/v1/auth/token`);
+      text = text.replace(/\{openapi_spec\}/g, `${nodeUrl}/v1/openapi.yaml`);
+    }
 
     res.json(success(config.nodeId, { prompt: text, ghii, gaii, node_url: nodeUrl, node_id: config.nodeId }));
   });

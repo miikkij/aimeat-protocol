@@ -29,6 +29,8 @@ import type {
   OAuthClientRecord,
   OAuthRefreshTokenRecord,
   OAuthApprovalRecord,
+  SystemPromptRecord,
+  SystemPromptVersionRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -4429,5 +4431,105 @@ export class SqliteStorage implements Storage {
       scope: row.scope as string,
       approvedAt: row.approvedAt as string,
     }));
+  }
+
+  // ── System Prompts ────────────────────────────────────────────────
+
+  private deserializeSystemPrompt(row: Record<string, unknown>): SystemPromptRecord {
+    return {
+      id: row.id as string,
+      group: row.grp as string,
+      name: row.name as string,
+      description: row.description as string,
+      content: row.content as string,
+      locales: row.locales ? JSON.parse(row.locales as string) : undefined,
+      active: row.active === 1,
+      variables: JSON.parse(row.variables as string),
+      usedIn: JSON.parse(row.usedIn as string),
+      version: row.version as number,
+      updatedAt: row.updatedAt as string,
+      updatedBy: row.updatedBy as string,
+    };
+  }
+
+  private deserializeSystemPromptVersion(row: Record<string, unknown>): SystemPromptVersionRecord {
+    return {
+      promptId: row.promptId as string,
+      version: row.version as number,
+      content: row.content as string,
+      locales: row.locales ? JSON.parse(row.locales as string) : undefined,
+      changedBy: row.changedBy as string,
+      changedAt: row.changedAt as string,
+      changeNote: row.changeNote as string | undefined,
+    };
+  }
+
+  async listSystemPrompts(opts?: { group?: string }): Promise<SystemPromptRecord[]> {
+    const sql = opts?.group
+      ? 'SELECT * FROM system_prompts WHERE grp = ? ORDER BY grp, name'
+      : 'SELECT * FROM system_prompts ORDER BY grp, name';
+    const rows = (opts?.group
+      ? this.db.prepare(sql).all(opts.group)
+      : this.db.prepare(sql).all()) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeSystemPrompt(r));
+  }
+
+  async getSystemPrompt(id: string): Promise<SystemPromptRecord | null> {
+    const row = this.db.prepare('SELECT * FROM system_prompts WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.deserializeSystemPrompt(row) : null;
+  }
+
+  async upsertSystemPrompt(record: SystemPromptRecord): Promise<SystemPromptRecord> {
+    this.db.prepare(
+      `INSERT INTO system_prompts (id, grp, name, description, content, locales, active, variables, usedIn, version, updatedAt, updatedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         grp = excluded.grp, name = excluded.name, description = excluded.description,
+         content = excluded.content, locales = excluded.locales, active = excluded.active,
+         variables = excluded.variables, usedIn = excluded.usedIn, version = excluded.version,
+         updatedAt = excluded.updatedAt, updatedBy = excluded.updatedBy`
+    ).run(
+      record.id, record.group, record.name, record.description, record.content,
+      record.locales ? JSON.stringify(record.locales) : null,
+      record.active ? 1 : 0,
+      JSON.stringify(record.variables), JSON.stringify(record.usedIn),
+      record.version, record.updatedAt, record.updatedBy,
+    );
+    return record;
+  }
+
+  async getSystemPromptVersions(promptId: string): Promise<SystemPromptVersionRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM system_prompt_versions WHERE promptId = ? ORDER BY version DESC'
+    ).all(promptId) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeSystemPromptVersion(r));
+  }
+
+  async getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null> {
+    const row = this.db.prepare(
+      'SELECT * FROM system_prompt_versions WHERE promptId = ? AND version = ?'
+    ).get(promptId, version) as Record<string, unknown> | undefined;
+    return row ? this.deserializeSystemPromptVersion(row) : null;
+  }
+
+  async createSystemPromptVersion(record: SystemPromptVersionRecord): Promise<SystemPromptVersionRecord> {
+    this.db.prepare(
+      `INSERT INTO system_prompt_versions (promptId, version, content, locales, changedBy, changedAt, changeNote)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      record.promptId, record.version, record.content,
+      record.locales ? JSON.stringify(record.locales) : null,
+      record.changedBy, record.changedAt, record.changeNote ?? null,
+    );
+    return record;
+  }
+
+  async pruneSystemPromptVersions(promptId: string, keepCount: number): Promise<number> {
+    const result = this.db.prepare(
+      `DELETE FROM system_prompt_versions WHERE promptId = ? AND version NOT IN (
+         SELECT version FROM system_prompt_versions WHERE promptId = ? ORDER BY version DESC LIMIT ?
+       )`
+    ).run(promptId, promptId, keepCount);
+    return result.changes;
   }
 }

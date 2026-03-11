@@ -54,6 +54,8 @@ import type {
     OAuthClientRecord,
     OAuthRefreshTokenRecord,
     OAuthApprovalRecord,
+    SystemPromptRecord,
+    SystemPromptVersionRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3919,6 +3921,127 @@ export class MongoStorage implements Storage {
             scope: row.scope,
             approvedAt: row.approvedAt instanceof Date ? row.approvedAt.toISOString() : row.approvedAt,
         }));
+    }
+
+    // ── System Prompts ────────────────────────────────────────────────
+
+    async listSystemPrompts(opts?: { group?: string }): Promise<SystemPromptRecord[]> {
+        this.ensureReady();
+        const where = opts?.group ? { group: opts.group } : {};
+        const rows = await this.prisma.systemPrompt.findMany({
+            where,
+            orderBy: [{ group: 'asc' }, { name: 'asc' }],
+        });
+        return rows.map((r: any) => this.toSystemPromptRecord(r));
+    }
+
+    async getSystemPrompt(id: string): Promise<SystemPromptRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.systemPrompt.findUnique({ where: { id } });
+        return row ? this.toSystemPromptRecord(row) : null;
+    }
+
+    async upsertSystemPrompt(record: SystemPromptRecord): Promise<SystemPromptRecord> {
+        this.ensureReady();
+        const data = {
+            id: record.id,
+            group: record.group,
+            name: record.name,
+            description: record.description,
+            content: record.content,
+            locales: record.locales ?? undefined,
+            active: record.active,
+            variables: record.variables,
+            usedIn: record.usedIn,
+            version: record.version,
+            updatedAt: new Date(record.updatedAt),
+            updatedBy: record.updatedBy,
+        };
+        await this.prisma.systemPrompt.upsert({
+            where: { id: record.id },
+            create: data,
+            update: data,
+        });
+        return record;
+    }
+
+    async getSystemPromptVersions(promptId: string): Promise<SystemPromptVersionRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.systemPromptVersion.findMany({
+            where: { promptId },
+            orderBy: { version: 'desc' },
+        });
+        return rows.map((r: any) => this.toSystemPromptVersionRecord(r));
+    }
+
+    async getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.systemPromptVersion.findUnique({
+            where: { promptId_version: { promptId, version } },
+        });
+        return row ? this.toSystemPromptVersionRecord(row) : null;
+    }
+
+    async createSystemPromptVersion(record: SystemPromptVersionRecord): Promise<SystemPromptVersionRecord> {
+        this.ensureReady();
+        await this.prisma.systemPromptVersion.create({
+            data: {
+                promptId: record.promptId,
+                version: record.version,
+                content: record.content,
+                locales: record.locales ?? undefined,
+                changedBy: record.changedBy,
+                changedAt: new Date(record.changedAt),
+                changeNote: record.changeNote ?? null,
+            },
+        });
+        return record;
+    }
+
+    async pruneSystemPromptVersions(promptId: string, keepCount: number): Promise<number> {
+        this.ensureReady();
+        // Get versions to keep
+        const keep = await this.prisma.systemPromptVersion.findMany({
+            where: { promptId },
+            orderBy: { version: 'desc' },
+            take: keepCount,
+            select: { version: true },
+        });
+        const keepVersions = keep.map((r: any) => r.version);
+        if (keepVersions.length === 0) return 0;
+        const result = await this.prisma.systemPromptVersion.deleteMany({
+            where: { promptId, version: { notIn: keepVersions } },
+        });
+        return result.count;
+    }
+
+    private toSystemPromptRecord(row: any): SystemPromptRecord {
+        return {
+            id: row.id,
+            group: row.group,
+            name: row.name,
+            description: row.description ?? '',
+            content: row.content,
+            locales: row.locales && Object.keys(row.locales).length > 0 ? row.locales : undefined,
+            active: row.active,
+            variables: row.variables ?? [],
+            usedIn: row.usedIn ?? [],
+            version: row.version,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+            updatedBy: row.updatedBy,
+        };
+    }
+
+    private toSystemPromptVersionRecord(row: any): SystemPromptVersionRecord {
+        return {
+            promptId: row.promptId,
+            version: row.version,
+            content: row.content,
+            locales: row.locales && Object.keys(row.locales).length > 0 ? row.locales : undefined,
+            changedBy: row.changedBy,
+            changedAt: row.changedAt instanceof Date ? row.changedAt.toISOString() : row.changedAt,
+            changeNote: row.changeNote ?? undefined,
+        };
     }
 }
 

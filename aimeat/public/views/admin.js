@@ -42,6 +42,7 @@ import GenesisTab      from './admin/genesis-tab.js';
 import ConsulTab       from './admin/consul-tab.js';
 import SchedulerTab      from './admin/scheduler-tab.js';
 import KnowledgeAdminTab from './admin/knowledge-tab.js';
+import PromptsTab        from './admin/prompts-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -54,6 +55,7 @@ const NAV_GROUPS = [
     { id: 'hooks',        icon: '\u{1F517}', key: 'dashboard.hooks',      component: HooksTab },
     { id: 'portal',       icon: '\u{1F310}', key: 'dashboard.portal',     component: PortalTab },
     { id: 'stats',        icon: '\u{1F4C8}', key: 'dashboard.stats',      component: StatsTab },
+    { id: 'prompts',      icon: '\u{1F4DD}', key: 'dashboard.promptsTab', component: PromptsTab },
   ]},
   { key: 'dashboard.navIdentity', items: [
     { id: 'owners',  icon: '\u{1F464}', key: 'dashboard.owners',  component: OwnersTab,  count: 'owners' },
@@ -214,6 +216,7 @@ export default function Admin({ navigate, locale }) {
         api.getConsulStatus().catch(() => ({ data: null })),
         api.getSchedulerJobs().catch(() => ({ data: null })),
         api.getExtensions().catch(() => ({ data: null })),
+        api.getSystemPrompts().catch(() => ({ data: null })),
       ]);
       if (!mountRef.current) return;
 
@@ -230,6 +233,7 @@ export default function Admin({ navigate, locale }) {
       d.consul          = features[10].status === 'fulfilled' ? features[10].value.data : null;
       d.schedulerJobs   = features[11].status === 'fulfilled' ? features[11].value.data : null;
       d.extensions      = features[12].status === 'fulfilled' ? features[12].value.data : null;
+      d.systemPrompts   = features[13].status === 'fulfilled' ? features[13].value?.data : null;
 
       // Phase 4: portal + stats + owners
       try {

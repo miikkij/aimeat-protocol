@@ -1028,6 +1028,33 @@ export interface OperatorReviewRecord {
   timestamp: string;          // ISO 8601
 }
 
+// ── System Prompts ──────────────────────────────────────────────────
+
+export interface SystemPromptRecord {
+  id: string;
+  group: string;
+  name: string;
+  description: string;
+  content: string;
+  locales?: Record<string, string>;
+  active: boolean;
+  variables: string[];
+  usedIn: string[];
+  version: number;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface SystemPromptVersionRecord {
+  promptId: string;
+  version: number;
+  content: string;
+  locales?: Record<string, string>;
+  changedBy: string;
+  changedAt: string;
+  changeNote?: string;
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1062,6 +1089,7 @@ import type { ExtensionInstanceRepository } from './repositories/extension-insta
 import type { ReplicationQueueRepository } from './repositories/replication-queue.repository.js';
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
 import type { OAuthRepository } from './repositories/oauth.repository.js';
+import type { SystemPromptRepository } from './repositories/system-prompt.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1077,4 +1105,4 @@ export interface Storage extends
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,
   DeviceAuthRepository,
-  OAuthRepository { }
+  OAuthRepository, SystemPromptRepository { }

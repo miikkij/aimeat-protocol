@@ -27,3 +27,4 @@ export type { ExtensionInstanceRepository } from './extension-instance.repositor
 export type { ReplicationQueueRepository } from './replication-queue.repository.js';
 export type { DeviceAuthRepository } from './device-auth.repository.js';
 export type { OAuthRepository } from './oauth.repository.js';
+export type { SystemPromptRepository } from './system-prompt.repository.js';
