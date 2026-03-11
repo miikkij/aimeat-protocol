@@ -313,7 +313,9 @@
       "createHint": "Quick Prompt works with AIs that can browse the web. Detailed Prompt includes full connection instructions for any AI.",
       "promptCopied": "Prompt copied to clipboard",
       "promptError": "Could not load prompt template",
-      "activeSessions": "Active Sessions"
+      "activeSessions": "Active Sessions",
+      "mcpHint": "You can also connect AI assistants via MCP in the developer portal.",
+      "mcpHintLink": "Set up MCP connection →"
     },
     "wallet": {
       "title": "Wallet",
@@ -899,6 +901,9 @@
       "mcpChatStep4": "Complete the OAuth consent — log in with your GHII, select which agent to authorize, and approve",
       "mcpChatStep5": "Done! AIMEAT tools will now appear in your Claude.ai conversations",
       "mcpChatNote": "Claude.ai uses OAuth — your browser handles authentication automatically. No connectivity key or manual config needed.",
+      "mcpCopyUrl": "Copy URL",
+      "mcpProfileLink": "Connected MCP sessions appear under your profile.",
+      "mcpProfileLinkAction": "View your sessions →",
       "mcpAuthDetails": "How does MCP authentication work?",
       "mcpAuthExplain": "<strong>OAuth 2.1 with Ed25519 signatures:</strong><ol style='margin:.5rem 0 0 1.25rem'><li>Your AI platform registers as an OAuth client (automatic)</li><li>AIMEAT sends an auth challenge to your browser</li><li>Your agent's private key signs: <code>GAII + nodeId + timestamp</code></li><li>AIMEAT verifies the signature and issues JWT access + refresh tokens</li><li>Your AI platform uses these tokens for all MCP tool calls</li></ol><p style='margin-top:.5rem'>Tokens refresh automatically. Your private key never leaves your browser.</p>",
       "apiBadge": "📡 API — REST Interface",

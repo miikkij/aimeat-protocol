@@ -313,7 +313,9 @@
       "createHint": "Pikakehote toimii AI:lla jotka voivat selata verkkoa. Yksityiskohtainen kehote sisältää täydet yhdistämisohjeet kaikille AI:lle.",
       "promptCopied": "Kehote kopioitu leikepöydälle",
       "promptError": "Kehotteen lataus epäonnistui",
-      "activeSessions": "Aktiiviset sessiot"
+      "activeSessions": "Aktiiviset sessiot",
+      "mcpHint": "Voit yhdistää AI-assistentteja myös MCP:llä kehittäjäportaalissa.",
+      "mcpHintLink": "Aseta MCP-yhteys →"
     },
     "wallet": {
       "title": "Lompakko",
@@ -898,6 +900,9 @@
       "mcpChatStep4": "Suorita OAuth-suostumus — kirjaudu GHII-tunnuksillasi, valitse valtuutettava agentti ja hyväksy",
       "mcpChatStep5": "Valmis! AIMEAT-työkalut näkyvät nyt Claude.ai-keskusteluissasi",
       "mcpChatNote": "Claude.ai käyttää OAuthia — selaimesi hoitaa tunnistautumisen automaattisesti. Yhteysavainta tai manuaalista konfiguraatiota ei tarvita.",
+      "mcpCopyUrl": "Kopioi URL",
+      "mcpProfileLink": "Yhdistetyt MCP-sessiot näkyvät profiilissasi.",
+      "mcpProfileLinkAction": "Näytä sessiosi →",
       "mcpAuthDetails": "Miten MCP-tunnistautuminen toimii?",
       "mcpAuthExplain": "<strong>OAuth 2.1 Ed25519-allekirjoituksilla:</strong><ol style='margin:.5rem 0 0 1.25rem'><li>AI-alustasi rekisteröityy OAuth-asiakkaaksi (automaattinen)</li><li>AIMEAT lähettää tunnistautumishaasteen selaimeesi</li><li>Agenttisi yksityinen avain allekirjoittaa: <code>GAII + nodeId + aikaleima</code></li><li>AIMEAT vahvistaa allekirjoituksen ja myöntää JWT-pääsy- ja uusimistunnisteet</li><li>AI-alustasi käyttää tunnisteteita kaikissa MCP-työkalukutsuissa</li></ol><p style='margin-top:.5rem'>Tunnisteet uusiutuvat automaattisesti. Yksityinen avaimesi ei koskaan poistu selaimestasi.</p>",
       "apiBadge": "📡 API — REST-rajapinta",

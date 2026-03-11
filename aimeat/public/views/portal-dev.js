@@ -357,7 +357,15 @@ function McpPanel({ locale, isLoggedIn, session }) {
                 <ol style="margin:0;padding-left:1.25rem;line-height:1.6">
                   <li>${dt('panel.mcpChatStep1', locale)}</li>
                   <li>${dt('panel.mcpChatStep2', locale)}</li>
-                  <li>${dt('panel.mcpChatStep3', locale)} <code style="font-size:.8rem">${NODE_URL}/v1/mcp</code></li>
+                  <li>${dt('panel.mcpChatStep3', locale)}
+                    <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
+                      <code style="font-size:.8rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${NODE_URL}/v1/mcp</code>
+                      <button type="button" onClick=${() => { navigator.clipboard.writeText(NODE_URL + '/v1/mcp'); }}
+                        style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                        ${dt('panel.mcpCopyUrl', locale)}
+                      </button>
+                    </div>
+                  </li>
                   <li>${dt('panel.mcpChatStep4', locale)}</li>
                   <li>${dt('panel.mcpChatStep5', locale)}</li>
                 </ol>
@@ -377,14 +385,18 @@ function McpPanel({ locale, isLoggedIn, session }) {
       `}
 
       <div class="dv-instructions">
-        <ol>
-          <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep1', locale)) }}></li>
-          <li>${dt('panel.mcpStep2', locale)}<br/><code>${NODE_URL}/v1/mcp</code></li>
-          <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep3', locale)) }}></li>
-          <li dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpStep4', locale)) }}></li>
-        </ol>
         <p dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpTools', locale)) }}></p>
       </div>
+
+      ${isLoggedIn && html`
+        <div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(100,200,255,.06);border:1px solid rgba(100,200,255,.15);border-radius:.25rem;font-size:.82rem">
+          <span dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpProfileLink', locale)) }}></span>
+          ${' '}
+          <a href="/v1/profile#chatsessions" style="color:var(--accent,#a78bfa);text-decoration:underline">
+            ${dt('panel.mcpProfileLinkAction', locale)}
+          </a>
+        </div>
+      `}
 
       <details style="margin-top:.75rem;font-size:.85rem">
         <summary style="cursor:pointer;color:var(--muted)">${dt('panel.mcpAuthDetails', locale)}</summary>

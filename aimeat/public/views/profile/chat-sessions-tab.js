@@ -70,6 +70,14 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     <div class="section-title">${t('profile.chatSessions.title')}</div>
     <div class="section-desc">${t('profile.chatSessions.desc')}</div>
 
+    <div style="margin-bottom:1rem;padding:.5rem .75rem;background:rgba(130,100,255,.06);border:1px solid rgba(130,100,255,.15);border-radius:.25rem;font-size:.82rem">
+      <span>${t('profile.chatSessions.mcpHint') || 'You can connect AI assistants via MCP in the developer portal.'}</span>
+      ${' '}
+      <a href="/v1/portal?view=dev#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
+        ${t('profile.chatSessions.mcpHintLink') || 'Set up MCP connection'}
+      </a>
+    </div>
+
     <div class="card" style="margin-bottom:1rem">
       <div class="card-header">
         <div class="card-title">${t('profile.chatSessions.createTitle') || 'Create a Chat Session'}</div>
