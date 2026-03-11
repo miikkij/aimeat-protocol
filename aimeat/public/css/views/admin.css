@@ -27,9 +27,9 @@
   height: 100vh;
   overflow-y: auto;
 }
-.adm-sidebar h1 { padding: 0 16px; margin-bottom: 16px; font-size: 1.1rem; }
 .adm-sidebar .node-id {
   padding: 0 16px;
+  padding-top: 4px;
   color: var(--text-dim, #94a3b8);
   font-size: .7rem;
   margin-bottom: 16px;

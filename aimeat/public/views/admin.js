@@ -329,7 +329,6 @@ export default function Admin({ navigate, locale }) {
     <div class="adm">
       <!-- Sidebar -->
       <nav class="adm-sidebar">
-        <h1>\u2764\uFE0F AIMEAT</h1>
         <div class="node-id">${data?.dash?.node_id || ''}</div>
 
         ${NAV_GROUPS.map(group => html`

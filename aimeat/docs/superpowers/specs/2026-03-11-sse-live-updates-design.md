@@ -193,8 +193,11 @@ export async function connect(getJwt) {
   if (es) return; // already connected
 
   jwtGetter = getJwt;
+  await _open();
+}
 
-  const jwt = getJwt();
+async function _open() {
+  const jwt = jwtGetter?.();
   if (!jwt) return;
 
   // Obtain a single-use ticket
@@ -221,7 +224,7 @@ export async function connect(getJwt) {
     if (es) { es.close(); es = null; }
     if (refCount > 0 && jwtGetter) {
       setTimeout(() => {
-        if (refCount > 0) connect(jwtGetter);
+        if (refCount > 0) _open(); // _open(), not connect() — avoids refCount inflation
       }, 5000);
     }
   };
@@ -232,6 +235,7 @@ export function disconnect() {
   if (refCount === 0) {
     if (es) { es.close(); es = null; }
     clearTimeout(debounceTimer);
+    jwtGetter = null;
   }
 }
 

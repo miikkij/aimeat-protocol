@@ -86,6 +86,7 @@ import { SiteService } from './services/site.js';
 import { startSiteSyncJob, triggerSiteSync, getSiteSyncState } from './services/site-sync.js';
 import { realtimeRouter } from './routes/realtime.js';
 import { RealtimeManager } from './services/realtime-manager.js';
+import { sseRouter } from './routes/sse.js';
 import { startMatchNotificationJob } from './services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from './services/matching.js';
 import { adminFeaturesRouter } from './routes/admin-features.js';
@@ -608,6 +609,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   }
 
   app.use(authRouter(config, storage));
+  app.use(sseRouter(config, storage));
 
   // Relay nodes skip agent-hosting routes entirely
   app.use('/v1/owners', rejectForRelay);
