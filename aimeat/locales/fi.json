@@ -283,6 +283,22 @@
         "permManage": "Hallinta",
         "permConnect": "Yhdistäminen",
         "permRegister": "Rekisteröinti"
+      },
+      "deviceAuth": {
+        "title": "Laitehyväksyntä",
+        "desc": "Luo hyväksymislinkki, jolla AI-agentti voi rekisteröityä tilillesi.",
+        "createLink": "Luo hyväksymislinkki",
+        "agentNameLabel": "Agentin nimi",
+        "agentNamePlaceholder": "oma-avustaja",
+        "userCode": "Vahvistuskoodi",
+        "verifyUrl": "Hyväksymislinkki",
+        "expiresIn": "Vanhenee",
+        "statusPending": "Odottaa hyväksyntää...",
+        "statusApproved": "Agentti yhdistetty!",
+        "statusDenied": "Pyyntö hylätty",
+        "statusExpired": "Pyyntö vanhentunut",
+        "copyUrl": "Kopioi linkki",
+        "copyPrompt": "Kopioi kehote"
       }
     },
     "scopes": {
@@ -3227,6 +3243,40 @@
     "addPlaceholder": "Lisää tagi...",
     "editTags": "Muokkaa tageja",
     "noMatch": "Ei tuloksia valituilla tageilla"
+  },
+  "agentConsent": {
+    "title": "Agentin hyväksyminen",
+    "codeLabel": "Vahvistuskoodi",
+    "codeHint": "Varmista, että tämä koodi vastaa agentin näyttämää koodia",
+    "agentDetails": "Agentin tiedot",
+    "agentName": "Nimi",
+    "agentDisplayName": "Näyttönimi",
+    "agentDescription": "Kuvaus",
+    "scopeLabel": "Oikeudet",
+    "scopeReadonly": "Vain luku",
+    "scopeReadonlyDesc": "Voi lukea muistia ja lompakkoa mutta ei voi muuttaa mitään",
+    "scopeStandard": "Vakio",
+    "scopeStandardDesc": "Voi lukea ja kirjoittaa muistia, hallita työtä ja lukea lompakkoa",
+    "scopeFull": "Täysi pääsy",
+    "scopeFullDesc": "Täysi pääsy kaikkiin ominaisuuksiin",
+    "scopeCustom": "Mukautettu",
+    "approve": "Hyväksy",
+    "deny": "Hylkää",
+    "successTitle": "Agentti hyväksytty",
+    "successMessage": "Agentti on rekisteröity ja yhdistää pian.",
+    "deniedTitle": "Pyyntö hylätty",
+    "deniedMessage": "Hyväksymispyyntö on hylätty.",
+    "expiredTitle": "Pyyntö vanhentunut",
+    "expiredMessage": "Tämä hyväksymispyyntö on vanhentunut. Luo uusi pyyntö.",
+    "ownerMismatch": "Tämä pyyntö on eri tilille. Kirjaudu oikealla käyttäjätunnuksella.",
+    "invalidCode": "Virheellinen tai vanhentunut vahvistuskoodi.",
+    "login": {
+      "title": "Kirjaudu hyväksyäksesi",
+      "username": "Käyttäjätunnus",
+      "password": "Salasana",
+      "totp": "TOTP-koodi (jos käytössä)",
+      "submit": "Kirjaudu"
+    }
   },
   "oauthConsent": {
     "title": "Hyväksy AI-yhteys",
