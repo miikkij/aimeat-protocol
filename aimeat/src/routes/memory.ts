@@ -171,8 +171,22 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory — list memory keys (agent auth required)
+  // Optional ?agent=GAII — owner can view any of their own agents' memory
   router.get('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    let gaii = req.auth!.sub;
+    const agentParam = req.query.agent as string | undefined;
+
+    // Allow owner to view another of their agents' memory
+    if (agentParam && agentParam !== gaii) {
+      const callerOwner = req.auth!.owner;
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== callerOwner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only view memory of your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
+
     const prefix = req.query.prefix as string | undefined;
     const visibility = req.query.visibility as string | undefined;
     const tagsParam = req.query.tags as string | undefined;
@@ -219,7 +233,17 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
   router.get('/v1/memory/search', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    let gaii = req.auth!.sub;
+    const agentParam = req.query.agent as string | undefined;
+    if (agentParam && agentParam !== gaii) {
+      const callerOwner = req.auth!.owner;
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== callerOwner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only search memory of your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
     const q = req.query.q as string;
     if (!q) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'q query parameter is required'));

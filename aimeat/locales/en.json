@@ -390,7 +390,9 @@
       "keyRequired": "Key and value are required",
       "saveFailed": "Failed to save",
       "searchFailed": "Search failed.",
-      "noResults": "No memory entries found."
+      "noResults": "No memory entries found.",
+      "agentMemories": "Agent Memories",
+      "agentMemoriesDesc": "Memory entries created by your agents (MCP sessions, autonomous agents). Click to expand."
     },
     "files": {
       "title": "Stored Files",

@@ -390,7 +390,9 @@
       "keyRequired": "Avain ja arvo vaaditaan",
       "saveFailed": "Tallennus epäonnistui",
       "searchFailed": "Haku epäonnistui.",
-      "noResults": "Muistimerkintöjä ei löytynyt."
+      "noResults": "Muistimerkintöjä ei löytynyt.",
+      "agentMemories": "Agenttien muistit",
+      "agentMemoriesDesc": "Agenttiesi (MCP-sessiot, autonomiset agentit) luomat muistimerkinnät. Klikkaa laajentaaksesi."
     },
     "files": {
       "title": "Tallennetut tiedostot",

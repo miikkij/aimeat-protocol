@@ -4,16 +4,19 @@
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
-/** List all memory entries. Returns array. */
-export async function listMemories() {
-  const data = await apiGet('/v1/memory');
+/** List all memory entries. Returns array. Optional agentGaii to view another agent's memory. */
+export async function listMemories(agentGaii) {
+  const url = agentGaii ? `/v1/memory?agent=${encodeURIComponent(agentGaii)}` : '/v1/memory';
+  const data = await apiGet(url);
   const list = data?.data?.items || data?.data?.entries || [];
   return Array.isArray(list) ? list : [];
 }
 
-/** Search memory by query string. Returns array. */
-export async function searchMemory(query) {
-  const data = await apiGet(`/v1/memory/search?q=${encodeURIComponent(query)}`);
+/** Search memory by query string. Returns array. Optional agentGaii. */
+export async function searchMemory(query, agentGaii) {
+  let url = `/v1/memory/search?q=${encodeURIComponent(query)}`;
+  if (agentGaii) url += `&agent=${encodeURIComponent(agentGaii)}`;
+  const data = await apiGet(url);
   const list = data?.data?.results || data?.data || [];
   return Array.isArray(list) ? list : [];
 }
