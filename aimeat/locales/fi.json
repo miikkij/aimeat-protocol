@@ -3305,6 +3305,11 @@
     "usernameLabel": "Käyttäjänimi",
     "passwordLabel": "Salasana",
     "totpLabel": "2FA-koodi (jos käytössä)",
-    "morsels": "morselia"
+    "morsels": "morselia",
+    "doneTitle": "Valmis",
+    "authCodeLabel": "Valtuutuskoodi:",
+    "authCodeHint": "Liitä tämä koodi takaisin sovellukseen, joka pyysi pääsyä.",
+    "copyBtn": "Kopioi",
+    "copiedBtn": "Kopioitu!"
   }
 }

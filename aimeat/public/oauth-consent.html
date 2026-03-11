@@ -343,7 +343,24 @@
               if (d.state) url.searchParams.set('state', d.state);
               location.href = url.toString();
             } else {
-              app.innerHTML = '<h1>Done</h1><p>Authorization code: <code>' + escHtml(d.code) + '</code></p>';
+              const code = escHtml(d.code);
+              app.innerHTML = `
+                <h1>${escHtml(t('doneTitle'))}</h1>
+                <p style="margin-bottom:.5rem;font-size:.9rem">${escHtml(t('authCodeLabel'))}</p>
+                <div style="display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;font-family:monospace;font-size:.8rem;word-break:break-all">
+                  <span style="flex:1" id="codeValue">${code}</span>
+                  <button id="copyBtn" class="btn-sm btn-sm-accent" style="white-space:nowrap">${escHtml(t('copyBtn'))}</button>
+                </div>
+                <p style="color:var(--muted);font-size:.82rem">${escHtml(t('authCodeHint'))}</p>
+              `;
+              document.getElementById('copyBtn').addEventListener('click', () => {
+                navigator.clipboard.writeText(d.code).then(() => {
+                  const btn = document.getElementById('copyBtn');
+                  btn.textContent = t('copiedBtn');
+                  btn.style.background = 'var(--success)';
+                  setTimeout(() => { btn.textContent = t('copyBtn'); btn.style.background = ''; }, 2000);
+                });
+              });
             }
           } else {
             throw new Error(d.error_description || d.error || t('errorGeneric'));

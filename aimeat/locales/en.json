@@ -3306,6 +3306,11 @@
     "usernameLabel": "Username",
     "passwordLabel": "Password",
     "totpLabel": "2FA Code (if enabled)",
-    "morsels": "morsels"
+    "morsels": "morsels",
+    "doneTitle": "Done",
+    "authCodeLabel": "Authorization code:",
+    "authCodeHint": "Paste this code back into the application that requested access.",
+    "copyBtn": "Copy",
+    "copiedBtn": "Copied!"
   }
 }
