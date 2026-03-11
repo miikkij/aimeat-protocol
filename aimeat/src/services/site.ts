@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
 import { getSiteSyncState } from './site-sync.js';
+import { substituteVariables, resolvePromptContent } from './prompt-variables.js';
 
 const __dirname_site = dirname(fileURLToPath(import.meta.url));
 
@@ -228,6 +229,18 @@ export class SiteService {
 
     /** Generate a context-aware prompt for AI-assisted portal editing. */
     async getPrompt(): Promise<string> {
+        // Try storage-backed prompt first
+        const record = await this.storage.getSystemPrompt('site-portal');
+        if (record && record.active) {
+            const promptContent = resolvePromptContent(record);
+            return substituteVariables(promptContent, {
+                node_id: this.config.nodeId,
+                node_name: (this.config as unknown as Record<string, unknown>).nodeName as string ?? this.config.nodeId,
+                node_url: this.config.baseUrl,
+            });
+        }
+
+        // Fallback: build prompt inline (legacy)
         const kvSummary = Object.entries(this.config.siteKv)
             .map(([k, v]) => `${k}=${v}`)
             .join(', ');

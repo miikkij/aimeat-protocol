@@ -4,8 +4,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { success } from '../middleware/envelope.js';
+import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 
@@ -609,19 +610,42 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     const stats = { agents: agents.length, chatSessions: chatSessions.length, actions: actions.length, boards: boards.length };
 
     const path = variant?.path ?? 'prompt-package';
+
+    // Map platform path to system prompt ID
+    const promptIdMap: Record<string, string> = {
+      mcp: 'platform-mcp',
+      api: 'platform-api',
+      browse: 'platform-browse',
+      'prompt-package': 'platform-app-builder',
+    };
+    const promptId = promptIdMap[path] ?? 'platform-app-builder';
+    const record = await storage.getSystemPrompt(promptId);
+
     let prompt: string;
-    switch (path) {
-      case 'mcp':
-        prompt = buildMcpInstructions(config);
-        break;
-      case 'api':
-        prompt = buildApiInstructions(config);
-        break;
-      case 'browse':
-        prompt = buildBrowseInstructions(config);
-        break;
-      default:
-        prompt = buildPromptPackage(config, stats);
+    if (record && record.active) {
+      const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+      prompt = substituteVariables(promptContent, {
+        node_url: config.baseUrl,
+        node_id: config.nodeId,
+        agent_count: stats.agents,
+        action_count: stats.actions,
+        owner_name: '',
+      });
+    } else {
+      // Fallback to hardcoded functions if storage prompt not available
+      switch (path) {
+        case 'mcp':
+          prompt = buildMcpInstructions(config);
+          break;
+        case 'api':
+          prompt = buildApiInstructions(config);
+          break;
+        case 'browse':
+          prompt = buildBrowseInstructions(config);
+          break;
+        default:
+          prompt = buildPromptPackage(config, stats);
+      }
     }
 
     // Append goal context if prompt-package

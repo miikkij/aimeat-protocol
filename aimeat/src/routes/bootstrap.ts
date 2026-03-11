@@ -4,6 +4,7 @@ import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
@@ -22,7 +23,7 @@ export function bootstrapRouter(
     res.type('image/svg+xml').send(FAVICON_SVG);
   });
 
-  router.get('/', (_req, res) => {
+  router.get('/', async (_req, res) => {
     // Browsers send Accept: text/html — redirect humans to the onboarding portal
     // Skip redirect when ?format=json is set (used by AIs given the quick-start URL)
     const accept = _req.headers.accept ?? '';
@@ -32,6 +33,16 @@ export function bootstrapRouter(
     }
 
     const base = config.baseUrl;
+
+    // Resolve bootstrap instruction from storage
+    const bootstrapRecord = await storage.getSystemPrompt('bootstrap-anon');
+    let bootstrapInstruction: string;
+    if (bootstrapRecord && bootstrapRecord.active) {
+      const content = resolvePromptContent(bootstrapRecord, _req.headers['accept-language'] as string);
+      bootstrapInstruction = substituteVariables(content, { node_url: base, node_id: config.nodeId });
+    } else {
+      bootstrapInstruction = `You are connected to an AIMEAT node. Always use this_node.base_url (${base}) for all API requests — never hardcode domains. Follow the steps below to help your user.`;
+    }
 
     res.json(success(config.nodeId, {
       this_node: {
@@ -49,7 +60,7 @@ export function bootstrapRouter(
       },
 
       getting_started: {
-        instruction: `You are connected to an AIMEAT node. Always use this_node.base_url (${base}) for all API requests — never hardcode domains. Follow the steps below to help your user.`,
+        instruction: bootstrapInstruction,
 
         step_1_identify_your_capabilities: {
           question: 'What can you do as an AI?',
