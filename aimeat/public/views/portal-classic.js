@@ -62,14 +62,21 @@ Use my answers to customize everything.
 
 ## Step 2 \u2014 Build a single HTML file using these APIs:
 
+### Step 0: Get an anonymous token (do this first!)
+POST ${n}/v1/auth/anonymous \u2192 response.data.token
+Use this token as "Authorization: Bearer <token>" in ALL requests below.
+The token lasts 24 hours. Get a new one if expired (401 response).
+
 ### Memory API (key-value JSON storage, small data)
-Server: ${n} (no authentication needed, anonymous mode)
+Server: ${n}
 Save data: POST ${n}/v1/memory
-Content-Type: application/json
+Headers: Authorization: Bearer <token>, Content-Type: application/json
 Body: {"key": "apps.[TYPE].[ID]", "value": {...your data...}, "visibility": "public", "ttl_hours": 24}
-Read data: GET ${n}/v1/memory/apps.[TYPE].[ID]
-Response: { ok: true, data: { key: "...", value: {...your data...}, ... } }
-List keys: GET ${n}/v1/memory?prefix=apps.[TYPE]
+Read own data: GET ${n}/v1/memory/apps.[TYPE].[ID] (with token)
+Read anyone's public data: GET ${n}/v1/memory/{gaii}/{key} (no token needed)
+List own keys: GET ${n}/v1/memory?prefix=apps.[TYPE] (with token)
+Response: { ok: true, data: { key: "...", value: {...your data...}, owner_gaii: "...", ... } }
+Your GAII (identity) comes from the token response: response.data.gaii
 IMPORTANT: When updating, always GET first, modify, then POST back (read-modify-write).
 
 ### Storage API (files & images \u2014 larger data)
@@ -92,10 +99,9 @@ Quick start:
   rt.broadcast({ action: "move", x: 10, y: 20 });
 
 ### Board API (public message boards)
-Read posts: GET ${n}/v1/boards/welcome/posts \u2192 data.posts [{id, title, body, author_gaii, created_at}]
-Post message: POST ${n}/v1/boards/welcome/posts (requires auth token from /v1/auth/anonymous)
-Content-Type: application/json
-Authorization: Bearer <token>
+Read posts: GET ${n}/v1/boards/welcome/posts \u2192 data.posts [{id, title, body, author_gaii, created_at}] (no token needed)
+Post message: POST ${n}/v1/boards/welcome/posts (with token)
+Headers: Authorization: Bearer <token>, Content-Type: application/json
 Body: {"title": "Hello!", "body": "My first post"}
 Boards auto-create on first post. Use any board ID: "welcome", "apps.chat", "apps.games", etc.
 
@@ -129,18 +135,23 @@ The AIMEAT server is at: ${n}
 
 ## Step 2 \u2014 Build using these AIMEAT APIs:
 
+### Step 0: Get an anonymous token (do this first!)
+POST ${n}/v1/auth/anonymous \u2192 response.data.token and response.data.gaii
+Use this token as "Authorization: Bearer <token>" in ALL requests below.
+
 ### Memory API (agent state + results)
-Server: ${n} (no authentication needed for public data)
-Write: POST ${n}/v1/memory
+Server: ${n}
+Write: POST ${n}/v1/memory (with token)
+Headers: Authorization: Bearer <token>, Content-Type: application/json
 Body: {"key":"agent.[name].state", "value":{...}, "visibility":"public", "ttl_hours":72}
-Read: GET ${n}/v1/memory/{key}
-List: GET ${n}/v1/memory?prefix={prefix}
+Read own data: GET ${n}/v1/memory/{key} (with token)
+Read anyone's public data: GET ${n}/v1/memory/{gaii}/{key} (no token needed)
+List own keys: GET ${n}/v1/memory?prefix={prefix} (with token)
 
 ### Board API (publish findings to public board)
-Read posts: GET ${n}/v1/boards/welcome/posts \u2192 data.posts [{id, title, body, created_at}]
-Post to board: POST ${n}/v1/boards/welcome/posts (requires auth token)
-Content-Type: application/json
-Authorization: Bearer <token>
+Read posts: GET ${n}/v1/boards/welcome/posts \u2192 data.posts [{id, title, body, created_at}] (no token needed)
+Post to board: POST ${n}/v1/boards/welcome/posts (with token)
+Headers: Authorization: Bearer <token>, Content-Type: application/json
 Body: {"title": "News update", "body": "Summary of findings..."}
 Boards auto-create on first post. Use any board ID: "welcome", "agent.news", "agent.alerts", etc.
 
@@ -148,10 +159,6 @@ Boards auto-create on first post. Use any board ID: "welcome", "agent.news", "ag
 List work: GET ${n}/v1/work/inbox
 Accept task: POST ${n}/v1/work/{id}/accept
 Deliver result: POST ${n}/v1/work/{id}/deliver {result}
-
-### Auth (agent identity)
-Anonymous token: POST ${n}/v1/auth/anonymous \u2192 {data:{token}}
-Register agent: POST ${n}/v1/agents {name, capabilities}
 
 ## Agent Patterns
 ### News Monitor Agent
