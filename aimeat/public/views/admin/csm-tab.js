@@ -5,16 +5,18 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Empty, ExpandableHelp } from './shared.js';
-import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate } from '/js/services/admin.js';
+import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
 
 export default function CsmTab({ data, reload }) {
   const templates = data.csm?.templates || [];
-  const [view, setView] = useState('list');    // list | detail | create
+  const [view, setView] = useState('list');    // list | detail | create | prompt
   const [detail, setDetail] = useState(null);
   const [yaml, setYaml] = useState('');
   const [fileTemplates, setFileTemplates] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [copied, setCopied] = useState(false);
 
   async function showDetail(name) {
     try {
@@ -72,7 +74,26 @@ export default function CsmTab({ data, reload }) {
     setLoading(false);
   }
 
-  function backToList() { setView('list'); setDetail(null); setErr(''); }
+  async function openPrompt() {
+    setErr('');
+    setLoading(true);
+    try {
+      const r = await getCsmBuilderPrompt();
+      setPrompt(r.data?.prompt || '');
+      setView('prompt');
+    } catch (e) { setErr(e.message); }
+    setLoading(false);
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* fallback — select text */ }
+  }
+
+  function backToList() { setView('list'); setDetail(null); setErr(''); setCopied(false); }
 
   // ── Detail view ──
   if (view === 'detail' && detail) {
@@ -106,6 +127,37 @@ export default function CsmTab({ data, reload }) {
 
           <h5 style="margin:16px 0 4px">${t('dashboard.csmDefinition')}</h5>
           <pre style="background:var(--bg-card);padding:12px;border-radius:6px;overflow:auto;font-size:.75rem">${JSON.stringify(def, null, 2)}</pre>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── AI Prompt view ──
+  if (view === 'prompt') {
+    return html`
+      <div>
+        <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
+        <div class="adm-card" style="margin-top:12px">
+          <h4 style="margin:0 0 4px">${t('dashboard.csmAiPromptTitle')}</h4>
+          <p style="font-size:.85rem;color:var(--text-dim);margin:0 0 12px">${t('dashboard.csmAiPromptDesc')}</p>
+
+          <div style="position:relative">
+            <pre style="background:var(--bg-deep,#0f172a);padding:16px;border-radius:8px;overflow:auto;font-size:.8rem;max-height:500px;white-space:pre-wrap;line-height:1.5;border:1px solid var(--glass-border,#334155)">${prompt}</pre>
+            <button class="adm-btn" style="position:absolute;top:8px;right:8px" onClick=${copyPrompt}>
+              ${copied ? t('dashboard.copied') : t('dashboard.copy')}
+            </button>
+          </div>
+
+          <div style="margin-top:16px">
+            <${ExpandableHelp} title=${t('dashboard.csmAiPromptHow')}>
+              <ol style="margin:0;padding-left:20px;font-size:.85rem;line-height:1.8">
+                <li>${t('dashboard.csmAiStep1')}</li>
+                <li>${t('dashboard.csmAiStep2')}</li>
+                <li>${t('dashboard.csmAiStep3')}</li>
+                <li>${t('dashboard.csmAiStep4')}</li>
+              </ol>
+            <//>
+          </div>
         </div>
       </div>
     `;
@@ -158,8 +210,9 @@ export default function CsmTab({ data, reload }) {
       ${t('dashboard.csmHelpDetail')}
     <//>
 
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:12px;display:flex;gap:8px">
       <button class="adm-btn" onClick=${openCreate}>${t('dashboard.csmAddNew')}</button>
+      <button class="adm-btn-action" onClick=${openPrompt}>${t('dashboard.csmCreateWithAi')}</button>
     </div>
 
     ${!templates.length

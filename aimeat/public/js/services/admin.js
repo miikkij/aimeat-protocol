@@ -117,6 +117,11 @@ export const getCsmBuilderPrompt = ()     => apiGet('/v1/portal/prompts/csm-buil
 // ── MSM ──
 export const getMsmIntegrations = ()    => apiGet('/v1/admin/msm');
 export const getMsmDetail       = (name) => apiGet(`/v1/admin/msm/${encodeURIComponent(name)}`);
+export const createMsm          = (yaml, federate) => apiPost('/v1/msm', { yaml, federate });
+export const updateMsm          = (name, updates) => apiPut(`/v1/admin/msm/${encodeURIComponent(name)}`, updates);
+export const deleteMsm          = (name) => apiDelete(`/v1/admin/msm/${encodeURIComponent(name)}`);
+export const getMsmTemplates     = ()    => apiGet('/v1/msm/templates');
+export const getMsmTemplate      = (type) => fetch(`/v1/msm/templates/${encodeURIComponent(type)}`, { headers: { 'Accept': 'application/x-yaml' } }).then(r => r.text());
 
 // ── Genesis ──
 export const getGenesisPeers    = ()          => apiGet('/v1/admin/genesis-peers');

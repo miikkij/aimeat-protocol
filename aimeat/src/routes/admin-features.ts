@@ -565,6 +565,79 @@ export function adminFeaturesRouter(
         }));
     }));
 
+    // GET /v1/admin/msm/:name — MSM detail for admin dashboard
+    router.get('/v1/admin/msm/:name', ...auth, handle(async (req, res) => {
+        const name = req.params.name as string;
+        const msm = await storage.getMsm(name);
+        if (!msm) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `MSM "${name}" not found`));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            name: msm.name,
+            category: msm.category,
+            auth_type: msm.authType,
+            actions_count: msm.actionsCount,
+            registered_by: msm.registeredBy,
+            registered_at: msm.registeredAt,
+            updated_at: msm.updatedAt,
+            federate: msm.federate ?? false,
+            definition: msm.definition,
+        }));
+    }));
+
+    // PUT /v1/admin/msm/:name — Update MSM metadata (description, federate)
+    router.put('/v1/admin/msm/:name', ...auth, handle(async (req, res) => {
+        const name = req.params.name as string;
+        const msm = await storage.getMsm(name);
+        if (!msm) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `MSM "${name}" not found`));
+            return;
+        }
+
+        const updates: Partial<import('../storage/interface.js').MsmRecord> = {};
+        if (req.body.description !== undefined) {
+            // Update description in the definition
+            const def = { ...msm.definition } as Record<string, unknown>;
+            if (def.service && typeof def.service === 'object') {
+                (def.service as Record<string, unknown>).description = req.body.description;
+            }
+            updates.definition = def;
+        }
+        if (typeof req.body.federate === 'boolean') {
+            updates.federate = req.body.federate;
+        }
+        updates.updatedAt = new Date().toISOString();
+
+        const updated = await storage.updateMsm(name, updates);
+        if (!updated) {
+            res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', 'Failed to update MSM'));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            name: updated.name,
+            category: updated.category,
+            auth_type: updated.authType,
+            actions_count: updated.actionsCount,
+            registered_by: updated.registeredBy,
+            registered_at: updated.registeredAt,
+            updated_at: updated.updatedAt,
+            federate: updated.federate ?? false,
+        }));
+    }));
+
+    // DELETE /v1/admin/msm/:name — Delete MSM from admin dashboard
+    router.delete('/v1/admin/msm/:name', ...auth, handle(async (req, res) => {
+        const name = req.params.name as string;
+        const msm = await storage.getMsm(name);
+        if (!msm) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `MSM "${name}" not found`));
+            return;
+        }
+        await storage.deleteMsm(name);
+        res.json(success(config.nodeId, { deleted: true, name }));
+    }));
+
     // ── Genesis Peers (Cross-Federation) ────────────────────
 
     router.get('/v1/admin/genesis-peers', ...auth, handle(async (_req, res) => {
