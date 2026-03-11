@@ -412,7 +412,9 @@
       "agentMemories": "Agenttien muistit",
       "agentMemoriesDesc": "Agenttiesi (MCP-sessiot, autonomiset agentit) luomat muistimerkinnät. Klikkaa laajentaaksesi.",
       "noAgents": "Ei rekisteröityjä agentteja. Kun yhdistät AI-assistentin MCP:llä, sen muistimerkinnät näkyvät täällä.",
-      "setupMcp": "Aseta MCP →"
+      "setupMcp": "Aseta MCP →",
+      "agent": "Agentti",
+      "defaultAgent": "Oletusagentti"
     },
     "files": {
       "title": "Tallennetut tiedostot",

@@ -6,6 +6,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner, recipientBadge } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
+import { listAgents } from '/js/services/agents.js';
 import { getKeyPermissions } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import TagCloud from '/js/components/tag-cloud.js';
@@ -24,14 +25,28 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [memTagFilter, setMemTagFilter] = useState(new Set());
   const [editingMemTags, setEditingMemTags] = useState(null);
   const [editingFileTags, setEditingFileTags] = useState(null);
+  const [agents, setAgents] = useState([]);
+  const [selectedAgent, setSelectedAgent] = useState('');
 
   useEffect(() => {
-    if (session) { loadMemories(); loadFiles(); }
+    if (session) { loadAgents(); loadMemories(); loadFiles(); }
   }, [session]);
+
+  useEffect(() => {
+    if (session) { loadMemories(); }
+  }, [selectedAgent]);
+
+  async function loadAgents() {
+    try {
+      const list = await listAgents();
+      setAgents(Array.isArray(list) ? list : []);
+    } catch { setAgents([]); }
+  }
 
   async function loadMemories() {
     try {
-      const list = await memoryService.listMemories();
+      const agentGaii = selectedAgent || undefined;
+      const list = await memoryService.listMemories(agentGaii);
       setMemories(Array.isArray(list) ? list : []);
       onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
     } catch { setMemories([]); }
@@ -71,7 +86,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
   async function handleSearch(query) {
     if (!query) { loadMemories(); return; }
     try {
-      const list = await memoryService.searchMemory(query);
+      const agentGaii = selectedAgent || undefined;
+      const list = await memoryService.searchMemory(query, agentGaii);
       setMemories(Array.isArray(list) ? list : []);
     } catch { showToast(t('profile.memory.searchFailed'), true); }
   }
@@ -283,6 +299,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
   return html`
     <div class="section-title">${t('profile.memory.title')}</div>
     <div class="section-desc">${t('profile.memory.desc')}</div>
+
+    ${agents.length > 1 && html`
+      <div class="agent-selector" style="margin-bottom:.75rem">
+        <label style="font-size:.8rem;color:var(--muted);margin-right:.5rem">${t('profile.memory.agent') || 'Agent'}:</label>
+        <select class="input-field" style="display:inline-block;width:auto;min-width:12rem"
+          value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); }}>
+          <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
+          ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${escHtml(a.name || a.gaii)}${a.display_name ? ` — ${escHtml(a.display_name)}` : ''}</option>`)}
+        </select>
+      </div>
+    `}
 
     <div class="sub-tabs">
       <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>

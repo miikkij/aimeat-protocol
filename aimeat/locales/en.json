@@ -412,7 +412,9 @@
       "agentMemories": "Agent Memories",
       "agentMemoriesDesc": "Memory entries created by your agents (MCP sessions, autonomous agents). Click to expand.",
       "noAgents": "No agents registered yet. When you connect an AI assistant via MCP, its memory entries will appear here.",
-      "setupMcp": "Set up MCP →"
+      "setupMcp": "Set up MCP →",
+      "agent": "Agent",
+      "defaultAgent": "Default agent"
     },
     "files": {
       "title": "Stored Files",
