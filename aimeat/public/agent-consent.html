@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Authorization — AIMEAT</title>
+  <style>
+    :root { --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
+      --muted:#8888aa; --accent:#a78bfa; --success:#4ade80; --danger:#ff6b6b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif;
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; }
+    .consent-card { background:var(--card); border:1px solid var(--border); border-radius:1rem;
+      padding:2rem; max-width:480px; width:100%; }
+    h1 { font-size:1.4rem; margin-bottom:.5rem; }
+    .subtitle { color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
+    label { display:block; font-size:.85rem; color:var(--muted); margin-bottom:.25rem; }
+    input { width:100%; padding:.6rem .75rem; background:var(--bg); border:1px solid var(--border);
+      border-radius:.5rem; color:var(--text); font-size:.9rem; margin-bottom:.75rem; }
+    input:focus { outline:none; border-color:var(--accent); }
+    .user-code-display { text-align:center; padding:1rem; margin:.75rem 0;
+      background:rgba(130,100,255,.08); border:1px solid rgba(130,100,255,.25);
+      border-radius:.75rem; }
+    .user-code-value { font-family:'Courier New',monospace; font-size:2rem; font-weight:700;
+      letter-spacing:.25em; color:var(--accent); }
+    .user-code-hint { font-size:.8rem; color:var(--muted); margin-top:.4rem; }
+    .agent-info { background:rgba(255,255,255,.03); border-radius:.5rem; padding:.75rem 1rem;
+      margin:.75rem 0; font-size:.85rem; }
+    .agent-info-row { display:flex; justify-content:space-between; padding:.25rem 0; }
+    .agent-info-label { color:var(--muted); }
+    .agent-info-value { font-weight:600; }
+    .scope-section { margin:.75rem 0; }
+    .scope-section-title { font-size:.9rem; font-weight:600; margin-bottom:.5rem; }
+    .scope-radio { display:flex; align-items:flex-start; gap:.5rem; padding:.5rem .75rem;
+      background:rgba(255,255,255,.03); border:1px solid transparent; border-radius:.5rem;
+      margin-bottom:.4rem; cursor:pointer; transition:border-color .15s; }
+    .scope-radio:hover { border-color:var(--border); }
+    .scope-radio.selected { background:rgba(130,100,255,.12); border-color:rgba(130,100,255,.3); }
+    .scope-radio input[type="radio"] { width:auto; margin:0; margin-top:.15rem; accent-color:var(--accent); }
+    .scope-radio-content { flex:1; }
+    .scope-radio-name { font-weight:600; font-size:.85rem; }
+    .scope-radio-desc { font-size:.75rem; color:var(--muted); margin-top:.1rem; }
+    .custom-scopes { padding:.5rem .75rem; background:rgba(255,255,255,.03); border-radius:.5rem;
+      margin-top:.4rem; display:none; }
+    .custom-scopes.visible { display:block; }
+    .scope-checkbox { display:flex; align-items:center; gap:.5rem; padding:.25rem 0; font-size:.82rem; }
+    .scope-checkbox input[type="checkbox"] { width:auto; margin:0; accent-color:var(--accent); }
+    .btn-row { display:flex; gap:.75rem; margin-top:1.25rem; }
+    .btn { flex:1; padding:.65rem 1rem; border:none; border-radius:.5rem; font-size:.9rem;
+      font-weight:600; cursor:pointer; transition:opacity .15s; }
+    .btn:hover { opacity:.85; }
+    .btn-approve { background:var(--success); color:#000; }
+    .btn-deny { background:transparent; border:1px solid var(--danger); color:var(--danger); }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .error-msg { color:var(--danger); font-size:.85rem; margin-top:.5rem; min-height:1.2em; }
+    .success-msg { text-align:center; padding:1.5rem 0; }
+    .success-msg h2 { color:var(--success); margin-bottom:.5rem; }
+    .success-msg .gaii { font-family:monospace; font-size:.85rem; color:var(--accent);
+      background:rgba(130,100,255,.1); padding:.3rem .6rem; border-radius:.3rem; display:inline-block; margin-top:.5rem; }
+    .denied-msg { text-align:center; padding:1.5rem 0; }
+    .denied-msg h2 { color:var(--muted); margin-bottom:.5rem; }
+    .expired-msg { text-align:center; padding:1.5rem 0; }
+    .expired-msg h2 { color:var(--danger); margin-bottom:.5rem; }
+    .spinner { display:inline-block; width:1.5rem; height:1.5rem; border:2px solid var(--border);
+      border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="consent-card" id="app">
+    <div id="loading" style="text-align:center;padding:2rem;color:var(--muted)">
+      <div class="spinner"></div>
+      <p style="margin-top:.75rem">Loading...</p>
+    </div>
+  </div>
+
+  <script type="module">
+    const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    const params = new URLSearchParams(location.search);
+    const code = params.get('code') || '';
+
+    // i18n
+    const lang = (navigator.language || 'en').startsWith('fi') ? 'fi' : 'en';
+    const strings = {
+      en: {
+        title: 'Agent Authorization',
+        subtitle: 'An agent is requesting access to your AIMEAT node',
+        loginRequired: 'Sign in to approve or deny this request.',
+        usernameLabel: 'Username',
+        passwordLabel: 'Password',
+        totpLabel: 'TOTP code (if enabled)',
+        loginBtn: 'Sign In',
+        confirmHint: 'Confirm this code matches what the agent showed you',
+        agentName: 'Agent Name',
+        displayName: 'Display Name',
+        description: 'Description',
+        scopeLabel: 'Permission Level',
+        scopeReadonly: 'Read Only',
+        scopeReadonlyDesc: 'Can read memory, wallet balance, and catalogue',
+        scopeStandard: 'Standard',
+        scopeStandardDesc: 'Can read/write memory, perform work, read wallet, manage catalogue',
+        scopeFull: 'Full Access',
+        scopeFullDesc: 'Unrestricted access to all node capabilities',
+        scopeCustom: 'Custom',
+        scopeCustomDesc: 'Select individual permissions',
+        approveBtn: 'Approve',
+        denyBtn: 'Deny',
+        approving: 'Approving...',
+        approved: 'Agent Authorized',
+        approvedMsg: 'The agent has been registered and can now access your node.',
+        agentGaii: 'Agent GAII',
+        denied: 'Request Denied',
+        deniedMsg: 'The authorization request has been denied. You can close this page.',
+        expired: 'Request Expired',
+        expiredMsg: 'This authorization request has expired. Please ask the agent to start a new request.',
+        errorNoCode: 'Missing code parameter. Please use the link provided by your agent.',
+        errorNotFound: 'Authorization request not found or expired.',
+        errorOwnerMismatch: 'This request belongs to a different user. Sign in with the correct account.',
+        errorGeneric: 'Something went wrong. Please try again.',
+      },
+      fi: {
+        title: 'Agentin hyväksyminen',
+        subtitle: 'Agentti pyytää pääsyä AIMEAT-solmuusi',
+        loginRequired: 'Kirjaudu sisään hyväksyäksesi tai hylätäksesi pyynnön.',
+        usernameLabel: 'Käyttäjänimi',
+        passwordLabel: 'Salasana',
+        totpLabel: 'TOTP-koodi (jos käytössä)',
+        loginBtn: 'Kirjaudu',
+        confirmHint: 'Varmista, että koodi vastaa agentin näyttämää koodia',
+        agentName: 'Agentin nimi',
+        displayName: 'Näyttönimi',
+        description: 'Kuvaus',
+        scopeLabel: 'Käyttöoikeustaso',
+        scopeReadonly: 'Vain luku',
+        scopeReadonlyDesc: 'Voi lukea muistia, lompakkosaldoa ja luetteloa',
+        scopeStandard: 'Normaali',
+        scopeStandardDesc: 'Voi lukea/kirjoittaa muistia, suorittaa työtä, lukea lompakkoa, hallita luetteloa',
+        scopeFull: 'Täysi pääsy',
+        scopeFullDesc: 'Rajoittamaton pääsy kaikkiin solmun toimintoihin',
+        scopeCustom: 'Mukautettu',
+        scopeCustomDesc: 'Valitse yksittäiset käyttöoikeudet',
+        approveBtn: 'Hyväksy',
+        denyBtn: 'Hylkää',
+        approving: 'Hyväksytään...',
+        approved: 'Agentti hyväksytty',
+        approvedMsg: 'Agentti on rekisteröity ja voi nyt käyttää solmuasi.',
+        agentGaii: 'Agentin GAII',
+        denied: 'Pyyntö hylätty',
+        deniedMsg: 'Valtuutuspyyntö on hylätty. Voit sulkea tämän sivun.',
+        expired: 'Pyyntö vanhentunut',
+        expiredMsg: 'Tämä valtuutuspyyntö on vanhentunut. Pyydä agenttia aloittamaan uusi pyyntö.',
+        errorNoCode: 'Koodi-parametri puuttuu. Käytä agentin antamaa linkkiä.',
+        errorNotFound: 'Valtuutuspyyntöä ei löydy tai se on vanhentunut.',
+        errorOwnerMismatch: 'Tämä pyyntö kuuluu toiselle käyttäjälle. Kirjaudu oikealla tilillä.',
+        errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
+      }
+    };
+    const T = strings[lang] || strings.en;
+    const t = (key) => T[key] || key;
+
+    const SCOPE_PRESETS = {
+      readonly: ['memory:read', 'wallet:read', 'catalogue:read'],
+      standard: ['memory:*', 'work:*', 'wallet:read', 'catalogue:*'],
+      full: ['*'],
+    };
+
+    const ALL_SCOPES = [
+      'memory:read', 'memory:write', 'memory:*',
+      'work:read', 'work:write', 'work:*',
+      'wallet:read', 'wallet:write', 'wallet:*',
+      'catalogue:read', 'catalogue:write', 'catalogue:*',
+      'consent:read', 'consent:write', 'consent:*',
+      'board:read', 'board:write', 'board:*',
+    ];
+
+    const app = document.getElementById('app');
+    let session = null;
+    let requestInfo = null;
+    let selectedPreset = 'standard';
+    let customScopes = ['memory:read', 'wallet:read'];
+
+    if (!code) {
+      app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg">${escHtml(t('errorNoCode'))}</p>`;
+    }
+
+    async function checkSession() {
+      try {
+        const r = await fetch('/v1/auth/session', { credentials: 'include' });
+        const d = await r.json();
+        if (d.ok && d.data?.jwt) return d.data;
+      } catch {}
+      return null;
+    }
+
+    async function doLogin(username, password, totp) {
+      const body = { username, password };
+      if (totp) body.totp_code = totp;
+      const r = await fetch('/v1/ghii/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error?.message || 'Login failed');
+      return d.data;
+    }
+
+    async function fetchRequestInfo(userCode) {
+      const r = await fetch(`/v1/agents/verify/info/${encodeURIComponent(userCode)}`);
+      const d = await r.json();
+      if (!d.ok) return null;
+      return d.data;
+    }
+
+    const getOwnerName = () => {
+      const o = session?.owner;
+      return typeof o === 'string' ? o : o?.name || session?.username || '';
+    };
+
+    function renderError(msg) {
+      app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg" style="margin-top:1rem">${escHtml(msg)}</p>`;
+    }
+
+    function renderLogin() {
+      app.innerHTML = `
+        <h1>${escHtml(t('title'))}</h1>
+        <p class="subtitle">${escHtml(t('subtitle'))}</p>
+        <div class="user-code-display">
+          <div class="user-code-value">${escHtml(code)}</div>
+          <div class="user-code-hint">${escHtml(t('confirmHint'))}</div>
+        </div>
+        <p style="margin-bottom:1rem;font-size:.9rem">${escHtml(t('loginRequired'))}</p>
+        <form id="loginForm">
+          <label>${escHtml(t('usernameLabel'))}</label>
+          <input type="text" id="username" required autocomplete="username" />
+          <label>${escHtml(t('passwordLabel'))}</label>
+          <input type="password" id="password" required autocomplete="current-password" />
+          <label>${escHtml(t('totpLabel'))}</label>
+          <input type="text" id="totp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" />
+          <div id="loginError" class="error-msg"></div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-approve">${escHtml(t('loginBtn'))}</button>
+          </div>
+        </form>
+      `;
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('loginError');
+        errEl.textContent = '';
+        try {
+          session = await doLogin(
+            document.getElementById('username').value.trim(),
+            document.getElementById('password').value,
+            document.getElementById('totp').value.trim() || undefined,
+          );
+          await loadAndRender();
+        } catch (err) {
+          errEl.textContent = err.message;
+        }
+      });
+    }
+
+    function getSelectedScopes() {
+      if (selectedPreset === 'custom') return [...customScopes];
+      return SCOPE_PRESETS[selectedPreset] || SCOPE_PRESETS.standard;
+    }
+
+    function renderConsent() {
+      const info = requestInfo;
+
+      const scopeOptions = [
+        { key: 'readonly', name: t('scopeReadonly'), desc: t('scopeReadonlyDesc') },
+        { key: 'standard', name: t('scopeStandard'), desc: t('scopeStandardDesc') },
+        { key: 'full', name: t('scopeFull'), desc: t('scopeFullDesc') },
+        { key: 'custom', name: t('scopeCustom'), desc: t('scopeCustomDesc') },
+      ];
+
+      const scopeRadiosHtml = scopeOptions.map(o => `
+        <label class="scope-radio ${selectedPreset === o.key ? 'selected' : ''}" data-preset="${escHtml(o.key)}">
+          <input type="radio" name="scopePreset" value="${escHtml(o.key)}" ${selectedPreset === o.key ? 'checked' : ''} />
+          <div class="scope-radio-content">
+            <div class="scope-radio-name">${escHtml(o.name)}</div>
+            <div class="scope-radio-desc">${escHtml(o.desc)}</div>
+          </div>
+        </label>
+      `).join('');
+
+      const customCheckboxesHtml = ALL_SCOPES.map(s => `
+        <label class="scope-checkbox">
+          <input type="checkbox" value="${escHtml(s)}" ${customScopes.includes(s) ? 'checked' : ''} />
+          ${escHtml(s)}
+        </label>
+      `).join('');
+
+      app.innerHTML = `
+        <h1>${escHtml(t('title'))}</h1>
+        <p class="subtitle">${escHtml(t('subtitle'))}</p>
+        <div class="user-code-display">
+          <div class="user-code-value">${escHtml(info.user_code)}</div>
+          <div class="user-code-hint">${escHtml(t('confirmHint'))}</div>
+        </div>
+        <div class="agent-info">
+          <div class="agent-info-row">
+            <span class="agent-info-label">${escHtml(t('agentName'))}</span>
+            <span class="agent-info-value">${escHtml(info.agent_name)}</span>
+          </div>
+          ${info.display_name ? `<div class="agent-info-row">
+            <span class="agent-info-label">${escHtml(t('displayName'))}</span>
+            <span class="agent-info-value">${escHtml(info.display_name)}</span>
+          </div>` : ''}
+          ${info.description ? `<div class="agent-info-row">
+            <span class="agent-info-label">${escHtml(t('description'))}</span>
+            <span class="agent-info-value">${escHtml(info.description)}</span>
+          </div>` : ''}
+        </div>
+        <div class="scope-section">
+          <div class="scope-section-title">${escHtml(t('scopeLabel'))}</div>
+          ${scopeRadiosHtml}
+          <div class="custom-scopes ${selectedPreset === 'custom' ? 'visible' : ''}" id="customScopes">
+            ${customCheckboxesHtml}
+          </div>
+        </div>
+        <div id="consentError" class="error-msg"></div>
+        <div class="btn-row">
+          <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
+          <button class="btn btn-approve" id="approveBtn">${escHtml(t('approveBtn'))}</button>
+        </div>
+      `;
+
+      // Scope radio handlers
+      document.querySelectorAll('input[name="scopePreset"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          selectedPreset = radio.value;
+          document.querySelectorAll('.scope-radio').forEach(el => {
+            el.classList.toggle('selected', el.dataset.preset === selectedPreset);
+          });
+          document.getElementById('customScopes').classList.toggle('visible', selectedPreset === 'custom');
+        });
+      });
+
+      // Custom scope checkboxes
+      document.querySelectorAll('#customScopes input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          customScopes = Array.from(document.querySelectorAll('#customScopes input[type="checkbox"]:checked'))
+            .map(el => el.value);
+        });
+      });
+
+      // Deny
+      document.getElementById('denyBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('denyBtn');
+        btn.disabled = true;
+        try {
+          const jwt = session.jwt || session.token;
+          await fetch('/v1/agents/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_code: code, action: 'deny', owner_token: jwt }),
+          });
+          renderDenied();
+        } catch {
+          renderDenied();
+        }
+      });
+
+      // Approve
+      document.getElementById('approveBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('approveBtn');
+        const errEl = document.getElementById('consentError');
+        btn.disabled = true;
+        btn.textContent = t('approving');
+        errEl.textContent = '';
+
+        const scopes = getSelectedScopes();
+        if (scopes.length === 0) {
+          errEl.textContent = 'Select at least one scope';
+          btn.disabled = false;
+          btn.textContent = t('approveBtn');
+          return;
+        }
+
+        try {
+          const jwt = session.jwt || session.token;
+          const r = await fetch('/v1/agents/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_code: code, action: 'approve', scopes, owner_token: jwt }),
+          });
+          const d = await r.json();
+          if (d.ok) {
+            renderApproved(d.data);
+          } else {
+            throw new Error(d.error?.message || t('errorGeneric'));
+          }
+        } catch (err) {
+          errEl.textContent = err.message;
+          btn.disabled = false;
+          btn.textContent = t('approveBtn');
+        }
+      });
+    }
+
+    function renderApproved(data) {
+      app.innerHTML = `
+        <div class="success-msg">
+          <h2>${escHtml(t('approved'))}</h2>
+          <p>${escHtml(t('approvedMsg'))}</p>
+          ${data?.gaii ? `<p style="margin-top:.75rem;font-size:.85rem;color:var(--muted)">${escHtml(t('agentGaii'))}</p>
+          <span class="gaii">${escHtml(data.gaii)}</span>` : ''}
+        </div>
+      `;
+    }
+
+    function renderDenied() {
+      app.innerHTML = `
+        <div class="denied-msg">
+          <h2>${escHtml(t('denied'))}</h2>
+          <p style="color:var(--muted)">${escHtml(t('deniedMsg'))}</p>
+        </div>
+      `;
+    }
+
+    function renderExpired() {
+      app.innerHTML = `
+        <div class="expired-msg">
+          <h2>${escHtml(t('expired'))}</h2>
+          <p style="color:var(--muted)">${escHtml(t('expiredMsg'))}</p>
+        </div>
+      `;
+    }
+
+    async function loadAndRender() {
+      requestInfo = await fetchRequestInfo(code);
+      if (!requestInfo) {
+        renderError(t('errorNotFound'));
+        return;
+      }
+      if (requestInfo.status === 'expired') {
+        renderExpired();
+        return;
+      }
+      if (requestInfo.status === 'approved') {
+        renderApproved({ gaii: null });
+        return;
+      }
+      if (requestInfo.status === 'denied') {
+        renderDenied();
+        return;
+      }
+
+      // Verify owner matches
+      const ownerName = getOwnerName();
+      if (requestInfo.owner && ownerName && requestInfo.owner !== ownerName) {
+        renderError(t('errorOwnerMismatch'));
+        return;
+      }
+
+      renderConsent();
+    }
+
+    // Boot
+    if (code) {
+      session = await checkSession();
+      if (session) {
+        await loadAndRender();
+      } else {
+        // Fetch info first to show code, then show login
+        requestInfo = await fetchRequestInfo(code);
+        if (!requestInfo) {
+          renderError(t('errorNotFound'));
+        } else if (requestInfo.status === 'expired') {
+          renderExpired();
+        } else {
+          renderLogin();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
