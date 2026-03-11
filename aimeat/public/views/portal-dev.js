@@ -148,134 +148,21 @@ function BgSelector({ activeBg, onChange }) {
    ══════════════════════════════════════════════ */
 function McpPanel({ locale, isLoggedIn, session }) {
   const [setupTab, setSetupTab] = useState('code'); // 'code' | 'cowork' | 'chat'
-  const [setupPrompt, setSetupPrompt] = useState(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState(null);
+  const [copied, setCopied] = useState(false);
 
-  const nodeId = document.querySelector('meta[name="aimeat-node-id"]')?.content || 'unknown';
+  const mcpUrl = `${NODE_URL}/v1/mcp`;
 
-  const generateSetupPrompt = useCallback(async (target) => {
-    if (!session) return;
-    setGenerating(true);
-    setGenError(null);
-    try {
-      const resp = await session.fetch('/v1/auth/connectivity-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: `MCP agent for ${target}` }),
-      });
-      const data = resp.data || resp;
-      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed to generate key');
-      const key = data.connectivity_key;
-      if (!key) throw new Error('No connectivity key in response');
+  const copyUrl = useCallback(() => {
+    navigator.clipboard.writeText(mcpUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [mcpUrl]);
 
-      let prompt;
-      if (target === 'code') {
-        prompt = [
-          `# AIMEAT MCP Setup — Claude Code`,
-          ``,
-          `Connect me to the AIMEAT node at ${NODE_URL}. Follow these steps exactly.`,
-          ``,
-          `## Step 1: Register as an agent`,
-          `Run this curl command:`,
-          '```bash',
-          `curl -s -X POST ${NODE_URL}/v1/agents/connect \\`,
-          `  -H "Content-Type: application/json" \\`,
-          `  -d '{"connectivity_key": "${key}", "agent_name": "claude-code-agent"}'`,
-          '```',
-          `Save the response — you need \`data.agent.gaii\` and \`data.private_key\` from it.`,
-          ``,
-          `## Step 2: Get a JWT token`,
-          `The node ID is: \`${nodeId}\``,
-          `To authenticate, Ed25519-sign the string: gaii + nodeId + ISO_timestamp`,
-          `The private_key from Step 1 is a hex-encoded Ed25519 seed (32 bytes).`,
-          ``,
-          `Write a small Node.js script to:`,
-          `1. Import @noble/ed25519 or use node:crypto Ed25519`,
-          `2. Sign the message: \`<gaii>${nodeId}<current ISO timestamp>\``,
-          `3. POST to ${NODE_URL}/v1/auth/token with body: \`{ "gaii": "<gaii>", "timestamp": "<ISO>", "signature": "<hex>" }\``,
-          `4. Extract the JWT from the response.`,
-          ``,
-          `## Step 3: Configure MCP server`,
-          `Run: \`claude mcp add aimeat --transport http --scope user ${NODE_URL}/v1/mcp\``,
-          `Or write this to \`.mcp.json\` in the project root:`,
-          '```json',
-          `{`,
-          `  "servers": {`,
-          `    "aimeat": {`,
-          `      "type": "http",`,
-          `      "url": "${NODE_URL}/v1/mcp",`,
-          `      "headers": { "Authorization": "Bearer <JWT_FROM_STEP_2>" }`,
-          `    }`,
-          `  }`,
-          `}`,
-          '```',
-          ``,
-          `## Step 4: Verify`,
-          `Use the \`aimeat_catalogue_search\` MCP tool to verify the connection works.`,
-          ``,
-          `## Notes`,
-          `- JWT expires after 24h. Save the private_key and gaii to re-authenticate.`,
-          `- Store credentials in \`.env\` (not committed to git).`,
-          `- 18 MCP tools: catalogue, agent profile, memory (read/write/list),`,
-          `  action execute, work queue (inbox/accept/deliver), wallet, boards (read/post),`,
-          `  storage (upload/download), and 4 admin tools (operator only).`,
-          `- Full API spec: ${NODE_URL}/v1/spec`,
-        ].join('\n');
-      } else if (target === 'cowork') {
-        prompt = [
-          `# AIMEAT MCP Setup — Claude Cowork (Desktop)`,
-          ``,
-          `Connect me to the AIMEAT node at ${NODE_URL}. I need you to set up the MCP connection.`,
-          ``,
-          `## Step 1: Register as an agent`,
-          `Run this command in your sandbox terminal:`,
-          '```bash',
-          `curl -s -X POST ${NODE_URL}/v1/agents/connect \\`,
-          `  -H "Content-Type: application/json" \\`,
-          `  -d '{"connectivity_key": "${key}", "agent_name": "claude-cowork-agent"}'`,
-          '```',
-          `Save the \`data.agent.gaii\` and \`data.private_key\` from the response.`,
-          ``,
-          `## Step 2: Get a JWT token`,
-          `The node ID is: \`${nodeId}\``,
-          `Sign the string \`<gaii>${nodeId}<ISO_timestamp>\` with Ed25519 using the private_key (hex-encoded seed).`,
-          `Then POST to ${NODE_URL}/v1/auth/token with body: \`{ "gaii": "...", "timestamp": "...", "signature": "..." }\``,
-          ``,
-          `## Step 3: Add MCP server to Claude Desktop config`,
-          `Edit the Claude Desktop config file:`,
-          `- macOS: ~/Library/Application Support/Claude/claude_desktop_config.json`,
-          `- Windows: %APPDATA%\\Claude\\claude_desktop_config.json`,
-          ``,
-          `Add under "mcpServers":`,
-          '```json',
-          `{`,
-          `  "mcpServers": {`,
-          `    "aimeat": {`,
-          `      "url": "${NODE_URL}/v1/mcp",`,
-          `      "headers": { "Authorization": "Bearer <JWT_FROM_STEP_2>" }`,
-          `    }`,
-          `  }`,
-          `}`,
-          '```',
-          `After editing, tell me to restart Claude Desktop to pick up the new MCP server.`,
-          ``,
-          `## Step 4: Verify`,
-          `After restart, use the aimeat_catalogue_search tool to test the connection.`,
-          ``,
-          `## Notes`,
-          `- JWT expires after 24h. Save gaii + private_key for re-authentication.`,
-          `- 18 MCP tools available after connection.`,
-          `- Full API spec: ${NODE_URL}/v1/spec`,
-        ].join('\n');
-      }
-      setSetupPrompt(prompt);
-    } catch (err) {
-      setGenError(err.message || 'Failed');
-    } finally {
-      setGenerating(false);
-    }
-  }, [session, nodeId]);
+  const copyCommand = useCallback(() => {
+    navigator.clipboard.writeText(`claude mcp add aimeat --transport http ${mcpUrl}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [mcpUrl]);
 
   const tabStyle = (tab) => `padding:.4rem .75rem;border:none;border-radius:.25rem .25rem 0 0;cursor:pointer;font-size:.8rem;font-weight:600;${
     setupTab === tab
@@ -312,13 +199,13 @@ function McpPanel({ locale, isLoggedIn, session }) {
 
           <!-- Platform tabs -->
           <div style="display:flex;gap:2px;margin-top:.75rem;border-bottom:1px solid rgba(130,100,255,.2)">
-            <button type="button" style="${tabStyle('code')}" onClick=${() => { setSetupTab('code'); setSetupPrompt(null); }}>
+            <button type="button" style="${tabStyle('code')}" onClick=${() => setSetupTab('code')}>
               Claude Code
             </button>
-            <button type="button" style="${tabStyle('cowork')}" onClick=${() => { setSetupTab('cowork'); setSetupPrompt(null); }}>
-              Claude Cowork
+            <button type="button" style="${tabStyle('cowork')}" onClick=${() => setSetupTab('cowork')}>
+              Claude Desktop
             </button>
-            <button type="button" style="${tabStyle('chat')}" onClick=${() => { setSetupTab('chat'); setSetupPrompt(null); }}>
+            <button type="button" style="${tabStyle('chat')}" onClick=${() => setSetupTab('chat')}>
               Claude.ai Chat
             </button>
           </div>
@@ -326,29 +213,45 @@ function McpPanel({ locale, isLoggedIn, session }) {
           <!-- Tab content -->
           <div style="padding:.75rem 0 0">
             ${setupTab === 'code' && html`
-              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .5rem">
+              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .75rem">
                 ${dt('panel.mcpSetupCodeDesc', locale)}
               </p>
-              ${!setupPrompt && html`
-                <button type="button" onClick=${() => generateSetupPrompt('code')} disabled=${generating}
-                  style="padding:.4rem .75rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.82rem">
-                  ${generating ? dt('panel.mcpSetupGenerating', locale) : dt('panel.mcpSetupBtn', locale)}
-                </button>
-                ${genError && html`<p style="color:#ff6b6b;margin-top:.5rem;font-size:.8rem">${genError}</p>`}
-              `}
+              <div style="margin-bottom:.75rem">
+                <div style="font-size:.8rem;color:var(--muted);margin-bottom:.25rem">${dt('panel.mcpCodeRunThis', locale)}</div>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                  <code style="font-size:.78rem;background:rgba(255,255,255,.06);padding:.4rem .6rem;border-radius:.25rem;user-select:all;flex:1;word-break:break-all">claude mcp add aimeat --transport http ${mcpUrl}</code>
+                  <button type="button" onClick=${copyCommand}
+                    style="padding:.3rem .6rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                    ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyCommand', locale)}
+                  </button>
+                </div>
+              </div>
+              <p style="font-size:.8rem;color:var(--muted);margin:0;font-style:italic">
+                ${dt('panel.mcpCodeOAuthNote', locale)}
+              </p>
             `}
 
             ${setupTab === 'cowork' && html`
-              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .5rem">
+              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .75rem">
                 ${dt('panel.mcpSetupCoworkDesc', locale)}
               </p>
-              ${!setupPrompt && html`
-                <button type="button" onClick=${() => generateSetupPrompt('cowork')} disabled=${generating}
-                  style="padding:.4rem .75rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.82rem">
-                  ${generating ? dt('panel.mcpSetupGenerating', locale) : dt('panel.mcpSetupBtn', locale)}
-                </button>
-                ${genError && html`<p style="color:#ff6b6b;margin-top:.5rem;font-size:.8rem">${genError}</p>`}
-              `}
+              <div style="font-size:.85rem">
+                <ol style="margin:0;padding-left:1.25rem;line-height:1.8">
+                  <li>${dt('panel.mcpDesktopStep1', locale)}</li>
+                  <li>${dt('panel.mcpDesktopStep2', locale)}
+                    <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
+                      <code style="font-size:.78rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
+                      <button type="button" onClick=${copyUrl}
+                        style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                        ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
+                      </button>
+                    </div>
+                  </li>
+                  <li>${dt('panel.mcpDesktopStep3', locale)}</li>
+                  <li>${dt('panel.mcpDesktopStep4', locale)}</li>
+                </ol>
+                <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpDesktopNote', locale)}</p>
+              </div>
             `}
 
             ${setupTab === 'chat' && html`
@@ -359,10 +262,10 @@ function McpPanel({ locale, isLoggedIn, session }) {
                   <li>${dt('panel.mcpChatStep2', locale)}</li>
                   <li>${dt('panel.mcpChatStep3', locale)}
                     <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
-                      <code style="font-size:.8rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${NODE_URL}/v1/mcp</code>
-                      <button type="button" onClick=${() => { navigator.clipboard.writeText(NODE_URL + '/v1/mcp'); }}
+                      <code style="font-size:.8rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
+                      <button type="button" onClick=${copyUrl}
                         style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
-                        ${dt('panel.mcpCopyUrl', locale)}
+                        ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
                       </button>
                     </div>
                   </li>
@@ -371,14 +274,6 @@ function McpPanel({ locale, isLoggedIn, session }) {
                 </ol>
                 <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpChatNote', locale)}</p>
               </div>
-            `}
-
-            ${setupPrompt && html`
-              <div class="dv-prompt-output" style="margin-top:.75rem">
-                <${CopyBtn} text=${setupPrompt} locale=${locale} />
-                <div class="dv-prompt-text" style="max-height:20rem;overflow-y:auto;white-space:pre-wrap;font-size:.8rem">${setupPrompt}</div>
-              </div>
-              <p style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${dt('panel.mcpSetupNote', locale)}</p>
             `}
           </div>
         </div>
