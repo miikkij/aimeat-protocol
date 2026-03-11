@@ -891,6 +891,33 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_device_auth_ownerName ON device_auth(ownerName);
     CREATE INDEX IF NOT EXISTS idx_device_auth_status ON device_auth(status);
 
+    -- System Prompts (Phase 4)
+    CREATE TABLE IF NOT EXISTS system_prompts (
+      id          TEXT PRIMARY KEY,
+      grp         TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      content     TEXT NOT NULL,
+      locales     TEXT,
+      active      INTEGER NOT NULL DEFAULT 1,
+      variables   TEXT NOT NULL DEFAULT '[]',
+      usedIn      TEXT NOT NULL DEFAULT '[]',
+      version     INTEGER NOT NULL DEFAULT 1,
+      updatedAt   TEXT NOT NULL,
+      updatedBy   TEXT NOT NULL DEFAULT 'system'
+    );
+
+    CREATE TABLE IF NOT EXISTS system_prompt_versions (
+      promptId    TEXT NOT NULL,
+      version     INTEGER NOT NULL,
+      content     TEXT NOT NULL,
+      locales     TEXT,
+      changedBy   TEXT NOT NULL,
+      changedAt   TEXT NOT NULL,
+      changeNote  TEXT,
+      PRIMARY KEY (promptId, version)
+    );
+
   `);
 
   // ── Schema migrations for existing databases ──
