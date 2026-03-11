@@ -50,6 +50,7 @@ import type {
     ScheduledJobRecord,
     ExtensionInstanceRecord,
     ReplicationQueueEntry,
+    DeviceAuthorizationRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3672,6 +3673,88 @@ export class MongoStorage implements Storage {
 
     async replicationQueueSize(): Promise<number> {
         return this.replicationQueue.size;
+    }
+
+    // ── Device Authorization (RFC 8628) ──
+
+    async createDeviceAuth(req: DeviceAuthorizationRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.deviceAuth.create({
+            data: {
+                deviceCode: req.deviceCode,
+                userCode: req.userCode,
+                ownerName: req.ownerName,
+                agentName: req.agentName,
+                displayName: req.displayName,
+                description: req.description,
+                status: req.status,
+                scopes: req.scopes ?? [],
+                createdAt: new Date(req.createdAt),
+                expiresAt: new Date(req.expiresAt),
+                lastPolledAt: req.lastPolledAt ? new Date(req.lastPolledAt) : null,
+                pollInterval: req.pollInterval,
+                approvedBy: req.approvedBy,
+                agentCredentials: req.agentCredentials ?? undefined,
+            },
+        });
+    }
+
+    async getDeviceAuthByDeviceCode(deviceCode: string): Promise<DeviceAuthorizationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.deviceAuth.findUnique({ where: { deviceCode } });
+        return row ? this.toDeviceAuthRecord(row) : null;
+    }
+
+    async getDeviceAuthByUserCode(userCode: string): Promise<DeviceAuthorizationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.deviceAuth.findUnique({ where: { userCode } });
+        return row ? this.toDeviceAuthRecord(row) : null;
+    }
+
+    async updateDeviceAuth(deviceCode: string, updates: Partial<DeviceAuthorizationRecord>): Promise<void> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.status !== undefined) data.status = updates.status;
+        if (updates.scopes !== undefined) data.scopes = updates.scopes;
+        if (updates.lastPolledAt !== undefined) data.lastPolledAt = updates.lastPolledAt ? new Date(updates.lastPolledAt) : null;
+        if (updates.pollInterval !== undefined) data.pollInterval = updates.pollInterval;
+        if (updates.approvedBy !== undefined) data.approvedBy = updates.approvedBy;
+        if ('agentCredentials' in updates) data.agentCredentials = updates.agentCredentials ?? null;
+        await this.prisma.deviceAuth.update({ where: { deviceCode }, data });
+    }
+
+    async countPendingDeviceAuthByOwner(ownerName: string): Promise<number> {
+        this.ensureReady();
+        return this.prisma.deviceAuth.count({
+            where: { ownerName, status: 'pending', expiresAt: { gt: new Date() } },
+        });
+    }
+
+    async cleanupExpiredDeviceAuth(): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.deviceAuth.deleteMany({
+            where: { status: 'pending', expiresAt: { lte: new Date() } },
+        });
+        return result.count;
+    }
+
+    private toDeviceAuthRecord(row: any): DeviceAuthorizationRecord {
+        return {
+            deviceCode: row.deviceCode,
+            userCode: row.userCode,
+            ownerName: row.ownerName,
+            agentName: row.agentName,
+            displayName: row.displayName ?? undefined,
+            description: row.description ?? undefined,
+            status: row.status,
+            scopes: row.scopes?.length ? row.scopes : undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+            lastPolledAt: row.lastPolledAt ? (row.lastPolledAt instanceof Date ? row.lastPolledAt.toISOString() : row.lastPolledAt) : undefined,
+            pollInterval: row.pollInterval,
+            approvedBy: row.approvedBy ?? undefined,
+            agentCredentials: row.agentCredentials ?? undefined,
+        };
     }
 }
 
