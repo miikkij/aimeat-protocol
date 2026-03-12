@@ -3,6 +3,7 @@
  * Reusable utilities used across admin tab components.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { escHtml } from '/js/utils.js';
@@ -92,7 +93,14 @@ export function ExpandableHelp({ title, children }) {
   </details>`;
 }
 
-/** Simple data table */
+/**
+ * DataTable — renders rows with optional raw HTML cells.
+ *
+ * SECURITY: When a cell object has `_html: true`, `cell.text` is rendered
+ * as raw HTML via dangerouslySetInnerHTML. Callers MUST ensure `cell.text`
+ * is sanitized (use escHtml() for any user-generated content).
+ * Only use `_html` for trusted, server-generated markup like badges.
+ */
 export function DataTable({ headers, rows, scroll }) {
   const table = html`<table>
     <thead><tr>${headers.map(h => html`<th>${h}</th>`)}</tr></thead>
@@ -113,5 +121,28 @@ export function DataTable({ headers, rows, scroll }) {
   </table>`;
   return html`<div class="adm-card">
     ${scroll ? html`<div class="scrollable">${table}</div>` : table}
+  </div>`;
+}
+
+/**
+ * useToast — state hook for dismissible error/success messages.
+ * Returns [message, showError, showSuccess, clear].
+ * Usage:
+ *   const [toast, showErr, showOk, clearToast] = useToast();
+ *   // in catch: showErr(e.message);
+ *   // in render: ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+ */
+export function useToast() {
+  const [msg, setMsg] = useState(null);
+  const showError   = (text) => setMsg({ type: 'error',   text });
+  const showSuccess = (text) => setMsg({ type: 'success', text });
+  const clear       = ()     => setMsg(null);
+  return [msg, showError, showSuccess, clear];
+}
+
+export function Toast({ type, text, onDismiss }) {
+  return html`<div class="adm-toast adm-toast-${type}">
+    <span>${text}</span>
+    <button class="adm-toast-dismiss" onClick=${onDismiss}>\u00d7</button>
   </div>`;
 }

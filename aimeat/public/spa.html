@@ -235,7 +235,7 @@
         })
           .then(r => r.json())
           .then(d => { if (d.ok) setMorsels(d.data?.balance ?? null); })
-          .catch(() => {});
+          .catch(e => console.warn('Wallet fetch failed:', e.message));
       }, [session]);
 
       const handleLangSwitch = (lang) => {
@@ -318,12 +318,22 @@
 
     boot().catch(err => {
       console.error('Boot failed:', err);
-      document.getElementById('app').innerHTML =
-        '<div style="text-align:center;padding:3rem;color:#ccc;font-family:system-ui">' +
-        '<h2>AIMEAT failed to start</h2>' +
-        '<p>' + (err.message || 'Unknown error') + '</p>' +
-        '<button onclick="location.reload()" style="margin-top:1rem;padding:0.6rem 1.5rem;background:#ff69b4;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">Reload</button>' +
-        '</div>';
+      const app = document.getElementById('app');
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'text-align:center;padding:3rem;color:#ccc;font-family:system-ui';
+      const h = document.createElement('h2');
+      h.textContent = 'AIMEAT failed to start';
+      const p = document.createElement('p');
+      p.textContent = err.message || 'Unknown error';
+      const btn = document.createElement('button');
+      btn.textContent = 'Reload';
+      btn.style.cssText = 'margin-top:1rem;padding:0.6rem 1.5rem;background:#ff69b4;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700';
+      btn.onclick = () => location.reload();
+      wrap.appendChild(h);
+      wrap.appendChild(p);
+      wrap.appendChild(btn);
+      app.textContent = '';
+      app.appendChild(wrap);
     });
   </script>
 </body>

@@ -147,6 +147,31 @@
 .adm-badge-idle      { background: #33415522; color: #94a3b8; border: 1px solid #33415555; }
 .adm-badge-general   { background: #33415522; color: #94a3b8; border: 1px solid #33415555; }
 
+/* Error / success toast */
+.adm-toast {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: .85rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: adm-toast-in .2s ease;
+}
+.adm-toast-error   { background: #dc262622; color: #ef4444; border: 1px solid #dc262655; }
+.adm-toast-success { background: #16a34a22; color: #22c55e; border: 1px solid #16a34a55; }
+.adm-toast-dismiss {
+  margin-left: auto;
+  cursor: pointer;
+  opacity: .6;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1rem;
+}
+.adm-toast-dismiss:hover { opacity: 1; }
+@keyframes adm-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
 /* Economy rows */
 .adm-erow { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--glass-border, #334155); }
 .adm-erow:last-child { border-bottom: none; }

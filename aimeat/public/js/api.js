@@ -27,7 +27,7 @@ export async function api(path, opts = {}) {
           if (payload?.exp && Date.now() / 1000 > payload.exp - 60) {
             await session.refresh();
           }
-        } catch (_) { /* proceed with current token */ }
+        } catch (e) { console.warn('JWT parse/refresh failed, proceeding:', e.message); }
       }
       headers['Authorization'] = 'Bearer ' + session.jwt;
     }
@@ -35,8 +35,10 @@ export async function api(path, opts = {}) {
 
   let lastError;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
     try {
-      const resp = await fetch(path, { ...opts, headers });
+      const resp = await fetch(path, { ...opts, headers, signal: controller.signal });
 
       // On 401, try refreshing token once and retry
       if (resp.status === 401 && attempt === 0) {
@@ -46,7 +48,7 @@ export async function api(path, opts = {}) {
             await session.refresh();
             headers['Authorization'] = 'Bearer ' + session.jwt;
             continue;
-          } catch (_) { /* refresh failed, return 401 */ }
+          } catch (e) { console.warn('Token refresh failed:', e.message); }
         }
       }
 
@@ -64,6 +66,10 @@ export async function api(path, opts = {}) {
       }
       return json;
     } catch (err) {
+      if (err.name === 'AbortError') {
+        if (attempt === MAX_RETRIES) throw new Error('Request timed out after 30s');
+        continue;
+      }
       // Don't retry client errors (4xx) — only retry network/server errors
       if (err.status && err.status >= 400 && err.status < 500) throw err;
       lastError = err;
@@ -71,6 +77,8 @@ export async function api(path, opts = {}) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
   const err = new Error(lastError?.message || 'Request failed');
