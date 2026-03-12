@@ -84,8 +84,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     loadMemories();
   }
 
-  async function handleSaveEdit(key, value) {
-    const resp = await memoryService.updateMemory(key, value);
+  async function handleSaveEdit(key, value, visibility) {
+    const resp = await memoryService.updateMemoryFull(key, { value, visibility });
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     showToast(t('profile.memory.updated'));
     setEditModal(null);
@@ -140,6 +140,12 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setKeyRulesPopover(null); }
   }
 
+  async function handleUpdateVisibility(key, visibility) {
+    const resp = await memoryService.updateMemoryVisibility(key, visibility);
+    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+    loadMemories();
+  }
+
   async function handleUpdateMemoryTags(key, tags) {
     const resp = await memoryService.updateMemoryTags(key, tags);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
@@ -192,7 +198,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <div>
             <div class="mem-item" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
               <span class="mem-key">${escHtml(m.key)}</span>
-              <span class="mem-vis badge ${m.visibility === 'public' ? 'badge-success' : m.visibility === 'shared' ? 'badge-info' : 'badge-muted'}">${m.visibility || 'private'}</span>
+              <select class="mem-vis-select" value=${m.visibility || 'private'}
+                onClick=${e => e.stopPropagation()}
+                onChange=${e => handleUpdateVisibility(m.key, e.target.value)}>
+                <option value="private">${t('profile.memory.visPrivate')}</option>
+                <option value="shared">${t('profile.memory.visShared')}</option>
+                <option value="public">${t('profile.memory.visPublic')}</option>
+              </select>
               <span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}\uFE0F</span>
             </div>
             ${expandedMem === m.key && html`
@@ -228,7 +240,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                   </div>
                 `}
                 <div class="mem-actions">
-                  <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '') })}>${t('profile.memory.editBtn')}</button>
+                  <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private' })}>${t('profile.memory.editBtn')}</button>
                   <button class="btn-danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
                 </div>
               </div>
@@ -329,7 +341,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     ${editModal && html`<${EditMemoryModal}
       memKey=${editModal.key}
       initialValue=${editModal.value}
-      onSave=${(v) => handleSaveEdit(editModal.key, v)}
+      initialVisibility=${editModal.visibility}
+      onSave=${(v, vis) => handleSaveEdit(editModal.key, v, vis)}
       onCancel=${() => setEditModal(null)} />`}
   `;
 }
@@ -480,15 +493,24 @@ function FileUploadForm({ onUpload, onCancel }) {
     </div>`;
 }
 
-function EditMemoryModal({ memKey, initialValue, onSave, onCancel }) {
+function EditMemoryModal({ memKey, initialValue, initialVisibility, onSave, onCancel }) {
   const [value, setValue] = useState(initialValue);
+  const [vis, setVis] = useState(initialVisibility || 'private');
   return html`
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
         <h3>${t('profile.memory.editTitle')}: ${escHtml(memKey)}</h3>
+        <div class="form-row" style="margin-bottom:.75rem">
+          <label>${t('profile.memory.visLabel')}</label>
+          <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+            <option value="private">${t('profile.memory.visPrivate')}</option>
+            <option value="shared">${t('profile.memory.visShared')}</option>
+            <option value="public">${t('profile.memory.visPublic')}</option>
+          </select>
+        </div>
         <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
         <div class="form-actions" style="margin-top:1rem">
-          <button class="btn-primary" onClick=${() => onSave(value)}>${t('profile.save')}</button>
+          <button class="btn-primary" onClick=${() => onSave(value, vis)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
       </div>

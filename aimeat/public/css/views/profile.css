@@ -92,7 +92,9 @@
 .pf .mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(255,107,157,.08);font-size:.85rem;cursor:pointer;gap:.5rem}
 .pf .mem-item:hover{background:rgba(255,107,157,.05)}
 .pf .mem-key{font-family:monospace;color:var(--love3,#ff8a80);font-weight:500;flex:1}
-.pf .mem-vis{font-size:.7rem}
+.pf .mem-vis-select{font-size:.7rem;padding:2px 4px;border-radius:4px;border:1px solid rgba(255,107,157,.2);background:rgba(15,10,20,.6);color:var(--text,#f0e6f6);cursor:pointer;outline:none}
+.pf .mem-vis-select:hover{border-color:rgba(255,107,157,.4)}
+.pf .mem-vis-select:focus{border-color:rgba(139,92,246,.5);box-shadow:0 0 0 2px rgba(139,92,246,.15)}
 .pf .shield-icon{font-size:.85rem;cursor:pointer;opacity:.6;transition:opacity .2s}
 .pf .shield-icon:hover{opacity:1}
 .pf .key-rules-box{background:rgba(15,10,20,.8);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}

@@ -39,6 +39,22 @@ export async function updateMemory(key, value) {
   });
 }
 
+/** Update multiple fields on a memory entry. */
+export async function updateMemoryFull(key, fields) {
+  return api(`/v1/memory/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: JSON.stringify(fields),
+  });
+}
+
+/** Update visibility on a memory entry. */
+export async function updateMemoryVisibility(key, visibility) {
+  return api(`/v1/memory/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ visibility }),
+  });
+}
+
 /** Update tags on a memory entry. */
 export async function updateMemoryTags(key, tags) {
   return api(`/v1/memory/${encodeURIComponent(key)}`, {
