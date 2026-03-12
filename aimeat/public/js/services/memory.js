@@ -32,14 +32,14 @@ export async function createMemory(key, value, visibility, tags) {
 }
 
 /** Update (PUT) a memory entry value. */
-export async function updateMemory(key, value) {
+export async function updateMemory(key, value, version) {
   return api(`/v1/memory/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify({ value }),
+    body: JSON.stringify({ value, version }),
   });
 }
 
-/** Update multiple fields on a memory entry. */
+/** Update multiple fields on a memory entry (must include version). */
 export async function updateMemoryFull(key, fields) {
   return api(`/v1/memory/${encodeURIComponent(key)}`, {
     method: 'PUT',
@@ -48,18 +48,18 @@ export async function updateMemoryFull(key, fields) {
 }
 
 /** Update visibility on a memory entry. */
-export async function updateMemoryVisibility(key, visibility) {
+export async function updateMemoryVisibility(key, visibility, version) {
   return api(`/v1/memory/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify({ visibility }),
+    body: JSON.stringify({ visibility, version }),
   });
 }
 
 /** Update tags on a memory entry. */
-export async function updateMemoryTags(key, tags) {
+export async function updateMemoryTags(key, tags, version) {
   return api(`/v1/memory/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify({ tags }),
+    body: JSON.stringify({ tags, version }),
   });
 }
 

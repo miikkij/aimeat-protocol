@@ -543,8 +543,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // Per-value size limit (configurable, must match POST enforcement)
-    const newValueSize = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    // Per-value size limit & quota check — only when value is being changed
+    const effectiveValue = value !== undefined ? value : existing.value;
+    const newValueSize = Buffer.byteLength(JSON.stringify(effectiveValue), 'utf8');
     const maxValueSize = config.memoryMaxValueSizeKb * 1024;
     if (newValueSize > maxValueSize) {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value size ${newValueSize} bytes exceeds limit of ${maxValueSize} bytes`));
@@ -559,23 +560,25 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // Schema validation (Phase 0.1)
-    const putValidation = await validateMemoryWrite(key, value, storage);
-    if (!putValidation.valid) {
-      res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
-        'Value does not match the schema for this key', 422, {
-        key,
-        violations: putValidation.errors,
-        schema_url: `/v1/memory/${encodeURIComponent(putValidation.schemaKey!)}/schema`,
-      }));
-      return;
+    // Schema validation (Phase 0.1) — only when value is being changed
+    if (value !== undefined) {
+      const putValidation = await validateMemoryWrite(key, value, storage);
+      if (!putValidation.valid) {
+        res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
+          'Value does not match the schema for this key', 422, {
+          key,
+          violations: putValidation.errors,
+          schema_url: `/v1/memory/${encodeURIComponent(putValidation.schemaKey!)}/schema`,
+        }));
+        return;
+      }
     }
 
     const now = new Date().toISOString();
     const record = await storage.setMemory({
       key,
       ownerGaii: gaii,
-      value,
+      value: value !== undefined ? value : existing.value,
       visibility: visibility ?? existing.visibility,
       tags: tags ?? existing.tags,
       ttlHours: ttl_hours ?? existing.ttlHours,

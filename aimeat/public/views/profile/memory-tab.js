@@ -84,8 +84,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     loadMemories();
   }
 
-  async function handleSaveEdit(key, value, visibility) {
-    const resp = await memoryService.updateMemoryFull(key, { value, visibility });
+  async function handleSaveEdit(key, value, visibility, version) {
+    const resp = await memoryService.updateMemoryFull(key, { value, visibility, version });
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     showToast(t('profile.memory.updated'));
     setEditModal(null);
@@ -145,14 +145,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
   const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
 
-  async function handleUpdateVisibility(key, newVis) {
-    const resp = await memoryService.updateMemoryVisibility(key, newVis);
+  async function handleUpdateVisibility(key, newVis, version) {
+    const resp = await memoryService.updateMemoryVisibility(key, newVis, version);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     loadMemories();
   }
 
-  async function handleUpdateMemoryTags(key, tags) {
-    const resp = await memoryService.updateMemoryTags(key, tags);
+  async function handleUpdateMemoryTags(key, tags, version) {
+    const resp = await memoryService.updateMemoryTags(key, tags, version);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     loadMemories();
   }
@@ -207,7 +207,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                 const vis = m.visibility || 'private';
                 const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
                 return html`<button class="kpkg-vis-pill"
-                  onClick=${(e) => { e.stopPropagation(); handleUpdateVisibility(m.key, nextVis); }}
+                  onClick=${(e) => { e.stopPropagation(); handleUpdateVisibility(m.key, nextVis, m.version); }}
                   title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
                   style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
                 >${t('knowledge.visibility.' + vis)} ▾</button>`;
@@ -224,7 +224,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                 </div>
                 ${editingMemTags === m.key && html`
                   <div style="margin-top:.5rem">
-                    <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags)} />
+                    <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />
                   </div>
                 `}
                 ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${m.tags.join(', ')}</div>`}
@@ -247,7 +247,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                   </div>
                 `}
                 <div class="mem-actions">
-                  <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private' })}>${t('profile.memory.editBtn')}</button>
+                  <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private', version: m.version })}>${t('profile.memory.editBtn')}</button>
                   <button class="btn-danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
                 </div>
               </div>
@@ -349,7 +349,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
       memKey=${editModal.key}
       initialValue=${editModal.value}
       initialVisibility=${editModal.visibility}
-      onSave=${(v, vis) => handleSaveEdit(editModal.key, v, vis)}
+      initialVersion=${editModal.version}
+      onSave=${(v, vis, ver) => handleSaveEdit(editModal.key, v, vis, ver)}
       onCancel=${() => setEditModal(null)} />`}
   `;
 }
@@ -500,7 +501,7 @@ function FileUploadForm({ onUpload, onCancel }) {
     </div>`;
 }
 
-function EditMemoryModal({ memKey, initialValue, initialVisibility, onSave, onCancel }) {
+function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, onSave, onCancel }) {
   const [value, setValue] = useState(initialValue);
   const [vis, setVis] = useState(initialVisibility || 'private');
   const cycleVis = ['private', 'owner', 'public'];
@@ -521,7 +522,7 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, onSave, onCa
         </div>
         <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
         <div class="form-actions" style="margin-top:1rem">
-          <button class="btn-primary" onClick=${() => onSave(value, vis)}>${t('profile.save')}</button>
+          <button class="btn-primary" onClick=${() => onSave(value, vis, initialVersion)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
       </div>
