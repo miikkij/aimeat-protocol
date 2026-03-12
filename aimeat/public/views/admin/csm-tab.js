@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty, ExpandableHelp } from './shared.js';
+import { dt, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
 
 export default function CsmTab({ data, reload }) {
@@ -17,6 +17,7 @@ export default function CsmTab({ data, reload }) {
   const [err, setErr] = useState('');
   const [prompt, setPrompt] = useState('');
   const [copied, setCopied] = useState(false);
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function showDetail(name) {
     try {
@@ -34,7 +35,7 @@ export default function CsmTab({ data, reload }) {
       setView('list');
       setDetail(null);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function openCreate() {
@@ -45,7 +46,7 @@ export default function CsmTab({ data, reload }) {
       try {
         const r = await getCsmFileTemplates();
         setFileTemplates(r.data?.templates || []);
-      } catch { setFileTemplates([]); }
+      } catch (e) { console.warn('Failed to load:', e.message); setFileTemplates([]); }
     }
   }
 
@@ -101,17 +102,18 @@ export default function CsmTab({ data, reload }) {
     const svc = def.service || {};
     return html`
       <div>
+        ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
         <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
-        <div class="adm-card" style="margin-top:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="adm-card adm-mt-md">
+          <div class="adm-flex-between">
             <h4 style="margin:0">${escHtml(detail.name)}</h4>
             <button class="adm-btn-sm" style="color:#ef4444;border-color:#ef4444" onClick=${() => doDelete(detail.name)}>
               ${t('dashboard.delete')}
             </button>
           </div>
-          ${svc.description && html`<p style="font-size:.85rem;color:var(--text-dim);margin:4px 0 12px">${escHtml(svc.description)}</p>`}
+          ${svc.description && html`<p class="adm-text-base adm-text-dim" style="margin:4px 0 12px">${escHtml(svc.description)}</p>`}
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:12px 0;font-size:.85rem">
+          <div class="adm-text-base" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:12px 0">
             <div><strong>${t('dashboard.csmServiceType')}:</strong> ${escHtml(detail.service_type || '—')}</div>
             <div><strong>${t('dashboard.csmRegisteredBy')}:</strong> ${escHtml(detail.registered_by || '—')}</div>
             <div><strong>${t('dashboard.created')}:</strong> ${dt(detail.registered_at)}</div>
@@ -137,9 +139,9 @@ export default function CsmTab({ data, reload }) {
     return html`
       <div>
         <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
-        <div class="adm-card" style="margin-top:12px">
+        <div class="adm-card adm-mt-md">
           <h4 style="margin:0 0 4px">${t('dashboard.csmAiPromptTitle')}</h4>
-          <p style="font-size:.85rem;color:var(--text-dim);margin:0 0 12px">${t('dashboard.csmAiPromptDesc')}</p>
+          <p class="adm-text-base adm-text-dim" style="margin:0 0 12px">${t('dashboard.csmAiPromptDesc')}</p>
 
           <div style="position:relative">
             <pre style="background:var(--bg-deep,#0f172a);padding:16px;border-radius:8px;overflow:auto;font-size:.8rem;max-height:500px;white-space:pre-wrap;line-height:1.5;border:1px solid var(--glass-border,#334155)">${prompt}</pre>
@@ -148,7 +150,7 @@ export default function CsmTab({ data, reload }) {
             </button>
           </div>
 
-          <div style="margin-top:16px">
+          <div class="adm-mt-lg">
             <${ExpandableHelp} title=${t('dashboard.csmAiPromptHow')}>
               <ol style="margin:0;padding-left:20px;font-size:.85rem;line-height:1.8">
                 <li>${t('dashboard.csmAiStep1')}</li>
@@ -168,12 +170,12 @@ export default function CsmTab({ data, reload }) {
     return html`
       <div>
         <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
-        <div class="adm-card" style="margin-top:12px">
+        <div class="adm-card adm-mt-md">
           <h4 style="margin:0 0 12px">${t('dashboard.csmCreate')}</h4>
 
           ${fileTemplates && fileTemplates.length > 0 && html`
-            <div style="margin-bottom:12px">
-              <label style="font-size:.85rem;color:var(--text-dim);display:block;margin-bottom:4px">${t('dashboard.csmCreateFromTemplate')}</label>
+            <div class="adm-mb-md">
+              <label class="adm-text-base adm-text-dim" style="display:block;margin-bottom:4px">${t('dashboard.csmCreateFromTemplate')}</label>
               <select style="width:auto;min-width:200px" onChange=${e => loadTemplate(e.target.value)}>
                 <option value="">${t('dashboard.csmSelectTemplate')}</option>
                 ${fileTemplates.map(ft => html`<option value=${ft.type}>${escHtml(ft.name)} (${ft.type})</option>`)}
@@ -181,7 +183,7 @@ export default function CsmTab({ data, reload }) {
             </div>
           `}
 
-          <label style="font-size:.85rem;color:var(--text-dim);display:block;margin-bottom:4px">${t('dashboard.csmDefinition')}</label>
+          <label class="adm-text-base adm-text-dim" style="display:block;margin-bottom:4px">${t('dashboard.csmDefinition')}</label>
           <textarea
             rows="16"
             style="width:100%;font-family:monospace;font-size:.8rem;resize:vertical"
@@ -190,9 +192,9 @@ export default function CsmTab({ data, reload }) {
             onInput=${e => setYaml(e.target.value)}
           />
 
-          ${err && html`<div class="error-box" style="margin-top:8px">${err}</div>`}
+          ${err && html`<div class="error-box adm-mt-sm">${err}</div>`}
 
-          <div style="margin-top:12px;display:flex;gap:8px">
+          <div class="adm-flex adm-mt-md">
             <button class="adm-btn" onClick=${doCreate} disabled=${loading || !yaml.trim()}>
               ${loading ? '...' : t('dashboard.csmCreate')}
             </button>
@@ -205,12 +207,13 @@ export default function CsmTab({ data, reload }) {
 
   // ── List view ──
   return html`
-    <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.csmExplain')}</p>
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+    <p class="adm-text-dim" style="margin:0 0 12px">${t('dashboard.csmExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.csmHelpTitle')}>
       ${t('dashboard.csmHelpDetail')}
     <//>
 
-    <div style="margin-bottom:12px;display:flex;gap:8px">
+    <div class="adm-flex adm-mb-md">
       <button class="adm-btn" onClick=${openCreate}>${t('dashboard.csmAddNew')}</button>
       <button class="adm-btn-action" onClick=${openPrompt}>${t('dashboard.csmCreateWithAi')}</button>
     </div>
@@ -232,10 +235,10 @@ export default function CsmTab({ data, reload }) {
               <tbody>
                 ${templates.map(c => html`<tr>
                   <td><strong>${escHtml(c.name)}</strong></td>
-                  <td style="font-size:.8rem;color:var(--text-dim)">${escHtml(c.service_type || '—')}</td>
-                  <td style="font-size:.8rem">${escHtml(c.registered_by || '—')}</td>
+                  <td class="adm-text-sm adm-text-dim">${escHtml(c.service_type || '—')}</td>
+                  <td class="adm-text-sm">${escHtml(c.registered_by || '—')}</td>
                   <td>${c.federate ? '✓' : '—'}</td>
-                  <td style="color:var(--text-dim)">${dt(c.registered_at)}</td>
+                  <td class="adm-text-dim">${dt(c.registered_at)}</td>
                   <td style="white-space:nowrap">
                     <button class="adm-btn-sm" onClick=${() => showDetail(c.name)}>${t('dashboard.details')}</button>
                     ${' '}

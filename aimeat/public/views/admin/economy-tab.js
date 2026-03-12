@@ -16,9 +16,9 @@ export default function EconomyTab({ data, reload }) {
   const [mintResult, setMintResult] = useState(null);
 
   async function doMint() {
-    const amount = parseInt(mintAmount);
-    if (!mintGaii || !amount || amount < 1) {
-      setMintResult({ ok: false, msg: t('dashboard.mintGaiiRequired') });
+    const amount = parseInt(mintAmount, 10);
+    if (!mintGaii || !amount || amount < 1 || amount > 1_000_000) {
+      setMintResult({ ok: false, msg: t('dashboard.mintGaiiRequired') || 'Amount must be 1\u20131,000,000' });
       return;
     }
     try {

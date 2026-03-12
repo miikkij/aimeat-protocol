@@ -3,20 +3,22 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty } from './shared.js';
+import { dt, Empty, useToast, Toast } from './shared.js';
 import { grantRole } from '/js/services/admin.js';
 
 export default function OwnersTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const owners = data.owners || [];
   if (owners.length === 0) return html`<${Empty} text=${t('dashboard.noOwnersFound')} />`;
 
   async function doGrant(name) {
     if (!confirm(t('dashboard.grantConfirm').replace('{name}', name))) return;
     try { await grantRole(name, 'operator'); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div class="adm-card">
       <div class="scrollable">
         <table>

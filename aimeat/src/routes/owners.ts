@@ -7,6 +7,7 @@ import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
+import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -56,7 +57,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // Extension hook: post_owner_registration (fire-and-forget)
-    executeHooks(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles }).catch(() => { });
+    fireHook(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles });
 
     // SECURITY: Prevent caching of response containing private key
     res.set('Cache-Control', 'no-store');
@@ -643,7 +644,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     await storage.updateOwner(name, { publicKey: keyPair.publicKey });
 
     // Extension hook: owner_recovery (fire-and-forget)
-    executeHooks(config, storage, 'owner_recovery', { owner: name }).catch(() => { });
+    fireHook(config, storage, 'owner_recovery', { owner: name });
 
     res.json(success(config.nodeId, {
       recovered: true,

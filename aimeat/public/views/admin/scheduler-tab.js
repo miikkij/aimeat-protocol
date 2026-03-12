@@ -7,10 +7,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, DataTable, Empty } from './shared.js';
+import { dt, Badge, StatsGrid, DataTable, Empty, useToast, Toast } from './shared.js';
 import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob } from '/js/services/admin.js';
 
 export default function SchedulerTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const jobs = data.schedulerJobs?.jobs || [];
 
   const totalJobs = jobs.length;
@@ -23,7 +24,7 @@ export default function SchedulerTab({ data, reload }) {
       await triggerSchedulerJob(id);
       reload();
     } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
+      showErr(e.message);
     }
   }
 
@@ -32,7 +33,7 @@ export default function SchedulerTab({ data, reload }) {
       await updateSchedulerJob(id, { enabled: !currentEnabled });
       reload();
     } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
+      showErr(e.message);
     }
   }
 
@@ -42,7 +43,7 @@ export default function SchedulerTab({ data, reload }) {
       await deleteSchedulerJob(id);
       reload();
     } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
+      showErr(e.message);
     }
   }
 
@@ -55,6 +56,7 @@ export default function SchedulerTab({ data, reload }) {
 
   if (!jobs.length) {
     return html`
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <${StatsGrid} items=${statsItems} />
       <${Empty} text=${t('dashboard.schedulerNoJobs')} />
     `;
@@ -101,6 +103,7 @@ export default function SchedulerTab({ data, reload }) {
   ]);
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${StatsGrid} items=${statsItems} />
     <h3 style="margin:16px 0 8px">${t('dashboard.schedulerJobs')}</h3>
     <${DataTable} headers=${headers} rows=${rows} scroll=${true} />

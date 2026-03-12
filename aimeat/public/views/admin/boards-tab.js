@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty } from './shared.js';
+import { dt, Badge, Empty, useToast, Toast } from './shared.js';
 import { getBoardPosts } from '/js/services/admin.js';
 import { apiPost } from '/js/api.js';
 
@@ -13,6 +13,7 @@ export default function BoardsTab({ data, reload }) {
   const [posts, setPosts] = useState({});
   const [showCreate, setShowCreate] = useState(false);
   const [newBoard, setNewBoard] = useState({ name: '', slug: '', description: '', visibility: 'public' });
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function togglePosts(slug) {
     if (posts[slug]) {
@@ -22,7 +23,7 @@ export default function BoardsTab({ data, reload }) {
     try {
       const r = await getBoardPosts(slug);
       setPosts(prev => ({ ...prev, [slug]: r.data?.posts || [] }));
-    } catch {}
+    } catch (e) { console.warn('Failed to load data:', e.message); }
   }
 
   async function createBoard() {
@@ -34,34 +35,32 @@ export default function BoardsTab({ data, reload }) {
         description: newBoard.description,
         visibility: newBoard.visibility,
       });
-      alert(t('dashboard.boardCreateConfirm'));
+      showOk(t('dashboard.boardCreateConfirm'));
       setNewBoard({ name: '', slug: '', description: '', visibility: 'public' });
       setShowCreate(false);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   if (!boards.length) return html`<${Empty} text=${t('dashboard.noBoardsCreated')} />`;
 
   return html`
-    <div style="margin-bottom:12px">
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+    <div class="adm-mb-md">
       <button class="adm-btn-action" onClick=${() => setShowCreate(!showCreate)}>
         + ${t('dashboard.boardCreateSystem')}
       </button>
       ${showCreate && html`
-        <div class="adm-card" style="margin-top:8px">
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <input value=${newBoard.name} onInput=${e => setNewBoard(prev => ({...prev, name: e.target.value}))}
-              placeholder=${t('dashboard.boardName')}
-              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
-            <input value=${newBoard.slug} onInput=${e => setNewBoard(prev => ({...prev, slug: e.target.value}))}
+        <div class="adm-card adm-mt-sm">
+          <div class="adm-flex-col">
+            <input class="adm-input adm-input-full" value=${newBoard.name} onInput=${e => setNewBoard(prev => ({...prev, name: e.target.value}))}
+              placeholder=${t('dashboard.boardName')} />
+            <input class="adm-input adm-input-full" value=${newBoard.slug} onInput=${e => setNewBoard(prev => ({...prev, slug: e.target.value}))}
               placeholder=${t('dashboard.boardSlug')}
-              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px;font-family:monospace" />
-            <input value=${newBoard.description} onInput=${e => setNewBoard(prev => ({...prev, description: e.target.value}))}
-              placeholder=${t('dashboard.boardDescription')}
-              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px" />
-            <select value=${newBoard.visibility} onChange=${e => setNewBoard(prev => ({...prev, visibility: e.target.value}))}
-              style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px">
+              style="font-family:monospace" />
+            <input class="adm-input adm-input-full" value=${newBoard.description} onInput=${e => setNewBoard(prev => ({...prev, description: e.target.value}))}
+              placeholder=${t('dashboard.boardDescription')} />
+            <select class="adm-input adm-input-full" value=${newBoard.visibility} onChange=${e => setNewBoard(prev => ({...prev, visibility: e.target.value}))}>
               <option value="public">${t('dashboard.boardPublic')}</option>
               <option value="private">${t('dashboard.boardPrivate')}</option>
             </select>
@@ -73,28 +72,28 @@ export default function BoardsTab({ data, reload }) {
     <div class="adm-card-grid">
       ${boards.map(b => html`
         <div class="adm-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="adm-flex-between adm-mb-sm">
             <strong>${escHtml(b.name || b.slug)}</strong>
             <${Badge} type=${b.visibility || 'public'} />
           </div>
-          ${b.description && html`<p style="font-size:.8rem;color:var(--text-dim);margin:0 0 8px">${escHtml(b.description)}</p>`}
-          <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:8px">
+          ${b.description && html`<p class="adm-text-sm adm-text-dim adm-mb-sm" style="margin:0">${escHtml(b.description)}</p>`}
+          <div class="adm-text-xs adm-text-dim adm-mb-sm">
             ${t('dashboard.slug')}: <code>${escHtml(b.slug)}</code> · ${t('dashboard.created')}: ${dt(b.created_at)}
           </div>
           <button class="adm-btn-sm" onClick=${() => togglePosts(b.slug)}>
             ${posts[b.slug] ? t('dashboard.hidePosts') : t('dashboard.showPosts')}
           </button>
           ${posts[b.slug] && html`
-            <div style="margin-top:8px;border-top:1px solid var(--card-border);padding-top:8px">
+            <div class="adm-mt-sm" style="border-top:1px solid var(--card-border);padding-top:8px">
               ${!posts[b.slug].length
-                ? html`<div style="font-size:.8rem;color:var(--text-dim)">${t('dashboard.noPosts')}</div>`
+                ? html`<div class="adm-text-sm adm-text-dim">${t('dashboard.noPosts')}</div>`
                 : posts[b.slug].map(p => html`
                     <div style="margin-bottom:6px;padding:6px;background:var(--bg-card);border-radius:6px">
-                      <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--text-dim)">
+                      <div class="adm-flex-between adm-text-xs adm-text-dim">
                         <span>${escHtml(p.author)}</span>
                         <span>${dt(p.created_at)}</span>
                       </div>
-                      <div style="font-size:.85rem;margin-top:2px">${escHtml(p.content?.substring(0, 200) || '')}</div>
+                      <div class="adm-text-base" style="margin-top:2px">${escHtml(p.content?.substring(0, 200) || '')}</div>
                     </div>
                   `)
               }

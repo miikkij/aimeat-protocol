@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Empty } from './shared.js';
+import { Empty, useToast, Toast } from './shared.js';
 import { clearGhiiCors, clearAgentCors, setGhiiCors, setAgentCors } from '/js/services/admin.js';
 
 const COMMON_ORIGINS = [
@@ -23,8 +23,8 @@ function OriginSuggestions({ value, onChange }) {
     onChange(parts.join(', '));
   }
   return html`
-    <div style="display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;margin-top:.4rem">
-      <span style="color:var(--text-dim);font-size:.8rem">${t('dashboard.corsCommonOrigins')}</span>
+    <div class="adm-flex-wrap adm-mt-sm" style="gap:.35rem;align-items:center">
+      <span class="adm-text-sm adm-text-dim">${t('dashboard.corsCommonOrigins')}</span>
       ${COMMON_ORIGINS.map(o => html`
         <button type="button" class="adm-btn-sm" style="font-size:.75rem;padding:2px 8px"
           onClick=${() => add(o)}>${o}</button>
@@ -42,12 +42,12 @@ function InlineEditor({ origins, onSave, onCancel }) {
     onSave(arr);
   }
   return html`
-    <div style="display:flex;flex-direction:column;gap:.4rem;padding:.5rem 0">
-      <input type="text" value=${val} onInput=${e => setVal(e.target.value)}
+    <div class="adm-flex-col" style="gap:.4rem;padding:.5rem 0">
+      <input class="adm-input adm-input-full" type="text" value=${val} onInput=${e => setVal(e.target.value)}
         placeholder=${t('dashboard.corsOriginPlaceholder')}
-        style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:6px 10px;border-radius:6px;font-size:.85rem;font-family:monospace;width:100%" />
+        style="font-family:monospace" />
       <${OriginSuggestions} value=${val} onChange=${setVal} />
-      <div style="display:flex;gap:.4rem;margin-top:.25rem">
+      <div class="adm-flex" style="gap:.4rem;margin-top:.25rem">
         <button class="adm-btn-action" onClick=${save}>${t('dashboard.corsSave')}</button>
         <button class="adm-btn-sm" onClick=${onCancel}>${t('dashboard.corsCancel')}</button>
       </div>
@@ -72,17 +72,16 @@ function AddOverrideForm({ items, labelKey, idKey, nameKey, onSave }) {
   return html`
     <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--glass-border)">
       <h3 style="font-size:.9rem;margin-bottom:.5rem">${t('dashboard.corsAddOverride')}</h3>
-      <div style="display:flex;flex-direction:column;gap:.4rem">
-        <select value=${selectedId} onChange=${e => setSelectedId(e.target.value)}
-          style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:6px 10px;border-radius:6px;font-size:.85rem">
+      <div class="adm-flex-col" style="gap:.4rem">
+        <select class="adm-input" value=${selectedId} onChange=${e => setSelectedId(e.target.value)}>
           <option value="">${t(labelKey)}</option>
           ${items.map(it => html`
             <option value=${it[idKey]}>${escHtml(it[nameKey] || it[idKey])}</option>
           `)}
         </select>
-        <input type="text" value=${origins} onInput=${e => setOrigins(e.target.value)}
+        <input class="adm-input adm-input-full" type="text" value=${origins} onInput=${e => setOrigins(e.target.value)}
           placeholder=${t('dashboard.corsOriginPlaceholder')}
-          style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:6px 10px;border-radius:6px;font-size:.85rem;font-family:monospace;width:100%" />
+          style="font-family:monospace" />
         <${OriginSuggestions} value=${origins} onChange=${setOrigins} />
         <div style="margin-top:.25rem">
           <button class="adm-btn-action" onClick=${save}>${t('dashboard.corsSave')}</button>
@@ -105,13 +104,14 @@ export default function CorsTab({ data, reload }) {
   // Track which row is being edited
   const [editGhii, setEditGhii] = useState(null);
   const [editAgent, setEditAgent] = useState(null);
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function doClearGhii(ghii) {
     if (!confirm(t('dashboard.corsClearConfirm'))) return;
     try {
       await clearGhiiCors(ghii);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doClearAgent(gaii) {
@@ -119,7 +119,7 @@ export default function CorsTab({ data, reload }) {
     try {
       await clearAgentCors(gaii);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doSaveGhii(ghii, origins) {
@@ -127,7 +127,7 @@ export default function CorsTab({ data, reload }) {
       await setGhiiCors(ghii, origins);
       setEditGhii(null);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doSaveAgent(gaii, origins) {
@@ -135,7 +135,7 @@ export default function CorsTab({ data, reload }) {
       await setAgentCors(gaii, origins);
       setEditAgent(null);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   // All GHII users (for add-override dropdown), excluding those already overridden
@@ -147,19 +147,20 @@ export default function CorsTab({ data, reload }) {
   const agentAvailable = (data.agents?.agents || []).filter(a => !agentOverriddenSet.has(a.gaii));
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <!-- Node default -->
     <div class="adm-card">
       <h2>${t('dashboard.corsNodeDefault')}</h2>
-      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:.75rem">${t('dashboard.corsNodeDefaultDesc')}</p>
+      <p class="adm-text-dim adm-text-base" style="margin-bottom:.75rem">${t('dashboard.corsNodeDefaultDesc')}</p>
       <code style="font-size:.85rem">${nodeOrigins ? escHtml(Array.isArray(nodeOrigins) ? nodeOrigins.join(', ') : String(nodeOrigins)) : '*'}</code>
     </div>
 
     <!-- GHII overrides -->
     <div class="adm-card">
       <h2>${t('dashboard.corsGhiiOverrides')}</h2>
-      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:.75rem">${t('dashboard.corsGhiiOverridesDesc')}</p>
+      <p class="adm-text-dim adm-text-base" style="margin-bottom:.75rem">${t('dashboard.corsGhiiOverridesDesc')}</p>
       ${ghiiRows.length === 0
-        ? html`<div style="color:var(--text-dim);font-size:.85rem">${t('dashboard.corsNoOverrides')}</div>`
+        ? html`<div class="adm-text-dim adm-text-base">${t('dashboard.corsNoOverrides')}</div>`
         : html`<table>
           <thead><tr><th>${t('dashboard.owner')}</th><th>${t('dashboard.corsOrigins')}</th><th></th></tr></thead>
           <tbody>
@@ -171,7 +172,7 @@ export default function CorsTab({ data, reload }) {
                       origins=${r.allowed_origins}
                       onSave=${(arr) => doSaveGhii(r.ghii, arr)}
                       onCancel=${() => setEditGhii(null)} />`
-                  : html`<span class="mono" style="font-size:.8rem">${escHtml(r.allowed_origins.join(', '))}</span>`
+                  : html`<span class="mono adm-text-sm">${escHtml(r.allowed_origins.join(', '))}</span>`
                 }
               </td>
               <td style="white-space:nowrap">
@@ -195,14 +196,14 @@ export default function CorsTab({ data, reload }) {
     <!-- Agent overrides -->
     <div class="adm-card">
       <h2>${t('dashboard.corsAgentOverrides')}</h2>
-      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:.75rem">${t('dashboard.corsAgentOverridesDesc')}</p>
+      <p class="adm-text-dim adm-text-base" style="margin-bottom:.75rem">${t('dashboard.corsAgentOverridesDesc')}</p>
       ${agentRows.length === 0
-        ? html`<div style="color:var(--text-dim);font-size:.85rem">${t('dashboard.corsNoOverrides')}</div>`
+        ? html`<div class="adm-text-dim adm-text-base">${t('dashboard.corsNoOverrides')}</div>`
         : html`<table>
           <thead><tr><th>GAII</th><th>${t('dashboard.owner')}</th><th>${t('dashboard.corsOrigins')}</th><th></th></tr></thead>
           <tbody>
             ${agentRows.map(a => html`<tr>
-              <td class="mono" style="font-size:.8rem">${escHtml(a.gaii)}</td>
+              <td class="mono adm-text-sm">${escHtml(a.gaii)}</td>
               <td>${escHtml(a.owner)}</td>
               <td style="width:100%">
                 ${editAgent === a.gaii
@@ -210,7 +211,7 @@ export default function CorsTab({ data, reload }) {
                       origins=${a.allowed_origins}
                       onSave=${(arr) => doSaveAgent(a.gaii, arr)}
                       onCancel=${() => setEditAgent(null)} />`
-                  : html`<span class="mono" style="font-size:.8rem">${escHtml(a.allowed_origins.join(', '))}</span>`
+                  : html`<span class="mono adm-text-sm">${escHtml(a.allowed_origins.join(', '))}</span>`
                 }
               </td>
               <td style="white-space:nowrap">

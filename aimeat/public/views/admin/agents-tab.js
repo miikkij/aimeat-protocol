@@ -21,7 +21,7 @@ export default function AgentsTab({ data }) {
     try {
       const r = await getAgentDetail(gaii);
       setExpanded(prev => ({ ...prev, [idx]: r.data }));
-    } catch {}
+    } catch (e) { console.warn('Failed to load data:', e.message); }
   }
 
   return html`

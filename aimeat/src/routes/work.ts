@@ -8,6 +8,7 @@ import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
 import { executeHooks } from '../services/hooks.js';
+import { fireHook } from '../utils/fire-hook.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
@@ -552,10 +553,10 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     await settlePayment(storage, config, work);
 
     // Extension hook: post_settlement (fire-and-forget)
-    executeHooks(config, storage, 'post_settlement', {
+    fireHook(config, storage, 'post_settlement', {
       tracking_code: tc, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
       cost: work.cost,
-    }).catch(() => { });
+    });
 
     const updated = await storage.updateWork(tc, {
       status: 'delivered',
@@ -575,9 +576,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }
 
     // Extension hook: post_work_delivery (fire-and-forget)
-    executeHooks(config, storage, 'post_work_delivery', {
+    fireHook(config, storage, 'post_work_delivery', {
       tracking_code: tc, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
-    }).catch(() => { });
+    });
 
     res.json(success(config.nodeId, {
       tracking_code: updated!.trackingCode,

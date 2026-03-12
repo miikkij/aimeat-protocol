@@ -4,10 +4,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, EconRow } from './shared.js';
+import { dt, EconRow, useToast, Toast } from './shared.js';
 import { setMaintenance, getBackup, doRestore as apiRestore } from '/js/services/admin.js';
 
 export default function MaintenanceTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const m = data.maintenance || { enabled: false, message: '', enabledAt: null, enabledBy: null };
   const [msg, setMsg] = useState(m.message || '');
   const [backupResult, setBackupResult] = useState(null);
@@ -16,7 +17,7 @@ export default function MaintenanceTab({ data, reload }) {
     try {
       await setMaintenance(on, msg);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doBackup() {
@@ -57,16 +58,17 @@ export default function MaintenanceTab({ data, reload }) {
   const status = m.enabled ? t('dashboard.maintenanceOn') : t('dashboard.operational');
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div class="adm-card" style="border-left:4px solid ${color}">
       <h2>${t('dashboard.maintenanceMode')}</h2>
-      <div class="adm-stat" style="color:${color};margin-bottom:12px">${status}</div>
-      ${m.enabled && html`<div style="margin-bottom:12px">
+      <div class="adm-stat adm-mb-md" style="color:${color}">${status}</div>
+      ${m.enabled && html`<div class="adm-mb-md">
         ${m.message && html`<${EconRow} label=${t('dashboard.message')} value=${escHtml(m.message)} />`}
         ${m.enabledAt && html`<${EconRow} label=${t('dashboard.since')} value=${dt(m.enabledAt)} />`}
         ${m.enabledBy && html`<${EconRow} label=${t('dashboard.by')} value=${escHtml(m.enabledBy)} />`}
       </div>`}
-      <div style="margin-top:16px">
-        <label style="display:block;color:var(--text-dim);font-size:.8rem;margin-bottom:4px">${t('dashboard.customMessage')}</label>
+      <div class="adm-mt-lg">
+        <label class="adm-text-sm adm-text-dim" style="display:block;margin-bottom:4px">${t('dashboard.customMessage')}</label>
         <input type="text" value=${msg} onInput=${e => setMsg(e.target.value)}
           placeholder=${t('dashboard.customMessagePlaceholder')}
           style="width:100%;margin-bottom:12px" />
@@ -75,18 +77,18 @@ export default function MaintenanceTab({ data, reload }) {
           : html`<button class="adm-btn" style="background:#ef4444;width:100%" onClick=${() => toggle(true)}>${t('dashboard.enableMaintenance')}</button>`
         }
       </div>
-      <p style="color:var(--text-dim);font-size:.75rem;margin-top:12px">${t('dashboard.maintenanceExplain')}</p>
+      <p class="adm-text-dim adm-text-xs adm-mt-md">${t('dashboard.maintenanceExplain')}</p>
     </div>
 
     <!-- Backup/Restore -->
-    <div class="adm-card" style="margin-top:16px">
+    <div class="adm-card adm-mt-lg">
       <h2>${t('dashboard.backupRestore')}</h2>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <div class="adm-flex-wrap" style="gap:12px">
         <button class="adm-btn" style="flex:1;min-width:140px" onClick=${doBackup}>${t('dashboard.downloadBackup')}</button>
         <button class="adm-btn" style="flex:1;min-width:140px;background:#a855f7" onClick=${pickRestore}>${t('dashboard.restoreFromFile')}</button>
       </div>
-      ${backupResult && html`<div style="margin-top:8px;font-size:.85rem;color:${backupResult.ok ? '#22c55e' : '#ef4444'}">${escHtml(backupResult.msg)}</div>`}
-      <p style="color:var(--text-dim);font-size:.72rem;margin-top:8px">${t('dashboard.backupExplain')}</p>
+      ${backupResult && html`<div class="adm-mt-sm adm-text-base" style="color:${backupResult.ok ? '#22c55e' : '#ef4444'}">${escHtml(backupResult.msg)}</div>`}
+      <p class="adm-text-dim adm-text-xs adm-mt-sm">${t('dashboard.backupExplain')}</p>
     </div>
   `;
 }

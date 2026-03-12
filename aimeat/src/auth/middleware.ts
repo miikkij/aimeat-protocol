@@ -3,6 +3,7 @@ import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
 import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
@@ -223,7 +224,7 @@ export function requireScope(...requiredScopes: string[]) {
       const hasDomainWild = agentScopes.includes(`${domain}:*`);
 
       if (!hasExact && !hasDomainWild) {
-        console.warn(`[scope-denied] ${req.auth.sub} needs "${required}", has [${agentScopes.join(', ')}] on ${req.method} ${req.path}`);
+        logger.warn(`[scope-denied] ${req.auth.sub} needs "${required}", has [${agentScopes.join(', ')}] on ${req.method} ${req.path}`);
         res.status(403).json(errorEnvelope('SCOPE_DENIED', `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`));
         return;
       }
