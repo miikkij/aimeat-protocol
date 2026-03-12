@@ -82,6 +82,7 @@ export default function FederationTab({ data, reload }) {
 
   const doAddPeer = useCallback(async () => {
     if (!addNodeId || !addUrl) { flashErr(t('dashboard.fedAddPeerMissing')); return; }
+    try { new URL(addUrl); } catch { flashErr(t('dashboard.fedInvalidUrl') || 'Invalid URL format'); return; }
     try { await addPeerDirect(addNodeId, addUrl, addKey); flash(t('dashboard.fedPeerAdded')); setAddNodeId(''); setAddUrl(''); setAddKey(''); reload(); }
     catch (e) { flashErr(e.message); }
   }, [addNodeId, addUrl, addKey, reload]);

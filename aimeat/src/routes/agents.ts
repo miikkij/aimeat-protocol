@@ -13,6 +13,9 @@ import { verifyJWT } from '../auth/jwt.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 
+/** Device authorization code expires after 10 minutes */
+const DEVICE_AUTH_EXPIRY_MS = 600_000;
+
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -57,7 +60,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 600_000); // 10 minutes
+    const expiresAt = new Date(now.getTime() + DEVICE_AUTH_EXPIRY_MS);
 
     await storage.createDeviceAuth({
       deviceCode,

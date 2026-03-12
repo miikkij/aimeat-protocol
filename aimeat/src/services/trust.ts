@@ -1,5 +1,17 @@
 import type { Storage } from '../storage/interface.js';
 
+/** Trust score component weights (must sum to 1.0) */
+const TRUST_WEIGHTS = {
+  successRate: 0.30,
+  positiveRatings: 0.25,
+  accountAge: 0.15,
+  volume: 0.15,
+  disputes: 0.15,
+} as const;
+
+/** Points deducted per lost dispute (from a base of 100) */
+const DISPUTE_PENALTY_PER_LOSS = 33;
+
 export interface TrustData {
   score: number;
   totalDeliveries: number;
@@ -66,14 +78,14 @@ export async function calculateTrustScore(gaii: string, storage: Storage): Promi
   const ageDays = Math.floor((Date.now() - new Date(agent.createdAt).getTime()) / 86_400_000);
   const ageFactor = Math.min(100, Math.log2(ageDays + 1) * 15);
   const volumeFactor = Math.min(100, Math.log2(delivered + 1) * 11);
-  const disputePenalty = Math.max(0, 100 - disputesLost * 33);
+  const disputePenalty = Math.max(0, 100 - disputesLost * DISPUTE_PENALTY_PER_LOSS);
 
   let score = Math.floor(
-    successRate * 0.30 +
-    positiveRatingRatio * 0.25 +
-    ageFactor * 0.15 +
-    volumeFactor * 0.15 +
-    disputePenalty * 0.15,
+    successRate * TRUST_WEIGHTS.successRate +
+    positiveRatingRatio * TRUST_WEIGHTS.positiveRatings +
+    ageFactor * TRUST_WEIGHTS.accountAge +
+    volumeFactor * TRUST_WEIGHTS.volume +
+    disputePenalty * TRUST_WEIGHTS.disputes,
   );
 
   // SECURITY: Require minimum 3 unique counterparties for meaningful trust score
