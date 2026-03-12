@@ -1043,6 +1043,29 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           value: String(config.extensionMaxInstalled),
           defaultVal: '20',
         },
+        {
+          envVar: 'AIMEAT_EXT_INSTALL_ROLE',
+          description: 'Role required to install extensions (operator | owner)',
+          value: config.extInstallRole,
+          defaultVal: 'operator',
+        },
+        {
+          envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER',
+          description: 'Max extensions per owner when owner-role installs enabled',
+          value: String(config.maxExtensionsPerOwner),
+          defaultVal: '10',
+        },
+      ],
+    },
+    {
+      title: 'Service Generator',
+      entries: [
+        {
+          envVar: 'AIMEAT_GENERATOR_ENABLED',
+          description: 'Show Generator tab in profile view',
+          value: String(config.generatorEnabled),
+          defaultVal: 'true',
+        },
       ],
     },
     {

@@ -144,6 +144,7 @@ export function validateEnv(): ValidationResult[] {
     { key: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', name: 'Push Max Subscriptions', defaultVal: '5', min: 1, max: 100 },
     { key: 'AIMEAT_PUSH_MAX_FAILURES', name: 'Push Max Failures', defaultVal: '3', min: 1, max: 50 },
     { key: 'AIMEAT_EMAIL_RATE_LIMIT_MIN', name: 'Email Rate Limit', defaultVal: '30', min: 1, max: 1440 },
+    { key: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', name: 'Max Extensions Per Owner', defaultVal: '10', min: 1, max: 100 },
   ];
 
   for (const field of numericFields) {
@@ -270,6 +271,12 @@ export function validateEnv(): ValidationResult[] {
   const statsAccess = env.AIMEAT_STATS_ACCESS;
   if (statsAccess && !['public', 'authenticated', 'operator'].includes(statsAccess)) {
     results.push({ level: 'error', variable: 'AIMEAT_STATS_ACCESS', message: `Invalid value "${statsAccess}". Must be: public, authenticated, or operator.` });
+  }
+
+  // ── Extension Install Role ──
+  const extRole = env.AIMEAT_EXT_INSTALL_ROLE;
+  if (extRole !== undefined && !['operator', 'owner'].includes(extRole)) {
+    results.push({ level: 'error', variable: 'AIMEAT_EXT_INSTALL_ROLE', message: `Invalid value "${extRole}". Must be "operator" or "owner"` });
   }
 
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────
