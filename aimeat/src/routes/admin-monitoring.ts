@@ -1,0 +1,370 @@
+import { Router } from 'express';
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
+import { success, error } from '../middleware/envelope.js';
+import { RoleGrantSchema, validateBody } from '../models/schemas.js';
+import { randomBytes } from 'node:crypto';
+import { generateKeyPair, sign } from '../auth/keypair.js';
+import { emitChange } from '../services/event-bus.js';
+
+export function adminMonitoringRouter(
+    config: AimeatConfig,
+    storage: Storage,
+): Router {
+    const router = Router();
+
+    // GET /v1/admin/work — list all work items (operator only)
+    router.get('/v1/admin/work', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const allWork = await storage.listAllWork();
+        res.json(success(config.nodeId, {
+            work: allWork.map(w => ({
+                tracking_code: w.trackingCode,
+                status: w.status,
+                action_id: w.actionId,
+                provider_gaii: w.providerGaii,
+                requester_gaii: w.requesterGaii,
+                cost: w.cost,
+                created_at: w.createdAt,
+                updated_at: w.updatedAt,
+                ttl_expires_at: w.ttlExpiresAt,
+            })),
+            total: allWork.length,
+        }));
+    });
+
+    // GET /v1/admin/federation — federation info (operator only)
+    router.get('/v1/admin/federation', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const peers = await storage.listPeeringRequests();
+        res.json(success(config.nodeId, {
+            peers: peers.map(p => ({
+                id: p.id,
+                from_node_url: p.fromNodeUrl,
+                from_node_id: p.fromNodeId,
+                target_url: p.targetUrl,
+                status: p.status,
+                message: p.message,
+                created_at: p.createdAt,
+            })),
+            total: peers.length,
+        }));
+    });
+
+    // POST /v1/admin/federation/join — introduce this node to a genesis/target node (operator only)
+    router.post('/v1/admin/federation/join', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { genesis_url, role } = req.body ?? {};
+        if (!genesis_url || typeof genesis_url !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'genesis_url is required'));
+            return;
+        }
+        const joinRole = (role === 'operator' || role === 'contributor') ? role : 'contributor';
+        const targetUrl = genesis_url.replace(/\/+$/, '');
+
+        // 1. Discovery
+        let targetInfo: { node_id?: string; type?: string; protocol?: string; version?: string | number; capabilities?: string[] };
+        try {
+            const disc = await fetch(`${targetUrl}/.well-known/aimeat`, { signal: AbortSignal.timeout(10_000) });
+            if (!disc.ok) throw new Error(`HTTP ${disc.status}`);
+            const body = await disc.json() as { data?: typeof targetInfo };
+            targetInfo = body.data!;
+            if (!targetInfo?.protocol || targetInfo.protocol !== 'aimeat') {
+                res.status(502).json(error(config.nodeId, 'NOT_AIMEAT', 'Target is not an AIMEAT node'));
+                return;
+            }
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'DISCOVERY_FAILED',
+                `Cannot reach ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
+            return;
+        }
+
+        // 2. Ensure this node has a keypair
+        let publicKey = process.env.AIMEAT_PUBLIC_KEY ?? '';
+        let privateKey = process.env.AIMEAT_PRIVATE_KEY ?? '';
+        if (!publicKey || !privateKey) {
+            const keys = await generateKeyPair();
+            publicKey = keys.publicKey;
+            privateKey = keys.privateKey;
+            process.env.AIMEAT_PUBLIC_KEY = publicKey;
+            process.env.AIMEAT_PRIVATE_KEY = privateKey;
+        }
+
+        // 3. Sign and send introduction
+        const timestamp = new Date().toISOString();
+        const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
+        const signature = await sign(privateKey, messageToSign);
+
+        try {
+            const introResp = await fetch(`${targetUrl}/v1/federation/peer/introduce`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    node_id: config.nodeId,
+                    node_url: config.baseUrl,
+                    node_type: config.nodeType,
+                    public_key: publicKey,
+                    role: joinRole,
+                    message: '',
+                    signature,
+                    timestamp,
+                }),
+                signal: AbortSignal.timeout(15_000),
+            });
+
+            const introBody = await introResp.json() as { data?: { request_id: string; status: string; message?: string }; error?: { message?: string } };
+            if (!introResp.ok) {
+                const msg = introBody?.error?.message ?? `HTTP ${introResp.status}`;
+                res.status(introResp.status).json(error(config.nodeId, 'INTRODUCTION_FAILED', msg));
+                return;
+            }
+
+            res.json(success(config.nodeId, {
+                target_node_id: targetInfo.node_id,
+                target_url: targetUrl,
+                request_id: introBody.data?.request_id,
+                status: introBody.data?.status ?? 'pending',
+                message: introBody.data?.message ?? 'Introduction sent. Awaiting genesis operator approval.',
+            }));
+            emitChange('config');
+        } catch (e) {
+            res.status(502).json(error(config.nodeId, 'INTRODUCTION_FAILED',
+                `Failed to introduce to ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
+        }
+    });
+
+    // GET /v1/admin/stats — aggregate statistics (operator only)
+    router.get('/v1/admin/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+
+        const trustBuckets = { low: 0, medium: 0, high: 0 };
+        for (const a of agents) {
+            if (a.trustScore < 30) trustBuckets.low++;
+            else if (a.trustScore < 70) trustBuckets.medium++;
+            else trustBuckets.high++;
+        }
+
+        res.json(success(config.nodeId, {
+            agents: {
+                total: agents.length,
+                trust_distribution: trustBuckets,
+            },
+            actions: {
+                total: actions.length,
+                categories: [...new Set(actions.map(a => a.category).filter(Boolean))],
+            },
+        }));
+    });
+
+    // GET /v1/admin/backup — export all data as JSON (operator only)
+    router.get('/v1/admin/backup', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const owners = await storage.listOwners();
+        const agents = await storage.listAgents();
+        const actions = await storage.listActions();
+        const boards = await storage.listBoards();
+
+        // Collect all memories and transactions per agent
+        const agentData: Record<string, { memories: unknown[]; transactions: unknown[] }> = {};
+        for (const a of agents) {
+            const memories = await storage.listMemory(a.gaii);
+            const transactions = await storage.getTransactions(a.gaii, 100_000);
+            agentData[a.gaii] = { memories, transactions };
+        }
+
+        res.json(success(config.nodeId, {
+            version: '1.2',
+            exported_at: new Date().toISOString(),
+            node_id: config.nodeId,
+            owners,
+            agents,
+            actions,
+            boards,
+            agent_data: agentData,
+        }));
+    });
+
+    // POST /v1/admin/restore — import data from backup (operator only)
+    router.post('/v1/admin/restore', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { owners, agents, actions, boards, agent_data } = req.body ?? {};
+        const imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
+
+        if (owners) {
+            for (const o of owners) {
+                try { await storage.createOwner(o); imported.owners++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (agents) {
+            for (const a of agents) {
+                try { await storage.createAgent(a); imported.agents++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (actions) {
+            for (const a of actions) {
+                try { await storage.createAction(a); imported.actions++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (boards) {
+            for (const b of boards) {
+                try { await storage.createBoard(b); imported.boards++; } catch { /* skip duplicates */ }
+            }
+        }
+        if (agent_data) {
+            for (const [gaii, data] of Object.entries(agent_data as Record<string, any>)) {
+                if (data.memories) {
+                    for (const m of data.memories) {
+                        await storage.setMemory(m);
+                        imported.memories++;
+                    }
+                }
+                if (data.transactions) {
+                    for (const tx of data.transactions) {
+                        await storage.addTransaction(tx);
+                    }
+                }
+            }
+        }
+
+        res.json(success(config.nodeId, {
+            restored: true,
+            imported,
+        }));
+        emitChange('config');
+    });
+
+    // POST /v1/admin/roles/grant — grant operator role (operator only)
+    router.post('/v1/admin/roles/grant', requireAuth(), requireRole('operator'), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
+        const { owner, role } = req.body ?? {};
+
+        const ownerRecord = await storage.getOwner(owner);
+        if (!ownerRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
+            return;
+        }
+
+        if (ownerRecord.roles.includes('operator')) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" already has operator role`));
+            return;
+        }
+
+        await storage.updateOwner(owner, { roles: [...ownerRecord.roles, 'operator'] });
+
+        res.json(success(config.nodeId, {
+            owner,
+            role: 'operator',
+            granted: true,
+        }));
+        emitChange('config');
+    });
+
+    // D.2: Trust advisory broadcast endpoint (operator only)
+    router.post('/v1/admin/federation/trust-advisory', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { target_node, advisory_type, reason, evidence_hash } = req.body ?? {};
+
+        if (!target_node || !advisory_type || !reason) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node, advisory_type, and reason are required'));
+            return;
+        }
+
+        const validTypes = ['warning', 'suspend', 'ban'];
+        if (!validTypes.includes(advisory_type)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${validTypes.join(', ')}`));
+            return;
+        }
+
+        // Note: Trust broadcast requires peers map which admin router doesn't have access to.
+        // Store the advisory and let the federation service pick it up.
+        const advisoryRecord = {
+            id: `adv-${randomBytes(8).toString('hex')}`,
+            target_node,
+            advisory_type,
+            reason,
+            evidence_hash: evidence_hash ?? null,
+            issued_by: config.nodeId,
+            created_at: new Date().toISOString(),
+            status: 'issued',
+        };
+
+        // Store as memory for persistence and querying
+        const systemGaii = `system@${config.nodeId}`;
+        await storage.setMemory({
+            key: `trust_advisory:${advisoryRecord.id}`,
+            ownerGaii: systemGaii,
+            value: advisoryRecord,
+            visibility: 'private',
+            tags: ['trust_advisory', `target:${target_node}`, `type:${advisory_type}`],
+            ttlHours: null,
+            version: 1,
+            createdAt: advisoryRecord.created_at,
+            updatedAt: advisoryRecord.created_at,
+        });
+
+        res.status(201).json(success(config.nodeId, {
+            advisory: advisoryRecord,
+            note: 'Advisory stored. It will be broadcast to peers during next sync cycle or can be manually triggered.',
+        }));
+        emitChange('config');
+    });
+
+    // D.2: List trust advisories (received + issued)
+    router.get('/v1/admin/federation/trust-advisories', requireAuth(), requireRole('operator'), async (req, res) => {
+        const systemGaii = `system@${config.nodeId}`;
+        // Query trust advisory memories
+        const memories = await storage.listMemory(systemGaii, { prefix: 'trust_advisory:' });
+
+        const advisories = memories.map(m => ({
+            id: (m.value as Record<string, unknown>)?.id ?? m.key.replace('trust_advisory:', ''),
+            ...(m.value as Record<string, unknown>),
+            stored_at: m.createdAt,
+        }));
+
+        // Sort by most recent first
+        advisories.sort((a, b) => {
+            const aTime = (a as { created_at?: string }).created_at ?? '';
+            const bTime = (b as { created_at?: string }).created_at ?? '';
+            return bTime.localeCompare(aTime);
+        });
+
+        res.json(success(config.nodeId, {
+            advisories,
+            total: advisories.length,
+        }));
+    });
+
+    // B.3: Sync health metrics (operator only)
+    router.get('/v1/admin/federation/sync-health', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const queueSize = await storage.replicationQueueSize();
+
+        res.json(success(config.nodeId, {
+            queue_depth: queueSize,
+            timestamp: new Date().toISOString(),
+        }));
+    });
+
+    // F.4: Relay earnings query (operator only)
+    router.get('/v1/admin/federation/relay-earnings', requireAuth(), requireRole('operator'), async (req, res) => {
+        const since = req.query.since as string | undefined;
+        const until = req.query.until as string | undefined;
+
+        const systemGaii = `system@${config.nodeId}`;
+        const memories = await storage.listMemory(systemGaii, { prefix: 'relay_earning:' });
+
+        let earnings = memories.map(m => m.value as Record<string, unknown>);
+
+        if (since) {
+            earnings = earnings.filter(e => (e.timestamp as string) >= since);
+        }
+        if (until) {
+            earnings = earnings.filter(e => (e.timestamp as string) <= until);
+        }
+
+        const totalMorsels = earnings.reduce((sum, e) => sum + ((e.amount as number) ?? 0), 0);
+
+        res.json(success(config.nodeId, {
+            earnings,
+            total_morsels: totalMorsels,
+            total_entries: earnings.length,
+            period: { since: since ?? null, until: until ?? null },
+        }));
+    });
+
+    return router;
+}
