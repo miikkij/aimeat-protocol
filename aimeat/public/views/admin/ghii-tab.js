@@ -3,24 +3,26 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, Empty, ExpandableHelp } from './shared.js';
+import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { updateGhiiLevel, deleteGhii } from '/js/services/admin.js';
 
 export default function GhiiTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const users = data.ghiiUsers || [];
 
   async function setLevel(ghii, level) {
     try { await updateGhiiLevel(ghii, parseInt(level)); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   async function doDelete(ghii) {
     if (!confirm(t('dashboard.deleteGhiiConfirm') + ' ' + ghii + '?')) return;
     try { await deleteGhii(ghii); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div class="adm-card" style="margin-bottom:12px">
       <h2>GHII <span style="font-weight:400;font-size:.85rem;color:var(--text-dim)">— ${t('dashboard.ghiiExplain')}</span></h2>
       <${ExpandableHelp} title=${t('dashboard.ghiiLevelsTitle')}>

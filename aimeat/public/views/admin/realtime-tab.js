@@ -3,10 +3,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { num, StatsGrid, Empty } from './shared.js';
+import { num, StatsGrid, Empty, useToast, Toast } from './shared.js';
 import { closeRoom } from '/js/services/admin.js';
 
 export default function RealtimeTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const rt = data.realtime;
   if (!rt) return html`<${Empty} text=${t('dashboard.realtimeUnavailable')} />`;
 
@@ -16,10 +17,11 @@ export default function RealtimeTab({ data, reload }) {
   async function doClose(roomId) {
     if (!confirm(t('dashboard.closeRoomConfirm'))) return;
     try { await closeRoom(roomId); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${StatsGrid} items=${[
       { label: t('dashboard.activeRooms'), value: rooms.length, color: '#06b6d4' },
       { label: t('dashboard.totalPeers'), value: rooms.reduce((a, r) => a + (r.peer_count || r.peers?.length || 0), 0), color: '#22c55e' },

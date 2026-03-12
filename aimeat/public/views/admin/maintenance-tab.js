@@ -4,10 +4,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, EconRow } from './shared.js';
+import { dt, EconRow, useToast, Toast } from './shared.js';
 import { setMaintenance, getBackup, doRestore as apiRestore } from '/js/services/admin.js';
 
 export default function MaintenanceTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const m = data.maintenance || { enabled: false, message: '', enabledAt: null, enabledBy: null };
   const [msg, setMsg] = useState(m.message || '');
   const [backupResult, setBackupResult] = useState(null);
@@ -16,7 +17,7 @@ export default function MaintenanceTab({ data, reload }) {
     try {
       await setMaintenance(on, msg);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doBackup() {
@@ -57,6 +58,7 @@ export default function MaintenanceTab({ data, reload }) {
   const status = m.enabled ? t('dashboard.maintenanceOn') : t('dashboard.operational');
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div class="adm-card" style="border-left:4px solid ${color}">
       <h2>${t('dashboard.maintenanceMode')}</h2>
       <div class="adm-stat" style="color:${color};margin-bottom:12px">${status}</div>
