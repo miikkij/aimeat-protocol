@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AIMEAT Design Mockups — Light Theme</title>
+<title>AIME AT Design Mockups — Light Theme</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ============================================
-   AIMEAT DESIGN SYSTEM — LIGHT THEME v1.0
+   AIME AT DESIGN SYSTEM — LIGHT THEME v1.0
    ============================================ */
 
 :root {
@@ -125,17 +125,12 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
 }
 .header-left { display: flex; align-items: center; gap: 20px; }
 .logo {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 0;
   text-decoration: none; color: var(--text-primary);
-  font-weight: 800; font-size: 17px; letter-spacing: 0.5px;
+  font-weight: 800; font-size: 18px; letter-spacing: 0.3px;
 }
-.logo-heart {
-  width: 28px; height: 28px; border-radius: 7px;
-  background: var(--heart-gradient);
-  display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 15px; font-weight: 800;
-}
-.logo-text em { font-style: normal; color: var(--heart); }
+.logo .heart { color: var(--heart); font-style: normal; margin: 0 1px; }
+.logo em { font-style: normal; color: var(--heart); }
 
 .morsel-badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -432,12 +427,6 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
   padding: 0 18px 16px; display: flex; align-items: center; gap: 8px;
   border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px;
 }
-.admin-sidebar .sidebar-logo .logo-mark {
-  width: 28px; height: 28px; border-radius: 7px;
-  background: linear-gradient(135deg, var(--admin-accent), #818CF8);
-  display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 13px; font-weight: 800;
-}
 .admin-sidebar .sidebar-logo span {
   color: #F1F5F9; font-weight: 700; font-size: 15px;
 }
@@ -572,7 +561,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
      DEMO NAVIGATION
      ============================================ -->
 <div class="demo-nav">
-  <span>AIMEAT Mockups</span>
+  <span>AIME♥AT Mockups</span>
   <button class="active" onclick="show('header')">Header</button>
   <button onclick="show('signin')">Sign In</button>
   <button onclick="show('profile')">Profile</button>
@@ -591,8 +580,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
   <div class="header" style="position:relative;top:0">
     <div class="header-left">
       <a class="logo" href="#">
-        <div class="logo-heart">♥</div>
-        <span>AIME<em>AT</em></span>
+        AIME<span class="heart">♥</span><em>AT</em>
       </a>
     </div>
     <div class="header-nav">
@@ -616,8 +604,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
   <div class="header" style="position:relative;top:0">
     <div class="header-left">
       <a class="logo" href="#">
-        <div class="logo-heart">♥</div>
-        <span>AIME<em>AT</em></span>
+        AIME<span class="heart">♥</span><em>AT</em>
       </a>
       <span class="morsel-badge">150</span>
     </div>
@@ -647,8 +634,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
   <div class="header" style="position:relative;top:0;border-bottom-color:#E0E7FF">
     <div class="header-left">
       <a class="logo" href="#">
-        <div class="logo-heart" style="background:linear-gradient(135deg,#6366F1,#818CF8)">♥</div>
-        <span>AIME<em style="color:#6366F1">AT</em></span>
+        AIME<span class="heart" style="color:#6366F1">♥</span><em style="color:#6366F1">AT</em>
       </a>
       <span class="morsel-badge" style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF);color:#6366F1;border-color:rgba(99,102,241,0.15)">100</span>
       <span style="background:#EEF2FF;color:#6366F1;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px">Admin</span>
@@ -688,8 +674,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
     <div class="modal-card">
       <div class="modal-header">
         <h2>
-          <span class="heart-icon">♥</span>
-          AIMEAT Sign In
+          AIME<span style="color:var(--heart)">♥</span><span style="color:var(--heart)">AT</span> Sign In
         </h2>
         <p>Uusi käyttäjä? Valitse käyttäjänimi ja salasana. Jo tili? Kirjaudu sisään.</p>
       </div>
@@ -742,7 +727,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
     <!-- Header (inline) -->
     <div class="header" style="position:relative;top:0">
       <div class="header-left">
-        <a class="logo" href="#"><div class="logo-heart">♥</div><span>AIME<em>AT</em></span></a>
+        <a class="logo" href="#">AIME<span class="heart">♥</span><em>AT</em></a>
         <span class="morsel-badge">150</span>
       </div>
       <div class="header-nav">
@@ -886,8 +871,7 @@ body { font-family: var(--font); color: var(--text-primary); background: var(--b
     <!-- Sidebar -->
     <aside class="admin-sidebar">
       <div class="sidebar-logo">
-        <div class="logo-mark">♥</div>
-        <span>AIMEAT</span>
+        <span style="color:#F1F5F9;font-weight:800;font-size:16px;letter-spacing:0.3px">AIME<span style="color:#818CF8">♥</span><span style="color:#818CF8">AT</span></span>
       </div>
       <div style="padding:0 18px 12px;font-family:var(--mono);font-size:11px;color:#475569">aimeat-local-001-dev</div>
 
