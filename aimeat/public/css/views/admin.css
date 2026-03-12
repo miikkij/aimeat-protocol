@@ -389,3 +389,70 @@
   display: flex; align-items: center; gap: 6px;
   border-bottom: 1px solid var(--glass-border);
 }
+
+/* ── Form Controls ── */
+.adm-input {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-bright);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: .85rem;
+  font-family: inherit;
+}
+.adm-input:focus { border-color: var(--accent); outline: none; }
+.adm-input-full { width: 100%; }
+
+.adm-textarea {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-bright);
+  padding: 10px;
+  border-radius: 6px;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: .8rem;
+  resize: vertical;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+/* ── Flex Utilities ── */
+.adm-flex       { display: flex; gap: 8px; }
+.adm-flex-col   { display: flex; flex-direction: column; gap: 8px; }
+.adm-flex-between { display: flex; justify-content: space-between; align-items: center; }
+.adm-flex-center  { display: flex; align-items: center; gap: 8px; }
+.adm-flex-wrap    { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Text Utilities ── */
+.adm-text-xs  { font-size: .7rem; }
+.adm-text-sm  { font-size: .8rem; }
+.adm-text-base { font-size: .85rem; }
+.adm-text-dim  { color: var(--text-dim); }
+.adm-text-bright { color: var(--text-bright); }
+.adm-text-accent { color: var(--accent); }
+.adm-text-error  { color: #ef4444; }
+.adm-text-success { color: #22c55e; }
+.adm-text-mono { font-family: 'SF Mono', Consolas, monospace; font-size: .8rem; }
+
+/* ── Spacing Utilities ── */
+.adm-gap-xs { gap: 4px; }
+.adm-gap-sm { gap: 8px; }
+.adm-gap-md { gap: 12px; }
+.adm-gap-lg { gap: 16px; }
+
+.adm-mb-xs { margin-bottom: 4px; }
+.adm-mb-sm { margin-bottom: 8px; }
+.adm-mb-md { margin-bottom: 12px; }
+.adm-mb-lg { margin-bottom: 16px; }
+
+.adm-mt-sm { margin-top: 8px; }
+.adm-mt-md { margin-top: 12px; }
+.adm-mt-lg { margin-top: 16px; }
+
+/* ── Modal ── */
+.adm-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
