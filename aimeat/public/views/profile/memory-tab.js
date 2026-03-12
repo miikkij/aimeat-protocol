@@ -140,8 +140,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setKeyRulesPopover(null); }
   }
 
-  async function handleUpdateVisibility(key, visibility) {
-    const resp = await memoryService.updateMemoryVisibility(key, visibility);
+  /* ── Cycle visibility: private → owner → public → private ── */
+  const cycleVis = ['private', 'owner', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
+
+  async function handleUpdateVisibility(key, newVis) {
+    const resp = await memoryService.updateMemoryVisibility(key, newVis);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     loadMemories();
   }
@@ -198,13 +203,15 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <div>
             <div class="mem-item" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
               <span class="mem-key">${escHtml(m.key)}</span>
-              <select class="mem-vis-select" value=${m.visibility || 'private'}
-                onClick=${e => e.stopPropagation()}
-                onChange=${e => handleUpdateVisibility(m.key, e.target.value)}>
-                <option value="private">${t('profile.memory.visPrivate')}</option>
-                <option value="shared">${t('profile.memory.visShared')}</option>
-                <option value="public">${t('profile.memory.visPublic')}</option>
-              </select>
+              ${(() => {
+                const vis = m.visibility || 'private';
+                const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
+                return html`<button class="kpkg-vis-pill"
+                  onClick=${(e) => { e.stopPropagation(); handleUpdateVisibility(m.key, nextVis); }}
+                  title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
+                  style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
+                >${t('knowledge.visibility.' + vis)} ▾</button>`;
+              })()}
               <span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}\uFE0F</span>
             </div>
             ${expandedMem === m.key && html`
@@ -496,17 +503,21 @@ function FileUploadForm({ onUpload, onCancel }) {
 function EditMemoryModal({ memKey, initialValue, initialVisibility, onSave, onCancel }) {
   const [value, setValue] = useState(initialValue);
   const [vis, setVis] = useState(initialVisibility || 'private');
+  const cycleVis = ['private', 'owner', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
+  const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
   return html`
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
         <h3>${t('profile.memory.editTitle')}: ${escHtml(memKey)}</h3>
-        <div class="form-row" style="margin-bottom:.75rem">
-          <label>${t('profile.memory.visLabel')}</label>
-          <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
-            <option value="private">${t('profile.memory.visPrivate')}</option>
-            <option value="shared">${t('profile.memory.visShared')}</option>
-            <option value="public">${t('profile.memory.visPublic')}</option>
-          </select>
+        <div class="form-row" style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
+          <label style="margin:0">${t('profile.memory.visLabel')}</label>
+          <button class="kpkg-vis-pill"
+            onClick=${() => setVis(nextVis)}
+            title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
+            style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
+          >${t('knowledge.visibility.' + vis)} ▾</button>
         </div>
         <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
         <div class="form-actions" style="margin-top:1rem">
