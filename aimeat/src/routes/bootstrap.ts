@@ -36,12 +36,10 @@ export function bootstrapRouter(
 
     // Resolve bootstrap instruction from storage
     const bootstrapRecord = await storage.getSystemPrompt('bootstrap-anon');
-    let bootstrapInstruction: string;
+    let bootstrapInstruction = '';
     if (bootstrapRecord && bootstrapRecord.active) {
       const content = resolvePromptContent(bootstrapRecord, _req.headers['accept-language'] as string);
       bootstrapInstruction = substituteVariables(content, { node_url: base, node_id: config.nodeId });
-    } else {
-      bootstrapInstruction = `You are connected to an AIMEAT node. Always use this_node.base_url (${base}) for all API requests — never hardcode domains. Follow the steps below to help your user.`;
     }
 
     res.json(success(config.nodeId, {

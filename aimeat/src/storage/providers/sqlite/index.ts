@@ -4532,4 +4532,9 @@ export class SqliteStorage implements Storage {
     ).run(promptId, promptId, keepCount);
     return result.changes;
   }
+
+  async deleteAllSystemPrompts(): Promise<void> {
+    this.db.prepare('DELETE FROM system_prompt_versions').run();
+    this.db.prepare('DELETE FROM system_prompts').run();
+  }
 }

@@ -2,7 +2,6 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -250,240 +249,18 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // ── Prompt Packages (dynamic API) ──────────────────────────
+  // ── Prompt Packages (storage-backed) ──────────────────────────
 
-  const PROMPT_PACKAGES: Record<string, { name: string; description: string; category: string; cortexHints: string[]; template: (nodeUrl: string, ownerName: string, cortexExtensions: string[]) => string }> = {
-    'app-builder-general': {
-      name: 'Custom App Builder',
-      description: 'User interview \u2192 bespoke single-file HTML app',
-      category: 'builder',
-      cortexHints: [],
-      template: (nodeUrl, ownerName, cortexExts) => `You are building a custom single-file HTML app for user "${ownerName}" on AIMEAT node ${nodeUrl}.
-
-Ask the user what their app should do. Then build a complete, self-contained HTML file.
-
-## AIMEAT Platform
-- Load client libraries from ${nodeUrl}/v1/libs/ (aimeat-auth.js, aimeat-data.js, aimeat-storage.js, aimeat-social.js, aimeat-wallet.js, aimeat-work.js)
-- Auth: AIMEAT.auth.mountLoginButton("#login", { onLogin: fn, onLogout: fn })
-- Data: AIMEAT.data.set(key, value), AIMEAT.data.get(key), AIMEAT.data.search(q)
-- Dark theme: --bg:#0f0a14; --text:#f0e6f6; --accent:#ff6b9d
-${cortexExts.length ? '\n## Available Cortex Extensions\n' + cortexExts.join('\n') : ''}
-
-## Rules
-- Return COMPLETE HTML file, not fragments
-- Mobile-first responsive design
-- Include error handling and loading states
-- Include a self-publish button using POST ${nodeUrl}/v1/apps`,
-    },
-    'app-builder-game': {
-      name: 'Multiplayer Game Builder',
-      description: 'Game with lobby, turns, scoreboard using AIMEAT boards',
-      category: 'builder',
-      cortexHints: [],
-      template: (nodeUrl, ownerName, cortexExts) => `Build a multiplayer HTML game for "${ownerName}" on AIMEAT node ${nodeUrl}.
-
-## Game Architecture
-- Use AIMEAT boards for real-time game state (POST/GET /v1/boards/{id}/posts)
-- Use AIMEAT memory for persistent scores and player profiles
-- Use AIMEAT auth for player identity
-
-## Required Features
-- Game lobby (create/join using a board as the lobby channel)
-- Turn-based or real-time gameplay via board posts
-- Scoreboard stored in AIMEAT memory (key: games.{gamename}.scores)
-- Player profiles with wins/losses
-
-## Libraries
-Load from ${nodeUrl}/v1/libs/:
-- aimeat-auth.js \u2014 Login/identity
-- aimeat-data.js \u2014 Score persistence
-- aimeat-social.js \u2014 Game state via boards
-${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
-
-## Design
-Dark theme (--bg:#0f0a14; --accent:#ff6b9d), mobile-first, smooth animations.
-Return a COMPLETE single HTML file.`,
-    },
-    'app-builder-notes': {
-      name: 'Note-Taking App Builder',
-      description: 'Notes app with folders, tags, search using AIMEAT memory',
-      category: 'builder',
-      cortexHints: [],
-      template: (nodeUrl, ownerName, cortexExts) => `Build a note-taking app for "${ownerName}" on AIMEAT node ${nodeUrl}.
-
-## Features
-- Create, edit, delete notes
-- Organize with folders/categories and tags
-- Full-text search via AIMEAT memory search
-- Set visibility (private/public) per note
-- Markdown support in note body
-
-## Data Storage
-- Notes stored as AIMEAT memory keys: notes.{id}
-- Value: { title, body, folder, tags, createdAt, updatedAt }
-- Use AIMEAT.data.search("notes.") to list all notes
-- Use AIMEAT.data.set() / .get() / .delete()
-
-## Libraries
-Load from ${nodeUrl}/v1/libs/:
-- aimeat-auth.js \u2014 Login
-- aimeat-data.js \u2014 Note CRUD
-${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
-
-## Design
-Dark theme, mobile-first, sidebar + editor layout. Return COMPLETE HTML file.`,
-    },
-    'app-builder-dashboard': {
-      name: 'Data Dashboard Builder',
-      description: 'Charts, tables, and live data from AIMEAT memory',
-      category: 'builder',
-      cortexHints: ['aimeat-charts'],
-      template: (nodeUrl, ownerName, cortexExts) => `Build a data dashboard for "${ownerName}" on AIMEAT node ${nodeUrl}.
-
-## Features
-- Read structured data from AIMEAT memory keys
-- Display as charts (bar, line, pie) and data tables
-- Auto-refresh interval for live data
-- Configurable data sources (user picks which memory keys to visualize)
-- Summary cards with key metrics
-
-## Libraries
-Load from ${nodeUrl}/v1/libs/:
-- aimeat-auth.js \u2014 Login
-- aimeat-data.js \u2014 Read data
-${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
-
-## Chart Implementation
-Use Canvas API or inline SVG for charts (no external dependencies).
-Dashboard should be fully self-contained in one HTML file.
-
-## Design
-Dark theme, grid layout, responsive cards. Return COMPLETE HTML file.`,
-    },
-    'app-builder-chat': {
-      name: 'Chat Room Builder',
-      description: 'Real-time messaging using AIMEAT boards',
-      category: 'builder',
-      cortexHints: [],
-      template: (nodeUrl, ownerName, cortexExts) => `Build a chat room app for "${ownerName}" on AIMEAT node ${nodeUrl}.
-
-## Features
-- Channel sidebar (list boards as channels)
-- Message display with author, timestamp, reactions
-- Send message (POST to board)
-- Reply threading
-- Emoji reactions
-- Auto-poll for new messages (every 3 seconds)
-- Create new channels (create board)
-
-## Architecture
-- Each channel = one AIMEAT board
-- Messages = board posts
-- Replies = posts with replyTo field
-- Reactions = post reaction API
-
-## Libraries
-Load from ${nodeUrl}/v1/libs/:
-- aimeat-auth.js \u2014 Login/identity
-- aimeat-social.js \u2014 Boards, posts, reactions
-${cortexExts.length ? '\n## Cortex Extensions\n' + cortexExts.join('\n') : ''}
-
-## Design
-Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
-    },
-    'csm-builder': {
-      name: 'CSM Builder',
-      description: 'Create a Contextual Service Model (CSM) via AI conversation',
-      category: 'builder',
-      cortexHints: [],
-      template: (nodeUrl, ownerName, _cortexExts) => `You are helping "${ownerName}" design a CSM (Contextual Service Model) for AIMEAT node ${nodeUrl}.
-
-## What is a CSM?
-
-A CSM is a YAML document that defines a service's data model for an AIMEAT node. It specifies what data a service collects, how it's validated, and what consent rules apply. Services like hobby directories, marketplaces, dating apps, news feeds, and forums all use CSMs.
-
-## CSM YAML Format
-
-\`\`\`yaml
-csm: "1.0"
-service:
-  name: "service-name"           # unique identifier (kebab-case)
-  type: "directory"              # directory | marketplace | forum | social | feed | auction
-  description: "What this service does"
-  locale: "en"                   # primary locale
-
-schema_mode: "open"              # open = flexible, strict = exact match, locked = no changes
-
-data_schema:
-  required:
-    field_name:
-      type: string               # string | number | boolean | array | object
-      maxLength: 200             # optional constraints
-    tags:
-      type: array
-      items: { type: string }
-      minItems: 1
-    location:
-      type: object
-      properties:
-        city: { type: string }
-        country: { type: string, default: "US" }
-      required: [city]
-  optional:
-    bio: { type: string, maxLength: 500 }
-    rating: { type: number, minimum: 0, maximum: 5 }
-    status: { type: string, enum: ["active", "paused", "closed"] }
-
-consent_requirements:
-  visibility_default: "federation"    # public | node | federation | private
-  requires_consent: true
-  consent_purpose: "community-discovery"  # describe why data is collected
-  data_retention: "until_revoked"     # until_revoked | 30_days | 90_days | 1_year
-
-moderation:
-  flags_enabled: true
-  auto_hide_threshold: 5
-  appeals_enabled: false
-
-ui_hints:
-  list_view: ["displayName", "tags", "location.city"]
-  detail_view: ["displayName", "bio", "tags", "location", "status"]
-  search_fields: ["tags", "location.city"]
-\`\`\`
-
-## Your Task
-
-1. Ask the user what kind of service they want to create
-2. Ask about the data fields they need (required vs optional)
-3. Ask about consent and moderation requirements
-4. Generate the complete CSM YAML
-
-## Rules
-- Service name must be unique and kebab-case
-- Include at least one required field in data_schema
-- Always include consent_requirements
-- Choose appropriate schema_mode (open for flexibility, strict for data integrity)
-- Include ui_hints to help frontends render the data
-
-## Registration
-
-Once the user is happy with the CSM, they can register it by:
-- Pasting the YAML in the admin dashboard CSM Management tab
-- Or via API: POST ${nodeUrl}/v1/csm with Content-Type: text/yaml
-
-The node will validate the CSM, generate a JSON Schema, and register it for use.`,
-    },
-  };
-
-  // GET /v1/portal/prompts — List available prompt packages
+  // GET /v1/portal/prompts — List available prompt packages from the builders group
   router.get('/v1/portal/prompts', async (req, res) => {
-    const packages = Object.entries(PROMPT_PACKAGES).map(([id, pkg]) => ({
-      id,
-      name: pkg.name,
-      description: pkg.description,
-      category: pkg.category,
-      cortex_hints: pkg.cortexHints,
-    }));
+    const builderPrompts = await storage.listSystemPrompts({ group: 'builders' });
+    const packages = builderPrompts
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        category: p.group,
+      }));
 
     res.json(success(config.nodeId, {
       packages,
@@ -496,7 +273,6 @@ The node will validate the CSM, generate a JSON Schema, and register it for use.
   // GET /v1/portal/prompts/:promptId — Get prompt with node values auto-filled
   router.get('/v1/portal/prompts/:promptId', async (req, res) => {
     const promptId = req.params.promptId as string;
-    const pkg = PROMPT_PACKAGES[promptId];
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const ownerName = req.auth?.owner ?? req.query.owner as string ?? 'user';
@@ -512,45 +288,24 @@ The node will validate the CSM, generate a JSON Schema, and register it for use.
       }
     } catch { /* cortex not available */ }
 
-    // Try storage-backed prompt first
     const record = await storage.getSystemPrompt(promptId);
-    if (record && record.active) {
-      const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
-      const prompt = substituteVariables(promptContent, {
-        node_url: baseUrl,
-        owner_name: ownerName,
-        cortex_extensions: cortexExtDescriptions.join('\n'),
-      });
-
-      // Use PROMPT_PACKAGES metadata if available, otherwise use record metadata
-      const meta = pkg ?? { name: record.name, description: record.description, category: record.group };
-      res.json(success(config.nodeId, {
-        id: promptId,
-        name: meta.name,
-        description: meta.description,
-        category: meta.category,
-        prompt,
-        node_url: baseUrl,
-        owner: ownerName,
-        cortex_extensions_available: cortexExtDescriptions.length,
-      }));
+    if (!record || !record.active) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Prompt package "${promptId}" not found`));
       return;
     }
 
-    // Fallback: prompt not in storage — check PROMPT_PACKAGES for legacy template
-    if (!pkg) {
-      const validIds = Object.keys(PROMPT_PACKAGES).join(', ');
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Prompt package "${promptId}" not found. Available: ${validIds}`));
-      return;
-    }
-
-    const prompt = pkg.template(baseUrl, ownerName, cortexExtDescriptions);
+    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const prompt = substituteVariables(promptContent, {
+      node_url: baseUrl,
+      owner_name: ownerName,
+      cortex_extensions: cortexExtDescriptions.join('\n'),
+    });
 
     res.json(success(config.nodeId, {
       id: promptId,
-      name: pkg.name,
-      description: pkg.description,
-      category: pkg.category,
+      name: record.name,
+      description: record.description,
+      category: record.group,
       prompt,
       node_url: baseUrl,
       owner: ownerName,

@@ -299,84 +299,22 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { broken_links: broken, count: broken.length }));
   });
 
-  /* ── Built-in prompt templates (used when no custom template is stored) ── */
-  const DEFAULT_HUMAN_PROMPT = `You are a knowledge packager for AIMEAT node {node_id}.
-
-Take the research, notes, or content I provide and structure it as an AIMEAT knowledge package.
-
-Output a JSON object with this structure:
-\`\`\`json
-{
-  "aimeat_knowledge_package": true,
-  "package": {
-    "type": "knowledge-package",
-    "name": "Package Title",
-    "version": "1.0.0",
-    "author": "{ghii}",
-    "description": "Brief description",
-    "content_type": "research",
-    "language": "en",
-    "tags": ["tag1", "tag2"],
-    "synthesis": { "level": "original", "description": "How it was created" },
-    "sharing": { "catalog_listed": false, "allow_clone": false, "morsel_price": 0 },
-    "entries": [
-      { "key": "section-name", "title": "Section Name", "value": "content here", "visibility": "private" }
-    ],
-    "references": [
-      { "title": "Source Title", "url": "https://example.com/source", "type": "article", "verified": false }
-    ]
-  }
-}
-\`\`\`
-
-Valid content_type values: idea, research, plan, dataset, document, tutorial, collection, article, story, fiction.
-Valid visibility values: private, owner, public.
-Valid synthesis levels: original, assisted, synthesized, ai-generated.
-Valid reference types: article, paper, book, website, dataset, video, code, standard, patent, report.
-
-IMPORTANT: Always include a "references" array with any sources, citations, links, or references used. Each reference should have a title, url (if available), type, and verified: false (since you cannot verify links). Even if no explicit sources are provided, include any URLs or documents mentioned in the content.
-
-Node URL: {node_url}
-Owner: {ghii}`;
-
-  const DEFAULT_AGENT_PROMPT = `You are an AIMEAT knowledge packager agent.
-
-Authenticate: POST {auth_endpoint}
-API Spec: {openapi_spec}
-Agent GAII: {agent_gaii}
-Node: {node_id} at {node_url}
-
-Import packages via POST {node_url}/v1/packages/import with body:
-{ "package": <knowledge_package_json>, "overrides": {} }
-
-Output structured AIMEAT knowledge packages as JSON.`;
-
   /* ── GET /v1/templates/knowledge-packager-human — Get human prompt template ── */
   router.get('/v1/templates/knowledge-packager-human', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
 
-    // Try storage-backed system prompt first
     const record = await storage.getSystemPrompt('knowledge-packager-human');
-    let text: string;
-    if (record && record.active) {
-      const content = resolvePromptContent(record, req.headers['accept-language'] as string);
-      text = substituteVariables(content, {
-        owner_name: ghii,
-        node_url: nodeUrl,
-        node_id: config.nodeId,
-        gaii: req.auth!.sub as string,
-      });
-    } else {
-      // Fallback: check memory, then hardcoded default
-      const stored = await storage.getMemory(req.auth!.sub as string, 'templates/knowledge-packager-human');
-      text = stored
-        ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
-        : DEFAULT_HUMAN_PROMPT;
-      text = text.replace(/\{ghii\}/g, ghii);
-      text = text.replace(/\{node_url\}/g, nodeUrl);
-      text = text.replace(/\{node_id\}/g, config.nodeId);
+    if (!record || !record.active) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available'));
     }
+    const content = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const text = substituteVariables(content, {
+      owner_name: ghii,
+      node_url: nodeUrl,
+      node_id: config.nodeId,
+      gaii: req.auth!.sub as string,
+    });
 
     res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
   });
@@ -387,115 +325,29 @@ Output structured AIMEAT knowledge packages as JSON.`;
     const gaii = req.auth!.sub as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
 
-    // Try storage-backed system prompt first
     const record = await storage.getSystemPrompt('knowledge-packager-agent');
-    let text: string;
-    if (record && record.active) {
-      const content = resolvePromptContent(record, req.headers['accept-language'] as string);
-      text = substituteVariables(content, {
-        owner_name: ghii,
-        node_url: nodeUrl,
-        node_id: config.nodeId,
-        gaii,
-      });
-    } else {
-      // Fallback: check memory, then hardcoded default
-      const stored = await storage.getMemory(gaii, 'templates/knowledge-packager-agent');
-      text = stored
-        ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
-        : DEFAULT_AGENT_PROMPT;
-      text = text.replace(/\{ghii\}/g, ghii);
-      text = text.replace(/\{node_url\}/g, nodeUrl);
-      text = text.replace(/\{node_id\}/g, config.nodeId);
-      text = text.replace(/\{agent_gaii\}/g, gaii);
-      text = text.replace(/\{auth_endpoint\}/g, `${nodeUrl}/v1/auth/token`);
-      text = text.replace(/\{openapi_spec\}/g, `${nodeUrl}/v1/openapi.yaml`);
+    if (!record || !record.active) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available'));
     }
+    const content = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const text = substituteVariables(content, {
+      owner_name: ghii,
+      node_url: nodeUrl,
+      node_id: config.nodeId,
+      gaii,
+    });
 
     res.json(success(config.nodeId, { prompt: text, ghii, gaii, node_url: nodeUrl, node_id: config.nodeId }));
   });
-
-  /* ── Chat session prompt templates ── */
-  const DEFAULT_CHAT_SESSION_PROMPT = `You are about to connect to an AIMEAT node as a chat session agent.
-
-This lets your conversation be registered on the AIMEAT network, giving you access to the user's memory, knowledge packages, wallet, and other AIMEAT services.
-
-## How to Connect
-
-### Step 1: Get a connectivity key
-The user needs to generate one from their profile, or you can request one:
-
-\`\`\`
-POST {node_url}/v1/auth/connectivity-key
-Authorization: Bearer <owner_jwt>
-Content-Type: application/json
-
-{
-  "agent_name": "session-<platform>-<timestamp>",
-  "description": "Chat session from <platform>"
-}
-\`\`\`
-
-### Step 2: Register using the connectivity key
-\`\`\`
-POST {node_url}/v1/agents/connect
-Content-Type: application/json
-
-{
-  "connectivity_key": "<key_from_step_1>",
-  "agent_name": "session-<platform>-<timestamp>",
-  "display_name": "Chat Session — <Platform Name>"
-}
-\`\`\`
-
-This returns your agent credentials (GAII + private key). Store the private key — it's shown only once.
-
-### Step 3: Authenticate
-Sign your GAII + timestamp with your Ed25519 private key:
-\`\`\`
-POST {node_url}/v1/auth/token
-Content-Type: application/json
-
-{
-  "gaii": "<your_gaii>",
-  "timestamp": "<ISO_timestamp>",
-  "signature": "<base64_ed25519_signature>"
-}
-\`\`\`
-
-### Step 4: Use AIMEAT services
-With your JWT token, you can now:
-- Read/write memory: GET/POST {node_url}/v1/memory
-- Access knowledge: GET {node_url}/v1/packages
-- Check wallet: GET {node_url}/v1/wallet
-- Browse catalogue: GET {node_url}/v1/catalogue
-- Post to boards: POST {node_url}/v1/boards/:id/posts
-
-Node: {node_id}
-Node URL: {node_url}
-Owner: {ghii}
-API Spec: {node_url}/v1/openapi.yaml`;
-
-  const DEFAULT_CHAT_SESSION_QUICK_PROMPT = `Read this URL and follow the instructions: {node_url}/v1/prompts/anonymous/share
-
-This will connect you to my AIMEAT node ({node_id}) where you can access my memory, knowledge, and other AI services.
-
-Node: {node_url}
-Owner: {ghii}`;
 
   /* ── GET /v1/templates/chat-session-human — Get chat session human prompt ── */
   router.get('/v1/templates/chat-session-human', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
-    const stored = await storage.getMemory(req.auth!.sub as string, 'templates/chat-session-human');
-
-    let text = stored
-      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
-      : DEFAULT_CHAT_SESSION_PROMPT;
-    text = text.replace(/\{ghii\}/g, ghii);
-    text = text.replace(/\{node_url\}/g, nodeUrl);
-    text = text.replace(/\{node_id\}/g, config.nodeId);
-
+    const record = await storage.getSystemPrompt('chat-session-human');
+    if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
+    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const text = substituteVariables(promptContent, { node_url: nodeUrl, node_id: config.nodeId, owner_name: ghii });
     res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
   });
 
@@ -503,15 +355,10 @@ Owner: {ghii}`;
   router.get('/v1/templates/chat-session-quick', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
-    const stored = await storage.getMemory(req.auth!.sub as string, 'templates/chat-session-quick');
-
-    let text = stored
-      ? (typeof stored.value === 'string' ? stored.value : JSON.stringify(stored.value))
-      : DEFAULT_CHAT_SESSION_QUICK_PROMPT;
-    text = text.replace(/\{ghii\}/g, ghii);
-    text = text.replace(/\{node_url\}/g, nodeUrl);
-    text = text.replace(/\{node_id\}/g, config.nodeId);
-
+    const record = await storage.getSystemPrompt('chat-session-quick');
+    if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
+    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const text = substituteVariables(promptContent, { node_url: nodeUrl, node_id: config.nodeId, owner_name: ghii });
     res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
   });
 

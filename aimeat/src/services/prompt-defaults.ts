@@ -938,7 +938,7 @@ The user will share content with you — this could be research notes, an idea, 
 2. **Analyze the content** and identify:
    - Content type: idea, research, plan, dataset, document, tutorial, collection, article, story, or fiction
    - Key tags and topics
-   - What should be PUBLIC vs PRIVATE (personal details, contacts, financial info -> private)
+   - What should be PUBLIC vs PRIVATE (personal details, contacts, financial info \u2192 private)
    - How much you (the AI) transformed the content (synthesis level)
    - Any citations or references that should be tracked
 3. **Present a structured draft** to the user showing:
@@ -987,6 +987,25 @@ The user will share content with you — this could be research notes, an idea, 
 
 When the user confirms, output EXACTLY this JSON structure as a code block. The user will paste this into their AIMEAT Knowledge tab import box.
 
+### Per-entry references & relationships
+
+Each entry is an **independent knowledge unit**. References (citations, sources) belong on the entry they support \u2014 NOT as a flat list at the package level. Similarly, entries can declare relationships to other entries in the same package using \`related_entries\`.
+
+**Reference rules:**
+- Place references on the specific entry they support
+- The same URL may appear on multiple entries if it supports both
+- Each entry should be self-contained with its own citations
+
+**Relationship types** (use in \`related_entries\`):
+| Relation | Meaning |
+|----------|---------|
+| related-to | General topical connection |
+| extends | Builds upon / expands the target |
+| derived-from | Was created based on the target |
+| contradicts | Disagrees with or challenges the target |
+| supersedes | Replaces or makes the target obsolete |
+| references | Cites or points to the target |
+
 \`\`\`json
 {
   "aimeat_knowledge_package": true,
@@ -1006,25 +1025,57 @@ When the user confirms, output EXACTLY this JSON structure as a code block. The 
       "level": "assisted",
       "description": "User provided research notes; AI organized into sections and suggested tags"
     },
-    "references": [
-      {
-        "url": "https://example.com/source",
-        "title": "Source Title",
-        "accessed": "2026-03-07",
-        "verified": false,
-        "note": "Could not verify — please confirm manually"
-      }
-    ],
+    "references": [],
     "entries": [
       {
         "key": "main-findings",
         "title": "Main Findings",
-        "visibility": "public"
+        "visibility": "public",
+        "references": [
+          {
+            "url": "https://example.com/source",
+            "title": "Source Title",
+            "accessed": "2026-03-07",
+            "verified": false,
+            "note": "Could not verify \u2014 please confirm manually"
+          }
+        ],
+        "related_entries": [
+          { "key": "methodology", "relation": "derived-from" },
+          { "key": "conclusions", "relation": "references" }
+        ]
+      },
+      {
+        "key": "methodology",
+        "title": "Research Methodology",
+        "visibility": "public",
+        "references": [
+          {
+            "url": "https://example.com/method-paper",
+            "title": "Methodology Reference",
+            "accessed": "2026-03-07",
+            "verified": true
+          }
+        ],
+        "related_entries": [
+          { "key": "main-findings", "relation": "extends" }
+        ]
+      },
+      {
+        "key": "conclusions",
+        "title": "Conclusions",
+        "visibility": "public",
+        "references": [],
+        "related_entries": [
+          { "key": "main-findings", "relation": "derived-from" }
+        ]
       },
       {
         "key": "personal-notes",
         "title": "Personal Notes",
-        "visibility": "private"
+        "visibility": "private",
+        "references": [],
+        "related_entries": []
       }
     ],
     "links": [],
@@ -1039,8 +1090,15 @@ When the user confirms, output EXACTLY this JSON structure as a code block. The 
     "main-findings": {
       "title": "Main Findings",
       "summary": "...",
-      "findings": ["..."],
-      "sources": ["..."]
+      "findings": ["..."]
+    },
+    "methodology": {
+      "title": "Research Methodology",
+      "body": "..."
+    },
+    "conclusions": {
+      "title": "Conclusions",
+      "body": "..."
     },
     "personal-notes": {
       "title": "Personal Notes",
@@ -1134,6 +1192,28 @@ Same as the human prompt workflow, but with enhanced capabilities:
 
 Same as human prompt — see the AIMEAT Knowledge documentation for full list.
 
+## Per-entry References & Relationships
+
+Each entry is an **independent knowledge unit**. Place references (citations, sources) directly on the entry they support, NOT as a flat list at the package level. The same reference may appear on multiple entries if applicable. Also declare \`related_entries\` to map how entries within the package relate to each other.
+
+Relationship types: related-to, extends, derived-from, contradicts, supersedes, references.
+
+Example entry with references and relationships:
+\`\`\`json
+{
+  "key": "findings",
+  "title": "Main Findings",
+  "visibility": "public",
+  "references": [
+    { "url": "https://...", "title": "Source", "accessed": "2026-03-12", "verified": true }
+  ],
+  "related_entries": [
+    { "key": "methodology", "relation": "derived-from" },
+    { "key": "conclusions", "relation": "references" }
+  ]
+}
+\`\`\`
+
 ## Enhanced Capabilities (agent-only)
 
 - **Deep research**: Search the web for related material to enrich the package
@@ -1145,6 +1225,93 @@ Same as human prompt — see the AIMEAT Knowledge documentation for full list.
 Now, please share the content you'd like to package.`,
     variables: ['owner_name', 'node_url', 'node_id', 'gaii'],
     usedIn: ['/v1/templates/knowledge-packager-agent'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Group: knowledge — chat session prompts
+  // ═══════════════════════════════════════════════════════════════════
+
+  {
+    id: 'chat-session-human',
+    group: 'knowledge',
+    name: 'Chat Session Connect',
+    description: 'Full chat session connection prompt — connectivity key flow, Ed25519 auth, and AIMEAT service overview',
+    content: `You are about to connect to an AIMEAT node as a chat session agent.
+
+This lets your conversation be registered on the AIMEAT network, giving you access to the user's memory, knowledge packages, wallet, and other AIMEAT services.
+
+## How to Connect
+
+### Step 1: Get a connectivity key
+The user needs to generate one from their profile, or you can request one:
+
+\`\`\`
+POST {{node_url}}/v1/auth/connectivity-key
+Authorization: Bearer <owner_jwt>
+Content-Type: application/json
+
+{
+  "agent_name": "session-<platform>-<timestamp>",
+  "description": "Chat session from <platform>"
+}
+\`\`\`
+
+### Step 2: Register using the connectivity key
+\`\`\`
+POST {{node_url}}/v1/agents/connect
+Content-Type: application/json
+
+{
+  "connectivity_key": "<key_from_step_1>",
+  "agent_name": "session-<platform>-<timestamp>",
+  "display_name": "Chat Session — <Platform Name>"
+}
+\`\`\`
+
+This returns your agent credentials (GAII + private key). Store the private key — it's shown only once.
+
+### Step 3: Authenticate
+Sign your GAII + timestamp with your Ed25519 private key:
+\`\`\`
+POST {{node_url}}/v1/auth/token
+Content-Type: application/json
+
+{
+  "gaii": "<your_gaii>",
+  "timestamp": "<ISO_timestamp>",
+  "signature": "<base64_ed25519_signature>"
+}
+\`\`\`
+
+### Step 4: Use AIMEAT services
+With your JWT token, you can now:
+- Read/write memory: GET/POST {{node_url}}/v1/memory
+- Access knowledge: GET {{node_url}}/v1/packages
+- Check wallet: GET {{node_url}}/v1/wallet
+- Browse catalogue: GET {{node_url}}/v1/catalogue
+- Post to boards: POST {{node_url}}/v1/boards/:id/posts
+
+Node: {{node_id}}
+Node URL: {{node_url}}
+Owner: {{owner_name}}
+API Spec: {{node_url}}/v1/openapi.yaml`,
+    variables: ['node_url', 'node_id', 'owner_name'],
+    usedIn: ['/v1/templates/chat-session-human'],
+  },
+
+  {
+    id: 'chat-session-quick',
+    group: 'knowledge',
+    name: 'Chat Session Quick',
+    description: 'Compact paste-to-any-AI prompt for quick anonymous chat session connection',
+    content: `Read this URL and follow the instructions: {{node_url}}/v1/prompts/anonymous/share
+
+This will connect you to my AIMEAT node ({{node_id}}) where you can access my memory, knowledge, and other AI services.
+
+Node: {{node_url}}
+Owner: {{owner_name}}`,
+    variables: ['node_url', 'node_id', 'owner_name'],
+    usedIn: ['/v1/templates/chat-session-quick'],
   },
 
   // ═══════════════════════════════════════════════════════════════════

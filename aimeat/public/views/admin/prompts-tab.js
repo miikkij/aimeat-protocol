@@ -7,7 +7,7 @@ import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, Empty, ExpandableHelp, Spinner } from './shared.js';
 import {
   getSystemPrompts, getSystemPrompt, updateSystemPrompt,
-  resetSystemPrompt, getPromptVersions, restorePromptVersion,
+  resetSystemPrompt, resetAllSystemPrompts, getPromptVersions, restorePromptVersion,
 } from '/js/services/admin.js';
 
 const GROUP_NAMES = {
@@ -94,6 +94,19 @@ export default function PromptsTab({ data, reload }) {
       const listRes = await getSystemPrompts();
       setPrompts(listRes.data.prompts || []);
       window.showToast?.(t('dashboard.promptsResetDone'));
+    } catch (e) {
+      window.showToast?.(e.message, true);
+    }
+    setSaving(false);
+  }
+
+  async function handleResetAll() {
+    if (!confirm(t('dashboard.promptsResetAllConfirm'))) return;
+    setSaving(true);
+    try {
+      const res = await resetAllSystemPrompts();
+      setPrompts(res.data.prompts || []);
+      window.showToast?.(t('dashboard.promptsResetAllDone'));
     } catch (e) {
       window.showToast?.(e.message, true);
     }
@@ -204,6 +217,12 @@ export default function PromptsTab({ data, reload }) {
     <${ExpandableHelp} title=${t('dashboard.promptsHelpTitle')}>
       <p>${t('dashboard.promptsHelp')}</p>
     </${ExpandableHelp}>
+
+    <div style="margin:12px 0">
+      <button class="adm-btn-action" style="background:#dc262633;color:#ef4444" onClick=${handleResetAll} disabled=${saving}>
+        ${t('dashboard.promptsResetAll')}
+      </button>
+    </div>
 
     ${Object.keys(groups).length === 0
       ? html`<${Empty} text=${t('dashboard.promptsEmpty')} />`

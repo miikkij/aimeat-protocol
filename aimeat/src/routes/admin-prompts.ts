@@ -4,9 +4,18 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
+import { seedSystemPrompts } from '../services/prompt-seeder.js';
 
 export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // POST /v1/admin/prompts/reset-all — reset ALL prompts to factory defaults, clear version histories
+  router.post('/v1/admin/prompts/reset-all', requireAuth(), requireRole('operator'), async (req, res) => {
+    await storage.deleteAllSystemPrompts();
+    await seedSystemPrompts(storage);
+    const prompts = await storage.listSystemPrompts();
+    res.json(success(config.nodeId, { prompts, resetCount: prompts.length }));
+  });
 
   // GET /v1/admin/prompts — list all prompts
   router.get('/v1/admin/prompts', requireAuth(), requireRole('operator'), async (req, res) => {

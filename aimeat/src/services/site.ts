@@ -229,98 +229,14 @@ export class SiteService {
 
     /** Generate a context-aware prompt for AI-assisted portal editing. */
     async getPrompt(): Promise<string> {
-        // Try storage-backed prompt first
         const record = await this.storage.getSystemPrompt('site-portal');
-        if (record && record.active) {
-            const promptContent = resolvePromptContent(record);
-            return substituteVariables(promptContent, {
-                node_id: this.config.nodeId,
-                node_name: (this.config as unknown as Record<string, unknown>).nodeName as string ?? this.config.nodeId,
-                node_url: this.config.baseUrl,
-            });
-        }
-
-        // Fallback: build prompt inline (legacy)
-        const kvSummary = Object.entries(this.config.siteKv)
-            .map(([k, v]) => `${k}=${v}`)
-            .join(', ');
-        const hasTemplate = await this.hasCustomTemplate();
-
-        // Gather memory keys under portal/* namespace
-        const portalKeys = await this.listPortalMemoryKeys();
-
-        const lines: string[] = [
-            `# AIMEAT Node Portal Editor`,
-            ``,
-            `You are editing the portal for AIMEAT node "${this.config.nodeId}" (${(this.config as unknown as Record<string, unknown>).nodeName ?? this.config.nodeId}).`,
-            hasTemplate
-                ? 'This node has a custom portal template at GET /.'
-                : 'This node uses the default portal. No custom template has been uploaded yet.',
-            ``,
-            `## Template Tag Reference`,
-            ``,
-            `Templates use \`{{type:key}}\` tags that resolve at serve-time:`,
-            `- \`{{config:KEY}}\` — Node config values. Available keys: ${[...CONFIG_WHITELIST].join(', ')}`,
-            `- \`{{memory:KEY}}\` — Memory values under the portal/* namespace. Stored via the memory API.`,
-            `- \`{{storage:KEY}}\` — Resolves to the download URL of a stored file.`,
-            `- \`{{kv:KEY}}\` — Operator-configured key-value pairs from env vars (AIMEAT_SITE_KV_*).`,
-            `- \`{{board:SLUG}}\` — Resolves to the 5 most recent posts from a board (by name or ID). Posts render as \`<div class="board-posts">\` with \`<article>\` elements.`,
-            ``,
-            `## Current Node Context`,
-            ``,
-            `- Node ID: ${this.config.nodeId}`,
-            `- Node Name: ${(this.config as unknown as Record<string, unknown>).nodeName ?? '(not set)'}`,
-            `- Base URL: ${this.config.baseUrl}`,
-            `- Node Type: ${this.config.nodeType}`,
-        ];
-
-        if (kvSummary) {
-            lines.push(`- KV values: ${kvSummary}`);
-        }
-        if (portalKeys.length > 0) {
-            lines.push(`- Portal memory keys: ${portalKeys.join(', ')}`);
-        }
-
-        lines.push(
-            ``,
-            `## Output Format`,
-            ``,
-            `Generate a JSON bundle matching the \`POST /v1/site/import\` body schema:`,
-            ``,
-            '```json',
-            `{`,
-            `  "template": "<html>...</html>",`,
-            `  "memory": {`,
-            `    "portal/welcome": "Welcome text...",`,
-            `    "portal/about": "About this node..."`,
-            `  },`,
-            `  "kv": {`,
-            `    "region": "Helsinki",`,
-            `    "contact": "admin@example.com"`,
-            `  }`,
-            `}`,
-            '```',
-            ``,
-            `## Guidelines`,
-            ``,
-            `- Use semantic HTML with CSS classes for styling`,
-            `- Make templates responsive (mobile-friendly)`,
-            `- All \`{{memory:*}}\` keys must start with \`portal/\``,
-            `- Content inside \`{{memory:*}}\` tags can contain HTML (operator-trusted)`,
-            `- \`{{config:*}}\` and \`{{kv:*}}\` values are HTML-escaped automatically`,
-            `- Do not use \`{{memory:*}}\` tags inside \`<script>\` blocks (they will be blocked)`,
-            `- Keep templates under ${this.config.siteMaxTemplateSizeKb} KB`,
-            ``,
-            `## API Endpoints`,
-            ``,
-            `- \`GET /v1/site\` — Portal metadata`,
-            `- \`POST /v1/site/template\` — Upload template (operator auth required)`,
-            `- \`POST /v1/site/import\` — Import full bundle (operator auth required)`,
-            `- \`DELETE /v1/site/template\` — Revert to default portal`,
-            `- \`POST /v1/site/cache-invalidate\` — Force cache refresh after changes`,
-        );
-
-        return lines.join('\n');
+        if (!record || !record.active) return '';
+        const promptContent = resolvePromptContent(record);
+        return substituteVariables(promptContent, {
+            node_id: this.config.nodeId,
+            node_name: (this.config as unknown as Record<string, unknown>).nodeName as string ?? this.config.nodeId,
+            node_url: this.config.baseUrl,
+        });
     }
 
     /** List memory keys under portal/* namespace. */

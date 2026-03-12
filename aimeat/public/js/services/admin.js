@@ -199,5 +199,6 @@ export const getSystemPrompts     = (group) => apiGet('/v1/admin/prompts' + (gro
 export const getSystemPrompt      = (id)    => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}`);
 export const updateSystemPrompt   = (id, body) => apiPatch(`/v1/admin/prompts/${encodeURIComponent(id)}`, body);
 export const resetSystemPrompt    = (id)    => apiPost(`/v1/admin/prompts/${encodeURIComponent(id)}/reset`);
+export const resetAllSystemPrompts = ()     => apiPost('/v1/admin/prompts/reset-all');
 export const getPromptVersions    = (id)    => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}/versions`);
 export const restorePromptVersion = (id, v) => apiPost(`/v1/admin/prompts/${encodeURIComponent(id)}/versions/${v}/restore`);

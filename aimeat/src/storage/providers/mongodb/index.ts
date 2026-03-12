@@ -4014,6 +4014,12 @@ export class MongoStorage implements Storage {
         return result.count;
     }
 
+    async deleteAllSystemPrompts(): Promise<void> {
+        this.ensureReady();
+        await this.prisma.systemPromptVersion.deleteMany({});
+        await this.prisma.systemPrompt.deleteMany({});
+    }
+
     private toSystemPromptRecord(row: any): SystemPromptRecord {
         return {
             id: row.id,

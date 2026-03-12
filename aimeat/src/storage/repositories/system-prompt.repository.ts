@@ -8,4 +8,5 @@ export interface SystemPromptRepository {
   getSystemPromptVersion(promptId: string, version: number): Promise<SystemPromptVersionRecord | null>;
   createSystemPromptVersion(record: SystemPromptVersionRecord): Promise<SystemPromptVersionRecord>;
   pruneSystemPromptVersions(promptId: string, keepCount: number): Promise<number>;
+  deleteAllSystemPrompts(): Promise<void>;
 }
