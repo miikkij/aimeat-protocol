@@ -8,6 +8,7 @@ import { success, error } from '../middleware/envelope.js';
 import { validateAgentName, buildGAII, generateUserCode } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
+import { fireHook } from '../utils/fire-hook.js';
 import { AgentRegistrationSchema, validateBody } from '../models/schemas.js';
 import { verifyJWT } from '../auth/jwt.js';
 import { rateLimit } from '../middleware/rate-limit.js';
@@ -320,7 +321,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Post-registration hook
-    executeHooks(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName }).catch(() => { });
+    fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
 
     // Store credentials for agent to poll
     await storage.updateDeviceAuth(request.deviceCode, {
@@ -421,7 +422,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Extension hook: post_agent_registration (fire-and-forget)
-    executeHooks(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner }).catch(() => { });
+    fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
 
     res.set('Cache-Control', 'no-store');
     res.set('Pragma', 'no-cache');
@@ -538,7 +539,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Extension hook: post_agent_registration (fire-and-forget)
-    executeHooks(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner }).catch(() => { });
+    fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
 
     // SECURITY: Prevent caching of response containing private key
     res.set('Cache-Control', 'no-store');
@@ -874,7 +875,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     await storage.updateAgent(gaii, { publicKey: keyPair.publicKey });
 
     // Extension hook: agent_rekey (fire-and-forget)
-    executeHooks(config, storage, 'agent_rekey', { gaii, owner: agent.owner }).catch(() => { });
+    fireHook(config, storage, 'agent_rekey', { gaii, owner: agent.owner });
 
     // SECURITY: Prevent caching of response containing private key
     res.set('Cache-Control', 'no-store');
