@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Empty } from './shared.js';
+import { Empty, useToast, Toast } from './shared.js';
 import { clearGhiiCors, clearAgentCors, setGhiiCors, setAgentCors } from '/js/services/admin.js';
 
 const COMMON_ORIGINS = [
@@ -105,13 +105,14 @@ export default function CorsTab({ data, reload }) {
   // Track which row is being edited
   const [editGhii, setEditGhii] = useState(null);
   const [editAgent, setEditAgent] = useState(null);
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function doClearGhii(ghii) {
     if (!confirm(t('dashboard.corsClearConfirm'))) return;
     try {
       await clearGhiiCors(ghii);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doClearAgent(gaii) {
@@ -119,7 +120,7 @@ export default function CorsTab({ data, reload }) {
     try {
       await clearAgentCors(gaii);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doSaveGhii(ghii, origins) {
@@ -127,7 +128,7 @@ export default function CorsTab({ data, reload }) {
       await setGhiiCors(ghii, origins);
       setEditGhii(null);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function doSaveAgent(gaii, origins) {
@@ -135,7 +136,7 @@ export default function CorsTab({ data, reload }) {
       await setAgentCors(gaii, origins);
       setEditAgent(null);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   // All GHII users (for add-override dropdown), excluding those already overridden
@@ -147,6 +148,7 @@ export default function CorsTab({ data, reload }) {
   const agentAvailable = (data.agents?.agents || []).filter(a => !agentOverriddenSet.has(a.gaii));
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <!-- Node default -->
     <div class="adm-card">
       <h2>${t('dashboard.corsNodeDefault')}</h2>

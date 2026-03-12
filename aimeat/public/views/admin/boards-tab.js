@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty } from './shared.js';
+import { dt, Badge, Empty, useToast, Toast } from './shared.js';
 import { getBoardPosts } from '/js/services/admin.js';
 import { apiPost } from '/js/api.js';
 
@@ -13,6 +13,7 @@ export default function BoardsTab({ data, reload }) {
   const [posts, setPosts] = useState({});
   const [showCreate, setShowCreate] = useState(false);
   const [newBoard, setNewBoard] = useState({ name: '', slug: '', description: '', visibility: 'public' });
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function togglePosts(slug) {
     if (posts[slug]) {
@@ -22,7 +23,7 @@ export default function BoardsTab({ data, reload }) {
     try {
       const r = await getBoardPosts(slug);
       setPosts(prev => ({ ...prev, [slug]: r.data?.posts || [] }));
-    } catch {}
+    } catch (e) { console.warn('Failed to load data:', e.message); }
   }
 
   async function createBoard() {
@@ -34,16 +35,17 @@ export default function BoardsTab({ data, reload }) {
         description: newBoard.description,
         visibility: newBoard.visibility,
       });
-      alert(t('dashboard.boardCreateConfirm'));
+      showOk(t('dashboard.boardCreateConfirm'));
       setNewBoard({ name: '', slug: '', description: '', visibility: 'public' });
       setShowCreate(false);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   if (!boards.length) return html`<${Empty} text=${t('dashboard.noBoardsCreated')} />`;
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div style="margin-bottom:12px">
       <button class="adm-btn-action" onClick=${() => setShowCreate(!showCreate)}>
         + ${t('dashboard.boardCreateSystem')}

@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, StatsGrid, Empty } from './shared.js';
+import { dt, StatsGrid, Empty, useToast, Toast } from './shared.js';
 import {
   deleteChatInstance,
   getBoards, getBoardPosts, createBoard, postToBoard,
@@ -16,12 +16,13 @@ function ChannelChat({ boardId }) {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const feedRef = useRef(null);
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function loadPosts() {
     try {
       const res = await getBoardPosts(boardId, 100);
       setPosts((res.data?.posts || []).reverse());
-    } catch { setPosts([]); }
+    } catch (e) { console.warn('Failed to load:', e.message); setPosts([]); }
     setLoading(false);
   }
 
@@ -41,11 +42,12 @@ function ChannelChat({ boardId }) {
       await postToBoard(boardId, msg.trim());
       setMsg('');
       loadPosts();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   return html`
     <div style="margin-top:10px;padding:10px 12px 12px;border-radius:8px;background:rgba(0,0,0,0.15)">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <div ref=${feedRef} style="
         height:220px;min-height:100px;overflow-y:auto;resize:vertical;
         border:1px solid var(--glass-border);border-radius:8px;
@@ -87,12 +89,13 @@ export default function ChatInstancesTab({ data, reload }) {
   const [channels, setChannels] = useState([]);
   const [openChats, setOpenChats] = useState(new Set());
   const nameRef = useRef(null);
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function loadChannels() {
     try {
       const res = await getBoards();
       setChannels((res.data?.boards || []).filter(b => b.name?.startsWith('ops:')));
-    } catch { setChannels([]); }
+    } catch (e) { console.warn('Failed to load:', e.message); setChannels([]); }
   }
 
   useEffect(() => { loadChannels(); }, []);
@@ -104,7 +107,7 @@ export default function ChatInstancesTab({ data, reload }) {
       await createBoard(channelName, 'shared', t('dashboard.chatOperatorChannelsExplain'));
       setName('');
       loadChannels();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   function toggleChat(id) {
@@ -118,10 +121,11 @@ export default function ChatInstancesTab({ data, reload }) {
   async function doDeleteInstance(id) {
     if (!confirm(t('dashboard.chatDeleteConfirm').replace('{id}', id))) return;
     try { await deleteChatInstance(id); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.chatExplain')}</p>
 
     <!-- Operator Channels -->

@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty, ExpandableHelp } from './shared.js';
+import { dt, Badge, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { getMsmDetail, createMsm, updateMsm, deleteMsm, getMsmTemplates, getMsmTemplate } from '/js/services/admin.js';
 
 export default function MsmTab({ data, reload }) {
@@ -24,6 +24,7 @@ export default function MsmTab({ data, reload }) {
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteInput, setDeleteInput] = useState('');
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function showDetail(name) {
     try {
@@ -117,7 +118,7 @@ export default function MsmTab({ data, reload }) {
       setDetail(null);
       setView('list');
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
     setLoading(false);
   }
 
@@ -210,6 +211,7 @@ export default function MsmTab({ data, reload }) {
     const svc = def.service || {};
     return html`
       <div>
+        ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
         ${renderDeleteModal()}
         <button class="adm-btn-sm" onClick=${backToList}>\u2190 ${t('dashboard.back')}</button>
         <div class="adm-card" style="margin-top:12px">
@@ -288,6 +290,7 @@ export default function MsmTab({ data, reload }) {
 
   // ── List view ──
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     ${renderDeleteModal()}
     <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.msmExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.msmHelpTitle')}>

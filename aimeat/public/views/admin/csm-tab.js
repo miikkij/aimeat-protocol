@@ -4,7 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty, ExpandableHelp } from './shared.js';
+import { dt, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
 
 export default function CsmTab({ data, reload }) {
@@ -17,6 +17,7 @@ export default function CsmTab({ data, reload }) {
   const [err, setErr] = useState('');
   const [prompt, setPrompt] = useState('');
   const [copied, setCopied] = useState(false);
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   async function showDetail(name) {
     try {
@@ -34,7 +35,7 @@ export default function CsmTab({ data, reload }) {
       setView('list');
       setDetail(null);
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function openCreate() {
@@ -45,7 +46,7 @@ export default function CsmTab({ data, reload }) {
       try {
         const r = await getCsmFileTemplates();
         setFileTemplates(r.data?.templates || []);
-      } catch { setFileTemplates([]); }
+      } catch (e) { console.warn('Failed to load:', e.message); setFileTemplates([]); }
     }
   }
 
@@ -101,6 +102,7 @@ export default function CsmTab({ data, reload }) {
     const svc = def.service || {};
     return html`
       <div>
+        ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
         <button class="adm-btn-sm" onClick=${backToList}>← ${t('dashboard.back')}</button>
         <div class="adm-card" style="margin-top:12px">
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -205,6 +207,7 @@ export default function CsmTab({ data, reload }) {
 
   // ── List view ──
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.csmExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.csmHelpTitle')}>
       ${t('dashboard.csmHelpDetail')}
