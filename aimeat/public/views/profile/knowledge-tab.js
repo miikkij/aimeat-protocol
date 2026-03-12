@@ -18,6 +18,8 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
   /* ── UI state ── */
   const [expandedPkg, setExpandedPkg] = useState(null);
+  const [entryData, setEntryData] = useState({});   // { entryKey: value }
+  const [loadingEntries, setLoadingEntries] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [savingSharing, setSavingSharing] = useState(null);
 
@@ -264,19 +266,51 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     }
   }, [showToast, loadPackages]);
 
-  /* ── Toggle expand ── */
+  /* ── Toggle expand + lazy-load entry data ── */
   const toggleExpand = useCallback((key) => {
-    setExpandedPkg(prev => prev === key ? null : key);
-  }, []);
+    setExpandedPkg(prev => {
+      if (prev === key) return null;
+      // Fetch entry values if not cached
+      const pkg = packages.find(p => p.key === key);
+      const manifest = pkg?.value;
+      if (manifest?.entries?.length) {
+        const uncached = manifest.entries.filter(e => e.key && !(e.key in entryData));
+        if (uncached.length > 0) {
+          setLoadingEntries(key);
+          Promise.all(uncached.map(async (entry) => {
+            try {
+              const resp = await apiGet('/v1/memory/' + encodeURIComponent(entry.key));
+              return [entry.key, resp?.data?.value];
+            } catch { return [entry.key, null]; }
+          })).then(results => {
+            setEntryData(prev => {
+              const next = { ...prev };
+              for (const [k, v] of results) { if (v != null) next[k] = v; }
+              return next;
+            });
+            setLoadingEntries(null);
+          });
+        }
+      }
+      return key;
+    });
+  }, [packages, entryData]);
 
   /* ── Cycle visibility: private → owner → public → private ── */
   const cycleVis = ['private', 'owner', 'public'];
   const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
   const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
 
-  /* ── Scroll to entry by key ── */
+  /* ── Scroll to entry by key (matches full or short key) ── */
   const scrollToEntry = useCallback((entryKey) => {
-    const el = document.querySelector(`[data-entry-key="${CSS.escape(entryKey)}"]`);
+    // Try exact match first, then suffix match for short keys
+    let el = document.querySelector(`[data-entry-key="${CSS.escape(entryKey)}"]`);
+    if (!el) {
+      const all = document.querySelectorAll('[data-entry-key]');
+      for (const candidate of all) {
+        if (candidate.dataset.entryKey.endsWith('/' + entryKey)) { el = candidate; break; }
+      }
+    }
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('kpkg-entry-highlight'); setTimeout(() => el.classList.remove('kpkg-entry-highlight'), 1500); }
   }, []);
 
@@ -323,12 +357,31 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     `;
   };
 
+  /* ── Format entry value for display ── */
+  const formatEntryValue = (data) => {
+    if (!data) return '';
+    if (typeof data === 'string') return data;
+    // Show structured content nicely: body/summary first, then other fields
+    const parts = [];
+    if (data.summary) parts.push(data.summary);
+    if (data.body) parts.push(data.body);
+    if (data.description) parts.push(data.description);
+    if (data.findings?.length) parts.push('Findings:\n' + data.findings.map(f => '  - ' + f).join('\n'));
+    if (data.steps?.length) parts.push('Steps:\n' + data.steps.map((s, i) => `  ${i + 1}. ${typeof s === 'string' ? s : JSON.stringify(s)}`).join('\n'));
+    if (data.items?.length) parts.push('Items:\n' + data.items.map(it => '  - ' + (it.title || JSON.stringify(it))).join('\n'));
+    if (data.open_questions?.length) parts.push('Open Questions:\n' + data.open_questions.map(q => '  - ' + q).join('\n'));
+    if (parts.length > 0) return parts.join('\n\n');
+    return JSON.stringify(data, null, 2);
+  };
+
   /* ── Render entry row ── */
   const renderEntry = (entry, i, pkg) => {
     const manifest = pkg.value;
     const allEntries = manifest?.entries || [];
     const label = entry.title || entry.key || `Entry ${i + 1}`;
-    const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value, null, 2) : '');
+    // Look up actual entry data from fetched entryData, fall back to inline value
+    const rawData = entryData[entry.key] ?? entry.value;
+    const val = formatEntryValue(rawData);
     const vis = entry.visibility || 'private';
     const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
     const entryKey = entry.key || '';
@@ -343,6 +396,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           <strong>${escHtml(label)}</strong>
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>
+        ${loadingEntries === pkg.key && !rawData ? html`<p class="kpkg-detail-loading" style="color:var(--muted,#888);font-size:.8rem;font-style:italic;margin:.25rem 0">Loading...</p>` : null}
         ${val && html`<pre class="kpkg-detail-value">${escHtml(val)}</pre>`}
         ${renderEntryRefs(entry.references)}
         ${renderRelatedEntries(entry.related_entries, allEntries)}
