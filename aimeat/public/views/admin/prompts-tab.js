@@ -152,7 +152,10 @@ export default function PromptsTab({ data, reload }) {
         ${editData.usedIn && editData.usedIn.length > 0 && html`
           <div style="margin:8px 0">
             <strong style="font-size:.85rem">${t('dashboard.promptsUsedIn')}:</strong>
-            ${editData.usedIn.map(u => html` <span class="adm-prompt-used-tag">${escHtml(u)}</span>`)}
+            ${editData.usedIn.map(u => u.startsWith('/')
+              ? html` <a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)">${escHtml(u)}</a>`
+              : html` <span class="adm-prompt-used-tag">${escHtml(u)}</span>`
+            )}
           </div>
         `}
 
@@ -218,7 +221,10 @@ export default function PromptsTab({ data, reload }) {
                 </div>
                 <div style="font-size:.8rem;color:var(--text-dim)">${escHtml(p.description)}</div>
                 ${p.usedIn && p.usedIn.length > 0 && html`
-                  <div>${p.usedIn.map(u => html`<span class="adm-prompt-used-tag">${escHtml(u)}</span> `)}</div>
+                  <div>${p.usedIn.map(u => u.startsWith('/')
+                    ? html`<a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)" onClick=${e => e.stopPropagation()}>${escHtml(u)}</a> `
+                    : html`<span class="adm-prompt-used-tag">${escHtml(u)}</span> `
+                  )}</div>
                 `}
               </div>
               <div style="text-align:right;font-size:.8rem;color:var(--text-dim)">

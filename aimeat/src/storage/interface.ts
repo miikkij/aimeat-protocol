@@ -958,11 +958,18 @@ export interface KnowledgeReference {
   note?: string;
 }
 
+export interface KnowledgeEntryRelation {
+  key: string;                              // Target entry key within same package
+  relation: KnowledgeLinkRelation;          // How entries relate
+}
+
 export interface KnowledgeEntryDescriptor {
   key: string;
   title: string;
   visibility: 'private' | 'owner' | 'public';
   schema?: string;
+  references?: KnowledgeReference[];        // Per-entry citations (independent knowledge unit)
+  related_entries?: KnowledgeEntryRelation[]; // Intra-package relationships
 }
 
 export interface KnowledgeLink {

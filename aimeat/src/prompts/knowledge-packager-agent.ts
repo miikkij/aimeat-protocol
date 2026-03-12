@@ -70,6 +70,28 @@ Same as the human prompt workflow, but with enhanced capabilities:
 
 Same as human prompt — see the AIMEAT Knowledge documentation for full list.
 
+## Per-entry References & Relationships
+
+Each entry is an **independent knowledge unit**. Place references (citations, sources) directly on the entry they support, NOT as a flat list at the package level. The same reference may appear on multiple entries if applicable. Also declare \`related_entries\` to map how entries within the package relate to each other.
+
+Relationship types: related-to, extends, derived-from, contradicts, supersedes, references.
+
+Example entry with references and relationships:
+\`\`\`json
+{
+  "key": "findings",
+  "title": "Main Findings",
+  "visibility": "public",
+  "references": [
+    { "url": "https://...", "title": "Source", "accessed": "2026-03-12", "verified": true }
+  ],
+  "related_entries": [
+    { "key": "methodology", "relation": "derived-from" },
+    { "key": "conclusions", "relation": "references" }
+  ]
+}
+\`\`\`
+
 ## Enhanced Capabilities (agent-only)
 
 - **Deep research**: Search the web for related material to enrich the package

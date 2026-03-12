@@ -406,6 +406,23 @@
 .kpkg-detail-refs{margin-top:.75rem}
 .kpkg-detail-refs h4{margin:0 0 .5rem;font-size:.85rem;color:var(--love1,#e84393)}
 .kpkg-ref-link{color:var(--love2,#6c5ce7);text-decoration:none;font-size:.8rem}
+/* Per-entry references */
+.kpkg-entry-refs{margin-top:.35rem;padding:.3rem .5rem;background:rgba(0,0,0,.15);border-radius:4px;border-left:2px solid var(--love2,#6c5ce7)}
+.kpkg-entry-refs .kpkg-ref-link{color:var(--love2,#6c5ce7);text-decoration:none;font-size:.78rem}
+.kpkg-entry-refs .kpkg-ref-link:hover{text-decoration:underline}
+/* Per-entry relationships */
+.kpkg-entry-relations{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem}
+.kpkg-relation-chip{display:inline-flex;align-items:center;gap:.3rem;padding:.15rem .5rem;background:rgba(108,92,231,.1);border:1px solid rgba(108,92,231,.25);border-radius:12px;font-size:.72rem;color:var(--text,#e0e0e0);cursor:pointer;transition:all .15s;line-height:1.3}
+.kpkg-relation-chip:hover{background:rgba(108,92,231,.2);border-color:rgba(108,92,231,.5)}
+.kpkg-relation-type{font-weight:600;color:var(--love2,#6c5ce7);font-size:.65rem;text-transform:uppercase;letter-spacing:.3px}
+/* Entry highlight animation on scroll-to */
+.kpkg-entry-highlight{outline:2px solid var(--love2,#6c5ce7);outline-offset:2px;transition:outline-color .3s}
+/* Import preview: per-entry ref/rel chips */
+.kpkg-preview-entry-refs,.kpkg-preview-entry-rels{display:flex;flex-wrap:wrap;gap:.25rem;width:100%;margin-top:.25rem;padding-left:1rem}
+.kpkg-ref-chip{display:inline-block;padding:.1rem .4rem;border-radius:3px;font-size:.7rem}
+.kpkg-ref-chip.kpkg-ref-verified{background:rgba(46,204,113,.1);color:var(--success,#2ecc71)}
+.kpkg-ref-chip.kpkg-ref-unverified{background:rgba(243,156,18,.1);color:var(--warn,#f39c12)}
+.kpkg-relation-chip-preview{cursor:default;font-size:.68rem;padding:.1rem .4rem}
 .kpkg-detail-meta{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border,#333);font-size:.7rem;color:var(--muted,#888);font-family:monospace}
 .kpkg-trust-advisory{color:var(--warn,#f39c12);font-size:.75rem;font-style:italic;margin:.35rem 0 0}
 

@@ -274,14 +274,66 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
   const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
 
+  /* ── Scroll to entry by key ── */
+  const scrollToEntry = useCallback((entryKey) => {
+    const el = document.querySelector(`[data-entry-key="${CSS.escape(entryKey)}"]`);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('kpkg-entry-highlight'); setTimeout(() => el.classList.remove('kpkg-entry-highlight'), 1500); }
+  }, []);
+
+  /* ── Render per-entry references ── */
+  const renderEntryRefs = (refs) => {
+    if (!refs || refs.length === 0) return null;
+    return html`
+      <div class="kpkg-entry-refs">
+        ${refs.map((ref, i) => html`
+          <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.4rem;padding:.15rem 0">
+            <span style="font-size:.75rem">${ref.verified ? '\u2713' : '?'}</span>
+            ${ref.url ? html`
+              <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link">
+                ${escHtml(ref.title || ref.url)}
+                <span style="font-size:.65rem;opacity:.6"> \u2197</span>
+              </a>
+            ` : html`<span style="font-size:.8rem">${escHtml(ref.title || 'Untitled')}</span>`}
+            ${ref.type ? html`<span class="kpkg-badge" style="font-size:.6rem">${escHtml(ref.type)}</span>` : null}
+          </div>
+        `)}
+      </div>
+    `;
+  };
+
+  /* ── Render related entries chips ── */
+  const relationLabels = { 'related-to': 'related', 'extends': 'extends', 'derived-from': 'from', 'contradicts': 'contradicts', 'supersedes': 'supersedes', 'references': 'refs' };
+  const renderRelatedEntries = (rels, allEntries) => {
+    if (!rels || rels.length === 0) return null;
+    return html`
+      <div class="kpkg-entry-relations">
+        ${rels.map((rel, i) => {
+          const targetEntry = allEntries.find(e => e.key === rel.key || e.key.endsWith('/' + rel.key));
+          const targetLabel = targetEntry ? (targetEntry.title || rel.key) : rel.key;
+          const shortKey = rel.key.includes('/') ? rel.key.split('/').pop() : rel.key;
+          return html`
+            <button key=${i} class="kpkg-relation-chip" onClick=${(e) => { e.stopPropagation(); scrollToEntry(rel.key); }}
+              title="${relationLabels[rel.relation] || rel.relation}: ${targetLabel}">
+              <span class="kpkg-relation-type">${relationLabels[rel.relation] || rel.relation}</span>
+              ${escHtml(targetLabel)}
+            </button>
+          `;
+        })}
+      </div>
+    `;
+  };
+
   /* ── Render entry row ── */
   const renderEntry = (entry, i, pkg) => {
+    const manifest = pkg.value;
+    const allEntries = manifest?.entries || [];
     const label = entry.title || entry.key || `Entry ${i + 1}`;
     const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value, null, 2) : '');
     const vis = entry.visibility || 'private';
     const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
+    const entryKey = entry.key || '';
     return html`
-      <div class="kpkg-detail-entry" key=${i}>
+      <div class="kpkg-detail-entry" key=${i} data-entry-key=${entryKey}>
         <div class="kpkg-detail-entry-header">
           <button class="kpkg-vis-pill"
             onClick=${(e) => { e.stopPropagation(); handleEntryVisibility(pkg, entry, nextVis); }}
@@ -292,6 +344,8 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>
         ${val && html`<pre class="kpkg-detail-value">${escHtml(val)}</pre>`}
+        ${renderEntryRefs(entry.references)}
+        ${renderRelatedEntries(entry.related_entries, allEntries)}
       </div>
     `;
   };
@@ -346,26 +400,54 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                 const label = entry.title || entry.key || `Entry ${i + 1}`;
                 const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value) : '');
                 const truncVal = val.length > 120 ? val.slice(0, 120) + '\u2026' : val;
+                const entryRefs = entry.references || [];
+                const entryRels = entry.related_entries || [];
                 return html`
                   <div class="kpkg-preview-entry" key=${i}>
                     <span class="kpkg-badge kpkg-badge-${entry.visibility || 'private'}">${t('knowledge.visibility.' + (entry.visibility || 'private'))}</span>
                     <strong class="kpkg-entry-key">${escHtml(label)}</strong>
                     ${truncVal && html`<p class="kpkg-entry-value">${escHtml(truncVal)}</p>`}
+                    ${entryRefs.length > 0 && html`
+                      <div class="kpkg-preview-entry-refs">
+                        ${entryRefs.map((ref, ri) => html`
+                          <span key=${ri} class="kpkg-ref-chip ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
+                            ${ref.verified ? '\u2713' : '?'} ${escHtml(ref.title || ref.url || 'ref')}
+                          </span>
+                        `)}
+                      </div>
+                    `}
+                    ${entryRels.length > 0 && html`
+                      <div class="kpkg-preview-entry-rels">
+                        ${entryRels.map((rel, ri) => html`
+                          <span key=${ri} class="kpkg-relation-chip kpkg-relation-chip-preview">
+                            <span class="kpkg-relation-type">${relationLabels[rel.relation] || rel.relation}</span>
+                            ${escHtml(rel.key)}
+                          </span>
+                        `)}
+                      </div>
+                    `}
                   </div>
                 `;
               })}
             </div>
 
-            ${(importPreview.pkg.references || []).length > 0 && html`
-              <div class="kpkg-preview-refs">
-                <strong>References:</strong>
-                ${importPreview.pkg.references.map((ref, i) => html`
-                  <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
-                    ${ref.verified ? '\u2713' : '?'} ${escHtml(ref.title)}
-                  </div>
-                `)}
-              </div>
-            `}
+            ${(() => {
+              // Legacy: show package-level refs only if entries don't have their own
+              const entries = importPreview.pkg.entries || [];
+              const hasPerEntryRefs = entries.some(e => e.references && e.references.length > 0);
+              const pkgRefs = importPreview.pkg.references || [];
+              if (pkgRefs.length > 0 && !hasPerEntryRefs) return html`
+                <div class="kpkg-preview-refs">
+                  <strong>References (package-level):</strong>
+                  ${pkgRefs.map((ref, i) => html`
+                    <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
+                      ${ref.verified ? '\u2713' : '?'} ${escHtml(ref.title)}
+                    </div>
+                  `)}
+                </div>
+              `;
+              return null;
+            })()}
 
             <label class="kpkg-toggle">
               <input type="checkbox"
@@ -466,23 +548,29 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                     ${entries.length === 0 && html`<p class="kpkg-empty">No entries</p>`}
                   </div>
 
-                  ${(manifest.references || []).length > 0 && html`
-                    <div class="kpkg-detail-refs">
-                      <h4>${t('knowledge.myKnowledge.references') || 'References'}</h4>
-                      ${manifest.references.map((ref, i) => html`
-                        <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0">
-                          <span>${ref.verified ? '\u2705' : '\u2753'}</span>
-                          ${ref.url ? html`
-                            <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link" style="color:var(--love1,#ff6b9d);text-decoration:none">
-                              ${escHtml(ref.title || ref.url)}
-                              <span style="font-size:.7rem;opacity:.6"> \u2197</span>
-                            </a>
-                          ` : html`<span>${escHtml(ref.title || 'Untitled')}</span>`}
-                          ${ref.type ? html`<span class="kpkg-badge" style="font-size:.6rem">${escHtml(ref.type)}</span>` : null}
-                        </div>
-                      `)}
-                    </div>
-                  `}
+                  ${(() => {
+                    // Show package-level refs only for legacy packages where entries lack per-entry refs
+                    const hasPerEntryRefs = entries.some(e => e.references && e.references.length > 0);
+                    const pkgRefs = manifest.references || [];
+                    if (pkgRefs.length > 0 && !hasPerEntryRefs) return html`
+                      <div class="kpkg-detail-refs">
+                        <h4>${t('knowledge.myKnowledge.references') || 'References'} (${t('knowledge.myKnowledge.packageLevel') || 'package-level'})</h4>
+                        ${pkgRefs.map((ref, i) => html`
+                          <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0">
+                            <span>${ref.verified ? '\u2705' : '\u2753'}</span>
+                            ${ref.url ? html`
+                              <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link" style="color:var(--love1,#ff6b9d);text-decoration:none">
+                                ${escHtml(ref.title || ref.url)}
+                                <span style="font-size:.7rem;opacity:.6"> \u2197</span>
+                              </a>
+                            ` : html`<span>${escHtml(ref.title || 'Untitled')}</span>`}
+                            ${ref.type ? html`<span class="kpkg-badge" style="font-size:.6rem">${escHtml(ref.type)}</span>` : null}
+                          </div>
+                        `)}
+                      </div>
+                    `;
+                    return null;
+                  })()}
 
                   <div class="kpkg-detail-meta">
                     <span>ID: ${escHtml(manifest.id || pkg.key)}</span>

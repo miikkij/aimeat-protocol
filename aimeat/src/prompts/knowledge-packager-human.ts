@@ -68,6 +68,25 @@ The user will share content with you — this could be research notes, an idea, 
 
 When the user confirms, output EXACTLY this JSON structure as a code block. The user will paste this into their AIMEAT Knowledge tab import box.
 
+### Per-entry references & relationships
+
+Each entry is an **independent knowledge unit**. References (citations, sources) belong on the entry they support — NOT as a flat list at the package level. Similarly, entries can declare relationships to other entries in the same package using \`related_entries\`.
+
+**Reference rules:**
+- Place references on the specific entry they support
+- The same URL may appear on multiple entries if it supports both
+- Each entry should be self-contained with its own citations
+
+**Relationship types** (use in \`related_entries\`):
+| Relation | Meaning |
+|----------|---------|
+| related-to | General topical connection |
+| extends | Builds upon / expands the target |
+| derived-from | Was created based on the target |
+| contradicts | Disagrees with or challenges the target |
+| supersedes | Replaces or makes the target obsolete |
+| references | Cites or points to the target |
+
 \`\`\`json
 {
   "aimeat_knowledge_package": true,
@@ -87,25 +106,57 @@ When the user confirms, output EXACTLY this JSON structure as a code block. The 
       "level": "assisted",
       "description": "User provided research notes; AI organized into sections and suggested tags"
     },
-    "references": [
-      {
-        "url": "https://example.com/source",
-        "title": "Source Title",
-        "accessed": "2026-03-07",
-        "verified": false,
-        "note": "Could not verify — please confirm manually"
-      }
-    ],
+    "references": [],
     "entries": [
       {
         "key": "main-findings",
         "title": "Main Findings",
-        "visibility": "public"
+        "visibility": "public",
+        "references": [
+          {
+            "url": "https://example.com/source",
+            "title": "Source Title",
+            "accessed": "2026-03-07",
+            "verified": false,
+            "note": "Could not verify — please confirm manually"
+          }
+        ],
+        "related_entries": [
+          { "key": "methodology", "relation": "derived-from" },
+          { "key": "conclusions", "relation": "references" }
+        ]
+      },
+      {
+        "key": "methodology",
+        "title": "Research Methodology",
+        "visibility": "public",
+        "references": [
+          {
+            "url": "https://example.com/method-paper",
+            "title": "Methodology Reference",
+            "accessed": "2026-03-07",
+            "verified": true
+          }
+        ],
+        "related_entries": [
+          { "key": "main-findings", "relation": "extends" }
+        ]
+      },
+      {
+        "key": "conclusions",
+        "title": "Conclusions",
+        "visibility": "public",
+        "references": [],
+        "related_entries": [
+          { "key": "main-findings", "relation": "derived-from" }
+        ]
       },
       {
         "key": "personal-notes",
         "title": "Personal Notes",
-        "visibility": "private"
+        "visibility": "private",
+        "references": [],
+        "related_entries": []
       }
     ],
     "links": [],
@@ -120,8 +171,15 @@ When the user confirms, output EXACTLY this JSON structure as a code block. The 
     "main-findings": {
       "title": "Main Findings",
       "summary": "...",
-      "findings": ["..."],
-      "sources": ["..."]
+      "findings": ["..."]
+    },
+    "methodology": {
+      "title": "Research Methodology",
+      "body": "..."
+    },
+    "conclusions": {
+      "title": "Conclusions",
+      "body": "..."
     },
     "personal-notes": {
       "title": "Personal Notes",

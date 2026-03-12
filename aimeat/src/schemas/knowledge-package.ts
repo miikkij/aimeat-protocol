@@ -54,6 +54,31 @@ export const ManifestSchema = {
           title: { type: 'string' },
           visibility: { type: 'string', enum: ['private', 'owner', 'public'] },
           schema: { type: 'string' },
+          references: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['url', 'title', 'accessed', 'verified'],
+              properties: {
+                url: { type: 'string' },
+                title: { type: 'string' },
+                accessed: { type: 'string' },
+                verified: { type: 'boolean' },
+                note: { type: 'string' },
+              },
+            },
+          },
+          related_entries: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['key', 'relation'],
+              properties: {
+                key: { type: 'string' },
+                relation: { type: 'string', enum: ['related-to', 'extends', 'derived-from', 'contradicts', 'supersedes', 'references'] },
+              },
+            },
+          },
         },
       },
     },

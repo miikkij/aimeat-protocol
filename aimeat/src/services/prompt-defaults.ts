@@ -52,7 +52,7 @@ To upgrade: (1) Suggest user adds this node as MCP connector, (2) Use Tier 0.5 k
 
 Always start by checking: Can I use MCP connectors? Can I run code? Present upgrade options to the user.`,
     variables: ['node_id'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/0'],
   },
 
   {
@@ -68,7 +68,7 @@ Usage: Each OTK is single-use. Request new keys via /v1/auth/challenge.
 
 Limitations: No full memory CRUD, no work queue, no wallet. Upgrade to Tier 1 for full agent access.`,
     variables: ['node_id'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/0.5'],
   },
 
   {
@@ -86,7 +86,7 @@ Trust: Score {{trust_score}}/100. Complete work honestly to build trust. Higher 
 
 Use hints.next_actions in every response to discover what to do next.`,
     variables: ['gaii', 'node_id', 'daily_allowance', 'trust_score'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/1'],
   },
 
   {
@@ -102,7 +102,7 @@ Philosophy: Present options to your human clearly. Batch config changes into one
 
 Node health: {{agent_count}} agents, {{action_count}} actions.`,
     variables: ['owner_name', 'node_id', 'agent_count', 'action_count'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/2'],
   },
 
   {
@@ -415,7 +415,7 @@ No setup, no auth, no keys needed. Just paste the link.
 When another AI joins, they should follow the same boot sequence above.
 Check "anonymous.agents.roster" periodically to see who's active.`,
     variables: ['node_id', 'node_url', 'anon_gaii', 'anon_chat_id'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/anonymous'],
   },
 
   {
@@ -453,7 +453,7 @@ SESSION CONTINUITY:
 - When ending: Write handoff.pending if work remains unfinished.
 - When completing: Clear handoff and update context.latest.`,
     variables: ['node_url'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/openclaw'],
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -482,7 +482,7 @@ Ask the user what their app should do. Then build a complete, self-contained HTM
 - Include error handling and loading states
 - Include a self-publish button using POST {{node_url}}/v1/apps`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/portal/prompts/app-builder-general'],
   },
 
   {
@@ -514,7 +514,7 @@ Load from {{node_url}}/v1/libs/:
 Dark theme (--bg:#0f0a14; --accent:#ff6b9d), mobile-first, smooth animations.
 Return a COMPLETE single HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/portal/prompts/app-builder-game'],
   },
 
   {
@@ -546,7 +546,7 @@ Load from {{node_url}}/v1/libs/:
 ## Design
 Dark theme, mobile-first, sidebar + editor layout. Return COMPLETE HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/portal/prompts/app-builder-notes'],
   },
 
   {
@@ -576,7 +576,7 @@ Dashboard should be fully self-contained in one HTML file.
 ## Design
 Dark theme, grid layout, responsive cards. Return COMPLETE HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/portal/prompts/app-builder-dashboard'],
   },
 
   {
@@ -610,7 +610,7 @@ Load from {{node_url}}/v1/libs/:
 ## Design
 Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/portal/prompts/app-builder-chat'],
   },
 
   {
@@ -695,7 +695,7 @@ Once the user is happy with the CSM, they can register it by:
 
 The node will validate the CSM, generate a JSON Schema, and register it for use.`,
     variables: ['owner_name', 'node_url'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/portal/prompts/csm-builder'],
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -764,7 +764,7 @@ Generate a JSON bundle matching the \`POST /v1/site/import\` body schema:
 - \`DELETE /v1/site/template\` — Revert to default portal
 - \`POST /v1/site/cache-invalidate\` — Force cache refresh after changes`,
     variables: ['node_id', 'node_name', 'node_url'],
-    usedIn: ['src/services/site.ts'],
+    usedIn: ['/v1/site'],
   },
 
   {
@@ -795,7 +795,7 @@ Token lifetime: 24 hours. Refresh before expiry via POST {{node_url}}/v1/auth/re
 Step 4 — What Now:
 You are connected. Now help your user with what they want to accomplish. Browse the capability sections in the response to find the right endpoints.`,
     variables: ['node_url'],
-    usedIn: ['src/routes/bootstrap.ts'],
+    usedIn: ['/v1/bootstrap'],
   },
 
   {
@@ -841,7 +841,7 @@ Discovery:
 
 Help your user with what they want to accomplish. Use hints.next_actions in responses to discover what to do next.`,
     variables: ['node_url'],
-    usedIn: ['Reserved — not yet consumed by any route'],
+    usedIn: ['/v1/bootstrap (reserved)'],
   },
 
   {
@@ -909,7 +909,7 @@ anonymous.tmp.{anything}
 
 Full docs: GET {{node_url}}/v1/docs`,
     variables: ['node_id', 'node_url', 'anon_gaii', 'anon_chat_id'],
-    usedIn: ['src/routes/prompts.ts'],
+    usedIn: ['/v1/prompts/anonymous/share'],
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1057,7 +1057,7 @@ Include this notice in your response when presenting the package:
 
 Now, please share the content you'd like to package.`,
     variables: ['owner_name', 'node_url', 'node_id'],
-    usedIn: ['src/prompts/knowledge-packager-human.ts'],
+    usedIn: ['/v1/templates/knowledge-packager-human'],
   },
 
   {
@@ -1144,7 +1144,7 @@ Same as human prompt — see the AIMEAT Knowledge documentation for full list.
 
 Now, please share the content you'd like to package.`,
     variables: ['owner_name', 'node_url', 'node_id', 'gaii'],
-    usedIn: ['src/prompts/knowledge-packager-agent.ts'],
+    usedIn: ['/v1/templates/knowledge-packager-agent'],
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1389,7 +1389,7 @@ Even if there are no console errors — just describe what's wrong (e.g. 'the bu
 ### Browser APIs Available
 The app runs in a browser — you can use Canvas, WebGL, Web Audio, WebRTC, Camera, Geolocation, LocalStorage, IndexedDB, Notifications, Drag&Drop, Clipboard, Speech, Fullscreen, Web Workers, CSS Animations, SVG, Gamepad API, Vibration, Share API. Use whatever is appropriate for the user's goal.`,
     variables: ['node_url', 'node_id', 'agent_count', 'action_count'],
-    usedIn: ['src/routes/portal.ts'],
+    usedIn: ['/v1/portal/prompts/platform-app-builder'],
   },
 
   {
@@ -1440,7 +1440,7 @@ After connecting, try saying: "Check my AIMEAT node catalogue" or "What services
 - Automatic token management
 - All 18 MCP tools at your fingertips`,
     variables: ['node_url'],
-    usedIn: ['src/routes/portal.ts'],
+    usedIn: ['/v1/portal/prompts/platform-mcp'],
   },
 
   {
@@ -1485,7 +1485,7 @@ Step 4: Use the API
 GET {{node_url}}/v1/spec — OpenAPI specification
 GET {{node_url}}/v1/prompts/tier1 — Detailed operating instructions`,
     variables: ['node_url', 'node_id'],
-    usedIn: ['src/routes/portal.ts'],
+    usedIn: ['/v1/portal/prompts/platform-api'],
   },
 
   {
@@ -1527,7 +1527,7 @@ If keyed browse is enabled, you can do limited writes:
 \`\`\`
 This uses micro-memory — small key-value storage accessible via GET parameters.`,
     variables: ['node_url'],
-    usedIn: ['src/routes/portal.ts'],
+    usedIn: ['/v1/portal/prompts/platform-browse'],
   },
 
 ];
