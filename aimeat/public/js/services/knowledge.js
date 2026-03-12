@@ -6,8 +6,10 @@ import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
 /* ── Package Import ── */
 
-export async function importPackage(pkg, overrides = {}) {
-  return apiPost('/v1/packages/import', { package: pkg, overrides });
+export async function importPackage(pkg, overrides = {}, entryData = null) {
+  const body = { package: pkg, overrides };
+  if (entryData) body.entry_data = entryData;
+  return apiPost('/v1/packages/import', body);
 }
 
 /* ── Package CRUD (via memory API) ── */
@@ -23,14 +25,8 @@ export async function getPackage(packageId) {
 }
 
 export async function deletePackage(ownerGaii, packageId) {
-  const prefix = `packages/${packageId}/`;
-  const entries = await apiGet(`/v1/memory?prefix=${encodeURIComponent(prefix)}`);
-  const list = entries?.data?.entries || entries?.data || [];
-  const results = [];
-  for (const entry of list) {
-    results.push(await apiDelete(`/v1/memory/${encodeURIComponent(entry.key)}`));
-  }
-  return results;
+  // Use admin endpoint for cascade delete (manifest + all entries)
+  return apiDelete(`/v1/admin/knowledge/${encodeURIComponent(packageId)}`);
 }
 
 /* ── Links ── */

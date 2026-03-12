@@ -718,11 +718,83 @@ git commit -m "refactor(css): consolidate 22 badge variants into 6 semantic colo
 
 ---
 
-### Task 14: Configure Test Coverage Reporting
+## Chunk 3: Low Priority Fixes and Cleanup
+
+### Task 14: Remove Unused @prisma/client Dependency
 
 **Files:**
-- Modify: `aimeat/vitest.config.ts`
-- Modify: `aimeat/package.json` (add coverage script)
+- Modify: `aimeat/package.json:132-134`
+
+- [ ] **Step 1: Remove optionalDependencies**
+
+In `package.json`, remove the `optionalDependencies` block:
+
+```json
+"optionalDependencies": {
+  "@prisma/client": "^6.19.2"
+},
+```
+
+If this is the only optional dependency, remove the entire `optionalDependencies` key.
+
+- [ ] **Step 2: Run pnpm install to update lockfile**
+
+Run: `cd aimeat && pnpm install`
+
+- [ ] **Step 3: Run type-check and tests**
+
+Run: `cd aimeat && npx tsc --noEmit && pnpm test`
+Expected: PASS (prisma is not imported anywhere)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add package.json pnpm-lock.yaml
+git commit -m "chore: remove unused @prisma/client optional dependency"
+```
+
+---
+
+### Task 15: Fix require() in Build Script
+
+**Files:**
+- Modify: `aimeat/package.json:16`
+
+- [ ] **Step 1: Replace require() with ESM-compatible approach**
+
+In `package.json`, find the build script (line 16). It uses `node -e "const fs=require('fs');..."`.
+
+Replace with a script that uses ESM:
+
+```json
+"build": "tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');\""
+```
+
+- [ ] **Step 2: Run build to verify**
+
+Run: `cd aimeat && pnpm build`
+Expected: Build completes successfully with all assets copied.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add package.json
+git commit -m "chore: use ESM import in build script instead of require()"
+```
+
+---
+
+## Chunk 4: Safety Net Tests (BEFORE Refactoring)
+
+> **Principle:** Write tests first that prove current behavior works. Run them after each refactoring task. If they fail, the refactoring broke something — fix before continuing.
+
+### Task 16: Configure Test Coverage Reporting
+
+**Moved here from Chunk 2 — coverage data informs which tests to write.**
+
+**Files:**
+- Modify: `vitest.config.ts`
+- Modify: `package.json` (add coverage script)
 
 - [ ] **Step 1: Install coverage provider**
 
@@ -758,11 +830,18 @@ In `package.json` scripts section, add:
 "test:coverage": "vitest run --coverage"
 ```
 
-- [ ] **Step 4: Run coverage**
+- [ ] **Step 4: Run coverage and review baseline**
 
 Run: `cd aimeat && pnpm test:coverage`
 
-Review the output. Note which modules have low coverage for future test writing.
+Note the baseline numbers — especially for modules we're about to refactor:
+- `src/storage/providers/sqlite/index.ts`
+- `src/routes/federation.ts`
+- `src/routes/admin.ts`
+- `src/server.ts`
+- `src/auth/middleware.ts`
+- `src/services/morsel.ts`
+- `src/services/hooks.ts`
 
 - [ ] **Step 5: Add coverage/ to .gitignore**
 
@@ -781,134 +860,964 @@ git commit -m "feat(test): add vitest coverage reporting with v8 provider"
 
 ---
 
-## Chunk 3: Low Priority Fixes and Cleanup
+### Task 17: Write Storage CRUD Safety Net Tests
 
-### Task 15: Remove Unused @prisma/client Dependency
+**Purpose:** These tests prove every SQLite storage method works correctly BEFORE we split the file. After the split (Task 22), we run these same tests — if they pass, the split was clean.
 
 **Files:**
-- Modify: `aimeat/package.json:132-134`
+- Create: `test/unit/storage-safety-net.test.ts`
 
-- [ ] **Step 1: Remove optionalDependencies**
+- [ ] **Step 1: Write owner + agent CRUD tests**
 
-In `package.json`, remove the `optionalDependencies` block:
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 
-```json
-"optionalDependencies": {
-  "@prisma/client": "^6.19.2"
-},
+const uid = () => Math.random().toString(36).slice(2, 10);
+const ts = () => new Date().toISOString();
+
+describe('Storage Safety Net — Owner & Agent', () => {
+  let storage: SqliteStorage;
+  beforeEach(() => { storage = new SqliteStorage(':memory:'); });
+
+  it('create + get + list + delete owner', async () => {
+    const name = `owner-${uid()}`;
+    const created = await storage.createOwner({ name, publicKey: 'dGVzdA==', roles: ['owner'], createdAt: ts() });
+    expect(created.name).toBe(name);
+
+    const found = await storage.getOwner(name);
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe(name);
+
+    const list = await storage.listOwners();
+    expect(list.some(o => o.name === name)).toBe(true);
+
+    await storage.deleteOwner(name);
+    expect(await storage.getOwner(name)).toBeNull();
+  });
+
+  it('create + get + list + delete agent', async () => {
+    const ownerName = `owner-${uid()}`;
+    await storage.createOwner({ name: ownerName, publicKey: 'dGVzdA==', roles: ['owner'], createdAt: ts() });
+
+    const gaii = `agent-${uid()}#${ownerName}@node`;
+    const created = await storage.createAgent({
+      name: `agent-${uid()}`, owner: ownerName, gaii, capabilities: [],
+      publicKey: 'dGVzdA==', trustScore: 50, morselBalance: 100,
+      createdAt: ts(), lastSeen: ts(),
+    });
+    expect(created.gaii).toBe(gaii);
+
+    const found = await storage.getAgent(gaii);
+    expect(found).not.toBeNull();
+
+    const byOwner = await storage.getAgentsByOwner(ownerName);
+    expect(byOwner.length).toBeGreaterThanOrEqual(1);
+
+    await storage.deleteAgent(gaii);
+    expect(await storage.getAgent(gaii)).toBeNull();
+  });
+});
 ```
 
-If this is the only optional dependency, remove the entire `optionalDependencies` key.
+- [ ] **Step 2: Write memory CRUD tests**
 
-- [ ] **Step 2: Run pnpm install to update lockfile**
+```typescript
+describe('Storage Safety Net — Memory', () => {
+  let storage: SqliteStorage;
+  beforeEach(() => { storage = new SqliteStorage(':memory:'); });
 
-Run: `cd aimeat && pnpm install`
+  it('set + get + list + search + delete memory', async () => {
+    const agentGaii = 'agent#alice@node';
+    await storage.setMemory({
+      key: 'profile.bio', ownerGaii: agentGaii, value: { text: 'hello' },
+      visibility: 'public', tags: ['profile'], ttlHours: null,
+      version: 1, createdAt: ts(), updatedAt: ts(),
+    });
 
-- [ ] **Step 3: Run type-check and tests**
+    const found = await storage.getMemory('profile.bio', agentGaii);
+    expect(found).not.toBeNull();
+    expect(found!.value).toEqual({ text: 'hello' });
 
-Run: `cd aimeat && npx tsc --noEmit && pnpm test`
-Expected: PASS (prisma is not imported anywhere)
+    const list = await storage.listMemory(agentGaii);
+    expect(list.length).toBe(1);
+
+    const deleted = await storage.deleteMemory('profile.bio', agentGaii);
+    expect(deleted).toBe(true);
+    expect(await storage.getMemory('profile.bio', agentGaii)).toBeNull();
+  });
+});
+```
+
+- [ ] **Step 3: Write work queue + wallet tests**
+
+```typescript
+describe('Storage Safety Net — Work & Wallet', () => {
+  let storage: SqliteStorage;
+  beforeEach(() => { storage = new SqliteStorage(':memory:'); });
+
+  it('create + get + update work', async () => {
+    const work = await storage.createWork({
+      trackingCode: `tc-${uid()}`, requesterGaii: 'req#a@n', providerGaii: 'prov#b@n',
+      actionId: 'act-1', status: 'pending', cost: 10, payload: {},
+      createdAt: ts(), updatedAt: ts(),
+    });
+    expect(work.status).toBe('pending');
+
+    const found = await storage.getWork(work.trackingCode);
+    expect(found).not.toBeNull();
+
+    await storage.updateWork(work.trackingCode, { status: 'in_progress' });
+    const updated = await storage.getWork(work.trackingCode);
+    expect(updated!.status).toBe('in_progress');
+  });
+});
+```
+
+- [ ] **Step 4: Write board, consent, dispute, organism tests**
+
+Cover the remaining major domains: boards (create board + post), consent (create + check), disputes (create + get), organisms (create + list + delete).
+
+- [ ] **Step 5: Run tests to establish baseline**
+
+Run: `cd aimeat && pnpm test`
+Expected: ALL pass. Record the count — this is our safety baseline.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add test/unit/storage-safety-net.test.ts
+git commit -m "test(storage): add CRUD safety net tests for all major storage domains"
+```
+
+---
+
+### Task 18: Write Auth Middleware Safety Net Tests
+
+**Files:**
+- Create: `test/unit/auth-middleware.test.ts`
+
+- [ ] **Step 1: Write scope resolution tests**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+// Test cases:
+// - Agent with exact scope passes
+// - Agent with domain wildcard (e.g., memory:*) passes
+// - Agent without required scope is denied
+// - Multiple required scopes all checked
+```
+
+- [ ] **Step 2: Write role hierarchy tests**
+
+```typescript
+// Test cases:
+// - Operator can access owner-level endpoints
+// - Owner cannot access operator-level endpoints
+// - Agent cannot access owner-level endpoints
+// - First owner gets operator role
+```
+
+- [ ] **Step 3: Write token revocation tests**
+
+```typescript
+// Test cases:
+// - Revoked token is rejected
+// - Valid token passes after revocation cache miss
+```
+
+- [ ] **Step 4: Run tests**
+
+Run: `cd aimeat && pnpm test`
+Expected: All pass
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add test/unit/auth-middleware.test.ts
+git commit -m "test(auth): add safety net tests for scope, roles, and token revocation"
+```
+
+---
+
+### Task 19: Write Hook Execution Safety Net Tests
+
+**Files:**
+- Create: `test/unit/hooks.test.ts`
+
+- [ ] **Step 1: Write hook dispatch tests**
+
+```typescript
+// Test cases:
+// - Hook fires for registered event
+// - Hook does not fire for unregistered event
+// - Multiple hooks for same event all fire
+// - Hook payload is correctly passed
+```
+
+- [ ] **Step 2: Write error handling tests**
+
+```typescript
+// Test cases (will also validate fireHook from Task 9):
+// - Failed hook does not throw
+// - Hook with invalid URL is handled gracefully
+```
+
+- [ ] **Step 3: Run tests**
+
+Run: `cd aimeat && pnpm test`
+Expected: All pass
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add package.json pnpm-lock.yaml
-git commit -m "chore: remove unused @prisma/client optional dependency"
+git add test/unit/hooks.test.ts
+git commit -m "test(hooks): add safety net tests for hook dispatch and error handling"
 ```
 
 ---
 
-### Task 16: Fix require() in Build Script
+### Task 20: Write Wallet/Morsel Calculation Safety Net Tests
 
 **Files:**
-- Modify: `aimeat/package.json:16`
+- Modify or create: `test/unit/morsel.test.ts` (may already exist — extend it)
 
-- [ ] **Step 1: Replace require() with ESM-compatible approach**
+- [ ] **Step 1: Test balance operations**
 
-In `package.json`, find the build script (line 16). It uses `node -e "const fs=require('fs');..."`.
-
-Replace with a script that uses ESM:
-
-```json
-"build": "tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');\""
+```typescript
+// Test cases:
+// - Debit reduces balance correctly
+// - Credit increases balance correctly
+// - Transfer preserves total supply
+// - Negative balance is prevented
 ```
 
-- [ ] **Step 2: Run build to verify**
+- [ ] **Step 2: Test escrow flows**
 
-Run: `cd aimeat && pnpm build`
-Expected: Build completes successfully with all assets copied.
+```typescript
+// Test cases:
+// - Escrow hold reduces available balance
+// - Release escrow transfers to provider
+// - Cancel escrow returns to requester
+// - Double-release is rejected
+```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Run all tests — record new baseline**
+
+Run: `cd aimeat && pnpm test`
+Expected: All pass. This is the final safety net baseline before refactoring.
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add package.json
-git commit -m "chore: use ESM import in build script instead of require()"
+git add test/unit/morsel.test.ts
+git commit -m "test(wallet): add safety net tests for balance ops and escrow flows"
 ```
 
 ---
 
-## Chunk 4: Deferred / Larger Refactoring (Separate Plans)
+## Chunk 5: Decompose Oversized Files (Tests Protect Us)
 
-These items are documented here for tracking but each warrants its own dedicated plan due to scope:
+> **After each task in this chunk:** Run `cd aimeat && npx tsc --noEmit && pnpm test`. ALL safety net tests from Chunk 4 must still pass. If any fail, the split broke something — fix before continuing.
 
-### Deferred A: Decompose Oversized Files
+### Task 21: Split federation.ts into Domain Routers (run safety net tests after)
 
-**Scope:** Split 4 files (4,535 + 2,317 + 1,587 + 1,353 = 9,792 lines) into domain-specific modules.
+**Files:**
+- Modify: `src/routes/federation.ts` (2,317 lines → keep as thin barrel)
+- Create: `src/routes/federation-peer.ts`
+- Create: `src/routes/federation-sync.ts`
+- Create: `src/routes/federation-settlements.ts`
+- Create: `src/routes/federation-genesis.ts`
+- Create: `src/services/federation-helpers.ts`
+- Modify: `src/server.ts` (update route imports)
 
-**Recommended approach:**
-- `sqlite/index.ts` → split into `sqlite/agents.ts`, `sqlite/memory.ts`, `sqlite/work.ts`, `sqlite/federation.ts`, `sqlite/boards.ts`, etc. with barrel `index.ts`
-- `federation.ts` → split into `federation-peering.ts`, `federation-sync.ts`, `federation-genesis.ts`
-- `admin.ts` → split into `admin-config.ts`, `admin-economy.ts`, `admin-federation.ts`, etc. (some already split)
-- `server.ts` → extract middleware setup, route mounting, static file config into separate modules
+**Current structure of federation.ts:**
 
-**Estimated effort:** Large (1-2 days). Create a separate plan for this.
+| Domain | Lines | Routes |
+|--------|-------|--------|
+| Keyword matching helpers | 21–54 | 4 helper functions |
+| Peer key cache | 55–144 | `performKeyExchange()` |
+| Peer directory & discovery | 150–195 | `GET /v1/federation/directory` |
+| Peer introduction | 197–385 | `POST /v1/federation/peer/introduce` |
+| Key exchange | 387–465 | `POST /v1/federation/key-exchange` |
+| Heartbeat | 467–550 | `POST /v1/federation/heartbeat` |
+| Peering requests CRUD | 551–765 | 4 endpoints |
+| Catalogue sync & replication | 766–1068 | `POST /v1/federation/replicate`, `/catalogue-sync` |
+| Cross-node query routing | 1068–1394 | `POST /v1/federation/query` |
+| Signed settlements | 1394–1656 | `POST /v1/federation/settlement` |
+| Genesis peering | 1656–2288 | 4 genesis endpoints |
+| Organism reputation | 2288–2317 | `GET /v1/federation/organisms/reputation` |
 
-### Deferred B: Migrate Inline Styles to CSS Classes
+- [ ] **Step 1: Extract helpers to federation-helpers.ts**
 
-**Scope:** 60+ inline style attributes in `email-tab.js` + scattered instances in other tabs.
+Create `src/services/federation-helpers.ts` with:
+- `matchesKeyword()`, `matchesActionKeyword()`, `matchesGenesisKeyword()`, `matchesLocation()` (lines 21–54)
+- Peer key cache class and `performKeyExchange()` (lines 55–144)
 
-**Recommended approach:**
-- Audit all inline `style=` in admin tabs
-- Create CSS classes in `admin.css` with `adm-*` prefix
-- Replace inline styles with class names
-- Preserve the existing visual appearance
+- [ ] **Step 2: Create federation-peer.ts**
 
-**Estimated effort:** Medium (half day). Can be done incrementally, tab by tab.
+Extract lines 150–765 into `src/routes/federation-peer.ts`:
+- `GET /v1/federation/directory`
+- `POST /v1/federation/peer/introduce`
+- `POST /v1/federation/key-exchange`
+- `POST /v1/federation/heartbeat`
+- Peering request CRUD (4 endpoints)
 
-### Deferred C: Add Missing Unit Tests for Critical Paths
+Export as `federationPeerRouter(config, storage)`.
 
-**Scope:** After enabling coverage reporting (Task 14), identify modules below 80% coverage.
+- [ ] **Step 3: Create federation-sync.ts**
 
-**Priority test targets (based on audit):**
-- Auth flow edge cases (anonymous mode, scope resolution)
-- Wallet/morsel calculations (decimal precision)
-- Federation sync conflict resolution
-- Hook execution and retry logic
+Extract lines 766–1394 into `src/routes/federation-sync.ts`:
+- `POST /v1/federation/replicate`
+- `POST /v1/federation/catalogue-sync`
+- `POST /v1/federation/query`
 
-**Estimated effort:** Large (ongoing). Create a test improvement plan after reviewing coverage report.
+Export as `federationSyncRouter(config, storage)`.
+
+- [ ] **Step 4: Create federation-settlements.ts**
+
+Extract lines 1394–1656 into `src/routes/federation-settlements.ts`:
+- `POST /v1/federation/settlement`
+
+Export as `federationSettlementsRouter(config, storage)`.
+
+- [ ] **Step 5: Create federation-genesis.ts**
+
+Extract lines 1656–2317 into `src/routes/federation-genesis.ts`:
+- Genesis peering CRUD (4 endpoints)
+- Organism reputation query
+
+Export as `federationGenesisRouter(config, storage)`.
+
+- [ ] **Step 6: Update federation.ts as barrel**
+
+Replace `federation.ts` content with a barrel that imports and re-exports all sub-routers, or create a composite `federationRouter()` that mounts all sub-routers.
+
+- [ ] **Step 7: Update server.ts imports**
+
+If the composite approach is used, no changes needed in `server.ts`. If individual routers are exported, update `server.ts` to mount each.
+
+- [ ] **Step 8: Run type-check and tests**
+
+Run: `cd aimeat && npx tsc --noEmit && pnpm test`
+Expected: PASS
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/routes/federation.ts src/routes/federation-peer.ts src/routes/federation-sync.ts src/routes/federation-settlements.ts src/routes/federation-genesis.ts src/services/federation-helpers.ts src/server.ts
+git commit -m "refactor: split federation.ts (2,317 LOC) into 4 domain routers + shared helpers"
+```
+
+---
+
+### Task 22: Split admin.ts into Domain Routers (run safety net tests after)
+
+**Files:**
+- Modify: `src/routes/admin.ts` (1,587 lines → keep setup-only ~250 lines)
+- Create: `src/routes/admin-config.ts`
+- Create: `src/routes/admin-monitoring.ts`
+- Create: `src/routes/admin-agents.ts`
+- Create: `src/routes/admin-maintenance.ts`
+- Create: `src/routes/admin-economy.ts`
+- Modify: `src/server.ts` (add new router imports)
+
+**Current structure of admin.ts:**
+
+| Domain | Lines | What stays / moves |
+|--------|-------|-------------------|
+| Setup pages (password-protected) | 96–286 | **Stays** in admin.ts |
+| Dashboard & UI | 287–481 | **Stays** in admin.ts |
+| Work & federation monitoring | 484–603 | → `admin-monitoring.ts` |
+| Config management + Consul | 602–831 | → `admin-config.ts` |
+| Agent & CORS management | 832–887 | → `admin-agents.ts` |
+| Stats, backup, restore, roles | 888–987 | → `admin-monitoring.ts` |
+| Hooks management | 1012–1068 | → `admin-maintenance.ts` |
+| Maintenance mode | 1069–1147 | → `admin-maintenance.ts` |
+| Morsel minting | 1094–1147 | → `admin-economy.ts` |
+| Federation trust & health | 1148–1284 | → `admin-monitoring.ts` |
+
+**Note:** `admin-features.ts`, `admin-extensions.ts`, `admin-scheduler.ts`, `admin-prompts.ts` already exist as prior extractions.
+
+- [ ] **Step 1: Create admin-config.ts**
+
+Extract config management routes (lines 602–831):
+- `GET/PUT /v1/admin/config`
+- `DELETE /v1/admin/config/:path`
+- `GET /v1/admin/consul`
+- `POST /v1/admin/consul/export`
+- `POST /v1/admin/consul/import`
+
+Export as `adminConfigRouter(config, storage)`.
+
+- [ ] **Step 2: Create admin-monitoring.ts**
+
+Extract monitoring/stats routes:
+- Work queue monitoring (lines 484–603)
+- Stats, backup, restore, role grants (lines 888–987)
+- Federation trust advisories, sync health, relay earnings (lines 1148–1284)
+
+Export as `adminMonitoringRouter(config, storage)`.
+
+- [ ] **Step 3: Create admin-agents.ts**
+
+Extract agent/CORS management (lines 832–887):
+- `GET /v1/admin/agents`
+- `PUT /v1/admin/agents/:gaii/cors`
+
+Export as `adminAgentsRouter(config, storage)`.
+
+- [ ] **Step 4: Create admin-maintenance.ts**
+
+Extract hooks + maintenance mode (lines 1012–1147):
+- Hooks CRUD
+- Maintenance mode toggle
+
+Export as `adminMaintenanceRouter(config, storage)`.
+
+- [ ] **Step 5: Create admin-economy.ts**
+
+Extract morsel minting (lines 1094–1147):
+- `POST /v1/admin/mint`
+
+Export as `adminEconomyRouter(config, storage)`.
+
+- [ ] **Step 6: Clean up admin.ts**
+
+Remove extracted sections. admin.ts should now contain only:
+- Setup pages (`/v1/admin/setup/*`) — password-protected
+- Dashboard & UI (`/v1/admin/dashboard`, `/v1/admin/ui`)
+
+Should be ~250 lines.
+
+- [ ] **Step 7: Update server.ts to mount new routers**
+
+Add imports and `app.use()` calls for each new admin sub-router.
+
+- [ ] **Step 8: Run type-check and tests**
+
+Run: `cd aimeat && npx tsc --noEmit && pnpm test`
+Expected: PASS
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/routes/admin.ts src/routes/admin-config.ts src/routes/admin-monitoring.ts src/routes/admin-agents.ts src/routes/admin-maintenance.ts src/routes/admin-economy.ts src/server.ts
+git commit -m "refactor: split admin.ts (1,587 LOC) into 5 domain routers, keep setup-only core"
+```
+
+---
+
+### Task 23: Split sqlite/index.ts into Domain Repository Files (run safety net tests after)
+
+**Files:**
+- Modify: `src/storage/providers/sqlite/index.ts` (4,535 lines → thin barrel ~100 lines)
+- Create: `src/storage/providers/sqlite/repos/` directory
+- Create: ~15 domain repository files in that directory
+
+**Current structure (37 domains, grouped into ~15 logical files):**
+
+| New File | Domains | Lines (approx) |
+|----------|---------|----------------|
+| `repos/owner.ts` | Owners | 60–217 |
+| `repos/agent.ts` | Agents | 219–354 |
+| `repos/memory.ts` | Memory, Micro-Memory | 356–502, 1111–1169 |
+| `repos/action.ts` | Actions | 504–608 |
+| `repos/work.ts` | Work, Wallet Transactions | 610–732 |
+| `repos/board.ts` | Boards, Board Subscriptions | 734–916 |
+| `repos/auth.ts` | OTK, Node Key, Sessions, Token Revocation, Device Auth | 918–1012, various |
+| `repos/dispute.ts` | Disputes, Appeals | 1014–1109, 2650–2719 |
+| `repos/storage-file.ts` | Storage (Binary Files), Chunked Uploads | 1171–1327 |
+| `repos/identity.ts` | GHII, Email Verifications, Personal Nodes | 1329–1710 |
+| `repos/mailbox.ts` | Mailbox, Maintenance Mode | 1712–1842 |
+| `repos/consent.ts` | Consent Layer, Schema Locking | 1844–2070 |
+| `repos/service-manifest.ts` | CSM, MSM | 2072–2215 |
+| `repos/community.ts` | Flags, Matches, Organisms, Memberships, Join Requests | 2217–2648 |
+| `repos/marketplace.ts` | Marketplace (Listings + Purchases) | 2721–2882 |
+| `repos/federation.ts` | Peering Requests, Genesis Peers, Organism Reputation, Replication | 1235–1295, 2977–3068 |
+| `repos/misc.ts` | Push, Trusted Issuers, Realtime, Site ChangeLog, Extensions, etc. | remaining |
+
+- [ ] **Step 1: Create repos/ directory**
+
+```bash
+mkdir -p src/storage/providers/sqlite/repos
+```
+
+- [ ] **Step 2: Create a shared helpers file**
+
+Create `src/storage/providers/sqlite/repos/_helpers.ts` with:
+- The `db` type reference
+- Common deserialize patterns
+- Shared imports (Database type from better-sqlite3)
+
+Each repo file will import the Database type and receive the `db` instance via constructor or function parameter.
+
+- [ ] **Step 3: Extract owner.ts (smallest, test the pattern)**
+
+Move lines 60–217 from `index.ts` to `repos/owner.ts`. Export functions that accept `db` as first parameter:
+
+```typescript
+import Database from 'better-sqlite3';
+
+export function createOwner(db: Database.Database, ...args) { ... }
+export function getOwner(db: Database.Database, ...args) { ... }
+// etc.
+```
+
+- [ ] **Step 4: Run type-check to validate the pattern**
+
+Run: `cd aimeat && npx tsc --noEmit`
+Expected: PASS
+
+- [ ] **Step 5: Extract remaining repo files (batch)**
+
+Repeat Step 3 for all 15 domain files. Each file:
+1. Gets the relevant code block from index.ts
+2. Exports functions with `db` as first parameter
+3. Imports needed types from the storage interface
+
+- [ ] **Step 6: Update index.ts as barrel**
+
+Replace index.ts with a thin barrel that:
+1. Creates the database connection
+2. Imports all repo functions
+3. Binds them to the db instance
+4. Exports the composite `Storage` implementation
+
+```typescript
+import Database from 'better-sqlite3';
+import * as ownerRepo from './repos/owner.js';
+import * as agentRepo from './repos/agent.js';
+// ... etc
+
+export function createSqliteStorage(dbPath: string): Storage {
+  const db = new Database(dbPath);
+  return {
+    createOwner: (...args) => ownerRepo.createOwner(db, ...args),
+    getOwner: (...args) => ownerRepo.getOwner(db, ...args),
+    // ... all methods
+  };
+}
+```
+
+- [ ] **Step 7: Run type-check and tests**
+
+Run: `cd aimeat && npx tsc --noEmit && pnpm test`
+Expected: PASS — all 517 tests should pass since the interface hasn't changed.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/storage/providers/sqlite/
+git commit -m "refactor: split sqlite/index.ts (4,535 LOC) into 15 domain repository files"
+```
+
+---
+
+### Task 24: Extract server.ts Bootstrap Modules (run safety net tests after)
+
+**Files:**
+- Modify: `src/server.ts` (1,353 lines → ~120 lines orchestrator)
+- Create: `src/server-bootstrap/static-files.ts`
+- Create: `src/server-bootstrap/config-init.ts`
+- Create: `src/server-bootstrap/service-init.ts`
+- Create: `src/server-bootstrap/middleware-guards.ts`
+- Create: `src/server-bootstrap/routes-loader.ts`
+- Create: `src/services/core-jobs.ts`
+- Create: `src/services/job-seeding.ts`
+
+**Current structure of server.ts:**
+
+| Section | Lines | Extract to |
+|---------|-------|-----------|
+| Imports | 1–112 | Stay (moved to each module) |
+| Type definitions | 113–127 | Stay |
+| Express setup | 129–156 | Stay |
+| Static file serving + CSP | 157–256 | `server-bootstrap/static-files.ts` |
+| Global middleware | 259–311 | Stay (small, core) |
+| Storage & config init | 313–388 | `server-bootstrap/config-init.ts` |
+| Service initialization | 390–500 | `server-bootstrap/service-init.ts` |
+| Middleware guards | 502–603 | `server-bootstrap/middleware-guards.ts` |
+| Route mounting (40+ app.use) | 604–802 | `server-bootstrap/routes-loader.ts` |
+| Error handler | 803–826 | Stay |
+| Core job handlers | 831–986 | `services/core-jobs.ts` |
+| Seed scheduled jobs | 987–1300 | `services/job-seeding.ts` |
+| Node key helpers | 1301–1353 | Move to `auth/node-keys.ts` |
+
+- [ ] **Step 1: Create server-bootstrap/ directory**
+
+```bash
+mkdir -p src/server-bootstrap
+```
+
+- [ ] **Step 2: Extract static-files.ts**
+
+Move lines 157–256 to `src/server-bootstrap/static-files.ts`. Export a function:
+
+```typescript
+export function setupStaticFiles(app: Express, config: AimeatConfig): void { ... }
+```
+
+- [ ] **Step 3: Extract config-init.ts**
+
+Move lines 313–388 to `src/server-bootstrap/config-init.ts`. Export:
+
+```typescript
+export async function initializeConfig(config: AimeatConfig): Promise<{ storage: Storage; configSources: ConfigSources }> { ... }
+```
+
+- [ ] **Step 4: Extract service-init.ts**
+
+Move lines 390–500 to `src/server-bootstrap/service-init.ts`. Export:
+
+```typescript
+export async function initializeServices(config: AimeatConfig, storage: Storage): Promise<void> { ... }
+```
+
+- [ ] **Step 5: Extract middleware-guards.ts**
+
+Move lines 502–603 to `src/server-bootstrap/middleware-guards.ts`. Export:
+
+```typescript
+export function setupGuards(app: Express, config: AimeatConfig, storage: Storage): void { ... }
+```
+
+- [ ] **Step 6: Extract routes-loader.ts**
+
+Move lines 604–802 (40+ `app.use()` calls) to `src/server-bootstrap/routes-loader.ts`. Export:
+
+```typescript
+export function mountRoutes(app: Express, config: AimeatConfig, storage: Storage): void { ... }
+```
+
+This file takes all the route imports with it.
+
+- [ ] **Step 7: Extract core-jobs.ts and job-seeding.ts**
+
+Move lines 831–986 to `src/services/core-jobs.ts`.
+Move lines 987–1300 to `src/services/job-seeding.ts`.
+
+- [ ] **Step 8: Move node key helpers**
+
+Move lines 1301–1353 to `src/auth/node-keys.ts` (or append to existing auth module).
+
+- [ ] **Step 9: Update server.ts as orchestrator**
+
+server.ts should now be ~120 lines:
+
+```typescript
+import { setupStaticFiles } from './server-bootstrap/static-files.js';
+import { initializeConfig } from './server-bootstrap/config-init.js';
+import { initializeServices } from './server-bootstrap/service-init.js';
+import { setupGuards } from './server-bootstrap/middleware-guards.js';
+import { mountRoutes } from './server-bootstrap/routes-loader.js';
+
+export async function createServer(config: AimeatConfig): Promise<ServerResult> {
+  const app = express();
+  // trust proxy, compression
+  setupStaticFiles(app, config);
+  // global middleware (CORS, rate limit, etc.)
+  const { storage, configSources } = await initializeConfig(config);
+  await initializeServices(config, storage);
+  setupGuards(app, config, storage);
+  mountRoutes(app, config, storage);
+  // error handler
+  return { app, storage, configSources };
+}
+```
+
+- [ ] **Step 10: Run type-check and tests**
+
+Run: `cd aimeat && npx tsc --noEmit && pnpm test`
+Expected: PASS
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add src/server.ts src/server-bootstrap/ src/services/core-jobs.ts src/services/job-seeding.ts src/auth/node-keys.ts
+git commit -m "refactor: split server.ts (1,353 LOC) into bootstrap modules + job services"
+```
+
+---
+
+## Chunk 6: Inline Style Migration to CSS Classes
+
+### Task 25: Add CSS Utility Classes to admin.css
+
+**Files:**
+- Modify: `public/css/views/admin.css`
+
+- [ ] **Step 1: Add form control classes**
+
+Append to `admin.css`:
+
+```css
+/* ── Form Controls ── */
+.adm-input {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-bright);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: .85rem;
+  font-family: inherit;
+}
+.adm-input:focus { border-color: var(--accent); outline: none; }
+.adm-input-full { width: 100%; }
+
+.adm-textarea {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-bright);
+  padding: 10px;
+  border-radius: 6px;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: .8rem;
+  resize: vertical;
+  line-height: 1.5;
+  tab-size: 2;
+}
+```
+
+- [ ] **Step 2: Add flexbox utility classes**
+
+```css
+/* ── Flex Utilities ── */
+.adm-flex       { display: flex; gap: 8px; }
+.adm-flex-col   { display: flex; flex-direction: column; gap: 8px; }
+.adm-flex-between { display: flex; justify-content: space-between; align-items: center; }
+.adm-flex-center  { display: flex; align-items: center; gap: 8px; }
+.adm-flex-wrap    { display: flex; flex-wrap: wrap; gap: 8px; }
+```
+
+- [ ] **Step 3: Add text utility classes**
+
+```css
+/* ── Text Utilities ── */
+.adm-text-xs  { font-size: .7rem; }
+.adm-text-sm  { font-size: .8rem; }
+.adm-text-base { font-size: .85rem; }
+.adm-text-dim  { color: var(--text-dim); }
+.adm-text-bright { color: var(--text-bright); }
+.adm-text-accent { color: var(--accent); }
+.adm-text-error  { color: #ef4444; }
+.adm-text-success { color: #22c55e; }
+.adm-text-mono { font-family: 'SF Mono', Consolas, monospace; font-size: .8rem; }
+```
+
+- [ ] **Step 4: Add spacing utility classes**
+
+```css
+/* ── Spacing Utilities ── */
+.adm-gap-xs { gap: 4px; }
+.adm-gap-sm { gap: 8px; }
+.adm-gap-md { gap: 12px; }
+.adm-gap-lg { gap: 16px; }
+
+.adm-mb-xs { margin-bottom: 4px; }
+.adm-mb-sm { margin-bottom: 8px; }
+.adm-mb-md { margin-bottom: 12px; }
+.adm-mb-lg { margin-bottom: 16px; }
+
+.adm-mt-sm { margin-top: 8px; }
+.adm-mt-md { margin-top: 12px; }
+.adm-mt-lg { margin-top: 16px; }
+```
+
+- [ ] **Step 5: Add modal overlay class**
+
+```css
+/* ── Modal ── */
+.adm-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add public/css/views/admin.css
+git commit -m "feat(css): add utility classes for forms, flex, text, spacing, and modals"
+```
+
+---
+
+### Task 26: Migrate Inline Styles — Top 5 Offender Tabs
+
+**Files (highest inline style counts):**
+- Modify: `public/views/admin/services-tab.js` (113 inline styles)
+- Modify: `public/views/admin/federation-tab.js` (90 inline styles)
+- Modify: `public/views/admin/email-tab.js` (57 inline styles)
+- Modify: `public/views/admin/push-tab.js` (45 inline styles)
+- Modify: `public/views/admin/msm-tab.js` (44 inline styles)
+
+For each file, apply this systematic process:
+
+- [ ] **Step 1: Replace flex layout inline styles**
+
+Find patterns like:
+```javascript
+style="display:flex;gap:8px;margin-bottom:12px"
+```
+Replace with:
+```javascript
+class="adm-flex adm-mb-md"
+```
+
+Common mappings:
+- `display:flex;gap:8px` → `class="adm-flex"`
+- `display:flex;flex-direction:column;gap:8px` → `class="adm-flex-col"`
+- `display:flex;justify-content:space-between;align-items:center` → `class="adm-flex-between"`
+- `display:flex;align-items:center;gap:8px` → `class="adm-flex-center"`
+
+- [ ] **Step 2: Replace text styling inline styles**
+
+Find patterns like:
+```javascript
+style="color:var(--text-dim);font-size:.85rem"
+```
+Replace with:
+```javascript
+class="adm-text-base adm-text-dim"
+```
+
+- [ ] **Step 3: Replace spacing inline styles**
+
+Find patterns like:
+```javascript
+style="margin-bottom:12px"
+```
+Replace with:
+```javascript
+class="adm-mb-md"
+```
+
+- [ ] **Step 4: Replace input/textarea inline styles**
+
+Find patterns like:
+```javascript
+style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px"
+```
+Replace with:
+```javascript
+class="adm-input adm-input-full"
+```
+
+- [ ] **Step 5: Replace modal overlay inline styles**
+
+Find patterns like:
+```javascript
+style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000"
+```
+Replace with:
+```javascript
+class="adm-modal-overlay"
+```
+
+- [ ] **Step 6: Visual test each tab**
+
+Open each tab in the admin dashboard. Verify visual appearance matches the original.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add public/views/admin/services-tab.js public/views/admin/federation-tab.js public/views/admin/email-tab.js public/views/admin/push-tab.js public/views/admin/msm-tab.js
+git commit -m "refactor(admin): migrate inline styles to CSS utility classes in top 5 tabs"
+```
+
+---
+
+### Task 27: Migrate Inline Styles — Remaining Tabs
+
+**Files (lower inline style counts, 2–39 each):**
+- Modify: `public/views/admin/knowledge-tab.js` (39)
+- Modify: `public/views/admin/csm-tab.js` (35)
+- Modify: `public/views/admin/chat-instances-tab.js` (28)
+- Modify: `public/views/admin/cors-tab.js` (27)
+- Modify: `public/views/admin/portal-tab.js` (23)
+- Modify: `public/views/admin/prompts-tab.js` (22)
+- Modify: `public/views/admin/maintenance-tab.js` (15)
+- Modify: `public/views/admin/config-tab.js` (15)
+- Modify: `public/views/admin/boards-tab.js` (15)
+- Modify: `public/views/admin/stats-tab.js` (11)
+- Modify: `public/views/admin/economy-tab.js` (11)
+- Modify: `public/views/admin/consul-tab.js` (8)
+- Modify: `public/views/admin/agents-tab.js` (8)
+- Modify: `public/views/admin/overview-tab.js` (6)
+- Modify: remaining tabs with <6 inline styles each
+
+Follow the same replacement patterns from Task 22.
+
+- [ ] **Step 1: Batch migrate tabs with 15+ inline styles (knowledge, csm, chat-instances, cors, portal, prompts)**
+
+Apply flex, text, spacing, and input class replacements.
+
+- [ ] **Step 2: Batch migrate tabs with 6–14 inline styles (maintenance, config, boards, stats, economy, consul, agents, overview)**
+
+Apply the same replacements.
+
+- [ ] **Step 3: Batch migrate tabs with <6 inline styles (genesis, ghii, work, matching, hooks, directory, realtime, owners, scheduler, actions)**
+
+These have minimal inline styles — quick pass.
+
+- [ ] **Step 4: Visual test all tabs**
+
+Walk through every admin tab. Confirm no visual regressions.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add public/views/admin/
+git commit -m "refactor(admin): migrate remaining inline styles to CSS utility classes"
+```
+
+---
 
 ---
 
 ## Execution Order Summary
 
-| Order | Task | Priority | Effort | Files Changed |
-|-------|------|----------|--------|---------------|
-| 1 | Fix XSS in spa.html | Critical | 5 min | 1 |
-| 2 | Document dangerouslySetInnerHTML | Medium | 10 min | 1 |
-| 3 | Add fetch timeout | High | 10 min | 1 |
-| 4 | Create Toast component | High | 15 min | 2 |
-| 5 | Migrate alert() — small tabs | High | 20 min | 6 |
-| 6 | Migrate alert() — medium tabs | High | 25 min | 7 |
-| 7 | Migrate alert() — large tabs | High | 20 min | 2 |
-| 8 | Log frontend silent catches | High | 15 min | 6 |
-| 9 | Create fireHook helper | High | 20 min | 8 |
-| 10 | Replace console.warn in auth | Low | 5 min | 1 |
-| 11 | Add form validation | Medium | 15 min | 3 |
-| 12 | Extract magic numbers | Low | 10 min | 2 |
-| 13 | Consolidate CSS badges | Low | 10 min | 1 |
-| 14 | Configure test coverage | Medium | 15 min | 3 |
-| 15 | Remove unused prisma dep | Low | 5 min | 2 |
-| 16 | Fix require() in build script | Low | 5 min | 1 |
+> **Key principle:** Tests BEFORE refactoring. Chunk 4 writes safety nets, Chunk 5 refactors with those tests as guards.
 
-**Total immediate work:** 16 tasks across ~47 files
-**Deferred refactoring:** 3 items requiring separate plans
+| Order | Task | Chunk | Purpose | Files |
+|-------|------|-------|---------|-------|
+| **Chunk 1: Critical & High Priority Fixes** | | | | |
+| 1 | Fix XSS in spa.html | 1 | Security | 1 |
+| 2 | Document dangerouslySetInnerHTML | 1 | Security | 1 |
+| 3 | Add fetch timeout | 1 | Resilience | 1 |
+| 4 | Create Toast component | 1 | Infrastructure | 2 |
+| 5 | Migrate alert() — small tabs | 1 | UX | 6 |
+| 6 | Migrate alert() — medium tabs | 1 | UX | 7 |
+| 7 | Migrate alert() — large tabs | 1 | UX | 2 |
+| 8 | Log frontend silent catches | 1 | Debuggability | 6 |
+| 9 | Create fireHook helper | 1 | Debuggability | 8 |
+| **Chunk 2: Medium Priority** | | | | |
+| 10 | Replace console.warn in auth | 2 | Consistency | 1 |
+| 11 | Add form validation | 2 | UX | 3 |
+| 12 | Extract magic numbers | 2 | Maintainability | 2 |
+| 13 | Consolidate CSS badges | 2 | CSS cleanup | 1 |
+| **Chunk 3: Low Priority Cleanup** | | | | |
+| 14 | Remove unused prisma dep | 3 | Hygiene | 2 |
+| 15 | Fix require() in build | 3 | ESM purity | 1 |
+| **Chunk 4: Safety Net Tests (BEFORE refactoring)** | | | | |
+| 16 | Configure test coverage | 4 | Infrastructure | 3 |
+| 17 | Storage CRUD safety net tests | 4 | **Guard for Task 23** | 1 |
+| 18 | Auth middleware safety net tests | 4 | **Guard for Tasks 21-24** | 1 |
+| 19 | Hook execution safety net tests | 4 | **Guard for Task 9 + 24** | 1 |
+| 20 | Wallet/morsel safety net tests | 4 | **Guard for Task 23** | 1 |
+| **Chunk 5: Decompose Oversized Files (tests protect us)** | | | | |
+| 21 | Split federation.ts → 4 routers | 5 | Decomposition | 7 |
+| 22 | Split admin.ts → 5 routers | 5 | Decomposition | 7 |
+| 23 | Split sqlite/index.ts → 15 repos | 5 | Decomposition | 17 |
+| 24 | Extract server.ts → bootstrap modules | 5 | Decomposition | 9 |
+| **Chunk 6: Inline Style Migration** | | | | |
+| 25 | Add CSS utility classes | 6 | Infrastructure | 1 |
+| 26 | Migrate inline styles — top 5 tabs | 6 | CSS cleanup | 5 |
+| 27 | Migrate inline styles — remaining tabs | 6 | CSS cleanup | 20+ |
+
+**Total: 27 tasks across 6 chunks, ~100+ files touched**
+
+**Verification rule:** After every task in Chunks 5-6, run `cd aimeat && npx tsc --noEmit && pnpm test`. If safety net tests from Chunk 4 fail, the refactoring broke something — stop and fix before continuing.

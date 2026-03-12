@@ -161,7 +161,8 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         catalog_listed: importPreview.catalogListed,
         organism_share: importPreview.organismShare || undefined,
       };
-      const result = await knowledgeService.importPackage(importPreview.pkg, overrides);
+      const entryData = importPreview.raw?.entry_data || null;
+      const result = await knowledgeService.importPackage(importPreview.pkg, overrides, entryData);
       if (result?.data?.package_id) {
         showToast(t('knowledge.import.success'));
         setImportText('');
@@ -266,35 +267,36 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     }
   }, [showToast, loadPackages]);
 
-  /* ── Toggle expand + lazy-load entry data ── */
-  const toggleExpand = useCallback((key) => {
-    setExpandedPkg(prev => {
-      if (prev === key) return null;
-      // Fetch entry values if not cached
-      const pkg = packages.find(p => p.key === key);
-      const manifest = pkg?.value;
-      if (manifest?.entries?.length) {
-        const uncached = manifest.entries.filter(e => e.key && !(e.key in entryData));
-        if (uncached.length > 0) {
-          setLoadingEntries(key);
-          Promise.all(uncached.map(async (entry) => {
-            try {
-              const resp = await apiGet('/v1/memory/' + encodeURIComponent(entry.key));
-              return [entry.key, resp?.data?.value];
-            } catch { return [entry.key, null]; }
-          })).then(results => {
-            setEntryData(prev => {
-              const next = { ...prev };
-              for (const [k, v] of results) { if (v != null) next[k] = v; }
-              return next;
-            });
-            setLoadingEntries(null);
-          });
+  /* ── Toggle expand + lazy-load entry data via list endpoint ── */
+  const toggleExpand = useCallback(async (key) => {
+    if (expandedPkg === key) { setExpandedPkg(null); return; }
+    setExpandedPkg(key);
+
+    // Fetch all entry values for this package in one call
+    const pkg = packages.find(p => p.key === key);
+    const manifest = pkg?.value;
+    if (!manifest?.entries?.length) return;
+    const hasUncached = manifest.entries.some(e => e.key && !(e.key in entryData));
+    if (!hasUncached) return;
+
+    // Extract package UUID from key: packages/{uuid}/manifest
+    const pkgId = key.split('/')[1];
+    if (!pkgId) return;
+
+    setLoadingEntries(key);
+    try {
+      const resp = await apiGet('/v1/memory?prefix=' + encodeURIComponent(`packages/${pkgId}/`));
+      const items = resp?.data?.items || [];
+      setEntryData(prev => {
+        const next = { ...prev };
+        for (const item of items) {
+          if (item.key && item.key !== key) next[item.key] = item.value;
         }
-      }
-      return key;
-    });
-  }, [packages, entryData]);
+        return next;
+      });
+    } catch { /* ignore */ }
+    finally { setLoadingEntries(null); }
+  }, [expandedPkg, packages, entryData]);
 
   /* ── Cycle visibility: private → owner → public → private ── */
   const cycleVis = ['private', 'owner', 'public'];
@@ -452,7 +454,8 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
             <div class="kpkg-preview-entries">
               ${(importPreview.pkg.entries || []).map((entry, i) => {
                 const label = entry.title || entry.key || `Entry ${i + 1}`;
-                const val = typeof entry.value === 'string' ? entry.value : (entry.value ? JSON.stringify(entry.value) : '');
+                const eData = importPreview.raw?.entry_data?.[entry.key] || entry.value;
+                const val = typeof eData === 'string' ? eData : (eData?.body || eData?.summary || eData?.description || (eData ? JSON.stringify(eData) : ''));
                 const truncVal = val.length > 120 ? val.slice(0, 120) + '\u2026' : val;
                 const entryRefs = entry.references || [];
                 const entryRels = entry.related_entries || [];
