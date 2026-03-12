@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIMEAT Design Mockups — Light Theme</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================
+   AIMEAT DESIGN SYSTEM — LIGHT THEME v1.0
+   ============================================ */
+
+:root {
+  /* Core */
+  --bg: #FAFAF8;
+  --bg-surface: #F3F4F6;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+
+  /* Heart / CTA */
+  --heart: #E8564A;
+  --heart-light: #FF6B6B;
+  --heart-glow: #FF8A80;
+  --heart-gradient: linear-gradient(135deg, #E8564A 0%, #FF6B6B 100%);
+
+  /* Text */
+  --text-primary: #1A1A2E;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --text-inverse: #FFFFFF;
+
+  /* Accents */
+  --blue: #3B82F6;
+  --blue-light: #EFF6FF;
+  --purple: #8B5CF6;
+  --purple-light: #F5F3FF;
+  --yellow: #FBBF24;
+  --yellow-light: #FFFBEB;
+  --mint: #34D399;
+  --mint-light: #ECFDF5;
+  --teal: #06B6D4;
+  --teal-light: #ECFEFF;
+  --pink: #F472B6;
+  --pink-light: #FDF2F8;
+  --orange: #FB923C;
+  --orange-light: #FFF7ED;
+
+  /* Admin-specific (slate/indigo) */
+  --admin-bg: #F8FAFC;
+  --admin-surface: #F1F5F9;
+  --admin-accent: #6366F1;
+  --admin-accent-light: #EEF2FF;
+  --admin-sidebar: #1E293B;
+  --admin-sidebar-text: #CBD5E1;
+  --admin-sidebar-active: #6366F1;
+
+  /* Status */
+  --success: #10B981;
+  --success-light: #D1FAE5;
+  --warning: #F59E0B;
+  --warning-light: #FEF3C7;
+  --danger: #EF4444;
+  --danger-light: #FEE2E2;
+
+  /* Borders */
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  --border-focus: #E8564A;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.12);
+  --shadow-heart: 0 4px 14px rgba(232,86,74,0.3);
+
+  /* Font */
+  --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--font); color: var(--text-primary); background: var(--bg); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+/* ============================================
+   DEMO NAV (switch between mockups)
+   ============================================ */
+.demo-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: var(--text-primary); padding: 10px 24px;
+  display: flex; gap: 8px; align-items: center;
+  font-size: 13px; color: #94a3b8;
+}
+.demo-nav span { color: #fff; font-weight: 600; margin-right: 12px; }
+.demo-nav button {
+  background: transparent; border: 1px solid #374151; color: #94a3b8;
+  padding: 5px 14px; border-radius: 6px; cursor: pointer; font-family: var(--font);
+  font-size: 12px; font-weight: 500; transition: all 0.15s;
+}
+.demo-nav button:hover { border-color: #6b7280; color: #fff; }
+.demo-nav button.active { background: var(--heart); border-color: var(--heart); color: #fff; }
+
+.mockup { display: none; padding-top: 48px; }
+.mockup.active { display: block; }
+
+/* ============================================
+   1. HEADER / NAVBAR
+   ============================================ */
+.header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky; top: 48px; z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 20px; }
+.logo {
+  display: flex; align-items: center; gap: 8px;
+  text-decoration: none; color: var(--text-primary);
+  font-weight: 800; font-size: 17px; letter-spacing: 0.5px;
+}
+.logo-heart {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--heart-gradient);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 15px; font-weight: 800;
+}
+.logo-text em { font-style: normal; color: var(--heart); }
+
+.morsel-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--heart-glow); background: linear-gradient(135deg, #FFF1F0, #FFE0DE);
+  color: var(--heart); font-weight: 700; font-size: 12px;
+  padding: 3px 10px; border-radius: var(--radius-full);
+  border: 1px solid rgba(232,86,74,0.15);
+}
+.morsel-badge::before { content: '♥'; }
+
+.header-nav { display: flex; gap: 4px; }
+.header-nav a {
+  text-decoration: none; color: var(--text-secondary);
+  font-size: 13.5px; font-weight: 500; padding: 6px 12px;
+  border-radius: var(--radius-sm); transition: all 0.15s;
+}
+.header-nav a:hover { color: var(--text-primary); background: var(--bg-surface); }
+.header-nav a.active { color: var(--heart); background: rgba(232,86,74,0.06); }
+
+.header-right { display: flex; align-items: center; gap: 12px; }
+.lang-toggle {
+  display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden;
+}
+.lang-toggle button {
+  background: transparent; border: none; padding: 4px 10px;
+  font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-tertiary);
+  font-family: var(--font); transition: all 0.15s;
+}
+.lang-toggle button.active { background: var(--text-primary); color: white; }
+
+.user-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  padding: 4px 12px 4px 4px; border-radius: var(--radius-full);
+  font-size: 13px; font-weight: 500; color: var(--text-primary);
+  cursor: pointer; transition: all 0.15s;
+}
+.user-pill:hover { border-color: var(--text-tertiary); box-shadow: var(--shadow-sm); }
+.user-pill .avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 12px; font-weight: 700;
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success); display: inline-block;
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+.btn-primary {
+  background: var(--heart-gradient); color: white;
+  border: none; padding: 8px 20px; border-radius: var(--radius-md);
+  font-family: var(--font); font-size: 13.5px; font-weight: 600;
+  cursor: pointer; box-shadow: var(--shadow-heart);
+  transition: all 0.2s;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(232,86,74,0.35); }
+
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); padding: 7px 16px; border-radius: var(--radius-md);
+  font-family: var(--font); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-ghost:hover { border-color: var(--text-tertiary); color: var(--text-primary); }
+
+/* ============================================
+   2. SIGN-IN MODAL
+   ============================================ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(26,26,46,0.4);
+  backdrop-filter: blur(8px); display: flex; align-items: center;
+  justify-content: center; z-index: 200; padding: 24px;
+}
+.modal-card {
+  background: var(--bg-card); border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl); width: 100%; max-width: 420px;
+  overflow: hidden; animation: modalIn 0.3s ease;
+}
+@keyframes modalIn {
+  from { opacity:0; transform: translateY(12px) scale(0.97); }
+  to { opacity:1; transform: translateY(0) scale(1); }
+}
+.modal-header {
+  padding: 28px 32px 0;
+}
+.modal-header h2 {
+  font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 8px;
+}
+.modal-header h2 .heart-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--heart-gradient); display: inline-flex;
+  align-items: center; justify-content: center;
+  color: white; font-size: 14px;
+}
+.modal-header p {
+  margin-top: 8px; font-size: 14px; color: var(--text-secondary); line-height: 1.5;
+}
+.modal-body { padding: 24px 32px; }
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.form-input {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-md); font-family: var(--font);
+  font-size: 15px; color: var(--text-primary); background: var(--bg);
+  transition: all 0.15s; outline: none;
+}
+.form-input::placeholder { color: var(--text-tertiary); }
+.form-input:focus { border-color: var(--heart); box-shadow: 0 0 0 3px rgba(232,86,74,0.1); }
+
+.modal-actions {
+  display: flex; gap: 10px; margin-top: 20px;
+}
+.modal-actions .btn-primary { flex: 1; padding: 12px; font-size: 15px; }
+.modal-actions .btn-ghost { padding: 12px 20px; }
+
+.modal-features {
+  padding: 20px 32px 28px; background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+}
+.modal-features h4 {
+  font-size: 13px; font-weight: 700; margin-bottom: 12px;
+  color: var(--text-primary); display: flex; align-items: center; gap: 6px;
+}
+.feature-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13.5px; color: var(--text-secondary);
+  margin-bottom: 8px; line-height: 1.45;
+}
+.feature-item .fi {
+  width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; margin-top: 1px;
+}
+
+/* ============================================
+   3. USER PROFILE PAGE
+   ============================================ */
+.profile-page { background: var(--bg); min-height: 100vh; }
+.profile-hero {
+  background: linear-gradient(135deg, #FAFAF8 0%, #FFF1F0 40%, #EFF6FF 100%);
+  padding: 32px 40px 0; border-bottom: 1px solid var(--border);
+}
+.profile-info {
+  display: flex; align-items: center; gap: 20px; margin-bottom: 24px;
+}
+.profile-avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, #E8564A, #8B5CF6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: white; font-weight: 700;
+  border: 3px solid white; box-shadow: var(--shadow-md);
+}
+.profile-meta h1 { font-size: 24px; font-weight: 800; }
+.profile-meta .gaii {
+  font-family: var(--mono); font-size: 13px;
+  color: var(--heart); font-weight: 500;
+}
+.profile-meta .node {
+  font-size: 12.5px; color: var(--text-tertiary); margin-top: 2px;
+}
+
+.stats-row {
+  display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;
+}
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px 20px; min-width: 100px;
+  text-align: center; box-shadow: var(--shadow-sm);
+}
+.stat-card .num {
+  font-size: 22px; font-weight: 800;
+}
+.stat-card .num.heart { color: var(--heart); }
+.stat-card .num.blue { color: var(--blue); }
+.stat-card .num.purple { color: var(--purple); }
+.stat-card .num.mint { color: var(--mint); }
+.stat-card .label {
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-tertiary); margin-top: 2px;
+}
+
+.profile-tabs {
+  display: flex; gap: 0; overflow-x: auto;
+}
+.profile-tabs a {
+  text-decoration: none; color: var(--text-secondary);
+  font-size: 13px; font-weight: 500; padding: 10px 16px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  white-space: nowrap;
+}
+.profile-tabs a:hover { color: var(--text-primary); }
+.profile-tabs a.active { color: var(--heart); border-bottom-color: var(--heart); font-weight: 600; }
+
+.profile-content { padding: 28px 40px; max-width: 900px; }
+
+.prompt-banner {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  margin-bottom: 24px; box-shadow: var(--shadow-sm);
+}
+.prompt-banner .actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.prompt-banner .btn-coral {
+  background: var(--heart-gradient); color: white;
+  border: none; padding: 7px 16px; border-radius: var(--radius-full);
+  font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: var(--font);
+}
+.prompt-banner .btn-outline {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border); padding: 6px 16px;
+  border-radius: var(--radius-full); font-size: 12.5px; font-weight: 500;
+  cursor: pointer; font-family: var(--font);
+}
+.prompt-banner p { font-size: 13.5px; color: var(--text-secondary); }
+
+.import-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.import-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.import-box textarea {
+  width: 100%; min-height: 80px; padding: 12px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-md); font-family: var(--font); font-size: 14px;
+  color: var(--text-primary); background: var(--bg); resize: vertical;
+  outline: none; transition: border-color 0.15s;
+}
+.import-box textarea:focus { border-color: var(--heart); }
+.import-box .hint { font-size: 12.5px; color: var(--text-tertiary); margin-top: 6px; }
+
+.section-title {
+  font-size: 18px; font-weight: 700; margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.knowledge-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  margin-bottom: 14px; box-shadow: var(--shadow-sm);
+  transition: all 0.15s;
+}
+.knowledge-card:hover { box-shadow: var(--shadow-md); border-color: #d1d5db; }
+.kc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.kc-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.kc-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+.badge {
+  padding: 2px 8px; border-radius: var(--radius-full);
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-research { background: var(--blue-light); color: #1D4ED8; }
+.badge-original { background: var(--mint-light); color: #047857; }
+.badge-idea { background: var(--purple-light); color: #6D28D9; }
+.badge-ai { background: var(--yellow-light); color: #B45309; }
+.badge-published { background: var(--mint-light); color: #047857; }
+
+.tag-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.tag {
+  background: var(--bg-surface); color: var(--text-secondary);
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  font-size: 11px; font-weight: 500;
+}
+.kc-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-light);
+}
+.kc-meta { font-size: 12px; color: var(--text-tertiary); }
+.kc-actions { display: flex; gap: 6px; }
+.kc-actions button {
+  padding: 4px 12px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  font-family: var(--font); transition: all 0.15s;
+}
+.btn-export { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-secondary); }
+.btn-delete { background: var(--danger-light); border: 1px solid #fecaca; color: var(--danger); }
+
+/* ============================================
+   4. SYSADMIN DASHBOARD
+   ============================================ */
+.admin-layout {
+  display: flex; min-height: 100vh; background: var(--admin-bg);
+}
+.admin-sidebar {
+  width: 220px; background: var(--admin-sidebar);
+  padding: 16px 0; flex-shrink: 0; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.admin-sidebar .sidebar-logo {
+  padding: 0 18px 16px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px;
+}
+.admin-sidebar .sidebar-logo .logo-mark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: linear-gradient(135deg, var(--admin-accent), #818CF8);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px; font-weight: 800;
+}
+.admin-sidebar .sidebar-logo span {
+  color: #F1F5F9; font-weight: 700; font-size: 15px;
+}
+.sidebar-group { margin-bottom: 16px; }
+.sidebar-group-label {
+  padding: 0 18px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: #475569; margin-bottom: 4px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 18px; color: var(--admin-sidebar-text);
+  text-decoration: none; font-size: 13.5px; font-weight: 400;
+  transition: all 0.1s; cursor: pointer; border-left: 3px solid transparent;
+}
+.sidebar-item:hover { background: rgba(255,255,255,0.04); color: #F1F5F9; }
+.sidebar-item.active {
+  color: white; background: rgba(99,102,241,0.12);
+  border-left-color: var(--admin-accent); font-weight: 500;
+}
+.sidebar-item .si-icon { width: 16px; text-align: center; font-size: 13px; }
+.sidebar-item .si-count {
+  margin-left: auto; background: rgba(255,255,255,0.08);
+  padding: 1px 7px; border-radius: var(--radius-full);
+  font-size: 11px; font-weight: 600; color: #94A3B8;
+}
+
+.admin-main { flex: 1; padding: 24px 32px; overflow-y: auto; }
+.admin-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.admin-top h1 { font-size: 22px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+.admin-top .time { font-size: 12.5px; color: var(--text-tertiary); font-family: var(--mono); }
+.btn-admin {
+  background: var(--admin-accent); color: white;
+  border: none; padding: 8px 18px; border-radius: var(--radius-md);
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-admin:hover { background: #4F46E5; }
+
+.node-status-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  margin-bottom: 20px; box-shadow: var(--shadow-sm);
+}
+.node-status-card .nsc-top {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.nsc-top .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); }
+.nsc-top .status-pill {
+  padding: 3px 10px; border-radius: var(--radius-full);
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+}
+.pill-healthy { background: var(--success-light); color: #047857; }
+.pill-danger { background: var(--danger-light); color: #DC2626; }
+
+.node-health-label {
+  font-size: 28px; font-weight: 800; margin-bottom: 4px;
+}
+.node-health-label.healthy { color: var(--success); }
+.node-health-label.danger { color: var(--danger); }
+.node-health-meta { font-size: 13px; color: var(--text-tertiary); font-family: var(--mono); }
+
+.health-rows { margin-top: 16px; }
+.health-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border-light);
+  font-size: 13.5px;
+}
+.health-row:last-child { border-bottom: none; }
+.health-row .hr-label { color: var(--text-secondary); }
+
+.admin-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+.ag-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 14px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.ag-card .ag-label {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-tertiary); margin-bottom: 6px;
+}
+.ag-card .ag-value { font-size: 26px; font-weight: 800; }
+.ag-card .ag-value.indigo { color: var(--admin-accent); }
+.ag-card .ag-value.mint { color: var(--mint); }
+.ag-card .ag-sub { font-size: 11px; color: var(--text-tertiary); }
+
+.admin-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.admin-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+}
+.admin-panel h3 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-tertiary); margin-bottom: 14px;
+}
+.ap-row {
+  display: flex; justify-content: space-between; padding: 7px 0;
+  border-bottom: 1px solid var(--border-light); font-size: 13.5px;
+}
+.ap-row:last-child { border-bottom: none; }
+.ap-row .ap-key { color: var(--text-secondary); }
+.ap-row .ap-val { font-weight: 600; font-family: var(--mono); font-size: 13px; }
+
+.warnings-table {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+}
+.warnings-table h3 {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-tertiary); margin-bottom: 14px;
+}
+.wt-header, .wt-row {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 2fr;
+  gap: 12px; padding: 8px 0; font-size: 13px;
+}
+.wt-header {
+  font-weight: 600; color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.wt-row { border-bottom: 1px solid var(--border-light); color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     DEMO NAVIGATION
+     ============================================ -->
+<div class="demo-nav">
+  <span>AIMEAT Mockups</span>
+  <button class="active" onclick="show('header')">Header</button>
+  <button onclick="show('signin')">Sign In</button>
+  <button onclick="show('profile')">Profile</button>
+  <button onclick="show('admin')">Sysadmin</button>
+</div>
+
+<!-- ============================================
+     1. HEADER MOCKUP
+     ============================================ -->
+<div class="mockup active" id="mock-header">
+
+  <!-- LOGGED OUT STATE -->
+  <div style="background:var(--bg-surface);padding:20px 40px">
+    <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Logged out</div>
+  </div>
+  <div class="header" style="position:relative;top:0">
+    <div class="header-left">
+      <a class="logo" href="#">
+        <div class="logo-heart">♥</div>
+        <span>AIME<em>AT</em></span>
+      </a>
+    </div>
+    <div class="header-nav">
+      <a href="#" class="active">Kokeile</a>
+      <a href="#">Kehittäjille</a>
+      <a href="#">Docs</a>
+    </div>
+    <div class="header-right">
+      <div class="lang-toggle">
+        <button>EN</button>
+        <button class="active">FI</button>
+      </div>
+      <button class="btn-primary">Kirjaudu sisään</button>
+    </div>
+  </div>
+
+  <!-- LOGGED IN STATE -->
+  <div style="background:var(--bg-surface);padding:20px 40px;margin-top:40px">
+    <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Logged in</div>
+  </div>
+  <div class="header" style="position:relative;top:0">
+    <div class="header-left">
+      <a class="logo" href="#">
+        <div class="logo-heart">♥</div>
+        <span>AIME<em>AT</em></span>
+      </a>
+      <span class="morsel-badge">150</span>
+    </div>
+    <div class="header-nav">
+      <a href="#">Kokeile</a>
+      <a href="#">Kehittäjille</a>
+      <a href="#" class="active">Profiili</a>
+    </div>
+    <div class="header-right">
+      <div class="lang-toggle">
+        <button>EN</button>
+        <button class="active">FI</button>
+      </div>
+      <div class="user-pill">
+        <div class="avatar">H</div>
+        <span>happyadmin</span>
+        <span class="status-dot"></span>
+      </div>
+      <button class="btn-ghost">Logout</button>
+    </div>
+  </div>
+
+  <!-- HEADER ON ADMIN PAGES (indigo accent) -->
+  <div style="background:var(--bg-surface);padding:20px 40px;margin-top:40px">
+    <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Admin header variant</div>
+  </div>
+  <div class="header" style="position:relative;top:0;border-bottom-color:#E0E7FF">
+    <div class="header-left">
+      <a class="logo" href="#">
+        <div class="logo-heart" style="background:linear-gradient(135deg,#6366F1,#818CF8)">♥</div>
+        <span>AIME<em style="color:#6366F1">AT</em></span>
+      </a>
+      <span class="morsel-badge" style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF);color:#6366F1;border-color:rgba(99,102,241,0.15)">100</span>
+      <span style="background:#EEF2FF;color:#6366F1;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.5px">Admin</span>
+    </div>
+    <div class="header-nav">
+      <a href="#">Kokeile</a>
+      <a href="#">Kehittäjille</a>
+      <a href="#" style="color:#6366F1;background:rgba(99,102,241,0.06)">Profiili</a>
+    </div>
+    <div class="header-right">
+      <div class="lang-toggle">
+        <button>EN</button>
+        <button class="active" style="background:#6366F1">FI</button>
+      </div>
+      <div class="user-pill">
+        <div class="avatar" style="background:linear-gradient(135deg,#6366F1,#A78BFA)">H</div>
+        <span>happyadmin</span>
+        <span class="status-dot"></span>
+      </div>
+      <button class="btn-ghost">Logout</button>
+    </div>
+  </div>
+
+  <div style="padding:60px 40px;text-align:center;color:var(--text-tertiary);font-size:13px">
+    ↑ Three header states: logged out, logged in (coral accent), admin (indigo accent)
+  </div>
+</div>
+
+<!-- ============================================
+     2. SIGN-IN MODAL
+     ============================================ -->
+<div class="mockup" id="mock-signin" style="background:var(--bg);">
+  <div style="height:200px;background:linear-gradient(135deg,#FAFAF8 0%,#FFF1F0 50%,#EFF6FF 100%);display:flex;align-items:center;justify-content:center">
+    <span style="font-size:42px;font-weight:800;color:var(--text-primary);letter-spacing:2px">AIME<span style="color:var(--heart)">♥</span>AT</span>
+  </div>
+  <div class="modal-overlay" style="position:relative;min-height:600px;background:rgba(26,26,46,0.25)">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>
+          <span class="heart-icon">♥</span>
+          AIMEAT Sign In
+        </h2>
+        <p>Uusi käyttäjä? Valitse käyttäjänimi ja salasana. Jo tili? Kirjaudu sisään.</p>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Käyttäjänimi</label>
+          <input class="form-input" type="text" value="happyadmin" />
+        </div>
+        <div class="form-group">
+          <label>Salasana</label>
+          <input class="form-input" type="password" value="••••••••" />
+        </div>
+        <div class="form-group">
+          <label>Näyttönimi <span style="font-weight:400;text-transform:none;letter-spacing:0">(valinnainen, uusille tileille)</span></label>
+          <input class="form-input" type="text" placeholder="Näyttönimi" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary">Kirjaudu sisään</button>
+          <button class="btn-ghost">Peruuta</button>
+        </div>
+      </div>
+      <div class="modal-features">
+        <h4>✨ Mitä saat?</h4>
+        <div class="feature-item">
+          <div class="fi" style="background:#FFF1F0;color:var(--heart)">♥</div>
+          <span>Ilmainen <strong>GHII</strong> (Global Human Intelligence Identifier) — oma AI-identiteettisi</span>
+        </div>
+        <div class="feature-item">
+          <div class="fi" style="background:var(--blue-light);color:var(--blue)">🔒</div>
+          <span>Oma yksityinen muistitila, suojattu salasanallasi</span>
+        </div>
+        <div class="feature-item">
+          <div class="fi" style="background:var(--purple-light);color:var(--purple)">🤖</div>
+          <span>Yhdistä AI-agentit jotka muistavat sinut ja työskentelevät puolestasi</span>
+        </div>
+        <div class="feature-item">
+          <div class="fi" style="background:#FFF1F0;color:var(--heart)">♥</div>
+          <span><strong>100 ilmaista sydänmursua</strong> alkuun! Muistipyyntö ~1, taululle kirjoitus ~2. Saat 50 lisää joka päivä.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     3. USER PROFILE PAGE
+     ============================================ -->
+<div class="mockup" id="mock-profile">
+  <div class="profile-page">
+    <!-- Header (inline) -->
+    <div class="header" style="position:relative;top:0">
+      <div class="header-left">
+        <a class="logo" href="#"><div class="logo-heart">♥</div><span>AIME<em>AT</em></span></a>
+        <span class="morsel-badge">150</span>
+      </div>
+      <div class="header-nav">
+        <a href="#">Kokeile</a>
+        <a href="#">Kehittäjille</a>
+        <a href="#" class="active">Profiili</a>
+      </div>
+      <div class="header-right">
+        <div class="lang-toggle"><button>EN</button><button class="active">FI</button></div>
+        <div class="user-pill">
+          <div class="avatar">H</div><span>happyadmin</span><span class="status-dot"></span>
+        </div>
+        <button class="btn-ghost">Logout</button>
+      </div>
+    </div>
+
+    <!-- Profile Hero -->
+    <div class="profile-hero">
+      <div class="profile-info">
+        <div class="profile-avatar">😊</div>
+        <div class="profile-meta">
+          <h1>happyadmin</h1>
+          <div class="gaii">happyadmin@aimeat-local-001-dev</div>
+          <div class="node">Solmu: http://localhost:40050</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="num blue">0</div><div class="label">Agentit</div></div>
+        <div class="stat-card"><div class="num purple">0</div><div class="label">Keskustelut</div></div>
+        <div class="stat-card"><div class="num heart">150</div><div class="label">Muruset</div></div>
+        <div class="stat-card"><div class="num mint">29</div><div class="label">Muistit</div></div>
+        <div class="stat-card"><div class="num">0</div><div class="label">Palvelut</div></div>
+        <div class="stat-card"><div class="num">0</div><div class="label">Tehtävät</div></div>
+        <div class="stat-card"><div class="num">0</div><div class="label">Sovellukset</div></div>
+        <div class="stat-card"><div class="num blue">8</div><div class="label">Tiedostot</div></div>
+        <div class="stat-card"><div class="num">-</div><div class="label">Solmut</div></div>
+      </div>
+
+      <div class="profile-tabs">
+        <a href="#">Portfolio</a>
+        <a href="#">Agentit</a>
+        <a href="#">Keskustelusessiot</a>
+        <a href="#">MCP</a>
+        <a href="#">Lompakko</a>
+        <a href="#" class="active">Tietopankki</a>
+        <a href="#">Organismit</a>
+        <a href="#">Muisti</a>
+        <a href="#">Työt</a>
+        <a href="#">Palvelut</a>
+        <a href="#">Taulut</a>
+        <a href="#">Sovellukset</a>
+        <a href="#">Laajennukset</a>
+        <a href="#">Federaatio</a>
+        <a href="#">Solmut</a>
+        <a href="#">Pääsy</a>
+        <a href="#">Tietolompakko</a>
+        <a href="#">Solmutilastot</a>
+        <a href="#">Turvallisuus</a>
+        <a href="#">Ilmoitukset</a>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="profile-content">
+      <div class="prompt-banner">
+        <div class="actions">
+          <button class="btn-coral">Kopioi kehote AI-chattiin</button>
+          <button class="btn-outline">Kopioi kehote OpenClaw-agentille</button>
+        </div>
+        <p>Käytä näitä kehotteita pakataksesi tutkimuksen, ideat tai minkä tahansa sisällön rakenteiseksi tiedoksi. Liitä kehote AI-chattiisi tai anna se OpenClaw-agentillesi.</p>
+      </div>
+
+      <div class="import-box">
+        <h3>Tuo tietopaketti</h3>
+        <textarea placeholder="Liitä tähän AI-chatin tuottama tulos"></textarea>
+        <div class="hint">Agentit lataavat automaattisesti — sinun ei tarvitse liittää mitään, jos käytät OpenClawia.</div>
+      </div>
+
+      <h2 class="section-title">Omat tiedot</h2>
+
+      <div class="knowledge-card">
+        <div class="kc-header">
+          <div>
+            <div class="kc-title">GPS-Denied Drone Navigation via Visual Terrain-Referenced Navigation (TRN)</div>
+            <div class="kc-badges">
+              <span class="badge badge-research">Tutkimus</span>
+              <span class="badge badge-original">Alkuperäinen</span>
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">drone</span><span class="tag">UAS</span><span class="tag">GNSS-denied</span>
+          <span class="tag">GPS-denied</span><span class="tag">TRN</span><span class="tag">terrain-referenced-navigation</span>
+          <span class="tag">visual-odometry</span><span class="tag">LoFTR</span><span class="tag">PX4</span>
+          <span class="tag">EKF2</span><span class="tag">Gazebo</span><span class="tag">ROS2</span>
+          <span class="tag">A-PNT</span><span class="tag">defence</span>
+        </div>
+        <div class="kc-footer">
+          <span class="kc-meta">11 merkintää · v1.0.0 · EN</span>
+          <div class="kc-actions">
+            <button class="btn-export">Vie</button>
+            <button class="btn-delete">Poista</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="knowledge-card">
+        <div class="kc-header">
+          <div>
+            <div class="kc-title">Toroidal Mercury Magnetic Vortex Propulsion Concept</div>
+            <div class="kc-badges">
+              <span class="badge badge-idea">Idea</span>
+              <span class="badge badge-ai">Tekoälyavusteinen</span>
+              <span class="badge badge-published">Julkaistu</span>
+            </div>
+          </div>
+        </div>
+        <div class="tag-row">
+          <span class="tag">physics</span><span class="tag">electromagnetism</span><span class="tag">toroid</span>
+          <span class="tag">magnetic-field</span><span class="tag">vortex</span><span class="tag">experimental-device</span>
+          <span class="tag">liquid-metal</span>
+        </div>
+        <div class="kc-footer">
+          <span class="kc-meta">8 merkintää · v1.0.0 · EN</span>
+          <div class="kc-actions">
+            <button class="btn-export">Vie</button>
+            <button class="btn-delete">Poista</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     4. SYSADMIN DASHBOARD
+     ============================================ -->
+<div class="mockup" id="mock-admin">
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">♥</div>
+        <span>AIMEAT</span>
+      </div>
+      <div style="padding:0 18px 12px;font-family:var(--mono);font-size:11px;color:#475569">aimeat-local-001-dev</div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Solmu</div>
+        <a class="sidebar-item active"><span class="si-icon">📊</span> Yleiskatsaus</a>
+        <a class="sidebar-item"><span class="si-icon">💰</span> Talous</a>
+        <a class="sidebar-item"><span class="si-icon">⚙️</span> Asetukset</a>
+        <a class="sidebar-item"><span class="si-icon">🔗</span> CORS</a>
+        <a class="sidebar-item"><span class="si-icon">🔧</span> Ylläpito</a>
+        <a class="sidebar-item"><span class="si-icon">🪝</span> Koukut</a>
+        <a class="sidebar-item"><span class="si-icon">🌐</span> Portaali</a>
+        <a class="sidebar-item"><span class="si-icon">📈</span> Tilastot</a>
+        <a class="sidebar-item"><span class="si-icon">📋</span> Järjestelmäkehotteet</a>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Identiteetti</div>
+        <a class="sidebar-item"><span class="si-icon">👤</span> Omistajat <span class="si-count">4</span></a>
+        <a class="sidebar-item"><span class="si-icon">🤖</span> Agentit <span class="si-count">4</span></a>
+        <a class="sidebar-item"><span class="si-icon">👥</span> GHII-käyttäjät <span class="si-count">12</span></a>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Data</div>
+        <a class="sidebar-item"><span class="si-icon">⚡</span> Toiminnot <span class="si-count">0</span></a>
+        <a class="sidebar-item"><span class="si-icon">📋</span> Taulut <span class="si-count">0</span></a>
+        <a class="sidebar-item"><span class="si-icon">💬</span> Chat-instanssit <span class="si-count">0</span></a>
+        <a class="sidebar-item"><span class="si-icon">📡</span> Reaaliaikainen <span class="si-count">0</span></a>
+        <a class="sidebar-item"><span class="si-icon">🔨</span> Työt <span class="si-count">0</span></a>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Infrastruktuuri</div>
+        <a class="sidebar-item"><span class="si-icon">📧</span> Sähköposti</a>
+        <a class="sidebar-item"><span class="si-icon">🔔</span> Push-ilmoitukset</a>
+        <a class="sidebar-item"><span class="si-icon">🏛</span> Consul</a>
+        <a class="sidebar-item"><span class="si-icon">⏰</span> Ajastin</a>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Palvelut</div>
+        <a class="sidebar-item"><span class="si-icon">📂</span> Hakemisto</a>
+        <a class="sidebar-item"><span class="si-icon">💛</span> Matchaus</a>
+        <a class="sidebar-item"><span class="si-icon">🧩</span> Palvelut</a>
+        <a class="sidebar-item"><span class="si-icon">📜</span> CSM-hallinta</a>
+        <a class="sidebar-item"><span class="si-icon">📦</span> Tietopankki</a>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Integraatiot</div>
+        <a class="sidebar-item"><span class="si-icon">🔌</span> MSM-hallinta <span class="si-count">0</span></a>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Federaatio</div>
+        <a class="sidebar-item"><span class="si-icon">🌍</span> Federaatio <span class="si-count">0</span></a>
+        <a class="sidebar-item"><span class="si-icon">🌱</span> Genesis-vertaiset <span class="si-count">0</span></a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <div class="admin-top">
+        <h1>📊 Yleiskatsaus</h1>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="time">1:26:13 AM</span>
+          <button class="btn-admin">Päivitä</button>
+        </div>
+      </div>
+
+      <!-- Node Status -->
+      <div class="node-status-card">
+        <div class="nsc-top">
+          <span class="label">Solmun tila</span>
+          <span class="status-pill pill-danger">Danger</span>
+        </div>
+        <div class="node-health-label danger">DANGER</div>
+        <div class="node-health-meta">Käyttöaika: 6h 19m · Tallennustila: mongodb</div>
+        <div class="health-rows">
+          <div class="health-row">
+            <span class="hr-label">Poltto/lyönti-suhde</span>
+            <span class="status-pill pill-danger" style="font-size:10px">Danger</span>
+          </div>
+          <div class="health-row">
+            <span class="hr-label">Agenttivaihtuvuus (30pv)</span>
+            <span class="status-pill pill-healthy" style="font-size:10px">Healthy</span>
+          </div>
+          <div class="health-row">
+            <span class="hr-label">Työn vanheneminen (30pv)</span>
+            <span class="status-pill pill-healthy" style="font-size:10px">Healthy</span>
+          </div>
+          <div class="health-row">
+            <span class="hr-label">Kiistanaikaprosentti (30pv)</span>
+            <span class="status-pill pill-healthy" style="font-size:10px">Healthy</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="admin-grid">
+        <div class="ag-card">
+          <div class="ag-label">Rekisteröidyt omistajat</div>
+          <div class="ag-value indigo">4</div>
+        </div>
+        <div class="ag-card">
+          <div class="ag-label">Rekisteröidyt agentit</div>
+          <div class="ag-value indigo">4</div>
+          <div class="ag-sub">(1 aktiivisia 24h)</div>
+        </div>
+        <div class="ag-card">
+          <div class="ag-label">Julkaistut toiminnot</div>
+          <div class="ag-value mint">0</div>
+        </div>
+        <div class="ag-card">
+          <div class="ag-label">Aktiiviset taulut</div>
+          <div class="ag-value">0</div>
+        </div>
+        <div class="ag-card">
+          <div class="ag-label">Aktiiviset chat-sessiot</div>
+          <div class="ag-value">0</div>
+        </div>
+      </div>
+
+      <!-- Two-column panels -->
+      <div class="admin-row">
+        <div class="admin-panel">
+          <h3>Talous tänään</h3>
+          <div class="ap-row"><span class="ap-key">Tapahtumat</span><span class="ap-val">1</span></div>
+          <div class="ap-row"><span class="ap-key">Muruset siirretty</span><span class="ap-val">100</span></div>
+          <div class="ap-row"><span class="ap-key">Kierrossa</span><span class="ap-val">550</span></div>
+          <div class="ap-row"><span class="ap-key">Poltettu tänään</span><span class="ap-val">0</span></div>
+        </div>
+        <div class="admin-panel">
+          <h3>Pika-asetukset</h3>
+          <div class="ap-row"><span class="ap-key">Portti</span><span class="ap-val">40050</span></div>
+          <div class="ap-row"><span class="ap-key">JWT-elinaika</span><span class="ap-val">3600s</span></div>
+          <div class="ap-row"><span class="ap-key">Avainselaus</span><span class="ap-val" style="color:var(--success)">Käytössä</span></div>
+          <div class="ap-row"><span class="ap-key">Tervetulobonus</span><span class="ap-val">100</span></div>
+        </div>
+      </div>
+
+      <!-- Warnings -->
+      <div class="warnings-table">
+        <h3>Varoitukset (1)</h3>
+        <div class="wt-header">
+          <span>Mittari</span><span>Arvo</span><span>Alue</span><span>Kynnysarvo</span>
+        </div>
+        <div class="wt-row">
+          <span>Poltto/lyönti-suhde</span>
+          <span style="font-weight:600">0</span>
+          <span><span class="status-pill pill-danger" style="font-size:10px">Danger</span></span>
+          <span style="color:var(--text-tertiary)">&lt;= 0.1 (danger)</span>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.mockup').forEach(m => m.classList.remove('active'));
+  document.querySelectorAll('.demo-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('mock-' + id).classList.add('active');
+  event.target.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>
