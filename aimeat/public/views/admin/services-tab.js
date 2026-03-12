@@ -9,7 +9,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, StatsGrid, Empty, ExpandableHelp } from './shared.js';
+import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance,
   deleteExtensionInstance, getAvailableExtensions, installBundledExtension,
@@ -428,6 +428,7 @@ function ScaffoldForm({ onCreated }) {
 
 // ── Inline instance panel for a single extension ──
 function ExtensionPanel({ ext, onUninstall }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const [expanded, setExpanded] = useState(false);
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -470,7 +471,7 @@ function ExtensionPanel({ ext, onUninstall }) {
       setNewConfig(buildDefaults(schema));
       setShowCreate(false);
       loadInstances();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function handleToggleStatus(inst) {
@@ -478,7 +479,7 @@ function ExtensionPanel({ ext, onUninstall }) {
     try {
       await updateExtensionInstance(ext.name, inst.id, { status: newStatus });
       loadInstances();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function handleDelete(inst) {
@@ -486,7 +487,7 @@ function ExtensionPanel({ ext, onUninstall }) {
     try {
       await deleteExtensionInstance(ext.name, inst.id);
       loadInstances();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   async function handleSaveTranslations(extName, instId, translations) {
@@ -499,7 +500,7 @@ function ExtensionPanel({ ext, onUninstall }) {
       await updateExtensionInstance(ext.name, inst.id, { config: editCfgData });
       setEditingCfg(null);
       loadInstances();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   function openConfigEditor(inst) {
@@ -515,6 +516,7 @@ function ExtensionPanel({ ext, onUninstall }) {
   const instanceCount = ext.instanceCount || ext.instance_count || 0;
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div class="adm-card" style="margin-bottom:8px;overflow:hidden">
       <!-- Extension header row -->
       <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none"
@@ -823,6 +825,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
 }
 
 export default function ServicesTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const extensions = data.extensions?.extensions || [];
   const [available, setAvailable] = useState([]);
   const [loadingAvailable, setLoadingAvailable] = useState(false);
@@ -845,7 +848,7 @@ export default function ServicesTab({ data, reload }) {
       await installBundledExtension(name);
       reload();
     } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
+      showErr(e.message);
     } finally {
       setInstallingName(null);
     }
@@ -857,7 +860,7 @@ export default function ServicesTab({ data, reload }) {
       await uninstallExtension(name);
       reload();
     } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
+      showErr(e.message);
     }
   }
 
@@ -867,7 +870,7 @@ export default function ServicesTab({ data, reload }) {
       await reinstallExtension(name);
       reload();
     } catch (e) {
-      alert(t('dashboard.errorLabel') + ': ' + e.message);
+      showErr(e.message);
     } finally {
       setInstallingName(null);
     }
@@ -887,6 +890,7 @@ export default function ServicesTab({ data, reload }) {
   const installedNames = new Set(extensions.map(e => e.name));
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${ExpandableHelp} title=${t('dashboard.servicesHelpTitle')}>
       <p>${t('dashboard.servicesHelpDetail')}</p>
     <//>

@@ -4,13 +4,14 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, ExpandableHelp } from './shared.js';
+import { dt, Badge, ExpandableHelp, useToast, Toast } from './shared.js';
 import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
   getSiteMemoryKeys, getSitePrompt, addMemory, deleteMemory, triggerLbSync,
 } from '/js/services/admin.js';
 
 export default function PortalTab({ data, reload }) {
+  const [toast, showErr, showOk, clearToast] = useToast();
   const p = data.portal || {};
   const meta = p.meta || {};
   const tmpl = p.template || {};
@@ -33,7 +34,7 @@ export default function PortalTab({ data, reload }) {
 
   async function saveTemplate() {
     try { await saveSiteTemplate(template); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   function downloadTemplate() {
@@ -46,23 +47,23 @@ export default function PortalTab({ data, reload }) {
   async function resetTemplate() {
     if (!confirm(t('dashboard.portalResetDefault') + '?')) return;
     try { await deleteSiteTemplate(); reload(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   async function doClearCache() {
-    try { await clearSiteCache(); } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    try { await clearSiteCache(); } catch (e) { showErr(e.message); }
   }
 
   async function addMem() {
     if (!newKey.trim()) return;
     try { await addMemory(newKey, newVal); setNewKey(''); setNewVal(''); loadMemKeys(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   async function delMem(key) {
     if (!confirm(t('dashboard.portalDeleteKeyConfirm').replace('{key}', key))) return;
     try { await deleteMemory(key); loadMemKeys(); }
-    catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    catch (e) { showErr(e.message); }
   }
 
   async function copyPrompt() {
@@ -70,23 +71,24 @@ export default function PortalTab({ data, reload }) {
       const res = await getSitePrompt();
       const prompt = res.data?.prompt || 'No prompt available';
       await navigator.clipboard.writeText(prompt);
-      alert(t('dashboard.portalAiCopied'));
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+      showOk(t('dashboard.portalAiCopied'));
+    } catch (e) { showErr(e.message); }
   }
 
   async function doLbSync() {
     try {
       const res = await triggerLbSync();
       const d = res.data || {};
-      alert(t('dashboard.portalLbSyncDone') + ' (template: ' + (d.template_updated ? 'yes' : 'no') + ', memory: ' + (d.memory_keys_synced || 0) + ')');
+      showOk(t('dashboard.portalLbSyncDone') + ' (template: ' + (d.template_updated ? 'yes' : 'no') + ', memory: ' + (d.memory_keys_synced || 0) + ')');
       reload();
-    } catch (e) { alert(t('dashboard.errorLabel') + ': ' + e.message); }
+    } catch (e) { showErr(e.message); }
   }
 
   const kv = meta.kv || {};
   const kvKeys = Object.keys(kv);
 
   return html`
+    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <p style="color:var(--text-dim);margin-bottom:16px">${t('dashboard.portalDesc')}</p>
 
     <!-- LB mode banner -->
