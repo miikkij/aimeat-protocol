@@ -229,6 +229,9 @@ export interface AimeatConfig {
   turnUsername: string | null;
   turnCredential: string | null;
 
+  // Encrypted Chat (extension)
+  echatAnonymous: boolean;
+
   // Node Portal (Site)
   siteEnabled: boolean;
   siteMaxTemplateSizeKb: number;
@@ -511,6 +514,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     turnServer: process.env.AIMEAT_TURN_SERVER ?? null,
     turnUsername: process.env.AIMEAT_TURN_USERNAME ?? null,
     turnCredential: process.env.AIMEAT_TURN_CREDENTIAL ?? null,
+    echatAnonymous: process.env.AIMEAT_ECHAT_ANONYMOUS === 'true',
     siteEnabled: process.env.AIMEAT_SITE_ENABLED !== 'false',
     siteMaxTemplateSizeKb: parseInt(process.env.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB ?? '512', 10),
     siteCacheTtlSeconds: parseInt(process.env.AIMEAT_SITE_CACHE_TTL_SECONDS ?? '60', 10),
