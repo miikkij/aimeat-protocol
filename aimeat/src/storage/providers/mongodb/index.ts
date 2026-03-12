@@ -3943,8 +3943,7 @@ export class MongoStorage implements Storage {
 
     async upsertSystemPrompt(record: SystemPromptRecord): Promise<SystemPromptRecord> {
         this.ensureReady();
-        const data = {
-            id: record.id,
+        const fields = {
             group: record.group,
             name: record.name,
             description: record.description,
@@ -3959,8 +3958,8 @@ export class MongoStorage implements Storage {
         };
         await this.prisma.systemPrompt.upsert({
             where: { id: record.id },
-            create: data,
-            update: data,
+            create: { id: record.id, ...fields },
+            update: fields,
         });
         return record;
     }
