@@ -267,6 +267,10 @@ export interface AimeatConfig {
   extensionMaxApiCalls: number;
   extensionMaxCodeSizeKb: number;
   extensionMaxInstalled: number;
+  maxExtensionsPerOwner: number;
+
+  // Service Generator
+  generatorEnabled: boolean;
 
   // Cortex Extensions (Manifest-based)
   cortexEnabled: boolean;
@@ -546,6 +550,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '50', 10),
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
+    maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
+
+    // Service Generator
+    generatorEnabled: process.env.AIMEAT_GENERATOR_ENABLED !== 'false',
 
     // Cortex Extensions (Manifest-based)
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
