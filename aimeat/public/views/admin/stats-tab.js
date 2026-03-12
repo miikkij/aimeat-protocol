@@ -23,7 +23,7 @@ export default function StatsTab({ data }) {
   const cs = sd.consent_permissions || {};
 
   return html`
-    <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:16px">${t('dashboard.statsExplain')}</p>
+    <p class="adm-text-dim adm-text-sm adm-mb-lg">${t('dashboard.statsExplain')}</p>
 
     <div class="adm-grid adm-grid-4">
       <${StatCard} label=${t('dashboard.requestsTotal')} value=${sd.requests_total} />
@@ -32,7 +32,7 @@ export default function StatsTab({ data }) {
       <${StatCard} label=${t('dashboard.schemaOps')} value=${sd.schema_validations} sub=${t('dashboard.failures') + ': ' + num(sd.schema_validation_failures)} />
     </div>
 
-    <div class="adm-grid adm-grid-4" style="margin-bottom:20px">
+    <div class="adm-grid adm-grid-4 adm-mb-lg">
       <${StatCard} label=${t('dashboard.uptime')} value=${fmtUp(sd.uptime_seconds || 0)} />
       <${StatCard} label=${t('dashboard.registeredOwners')} value=${sd.active_owners} />
       <${StatCard} label=${t('dashboard.registeredAgents')} value=${sd.active_agents} />
@@ -42,11 +42,11 @@ export default function StatsTab({ data }) {
       <div class="adm-card"><h2>${t('dashboard.dailyActivity')}</h2><canvas id="chartDaily" height="200"></canvas></div>
       <div class="adm-card"><h2>${t('dashboard.weeklyComparison')}</h2><canvas id="chartWeekly" height="200"></canvas></div>
     </div>
-    <div class="adm-card" style="margin-top:16px"><h2>${t('dashboard.monthlyTrend')}</h2><canvas id="chartMonthly" height="160"></canvas></div>
+    <div class="adm-card adm-mt-lg"><h2>${t('dashboard.monthlyTrend')}</h2><canvas id="chartMonthly" height="160"></canvas></div>
 
     <!-- Tunnel Stats -->
-    <h3 style="margin-top:24px;font-size:.9rem;color:var(--accent)">${t('dashboard.tunnelStats')}</h3>
-    <div class="adm-grid adm-grid-4" style="margin-top:12px">
+    <h3 class="adm-text-accent" style="margin-top:24px;font-size:.9rem">${t('dashboard.tunnelStats')}</h3>
+    <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.tunnelActive')} value=${ts.connections_active || 0} color="#22c55e" />
       <${StatCard} label=${t('dashboard.tunnelTotal')} value=${ts.connections_total || 0} />
       <${StatCard} label=${t('dashboard.tunnelDisconnections')} value=${ts.disconnections_total || 0} color="#eab308" />
@@ -69,8 +69,8 @@ export default function StatsTab({ data }) {
     </div>
 
     <!-- Mailbox Stats -->
-    <h3 style="margin-top:24px;font-size:.9rem;color:#a855f7">${t('dashboard.mailboxStats')}</h3>
-    <div class="adm-grid adm-grid-4" style="margin-top:12px">
+    <h3 class="adm-mt-lg adm-text-sm" style="color:#a855f7">${t('dashboard.mailboxStats')}</h3>
+    <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.mailboxItems')} value=${ms.items_total || 0} />
       <${StatCard} label=${t('dashboard.mailboxBytes')} value=${fmtBytes(ms.bytes_total || 0)} />
       <${StatCard} label=${t('dashboard.mailboxEnqueued')} value=${ms.enqueued_total || 0} color="#3b82f6" />
@@ -83,8 +83,8 @@ export default function StatsTab({ data }) {
     </div>
 
     <!-- Consent Permission Stats -->
-    <h3 style="margin-top:24px;font-size:.9rem;color:#a855f7">${t('dashboard.consentPermStats')}</h3>
-    <div class="adm-grid adm-grid-4" style="margin-top:12px">
+    <h3 class="adm-mt-lg adm-text-sm" style="color:#a855f7">${t('dashboard.consentPermStats')}</h3>
+    <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.consentActiveRules')} value=${cs.active_rules || 0} color="#a855f7" />
       <${StatCard} label=${t('dashboard.consentByGaii')} value=${cs.by_gaii || 0} color="#3b82f6" />
       <${StatCard} label=${t('dashboard.consentByGhii')} value=${cs.by_ghii || 0} color="#a855f7" />
@@ -98,8 +98,8 @@ export default function StatsTab({ data }) {
     </div>
 
     <!-- Security Stats -->
-    <h3 style="margin-top:24px;font-size:.9rem;color:#ef4444">${t('dashboard.securityStats')}</h3>
-    <div class="adm-grid adm-grid-4" style="margin-top:12px">
+    <h3 class="adm-mt-lg adm-text-sm" style="color:#ef4444">${t('dashboard.securityStats')}</h3>
+    <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.authFailures')} value=${sd.auth_failures_total || 0} color=${sd.auth_failures_total > 0 ? '#ef4444' : '#22c55e'} />
       <${StatCard} label=${t('dashboard.rateLimitHits')} value=${sd.rate_limit_hits_total || 0} color=${sd.rate_limit_hits_total > 0 ? '#eab308' : '#22c55e'} />
       <${StatCard} label=${t('dashboard.scopeDenials')} value=${sd.scope_denials_total || 0} color=${sd.scope_denials_total > 0 ? '#eab308' : '#22c55e'} />

@@ -128,21 +128,21 @@ export default function MsmTab({ data, reload }) {
   function renderDeleteModal() {
     if (!deleteTarget) return null;
     return html`
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000"
+      <div class="adm-modal-overlay"
            onClick=${e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteInput(''); } }}>
         <div class="adm-card" style="max-width:460px;width:90%;margin:0">
-          <h4 style="margin:0 0 8px;color:#ef4444">${t('dashboard.msmDeleteTitle')}</h4>
-          <p style="font-size:.85rem;margin:0 0 12px">
+          <h4 class="adm-mb-sm adm-text-error" style="margin:0">${t('dashboard.msmDeleteTitle')}</h4>
+          <p class="adm-text-base adm-mb-md" style="margin:0">
             ${t('dashboard.msmDeleteConfirm').replace('{name}', deleteTarget)}
           </p>
           <input
             type="text"
-            style="width:100%;margin-bottom:12px"
+            class="adm-input adm-input-full adm-mb-md"
             placeholder=${deleteTarget}
             value=${deleteInput}
             onInput=${e => setDeleteInput(e.target.value)}
           />
-          <div style="display:flex;gap:8px;justify-content:flex-end">
+          <div class="adm-flex" style="justify-content:flex-end">
             <button class="adm-btn-sm" onClick=${() => { setDeleteTarget(null); setDeleteInput(''); }}>
               ${t('dashboard.cancel')}
             </button>
@@ -167,34 +167,34 @@ export default function MsmTab({ data, reload }) {
     return html`
       <div>
         <button class="adm-btn-sm" onClick=${() => setView('detail')}>\u2190 ${t('dashboard.back')}</button>
-        <div class="adm-card" style="margin-top:12px">
-          <h4 style="margin:0 0 12px">${t('dashboard.msmEdit')}</h4>
+        <div class="adm-card adm-mt-md">
+          <h4 class="adm-mb-md" style="margin:0">${t('dashboard.msmEdit')}</h4>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:16px;font-size:.85rem">
+          <div class="adm-text-base adm-mb-lg" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px">
             <div><strong>${t('dashboard.name')}:</strong> ${escHtml(detail.name)}</div>
             <div><strong>${t('dashboard.msmCategory')}:</strong> ${escHtml(detail.category || '—')}</div>
             <div><strong>${t('dashboard.msmAuthType')}:</strong> ${escHtml(detail.auth_type || '—')}</div>
             <div><strong>${t('dashboard.msmActions')}:</strong> ${detail.actions_count || 0}</div>
           </div>
 
-          <label style="font-size:.85rem;color:var(--text-dim);display:block;margin-bottom:4px">
+          <label class="adm-text-base adm-text-dim adm-mb-xs" style="display:block">
             ${t('dashboard.msmEditDescription')}
           </label>
           <input
             type="text"
-            style="width:100%;margin-bottom:12px"
+            class="adm-input adm-input-full adm-mb-md"
             value=${editDesc}
             onInput=${e => setEditDesc(e.target.value)}
           />
 
-          <label style="font-size:.85rem;display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer">
+          <label class="adm-text-base adm-flex-center adm-mb-lg" style="cursor:pointer">
             <input type="checkbox" checked=${editFederate} onChange=${e => setEditFederate(e.target.checked)} />
             ${t('dashboard.msmEditFederate')}
           </label>
 
-          ${err && html`<div class="error-box" style="margin-bottom:8px">${err}</div>`}
+          ${err && html`<div class="error-box adm-mb-sm">${err}</div>`}
 
-          <div style="display:flex;gap:8px">
+          <div class="adm-flex">
             <button class="adm-btn" onClick=${doEdit} disabled=${loading}>
               ${loading ? '...' : t('dashboard.msmEditSave')}
             </button>
@@ -214,19 +214,19 @@ export default function MsmTab({ data, reload }) {
         ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
         ${renderDeleteModal()}
         <button class="adm-btn-sm" onClick=${backToList}>\u2190 ${t('dashboard.back')}</button>
-        <div class="adm-card" style="margin-top:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="adm-card adm-mt-md">
+          <div class="adm-flex-between">
             <h4 style="margin:0">${escHtml(detail.name)}</h4>
-            <div style="display:flex;gap:8px">
+            <div class="adm-flex">
               <button class="adm-btn-sm" onClick=${openEdit}>${t('dashboard.edit')}</button>
-              <button class="adm-btn-sm" style="color:#ef4444;border-color:#ef4444" onClick=${() => openDelete(detail.name)}>
+              <button class="adm-btn-sm adm-text-error" style="border-color:#ef4444" onClick=${() => openDelete(detail.name)}>
                 ${t('dashboard.delete')}
               </button>
             </div>
           </div>
-          ${svc.description && html`<p style="font-size:.85rem;color:var(--text-dim);margin:4px 0 12px">${escHtml(svc.description)}</p>`}
+          ${svc.description && html`<p class="adm-text-base adm-text-dim" style="margin:4px 0 12px">${escHtml(svc.description)}</p>`}
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:12px 0;font-size:.85rem">
+          <div class="adm-text-base" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin:12px 0">
             <div><strong>${t('dashboard.msmCategory')}:</strong> ${escHtml(detail.category || '—')}</div>
             <div><strong>${t('dashboard.msmAuthType')}:</strong> ${escHtml(detail.auth_type || '—')}</div>
             <div><strong>${t('dashboard.msmActions')}:</strong> ${detail.actions_count || 0}</div>
@@ -248,12 +248,12 @@ export default function MsmTab({ data, reload }) {
     return html`
       <div>
         <button class="adm-btn-sm" onClick=${backToList}>\u2190 ${t('dashboard.back')}</button>
-        <div class="adm-card" style="margin-top:12px">
-          <h4 style="margin:0 0 12px">${t('dashboard.msmAddNew')}</h4>
+        <div class="adm-card adm-mt-md">
+          <h4 class="adm-mb-md" style="margin:0">${t('dashboard.msmAddNew')}</h4>
 
           ${templates && templates.length > 0 && html`
-            <div style="margin-bottom:12px">
-              <label style="font-size:.85rem;color:var(--text-dim);display:block;margin-bottom:4px">${t('dashboard.msmCreateFromTemplate')}</label>
+            <div class="adm-mb-md">
+              <label class="adm-text-base adm-text-dim adm-mb-xs" style="display:block">${t('dashboard.msmCreateFromTemplate')}</label>
               <select style="width:auto;min-width:200px" onChange=${e => loadTemplate(e.target.value)}>
                 <option value="">${t('dashboard.msmSelectTemplate')}</option>
                 ${templates.map(ft => html`<option value=${ft.type}>${escHtml(ft.name)} (${ft.type})</option>`)}
@@ -261,23 +261,24 @@ export default function MsmTab({ data, reload }) {
             </div>
           `}
 
-          <label style="font-size:.85rem;color:var(--text-dim);display:block;margin-bottom:4px">${t('dashboard.msmDefinition')}</label>
+          <label class="adm-text-base adm-text-dim adm-mb-xs" style="display:block">${t('dashboard.msmDefinition')}</label>
           <textarea
             rows="20"
-            style="width:100%;font-family:monospace;font-size:.8rem;resize:vertical"
+            class="adm-input adm-input-full adm-text-sm"
+            style="font-family:monospace;resize:vertical"
             placeholder=${t('dashboard.msmYamlPlaceholder')}
             value=${yaml}
             onInput=${e => setYaml(e.target.value)}
           />
 
-          <label style="font-size:.85rem;display:flex;align-items:center;gap:8px;margin:12px 0;cursor:pointer">
+          <label class="adm-text-base adm-flex-center" style="margin:12px 0;cursor:pointer">
             <input type="checkbox" checked=${federate} onChange=${e => setFederate(e.target.checked)} />
             ${t('dashboard.msmEditFederate')}
           </label>
 
-          ${err && html`<div class="error-box" style="margin-top:8px">${err}</div>`}
+          ${err && html`<div class="error-box adm-mt-sm">${err}</div>`}
 
-          <div style="margin-top:12px;display:flex;gap:8px">
+          <div class="adm-flex adm-mt-md">
             <button class="adm-btn" onClick=${doCreate} disabled=${loading || !yaml.trim()}>
               ${loading ? '...' : t('dashboard.msmAddNew')}
             </button>
@@ -292,12 +293,12 @@ export default function MsmTab({ data, reload }) {
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     ${renderDeleteModal()}
-    <p style="color:var(--text-dim);margin:0 0 12px">${t('dashboard.msmExplain')}</p>
+    <p class="adm-text-dim adm-mb-md" style="margin:0">${t('dashboard.msmExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.msmHelpTitle')}>
       ${t('dashboard.msmHelpDetail')}
     <//>
 
-    <div style="margin-bottom:12px">
+    <div class="adm-mb-md">
       <button class="adm-btn" onClick=${openCreate}>${t('dashboard.msmAddNew')}</button>
     </div>
 
@@ -319,15 +320,15 @@ export default function MsmTab({ data, reload }) {
               <tbody>
                 ${integrations.map(m => html`<tr>
                   <td><strong style="cursor:pointer;color:var(--accent)" onClick=${() => showDetail(m.name)}>${escHtml(m.name)}</strong></td>
-                  <td style="font-size:.8rem;color:var(--text-dim)">${escHtml(m.category || '—')}</td>
-                  <td style="font-size:.8rem;color:var(--text-dim)">${escHtml(m.auth_type || '—')}</td>
-                  <td style="font-size:.8rem">${m.actions_count || 0}</td>
-                  <td style="font-size:.8rem">${escHtml(m.registered_by || '—')}</td>
-                  <td style="color:var(--text-dim)">${dt(m.registered_at)}</td>
+                  <td class="adm-text-sm adm-text-dim">${escHtml(m.category || '—')}</td>
+                  <td class="adm-text-sm adm-text-dim">${escHtml(m.auth_type || '—')}</td>
+                  <td class="adm-text-sm">${m.actions_count || 0}</td>
+                  <td class="adm-text-sm">${escHtml(m.registered_by || '—')}</td>
+                  <td class="adm-text-dim">${dt(m.registered_at)}</td>
                   <td style="white-space:nowrap">
                     <button class="adm-btn-sm" onClick=${() => showDetail(m.name)}>${t('dashboard.edit')}</button>
                     ${' '}
-                    <button class="adm-btn-sm" style="color:#ef4444;border-color:#ef4444" onClick=${() => openDelete(m.name)}>
+                    <button class="adm-btn-sm adm-text-error" style="border-color:#ef4444" onClick=${() => openDelete(m.name)}>
                       ${t('dashboard.delete')}
                     </button>
                   </td>

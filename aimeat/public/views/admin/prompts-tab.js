@@ -136,10 +136,10 @@ export default function PromptsTab({ data, reload }) {
       <div>
         <button class="adm-btn-action" onClick=${() => { setEditId(null); setEditData(null); }}>← ${t('dashboard.promptsTab')}</button>
         <h3 style="margin:12px 0 4px">${escHtml(editData.name)}</h3>
-        <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 16px">${escHtml(editData.description)}</p>
+        <p class="adm-text-dim adm-text-base" style="margin:0 0 16px">${escHtml(editData.description)}</p>
 
         <!-- Active toggle -->
-        <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer">
+        <label class="adm-flex-center adm-mb-md" style="cursor:pointer">
           <input type="checkbox" checked=${editData.active}
             onChange=${e => setEditData({...editData, active: e.target.checked})} />
           ${editData.active ? t('dashboard.promptsStatusActive') : t('dashboard.promptsStatusInactive')}
@@ -164,7 +164,7 @@ export default function PromptsTab({ data, reload }) {
         <!-- Used in -->
         ${editData.usedIn && editData.usedIn.length > 0 && html`
           <div style="margin:8px 0">
-            <strong style="font-size:.85rem">${t('dashboard.promptsUsedIn')}:</strong>
+            <strong class="adm-text-base">${t('dashboard.promptsUsedIn')}:</strong>
             ${editData.usedIn.map(u => u.startsWith('/')
               ? html` <a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)">${escHtml(u)}</a>`
               : html` <span class="adm-prompt-used-tag">${escHtml(u)}</span>`
@@ -173,13 +173,13 @@ export default function PromptsTab({ data, reload }) {
         `}
 
         <!-- Change note -->
-        <input type="text" placeholder=${t('dashboard.promptsChangeNotePlaceholder')}
+        <input class="adm-input adm-input-full" type="text" placeholder=${t('dashboard.promptsChangeNotePlaceholder')}
           value=${editData.changeNote || ''}
           onInput=${e => setEditData({...editData, changeNote: e.target.value})}
-          style="width:100%;margin:8px 0;padding:6px 10px;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);border-radius:6px" />
+          style="margin:8px 0" />
 
         <!-- Buttons -->
-        <div style="display:flex;gap:8px;margin:12px 0">
+        <div class="adm-flex" style="margin:12px 0">
           <button class="adm-btn-action" onClick=${handleSave} disabled=${saving}>
             ${saving ? '...' : t('dashboard.promptsSave')}
           </button>
@@ -189,14 +189,14 @@ export default function PromptsTab({ data, reload }) {
         </div>
 
         <!-- Version History -->
-        <details style="margin-top:16px">
+        <details class="adm-mt-lg">
           <summary class="adm-prompt-group-header">${t('dashboard.promptsVersionHistory')} (${versions.length})</summary>
           ${versions.length === 0
             ? html`<${Empty} text=${t('dashboard.promptsNoVersions')} />`
             : versions.map(v => html`
               <div class="adm-prompt-version-row">
                 <span style="font-weight:600">v${v.version}</span>
-                <span style="color:var(--text-dim);flex:1">${dt(v.changedAt)} · ${escHtml(v.changedBy)}${v.changeNote ? ` · ${escHtml(v.changeNote)}` : ''}</span>
+                <span class="adm-text-dim" style="flex:1">${dt(v.changedAt)} · ${escHtml(v.changedBy)}${v.changeNote ? ` · ${escHtml(v.changeNote)}` : ''}</span>
                 <button class="adm-btn-sm" onClick=${() => handleRestore(v.version)} disabled=${saving}>
                   ${t('dashboard.promptsRestore')}
                 </button>
@@ -227,18 +227,18 @@ export default function PromptsTab({ data, reload }) {
     ${Object.keys(groups).length === 0
       ? html`<${Empty} text=${t('dashboard.promptsEmpty')} />`
       : Object.entries(groups).map(([g, items]) => html`
-        <details class="adm-card" style="margin-bottom:8px" open>
+        <details class="adm-card adm-mb-sm" open>
           <summary class="adm-prompt-group-header">
             ${t('dashboard.' + (GROUP_NAMES[g] || g))} (${items.length})
           </summary>
           ${items.map(p => html`
             <div class="adm-hrow" style="cursor:pointer" onClick=${() => openEdit(p.id)}>
               <div style="flex:1">
-                <div style="display:flex;align-items:center;gap:6px">
+                <div class="adm-flex-center" style="gap:6px">
                   <strong>${escHtml(p.name)}</strong>
                   <${Badge} type=${p.active ? 'healthy' : 'critical'} />
                 </div>
-                <div style="font-size:.8rem;color:var(--text-dim)">${escHtml(p.description)}</div>
+                <div class="adm-text-sm adm-text-dim">${escHtml(p.description)}</div>
                 ${p.usedIn && p.usedIn.length > 0 && html`
                   <div>${p.usedIn.map(u => u.startsWith('/')
                     ? html`<a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)" onClick=${e => e.stopPropagation()}>${escHtml(u)}</a> `
@@ -246,7 +246,7 @@ export default function PromptsTab({ data, reload }) {
                   )}</div>
                 `}
               </div>
-              <div style="text-align:right;font-size:.8rem;color:var(--text-dim)">
+              <div class="adm-text-sm adm-text-dim" style="text-align:right">
                 <div>v${p.version} · ${dt(p.updatedAt)}</div>
               </div>
             </div>

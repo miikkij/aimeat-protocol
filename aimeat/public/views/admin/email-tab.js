@@ -138,7 +138,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
         <div style="margin-bottom:10px;padding:8px 10px;border-radius:6px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15)">
           <div style="font-size:.72rem;font-weight:600;color:#f59e0b;margin-bottom:4px">${t('dashboard.emailTplParams')}</div>
           <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">${t('dashboard.emailTplParamsExplain')}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <div class="adm-flex-wrap" style="gap:6px">
             ${tpl.params.map(p => html`
               <span style="font-size:.72rem;background:rgba(0,0,0,0.2);color:#f59e0b;padding:2px 8px;border-radius:4px;font-family:monospace"
                 title=${(tpl.paramDescriptions || {})[p] || ''}>${p}</span>
@@ -148,7 +148,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
       `}
 
       <!-- Sub-tabs -->
-      <div style="display:flex;gap:2px;border-bottom:1px solid var(--glass-border);margin-bottom:0">
+      <div style="display:flex;gap:2px;border-bottom:1px solid var(--glass-border)">
         <button style=${tabStyle(view === 'preview')} onClick=${() => setView('preview')}>${t('dashboard.emailTplPreview')}</button>
         <button style=${tabStyle(view === 'html')} onClick=${() => setView('html')}>${t('dashboard.emailTplEditHtml')}</button>
         <button style=${tabStyle(view === 'text')} onClick=${() => setView('text')}>${t('dashboard.emailTplEditText')}</button>
@@ -180,16 +180,16 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
       `}
 
       <!-- Action buttons -->
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
-        <button class="adm-btn-action" onClick=${doSave} disabled=${saving || !hasChanges}
-          style="font-size:.8rem">${saving ? '...' : t('dashboard.emailTplSave')}</button>
-        <button class="adm-btn-action" onClick=${copyAiPrompt}
-          style="font-size:.8rem;background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.3);color:#818cf8">${t('dashboard.emailTplAiPrompt')}</button>
+      <div class="adm-flex-center" style="flex-wrap:wrap;margin-top:10px">
+        <button class="adm-btn-action adm-text-sm" onClick=${doSave} disabled=${saving || !hasChanges}>
+          ${saving ? '...' : t('dashboard.emailTplSave')}</button>
+        <button class="adm-btn-action adm-text-sm" onClick=${copyAiPrompt}
+          style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.3);color:#818cf8">${t('dashboard.emailTplAiPrompt')}</button>
         ${tpl.isCustom && html`
-          <button class="adm-btn-action" onClick=${doReset} disabled=${saving}
-            style="font-size:.8rem;color:#ef4444;border-color:rgba(239,68,68,0.3)">${t('dashboard.emailTplReset')}</button>
+          <button class="adm-btn-action adm-text-sm" onClick=${doReset} disabled=${saving}
+            style="color:#ef4444;border-color:rgba(239,68,68,0.3)">${t('dashboard.emailTplReset')}</button>
         `}
-        ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+        ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
     </div>
   `;
@@ -246,7 +246,7 @@ export default function EmailTab({ data, reload, locale }) {
 
   if (!email.enabled) {
     return html`
-      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.emailDisabledExplain')}</p>
+      <p class="adm-text-dim adm-text-base adm-mb-md">${t('dashboard.emailDisabledExplain')}</p>
       <${ExpandableHelp} title=${t('dashboard.emailSmtpHelp')}>
         <p>${t('dashboard.emailSmtpHelpDetail')}</p>
       </${ExpandableHelp}>
@@ -321,11 +321,11 @@ export default function EmailTab({ data, reload, locale }) {
   }
 
   return html`
-    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.emailExplain')}</p>
+    <p class="adm-text-dim adm-text-base adm-mb-md">${t('dashboard.emailExplain')}</p>
 
     <!-- SMTP Configuration -->
     <div class="adm-card">
-      <h4 style="margin:0 0 12px">${t('dashboard.smtpConfig')}</h4>
+      <h4 class="adm-mb-md" style="margin:0">${t('dashboard.smtpConfig')}</h4>
       <${EconRow} label=${t('dashboard.host')} value=${email.smtp_host || '\u2014'} />
       <${EconRow} label=${t('dashboard.port')} value=${email.smtp_port || '\u2014'} />
       <div class="adm-hrow">
@@ -345,9 +345,9 @@ export default function EmailTab({ data, reload, locale }) {
     </div>
 
     <!-- Test Email -->
-    <div class="adm-card" style="margin-top:12px">
-      <h4 style="margin:0 0 12px">${t('dashboard.testEmail')}</h4>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div class="adm-card adm-mt-md">
+      <h4 class="adm-mb-md" style="margin:0">${t('dashboard.testEmail')}</h4>
+      <div class="adm-flex-center" style="flex-wrap:wrap">
         <input type="email" class="adm-input" value=${to}
           onInput=${e => setTo(e.target.value)}
           placeholder=${t('dashboard.emailPlaceholder')}
@@ -362,40 +362,39 @@ export default function EmailTab({ data, reload, locale }) {
           ${sending ? '...' : t('dashboard.send')}
         </button>
       </div>
-      ${result && html`<div style="margin-top:8px;font-size:.85rem;color:${result.ok ? '#22c55e' : '#ef4444'}">${result.msg}</div>`}
+      ${result && html`<div class="adm-mt-sm adm-text-base" style="color:${result.ok ? '#22c55e' : '#ef4444'}">${result.msg}</div>`}
     </div>
 
     <!-- Send to Group -->
-    <div class="adm-card" style="margin-top:12px">
-      <h4 style="margin:0 0 12px">${t('dashboard.emailGroupTitle')}</h4>
-      <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 12px">${t('dashboard.emailGroupExplain')}</p>
-      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+    <div class="adm-card adm-mt-md">
+      <h4 class="adm-mb-md" style="margin:0">${t('dashboard.emailGroupTitle')}</h4>
+      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.emailGroupExplain')}</p>
+      <div class="adm-flex-wrap adm-mb-sm">
         <select class="adm-input" value=${grpGroup} onChange=${e => setGrpGroup(e.target.value)}
           style="width:auto;min-width:140px">
           <option value="operators">${t('dashboard.emailGroupOperators')}</option>
           <option value="all">${t('dashboard.emailGroupAll')}</option>
         </select>
       </div>
-      <input type="text" class="adm-input" value=${grpSubject}
+      <input type="text" class="adm-input adm-input-full adm-mb-sm" value=${grpSubject}
         onInput=${e => setGrpSubject(e.target.value)}
-        placeholder=${t('dashboard.emailGroupSubject')}
-        style="width:100%;margin-bottom:8px" />
-      <textarea class="adm-input" value=${grpBody}
+        placeholder=${t('dashboard.emailGroupSubject')} />
+      <textarea class="adm-input adm-input-full" value=${grpBody}
         onInput=${e => setGrpBody(e.target.value)}
         placeholder=${t('dashboard.emailGroupBody')}
         rows="4"
-        style="width:100%;resize:vertical;font-family:inherit" />
-      <div style="margin-top:8px">
+        style="resize:vertical;font-family:inherit" />
+      <div class="adm-mt-sm">
         <button class="adm-btn" onClick=${doGroupSend} disabled=${grpSending || !grpSubject || !grpBody}>
           ${grpSending ? '...' : t('dashboard.emailGroupSend')}
         </button>
       </div>
-      ${grpResult && html`<div style="margin-top:8px;font-size:.85rem;color:${grpResult.ok ? '#22c55e' : '#ef4444'}">${grpResult.msg}</div>`}
+      ${grpResult && html`<div class="adm-mt-sm adm-text-base" style="color:${grpResult.ok ? '#22c55e' : '#ef4444'}">${grpResult.msg}</div>`}
     </div>
 
     <!-- Email Templates -->
-    <div class="adm-card" style="margin-top:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="adm-card adm-mt-md">
+      <div class="adm-flex-between adm-mb-md">
         <h4 style="margin:0">${t('dashboard.emailTemplatesTitle')}</h4>
         <div style="display:flex;gap:4px">
           ${['en', 'fi'].map(l => html`
@@ -404,37 +403,37 @@ export default function EmailTab({ data, reload, locale }) {
           `)}
         </div>
       </div>
-      <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 12px">${t('dashboard.emailTemplatesExplain')}</p>
+      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.emailTemplatesExplain')}</p>
 
       <!-- Seed / Reset All buttons -->
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border)">
+      <div class="adm-flex-center" style="flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border)">
         ${!seeded && html`
-          <button class="adm-btn-action" onClick=${doSeedDefaults}
-            style="font-size:.8rem;background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.3);color:#22c55e">${t('dashboard.emailTplSeedDefaults')}</button>
-          <span style="font-size:.78rem;color:var(--text-dim)">${t('dashboard.emailTplSeedExplain')}</span>
+          <button class="adm-btn-action adm-text-sm" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.3);color:#22c55e"
+            onClick=${doSeedDefaults}>${t('dashboard.emailTplSeedDefaults')}</button>
+          <span style="font-size:.78rem" class="adm-text-dim">${t('dashboard.emailTplSeedExplain')}</span>
         `}
         ${seeded && html`
-          <button class="adm-btn-action" onClick=${doResetAll}
-            style="font-size:.8rem;color:#ef4444;border-color:rgba(239,68,68,0.3)">${t('dashboard.emailTplResetAll')}</button>
-          <button class="adm-btn-action" onClick=${doSeedDefaults}
-            style="font-size:.8rem">${t('dashboard.emailTplReseed')}</button>
-          <span style="font-size:.78rem;color:var(--text-dim)">${t('dashboard.emailTplSeededStatus')}</span>
+          <button class="adm-btn-action adm-text-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)"
+            onClick=${doResetAll}>${t('dashboard.emailTplResetAll')}</button>
+          <button class="adm-btn-action adm-text-sm"
+            onClick=${doSeedDefaults}>${t('dashboard.emailTplReseed')}</button>
+          <span style="font-size:.78rem" class="adm-text-dim">${t('dashboard.emailTplSeededStatus')}</span>
         `}
-        ${seedMsg && html`<span style="font-size:.8rem;color:${seedMsg.ok ? '#22c55e' : '#ef4444'}">${seedMsg.text}</span>`}
+        ${seedMsg && html`<span class="adm-text-sm" style="color:${seedMsg.ok ? '#22c55e' : '#ef4444'}">${seedMsg.text}</span>`}
       </div>
 
-      ${tplLoading ? html`<p style="color:var(--text-dim);font-size:.85rem">...</p>` : null}
+      ${tplLoading ? html`<p class="adm-text-dim adm-text-base">...</p>` : null}
 
       ${templates && templates.map(tpl => html`
         <div style="border:1px solid ${expanded[tpl.id] ? '#818cf8' : 'var(--glass-border)'};border-radius:8px;margin-bottom:10px;overflow:hidden;transition:border-color .2s ease">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;background:${expanded[tpl.id] ? 'rgba(79,70,229,0.04)' : 'rgba(255,255,255,.03)'}"
+          <div class="adm-flex-between" style="padding:10px 14px;cursor:pointer;background:${expanded[tpl.id] ? 'rgba(79,70,229,0.04)' : 'rgba(255,255,255,.03)'}"
             onClick=${() => toggle(tpl.id)}>
-            <span style="display:flex;align-items:center;gap:8px">
+            <span class="adm-flex-center">
               <strong>${t(TEMPLATE_LABELS[tpl.id] || tpl.id)}</strong>
-              <span style="font-size:.72rem;color:var(--text-dim)">${t(USED_IN_LABELS[tpl.usedIn] || tpl.usedIn)}</span>
+              <span class="adm-text-dim" style="font-size:.72rem">${t(USED_IN_LABELS[tpl.usedIn] || tpl.usedIn)}</span>
               ${tpl.isCustom && html`<span style="font-size:.65rem;background:rgba(79,70,229,0.15);color:#818cf8;padding:1px 6px;border-radius:3px;font-weight:600">${t('dashboard.emailTplCustomBadge')}</span>`}
             </span>
-            <span style="font-size:.75rem;color:var(--text-dim)">${expanded[tpl.id] ? '\u25B2' : '\u25BC'}</span>
+            <span class="adm-text-dim" style="font-size:.75rem">${expanded[tpl.id] ? '\u25B2' : '\u25BC'}</span>
           </div>
           ${expanded[tpl.id] && html`
             <div style="padding:0 14px 14px">

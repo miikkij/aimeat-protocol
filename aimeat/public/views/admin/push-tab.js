@@ -122,14 +122,14 @@ export default function PushTab({ data, reload }) {
 
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.pushExplain')}</p>
+    <p class="adm-text-dim adm-text-base adm-mb-md">${t('dashboard.pushExplain')}</p>
     <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
 
-    <div style="display:flex;gap:12px;align-items:stretch;margin-bottom:16px;flex-wrap:wrap">
+    <div class="adm-flex-wrap adm-mb-lg" style="gap:12px;align-items:stretch">
       <${StatCard} label=${t('dashboard.totalSubscriptions')} value=${push.total_subscriptions || subs.length} color="#06b6d4" />
       <${StatCard} label=${t('dashboard.activeSubscriptions')} value=${subs.filter(s => s.active !== false).length} color="#22c55e" />
       <div style="margin-left:auto;display:flex;flex-direction:column;justify-content:center;gap:6px;align-items:flex-end">
-        <div style="display:flex;gap:8px">
+        <div class="adm-flex">
           <button
             class="adm-btn"
             style="white-space:nowrap"
@@ -159,14 +159,14 @@ export default function PushTab({ data, reload }) {
             disabled=${subStatus === 'unsubscribing'}
           >${t('dashboard.pushUnsubscribeBtn') || 'Unsubscribe'}</button>
         `}
-        ${!subs.length && html`<span style="font-size:.72rem;color:var(--text-dim)">${t('dashboard.pushTestNoSubs')}</span>`}
-        ${testStatus === 'error' && html`<span style="font-size:.72rem;color:#ef4444">${t('dashboard.pushTestErrorDetail')}</span>`}
+        ${!subs.length && html`<span class="adm-text-dim" style="font-size:.72rem">${t('dashboard.pushTestNoSubs')}</span>`}
+        ${testStatus === 'error' && html`<span class="adm-text-error" style="font-size:.72rem">${t('dashboard.pushTestErrorDetail')}</span>`}
       </div>
     </div>
 
     <!-- Templates card — matches email tab structure -->
-    <div class="adm-card" style="margin-top:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div class="adm-card adm-mt-md">
+      <div class="adm-flex-between adm-mb-md">
         <h4 style="margin:0">${t('dashboard.pushTemplatesTitle')}</h4>
         <div style="display:flex;gap:4px">
           ${locales.map(l => html`
@@ -175,7 +175,7 @@ export default function PushTab({ data, reload }) {
           `)}
         </div>
       </div>
-      <p style="color:var(--text-dim);font-size:.85rem;margin:0 0 12px">${t('dashboard.pushTemplatesExplain')}</p>
+      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.pushTemplatesExplain')}</p>
 
       ${localeTpls.map(tpl => {
         const isWebPush = tpl.id.startsWith('web_push');
@@ -184,14 +184,14 @@ export default function PushTab({ data, reload }) {
         const isOpen = expanded[tpl.id];
         return html`
           <div style="border:1px solid ${isOpen ? '#818cf8' : 'var(--glass-border)'};border-radius:8px;margin-bottom:10px;overflow:hidden;transition:border-color .2s ease">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;background:${isOpen ? 'rgba(79,70,229,0.04)' : 'rgba(255,255,255,.03)'}"
+            <div class="adm-flex-between" style="padding:10px 14px;cursor:pointer;background:${isOpen ? 'rgba(79,70,229,0.04)' : 'rgba(255,255,255,.03)'}"
               onClick=${() => toggle(tpl.id)}>
-              <span style="display:flex;align-items:center;gap:8px">
+              <span class="adm-flex-center">
                 <strong>${isWebPush ? t('dashboard.pushWebPushTitle') : t('dashboard.pushEmailTitle')}</strong>
-                <span style="font-size:.72rem;color:var(--text-dim)">${isWebPush ? t('dashboard.pushWebPushUsed') : t('dashboard.pushEmailUsed')}</span>
+                <span class="adm-text-dim" style="font-size:.72rem">${isWebPush ? t('dashboard.pushWebPushUsed') : t('dashboard.pushEmailUsed')}</span>
                 ${!tpl.is_default && html`<span style="font-size:.65rem;background:rgba(79,70,229,0.15);color:#818cf8;padding:1px 6px;border-radius:3px;font-weight:600">${t('dashboard.pushCustomized')}</span>`}
               </span>
-              <span style="font-size:.75rem;color:var(--text-dim)">${isOpen ? '\u25B2' : '\u25BC'}</span>
+              <span class="adm-text-dim" style="font-size:.75rem">${isOpen ? '\u25B2' : '\u25BC'}</span>
             </div>
             ${isOpen && html`
               <div style="padding:0 14px 14px">
@@ -201,7 +201,7 @@ export default function PushTab({ data, reload }) {
                     <div style="margin-bottom:10px;padding:8px 10px;border-radius:6px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15)">
                       <div style="font-size:.72rem;font-weight:600;color:#f59e0b;margin-bottom:4px">${t('dashboard.emailTplParams')}</div>
                       <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">${t('dashboard.emailTplParamsExplain')}</div>
-                      <div style="display:flex;flex-wrap:wrap;gap:6px">
+                      <div class="adm-flex-wrap" style="gap:6px">
                         ${tpl.placeholders.map(p => html`
                           <span style="font-size:.72rem;background:rgba(0,0,0,0.2);color:#f59e0b;padding:2px 8px;border-radius:4px;font-family:monospace">${p}</span>
                         `)}
@@ -210,8 +210,8 @@ export default function PushTab({ data, reload }) {
                   `}
 
                   <!-- Fields -->
-                  <div style="display:flex;flex-direction:column;gap:8px">
-                    <label style="font-size:.75rem;color:var(--text-dim)">${isWebPush ? t('dashboard.pushFieldTitle') : t('dashboard.pushFieldSubject')}</label>
+                  <div class="adm-flex-col">
+                    <label class="adm-text-dim" style="font-size:.75rem">${isWebPush ? t('dashboard.pushFieldTitle') : t('dashboard.pushFieldSubject')}</label>
                     <input
                       class="adm-input"
                       style="font-size:.85rem;font-family:monospace"
@@ -219,7 +219,7 @@ export default function PushTab({ data, reload }) {
                       onInput=${(e) => updateField(tpl.id, isWebPush ? 'title' : 'subject', e.target.value)}
                     />
 
-                    <label style="font-size:.75rem;color:var(--text-dim)">${t('dashboard.pushFieldBody')}</label>
+                    <label class="adm-text-dim" style="font-size:.75rem">${t('dashboard.pushFieldBody')}</label>
                     <textarea
                       class="adm-input"
                       style="font-size:.85rem;font-family:monospace;min-height:${isWebPush ? '40px' : '100px'};resize:vertical"
@@ -228,9 +228,9 @@ export default function PushTab({ data, reload }) {
                   </div>
 
                   <!-- Action buttons -->
-                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
-                    <button class="adm-btn-action" onClick=${() => handleSave(tpl)} disabled=${isSaving}
-                      style="font-size:.8rem">${isSaving ? t('dashboard.saving') : t('dashboard.save')}</button>
+                  <div class="adm-flex-center" style="flex-wrap:wrap;margin-top:10px">
+                    <button class="adm-btn-action adm-text-sm" onClick=${() => handleSave(tpl)} disabled=${isSaving}>
+                      ${isSaving ? t('dashboard.saving') : t('dashboard.save')}</button>
                   </div>
                 </div>
               </div>
@@ -241,24 +241,24 @@ export default function PushTab({ data, reload }) {
 
       <!-- Reset button -->
       <div style="display:flex;justify-content:flex-end;margin-top:4px">
-        <button class="adm-btn-action" onClick=${handleReset} disabled=${resetStatus === 'resetting'}
-          style="font-size:.8rem;color:#ef4444;border-color:rgba(239,68,68,0.3)">${resetStatus === 'resetting' ? t('dashboard.pushResetting') : t('dashboard.pushResetBtn')}</button>
+        <button class="adm-btn-action adm-text-sm" onClick=${handleReset} disabled=${resetStatus === 'resetting'}
+          style="color:#ef4444;border-color:rgba(239,68,68,0.3)">${resetStatus === 'resetting' ? t('dashboard.pushResetting') : t('dashboard.pushResetBtn')}</button>
       </div>
     </div>
 
     <!-- Notification Triggers -->
     <div class="adm-card">
       <h3>${t('dashboard.pushNotifyTypesTitle')}</h3>
-      <p style="color:var(--text-dim);font-size:.8rem;margin-bottom:10px">${t('dashboard.pushNotifyTypesExplain')}</p>
-      <div style="display:flex;flex-direction:column;gap:6px">
+      <p class="adm-text-dim adm-text-sm" style="margin-bottom:10px">${t('dashboard.pushNotifyTypesExplain')}</p>
+      <div class="adm-flex-col" style="gap:6px">
         ${['pushTypeWorkAssignment', 'pushTypeActionRequest', 'pushTypeBoardNotification', 'pushTypeFederationSync'].map(key => {
           const text = t('dashboard.' + key);
           const [code, ...descParts] = text.split(' \u2014 ');
           const desc = descParts.join(' \u2014 ');
           return html`
             <div style="display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border)">
-              <code style="font-size:.8rem;color:#f59e0b;min-width:160px">${escHtml(code)}</code>
-              <span style="font-size:.82rem;color:var(--text-dim)">${escHtml(desc)}</span>
+              <code class="adm-text-sm" style="color:#f59e0b;min-width:160px">${escHtml(code)}</code>
+              <span class="adm-text-dim" style="font-size:.82rem">${escHtml(desc)}</span>
             </div>
           `;
         })}
@@ -276,9 +276,9 @@ export default function PushTab({ data, reload }) {
         </tr></thead>
         <tbody>
           ${subs.map(s => html`<tr>
-            <td class="mono" style="font-size:.8rem">${escHtml(s.owner_name || '\u2014')}</td>
-            <td class="mono" style="font-size:.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">${escHtml(s.endpoint?.substring(0, 40) || '\u2014')}</td>
-            <td style="color:var(--text-dim)">${dt(s.created_at)}</td>
+            <td class="mono adm-text-sm">${escHtml(s.owner_name || '\u2014')}</td>
+            <td class="mono adm-text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${escHtml(s.endpoint?.substring(0, 40) || '\u2014')}</td>
+            <td class="adm-text-dim">${dt(s.created_at)}</td>
           </tr>`)}
         </tbody>
       </table></div></div>`

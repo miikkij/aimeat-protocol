@@ -91,14 +91,14 @@ export default function ConfigTab({ data, reload }) {
       </div>
     `}
 
-    ${result && html`<div style="margin-bottom:12px;padding:8px 12px;border-radius:6px;background:${result.ok ? '#16a34a22' : '#dc262622'};color:${result.ok ? '#22c55e' : '#ef4444'};font-size:.85rem">${escHtml(result.msg)}</div>`}
+    ${result && html`<div class="adm-mb-md adm-text-base" style="padding:8px 12px;border-radius:6px;background:${result.ok ? '#16a34a22' : '#dc262622'};color:${result.ok ? '#22c55e' : '#ef4444'}">${escHtml(result.msg)}</div>`}
 
     <!-- Pending changes banner -->
     ${editable && pendingKeys.length > 0 && html`
       <div class="adm-config-changes">
-        <h3 style="color:#eab308;margin-bottom:8px">${t('dashboard.pendingChanges')}</h3>
+        <h3 class="adm-mb-sm" style="color:#eab308">${t('dashboard.pendingChanges')}</h3>
         ${pendingKeys.map(k => html`<div>${escHtml(k)} \u2192 <strong>${escHtml(String(pending[k]))}</strong></div>`)}
-        <div style="margin-top:8px">
+        <div class="adm-mt-sm">
           <button class="adm-btn-action" onClick=${save}>${t('dashboard.saveChanges')}</button>
           ${' '}
           <button class="adm-btn-action" onClick=${cancel}>${t('dashboard.cancelLabel')}</button>
@@ -111,7 +111,7 @@ export default function ConfigTab({ data, reload }) {
       const helpText = t(helpKey);
       const hasHelp = helpText !== helpKey;
       return html`
-      <details class="adm-card" style="margin-bottom:8px" open>
+      <details class="adm-card adm-mb-sm" open>
         <summary style="cursor:pointer;font-weight:600;font-size:.95rem;padding:8px 0">
           ${groupLabel(g)}
         </summary>
@@ -127,13 +127,13 @@ export default function ConfigTab({ data, reload }) {
                 ${!e.mutable
                   ? (typeof e.value === 'boolean'
                     ? html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}`
-                    : html`<code>${escHtml(String(e.value))}</code> <span style="color:var(--text-dim);font-size:.75rem">${t('dashboard.readOnly')}</span>`)
+                    : html`<code>${escHtml(String(e.value))}</code> <span class="adm-text-dim adm-text-xs">${t('dashboard.readOnly')}</span>`)
                   : e.type === 'boolean'
                     ? html`<label style="cursor:pointer"><input type="checkbox" checked=${e.value} onChange=${ev => onChange(p, ev.target.checked)} disabled=${!editable} /> ${e.value ? t('dashboard.enabled') : t('dashboard.disabled')}</label>`
                     : e.type === 'integer'
-                      ? html`<input type="number" value=${e.value} style="width:120px" onChange=${ev => onChange(p, parseInt(ev.target.value))} disabled=${!editable} />${e.range ? html` <span style="color:var(--text-dim);font-size:.75rem">${escHtml(e.range)}</span>` : null}`
+                      ? html`<input type="number" value=${e.value} style="width:120px" onChange=${ev => onChange(p, parseInt(ev.target.value))} disabled=${!editable} />${e.range ? html` <span class="adm-text-dim adm-text-xs">${escHtml(e.range)}</span>` : null}`
                       : e.type === 'float'
-                        ? html`<input type="number" step="0.01" value=${e.value} style="width:120px" onChange=${ev => onChange(p, parseFloat(ev.target.value))} disabled=${!editable} />${e.range ? html` <span style="color:var(--text-dim);font-size:.75rem">${escHtml(e.range)}</span>` : null}`
+                        ? html`<input type="number" step="0.01" value=${e.value} style="width:120px" onChange=${ev => onChange(p, parseFloat(ev.target.value))} disabled=${!editable} />${e.range ? html` <span class="adm-text-dim adm-text-xs">${escHtml(e.range)}</span>` : null}`
                         : e.type === 'string'
                           ? html`<input type="text" value=${e.value || ''} style="width:250px" onChange=${ev => onChange(p, ev.target.value)} disabled=${!editable} />`
                           : e.type === 'object'

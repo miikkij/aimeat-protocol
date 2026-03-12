@@ -17,8 +17,8 @@ import {
   getDiskScript, saveDiskScript, addDiskAction, reinstallExtension,
 } from '/js/services/admin.js';
 
-const inputStyle = 'background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-bright);padding:8px 12px;border-radius:6px';
-const labelStyle = 'font-size:.8rem;color:var(--text-dim)';
+const inputStyle = 'adm-input';
+const labelStyle = 'adm-text-sm adm-text-dim';
 const fieldWrap = 'display:flex;flex-direction:column;gap:2px';
 
 // Extension name → user-facing SPA URL
@@ -57,8 +57,8 @@ function ConfigForm({ schema, config, onChange }) {
         if (prop.enum) {
           return html`
             <div style=${fieldWrap}>
-              <label style=${labelStyle}>${key}</label>
-              <select style=${inputStyle} value=${val}
+              <label class="${labelStyle}">${key}</label>
+              <select class="${inputStyle}" value=${val}
                 onChange=${e => set(key, e.target.value)}>
                 ${prop.enum.map(opt => html`<option value=${opt}>${opt}</option>`)}
               </select>
@@ -71,8 +71,8 @@ function ConfigForm({ schema, config, onChange }) {
           const arrVal = Array.isArray(val) ? val.join(', ') : (val || '');
           return html`
             <div style=${fieldWrap + ';flex:1;min-width:160px'}>
-              <label style=${labelStyle}>${key} <span style="opacity:.6">(${t('dashboard.servicesCommaSep')})</span></label>
-              <input type="text" style=${inputStyle} value=${arrVal}
+              <label class="${labelStyle}">${key} <span style="opacity:.6">(${t('dashboard.servicesCommaSep')})</span></label>
+              <input type="text" class="${inputStyle}" value=${arrVal}
                 placeholder=${(prop.default || []).join(', ') || 'a, b, c'}
                 onInput=${e => {
                   const items = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
@@ -86,8 +86,8 @@ function ConfigForm({ schema, config, onChange }) {
         if (prop.type === 'number' || prop.type === 'integer') {
           return html`
             <div style=${fieldWrap}>
-              <label style=${labelStyle}>${key}</label>
-              <input type="number" style=${inputStyle + ';width:100px'} value=${val}
+              <label class="${labelStyle}">${key}</label>
+              <input type="number" class="${inputStyle}" style="width:100px" value=${val}
                 step=${prop.type === 'integer' ? 1 : 'any'}
                 onInput=${e => set(key, e.target.value === '' ? '' : Number(e.target.value))} />
             </div>
@@ -97,8 +97,8 @@ function ConfigForm({ schema, config, onChange }) {
         // String (default)
         return html`
           <div style=${fieldWrap + ';min-width:140px'}>
-            <label style=${labelStyle}>${key}</label>
-            <input type="text" style=${inputStyle} value=${val}
+            <label class="${labelStyle}">${key}</label>
+            <input type="text" class="${inputStyle}" value=${val}
               placeholder=${prop.default || ''}
               onInput=${e => set(key, e.target.value)} />
           </div>
@@ -231,9 +231,9 @@ function TranslationEditor({ extName, inst, onSave }) {
 
   return html`
     <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
         <strong style="font-size:.85rem">${t('dashboard.servicesTlTitle')}</strong>
-        <select style=${inputStyle + ';padding:4px 8px;font-size:.8rem'} value=${locale}
+        <select class="${inputStyle}" style="padding:4px 8px;font-size:.8rem" value=${locale}
           onChange=${e => setLocale(e.target.value)}>
           <option value="fi">Suomi (fi)</option>
           <option value="en">English (en)</option>
@@ -249,11 +249,11 @@ function TranslationEditor({ extName, inst, onSave }) {
           style="width:100%;height:200px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.2);color:var(--text-bright);resize:vertical"
           spellcheck="false" />
       ` : html`
-        <div style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto">
+        <div class="adm-flex-col" style="gap:4px;max-height:300px;overflow-y:auto">
           ${displayKeys.map(key => html`
             <div style="display:flex;align-items:center;gap:6px">
               <code style="font-size:.75rem;color:var(--text-dim);min-width:140px;flex-shrink:0">${key}</code>
-              <input type="text" style=${inputStyle + ';flex:1;padding:4px 8px;font-size:.85rem'} value=${translations[key] || ''}
+              <input type="text" class="${inputStyle}" style="flex:1;padding:4px 8px;font-size:.85rem" value=${translations[key] || ''}
                 placeholder=${key.split('.').pop()}
                 onInput=${e => setKey(key, e.target.value)} />
               ${!autoKeys.includes(key) && html`
@@ -263,17 +263,17 @@ function TranslationEditor({ extName, inst, onSave }) {
           `)}
         </div>
         <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
-          <input type="text" style=${inputStyle + ';padding:4px 8px;font-size:.8rem;flex:1'} value=${customKey}
+          <input type="text" class="${inputStyle}" style="padding:4px 8px;font-size:.8rem;flex:1" value=${customKey}
             placeholder=${t('dashboard.servicesTlAddKey')} onInput=${e => setCustomKey(e.target.value)}
             onKeyDown=${e => { if (e.key === 'Enter') addCustomKey(); }} />
           <button class="adm-btn-sm" style="font-size:.75rem" onClick=${addCustomKey}>+</button>
         </div>
       `}
 
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSave} disabled=${saving}>
+      <div class="adm-flex-center adm-mt-sm">
+        <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
           ${saving ? '...' : t('dashboard.servicesTlSave')}</button>
-        ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+        ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
     </div>
   `;
@@ -310,7 +310,7 @@ function ActionScriptEditor({ extName, actions, onUpdated }) {
 
   return html`
     <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
         <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
         ${actions.map(a => html`
           <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
@@ -320,11 +320,11 @@ function ActionScriptEditor({ extName, actions, onUpdated }) {
         `)}
       </div>
 
-      ${loading && html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`}
+      ${loading && html`<p class="adm-text-dim adm-text-base">${t('dashboard.loading')}...</p>`}
 
       ${selectedAction && !loading && html`
         <div style="margin-top:4px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div class="adm-flex-between adm-mb-xs">
             <code style="font-size:.8rem;color:var(--text-dim)">${extName}/${selectedAction}</code>
           </div>
           <textarea value=${script} onInput=${e => setScript(e.target.value)}
@@ -347,11 +347,11 @@ function ActionScriptEditor({ extName, actions, onUpdated }) {
               }
             }}
           />
-          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-            <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSave} disabled=${saving}>
+          <div class="adm-flex-center" style="margin-top:6px">
+            <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
               ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
-            <span style="font-size:.75rem;color:var(--text-dim)">Ctrl+S</span>
-            ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+            <span style="font-size:.75rem" class="adm-text-dim">Ctrl+S</span>
+            ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
           </div>
         </div>
       `}
@@ -389,17 +389,17 @@ function ScaffoldForm({ onCreated }) {
   return html`
     <div class="adm-card" style="padding:16px;margin-bottom:16px">
       <h3 style="margin:0 0 12px;font-size:1rem">${t('dashboard.servicesScaffoldTitle')}</h3>
-      <p style="margin:0 0 12px;color:var(--text-dim);font-size:.85rem">${t('dashboard.servicesScaffoldDesc')}</p>
+      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.servicesScaffoldDesc')}</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <div style=${fieldWrap}>
-          <label style=${labelStyle}>${t('dashboard.servicesName')}</label>
+          <label class="${labelStyle}">${t('dashboard.servicesName')}</label>
           <input type="text" value=${name} onInput=${e => setName(e.target.value)}
-            style=${inputStyle + ';width:220px'} placeholder="my-service" />
+            class="${inputStyle}" style="width:220px" placeholder="my-service" />
         </div>
         <div style=${fieldWrap + ';flex:1;min-width:200px'}>
-          <label style=${labelStyle}>${t('dashboard.servicesScaffoldDescLabel')}</label>
+          <label class="${labelStyle}">${t('dashboard.servicesScaffoldDescLabel')}</label>
           <input type="text" value=${description} onInput=${e => setDescription(e.target.value)}
-            style=${inputStyle} placeholder="What does this extension do?" />
+            class="${inputStyle}" placeholder="What does this extension do?" />
         </div>
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap">
@@ -417,10 +417,10 @@ function ScaffoldForm({ onCreated }) {
           ${t('dashboard.servicesMultiInstance')}
         </label>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <div class="adm-flex-center adm-mt-md">
         <button class="adm-btn-action" onClick=${handleCreate} disabled=${creating || !name.trim()}>
           ${creating ? '...' : t('dashboard.servicesScaffoldBtn')}</button>
-        ${msg && html`<span style="font-size:.85rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+        ${msg && html`<span class="adm-text-base" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
     </div>
   `;
@@ -523,9 +523,9 @@ function ExtensionPanel({ ext, onUninstall }) {
         onClick=${toggle}>
         <span style="font-size:.9rem;color:var(--text-dim);width:16px">${expanded ? '\u25BC' : '\u25B6'}</span>
         <strong style="flex:1;min-width:0">${escHtml(ext.name)}</strong>
-        <span style="color:var(--text-dim);font-size:.85rem">${escHtml(ext.version || '\u2014')}</span>
+        <span class="adm-text-dim adm-text-base">${escHtml(ext.version || '\u2014')}</span>
         <${Badge} type=${ext.status === 'active' ? 'healthy' : 'warning'} />
-        <span style="color:var(--text-dim);font-size:.85rem;min-width:80px;text-align:right">
+        <span class="adm-text-dim adm-text-base" style="min-width:80px;text-align:right">
           ${actionCount} ${t('dashboard.servicesActionsCount').toLowerCase()}, ${instanceCount} inst.
         </span>
         <div style="display:flex;gap:4px" onClick=${e => e.stopPropagation()}>
@@ -538,7 +538,7 @@ function ExtensionPanel({ ext, onUninstall }) {
       <!-- Expanded instance panel -->
       ${expanded && html`
         <div style="border-top:1px solid var(--glass-border);padding:12px 16px;background:rgba(0,0,0,0.15)">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div class="adm-flex-center adm-mb-sm">
             <button class="adm-btn-sm" onClick=${() => setShowCreate(!showCreate)}>
               + ${t('dashboard.servicesCreateInstance')}
             </button>
@@ -561,9 +561,9 @@ function ExtensionPanel({ ext, onUninstall }) {
             <div style="margin-bottom:12px;padding:12px;border:1px solid var(--glass-border);border-radius:6px;display:flex;flex-direction:column;gap:10px">
               <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
                 <div style=${fieldWrap}>
-                  <label style=${labelStyle}>${t('dashboard.servicesInstanceId')}</label>
+                  <label class="${labelStyle}">${t('dashboard.servicesInstanceId')}</label>
                   <input type="text" value=${newId} onInput=${e => setNewId(e.target.value)}
-                    style=${inputStyle + ';width:200px'} placeholder="my-instance-01" />
+                    class="${inputStyle}" style="width:200px" placeholder="my-instance-01" />
                 </div>
                 <button class="adm-btn-action" onClick=${handleCreate}>
                   ${t('dashboard.servicesCreateInstance')}
@@ -581,11 +581,11 @@ function ExtensionPanel({ ext, onUninstall }) {
           `}
 
           ${loading
-            ? html`<p style="margin:0;color:var(--text-dim)">${t('dashboard.loading')}...</p>`
+            ? html`<p class="adm-text-dim" style="margin:0">${t('dashboard.loading')}...</p>`
             : instances.length === 0
-              ? html`<p style="margin:0;color:var(--text-dim);font-size:.9rem">${t('dashboard.servicesNoInstances')}</p>`
+              ? html`<p class="adm-text-dim" style="margin:0;font-size:.9rem">${t('dashboard.servicesNoInstances')}</p>`
               : html`
-                <div style="display:flex;flex-direction:column;gap:4px">
+                <div class="adm-flex-col" style="gap:4px">
                   ${instances.map(inst => {
                     const spaUrl = EXT_SPA_URLS[ext.name];
                     const tlOpen = editingTl === inst.id;
@@ -595,8 +595,8 @@ function ExtensionPanel({ ext, onUninstall }) {
                       <div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:4px;background:var(--glass-bg)">
                         <code style="flex:1;min-width:0;font-size:.9rem">${escHtml(inst.id)}</code>
                         <${Badge} type=${inst.status === 'active' ? 'healthy' : 'warning'} />
-                        <span style="color:var(--text-dim);font-size:.8rem">${escHtml(inst.createdBy || inst.created_by || '')}</span>
-                        <span style="color:var(--text-dim);font-size:.8rem">${dt(inst.createdAt || inst.created_at)}</span>
+                        <span class="adm-text-dim adm-text-sm">${escHtml(inst.createdBy || inst.created_by || '')}</span>
+                        <span class="adm-text-dim adm-text-sm">${dt(inst.createdAt || inst.created_at)}</span>
                         ${spaUrl && html`
                           <a class="adm-btn-sm" href=${spaUrl} target="_blank"
                             style="text-decoration:none;color:var(--accent-bright)"
@@ -629,10 +629,10 @@ function ExtensionPanel({ ext, onUninstall }) {
                             <strong>${t('dashboard.servicesEditConfig')}</strong>
                           </div>
                           <${ConfigForm} schema=${schema} config=${editCfgData} onChange=${setEditCfgData} />
-                          <div style="margin-top:10px;display:flex;gap:8px">
-                            <button class="adm-btn-action" style="font-size:.8rem" onClick=${() => handleSaveConfig(inst)}>
+                          <div class="adm-flex adm-mt-md">
+                            <button class="adm-btn-action adm-text-sm" onClick=${() => handleSaveConfig(inst)}>
                               ${t('dashboard.servicesCfgSave')}</button>
-                            <button class="adm-btn-sm" style="font-size:.8rem" onClick=${() => setEditingCfg(null)}>
+                            <button class="adm-btn-sm adm-text-sm" onClick=${() => setEditingCfg(null)}>
                               ${t('dashboard.servicesCfgCancel')}</button>
                           </div>
                         </div>
@@ -709,17 +709,17 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
 
   return html`
     <div class="adm-card" style="padding:16px;display:flex;flex-direction:column;gap:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="adm-flex-between">
         <strong style="font-size:1.05rem">${escHtml(ext.name)}</strong>
-        <span style="color:var(--text-dim);font-size:.85rem">v${escHtml(ext.version)}</span>
+        <span class="adm-text-dim adm-text-base">v${escHtml(ext.version)}</span>
       </div>
-      <p style="margin:0;color:var(--text-dim);font-size:.9rem">${escHtml(ext.description)}</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:.8rem">
-        <span style="color:var(--text-dim)">${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}</span>
+      <p class="adm-text-dim" style="margin:0;font-size:.9rem">${escHtml(ext.description)}</p>
+      <div class="adm-flex-wrap adm-text-sm">
+        <span class="adm-text-dim">${t('dashboard.servicesApis')}: ${ext.requiredApis.join(', ')}</span>
         <span style="color:${ext.instancesSupported ? 'var(--green, #22c55e)' : 'var(--text-dim)'}">
           ${ext.instancesSupported ? t('dashboard.servicesMultiInstance') : t('dashboard.servicesSingleInstance')}
         </span>
-        <span style="color:var(--text-dim)">${actions.length} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
+        <span class="adm-text-dim">${actions.length} ${t('dashboard.servicesActionsCount').toLowerCase()}</span>
       </div>
       <div style="margin-top:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${isInstalled
@@ -727,7 +727,7 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
             <button class="adm-btn-action" disabled=${isInstalling} onClick=${handleReinstall}>
               ${isInstalling ? '...' : t('dashboard.servicesReinstall')}
             </button>
-            <span style="font-size:.8rem;color:var(--text-dim)">${t('dashboard.servicesInstalled')}</span>
+            <span class="adm-text-sm adm-text-dim">${t('dashboard.servicesInstalled')}</span>
           `
           : html`<button class="adm-btn-action" disabled=${isInstalling} onClick=${() => onInstall(ext.name)}>
               ${isInstalling ? t('dashboard.servicesInstalling') : t('dashboard.servicesInstall')}
@@ -737,12 +737,12 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
           style="font-size:.8rem${showEditor ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
           \u{1F4DD} ${t('dashboard.servicesScriptEditor')}
         </button>
-        ${msg && html`<span style="font-size:.8rem;color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+        ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
 
       ${showEditor && html`
         <div style="margin-top:4px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
             <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
             ${actions.map(a => html`
               <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
@@ -759,22 +759,22 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
           ${showAddAction && html`
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;padding:8px;border:1px solid var(--glass-border);border-radius:4px">
               <div style=${fieldWrap}>
-                <label style=${labelStyle}>ID</label>
+                <label class="${labelStyle}">ID</label>
                 <input type="text" value=${newActionId} onInput=${e => setNewActionId(e.target.value)}
-                  style=${inputStyle + ';width:160px;padding:4px 8px;font-size:.85rem'} placeholder="my-action" />
+                  class="${inputStyle}" style="width:160px;padding:4px 8px;font-size:.85rem" placeholder="my-action" />
               </div>
               <div style=${fieldWrap}>
-                <label style=${labelStyle}>Method</label>
-                <select style=${inputStyle + ';padding:4px 8px;font-size:.85rem'} value=${newActionMethod}
+                <label class="${labelStyle}">Method</label>
+                <select class="${inputStyle}" style="padding:4px 8px;font-size:.85rem" value=${newActionMethod}
                   onChange=${e => setNewActionMethod(e.target.value)}>
                   <option value="POST">POST</option><option value="GET">GET</option>
                   <option value="PUT">PUT</option><option value="DELETE">DELETE</option>
                 </select>
               </div>
               <div style=${fieldWrap + ';flex:1;min-width:120px'}>
-                <label style=${labelStyle}>${t('dashboard.servicesScaffoldDescLabel')}</label>
+                <label class="${labelStyle}">${t('dashboard.servicesScaffoldDescLabel')}</label>
                 <input type="text" value=${newActionDesc} onInput=${e => setNewActionDesc(e.target.value)}
-                  style=${inputStyle + ';padding:4px 8px;font-size:.85rem'} placeholder="What does this action do?" />
+                  class="${inputStyle}" style="padding:4px 8px;font-size:.85rem" placeholder="What does this action do?" />
               </div>
               <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleAddAction}
                 disabled=${adding || !newActionId.trim()}>
@@ -782,11 +782,11 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
             </div>
           `}
 
-          ${loading && html`<p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loading')}...</p>`}
+          ${loading && html`<p class="adm-text-dim adm-text-base">${t('dashboard.loading')}...</p>`}
 
           ${selectedAction && !loading && html`
             <div>
-              <code style="font-size:.8rem;color:var(--text-dim)">${ext.name}/actions/${selectedAction}.js</code>
+              <code class="adm-text-sm adm-text-dim">${ext.name}/actions/${selectedAction}.js</code>
               <textarea value=${script} onInput=${e => setScript(e.target.value)}
                 style="width:100%;height:320px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.3);color:var(--text-bright);resize:vertical;tab-size:2;margin-top:4px"
                 spellcheck="false"
@@ -807,16 +807,16 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
                   }
                 }}
               />
-              <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-                <button class="adm-btn-action" style="font-size:.8rem" onClick=${handleSave} disabled=${saving}>
+              <div class="adm-flex-center" style="margin-top:6px">
+                <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
                   ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
-                <span style="font-size:.75rem;color:var(--text-dim)">Ctrl+S</span>
+                <span style="font-size:.75rem" class="adm-text-dim">Ctrl+S</span>
               </div>
             </div>
           `}
 
           ${actions.length === 0 && !showAddAction && html`
-            <p style="color:var(--text-dim);font-size:.85rem;margin:0">${t('dashboard.servicesNoActions')}</p>
+            <p class="adm-text-dim adm-text-base" style="margin:0">${t('dashboard.servicesNoActions')}</p>
           `}
         </div>
       `}
@@ -895,7 +895,7 @@ export default function ServicesTab({ data, reload }) {
       <p>${t('dashboard.servicesHelpDetail')}</p>
     <//>
     <${StatsGrid} items=${statsItems} />
-    <p style="color:var(--text-dim);margin:8px 0 16px">${t('dashboard.servicesExplain')}</p>
+    <p class="adm-text-dim" style="margin:8px 0 16px">${t('dashboard.servicesExplain')}</p>
 
     ${extensions.length > 0 && html`
       ${extensions.map(ext => html`
@@ -906,14 +906,14 @@ export default function ServicesTab({ data, reload }) {
     <${ScaffoldForm} onCreated=${reload} />
 
     <h3 style="margin:24px 0 8px">${t('dashboard.servicesAvailable')}</h3>
-    <p style="color:var(--text-dim);margin:0 0 16px;font-size:.9rem">${t('dashboard.servicesAvailableDesc')}</p>
+    <p class="adm-text-dim" style="margin:0 0 16px;font-size:.9rem">${t('dashboard.servicesAvailableDesc')}</p>
 
     ${loadingAvailable
       ? html`<p>${t('dashboard.loading')}...</p>`
       : available.length === 0
         ? html`<${Empty} text=${t('dashboard.servicesNoExtensions')} />`
         : html`
-          <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="adm-flex-col" style="gap:12px">
             ${available.map(ext => {
               const isInstalled = ext.installed || installedNames.has(ext.name);
               const isInstalling = installingName === ext.name;
@@ -929,7 +929,7 @@ export default function ServicesTab({ data, reload }) {
     <div style="margin-top:32px;padding:20px;border:1px solid var(--glass-border);border-radius:8px;background:rgba(0,0,0,0.1)">
       <h3 style="margin:0 0 12px;font-size:1rem">${t('dashboard.servicesManualTitle')}</h3>
 
-      <div style="font-size:.85rem;color:var(--text-dim);line-height:1.6">
+      <div class="adm-text-dim adm-text-base" style="line-height:1.6">
         <p style="margin:0 0 12px"><strong style="color:var(--text-bright)">${t('dashboard.servicesManualWorkflow')}</strong></p>
         <ol style="margin:0 0 16px;padding-left:20px">
           <li>${t('dashboard.servicesManualStep1')}</li>
