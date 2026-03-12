@@ -63,8 +63,12 @@ const TABS = [
 export default function Profile({ navigate, locale }) {
   const NODE_URL = getNodeUrl();
   const [session, setSession] = useState(null);
-  const [activeTab, setActiveTab] = useState('agents');
-  const [visitedTabs, setVisitedTabs] = useState(new Set(['agents']));
+  const savedTab = () => {
+    const id = localStorage.getItem('aimeat-profile-tab');
+    return id && TABS.some(t => t.id === id) ? id : 'agents';
+  };
+  const [activeTab, setActiveTab] = useState(savedTab);
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([savedTab()]));
   const [stats, setStats] = useState({
     agents: '-', chatSessions: '-', balance: '-', memory: '-',
     services: '-', work: '-', apps: '-', files: '-', nodes: '-',
@@ -92,6 +96,7 @@ export default function Profile({ navigate, locale }) {
       if (!ns) {
         setActiveTab('agents');
         setVisitedTabs(new Set(['agents']));
+        localStorage.removeItem('aimeat-profile-tab');
       }
     });
   }, []);
@@ -177,6 +182,7 @@ export default function Profile({ navigate, locale }) {
   // Tab switching
   function switchTab(tabId) {
     setActiveTab(tabId);
+    localStorage.setItem('aimeat-profile-tab', tabId);
     setVisitedTabs(prev => {
       const next = new Set(prev);
       next.add(tabId);
