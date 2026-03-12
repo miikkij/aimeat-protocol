@@ -934,3 +934,31 @@ model OAuthApproval {
 
   @@unique([clientId, gaii])
 }
+
+model SystemPrompt {
+  id          String   @id @map("_id")
+  group       String
+  name        String
+  description String   @default("")
+  content     String
+  locales     Json?
+  active      Boolean  @default(true)
+  variables   String[]
+  usedIn      String[]
+  version     Int      @default(1)
+  updatedAt   DateTime @default(now())
+  updatedBy   String
+}
+
+model SystemPromptVersion {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  promptId   String
+  version    Int
+  content    String
+  locales    Json?
+  changedBy  String
+  changedAt  DateTime @default(now())
+  changeNote String?
+
+  @@unique([promptId, version])
+}

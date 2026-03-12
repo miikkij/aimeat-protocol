@@ -7,6 +7,13 @@ import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { getSession, getNodeUrl, onAuthChange } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
+import { listAgents } from '/js/services/agents.js';
+import { getWallet } from '/js/services/wallet.js';
+import * as memoryService from '/js/services/memory.js';
+import { listMyServices } from '/js/services/catalogue.js';
+import { listInbox } from '/js/services/work.js';
+import { listApps } from '/js/services/apps.js';
+import * as nodesService from '/js/services/nodes.js';
 
 // === Tab modules (lazy-loaded on first visit, stay mounted) ===
 import PortfolioTab from './profile/portfolio-tab.js';
@@ -100,6 +107,58 @@ export default function Profile({ navigate, locale }) {
   }, []);
 
   useViewCSS('/css/views/profile.css');
+
+  // Load all stats on mount so the stats bar shows counts immediately
+  useEffect(() => {
+    if (!session) return;
+    const owner = session.owner;
+    Promise.allSettled([
+      listAgents(owner),
+      getWallet(),
+      memoryService.listMemories(),
+      memoryService.listFiles(),
+      listMyServices(owner),
+      listInbox(),
+      listApps(),
+      nodesService.listNodes(),
+    ]).then(([agents, wallet, memories, files, services, work, apps, nodes]) => {
+      const s = {};
+      if (agents.status === 'fulfilled') {
+        const list = agents.value;
+        s.agents = Array.isArray(list) ? list.length : 0;
+        s.chatSessions = Array.isArray(list) ? list.filter(a => a.owner === owner && a.name?.startsWith('session-')).length : 0;
+      }
+      if (wallet.status === 'fulfilled') {
+        const w = wallet.value?.data || wallet.value || {};
+        s.balance = w.balance ?? '-';
+      }
+      if (memories.status === 'fulfilled') {
+        const list = memories.value;
+        s.memory = Array.isArray(list) ? list.length : 0;
+      }
+      if (files.status === 'fulfilled') {
+        const list = files.value;
+        s.files = Array.isArray(list) ? list.length : 0;
+      }
+      if (services.status === 'fulfilled') {
+        const list = services.value;
+        s.services = Array.isArray(list) ? list.length : 0;
+      }
+      if (work.status === 'fulfilled') {
+        const list = work.value;
+        s.work = Array.isArray(list) ? list.length : 0;
+      }
+      if (apps.status === 'fulfilled') {
+        const list = apps.value;
+        s.apps = Array.isArray(list) ? list.filter(a => a.owner === owner).length : 0;
+      }
+      if (nodes.status === 'fulfilled') {
+        const list = nodes.value;
+        s.nodes = Array.isArray(list) ? list.length : 0;
+      }
+      updateStats(s);
+    });
+  }, [session]);
 
   // SSE live updates — broadcast custom event so tabs can re-fetch
   useEffect(() => {
