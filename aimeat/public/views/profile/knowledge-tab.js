@@ -399,7 +399,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>
         ${loadingEntries === pkg.key && !rawData ? html`<p class="kpkg-detail-loading" style="color:var(--muted,#888);font-size:.8rem;font-style:italic;margin:.25rem 0">Loading...</p>` : null}
-        ${val && html`<pre class="kpkg-detail-value">${escHtml(val)}</pre>`}
+        ${val && html`<pre class="kpkg-detail-value">${val}</pre>`}
         ${renderEntryRefs(entry.references)}
         ${renderRelatedEntries(entry.related_entries, allEntries)}
       </div>

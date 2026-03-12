@@ -197,7 +197,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
             </div>
             ${expandedMem === m.key && html`
               <div class="mem-detail">
-                <pre>${escHtml(typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''))}</pre>
+                <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
                 <div style="margin-top:.5rem">
                   <button class="btn-sm btn-outline" style="font-size:.7rem" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
                     ${t('tags.editTags') || 'Edit tags'}

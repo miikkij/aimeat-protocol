@@ -93,7 +93,27 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       }
     }
 
-    // Store manifest
+    // Resolve entry data — can be in req.body.entry_data, pkg.entry_data,
+    // or directly on each entry's .value field (AI chat output format)
+    const entryData: Record<string, unknown> = req.body.entry_data ?? (pkg as any).entry_data ?? {};
+    // Extract inline values from entries into entryData
+    for (const entry of manifest.entries) {
+      if ((entry as any).value !== undefined) {
+        const entryName = entry.key.split('/').pop() ?? entry.key;
+        if (!entryData[entry.key] && !entryData[entryName]) {
+          entryData[entryName] = (entry as any).value;
+        }
+      }
+    }
+
+    // Normalize entry keys to full path BEFORE storing manifest
+    for (const entry of manifest.entries) {
+      if (!entry.key.startsWith('packages/')) {
+        entry.key = `packages/${packageId}/${entry.key}`;
+      }
+    }
+
+    // Store manifest (with normalized entry keys)
     manifest.created = now;
     manifest.updated = now;
     await storage.setMemory({
@@ -108,27 +128,13 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       updatedAt: now,
     });
 
-    // Store entries — content can be in pkg.entry_data, req.body.entry_data,
-    // or directly on each entry's .value field (AI chat output format)
-    const entryData = (pkg as any).entry_data ?? (req.body.entry_data ?? {});
-    // Extract inline values from entries into entryData
-    for (const entry of manifest.entries) {
-      if ((entry as any).value !== undefined) {
-        const entryName = entry.key.split('/').pop() ?? entry.key;
-        if (!entryData[entry.key] && !entryData[entryName]) {
-          entryData[entryName] = (entry as any).value;
-        }
-      }
-    }
+    // Store entries with their content
     const createdEntries: string[] = [];
     for (const entry of manifest.entries) {
-      const entryKey = entry.key.startsWith('packages/')
-        ? entry.key
-        : `packages/${packageId}/${entry.key}`;
-      entry.key = entryKey; // Normalize
-      const data = entryData[entry.key] ?? entryData[entry.key.split('/').pop() ?? ''] ?? {};
+      const shortKey = entry.key.split('/').pop() ?? '';
+      const data = entryData[entry.key] ?? entryData[shortKey] ?? {};
       await storage.setMemory({
-        key: entryKey,
+        key: entry.key,
         ownerGaii,
         value: data,
         visibility: entry.visibility,
@@ -138,7 +144,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
         createdAt: now,
         updatedAt: now,
       });
-      createdEntries.push(entryKey);
+      createdEntries.push(entry.key);
     }
 
     // Create memory links if specified
