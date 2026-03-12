@@ -773,7 +773,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       // Build the ExtensionCtx with instance-scoped memory namespace
-      const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
+      // When extInstallRole=owner, owner-installed extensions get per-owner scoping.
+      let extMemoryOwner = `ext:${ext.name}.${instanceId}`;
+      if (config.extInstallRole === 'owner' && ext.installedBy && !req.auth!.roles.includes('operator')) {
+        const ownerScope = ext.installedBy.split('#')[1]?.split('@')[0] || ext.installedBy;
+        extMemoryOwner = `ext:${ext.name}.${ownerScope}.${instanceId}`;
+      }
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {
@@ -914,7 +919,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       // Build the ExtensionCtx
       // Extension memory uses a shared namespace (ext:{name}) so cross-user
       // workflows (e.g. buyer reads seller's listing) work correctly.
-      const extMemoryOwner = `ext:${ext.name}`;
+      // When extInstallRole=owner, owner-installed extensions get per-owner scoping.
+      let extMemoryOwner = `ext:${ext.name}`;
+      if (config.extInstallRole === 'owner' && ext.installedBy && !req.auth!.roles.includes('operator')) {
+        const ownerScope = ext.installedBy.split('#')[1]?.split('@')[0] || ext.installedBy;
+        extMemoryOwner = `ext:${ext.name}.${ownerScope}`;
+      }
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {
