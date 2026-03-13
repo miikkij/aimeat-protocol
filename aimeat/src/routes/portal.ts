@@ -7,6 +7,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 
@@ -260,11 +261,19 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     const record = await storage.getSystemPrompt(promptId)
       ?? (promptId !== 'platform-app-builder' ? await storage.getSystemPrompt('platform-app-builder') : null);
 
-    if (!record || !record.active) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available'));
-      return;
+    // Fallback to factory seed if prompts haven't been seeded yet
+    let promptContent: string;
+    if (record && record.active) {
+      promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+    } else {
+      const seed = PROMPT_SEEDS.find(s => s.id === promptId)
+        ?? PROMPT_SEEDS.find(s => s.id === 'platform-app-builder');
+      if (!seed) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available'));
+        return;
+      }
+      promptContent = seed.content;
     }
-    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
     let prompt = substituteVariables(promptContent, {
       node_url: config.baseUrl,
       node_id: config.nodeId,
