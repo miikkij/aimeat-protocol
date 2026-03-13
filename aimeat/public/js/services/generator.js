@@ -1,6 +1,21 @@
 /**
- * Generator Service — manages project state via Memory API
- * All state stored at generator.{projectId}.* memory keys
+ * @file generator.js
+ * @description Generator service — manages project state, task queue, agent listeners,
+ *   and agent setup prompt generation via the AIMEAT Memory API.
+ *   All state stored at generator.{projectId}.* memory keys.
+ * @structure
+ *   - Project CRUD (listProjects, createProject, updateProject, deleteProject, archiveProject)
+ *   - Component state (getComponent, saveComponent, loadAllComponents)
+ *   - Agent queue (enqueueTask, pollResults, pollLogs, checkQueueStatus)
+ *   - Agent discovery (discoverAgents, getListeners)
+ *   - Agent setup (createGeneratorAgent, buildAgentSetupPrompt)
+ *   - Cleanup (cleanupOldEntries)
+ *   - Registration (registerComponent)
+ * @usage import { listProjects, buildAgentSetupPrompt } from '/js/services/generator.js';
+ * @version-history
+ *   v1.0.0 — 2026-03-10 — Initial generator service
+ *   v1.1.0 — 2026-03-14 — Rewritten buildAgentSetupPrompt with SSE, GAII docs, full HTTP examples
+ *   v1.1.1 — 2026-03-14 — getListeners now queries /v1/agents instead of memory; heartbeat uses /v1/checkin
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 
@@ -225,14 +240,18 @@ export async function registerComponent(type, result, session) {
 
 export async function getListeners() {
   try {
-    const resp = await apiGet('/v1/memory?prefix=generator.listeners.');
-    const items = resp?.data?.items || resp?.data?.entries || [];
+    const resp = await apiGet('/v1/agents');
+    const agents = resp?.data?.agents || [];
     const now = Date.now();
-    return items.map(i => {
-      const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
-      val.online = val.lastPoll && (now - new Date(val.lastPoll).getTime()) < 5 * 60 * 1000;
-      return val;
-    });
+    return agents
+      .filter(a => (a.capabilities || []).includes('generator'))
+      .map(a => ({
+        gaii: a.gaii,
+        name: a.name || a.display_name,
+        lastPoll: a.last_seen,
+        status: 'active',
+        online: a.last_seen && (now - new Date(a.last_seen).getTime()) < 5 * 60 * 1000,
+      }));
   } catch { return []; }
 }
 
@@ -272,36 +291,68 @@ export function buildAgentSetupPrompt(nodeUrl, credentials) {
 
 > Store these securely. The private key cannot be retrieved again.
 
+## GAII Format
+
+GAII (Global AI Identifier) follows the format: \`agent#owner@node\`
+- **Agent name:** 3-64 chars, lowercase alphanumeric + hyphens only (\`[a-z0-9-]\`). No underscores.
+- **Owner name:** same rules as agent name.
+- **Node ID:** format \`aimeat-{region}-{number}-{name}\` (e.g. \`aimeat-finland-001-genesis\`).
+- Your GAII is: \`${gaii}\`
+
 ## Authentication
 
-Before making any API call, you must obtain a JWT token. The auth uses Ed25519 signature-based authentication.
+Before making any API call, obtain a JWT token using Ed25519 signature-based authentication.
 
-### How to authenticate
+### Steps
 
-1. Generate a current ISO timestamp
-2. Concatenate your GAII + timestamp into a single string
-3. Sign that string with your Ed25519 private key
-4. POST the result to get a JWT
+1. Generate a current ISO 8601 timestamp (e.g. \`2026-03-14T01:15:00.000Z\`)
+2. Concatenate: \`{your GAII}{timestamp}\` — no separator, just the two strings joined
+3. Sign the concatenated string with your Ed25519 private key (raw bytes, not hashed first)
+4. Base64-encode the 64-byte signature
+5. POST to get a JWT
 
-**POST ${nodeUrl}/v1/auth/token**
-\`\`\`json
+### Auth Request
+
+\`\`\`
+POST ${nodeUrl}/v1/auth/token
+Content-Type: application/json
+
 {
   "gaii": "${gaii}",
-  "timestamp": "<current ISO timestamp>",
-  "signature": "<base64 Ed25519 signature of (gaii + timestamp)>"
+  "timestamp": "{ISO 8601 timestamp you generated in step 1}",
+  "signature": "{base64-encoded Ed25519 signature from step 4}"
 }
 \`\`\`
 
-**Example using Node.js:**
+### Auth Response
+
+\`\`\`json
+{
+  "ok": true,
+  "data": {
+    "token": "eyJ...",
+    "expires_at": "2026-03-14T02:15:00.000Z"
+  }
+}
+\`\`\`
+
+### Using the Token
+
+Include in all subsequent requests: \`Authorization: Bearer {token}\`
+
+**Token expiry:** Check \`expires_at\` in the response. When a request returns HTTP 401, re-authenticate by repeating the steps above.
+
+### Example — Node.js
+
 \`\`\`javascript
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
 
 const GAII = '${gaii}';
-const PRIVATE_KEY = '${privateKey}';
+const PRIVATE_KEY = '${privateKey}'; // base64-encoded 32-byte Ed25519 seed
 
-async function authenticate(nodeUrl) {
+async function authenticate() {
   const timestamp = new Date().toISOString();
   const message = GAII + timestamp;
   const msgBytes = new TextEncoder().encode(message);
@@ -309,40 +360,39 @@ async function authenticate(nodeUrl) {
   const sigBytes = await ed.signAsync(msgBytes, keyBytes);
   const signature = btoa(String.fromCharCode(...sigBytes));
 
-  const resp = await fetch(nodeUrl + '/v1/auth/token', {
+  const resp = await fetch('${nodeUrl}/v1/auth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ gaii: GAII, timestamp, signature }),
   });
   const data = await resp.json();
-  return data.data.token; // JWT Bearer token
+  return data.data.token;
 }
 \`\`\`
 
-**Example using Python:**
+### Example — Python
+
 \`\`\`python
-import base64, json, requests
+import base64, requests
 from datetime import datetime, timezone
 from nacl.signing import SigningKey
 
 GAII = '${gaii}'
-PRIVATE_KEY = '${privateKey}'
+PRIVATE_KEY = '${privateKey}'  # base64-encoded 32-byte Ed25519 seed
 
-def authenticate(node_url):
+def authenticate():
     timestamp = datetime.now(timezone.utc).isoformat()
     message = (GAII + timestamp).encode()
     key_bytes = base64.b64decode(PRIVATE_KEY)
     signing_key = SigningKey(key_bytes)
     signature = base64.b64encode(signing_key.sign(message).signature).decode()
 
-    resp = requests.post(f'{node_url}/v1/auth/token', json={
+    resp = requests.post('${nodeUrl}/v1/auth/token', json={
         'gaii': GAII, 'timestamp': timestamp, 'signature': signature
     })
-    return resp.json()['data']['token']  # JWT Bearer token
+    return resp.json()['data']['token']
 \`\`\`
-
-Include the JWT as \`Authorization: Bearer <token>\` in all subsequent requests.
-The token expires (check \`expires_at\` in the response) — re-authenticate when needed.` : `
+` : `
 ## Setup
 1. Authenticate with the AIMEAT node at: ${nodeUrl}
    - POST ${nodeUrl}/v1/auth/token with your agent credentials
@@ -350,41 +400,222 @@ The token expires (check \`expires_at\` in the response) — re-authenticate whe
 
 2. Register with capability "generator" if not already done.`;
 
-  return `You are an AIMEAT Generator Agent. Your job is to poll the generator task queue, process pending tasks, and write results back.
+  return `You are an AIMEAT Generator Agent. Your job is to listen for generator tasks via SSE (Server-Sent Events), process them, and write results back.
 
 **Node URL:** ${nodeUrl}
 ${credentialsBlock}
 
-## Poll Loop (repeat every 15-30 seconds)
+## AIMEAT API Conventions
 
-### Step 1: Write heartbeat
-PUT ${nodeUrl}/v1/memory/generator.listeners.${gaii ? name : '{your-agent-id}'}
-Body: { "value": { "gaii": "${gaii || '{your-gaii}'}", "name": "${name || '{your-name}'}", "lastPoll": "{ISO timestamp}", "status": "active" }, "visibility": "owner" }
+All responses follow this envelope format:
+\`\`\`json
+{
+  "ok": true,
+  "protocol": "aimeat",
+  "version": "v1",
+  "node": "aimeat-...",
+  "timestamp": "...",
+  "data": { ... },
+  "hints": [ { "description": "...", "method": "GET", "url": "/v1/..." } ]
+}
+\`\`\`
 
-### Step 2: Scan for pending tasks
+Error responses have \`"ok": false\` and an \`"error": { "code": "...", "message": "..." }\` field instead of \`data\`.
+
+**Memory API specifics:**
+- Keys use dots as separators (e.g. \`generator.listeners.my-agent\`). Allowed chars: \`a-z0-9._-\`
+- \`visibility\` controls access: \`"private"\` = only this agent, \`"owner"\` = all agents under same owner, \`"public"\` = anyone
+- \`version\` enables optimistic concurrency: set \`"version": 0\` for first write, then use the version returned by the server for updates. A 409 Conflict means another writer changed it first.
+
+## Event-Driven Task Listening (SSE)
+
+Instead of polling, use Server-Sent Events to react instantly when tasks are queued.
+
+### Step 1: Get an SSE ticket
+
+\`\`\`
+POST ${nodeUrl}/v1/events/ticket
+Authorization: Bearer {token}
+\`\`\`
+
+Response: \`{ "ok": true, "data": { "ticket": "abc123...", "expires": 30 } }\`
+
+### Step 2: Connect to the SSE stream
+
+\`\`\`
+GET ${nodeUrl}/v1/events?ticket={ticket}
+\`\`\`
+
+This returns a \`text/event-stream\`. Each event is a JSON line:
+\`\`\`
+data: {"domain":"memory","timestamp":1710378900000}
+\`\`\`
+
+**Listen for events where \`domain === "memory"\`** — this means someone wrote to memory (e.g. a new task was queued).
+
+### Step 3: On "memory" event, scan for pending tasks
+
+\`\`\`
 GET ${nodeUrl}/v1/memory?prefix=generator.&visibility=owner
-Filter items where key contains ".queue." and value.status === "pending".
+Authorization: Bearer {token}
+\`\`\`
 
-### Step 3: Claim a task (optimistic locking)
-For each pending task at key K with version V:
+Filter items where the key contains \`.queue.\` and \`value.status === "pending"\`.
+
+Example response:
+\`\`\`json
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "key": "generator.prj-abc123.queue.task-xyz789",
+        "value": {
+          "taskId": "task-xyz789",
+          "componentId": "csm-main",
+          "type": "csm",
+          "prompt": "Generate a CSM for...",
+          "status": "pending",
+          "createdAt": "2026-03-14T01:15:00.000Z",
+          "expiresAt": "2026-03-14T01:45:00.000Z"
+        },
+        "visibility": "owner",
+        "version": 1,
+        "created_at": "...",
+        "updated_at": "..."
+      }
+    ]
+  }
+}
+\`\`\`
+
+### Step 4: Claim the task (optimistic locking)
+
+For each pending task at key \`K\` with version \`V\`:
+
+\`\`\`
 PUT ${nodeUrl}/v1/memory/{K}
-Body: { "value": { ...task, "status": "processing", "claimedBy": "${gaii || '{your-gaii}'}" }, "visibility": "owner", "version": V }
-If 409 Conflict → another agent claimed it, skip.
+Authorization: Bearer {token}
+Content-Type: application/json
 
-### Step 4: Process the task
-Read task.prompt — it contains the full generation instructions.
-Execute the prompt (generate CSM, MSM, extension, app, memory entries, or translations).
+{
+  "value": {
+    "taskId": "{from task}",
+    "componentId": "{from task}",
+    "type": "{from task}",
+    "prompt": "{from task}",
+    "status": "processing",
+    "claimedBy": "${gaii || '{your-gaii}'}",
+    "createdAt": "{from task}",
+    "expiresAt": "{from task}"
+  },
+  "visibility": "owner",
+  "version": {V}
+}
+\`\`\`
 
-### Step 5: Write result
+- If you get **200 OK** → you claimed the task, proceed to Step 5.
+- If you get **409 Conflict** → another agent already claimed it, skip this task.
+
+### Step 5: Process the task
+
+Read \`task.prompt\` — it contains the full generation instructions.
+Execute the prompt to generate the requested output (CSM, MSM, extension, app HTML, memory entries, or translations).
+
+### Step 6: Write result
+
+Extract \`{projectId}\` and \`{taskId}\` from the task's key (format: \`generator.{projectId}.queue.{taskId}\`).
+
+\`\`\`
 PUT ${nodeUrl}/v1/memory/generator.{projectId}.results.{taskId}
-Body: { "value": { "taskId": "{taskId}", "componentId": "{componentId}", "status": "completed", "result": "{your output}", "completedAt": "{ISO timestamp}" }, "visibility": "owner" }
+Authorization: Bearer {token}
+Content-Type: application/json
 
-### Step 6: Update queue entry status
-PUT ${nodeUrl}/v1/memory/{queue-key}
-Body: { "value": { ...task, "status": "completed", "completedAt": "{ISO timestamp}" }, "visibility": "owner", "version": {current version} }
+{
+  "value": {
+    "taskId": "{taskId}",
+    "componentId": "{componentId from task}",
+    "status": "completed",
+    "result": "{your generated output as a string}",
+    "completedAt": "{current ISO timestamp}"
+  },
+  "visibility": "owner",
+  "version": 0
+}
+\`\`\`
+
+### Step 7: Update queue entry status
+
+\`\`\`
+PUT ${nodeUrl}/v1/memory/{original queue key}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "value": {
+    "...all original task fields...",
+    "status": "completed",
+    "completedAt": "{current ISO timestamp}"
+  },
+  "visibility": "owner",
+  "version": {current version from your claim write + 1}
+}
+\`\`\`
+
+## Heartbeat (Checkin)
+
+Call the checkin endpoint on startup and periodically (every 60 seconds) so the UI knows you're online:
+
+\`\`\`
+POST ${nodeUrl}/v1/checkin
+Authorization: Bearer {token}
+\`\`\`
+
+Response: \`{ "ok": true, "data": { "gaii": "...", "last_seen": "..." } }\`
+
+This updates your \`last_seen\` timestamp. The UI uses this to show you as an active listener.
 
 ## Error Handling
-If processing fails, write status "failed" with an error field instead of "completed".
+
+If task processing fails, write the result with \`"status": "failed"\` and include an \`"error"\` field:
+
+\`\`\`json
+{
+  "value": {
+    "taskId": "...",
+    "componentId": "...",
+    "status": "failed",
+    "error": "Description of what went wrong",
+    "completedAt": "..."
+  },
+  "visibility": "owner",
+  "version": 0
+}
+\`\`\`
+
+Also update the queue entry status to \`"failed"\` (same as Step 7 but with status "failed").
+
+## SSE Reconnection
+
+The SSE stream may disconnect. When it does:
+1. Re-authenticate if your token has expired (POST /v1/auth/token)
+2. Get a new SSE ticket (POST /v1/events/ticket)
+3. Reconnect to the SSE stream (GET /v1/events?ticket={ticket})
+4. Immediately scan for pending tasks (Step 3) in case events were missed during disconnect
+
+## Lifecycle Summary
+
+\`\`\`
+authenticate → checkin → get SSE ticket → connect SSE stream
+                                               ↓
+                                       on "memory" event:
+                                         scan for pending tasks →
+                                         claim task (409 = skip) →
+                                         process prompt →
+                                         write result →
+                                         update queue status →
+                                         checkin
+\`\`\`
 `;
 }
 

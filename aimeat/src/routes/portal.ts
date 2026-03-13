@@ -1,3 +1,22 @@
+/**
+ * @file portal.ts
+ * @description Portal router — serves the SPA shell, platform prompt generation,
+ *   cookie consent JS, and backward-compatible URL routes for static HTML pages.
+ * @structure
+ *   - PLATFORMS array — known AI platforms with tier/variant metadata
+ *   - portalRouter() — Express router factory
+ *     - GET /v1/portal — SPA shell
+ *     - GET /v1/portal/platforms — JSON platform list
+ *     - GET /v1/portal/prompt/:platformId — generate prompt for a platform
+ *     - GET /v1/portal/cookie-consent.js — standalone cookie consent snippet
+ *     - SPA routes — /v1/profile, /v1/guides, /v1/app-store, etc.
+ * @usage import { portalRouter } from '../routes/portal.js';
+ * @version-history
+ *   v1.0.0 — 2026-03-03 — Initial portal with SSR removal
+ *   v1.1.0 — 2026-03-04 — Static HTML URL routing, SPA shell serving
+ *   v1.2.0 — 2026-03-14 — Prompt fallback to factory seeds when storage not yet seeded
+ *   v1.2.1 — 2026-03-14 — Marketplace route renamed to app-store
+ */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
