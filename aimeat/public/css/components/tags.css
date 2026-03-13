@@ -11,33 +11,33 @@
   font-size: 0.75rem;
   padding: 3px 10px;
   border-radius: 12px;
-  border: 1px solid var(--border, rgba(255,107,157,0.25));
+  border: 1px solid var(--border, #E5E7EB);
   background: transparent;
-  color: var(--text, #e8d5f5);
+  color: var(--text, #1A1A2E);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .tag-pill:hover {
-  border-color: var(--love1, #ff6b9d);
-  background: rgba(255,107,157,0.1);
+  border-color: var(--accent, #E8564A);
+  background: rgba(232,86,74,0.06);
 }
 
 .tag-pill.active {
-  background: var(--love1, #ff6b9d);
+  background: var(--accent, #E8564A);
   color: #fff;
-  border-color: var(--love1, #ff6b9d);
+  border-color: var(--accent, #E8564A);
 }
 
 .tag-clear {
-  color: var(--muted, #c4a6d0);
+  color: var(--text-dim, #6B7280);
   font-style: italic;
 }
 
 .tag-clear.active {
   background: transparent;
-  color: var(--muted, #c4a6d0);
-  border-color: var(--border, rgba(255,107,157,0.25));
+  color: var(--text-dim, #6B7280);
+  border-color: var(--border, #E5E7EB);
 }
 
 /* ── Tag Editor ── */

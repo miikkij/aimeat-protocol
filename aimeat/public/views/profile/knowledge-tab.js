@@ -579,7 +579,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                   ` : null}
 
                   <!-- Sharing settings -->
-                  <div class="kpkg-sharing-settings" style="margin-bottom:.75rem;padding:.5rem .75rem;border:1px solid rgba(255,107,157,.15);border-radius:8px;background:rgba(255,107,157,.03)">
+                  <div class="kpkg-sharing-settings" style="margin-bottom:.75rem;padding:.5rem .75rem;border:1px solid rgba(232,86,74,.15);border-radius:8px;background:rgba(232,86,74,.04)">
                     <h4 style="margin:0 0 .5rem;font-size:.8rem">${t('knowledge.myKnowledge.shareSettings')}</h4>
                     <label class="kpkg-toggle" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;font-size:.8rem;cursor:pointer">
                       <input type="checkbox"
@@ -616,7 +616,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                           <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0">
                             <span>${ref.verified ? '\u2705' : '\u2753'}</span>
                             ${ref.url ? html`
-                              <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link" style="color:var(--love1,#ff6b9d);text-decoration:none">
+                              <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link" style="color:var(--love1,#E8564A);text-decoration:none">
                                 ${escHtml(ref.title || ref.url)}
                                 <span style="font-size:.7rem;opacity:.6"> \u2197</span>
                               </a>

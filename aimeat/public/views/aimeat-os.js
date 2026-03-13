@@ -511,8 +511,8 @@ await AIMEAT.work.publishAction({
   --card: rgba(30, 20, 40, 0.85);
   --text: #f0e6f6;
   --muted: #c4a6d0;
-  --accent: #ff6b9d;
-  --border: rgba(255, 107, 157, 0.25);
+  --accent: #E8564A;
+  --border: rgba(232, 86, 74, 0.15);
   --success: #22c55e;
   --radius: 12px;
 }

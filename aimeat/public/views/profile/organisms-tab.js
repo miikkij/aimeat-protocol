@@ -176,8 +176,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     } finally { setSaving(false); }
   }, [editForm, showToast, loadData]);
 
-  const inputStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:transparent;color:var(--text,#e8d5f5);font-size:.85rem';
-  const selectStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:var(--bg2,#1a0a2e);color:var(--text,#e8d5f5);font-size:.8rem';
+  const inputStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem';
+  const selectStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem';
 
   const renderEditForm = (org) => html`
     <div class="card-detail" onClick=${(e) => e.stopPropagation()}>
@@ -249,7 +249,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
         ${(org.interests || []).length > 0 && html`
           <div style="display:flex;flex-wrap:wrap;gap:.25rem;padding:0 1rem .25rem">
-            ${org.interests.map(tag => html`<span class="badge" style="font-size:.65rem;padding:1px 6px;border-radius:8px;background:rgba(255,107,157,.15);color:var(--love1,#ff6b9d)" key=${tag}>${escHtml(tag)}</span>`)}
+            ${org.interests.map(tag => html`<span class="badge" style="font-size:.65rem;padding:1px 6px;border-radius:8px;background:rgba(232,86,74,.06);color:var(--love1,#E8564A)" key=${tag}>${escHtml(tag)}</span>`)}
           </div>
         `}
 
@@ -329,14 +329,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           <h4 style="margin:0 0 .5rem">${t('organisms.createTitle') || 'Create New Organism'}</h4>
           <div style="display:flex;flex-direction:column;gap:.5rem">
             <input type="text" placeholder=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${(e) => setFormName(e.target.value)}
-              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:transparent;color:var(--text,#e8d5f5);font-size:.85rem" />
+              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem" />
             <textarea placeholder=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${(e) => setFormDesc(e.target.value)} rows="2"
-              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:transparent;color:var(--text,#e8d5f5);font-size:.85rem;resize:vertical" />
+              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem;resize:vertical" />
             <input type="text" placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${(e) => setFormInterests(e.target.value)}
-              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:transparent;color:var(--text,#e8d5f5);font-size:.85rem" />
+              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem" />
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
               <select value=${formType} onChange=${(e) => setFormType(e.target.value)}
-                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:var(--bg2,#1a0a2e);color:var(--text,#e8d5f5);font-size:.8rem">
+                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem">
                 <option value="community">${t('organisms.types.community') || 'Community'}</option>
                 <option value="team">${t('organisms.types.team') || 'Team'}</option>
                 <option value="club">${t('organisms.types.club') || 'Club'}</option>
@@ -344,13 +344,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 <option value="project">${t('organisms.types.project') || 'Project'}</option>
               </select>
               <select value=${formPolicy} onChange=${(e) => setFormPolicy(e.target.value)}
-                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:var(--bg2,#1a0a2e);color:var(--text,#e8d5f5);font-size:.8rem">
+                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem">
                 <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
                 <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
                 <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
               </select>
               <select value=${formVisibility} onChange=${(e) => setFormVisibility(e.target.value)}
-                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(255,107,157,.25));background:var(--bg2,#1a0a2e);color:var(--text,#e8d5f5);font-size:.8rem">
+                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem">
                 <option value="public">${t('organisms.visPublic') || 'Public'}</option>
                 <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
                 <option value="private">${t('organisms.visPrivate') || 'Private'}</option>

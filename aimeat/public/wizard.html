@@ -14,9 +14,9 @@
   --card: rgba(30,20,40,.85);
   --text: #f0e6f6;
   --muted: #c4a6d0;
-  --accent: #ff6b9d;
-  --accent2: #c44569;
-  --border: rgba(255,107,157,.25);
+  --accent: #E8564A;
+  --accent2: #E8564A;
+  --border: rgba(232,86,74,.15);
   --success: #22c55e;
   --radius: 12px;
   --font: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -90,13 +90,13 @@ body {
 .step-dot {
   width: 10px; height: 10px;
   border-radius: 50%;
-  background: rgba(255,107,157,.2);
+  background: rgba(232,86,74,.15);
   transition: all .3s ease;
   flex-shrink: 0;
 }
 .step-dot.active {
   background: var(--accent);
-  box-shadow: 0 0 8px rgba(255,107,157,.5);
+  box-shadow: 0 0 8px rgba(232,86,74,.2);
   transform: scale(1.2);
 }
 .step-dot.done {
@@ -105,7 +105,7 @@ body {
 }
 .step-line {
   width: 28px; height: 2px;
-  background: rgba(255,107,157,.15);
+  background: rgba(232,86,74,.1);
   border-radius: 1px;
   transition: background .3s ease;
   flex-shrink: 0;
@@ -238,7 +238,7 @@ body {
 }
 .radio-card.selected {
   border-color: var(--accent);
-  background: rgba(255,107,157,.08);
+  background: rgba(232,86,74,.05);
 }
 .radio-card input[type="radio"] {
   appearance: none;
@@ -292,11 +292,11 @@ body {
 }
 .lang-card:hover {
   background: var(--bg-input-focus);
-  border-color: rgba(255,107,157,.4);
+  border-color: rgba(232,86,74,.3);
 }
 .lang-card.selected {
   border-color: var(--accent);
-  background: rgba(255,107,157,.1);
+  background: rgba(232,86,74,.06);
 }
 .lang-card .lang-flag {
   font-size: 1.8rem;
@@ -347,7 +347,7 @@ body {
 .btn-primary:hover:not(:disabled) {
   filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(255,107,157,.3);
+  box-shadow: 0 4px 16px rgba(232,86,74,.2);
 }
 .btn-secondary {
   background: rgba(255,255,255,.06);
@@ -374,7 +374,7 @@ body {
   border-collapse: collapse;
 }
 .summary-table tr {
-  border-bottom: 1px solid rgba(255,107,157,.1);
+  border-bottom: 1px solid rgba(232,86,74,.08);
 }
 .summary-table tr:last-child {
   border-bottom: none;

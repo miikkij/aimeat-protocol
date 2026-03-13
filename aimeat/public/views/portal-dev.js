@@ -96,7 +96,7 @@ function BackgroundLayer({ activeBg }) {
     if (!sparkleRef.current) return;
     const c = sparkleRef.current;
     c.innerHTML = '';
-    const colors = ['rgba(255,107,157,.3)','rgba(196,69,105,.25)','rgba(244,143,177,.2)','rgba(136,14,79,.2)'];
+    const colors = ['rgba(232,86,74,.15)','rgba(232,86,74,.1)','rgba(255,107,107,.1)','rgba(200,60,50,.08)'];
     for (let n = 0; n < 5; n++) {
       const blob = document.createElement('div');
       blob.className = 'dv-nebula-blob';
@@ -221,7 +221,7 @@ function McpPanel({ locale, isLoggedIn, session }) {
                 <div style="display:flex;align-items:center;gap:.5rem">
                   <code style="font-size:.78rem;background:rgba(255,255,255,.06);padding:.4rem .6rem;border-radius:.25rem;user-select:all;flex:1;word-break:break-all">claude mcp add aimeat --transport http ${mcpUrl}</code>
                   <button type="button" onClick=${copyCommand}
-                    style="padding:.3rem .6rem;background:var(--love1,#ff6b9d);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                    style="padding:.3rem .6rem;background:var(--love1,#E8564A);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
                     ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyCommand', locale)}
                   </button>
                 </div>
@@ -741,7 +741,7 @@ export default function PortalDevView({ navigate, locale }) {
       }
 
       <!-- Quick Start -->
-      <div class="dv-panel" style="border-color:var(--love1,#ff6b9d);background:linear-gradient(135deg,rgba(30,20,40,.9),rgba(60,10,40,.8))">
+      <div class="dv-panel" style="border-color:var(--love1,#E8564A);background:linear-gradient(135deg,rgba(250,250,248,.95),rgba(245,240,238,.9))">
         <h3 style="margin-bottom:.5rem">\ud83d\ude80 ${dt('quickStart.title', locale)}</h3>
         <p style="margin-bottom:.5rem">${dt('quickStart.desc', locale)}</p>
         <div class="dv-prompt-output" style="margin-bottom:0">

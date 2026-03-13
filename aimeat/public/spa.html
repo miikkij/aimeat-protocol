@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="aimeat-node" content="">
-  <title>AIMEAT</title>
+  <title>AIME AT</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#050510">
+  <meta name="theme-color" content="#FAFAF8">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/theme.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
@@ -48,7 +49,7 @@
     import { useState, useEffect, useCallback } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
-    import { generateStars } from '/js/utils.js';
+    // generateStars no longer needed for light theme
 
     const html = htm.bind(h);
 
@@ -251,14 +252,15 @@
 
       return html`
         <nav class="topnav">
-          <a href="/v1/portal" class="topnav-brand" onClick=${(e) => handleNav(e, '/v1/portal')}>
-            <span class="heart">\u{1F496}</span>
-            <span class="brand-name">AIME AT</span>
-            ${morsels !== null && html`<span class="brand-morsels" style="display:inline">${morsels} ❤️</span>`}
-          </a>
+          <div style="display:flex;align-items:center;gap:20px">
+            <a href="/v1/portal" class="topnav-brand" onClick=${(e) => handleNav(e, '/v1/portal')}>
+              AIME<span class="heart">\u2665</span>AT
+            </a>
+            ${morsels !== null && html`<span class="brand-morsels" style="display:inline-flex">${morsels}</span>`}
+          </div>
 
           <div class="topnav-right">
-            <a href="/v1/classic" onClick=${(e) => handleNav(e, '/v1/classic')}>${t('nav.try')}</a>
+            <a href="/v1/classic" onClick=${(e) => handleNav(e, '/v1/classic')} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
             <a href="/v1/portal?view=dev" onClick=${(e) => handleNav(e, '/v1/portal?view=dev')}>${t('nav.devView')}</a>
             ${session && html`
               <a href="/v1/profile" class="profile-link visible" onClick=${(e) => handleNav(e, '/v1/profile')}>
@@ -277,10 +279,6 @@
 
     // ── Bootstrap ──
     async function boot() {
-      // Generate background stars
-      const bg = document.getElementById('bgCanvas');
-      if (bg) generateStars(bg, 80);
-
       // Load translations
       await loadTranslations();
 
@@ -320,14 +318,14 @@
       console.error('Boot failed:', err);
       const app = document.getElementById('app');
       const wrap = document.createElement('div');
-      wrap.style.cssText = 'text-align:center;padding:3rem;color:#ccc;font-family:system-ui';
+      wrap.style.cssText = 'text-align:center;padding:3rem;color:#6B7280;font-family:DM Sans,system-ui';
       const h = document.createElement('h2');
       h.textContent = 'AIMEAT failed to start';
       const p = document.createElement('p');
       p.textContent = err.message || 'Unknown error';
       const btn = document.createElement('button');
       btn.textContent = 'Reload';
-      btn.style.cssText = 'margin-top:1rem;padding:0.6rem 1.5rem;background:#ff69b4;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700';
+      btn.style.cssText = 'margin-top:1rem;padding:0.6rem 1.5rem;background:linear-gradient(135deg,#E8564A,#FF6B6B);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700';
       btn.onclick = () => location.reload();
       wrap.appendChild(h);
       wrap.appendChild(p);

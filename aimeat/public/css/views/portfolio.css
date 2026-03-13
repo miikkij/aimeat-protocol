@@ -14,8 +14,8 @@
 }
 
 .portfolio-step {
-  background: var(--card-bg, rgba(255,255,255,0.03));
-  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
   border-radius: 12px;
   padding: 1.5rem;
 }
@@ -23,7 +23,7 @@
 .portfolio-step h3 {
   margin: 0 0 1rem;
   font-size: 1.1rem;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
 }
 
 .portfolio-step-number {
@@ -48,7 +48,7 @@
 .portfolio-source-group summary {
   cursor: pointer;
   font-weight: 600;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   padding: 0.5rem 0;
   user-select: none;
 }
@@ -74,12 +74,12 @@
 }
 
 .portfolio-source-item:hover {
-  background: rgba(255,255,255,0.04);
+  background: rgba(232,86,74,0.04);
 }
 
 .portfolio-source-item label {
   cursor: pointer;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   font-size: 0.9rem;
 }
 
@@ -94,9 +94,9 @@
   height: 40px;
   object-fit: cover;
   border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid #E5E7EB;
   flex-shrink: 0;
-  background: rgba(255,255,255,0.03);
+  background: #F3F4F6;
 }
 
 .portfolio-img-item {
@@ -112,7 +112,7 @@
 
 .portfolio-source-meta {
   font-size: 0.75rem;
-  color: var(--text-dim, #666);
+  color: var(--text-dim, #6B7280);
   margin-left: auto;
   flex-shrink: 1;
   min-width: 0;
@@ -130,7 +130,7 @@
 }
 
 .portfolio-mem-item:hover {
-  background: rgba(255,255,255,0.04);
+  background: rgba(232,86,74,0.04);
 }
 
 .portfolio-mem-header {
@@ -141,7 +141,7 @@
 
 .portfolio-mem-header label {
   cursor: pointer;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   font-size: 0.9rem;
   font-weight: 500;
   min-width: 0;
@@ -154,7 +154,7 @@
 .portfolio-mem-preview {
   margin: 0.25rem 0 0 1.75rem;
   font-size: 0.8rem;
-  color: var(--text, #ccc);
+  color: var(--text, #6B7280);
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -173,7 +173,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
@@ -185,7 +185,7 @@
 
 .portfolio-option.selected {
   border-color: var(--accent, #7c5cff);
-  background: rgba(124,92,255,0.08);
+  background: rgba(124,92,255,0.06);
 }
 
 .portfolio-option input[type="radio"] {
@@ -203,8 +203,8 @@
 /* ── Prompt Output ── */
 .portfolio-prompt-output {
   position: relative;
-  background: var(--code-bg, rgba(0,0,0,0.3));
-  border: 1px solid var(--border, rgba(255,255,255,0.08));
+  background: var(--code-bg, #F3F4F6);
+  border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
   padding: 1rem;
   max-height: 300px;
@@ -213,7 +213,7 @@
   font-size: 0.8rem;
   line-height: 1.5;
   white-space: pre-wrap;
-  color: var(--text-dim, #aaa);
+  color: var(--text-dim, #6B7280);
 }
 
 .portfolio-prompt-actions {
@@ -225,8 +225,8 @@
 
 /* ── Instructions ── */
 .portfolio-instructions {
-  background: rgba(124,92,255,0.06);
-  border: 1px solid rgba(124,92,255,0.15);
+  background: rgba(124,92,255,0.05);
+  border: 1px solid rgba(124,92,255,0.12);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   margin-top: 1rem;
@@ -239,7 +239,7 @@
 
 .portfolio-instructions li {
   margin-bottom: 0.4rem;
-  color: var(--text-dim, #aaa);
+  color: var(--text-dim, #6B7280);
   font-size: 0.9rem;
 }
 
@@ -259,17 +259,17 @@
 .portfolio-not-found {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--text-dim, #888);
+  color: var(--text-dim, #6B7280);
 }
 
 .portfolio-not-found h2 {
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   margin-bottom: 0.5rem;
 }
 
 /* ── Upload Section ── */
 .portfolio-upload-zone {
-  border: 2px dashed var(--border, rgba(255,255,255,0.15));
+  border: 2px dashed var(--border, #E5E7EB);
   border-radius: 12px;
   padding: 2rem;
   text-align: center;
@@ -291,10 +291,10 @@
   width: 100%;
   min-height: 120px;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--border, rgba(255,255,255,0.15));
+  border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
-  background: var(--bg-card, rgba(255,255,255,0.03));
-  color: var(--text, #e0e0e0);
+  background: var(--bg-card, #FFFFFF);
+  color: var(--text, #374151);
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.85rem;
   resize: vertical;
@@ -305,7 +305,7 @@
   border-color: var(--accent, #7c5cff);
 }
 .portfolio-paste-area::placeholder {
-  color: var(--text-dim, rgba(255,255,255,0.35));
+  color: var(--text-dim, #9CA3AF);
 }
 
 /* ── Responsive ── */

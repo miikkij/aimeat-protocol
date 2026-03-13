@@ -332,7 +332,7 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
 
       ${listing.status === 'active' && !isOwner ? html`
         <div class="mk-listing-actions">
-          <div class="mk-card" style="padding:16px; background:rgba(255,105,180,0.05); border-color:rgba(255,105,180,0.2); flex:1;">
+          <div class="mk-card" style="padding:16px; background:rgba(232,86,74,0.04); border-color:rgba(232,86,74,0.15); flex:1;">
             <div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:8px;">${t('mkt.detail.totalPrice')} (${feePercent}%)</div>
             <div style="font-size:1.2rem; font-weight:700; color:var(--accent-bright);">${totalCost} morsels</div>
             <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">${t('mkt.detail.price')}: ${listing.price} + ${t('mkt.detail.serviceFee')}: ${fee}</div>

@@ -7,14 +7,14 @@
 .cl-hero-title {
   font-size: clamp(1.8rem, 5vw, 2.8rem);
   font-weight: 800;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   line-height: 1.2;
   letter-spacing: -0.03em;
   margin-bottom: 1rem;
 }
 .cl-hero-subtitle {
   font-size: clamp(1rem, 2.5vw, 1.15rem);
-  color: var(--text, #e0e0e0);
+  color: var(--text, #374151);
   max-width: 540px;
   margin: 0 auto;
   line-height: 1.7;
@@ -25,11 +25,11 @@
 .cl-anon-banner {
   text-align: center;
   padding: 0.65rem 1rem;
-  background: rgba(124, 58, 237, 0.08);
-  border: 1px solid rgba(124, 58, 237, 0.2);
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.15);
   border-radius: 10px;
   font-size: 0.82rem;
-  color: #c4b5fd;
+  color: #6D28D9;
   margin-bottom: 1.5rem;
   max-width: 720px;
   margin-left: auto;
@@ -38,8 +38,8 @@
 
 /* ── Welcome Board ── */
 .cl-welcome-section {
-  background: linear-gradient(135deg, rgba(255, 105, 180, 0.06), rgba(124, 58, 237, 0.06));
-  border: 1px solid rgba(255, 105, 180, 0.15);
+  background: rgba(232, 86, 74, 0.06);
+  border: 1px solid #E5E7EB;
   border-radius: 16px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -50,34 +50,34 @@
 .cl-welcome-title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   margin-bottom: 0.25rem;
 }
 .cl-welcome-subtitle {
   font-size: 0.85rem;
-  color: var(--text-dim, #888);
+  color: var(--text-dim, #6B7280);
   margin-bottom: 1rem;
 }
 .cl-board-messages { margin-bottom: 1rem; }
 .cl-board-list {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid #E5E7EB;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.2);
+  background: #FFFFFF;
 }
 .cl-board-empty {
   padding: 1rem;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--text-muted, #6b6b8a);
+  color: var(--text-muted, #9CA3AF);
   font-style: italic;
 }
 .cl-board-msg {
   padding: 0.6rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid #F3F4F6;
   font-size: 0.88rem;
-  color: var(--text, #e0e0e0);
+  color: var(--text, #374151);
   line-height: 1.5;
   display: flex;
   justify-content: space-between;
@@ -88,7 +88,7 @@
 .cl-board-msg-text { flex: 1; word-break: break-word; }
 .cl-board-msg-time {
   font-size: 0.7rem;
-  color: var(--text-muted, #6b6b8a);
+  color: var(--text-muted, #9CA3AF);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -101,10 +101,10 @@
 .cl-memory-input {
   flex: 1;
   padding: 0.85rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
   border-radius: 10px;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   font-size: 0.95rem;
   font-family: var(--font, system-ui, sans-serif);
   outline: none;
@@ -112,11 +112,11 @@
   resize: none;
 }
 .cl-memory-input:focus {
-  border-color: var(--accent, #ff69b4);
-  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.3);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--accent, #E8564A);
+  box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.15);
+  background: #FFFFFF;
 }
-.cl-memory-input::placeholder { color: var(--text-muted, #6b6b8a); }
+.cl-memory-input::placeholder { color: var(--text-muted, #9CA3AF); }
 .cl-welcome-result {
   margin-top: 0.5rem;
   font-size: 0.85rem;
@@ -127,7 +127,7 @@
 /* ── Save / Submit Button ── */
 .cl-save-btn {
   padding: 0.7rem 1.6rem;
-  background: linear-gradient(135deg, var(--accent, #ff69b4), var(--accent-deep, #c44569));
+  background: linear-gradient(135deg, var(--accent, #E8564A), var(--accent-deep, #D44A3F));
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -136,11 +136,11 @@
   font-family: var(--font, system-ui, sans-serif);
   cursor: pointer;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
-  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+  box-shadow: 0 4px 15px rgba(232, 86, 74, 0.15);
 }
 .cl-save-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+  box-shadow: 0 6px 25px rgba(232, 86, 74, 0.25);
 }
 .cl-save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 .cl-save-btn.loading {
@@ -194,22 +194,22 @@
 
 /* ── Card ── */
 .cl-card {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 105, 180, 0.25);
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
   border-radius: 16px;
   overflow: hidden;
   transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease;
   cursor: pointer;
 }
 .cl-card:hover {
-  background: rgba(255, 255, 255, 0.13);
-  border-color: rgba(255, 105, 180, 0.5);
-  box-shadow: 0 0 30px rgba(255, 105, 180, 0.12), 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: #FFFFFF;
+  border-color: rgba(232, 86, 74, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.04);
   transform: translateY(-2px);
 }
 .cl-card.expanded {
-  border-color: var(--accent, #ff69b4);
-  box-shadow: 0 0 40px rgba(255, 105, 180, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
+  border-color: var(--accent, #E8564A);
+  box-shadow: 0 4px 24px rgba(232, 86, 74, 0.1), 0 8px 32px rgba(0, 0, 0, 0.06);
   cursor: default;
 }
 
@@ -227,19 +227,19 @@
   justify-content: center;
   font-size: 1.5rem;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(196, 69, 105, 0.15));
-  border: 1px solid rgba(255, 105, 180, 0.2);
+  background: rgba(232, 86, 74, 0.08);
+  border: 1px solid rgba(232, 86, 74, 0.15);
 }
 .cl-card-text { flex: 1; min-width: 0; }
 .cl-card-title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   margin-bottom: 0.15rem;
 }
 .cl-card-tagline {
   font-size: 0.88rem;
-  color: var(--text-dim, #888);
+  color: var(--text-dim, #6B7280);
 }
 .cl-card-arrow {
   width: 28px; height: 28px;
@@ -248,15 +248,15 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-dim, #888);
+  background: #F3F4F6;
+  color: var(--text-dim, #6B7280);
   font-size: 0.75rem;
   transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
 }
 .cl-card.expanded .cl-card-arrow {
   transform: rotate(180deg);
-  background: rgba(255, 105, 180, 0.15);
-  color: var(--accent, #ff69b4);
+  background: rgba(232, 86, 74, 0.1);
+  color: var(--accent, #E8564A);
 }
 
 .cl-card-body {
@@ -272,37 +272,37 @@
 
 .cl-card-desc {
   font-size: 0.92rem;
-  color: #ccc;
+  color: #6B7280;
   line-height: 1.7;
   margin-bottom: 1.25rem;
 }
 
 /* ── Group accent colors ── */
 .cl-group-me .cl-card-icon {
-  background: linear-gradient(135deg, rgba(255, 105, 180, 0.15), rgba(196, 69, 105, 0.15));
-  border-color: rgba(255, 105, 180, 0.2);
+  background: rgba(232, 86, 74, 0.08);
+  border-color: rgba(232, 86, 74, 0.15);
 }
 .cl-group-agents .cl-card-icon {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
-  border-color: rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.15);
 }
 .cl-group-agents.expanded {
   border-color: #6366f1;
-  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 24px rgba(99, 102, 241, 0.1), 0 8px 32px rgba(0, 0, 0, 0.06);
 }
 .cl-group-builders .cl-card-icon {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.15));
-  border-color: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.15);
 }
 .cl-group-builders.expanded {
   border-color: #22c55e;
-  box-shadow: 0 0 40px rgba(34, 197, 94, 0.15), 0 12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 24px rgba(34, 197, 94, 0.1), 0 8px 32px rgba(0, 0, 0, 0.06);
 }
 
 /* ── Starter hints ── */
 .cl-starter-hint {
   font-size: 0.88rem;
-  color: var(--accent, #ff69b4);
+  color: var(--accent, #E8564A);
   margin-bottom: 1.25rem;
   font-style: italic;
 }
@@ -314,10 +314,10 @@
   min-height: 200px;
   max-height: 400px;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
   border-radius: 10px;
-  color: var(--text, #e0e0e0);
+  color: var(--text, #374151);
   font-family: 'Courier New', monospace;
   font-size: 0.82rem;
   line-height: 1.6;
@@ -333,7 +333,7 @@
 }
 .cl-copy-prompt-btn {
   padding: 0.6rem 1.4rem;
-  background: linear-gradient(135deg, var(--accent, #ff69b4), var(--accent-deep, #c44569));
+  background: linear-gradient(135deg, var(--accent, #E8564A), var(--accent-deep, #D44A3F));
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -341,29 +341,29 @@
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.25);
+  box-shadow: 0 4px 15px rgba(232, 86, 74, 0.15);
   font-family: var(--font, system-ui, sans-serif);
 }
 .cl-copy-prompt-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 25px rgba(255, 105, 180, 0.4);
+  box-shadow: 0 6px 25px rgba(232, 86, 74, 0.25);
 }
 .cl-prompt-lang-note {
   font-size: 0.8rem;
-  color: var(--text-muted, #6b6b8a);
+  color: var(--text-muted, #9CA3AF);
   margin-top: 0.5rem;
   font-style: italic;
 }
 .cl-beginner-tip {
   font-size: 0.85rem;
-  color: var(--accent, #ff69b4);
+  color: var(--accent, #E8564A);
   margin-top: 0.5rem;
   font-weight: 600;
 }
 .cl-prompt-steps {
   margin-top: 0.75rem;
   font-size: 0.82rem;
-  color: #aaa;
+  color: #6B7280;
   line-height: 1.7;
 }
 .cl-prompt-steps ol { padding-left: 1.2rem; }
@@ -381,49 +381,49 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.55rem 1.25rem;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
-  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
   border-radius: 10px;
-  color: var(--text-bright, #fff);
+  color: var(--text, #1A1A2E);
   font-weight: 700;
   font-size: 0.9rem;
   text-decoration: none;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .cl-launcher-cta:hover {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+  background: rgba(251, 191, 36, 0.18);
+  box-shadow: 0 2px 12px rgba(251, 191, 36, 0.1);
   transform: translateY(-1px);
 }
 .cl-launcher-cta.secondary {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: #F3F4F6;
+  border-color: #E5E7EB;
   font-weight: 600;
   font-size: 0.85rem;
   padding: 0.45rem 1rem;
 }
 .cl-launcher-cta.secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(251, 191, 36, 0.4);
+  background: #E5E7EB;
+  border-color: rgba(251, 191, 36, 0.3);
 }
 
 /* ── Return / upload section ── */
 .cl-return-section {
   margin-top: 1.5rem;
   padding: 1rem;
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.35);
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.15);
   border-radius: 12px;
 }
 .cl-return-title {
   font-weight: 700;
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
-  color: #e0e0e0;
+  color: #374151;
 }
 .cl-return-motivation {
   font-size: 0.85rem;
-  color: #bbb;
+  color: #6B7280;
   margin-bottom: 0.5rem;
 }
 
@@ -431,42 +431,42 @@
 .cl-connect-section {
   margin-top: 2rem;
   padding: 1.25rem;
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.35);
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.15);
   border-radius: 12px;
 }
 .cl-connect-title {
   font-weight: 700;
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
-  color: #e0e0e0;
+  color: #374151;
 }
 .cl-connect-desc {
   font-size: 0.88rem;
-  color: #bbb;
+  color: #6B7280;
   margin-bottom: 0.75rem;
 }
 .cl-connect-link {
-  color: #a78bfa;
+  color: #7C3AED;
   text-decoration: underline;
   text-underline-offset: 2px;
   font-size: 0.9rem;
 }
-.cl-connect-link:hover { color: #c4b5fd; }
+.cl-connect-link:hover { color: #6D28D9; }
 
 /* ── Morsels economy footer ── */
 .cl-morsels-economy {
   text-align: center;
   padding: 2rem 0 3.5rem;
   font-size: 0.85rem;
-  color: var(--text-dim, #888);
+  color: var(--text-dim, #6B7280);
   line-height: 1.7;
   max-width: 540px;
   margin: 0 auto;
 }
 .cl-heart-icon {
   display: inline-block;
-  color: var(--accent, #ff69b4);
+  color: var(--accent, #E8564A);
   font-size: 0.9rem;
   margin: 0 0.15rem;
   animation: cl-heartPulse 2s ease-in-out infinite;
