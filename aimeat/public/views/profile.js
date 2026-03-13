@@ -227,14 +227,14 @@ export default function Profile({ navigate, locale }) {
 
         <!-- Stats bar -->
         <div class="stats-bar">
-          <div class="stat-card"><div class="num">${stats.agents}</div><div class="label">${t('profile.stats.agents')}</div></div>
-          <div class="stat-card"><div class="num">${stats.chatSessions}</div><div class="label">${t('profile.stats.chatSessions')}</div></div>
-          <div class="stat-card"><div class="num">${stats.balance}</div><div class="label">${t('profile.stats.morsels')}</div></div>
-          <div class="stat-card"><div class="num">${stats.memory}</div><div class="label">${t('profile.stats.memories')}</div></div>
+          <div class="stat-card"><div class="num blue">${stats.agents}</div><div class="label">${t('profile.stats.agents')}</div></div>
+          <div class="stat-card"><div class="num purple">${stats.chatSessions}</div><div class="label">${t('profile.stats.chatSessions')}</div></div>
+          <div class="stat-card"><div class="num heart">${stats.balance}</div><div class="label">${t('profile.stats.morsels')}</div></div>
+          <div class="stat-card"><div class="num mint">${stats.memory}</div><div class="label">${t('profile.stats.memories')}</div></div>
           <div class="stat-card"><div class="num">${stats.services}</div><div class="label">${t('profile.stats.services')}</div></div>
           <div class="stat-card"><div class="num">${stats.work}</div><div class="label">${t('profile.stats.tasks')}</div></div>
           <div class="stat-card"><div class="num">${stats.apps}</div><div class="label">${t('profile.stats.apps')}</div></div>
-          <div class="stat-card"><div class="num">${stats.files}</div><div class="label">${t('profile.stats.files')}</div></div>
+          <div class="stat-card"><div class="num blue">${stats.files}</div><div class="label">${t('profile.stats.files')}</div></div>
           <div class="stat-card"><div class="num">${stats.nodes}</div><div class="label">${t('profile.stats.nodes')}</div></div>
         </div>
 

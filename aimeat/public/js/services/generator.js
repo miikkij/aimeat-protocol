@@ -124,7 +124,7 @@ export async function enqueueTask(projectId, componentId, type, prompt, assigned
   };
   await apiPut(`/v1/memory/generator.${projectId}.queue.${id}`, {
     value: entry,
-    visibility: 'private',
+    visibility: 'owner',
   });
   return entry;
 }
@@ -219,6 +219,64 @@ export async function registerComponent(type, result, session) {
     default:
       throw new Error(`Unknown component type: ${type}`);
   }
+}
+
+/* ── Agent Listeners ─────────────────────────────────── */
+
+export async function getListeners() {
+  try {
+    const resp = await apiGet('/v1/memory?prefix=generator.listeners.');
+    const items = resp?.data?.items || resp?.data?.entries || [];
+    const now = Date.now();
+    return items.map(i => {
+      const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
+      val.online = val.lastPoll && (now - new Date(val.lastPoll).getTime()) < 5 * 60 * 1000;
+      return val;
+    });
+  } catch { return []; }
+}
+
+export function buildAgentSetupPrompt(nodeUrl) {
+  return `You are an AIMEAT Generator Agent. Your job is to poll the generator task queue, process pending tasks, and write results back.
+
+## Setup
+1. Authenticate with the AIMEAT node at: ${nodeUrl}
+   - POST ${nodeUrl}/v1/auth/token with your agent credentials
+   - Include the JWT as Bearer token in all subsequent requests
+
+2. Register with capability "generator" if not already done.
+
+## Poll Loop (repeat every 15-30 seconds)
+
+### Step 1: Write heartbeat
+PUT ${nodeUrl}/v1/memory/generator.listeners.{your-agent-id}
+Body: { "value": { "gaii": "{your-gaii}", "name": "{your-name}", "lastPoll": "{ISO timestamp}", "status": "active" }, "visibility": "owner" }
+
+### Step 2: Scan for pending tasks
+GET ${nodeUrl}/v1/memory?prefix=generator.&visibility=owner
+Filter items where key contains ".queue." and value.status === "pending".
+
+### Step 3: Claim a task (optimistic locking)
+For each pending task at key K with version V:
+PUT ${nodeUrl}/v1/memory/{K}
+Body: { "value": { ...task, "status": "processing", "claimedBy": "{your-gaii}" }, "visibility": "owner", "version": V }
+If 409 Conflict → another agent claimed it, skip.
+
+### Step 4: Process the task
+Read task.prompt — it contains the full generation instructions.
+Execute the prompt (generate CSM, MSM, extension, app, memory entries, or translations).
+
+### Step 5: Write result
+PUT ${nodeUrl}/v1/memory/generator.{projectId}.results.{taskId}
+Body: { "value": { "taskId": "{taskId}", "componentId": "{componentId}", "status": "completed", "result": "{your output}", "completedAt": "{ISO timestamp}" }, "visibility": "owner" }
+
+### Step 6: Update queue entry status
+PUT ${nodeUrl}/v1/memory/{queue-key}
+Body: { "value": { ...task, "status": "completed", "completedAt": "{ISO timestamp}" }, "visibility": "owner", "version": {current version} }
+
+## Error Handling
+If processing fails, write status "failed" with an error field instead of "completed".
+`;
 }
 
 /* ── Extension Result Parser ─────────────────────────── */
