@@ -136,7 +136,7 @@ export default function NotificationsTab({ session, showToast }) {
       <h3>${t('profile.notifications.title')}</h3>
       <p style="color:var(--text-dim);font-size:.9rem;margin-bottom:16px">${t('profile.notifications.explain')}</p>
 
-      <div style="display:flex;align-items:center;gap:12px;padding:16px;border-radius:8px;background:var(--glass-bg);border:1px solid var(--glass-border)">
+      <div style="display:flex;align-items:center;gap:12px;padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB)">
         <div style="flex:1">
           <div style="font-weight:600;margin-bottom:4px">
             ${t('profile.notifications.browserPush')}

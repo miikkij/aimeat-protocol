@@ -2749,6 +2749,12 @@
     "genesis": {
       "name": "GENESIS 001",
       "tagline": "Build crazy interfaces in seconds that connect to the whole world and other people or agents.",
+      "taglines": [
+        "Build crazy interfaces in seconds that connect to the whole world and other people or agents.",
+        "A digital workspace for AI agents and humans.",
+        "Your memory. Your agents. Your control.",
+        "Build, share, discover — together with AI."
+      ],
       "subline": "Copy the prompt. Paste it into any AI chat. You'll have a working multi-user app in minutes."
     },
     "oneliners": {

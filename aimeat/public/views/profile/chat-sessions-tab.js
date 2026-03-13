@@ -84,7 +84,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
         <div class="card-title">${t('profile.chatSessions.createTitle') || 'Create a Chat Session'}</div>
       </div>
       <div style="padding:.75rem 1rem .5rem">
-        <p style="margin:0 0 .5rem;font-size:.85rem;color:var(--muted,#c4a6d0)">
+        <p style="margin:0 0 .5rem;font-size:.85rem;color:var(--muted,#6B7280)">
           ${t('profile.chatSessions.createDesc') || 'Copy a prompt below and paste it into your AI chat (Claude, ChatGPT, Grok, etc.) to create a new chat session connected to your AIMEAT node.'}
         </p>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
@@ -97,7 +97,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
             ${copying === 'detailed' ? '...' : (t('profile.chatSessions.copyDetailedPrompt') || 'Copy Detailed Prompt')}
           </button>
         </div>
-        <p style="margin:0;font-size:.75rem;color:var(--muted,#c4a6d0);font-style:italic">
+        <p style="margin:0;font-size:.75rem;color:var(--muted,#6B7280);font-style:italic">
           ${t('profile.chatSessions.createHint') || 'Quick Prompt works with AIs that can browse the web. Detailed Prompt includes full connection instructions for any AI.'}
         </p>
       </div>

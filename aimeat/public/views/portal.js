@@ -1326,7 +1326,7 @@ export default function Portal({ navigate, locale }) {
     <!-- Genesis Hero 3D -->
     <${GenesisCanvas} />
     <div class="genesis-text-under">
-      <p class="genesis-tagline">${t('portal.genesis.tagline')}</p>
+      <p class="genesis-tagline">${(() => { const tl = t('portal.genesis.taglines'); return Array.isArray(tl) ? tl[Math.floor(Math.random() * tl.length)] : t('portal.genesis.tagline'); })()}</p>
     </div>
 
     <!-- Divider -->

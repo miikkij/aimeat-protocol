@@ -64,7 +64,7 @@ export default function McpTab({ session, showToast, onStats }) {
     <div style="margin-bottom:1rem;padding:.5rem .75rem;background:rgba(130,100,255,.06);border:1px solid rgba(130,100,255,.15);border-radius:.25rem;font-size:.82rem">
       <span>${t('profile.mcp.setupHint') || 'Connect a new AI assistant via the developer portal.'}</span>
       ${' '}
-      <a href="/v1/portal?view=dev#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
+      <a href="/v1/portal?view=dev#mcp" style="color:var(--accent,#E8564A);text-decoration:underline">
         ${t('profile.mcp.setupLink') || 'Set up MCP connection'}
       </a>
     </div>
@@ -72,7 +72,7 @@ export default function McpTab({ session, showToast, onStats }) {
     ${connections.length === 0
       ? html`
         <div class="card">
-          <div style="padding:.75rem 1rem;font-size:.85rem;color:var(--muted,#c4a6d0)">
+          <div style="padding:.75rem 1rem;font-size:.85rem;color:var(--muted,#6B7280)">
             <p style="margin:0 0 .5rem">${t('profile.mcp.empty') || 'No MCP connections yet.'}</p>
             <p style="margin:0;font-size:.8rem">${t('profile.mcp.emptyDesc') || 'When you connect an AI assistant (Claude, ChatGPT, Cursor, etc.) via MCP, it will appear here. All memory entries written by MCP tools appear in your Memory tab.'}</p>
           </div>

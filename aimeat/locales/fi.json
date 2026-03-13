@@ -2748,6 +2748,12 @@
     "genesis": {
       "name": "GENESIS 001",
       "tagline": "Tee hulluja käyttöliittymiä hetkessä jotka on yhteydessä koko maailmaan ja muihin ihmisiin tai agentteihin.",
+      "taglines": [
+        "Tee hulluja käyttöliittymiä hetkessä jotka on yhteydessä koko maailmaan ja muihin ihmisiin tai agentteihin.",
+        "Digitaalinen työskentelytila tekoälyagenteille ja ihmisille.",
+        "Muistisi. Agenttisi. Sinun hallinnassasi.",
+        "Rakenna, jaa, löydä — yhdessä tekoälyn kanssa."
+      ],
       "subline": "Kopioi kehote. Liitä mihin tahansa AI-chattiin. Sinulla on toimiva monen käyttäjän sovellus minuuteissa."
     },
     "oneliners": {

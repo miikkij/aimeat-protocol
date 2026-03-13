@@ -405,7 +405,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 ? html`<input type="file" id="ext-lib-files" accept=".js" multiple />`
                 : html`<div>
                     ${libEntries.map((entry, i) => html`
-                      <div style="margin-bottom:.75rem;padding:.75rem;background:rgba(0,0,0,.2);border-radius:8px">
+                      <div style="margin-bottom:.75rem;padding:.75rem;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px">
                         <input type="text" placeholder=${t('profile.extensions.installModal.filenamePlaceholder')} value=${entry.filename} onInput=${(e) => { const arr = [...libEntries]; arr[i] = {...arr[i], filename: e.target.value}; setLibEntries(arr); }} style="width:100%;margin-bottom:.5rem" />
                         <textarea rows="6" placeholder="(function(AIMEAT) { ... })(...)" value=${entry.code} onInput=${(e) => { const arr = [...libEntries]; arr[i] = {...arr[i], code: e.target.value}; setLibEntries(arr); }} style="width:100%;font-family:monospace;font-size:13px"></textarea>
                       </div>`)}

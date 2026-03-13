@@ -114,7 +114,7 @@ export default function DataWalletTab({ session, showToast }) {
             <div style="font-size:.75rem;color:var(--muted)">${t('permissions.summaryActiveRules')}</div>
           </div>
           <div style="text-align:center">
-            <div style="font-size:1.4rem;font-weight:700;color:#8b5cf6">${permSummary.total_memory_keys || 0}</div>
+            <div style="font-size:1.4rem;font-weight:700;color:var(--love1,#E8564A)">${permSummary.total_memory_keys || 0}</div>
             <div style="font-size:.75rem;color:var(--muted)">${t('permissions.summaryMemoryKeys')}</div>
           </div>
           <div style="text-align:center">
