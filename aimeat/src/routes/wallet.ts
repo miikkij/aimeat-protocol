@@ -112,7 +112,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/wallet/history — transaction history (DEPRECATED: use /v1/wallet/transactions)
-  router.get('/v1/wallet/history', requireAuth(), requireRole('agent'), requireScope('wallet:read'), async (req, res) => {
+  router.get('/v1/wallet/history', requireAuth(), async (req, res) => {
     res.setHeader('X-Deprecated', 'Use GET /v1/wallet/transactions instead');
     res.setHeader('Deprecation', 'true');
     res.setHeader('Sunset', '2026-09-01');
@@ -138,42 +138,80 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
-  // POST /v1/wallet/request — request morsels from operator (agent auth)
-  router.post('/v1/wallet/request', requireAuth(), requireRole('agent'), requireScope('wallet:read'), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
-    const gaii = req.auth!.sub;
+  // POST /v1/wallet/request — request morsels (agent or owner auth)
+  router.post('/v1/wallet/request', requireAuth(), validateBody(MorselRequestSchema, config.nodeId), async (req, res) => {
+    const roles = req.auth!.roles;
+    const isOwner = roles.includes('owner');
+    const isAgent = roles.includes('agent');
     const { amount, reason } = req.body ?? {};
-
-    // Auto-approve small requests (up to daily allowance), log for operator review
     const grantAmount = Math.min(amount ?? config.dailyAllowance, config.dailyAllowance);
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', 'Agent not found'));
+
+    if (isAgent) {
+      const gaii = req.auth!.sub;
+      const agent = await storage.getAgent(gaii);
+      if (!agent) {
+        res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', 'Agent not found'));
+        return;
+      }
+
+      const credited = await storage.creditBalanceCapped(gaii, grantAmount, config.dailyAllowanceCap);
+      if (credited <= 0) {
+        res.status(409).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+          `Balance is already at or above accumulation cap of ${config.dailyAllowanceCap}`));
+        return;
+      }
+
+      await storage.addTransaction({
+        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        gaii,
+        type: 'allowance',
+        amount: credited,
+        timestamp: new Date().toISOString(),
+      });
+
+      const updatedAgent = await storage.getAgent(gaii);
+      res.json(success(config.nodeId, {
+        '@type': 'schema:TransferAction',
+        granted: credited,
+        new_balance: updatedAgent?.morselBalance ?? 0,
+        reason,
+      }));
+    } else if (isOwner) {
+      const ownerName = req.auth!.owner as string;
+      const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+      if (!ghiiRecord) {
+        res.status(404).json(error(config.nodeId, 'USER_NOT_FOUND', 'Owner not found'));
+        return;
+      }
+
+      const currentBalance = ghiiRecord.morselBalance ?? 0;
+      if (currentBalance >= config.dailyAllowanceCap) {
+        res.status(409).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+          `Balance is already at or above accumulation cap of ${config.dailyAllowanceCap}`));
+        return;
+      }
+      const credited = Math.min(grantAmount, config.dailyAllowanceCap - currentBalance);
+
+      await storage.updateGHII(ghiiRecord.ghii, { morselBalance: currentBalance + credited });
+
+      await storage.addTransaction({
+        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        gaii: ghiiRecord.ghii,
+        type: 'allowance',
+        amount: credited,
+        timestamp: new Date().toISOString(),
+      });
+
+      res.json(success(config.nodeId, {
+        '@type': 'schema:TransferAction',
+        granted: credited,
+        new_balance: currentBalance + credited,
+        reason,
+      }));
+    } else {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Requires agent or owner role'));
       return;
     }
-
-    // Use atomic creditBalanceCapped to prevent TOCTOU race conditions
-    const credited = await storage.creditBalanceCapped(gaii, grantAmount, config.dailyAllowanceCap);
-    if (credited <= 0) {
-      res.status(409).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-        `Balance is already at or above accumulation cap of ${config.dailyAllowanceCap}`));
-      return;
-    }
-
-    await storage.addTransaction({
-      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      gaii,
-      type: 'allowance',
-      amount: credited,
-      timestamp: new Date().toISOString(),
-    });
-
-    const updatedAgent = await storage.getAgent(gaii);
-    res.json(success(config.nodeId, {
-      '@type': 'schema:TransferAction',
-      granted: credited,
-      new_balance: updatedAgent?.morselBalance ?? 0,
-      reason,
-    }));
     emitChange('wallet');
   });
 
