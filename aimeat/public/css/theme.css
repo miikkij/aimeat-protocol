@@ -239,6 +239,9 @@ a { color: inherit; text-decoration: none; }
   animation: none;
   filter: none;
 }
+.topnav-brand .brand-at {
+  color: var(--accent);
+}
 
 .topnav-center {
   display: flex;

@@ -213,36 +213,40 @@ export default function Profile({ navigate, locale }) {
     <div class="bg-aurora" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none">
       <div class="aurora-wave"></div><div class="aurora-wave"></div><div class="aurora-wave"></div>
     </div>
-    <div class="pf">
-      <!-- Profile header -->
-      <div class="profile-header">
-        <div class="avatar">\u{1F9D1}</div>
-        <div class="profile-info">
-          <h1>${escHtml(session.displayName || session.owner)}</h1>
-          <div class="ghii">${escHtml(session.ghii || '')}</div>
-          <div class="meta">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
+    <div class="pf-hero">
+      <div class="pf-hero-inner">
+        <!-- Profile header -->
+        <div class="profile-header">
+          <div class="avatar">\u{1F9D1}</div>
+          <div class="profile-info">
+            <h1>${escHtml(session.displayName || session.owner)}</h1>
+            <div class="ghii">${escHtml(session.ghii || '')}</div>
+            <div class="meta">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
+          </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div class="stats-bar">
+          <div class="stat-card"><div class="num">${stats.agents}</div><div class="label">${t('profile.stats.agents')}</div></div>
+          <div class="stat-card"><div class="num">${stats.chatSessions}</div><div class="label">${t('profile.stats.chatSessions')}</div></div>
+          <div class="stat-card"><div class="num">${stats.balance}</div><div class="label">${t('profile.stats.morsels')}</div></div>
+          <div class="stat-card"><div class="num">${stats.memory}</div><div class="label">${t('profile.stats.memories')}</div></div>
+          <div class="stat-card"><div class="num">${stats.services}</div><div class="label">${t('profile.stats.services')}</div></div>
+          <div class="stat-card"><div class="num">${stats.work}</div><div class="label">${t('profile.stats.tasks')}</div></div>
+          <div class="stat-card"><div class="num">${stats.apps}</div><div class="label">${t('profile.stats.apps')}</div></div>
+          <div class="stat-card"><div class="num">${stats.files}</div><div class="label">${t('profile.stats.files')}</div></div>
+          <div class="stat-card"><div class="num">${stats.nodes}</div><div class="label">${t('profile.stats.nodes')}</div></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          ${TABS.map(tab => html`
+            <button class="tab ${activeTab === tab.id ? 'active' : ''}" onClick=${() => switchTab(tab.id)}>${t(tab.key)}</button>
+          `)}
         </div>
       </div>
-
-      <!-- Stats bar -->
-      <div class="stats-bar">
-        <div class="stat-card"><div class="num">${stats.agents}</div><div class="label">${t('profile.stats.agents')}</div></div>
-        <div class="stat-card"><div class="num">${stats.chatSessions}</div><div class="label">${t('profile.stats.chatSessions')}</div></div>
-        <div class="stat-card"><div class="num">${stats.balance}</div><div class="label">${t('profile.stats.morsels')}</div></div>
-        <div class="stat-card"><div class="num">${stats.memory}</div><div class="label">${t('profile.stats.memories')}</div></div>
-        <div class="stat-card"><div class="num">${stats.services}</div><div class="label">${t('profile.stats.services')}</div></div>
-        <div class="stat-card"><div class="num">${stats.work}</div><div class="label">${t('profile.stats.tasks')}</div></div>
-        <div class="stat-card"><div class="num">${stats.apps}</div><div class="label">${t('profile.stats.apps')}</div></div>
-        <div class="stat-card"><div class="num">${stats.files}</div><div class="label">${t('profile.stats.files')}</div></div>
-        <div class="stat-card"><div class="num">${stats.nodes}</div><div class="label">${t('profile.stats.nodes')}</div></div>
-      </div>
-
-      <!-- Tabs -->
-      <div class="tabs">
-        ${TABS.map(tab => html`
-          <button class="tab ${activeTab === tab.id ? 'active' : ''}" onClick=${() => switchTab(tab.id)}>${t(tab.key)}</button>
-        `)}
-      </div>
+    </div>
+    <div class="pf">
 
       <!-- Tab panels: mount once on first visit, show/hide with display -->
       ${TABS.filter(tab => visitedTabs.has(tab.id)).map(tab => html`

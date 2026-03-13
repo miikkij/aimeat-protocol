@@ -8,75 +8,13 @@ import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent, enqueueTask, pollResults, pollLogs,
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
-  getListeners, buildAgentSetupPrompt,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildComponentPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
 
-/* ── Agent Listener Status ───────────────────────────── */
-
-function AgentListenerBar({ showToast }) {
-  const [listeners, setListeners] = useState([]);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [nodeUrl, setNodeUrl] = useState('');
-
-  useEffect(() => {
-    loadListeners();
-    apiGet('/v1/node').then(resp => {
-      setNodeUrl(resp?.data?.this_node?.base_url || resp?.data?.base_url || window.location.origin);
-    }).catch(() => setNodeUrl(window.location.origin));
-  }, []);
-
-  async function loadListeners() {
-    setListeners(await getListeners());
-  }
-
-  function handleCopyPrompt() {
-    const prompt = buildAgentSetupPrompt(nodeUrl || window.location.origin);
-    navigator.clipboard.writeText(prompt).catch(() => {});
-    showToast?.(t('profile.generator.agentPromptCopied'));
-  }
-
-  const online = listeners.filter(l => l.online);
-  const lastSync = online.length > 0
-    ? new Date(Math.max(...online.map(l => new Date(l.lastPoll).getTime()))).toLocaleTimeString()
-    : null;
-
-  return html`
-    <div class="pf-gen-listener-bar">
-      <div class="pf-gen-listener-status">
-        <span class="pf-gen-listener-dot ${online.length > 0 ? 'online' : 'offline'}"></span>
-        <span class="pf-gen-listener-count">
-          ${online.length > 0
-            ? `${online.length} ${t('profile.generator.agentsListening')}`
-            : t('profile.generator.noAgentsListening')}
-        </span>
-        ${lastSync && html`
-          <span class="pf-gen-listener-sync">${t('profile.generator.lastSync')}: ${lastSync}</span>
-        `}
-      </div>
-      <div class="pf-gen-listener-actions">
-        <button class="btn btn-sm btn-outline" onClick=${() => setShowPrompt(!showPrompt)}>
-          ${showPrompt ? t('profile.generator.hideSetup') : t('profile.generator.agentSetup')}
-        </button>
-        <button class="btn btn-sm btn-ghost" onClick=${loadListeners}>↻</button>
-      </div>
-    </div>
-    ${showPrompt && html`
-      <div class="pf-gen-agent-prompt-panel">
-        <p class="pf-gen-subtitle">${t('profile.generator.agentSetupDesc')}</p>
-        <pre class="pf-gen-prompt-box">${buildAgentSetupPrompt(nodeUrl || window.location.origin)}</pre>
-        <button class="btn btn-sm btn-primary" onClick=${handleCopyPrompt}>
-          ${t('profile.generator.copyAgentPrompt')}
-        </button>
-      </div>
-    `}
-  `;
-}
-
 /* ── Sub-views ───────────────────────────────────────── */
 
-function ProjectListView({ onSelect, onCreate, showToast }) {
+function ProjectListView({ onSelect, onCreate }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -116,7 +54,6 @@ function ProjectListView({ onSelect, onCreate, showToast }) {
           <button class="btn btn-primary" onClick=${onCreate}>+ ${t('profile.generator.newProject')}</button>
         </div>
       </div>
-      <${AgentListenerBar} showToast=${showToast} />
       ${filtered.length === 0 && html`
         <div class="pf-gen-empty">${t('profile.generator.empty')}</div>
       `}
@@ -564,5 +501,5 @@ export default function GeneratorTab({ session, showToast }) {
       showToast=${showToast}
     />`;
   }
-  return html`<${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} showToast=${showToast} />`;
+  return html`<${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} />`;
 }
