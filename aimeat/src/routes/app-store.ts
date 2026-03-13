@@ -8,20 +8,32 @@ import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 
 /**
- * App Marketplace routes — purchase flow, license verification, purchase history.
+ * @file app-store.ts
+ * @description App Store routes — purchase flow, license verification, purchase history.
+ *   Handles morsel-based app purchases with immutable receipts and cryptographic proofs.
+ *
+ * @structure
+ *   - POST /v1/app-store/purchase — Buy an app with morsels
+ *   - GET  /v1/app-store/purchases — List buyer's purchase history
+ *   - GET  /v1/app-store/purchases/:txId — Get full purchase detail with content
+ *   - GET  /v1/app-store/sales — List seller's sales history
+ *   - GET  /v1/app-store/license-check — Verify app license
  *
  * Domain separation:
- * - Wallet (morsel.ts): balance tracking, morsel transfers
- * - Marketplace (this file): purchase records, license verification, content snapshots, proofs
- * - Apps (apps.ts): app storage, versioning, manifest, search
+ *   - Wallet (wallet.ts): balance tracking, morsel transfers
+ *   - App Store (this file): purchase records, license verification, content snapshots, proofs
+ *   - Apps (apps.ts): app storage, versioning, manifest, search
+ *
+ * @version-history
+ *   v1.0.0 — 2026-03-13 — Renamed from marketplace.ts to app-store.ts; routes /v1/marketplace/* → /v1/app-store/*
  */
-export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Router {
+export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
-    // POST /v1/marketplace/purchase — Purchase an app
-    router.post('/v1/marketplace/purchase', requireAuth(), async (req, res) => {
+    // POST /v1/app-store/purchase — Purchase an app
+    router.post('/v1/app-store/purchase', requireAuth(), async (req, res) => {
         if (!config.marketplaceEnabled) {
-            res.status(403).json(error(config.nodeId, 'MARKETPLACE_DISABLED', 'App marketplace payments are not enabled on this node'));
+            res.status(403).json(error(config.nodeId, 'APP_STORE_DISABLED', 'App store payments are not enabled on this node'));
             return;
         }
 
@@ -126,7 +138,7 @@ export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Ro
             await storage.addTransaction({
                 id: `tx-${Date.now()}-${randomBytes(4).toString('hex')}`,
                 gaii: app.ownerGaii,
-                type: 'marketplace_fee',
+                type: 'app_store_fee',
                 amount: -transactionFee,
                 trackingCode: txId,
                 timestamp: now,
@@ -187,14 +199,14 @@ export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Ro
             buyer_balance: buyer.morselBalance - totalCost,
             note: `Purchased "${purchase.appName}" (${licenseType} license). The full app content is included in this receipt.`,
         }, [
-            { description: 'View purchase details', method: 'GET', url: `/v1/marketplace/purchases/${txId}` },
-            { description: 'List all purchases', method: 'GET', url: '/v1/marketplace/purchases' },
+            { description: 'View purchase details', method: 'GET', url: `/v1/app-store/purchases/${txId}` },
+            { description: 'List all purchases', method: 'GET', url: '/v1/app-store/purchases' },
         ]));
-        emitChange('marketplace');
+        emitChange('app-store');
     });
 
-    // GET /v1/marketplace/purchases — List buyer's purchases
-    router.get('/v1/marketplace/purchases', requireAuth(), async (req, res) => {
+    // GET /v1/app-store/purchases — List buyer's purchases
+    router.get('/v1/app-store/purchases', requireAuth(), async (req, res) => {
         const gaii = req.auth!.sub;
         const purchases = await storage.listAppPurchasesByBuyer(gaii);
 
@@ -213,8 +225,8 @@ export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Ro
         }));
     });
 
-    // GET /v1/marketplace/purchases/:txId — Get specific purchase (includes full content)
-    router.get('/v1/marketplace/purchases/:txId', requireAuth(), async (req, res) => {
+    // GET /v1/app-store/purchases/:txId — Get specific purchase (includes full content)
+    router.get('/v1/app-store/purchases/:txId', requireAuth(), async (req, res) => {
         const gaii = req.auth!.sub;
         const txId = req.params.txId as string;
 
@@ -250,8 +262,8 @@ export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Ro
         }));
     });
 
-    // GET /v1/marketplace/sales — List seller's sales
-    router.get('/v1/marketplace/sales', requireAuth(), async (req, res) => {
+    // GET /v1/app-store/sales — List seller's sales
+    router.get('/v1/app-store/sales', requireAuth(), async (req, res) => {
         const gaii = req.auth!.sub;
         const sales = await storage.listAppPurchasesBySeller(gaii);
 
@@ -271,8 +283,8 @@ export function appMarketplaceRouter(config: AimeatConfig, storage: Storage): Ro
         }));
     });
 
-    // GET /v1/marketplace/license-check — Check if user has valid license for an app
-    router.get('/v1/marketplace/license-check', requireAuth(), async (req, res) => {
+    // GET /v1/app-store/license-check — Check if user has valid license for an app
+    router.get('/v1/app-store/license-check', requireAuth(), async (req, res) => {
         const gaii = req.auth!.sub;
         const appFilename = req.query.app_filename as string;
         const appOwner = req.query.app_owner as string;

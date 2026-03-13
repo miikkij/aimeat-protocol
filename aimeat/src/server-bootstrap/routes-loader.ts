@@ -49,7 +49,7 @@ import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
 import { libsRouter } from '../routes/libs.js';
 import { appsRouter } from '../routes/apps.js';
-import { appMarketplaceRouter } from '../routes/marketplace.js';
+import { appStoreRouter } from '../routes/app-store.js';
 import { flagsRouter } from '../routes/flags.js';
 import { appealsRouter } from '../routes/appeals.js';
 import { matchesRouter } from '../routes/matches.js';
@@ -277,7 +277,7 @@ export function mountRoutes(
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage, peers));
-  app.use(appMarketplaceRouter(config, storage));
+  app.use(appStoreRouter(config, storage));
   // Node Extensions (V8 Isolates)
   if (config.extensionsEnabled) {
     app.use(extensionsRouter(config, storage, scheduler));

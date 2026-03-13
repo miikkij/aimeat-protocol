@@ -2716,7 +2716,7 @@
       "empty": "No purchases yet.",
       "seller": "Seller",
       "code": "Code",
-      "rateHint": "Rate: POST /v1/marketplace/purchases/",
+      "rateHint": "Rate: POST /v1/app-store/purchases/",
       "authRequired": "Sign in to view your purchases.",
       "error": "Could not load page.",
       "unknown": "Unknown"

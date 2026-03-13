@@ -2716,7 +2716,7 @@
       "empty": "Ei vielä ostoksia.",
       "seller": "Myyjä",
       "code": "Koodi",
-      "rateHint": "Arvostele: POST /v1/marketplace/purchases/",
+      "rateHint": "Arvostele: POST /v1/app-store/purchases/",
       "authRequired": "Kirjaudu sisään nähdäksesi ostoksesi.",
       "error": "Sivua ei voitu ladata.",
       "unknown": "Tuntematon"

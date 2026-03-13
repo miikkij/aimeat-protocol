@@ -177,12 +177,12 @@ export function bootstrapRouter(
       },
 
       commerce: {
-        description: 'Morsel-based marketplace for purchasing and selling apps and services.',
+        description: 'App store for purchasing apps with morsels.',
         endpoints: {
-          marketplace_purchase: { method: 'POST', url: '/v1/marketplace/purchase', description: 'Purchase apps or services with morsels', tier: 1 },
-          marketplace_purchases: { method: 'GET', url: '/v1/marketplace/purchases', description: 'View your purchase history and receipts', tier: 1 },
-          marketplace_sales: { method: 'GET', url: '/v1/marketplace/sales', description: 'View your sales as a publisher', tier: 1 },
-          license_check: { method: 'GET', url: '/v1/marketplace/license-check', description: 'Verify a purchase license for an app', tier: 1 },
+          app_store_purchase: { method: 'POST', url: '/v1/app-store/purchase', description: 'Purchase apps with morsels', tier: 1 },
+          app_store_purchases: { method: 'GET', url: '/v1/app-store/purchases', description: 'View your purchase history and receipts', tier: 1 },
+          app_store_sales: { method: 'GET', url: '/v1/app-store/sales', description: 'View your sales as a publisher', tier: 1 },
+          license_check: { method: 'GET', url: '/v1/app-store/license-check', description: 'Verify a purchase license for an app', tier: 1 },
         },
       },
 

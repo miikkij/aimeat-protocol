@@ -194,7 +194,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) {
             if (!req.auth) {
                 res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED',
-                    'This is a paid app. Authenticate and purchase it first via POST /v1/marketplace/purchase'));
+                    'This is a paid app. Authenticate and purchase it first via POST /v1/app-store/purchase'));
                 return;
             }
             // Seller can always download their own app
@@ -202,7 +202,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 const hasLicense = await storage.hasValidLicense(req.auth.sub, app.ownerGaii, filename);
                 if (!hasLicense) {
                     res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED',
-                        `This app costs ${app.manifest.priceMorsels} morsels. Purchase it first via POST /v1/marketplace/purchase`));
+                        `This app costs ${app.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase`));
                     return;
                 }
             }
