@@ -887,9 +887,11 @@
       "lastSync": "Viimeisin synkronointi",
       "agentSetup": "Agentin asennus",
       "hideSetup": "Piilota asennus",
-      "agentSetupDesc": "Kopioi tämä prompt ja liitä se AI-agenttiisi aloittaaksesi generaattorijonon kuuntelun.",
+      "agentSetupDesc": "Luo uuden generaattoriagentin avaimineen ja kopioi asennuspromptin leikepöydälle. Liitä se AI-agenttiisi kuuntelun aloittamiseksi.",
       "copyAgentPrompt": "Kopioi agentin prompt",
-      "agentPromptCopied": "Agentin asennusprompt kopioitu!",
+      "agentPromptCopied": "Agentti luotu ja asennusprompt kopioitu!",
+      "creatingAgent": "Luodaan agenttia...",
+      "agentCreateFailed": "Generaattoriagentin luonti epäonnistui. Tarkista että olet kirjautunut.",
       "status": {
         "not_started": "Ei aloitettu",
         "prompt_ready": "Prompt valmis",

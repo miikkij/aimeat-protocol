@@ -8,17 +8,18 @@ import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent, enqueueTask, pollResults, pollLogs,
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
-  getListeners, buildAgentSetupPrompt,
+  getListeners, buildAgentSetupPrompt, createGeneratorAgent,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildComponentPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
 
 /* ── Agent Listener Status ───────────────────────────── */
 
-function AgentListenerBar({ showToast }) {
+function AgentListenerBar({ showToast, session }) {
   const [listeners, setListeners] = useState([]);
   const [showPrompt, setShowPrompt] = useState(false);
   const [nodeUrl, setNodeUrl] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     loadListeners();
@@ -31,10 +32,25 @@ function AgentListenerBar({ showToast }) {
     setListeners(await getListeners());
   }
 
-  function handleCopyPrompt() {
-    const prompt = buildAgentSetupPrompt(nodeUrl || window.location.origin);
-    navigator.clipboard.writeText(prompt).catch(() => {});
-    showToast?.(t('profile.generator.agentPromptCopied'));
+  async function handleCopyPrompt() {
+    const url = nodeUrl || window.location.origin;
+    const ownerName = session?.owner;
+    if (!ownerName) {
+      showToast?.(t('profile.generator.agentCreateFailed'));
+      return;
+    }
+    setCreating(true);
+    try {
+      const creds = await createGeneratorAgent(ownerName);
+      const prompt = buildAgentSetupPrompt(url, creds);
+      await navigator.clipboard.writeText(prompt);
+      showToast?.(t('profile.generator.agentPromptCopied'));
+    } catch (err) {
+      console.error('Failed to create generator agent:', err);
+      showToast?.(t('profile.generator.agentCreateFailed'));
+    } finally {
+      setCreating(false);
+    }
   }
 
   const online = listeners.filter(l => l.online);
@@ -62,8 +78,8 @@ function AgentListenerBar({ showToast }) {
     ${showPrompt && html`
       <div class="pf-gen-agent-prompt-panel">
         <p class="pf-gen-subtitle">${t('profile.generator.agentSetupDesc')}</p>
-        <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}>
-          ${t('profile.generator.copyAgentPrompt')}
+        <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt} disabled=${creating}>
+          ${creating ? t('profile.generator.creatingAgent') : t('profile.generator.copyAgentPrompt')}
         </button>
       </div>
     `}
@@ -72,7 +88,7 @@ function AgentListenerBar({ showToast }) {
 
 /* ── Sub-views ───────────────────────────────────────── */
 
-function ProjectListView({ onSelect, onCreate, showToast }) {
+function ProjectListView({ onSelect, onCreate, showToast, session }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
@@ -102,7 +118,7 @@ function ProjectListView({ onSelect, onCreate, showToast }) {
 
   return html`
     <div class="pf-gen-project-list">
-      <${AgentListenerBar} showToast=${showToast} />
+      <${AgentListenerBar} showToast=${showToast} session=${session} />
       <div class="pf-gen-header">
         <h3>${t('profile.generator.title')}</h3>
         <div class="pf-gen-header-actions">
@@ -560,5 +576,5 @@ export default function GeneratorTab({ session, showToast }) {
       showToast=${showToast}
     />`;
   }
-  return html`<${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} showToast=${showToast} />`;
+  return html`<${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} showToast=${showToast} session=${session} />`;
 }

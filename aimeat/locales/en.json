@@ -887,9 +887,11 @@
       "lastSync": "Last sync",
       "agentSetup": "Agent Setup",
       "hideSetup": "Hide Setup",
-      "agentSetupDesc": "Copy this prompt and paste it into your AI agent to start listening to the generator queue.",
+      "agentSetupDesc": "Creates a new generator agent with credentials and copies the setup prompt to your clipboard. Paste it into your AI agent to start listening.",
       "copyAgentPrompt": "Copy Agent Prompt",
-      "agentPromptCopied": "Agent setup prompt copied!",
+      "agentPromptCopied": "Agent created and setup prompt copied!",
+      "creatingAgent": "Creating agent...",
+      "agentCreateFailed": "Failed to create generator agent. Check that you are logged in.",
       "status": {
         "not_started": "Not started",
         "prompt_ready": "Prompt ready",

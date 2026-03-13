@@ -236,21 +236,130 @@ export async function getListeners() {
   } catch { return []; }
 }
 
-export function buildAgentSetupPrompt(nodeUrl) {
-  return `You are an AIMEAT Generator Agent. Your job is to poll the generator task queue, process pending tasks, and write results back.
+/* ── Generator Agent Setup ──────────────────────────── */
 
+/**
+ * Create a dedicated generator agent via POST /v1/agents.
+ * Returns { gaii, privateKey, publicKey, name } or throws on failure.
+ */
+export async function createGeneratorAgent(ownerName) {
+  const agentName = 'generator-' + Date.now().toString(36);
+  const resp = await apiPost('/v1/agents', {
+    name: agentName,
+    owner: ownerName,
+    display_name: 'Generator Agent',
+    description: 'Auto-created agent for the service generator queue',
+    capabilities: ['generator'],
+  });
+  const data = resp?.data || resp;
+  return {
+    gaii: data.agent?.gaii,
+    name: agentName,
+    privateKey: data.private_key,
+    publicKey: data.public_key,
+  };
+}
+
+export function buildAgentSetupPrompt(nodeUrl, credentials) {
+  const { gaii, name, privateKey } = credentials || {};
+
+  const credentialsBlock = gaii && privateKey ? `
+## Your Credentials
+
+- **GAII:** \`${gaii}\`
+- **Agent name:** \`${name}\`
+- **Private key (Ed25519, base64):** \`${privateKey}\`
+
+> Store these securely. The private key cannot be retrieved again.
+
+## Authentication
+
+Before making any API call, you must obtain a JWT token. The auth uses Ed25519 signature-based authentication.
+
+### How to authenticate
+
+1. Generate a current ISO timestamp
+2. Concatenate your GAII + timestamp into a single string
+3. Sign that string with your Ed25519 private key
+4. POST the result to get a JWT
+
+**POST ${nodeUrl}/v1/auth/token**
+\`\`\`json
+{
+  "gaii": "${gaii}",
+  "timestamp": "<current ISO timestamp>",
+  "signature": "<base64 Ed25519 signature of (gaii + timestamp)>"
+}
+\`\`\`
+
+**Example using Node.js:**
+\`\`\`javascript
+import * as ed from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha512';
+ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
+
+const GAII = '${gaii}';
+const PRIVATE_KEY = '${privateKey}';
+
+async function authenticate(nodeUrl) {
+  const timestamp = new Date().toISOString();
+  const message = GAII + timestamp;
+  const msgBytes = new TextEncoder().encode(message);
+  const keyBytes = Uint8Array.from(atob(PRIVATE_KEY), c => c.charCodeAt(0));
+  const sigBytes = await ed.signAsync(msgBytes, keyBytes);
+  const signature = btoa(String.fromCharCode(...sigBytes));
+
+  const resp = await fetch(nodeUrl + '/v1/auth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gaii: GAII, timestamp, signature }),
+  });
+  const data = await resp.json();
+  return data.data.token; // JWT Bearer token
+}
+\`\`\`
+
+**Example using Python:**
+\`\`\`python
+import base64, json, requests
+from datetime import datetime, timezone
+from nacl.signing import SigningKey
+
+GAII = '${gaii}'
+PRIVATE_KEY = '${privateKey}'
+
+def authenticate(node_url):
+    timestamp = datetime.now(timezone.utc).isoformat()
+    message = (GAII + timestamp).encode()
+    key_bytes = base64.b64decode(PRIVATE_KEY)
+    signing_key = SigningKey(key_bytes)
+    signature = base64.b64encode(signing_key.sign(message).signature).decode()
+
+    resp = requests.post(f'{node_url}/v1/auth/token', json={
+        'gaii': GAII, 'timestamp': timestamp, 'signature': signature
+    })
+    return resp.json()['data']['token']  # JWT Bearer token
+\`\`\`
+
+Include the JWT as \`Authorization: Bearer <token>\` in all subsequent requests.
+The token expires (check \`expires_at\` in the response) — re-authenticate when needed.` : `
 ## Setup
 1. Authenticate with the AIMEAT node at: ${nodeUrl}
    - POST ${nodeUrl}/v1/auth/token with your agent credentials
    - Include the JWT as Bearer token in all subsequent requests
 
-2. Register with capability "generator" if not already done.
+2. Register with capability "generator" if not already done.`;
+
+  return `You are an AIMEAT Generator Agent. Your job is to poll the generator task queue, process pending tasks, and write results back.
+
+**Node URL:** ${nodeUrl}
+${credentialsBlock}
 
 ## Poll Loop (repeat every 15-30 seconds)
 
 ### Step 1: Write heartbeat
-PUT ${nodeUrl}/v1/memory/generator.listeners.{your-agent-id}
-Body: { "value": { "gaii": "{your-gaii}", "name": "{your-name}", "lastPoll": "{ISO timestamp}", "status": "active" }, "visibility": "owner" }
+PUT ${nodeUrl}/v1/memory/generator.listeners.${gaii ? name : '{your-agent-id}'}
+Body: { "value": { "gaii": "${gaii || '{your-gaii}'}", "name": "${name || '{your-name}'}", "lastPoll": "{ISO timestamp}", "status": "active" }, "visibility": "owner" }
 
 ### Step 2: Scan for pending tasks
 GET ${nodeUrl}/v1/memory?prefix=generator.&visibility=owner
@@ -259,7 +368,7 @@ Filter items where key contains ".queue." and value.status === "pending".
 ### Step 3: Claim a task (optimistic locking)
 For each pending task at key K with version V:
 PUT ${nodeUrl}/v1/memory/{K}
-Body: { "value": { ...task, "status": "processing", "claimedBy": "{your-gaii}" }, "visibility": "owner", "version": V }
+Body: { "value": { ...task, "status": "processing", "claimedBy": "${gaii || '{your-gaii}'}" }, "visibility": "owner", "version": V }
 If 409 Conflict → another agent claimed it, skip.
 
 ### Step 4: Process the task
