@@ -383,5 +383,21 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
+  // Encrypted chat example app — standalone HTML (not SPA)
+  router.get('/v1/echat', (_req, res) => {
+    const htmlPath = resolvePublicFile('echat.html');
+    if (htmlPath) {
+      let html = readFileSync(htmlPath, 'utf-8');
+      const nonce = res.locals.cspNonce as string || '';
+      if (nonce) {
+        html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+        html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+      }
+      res.type('text/html').send(html);
+    } else {
+      res.status(404).type('text/plain').send('Encrypted chat page not found');
+    }
+  });
+
   return router;
 }

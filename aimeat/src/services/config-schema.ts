@@ -185,6 +185,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'matchNotificationEnabled', dotPath: 'match_notifications.enabled', envVar: 'AIMEAT_MATCH_NOTIFICATION_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Match notification emails enabled' },
   { key: 'matchNotificationIntervalHours', dotPath: 'match_notifications.interval_hours', envVar: 'AIMEAT_MATCH_NOTIFICATION_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between match notification batches', range: '1-168' },
 
+  // ── Encrypted Chat (mutable) ──
+  { key: 'echatAnonymous', dotPath: 'echat.anonymous', envVar: 'AIMEAT_ECHAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous encrypted chat WebSocket connections' },
+
   // ── Consul (immutable — set before startup) ──
   { key: 'consulEnabled', dotPath: 'consul.enabled', envVar: 'AIMEAT_CONSUL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Enable Consul integration' },
   { key: 'consulUrl', dotPath: 'consul.url', envVar: 'AIMEAT_CONSUL_URL', type: 'string', validate: () => true, immutable: true, description: 'Consul HTTP URL' },

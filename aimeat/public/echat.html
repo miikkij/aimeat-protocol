@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIMEAT Encrypted Chat</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "preact": "/lib/preact.mjs",
+      "preact/hooks": "/lib/preact-hooks.mjs",
+      "htm": "/lib/htm.mjs"
+    }
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #14141f;
+      --surface-hover: #1a1a2e;
+      --border: #2a2a3e;
+      --text: #e0e0e8;
+      --text-muted: #8888a0;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --radius: 8px;
+      --font: system-ui, -apple-system, sans-serif;
+      --mono: 'SF Mono', 'Cascadia Code', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+    #app { width: 100%; max-width: 900px; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* Join screen */
+    .join-container { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 2rem; }
+    .join-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; width: 100%; max-width: 420px; }
+    .join-card h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .join-card p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .field input { width: 100%; padding: 0.6rem 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.95rem; outline: none; }
+    .field input:focus { border-color: var(--accent); }
+    .btn-primary { width: 100%; padding: 0.7rem; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 0.95rem; cursor: pointer; font-weight: 500; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; }
+
+    /* Chat screen */
+    .chat-container { display: flex; flex-direction: column; height: 100vh; }
+    .chat-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .chat-header .room-name { font-weight: 600; flex: 1; }
+    .chat-header .lock { color: var(--success); font-size: 0.85rem; }
+    .chat-header .count { color: var(--text-muted); font-size: 0.85rem; }
+    .btn-leave { padding: 0.35rem 0.75rem; background: transparent; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
+    .btn-leave:hover { border-color: var(--danger); color: var(--danger); }
+
+    .chat-body { display: flex; flex: 1; overflow: hidden; }
+    .participants { width: 180px; background: var(--surface); border-right: 1px solid var(--border); padding: 0.75rem; overflow-y: auto; }
+    .participants h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .participant { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0; font-size: 0.85rem; }
+    .participant .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+
+    .messages { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .msg-list { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .msg { max-width: 80%; }
+    .msg .meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem; }
+    .msg .meta .name { font-weight: 600; color: var(--text); }
+    .msg .body { background: var(--surface); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-size: 0.9rem; line-height: 1.4; word-break: break-word; }
+    .msg.mine { align-self: flex-end; }
+    .msg.mine .body { background: var(--accent); color: #fff; }
+    .msg.system { align-self: center; max-width: 100%; }
+    .msg.system .body { background: transparent; color: var(--text-muted); font-size: 0.8rem; font-style: italic; text-align: center; padding: 0.25rem; }
+    .msg.decrypt-fail .body { background: var(--danger); color: #fff; opacity: 0.7; font-style: italic; }
+
+    .chat-input { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; background: var(--surface); border-top: 1px solid var(--border); }
+    .chat-input input { flex: 1; padding: 0.6rem 0.8rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 0.95rem; outline: none; }
+    .chat-input input:focus { border-color: var(--accent); }
+    .chat-input button { padding: 0.6rem 1.2rem; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); cursor: pointer; font-size: 0.9rem; }
+
+    .chat-footer { padding: 0.4rem 1rem; text-align: center; font-size: 0.7rem; color: var(--text-muted); background: var(--surface); border-top: 1px solid var(--border); }
+
+    @media (max-width: 600px) {
+      .participants { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { h, render } from 'preact';
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
+import htm from 'htm';
+
+const html = htm.bind(h);
+
+// ── Crypto module ──
+
+const Crypto = {
+  async deriveKey(passphrase, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: enc.encode(salt), iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  },
+
+  async encrypt(key, plaintext) {
+    const enc = new TextEncoder();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key, enc.encode(plaintext)
+    );
+    // Concatenate IV + ciphertext
+    const buf = new Uint8Array(12 + ct.byteLength);
+    buf.set(iv, 0);
+    buf.set(new Uint8Array(ct), 12);
+    return btoa(String.fromCharCode(...buf));
+  },
+
+  async decrypt(key, b64) {
+    const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const iv = raw.slice(0, 12);
+    const ct = raw.slice(12);
+    const pt = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key, ct
+    );
+    return new TextDecoder().decode(pt);
+  }
+};
+
+// ── App component ──
+
+function App() {
+  const [screen, setScreen] = useState('join'); // 'join' | 'chat'
+  const [roomName, setRoomName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [passphrase, setPassphrase] = useState('');
+  const [error, setError] = useState('');
+  const [connecting, setConnecting] = useState(false);
+
+  // Chat state
+  const [messages, setMessages] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [input, setInput] = useState('');
+  const [myName, setMyName] = useState('');
+  const myNameRef = useRef('');
+
+  const wsRef = useRef(null);
+  const keyRef = useRef(null);
+  const msgListRef = useRef(null);
+  const reconnectRef = useRef(null);
+  const roomMetaRef = useRef(null);
+
+  // Auto-scroll messages
+  useEffect(() => {
+    if (msgListRef.current) {
+      msgListRef.current.scrollTop = msgListRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const addSystemMessage = useCallback((text) => {
+    setMessages(prev => [...prev, { type: 'system', text, ts: Date.now() }]);
+  }, []);
+
+  const handleWsMessage = useCallback(async (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+
+      switch (msg.type) {
+        case 'room-meta':
+          roomMetaRef.current = msg;
+          // Derive key now that we have salt components
+          const salt = `${msg.room}:${msg.nodeId}:${msg.createdAt}`;
+          keyRef.current = await Crypto.deriveKey(passphrase, salt);
+          if (msg.participants) {
+            setParticipants(msg.participants.map(n => ({ name: n })));
+          }
+          break;
+
+        case 'joined':
+          // Server confirmed join — transition to chat
+          setScreen('chat');
+          setConnecting(false);
+          addSystemMessage('Connected to room');
+          break;
+
+        case 'history':
+          if (!keyRef.current || !msg.messages) break;
+          const historyMsgs = [];
+          for (const m of msg.messages) {
+            try {
+              const text = await Crypto.decrypt(keyRef.current, m.payload);
+              historyMsgs.push({ type: 'chat', sender: m.sender, text, ts: m.ts, mine: false });
+            } catch {
+              historyMsgs.push({ type: 'decrypt-fail', sender: m.sender, ts: m.ts });
+            }
+          }
+          setMessages(prev => [...historyMsgs, ...prev]);
+          break;
+
+        case 'chat':
+          if (!keyRef.current) break;
+          try {
+            const text = await Crypto.decrypt(keyRef.current, msg.payload);
+            const isMine = msg.sender === myNameRef.current;
+            setMessages(prev => [...prev, { type: 'chat', sender: msg.sender, text, ts: msg.ts, mine: isMine }]);
+          } catch {
+            setMessages(prev => [...prev, { type: 'decrypt-fail', sender: msg.sender, ts: msg.ts }]);
+          }
+          break;
+
+        case 'participant':
+          if (msg.action === 'join') {
+            addSystemMessage(`${msg.name} joined`);
+            setParticipants(prev => [...prev, { name: msg.name }]);
+          } else if (msg.action === 'leave') {
+            addSystemMessage(`${msg.name} left`);
+            setParticipants(prev => prev.filter(p => p.name !== msg.name));
+          } else if (msg.action === 'rename') {
+            setParticipants(prev => prev.map(p =>
+              p.name === msg.message ? { ...p, name: msg.name } : p
+            ));
+          }
+          break;
+
+        case 'peer-joined':
+          // Already handled by participant event
+          break;
+
+        case 'peer-left':
+          // Already handled by participant event
+          break;
+
+        case 'error':
+          setError(msg.message || 'Server error');
+          break;
+      }
+    } catch (e) {
+      console.error('WS message parse error:', e);
+    }
+  }, [passphrase, addSystemMessage]);
+
+  const connect = useCallback(async () => {
+    setError('');
+    if (!roomName.trim() || !passphrase.trim() || !displayName.trim()) {
+      setError('All fields are required');
+      return;
+    }
+
+    setConnecting(true);
+    const name = displayName.trim();
+    setMyName(name);
+    myNameRef.current = name;
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${proto}//${location.host}/v1/realtime/ws?echat=1&room=${encodeURIComponent(roomName.trim())}`;
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      // Send display name as first message
+      ws.send(JSON.stringify({ type: 'set-name', name }));
+    };
+
+    ws.onmessage = handleWsMessage;
+
+    ws.onerror = () => {
+      setError('Connection failed');
+      setConnecting(false);
+    };
+
+    ws.onclose = (event) => {
+      if (screen === 'chat' || connecting) {
+        addSystemMessage('Disconnected. Reconnecting...');
+        // Exponential backoff reconnect
+        let delay = 1000;
+        const tryReconnect = () => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
+          const newWs = new WebSocket(wsUrl);
+          wsRef.current = newWs;
+          newWs.onopen = () => {
+            newWs.send(JSON.stringify({ type: 'set-name', name }));
+            addSystemMessage('Reconnected');
+          };
+          newWs.onmessage = handleWsMessage;
+          newWs.onerror = () => {};
+          newWs.onclose = () => {
+            delay = Math.min(delay * 2, 30000);
+            reconnectRef.current = setTimeout(tryReconnect, delay);
+          };
+        };
+        reconnectRef.current = setTimeout(tryReconnect, delay);
+      }
+    };
+  }, [roomName, displayName, passphrase, handleWsMessage, screen, connecting, addSystemMessage]);
+
+  const sendMessage = useCallback(async () => {
+    if (!input.trim() || !keyRef.current || !wsRef.current) return;
+    try {
+      const encrypted = await Crypto.encrypt(keyRef.current, input.trim());
+      wsRef.current.send(JSON.stringify({
+        type: 'chat',
+        room: roomName,
+        payload: encrypted,
+      }));
+      setInput('');
+    } catch (e) {
+      console.error('Encrypt error:', e);
+    }
+  }, [input, roomName]);
+
+  const leave = useCallback(() => {
+    if (reconnectRef.current) clearTimeout(reconnectRef.current);
+    if (wsRef.current) wsRef.current.close();
+    wsRef.current = null;
+    keyRef.current = null;
+    roomMetaRef.current = null;
+    setScreen('join');
+    setMessages([]);
+    setParticipants([]);
+    setInput('');
+    setError('');
+    setConnecting(false);
+  }, []);
+
+  const formatTime = (ts) => {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // ── Join screen ──
+  if (screen === 'join') {
+    return html`
+      <div class="join-container">
+        <div class="join-card">
+          <h1>Encrypted Chat</h1>
+          <p>End-to-end encrypted messaging. Keys never leave your browser.</p>
+
+          <div class="field">
+            <label>Room Name</label>
+            <input type="text" placeholder="e.g. lunch-plan" value=${roomName}
+              onInput=${e => setRoomName(e.target.value)} maxlength="64"
+              pattern="[a-zA-Z0-9-]+" />
+          </div>
+
+          <div class="field">
+            <label>Display Name</label>
+            <input type="text" placeholder="e.g. Alice" value=${displayName}
+              onInput=${e => setDisplayName(e.target.value)} maxlength="32" />
+          </div>
+
+          <div class="field">
+            <label>Passphrase</label>
+            <input type="password" placeholder="Shared secret (e.g. testadminpw123)" value=${passphrase}
+              onInput=${e => setPassphrase(e.target.value)} maxlength="256" />
+          </div>
+
+          ${error ? html`<div class="error-msg">${error}</div>` : null}
+
+          <button class="btn-primary" onClick=${connect} disabled=${connecting}>
+            ${connecting ? 'Connecting...' : 'Join Room'}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Chat screen ──
+  return html`
+    <div class="chat-container">
+      <div class="chat-header">
+        <span class="lock">${'\u{1F512}'}</span>
+        <span class="room-name">${roomName}</span>
+        <span class="count">${participants.length} online</span>
+        <button class="btn-leave" onClick=${leave}>Leave</button>
+      </div>
+
+      <div class="chat-body">
+        <div class="participants">
+          <h3>Participants</h3>
+          ${participants.map(p => html`
+            <div class="participant">
+              <span class="dot"></span>
+              <span>${p.name}</span>
+            </div>
+          `)}
+        </div>
+
+        <div class="messages">
+          <div class="msg-list" ref=${msgListRef}>
+            ${messages.map(m => {
+              if (m.type === 'system') {
+                return html`<div class="msg system"><div class="body">${m.text}</div></div>`;
+              }
+              if (m.type === 'decrypt-fail') {
+                return html`
+                  <div class="msg decrypt-fail">
+                    <div class="meta"><span class="name">${m.sender}</span> ${formatTime(m.ts)}</div>
+                    <div class="body">Could not decrypt (wrong key?)</div>
+                  </div>
+                `;
+              }
+              return html`
+                <div class="msg ${m.mine ? 'mine' : ''}">
+                  <div class="meta"><span class="name">${m.sender}</span> ${formatTime(m.ts)}</div>
+                  <div class="body">${m.text}</div>
+                </div>
+              `;
+            })}
+          </div>
+
+          <div class="chat-input">
+            <input type="text" placeholder="Type a message..." value=${input}
+              onInput=${e => setInput(e.target.value)}
+              onKeyDown=${e => e.key === 'Enter' && sendMessage()} />
+            <button onClick=${sendMessage}>Send</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-footer">
+        Encrypted with AES-256-GCM | PBKDF2 key derivation | Key never leaves your browser
+      </div>
+    </div>
+  `;
+}
+
+render(html`<${App} />`, document.getElementById('app'));
+</script>
+</body>
+</html>

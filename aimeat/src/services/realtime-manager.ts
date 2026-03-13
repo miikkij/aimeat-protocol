@@ -8,7 +8,8 @@ import { logger } from '../utils/logger.js';
 
 export interface RealtimeMessage {
   type: 'join' | 'leave' | 'presence' | 'signal' | 'broadcast' | 'yjs-sync'
-  | 'joined' | 'peer-joined' | 'peer-left' | 'peer-presence' | 'error';
+    | 'joined' | 'peer-joined' | 'peer-left' | 'peer-presence' | 'error'
+    | 'chat' | 'history' | 'participant' | 'set-name' | 'room-meta';
   roomId?: string;
   peerId?: string;
   nick?: string;
@@ -22,6 +23,17 @@ export interface RealtimeMessage {
   peers?: Array<{ peerId: string; nick: string; state: Record<string, unknown> }>;
   code?: string;
   message?: string;
+  // echat additions
+  room?: string;       // room name (echat)
+  sender?: string;     // display name or GAII (echat)
+  ts?: number;         // timestamp ms (echat)
+  name?: string;       // display name for set-name (echat)
+  action?: string;     // 'join' | 'leave' for participant events (echat)
+  count?: number;      // participant count (echat)
+  messages?: Array<{ sender: string; payload: unknown; ts: number }>;  // history burst
+  nodeId?: string;     // node ID for room-meta
+  createdAt?: number;  // room creation timestamp for room-meta
+  participants?: string[]; // current participant names for room-meta
 }
 
 // ── Internal types ──
@@ -74,6 +86,9 @@ export class RealtimeManager {
   private rooms = new Map<string, RealtimeRoom>();
   private peerToRoom = new Map<string, string>(); // peerId → roomId
   private wsToPerr = new Map<WebSocket, string>(); // ws → peerId
+  private roomNameIndex = new Map<string, string>(); // room name → room UUID
+  private roomMessageCache = new Map<string, Array<{ sender: string; payload: unknown; ts: number }>>();
+  private static readonly ECHAT_MAX_CACHED_MESSAGES = 200;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private static readonly RATE_LIMIT_WINDOW_MS = 1000;
 
@@ -138,6 +153,31 @@ export class RealtimeManager {
     return room;
   }
 
+  async getOrCreateRoomByName(name: string, createdBy: string): Promise<RealtimeRoom> {
+    // Validate room name: 1-64 chars, alphanumeric + hyphens
+    if (!/^[a-zA-Z0-9-]{1,64}$/.test(name)) {
+      throw new Error('INVALID_ROOM_NAME');
+    }
+
+    const existingId = this.roomNameIndex.get(name);
+    if (existingId) {
+      const room = this.rooms.get(existingId);
+      if (room) return room;
+      // Stale index entry — clean up
+      this.roomNameIndex.delete(name);
+    }
+
+    const room = await this.createRoom({
+      appType: 'echat',
+      name,
+      createdBy,
+      isPublic: false,
+      tags: ['echat'],
+    });
+    this.roomNameIndex.set(name, room.id);
+    return room;
+  }
+
   joinRoom(roomId: string, ws: WebSocket, nick: string): PeerConnection | null {
     const room = this.rooms.get(roomId);
     if (!room) return null;
@@ -188,6 +228,35 @@ export class RealtimeManager {
       state: {},
     });
 
+    // Broadcast echat participant join event
+    this.broadcastToRoom(roomId, peerId, {
+      type: 'participant',
+      room: room.name,
+      action: 'join',
+      name: nick,
+      count: room.peers.size,
+    });
+
+    // Send room-meta for echat clients (needed for key derivation salt)
+    this.sendToWs(ws, {
+      type: 'room-meta',
+      room: room.name,
+      roomId,
+      nodeId: this.config.nodeId,
+      createdAt: room.createdAt.getTime(),
+      participants: [...room.peers.values()].map(p => p.nick),
+    });
+
+    // Send cached message history for echat rooms
+    const cache = this.roomMessageCache.get(roomId);
+    if (cache && cache.length > 0) {
+      this.sendToWs(ws, {
+        type: 'history',
+        room: room.name,
+        messages: cache,
+      });
+    }
+
     // Register WS handlers
     ws.on('message', (data) => {
       try {
@@ -228,6 +297,19 @@ export class RealtimeManager {
       if (peer) {
         this.wsToPerr.delete(peer.ws);
       }
+
+      // Broadcast participant leave for echat
+      const leavingPeer = room.peers.get(peerId);
+      if (leavingPeer) {
+        this.broadcastToRoom(roomId, peerId, {
+          type: 'participant',
+          room: room.name,
+          action: 'leave',
+          name: leavingPeer.nick,
+          count: room.peers.size - 1,
+        });
+      }
+
       room.peers.delete(peerId);
 
       // Notify remaining peers
@@ -243,6 +325,12 @@ export class RealtimeManager {
 
       // Auto-delete empty rooms
       if (room.peers.size === 0) {
+        // Clean up echat caches
+        this.roomMessageCache.delete(roomId);
+        // Remove name index entry
+        for (const [name, id] of this.roomNameIndex) {
+          if (id === roomId) { this.roomNameIndex.delete(name); break; }
+        }
         this.rooms.delete(roomId);
         this.storage.deleteRealtimeRoom(roomId).catch(() => { });
         logger.info('Realtime room auto-deleted (empty)', { roomId });
@@ -262,6 +350,12 @@ export class RealtimeManager {
       peer.ws.close();
       this.peerToRoom.delete(peer.peerId);
       this.wsToPerr.delete(peer.ws);
+    }
+
+    // Clean up echat caches before room deletion
+    this.roomMessageCache.delete(roomId);
+    for (const [name, id] of this.roomNameIndex) {
+      if (id === roomId) { this.roomNameIndex.delete(name); break; }
     }
 
     this.rooms.delete(roomId);
@@ -347,6 +441,59 @@ export class RealtimeManager {
           docId: msg.docId,
           update: msg.update,
         });
+        break;
+      }
+
+      case 'chat': {
+        const peer = room.peers.get(peerId);
+        if (!peer) break;
+        const chatMsg = {
+          sender: peer.nick,
+          payload: msg.payload,
+          ts: Date.now(),
+        };
+        // Cache for late-joiners
+        let cache = this.roomMessageCache.get(roomId);
+        if (!cache) {
+          cache = [];
+          this.roomMessageCache.set(roomId, cache);
+        }
+        cache.push(chatMsg);
+        if (cache.length > RealtimeManager.ECHAT_MAX_CACHED_MESSAGES) {
+          cache.shift(); // FIFO eviction
+        }
+        // Broadcast to all peers in room (including sender for confirmation)
+        for (const p of room.peers.values()) {
+          if (p.ws.readyState === 1) {
+            p.ws.send(JSON.stringify({
+              type: 'chat',
+              room: room.name,
+              sender: peer.nick,
+              payload: msg.payload,
+              ts: chatMsg.ts,
+            }));
+            this.metricsMessagesOut++;
+          }
+        }
+        break;
+      }
+
+      case 'set-name': {
+        const peer = room.peers.get(peerId);
+        if (peer && msg.name) {
+          const oldNick = peer.nick;
+          peer.nick = msg.name;
+          // Notify room of name change
+          this.broadcastToRoom(roomId, '', {
+            type: 'participant',
+            room: room.name,
+            action: 'rename',
+            name: msg.name,
+            peerId,
+            message: oldNick,  // old name for client display
+            count: room.peers.size,
+          });
+        }
         break;
       }
 
