@@ -56,16 +56,28 @@ await test('Anonymous agent exists in agent list', async () => {
     assert(body.data.display_name === 'Shared Anonymous Agent', `Unexpected display_name: ${body.data.display_name}`);
 });
 
-// ─── Phase 2: Memory CRUD without auth ───
-console.log('\nPhase 2 — Memory CRUD (no auth)');
+// ─── Phase 2: Memory CRUD with anonymous auth ───
+console.log('\nPhase 2 — Memory CRUD (anonymous auth)');
 
-const testKey = `anon-test-${Date.now()}`;
+let anonToken = '';
+await test('Get anonymous auth token', async () => {
+    const { status, body } = await json('/v1/auth/anonymous', { method: 'POST' });
+    assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(typeof body.data.token === 'string', 'Expected anonymous JWT');
+    anonToken = body.data.token;
+});
 
-await test('Write memory without auth', async () => {
-    const { status, body } = await json('/v1/memory', {
+function anonAuth(opts: RequestInit = {}): RequestInit {
+    return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${anonToken}` } };
+}
+
+const testKey = `anonymous.test-${Date.now()}`;
+
+await test('Write memory with anonymous auth', async () => {
+    const { status, body } = await json('/v1/memory', anonAuth({
         method: 'POST',
         body: JSON.stringify({ key: testKey, value: { message: 'hello from anonymous' }, visibility: 'public', tags: ['test'] }),
-    });
+    }));
     assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
     assert(body.data.key === testKey, `Expected key ${testKey}`);
     assert(body.data.version === 1, 'Expected version 1');
@@ -73,47 +85,47 @@ await test('Write memory without auth', async () => {
     assert(body.data.updated_at !== undefined, 'Expected updated_at');
 });
 
-await test('Read memory without auth', async () => {
-    const { status, body } = await json(`/v1/memory/${encodeURIComponent(testKey)}`);
+await test('Read memory with anonymous auth', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(testKey)}`, anonAuth());
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.key === testKey, `Expected key ${testKey}`);
     assert(body.data.value.message === 'hello from anonymous', 'Expected correct value');
     assert(body.data.version === 1, 'Expected version 1');
 });
 
-await test('List memory without auth', async () => {
-    const { status, body } = await json('/v1/memory');
+await test('List memory with anonymous auth', async () => {
+    const { status, body } = await json('/v1/memory', anonAuth());
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.items.length > 0, 'Expected at least one memory entry');
     const found = body.data.items.find((it: any) => it.key === testKey);
     assert(found, `Expected to find key ${testKey} in list`);
 });
 
-await test('Search memory without auth', async () => {
-    const { status, body } = await json(`/v1/memory/search?q=anonymous`);
+await test('Search memory with anonymous auth', async () => {
+    const { status, body } = await json(`/v1/memory/search?q=anonymous`, anonAuth());
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.results !== undefined, 'Expected results array');
 });
 
-await test('Update memory with PUT without auth', async () => {
-    const { status, body } = await json(`/v1/memory/${encodeURIComponent(testKey)}`, {
+await test('Update memory with PUT and anonymous auth', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(testKey)}`, anonAuth({
         method: 'PUT',
         body: JSON.stringify({ value: { message: 'updated anonymous data' }, version: 1 }),
-    });
+    }));
     assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.data.version === 2, 'Expected version 2');
 });
 
-await test('Delete memory without auth', async () => {
-    const { status, body } = await json(`/v1/memory/${encodeURIComponent(testKey)}`, {
+await test('Delete memory with anonymous auth', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(testKey)}`, anonAuth({
         method: 'DELETE',
-    });
+    }));
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.deleted === true, 'Expected deleted: true');
 });
 
 await test('Deleted memory returns 404', async () => {
-    const { status } = await json(`/v1/memory/${encodeURIComponent(testKey)}`);
+    const { status } = await json(`/v1/memory/${encodeURIComponent(testKey)}`, anonAuth());
     assert(status === 404, `Expected 404, got ${status}`);
 });
 
@@ -178,7 +190,7 @@ await test('Get anonymous prompt tier', async () => {
     assert(body.data.note.includes('alongside'), 'Expected co-existence note');
     // v2: structured metadata
     assert(Array.isArray(body.data.boot_sequence), 'Expected boot_sequence array');
-    assert(body.data.boot_sequence.length === 5, `Expected 5 boot steps, got ${body.data.boot_sequence.length}`);
+    assert(body.data.boot_sequence.length === 6, `Expected 6 boot steps, got ${body.data.boot_sequence.length}`);
     assert(body.data.key_conventions['context.latest'] !== undefined, 'Expected context.latest in key_conventions');
     assert(body.data.key_conventions['handoff.pending'] !== undefined, 'Expected handoff.pending in key_conventions');
     assert(body.data.key_conventions['agents.roster'] !== undefined, 'Expected agents.roster in key_conventions');

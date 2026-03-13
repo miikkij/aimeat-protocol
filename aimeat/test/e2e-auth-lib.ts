@@ -252,7 +252,7 @@ await test('Re-authenticate with agent key (simulates session.refresh())', async
 console.log('\nPhase 7 — Password Login');
 
 const pwUsername = `pwtest${Date.now()}`;
-const pwPassword = 'testpass123';
+const pwPassword = 'TestPass123';
 let pwAgentJwt = '';
 
 await test('POST /v1/ghii — register with password', async () => {

@@ -164,6 +164,15 @@ await test('Agent auth token', async () => {
     agentToken = body.data.token;
 });
 
+// ─── Setup: GHII account (required for MCP access) ───
+await test('Register GHII identity for MCP', async () => {
+    const { status, body } = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: ownerName, display_name: 'MCP Test User', password: 'McpTest1234' }),
+    });
+    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
+});
+
 // ─── Phase 1: OAuth 2.1 Discovery & Registration ───
 console.log('\nPhase 1 — OAuth Discovery & Registration');
 

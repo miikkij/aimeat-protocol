@@ -14,6 +14,9 @@ import { hashPassword } from '../services/password.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Sub-routers (domain-split from admin.ts)
 import { adminConfigRouter } from './admin-config.js';
@@ -480,6 +483,20 @@ export function adminRouter(
     // GET /v1/admin/ui — legacy URL, redirect to SPA
     router.get('/v1/admin/ui', (_req, res) => {
         res.redirect(301, '/v1/admin');
+    });
+
+    // GET /v1/admin/translations — serve locale JSON for admin dashboard
+    router.get('/v1/admin/translations', requireAuth(), requireRole('operator'), (req, res) => {
+        const lang = (req.query.lang as string) ?? 'en';
+        const safeLang = lang.replace(/[^a-z]/gi, '').slice(0, 5) || 'en';
+        try {
+            const localesDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../locales');
+            const data = JSON.parse(readFileSync(resolve(localesDir, `${safeLang}.json`), 'utf8'));
+            const dashboard = data.dashboard ?? {};
+            res.json(success(config.nodeId, dashboard));
+        } catch {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Locale "${safeLang}" not found`));
+        }
     });
 
     // ── Mount domain sub-routers ──

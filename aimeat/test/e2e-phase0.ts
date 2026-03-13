@@ -47,7 +47,7 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 // ─── State ───
 let ownerToken = '';
 let ownerPrivKey = '';
-const ownerName = `testphase0_${Date.now()}`;
+const ownerName = `testphase0-${Date.now()}`;
 
 let agentToken = '';
 let agentPrivKey = '';
@@ -330,7 +330,7 @@ await test('GET /v1/consent/audit \u2192 200, audit trail endpoint works', async
 console.log('\nPhase 0.5 — TOTP');
 
 // TOTP requires a GHII identity, register one for testing
-const ghiiUser = `ghiitotp_${Date.now()}`;
+const ghiiUser = `ghiitotp-${Date.now()}`;
 
 await test('POST /v1/ghii → register GHII identity for TOTP tests', async () => {
     const { status, body } = await json('/v1/ghii', {

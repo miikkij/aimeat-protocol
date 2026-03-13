@@ -371,6 +371,30 @@ export class MongoStorage implements Storage {
         return this.toMemoryRecord(row);
     }
 
+    async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
+        this.ensureReady();
+        // Atomic version-checked update using raw MongoDB $set + version filter
+        const result = await this.prisma.memory.updateMany({
+            where: {
+                ownerGaii: record.ownerGaii,
+                key: record.key,
+                version: expectedVersion,
+            },
+            data: {
+                value: record.value as any,
+                visibility: record.visibility,
+                tags: record.tags,
+                ttlHours: record.ttlHours,
+                version: record.version,
+                flagCount: record.flagCount ?? 0,
+                allowedOrigins: record.allowedOrigins ?? [],
+                updatedAt: new Date(record.updatedAt),
+            },
+        });
+        if (result.count === 0) return null; // version conflict
+        return this.getMemory(record.ownerGaii, record.key);
+    }
+
     async getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null> {
         this.ensureReady();
         const row = await this.prisma.memory.findUnique({

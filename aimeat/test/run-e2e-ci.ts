@@ -76,6 +76,9 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_WORK: process.env.AIMEAT_RL_WORK ?? '1000',
         AIMEAT_RL_MEMORY: process.env.AIMEAT_RL_MEMORY ?? '1000',
         AIMEAT_RL_BOARDS: process.env.AIMEAT_RL_BOARDS ?? '1000',
+        AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
+        AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
+        AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
     };
 
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];
@@ -118,11 +121,33 @@ function killServer(child: ChildProcess): void {
     }
 }
 
+// ── Clean database between suites ──
+function cleanDatabase(): void {
+    if (DB_TYPE === 'sqlite') {
+        const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
+        const resolved = resolve(process.cwd(), dbPath);
+        for (const suffix of ['', '-shm', '-wal']) {
+            const f = resolved + suffix;
+            if (existsSync(f)) unlinkSync(f);
+        }
+    } else if (DB_TYPE === 'mongodb') {
+        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
+        if (dbUrl) {
+            try {
+                execSync(`mongosh "${dbUrl}" --eval "db.dropDatabase()" --quiet`, {
+                    cwd: process.cwd(),
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                });
+            } catch { /* mongosh may not be available */ }
+        }
+    }
+}
+
 // ── Run a single test suite ──
 function runTest(suitePath: string): Promise<{ output: string; exitCode: number }> {
     return new Promise((resolve) => {
         const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE_URL },
+            env: { ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE_URL, E2E_BASE: BASE_URL },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: process.cwd(),
         });
@@ -210,8 +235,18 @@ async function main() {
     let anyFailed = false;
 
     try {
-        for (const suite of suites) {
+        for (let i = 0; i < suites.length; i++) {
+            const suite = suites[i];
             const name = basename(suite, '.ts');
+
+            // Clean DB and restart server between suites for isolation
+            if (i > 0 && server && !USE_EXTERNAL_SERVER) {
+                killServer(server);
+                await new Promise(r => setTimeout(r, 1000));
+                cleanDatabase();
+                server = await startServer();
+            }
+
             console.log(`\n${'─'.repeat(40)}`);
             console.log(`  ${name}`);
             console.log(`${'─'.repeat(40)}`);

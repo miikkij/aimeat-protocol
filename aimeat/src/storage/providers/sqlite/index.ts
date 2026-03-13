@@ -389,6 +389,22 @@ export class SqliteStorage implements Storage {
     return record;
   }
 
+  async setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
+    const result = this.db.prepare(
+      `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
+       updatedAt = ?, flagCount = ?, allowedOrigins = ? WHERE ownerGaii = ? AND key = ? AND version = ?`
+    ).run(
+      JSON.stringify(record.value), record.visibility,
+      JSON.stringify(record.tags), record.ttlHours,
+      record.version, record.updatedAt,
+      record.flagCount ?? 0,
+      record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
+      record.ownerGaii, record.key, expectedVersion,
+    );
+    if (result.changes === 0) return null; // version conflict
+    return record;
+  }
+
   private isMemoryExpired(record: MemoryRecord): boolean {
     if (!record.ttlHours) return false;
     const createdMs = new Date(record.createdAt).getTime();

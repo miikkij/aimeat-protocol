@@ -47,7 +47,7 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 
 // ─── State ───
 // Owner A (primary)
-const ownerAName = `secowner_a_${Date.now()}`;
+const ownerAName = `secowner-a-${Date.now()}`;
 let ownerAToken = '';
 let ownerAPrivKey = '';
 
@@ -57,7 +57,7 @@ let agentAToken = '';
 let agentAPrivKey = '';
 
 // Owner B (secondary, for cross-owner tests)
-const ownerBName = `secowner_b_${Date.now()}`;
+const ownerBName = `secowner-b-${Date.now()}`;
 let ownerBToken = '';
 let ownerBPrivKey = '';
 

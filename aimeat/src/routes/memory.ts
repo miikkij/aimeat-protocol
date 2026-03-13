@@ -583,7 +583,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     const now = new Date().toISOString();
-    const record = await storage.setMemory({
+    const newRecord = {
       key,
       ownerGaii: gaii,
       value: value !== undefined ? value : existing.value,
@@ -593,7 +593,23 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       version: existing.version + 1,
       createdAt: existing.createdAt,
       updatedAt: now,
-    });
+    };
+
+    // Use atomic version-checked update when available (prevents race conditions)
+    let record;
+    if (storage.setMemoryIfVersion) {
+      const result = await storage.setMemoryIfVersion(newRecord, version);
+      if (!result) {
+        const current = await storage.getMemory(gaii, key);
+        res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
+          `Expected version ${version} but current is ${current?.version ?? 'unknown'}`,
+          409, { current_version: current?.version, your_version: version }));
+        return;
+      }
+      record = result;
+    } else {
+      record = await storage.setMemory(newRecord);
+    }
 
     // C.3: Event-driven replication queue integration
     if (peers) {

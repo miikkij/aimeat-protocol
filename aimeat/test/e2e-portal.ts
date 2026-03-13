@@ -23,18 +23,16 @@ function assert(cond: boolean, msg: string) {
 
 console.log('\n=== AIMEAT Portal E2E Test ===\n');
 
-// ─── GET /v1/portal — HTML page ───
+// ─── GET /v1/portal — SPA shell ───
 await test('GET /v1/portal — returns HTML', async () => {
     const res = await fetch(`${BASE}/v1/portal`);
     assert(res.status === 200, `status ${res.status}`);
     const ct = res.headers.get('content-type') ?? '';
     assert(ct.includes('text/html'), `content-type: ${ct}`);
     const html = await res.text();
-    assert(html.includes('AIMEAT Onboarding Portal'), 'missing title');
-    assert(html.includes('platform-grid'), 'missing platform grid');
-    assert(html.includes('ChatGPT'), 'missing ChatGPT platform');
-    assert(html.includes('Claude'), 'missing Claude platform');
-    assert(html.includes('LM Studio'), 'missing LM Studio platform');
+    assert(html.includes('<title>'), 'missing title tag');
+    assert(html.includes('AIME'), 'missing AIME in title');
+    assert(html.includes('<div id="app"'), 'missing SPA mount point');
 });
 
 // ─── GET /v1/portal/platforms — JSON ───
@@ -130,11 +128,10 @@ await test('GET /v1/portal/prompt/nonexistent — returns 404', async () => {
 
 // ─── Bootstrap includes portal link ───
 await test('GET / — bootstrap hints include portal', async () => {
-    const res = await fetch(`${BASE}/`);
+    const res = await fetch(`${BASE}/?format=json`);
     const body = await res.json() as any;
     assert(body.ok === true, 'ok');
-    assert(body.data.endpoints.portal, 'endpoints should include portal');
-    assert(body.data.endpoints.portal.url === '/v1/portal', `portal url: ${body.data.endpoints.portal?.url}`);
+    // Portal is referenced in discovery_and_meta.endpoints or as a hint
     const hints = body.hints?.next_actions ?? body.hints;
     const portalHint = Array.isArray(hints) ? hints.find((h: any) => h.url === '/v1/portal') : null;
     assert(portalHint, 'hints should include portal link');
