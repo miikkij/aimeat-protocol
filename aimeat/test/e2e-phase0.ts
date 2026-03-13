@@ -96,7 +96,7 @@ await test('Register test agent', async () => {
             name: agentName,
             owner: ownerName,
             capabilities: ['memory', 'actions'],
-            scopes: ['memory:read', 'memory:write', 'memory:delete', 'catalogue:read', 'work:publish'],
+            scopes: ['*'],
             model: 'gpt-4o',
         }),
     }));
@@ -227,7 +227,9 @@ await test('POST /v1/csm \u2192 201, register CSM from hobby-directory template'
 
     // Pre-cleanup: delete if it already exists from a previous run
     const preList = await json('/v1/csm');
-    const existing = (preList.body?.data?.services ?? []).find((s: any) => s.template === 'hobby-directory');
+    const existing = (preList.body?.data?.services ?? []).find(
+        (s: any) => s.service_type === 'hobby-directory' || s.name === 'Harrastehakemisto'
+    );
     if (existing) {
         await json(`/v1/csm/${encodeURIComponent(existing.name)}`, authed({ method: 'DELETE' }));
     }

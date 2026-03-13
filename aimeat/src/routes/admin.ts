@@ -493,7 +493,7 @@ export function adminRouter(
             const localesDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../locales');
             const data = JSON.parse(readFileSync(resolve(localesDir, `${safeLang}.json`), 'utf8'));
             const dashboard = data.dashboard ?? {};
-            res.json(success(config.nodeId, dashboard));
+            res.json(success(config.nodeId, { locale: safeLang, translations: dashboard }));
         } catch {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Locale "${safeLang}" not found`));
         }

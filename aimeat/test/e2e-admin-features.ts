@@ -366,21 +366,21 @@ await test('GET /v1/admin/translations?lang=en \u2192 200, has overview key', as
     const { status, body } = await json('/v1/admin/translations?lang=en', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(body.locale === 'en', `locale is en, got ${body.locale}`);
-    assert(typeof body.translations === 'object', 'has translations');
-    assert(typeof body.translations.overview === 'string', 'has overview key');
-    assert(typeof body.translations.mintMorsels === 'string', 'has mintMorsels key');
+    assert(body.data.locale === 'en', `locale is en, got ${body.data.locale}`);
+    assert(typeof body.data.translations === 'object', 'has translations');
+    assert(typeof body.data.translations.overview === 'string', 'has overview key');
+    assert(typeof body.data.translations.mintMorsels === 'string', 'has mintMorsels key');
 });
 
 await test('GET /v1/admin/translations?lang=fi \u2192 200, mintMorsels contains Luo', async () => {
     const { status, body } = await json('/v1/admin/translations?lang=fi', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(body.locale === 'fi', `locale is fi, got ${body.locale}`);
-    assert(typeof body.translations === 'object', 'has translations');
+    assert(body.data.locale === 'fi', `locale is fi, got ${body.data.locale}`);
+    assert(typeof body.data.translations === 'object', 'has translations');
     assert(
-        typeof body.translations.mintMorsels === 'string' && body.translations.mintMorsels.includes('Luo'),
-        `mintMorsels should contain 'Luo', got '${body.translations.mintMorsels}'`,
+        typeof body.data.translations.mintMorsels === 'string' && body.data.translations.mintMorsels.includes('Luo'),
+        `mintMorsels should contain 'Luo', got '${body.data.translations.mintMorsels}'`,
     );
 });
 
@@ -499,20 +499,20 @@ await test('GET /v1/admin/translations?lang=en → has navServices, msmLabel, na
     const { status, body } = await json('/v1/admin/translations?lang=en', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(typeof body.translations === 'object', 'has translations');
-    assert(typeof body.translations.navServices === 'string', 'has navServices');
-    assert(typeof body.translations.msmLabel === 'string', 'has msmLabel');
-    assert(typeof body.translations.navIntegrations === 'string', 'has navIntegrations');
+    assert(typeof body.data.translations === 'object', 'has translations');
+    assert(typeof body.data.translations.navServices === 'string', 'has navServices');
+    assert(typeof body.data.translations.msmLabel === 'string', 'has msmLabel');
+    assert(typeof body.data.translations.navIntegrations === 'string', 'has navIntegrations');
 });
 
 await test('GET /v1/admin/translations?lang=fi → navServices equals "Palvelut"', async () => {
     const { status, body } = await json('/v1/admin/translations?lang=fi', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(typeof body.translations === 'object', 'has translations');
+    assert(typeof body.data.translations === 'object', 'has translations');
     assert(
-        body.translations.navServices === 'Palvelut',
-        `expected navServices = 'Palvelut', got '${body.translations.navServices}'`,
+        body.data.translations.navServices === 'Palvelut',
+        `expected navServices = 'Palvelut', got '${body.data.translations.navServices}'`,
     );
 });
 

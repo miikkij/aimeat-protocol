@@ -173,12 +173,27 @@ function runTest(suitePath: string): Promise<{ output: string; exitCode: number 
 // ── Parse results from test output ──
 function parseResults(output: string): { passed: number; failed: number; total: number } {
     const lines = output.split('\n');
+    // Try to find a summary line first (most reliable)
     const resultLine = lines.filter(l => /\d+ passed.*\d+ failed/.test(l)).pop();
     if (resultLine) {
-        const m = resultLine.match(/(\d+) passed.*?(\d+) failed.*?(?:out of |.*\()(\d+)/);
-        if (m) return { passed: +m[1], failed: +m[2], total: +m[3] };
+        const m = resultLine.match(/(\d+) passed.*?(\d+) failed/);
+        if (m) {
+            const passed = +m[1];
+            const failed = +m[2];
+            const totalMatch = resultLine.match(/(?:out of |of |total.*?)(\d+)/);
+            const total = totalMatch ? +totalMatch[1] : passed + failed;
+            return { passed, failed, total };
+        }
     }
-    return { passed: 0, failed: 0, total: 0 };
+    // Fallback: count ✅ and ❌ emoji lines (handles crashes before summary)
+    let passed = 0;
+    let failed = 0;
+    for (const line of lines) {
+        if (/^\s*✅/.test(line)) passed++;
+        if (/^\s*❌/.test(line)) failed++;
+    }
+    const total = passed + failed;
+    return { passed, failed, total };
 }
 
 // ── Main ──
