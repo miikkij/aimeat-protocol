@@ -730,6 +730,7 @@
       "hint": "Push-ilmoitukset vaativat selaimesi luvan. Voit peruuttaa luvan milloin tahansa selaimen asetuksista."
     },
     "nodeStats": {
+      "title": "Solmun tilastot",
       "desc": "Reaaliaikaiset tilastot tältä AIMEAT-solmulta. Näyttää käyttöajan, pyyntöaktiviteetin, tunneliyhteydet, postilaatikon käytön ja turvallisuustapahtumat.",
       "loading": "Ladataan tilastoja...",
       "error": "Tilastojen lataus epäonnistui. Tilastot voivat olla pois käytöstä tässä solmussa.",

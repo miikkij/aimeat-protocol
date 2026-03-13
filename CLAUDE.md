@@ -1,5 +1,124 @@
 # CLAUDE.md — AI Assistant Instructions for JM001 / AIMEAT
 
+---
+
+## MANDATORY RULES (HIGHEST PRIORITY)
+
+These rules MUST be followed at all times during development. They override any conflicting default behavior.
+
+### Rule 1: E2E Tests Must Pass After Major Changes
+
+When any major feature, bugfix, or structural change is completed:
+
+1. **Run E2E tests on both persistent backends:**
+   ```bash
+   cd aimeat
+   pnpm test:e2e:mongodb
+   pnpm test:e2e:sqlite
+   ```
+2. **Target: 0 failures.** All tests must pass.
+3. **If tests fail in areas affected by the change**, the change is NOT complete — fix the failures first.
+4. **If failures are complicated or need user input**, ask the user how to proceed before continuing.
+5. **Full test runs are required at the end of any multi-step plan execution.**
+6. **New features must include quality E2E tests** that verify correctness and prevent future regressions.
+7. **Never claim work is done without running tests.** Evidence before assertions.
+
+Full guide: `docs/coding-guidelines/testing-requirements.md`
+
+### Rule 1b: Playwright Tests Must Pass After Frontend Changes
+
+When frontend work is **finished** (a view, component, or feature is done — not mid-development):
+
+1. **Run Playwright browser tests:**
+   ```bash
+   cd aimeat
+   npx playwright test
+   ```
+2. **Target: 0 failures.** All browser tests must pass.
+3. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
+4. **New frontend features must include Playwright tests** that confirm the feature renders, navigates, and behaves correctly — not just that it loads without error.
+5. **Run on MongoDB backend** for realistic behavior — Playwright tests hit a live server.
+6. **Maintain test quality:** Playwright tests must verify that things actually happen (elements appear, data loads, interactions work), not just that the page doesn't crash.
+
+### Rule 2: Source File Headers Required
+
+Every source code file (`.ts`, `.js`, `.css`) must have a descriptive header comment:
+
+- `@file` — filename
+- `@description` — what the file does and its role in the system
+- `@structure` — key exports/sections (recommended)
+- `@usage` — import example or how it's consumed (recommended)
+- `@version-history` — dated changelog: `v{major}.{minor}.{patch} — {date} — {reason}`
+
+**Campsite rule:** Add headers to files as you touch them. Update version history when modifying files. Headers may be outdated — they reliably tell at minimum what the file is for.
+
+Full format: `docs/coding-guidelines/file-headers.md`
+
+### Rule 3: OpenAPI Spec Must Stay In Sync
+
+`openapi.yaml` is the canonical API contract. It MUST reflect the actual implementation:
+
+1. **When adding a new route**, add it to `openapi.yaml` in the same PR/commit.
+2. **When modifying a route** (params, response shape, auth), update the spec immediately.
+3. **When removing a route**, remove it from the spec.
+4. **Campsite rule applies**: if you notice an undocumented route while working nearby, document it.
+5. **Generate types after spec changes**: `pnpm generate:types`
+
+Full sync plan: `docs/plans/openapi-sync-plan.md`
+
+### Rule 4: i18n Files Must Stay In Sync
+
+Both `locales/en.json` and `locales/fi.json` must be updated together:
+
+1. **Every new translation key** must be added to BOTH files simultaneously.
+2. **Never add a key to one file without the other.** If unsure of the Finnish translation, use the English text as a placeholder with a `[TODO:fi]` prefix.
+3. **Frontend locale files** (`public/locales/`) follow the same rule if they exist.
+4. **Verify sync** by checking both files have the same key structure.
+
+### Rule 5: Dependency Management
+
+Before adding any new npm package:
+
+1. **Check license compatibility** — MIT, Apache-2.0, ISC, BSD are acceptable. GPL/AGPL require user approval.
+2. **Prefer small, focused libraries** with active maintenance and good security track records.
+3. **Run `pnpm audit`** after adding dependencies. Fix any high/critical vulnerabilities.
+4. **If audit finds problems**, investigate, research alternatives, and present options to the user.
+5. **Never add packages without justification** — check if existing dependencies or Node.js built-ins can do the job.
+
+Full guide: `docs/coding-guidelines/dependency-management.md`
+
+### Rule 6: ESLint Must Pass
+
+All code changes must pass linting:
+
+```bash
+cd aimeat
+pnpm lint
+```
+
+Lint rules enforce code quality, style consistency, and prevent common errors. See `docs/coding-guidelines/code-style.md`.
+
+---
+
+## Coding Guidelines Reference
+
+All development standards are collected in `docs/coding-guidelines/`:
+
+| Guide | Purpose |
+|-------|---------|
+| [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E testing rules, multi-backend testing, writing tests |
+| [File Headers](docs/coding-guidelines/file-headers.md) | Source file header format, version history |
+| [Code Style](docs/coding-guidelines/code-style.md) | TypeScript/JS conventions, route patterns, i18n |
+| [Architecture](docs/coding-guidelines/architecture.md) | System design, core vs extended, directory structure, storage layer |
+| [Security](docs/coding-guidelines/security.md) | Auth, input validation, XSS, rate limiting, GDPR |
+| [Getting Started](docs/coding-guidelines/getting-started.md) | Installation, setup, development workflow |
+| [Dependency Management](docs/coding-guidelines/dependency-management.md) | Adding packages, license checks, security audits |
+| [Environment Configs](docs/coding-guidelines/environment-configs.md) | Node type configs (full, personal, relay, mirror) |
+| [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync process, adding fields/tables |
+| [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
+
+---
+
 ## Project Overview
 
 This is the **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an open protocol for AI agent infrastructure. The repo contains:
@@ -93,11 +212,12 @@ Then in server.ts: `app.use(myRouter(config, storage));`
 
 ### Storage Layer
 
-All data access goes through the `Storage` interface (`src/storage/interface.ts`). Current implementation is in-memory (`src/storage/memory.ts`). When adding new data types:
+All data access goes through the `Storage` interface (`src/storage/interface.ts`). Two backend implementations:
 
-1. Add the interface/record type to `interface.ts`
-2. Add CRUD methods to the `Storage` interface
-3. Implement in `memory.ts` with a new `Map`
+- **SQLite** (better-sqlite3) — for memory mode (`:memory:`), dev, and personal nodes
+- **MongoDB** (Prisma) — for production deployments
+
+When adding new data types or fields, ALL backends must be updated. See `docs/coding-guidelines/storage-sync.md` for the complete checklist.
 
 ### Import Extensions
 
@@ -131,13 +251,17 @@ The frontend is a Preact + HTM SPA with no build step. See `docs/frontend-develo
 
 ## Testing
 
-The API integration test file (`test/api-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 40251. The test creates its own owner/agents and cleans up via cascade delete at the end.
+The API integration test file (`test/api-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 40251. The test creates its own owner/agents and cleans up via cascade delete at the end. There are 19 E2E test suites covering security, federation, concurrency, storage visibility, and more.
 
 **Always run `npx tsc --noEmit` after changes** to verify the build compiles cleanly.
 
+**After major changes, run `pnpm test:e2e:mongodb` and `pnpm test:e2e:sqlite`** — see Mandatory Rule 1 above.
+
+Full testing guide: `docs/coding-guidelines/testing-requirements.md`
+
 ## Spec Documents
 
-- `openapi.yaml` — The canonical API contract (75 paths, 88 operations)
+- `openapi.yaml` — The canonical API contract (MUST be kept in sync — see Mandatory Rule 3)
 - `docs/aimeat-implementation-prompt.md` — Detailed implementation guidance
 - `docs/01-core.md` through `docs/09-community.md` — RFC sections
 - `docs/a-endpoints.md` — Quick endpoint reference
