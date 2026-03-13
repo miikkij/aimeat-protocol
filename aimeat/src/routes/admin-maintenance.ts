@@ -25,7 +25,7 @@ export function adminMaintenanceRouter(
     });
 
     // PUT /v1/admin/hooks/:hookName — set actions for a hook
-    router.put('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), (req, res) => {
+    router.put('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), async (req, res) => {
         const hookName = req.params.hookName as string;
         const validHooks: HookName[] = [
             'pre_owner_registration', 'post_owner_registration',
@@ -48,6 +48,9 @@ export function adminMaintenanceRouter(
 
         config.extensionHooks[hookName as HookName] = actions;
 
+        // Persist to database
+        await storage.setConfigValue(`hooks.${hookName}`, JSON.stringify(actions));
+
         res.json(success(config.nodeId, {
             hook: hookName,
             actions: config.extensionHooks[hookName as HookName],
@@ -57,7 +60,7 @@ export function adminMaintenanceRouter(
     });
 
     // DELETE /v1/admin/hooks/:hookName — clear all actions from a hook
-    router.delete('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), (req, res) => {
+    router.delete('/v1/admin/hooks/:hookName', requireAuth(), requireRole('operator'), async (req, res) => {
         const hookName = req.params.hookName as string;
         if (!(hookName in config.extensionHooks)) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Hook "${hookName}" not found`));
@@ -65,6 +68,9 @@ export function adminMaintenanceRouter(
         }
 
         config.extensionHooks[hookName as HookName] = [];
+
+        // Remove from database
+        await storage.deleteConfigValue(`hooks.${hookName}`);
 
         res.json(success(config.nodeId, {
             hook: hookName,

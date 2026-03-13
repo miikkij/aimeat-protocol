@@ -694,6 +694,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         res.json(success(config.nodeId, {
             node_id: config.nodeId,
             node_public_key: nodeKey?.publicKey ?? '',
+            accepted: true,
+            capabilities: req.body?.capabilities ?? [],
             agent_keys: ourAgentKeys,
             timestamp: new Date().toISOString(),
         }));

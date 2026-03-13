@@ -1,4 +1,4 @@
-import type { AimeatConfig } from '../config.js';
+import type { AimeatConfig, HookName } from '../config.js';
 import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import { ConfigProvenance } from '../services/config-provenance.js';
@@ -92,6 +92,29 @@ export async function initializeConfig(
   if (dbSkipped.length > 0) {
     logger.warn(`Skipped ${dbSkipped.length} invalid DB config value(s): ${dbSkipped.join(', ')}`);
   }
+
+  // ── Load persisted extension hooks from DB ──
+  try {
+    const allValues = await storage.getAllConfigValues();
+    let hooksLoaded = 0;
+    for (const [key, value] of Object.entries(allValues)) {
+      if (key.startsWith('hooks.')) {
+        const hookName = key.slice(6) as HookName;
+        if (hookName in config.extensionHooks) {
+          try {
+            const actions = JSON.parse(value);
+            if (Array.isArray(actions)) {
+              config.extensionHooks[hookName] = actions;
+              hooksLoaded++;
+            }
+          } catch { /* skip malformed hook values */ }
+        }
+      }
+    }
+    if (hooksLoaded > 0) {
+      logger.info(`Loaded ${hooksLoaded} persisted extension hook(s) from database`);
+    }
+  } catch { /* getAllConfigValues may fail for some backends — hooks stay at defaults */ }
 
   // Wire storage into token revocation system for persistent revocation
   initRevocationStorage(storage);

@@ -70,6 +70,8 @@ model Action {
   estimatedTimeSeconds Int?
   maxInputSizeBytes    Int?
   tags                 String[]
+  webhookUrl           String?
+  semantic             Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

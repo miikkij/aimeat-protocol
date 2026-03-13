@@ -61,7 +61,7 @@ const directPeerNodeId = `aimeat-direct-peer-${Date.now()}`;
 const directPeerUrl = 'http://localhost:9998';
 
 // Generate a real Ed25519 keypair for the direct peer (used to sign federation payloads)
-const directPeerPrivKeyBytes = ed.utils.randomPrivateKey();
+const directPeerPrivKeyBytes = ed.utils.randomSecretKey();
 const directPeerPubKeyBytes = await ed.getPublicKeyAsync(directPeerPrivKeyBytes);
 const directPeerPrivKeyB64 = Buffer.from(directPeerPrivKeyBytes).toString('base64');
 const directPeerPubKeyB64 = Buffer.from(directPeerPubKeyBytes).toString('base64');
@@ -523,7 +523,7 @@ await test('18c. Key exchange with known peer', async () => {
     });
     assert(body.ok === true, `key-exchange: ${JSON.stringify(body.error)}`);
     assert(body.data.node_id === NODE_ID, `node_id: ${body.data.node_id}`);
-    assert(typeof body.data.public_key === 'string', 'has public_key');
+    assert(typeof body.data.node_public_key === 'string', 'has node_public_key');
     assert(body.data.accepted === true, 'accepted');
     assert(Array.isArray(body.data.capabilities), 'has capabilities');
 });

@@ -110,15 +110,15 @@ let sessionId = '';
 
 console.log('\n=== AIMEAT MCP + OAuth E2E Test ===\n');
 
-// ─── Setup: Register owner + agent ───
-console.log('Setup — Owner & Agent');
+// ─── Setup: Register GHII (creates owner) + agent ───
+console.log('Setup — Owner (via GHII) & Agent');
 
-await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
+await test('Register GHII identity (creates owner)', async () => {
+    const { status, body } = await json('/v1/ghii', {
         method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
+        body: JSON.stringify({ username: ownerName, display_name: 'MCP Test User', password: 'McpTest1234' }),
     });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
     ownerPrivKey = body.data.private_key;
     assert(typeof ownerPrivKey === 'string', 'got owner private key');
 });
@@ -162,15 +162,6 @@ await test('Agent auth token', async () => {
     });
     assert(body.ok === true, `agent token: ${JSON.stringify(body.error)}`);
     agentToken = body.data.token;
-});
-
-// ─── Setup: GHII account (required for MCP access) ───
-await test('Register GHII identity for MCP', async () => {
-    const { status, body } = await json('/v1/ghii', {
-        method: 'POST',
-        body: JSON.stringify({ username: ownerName, display_name: 'MCP Test User', password: 'McpTest1234' }),
-    });
-    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
 });
 
 // ─── Phase 1: OAuth 2.1 Discovery & Registration ───
@@ -231,14 +222,19 @@ await test('4. Request auth code with signature', async () => {
     authCode = body.code;
 });
 
-await test('5. Auth without signature → 400', async () => {
+await test('5. Auth without signature → redirects to consent', async () => {
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
     });
-    const { status, body } = await json(`/v1/mcp/authorize?${params}`);
-    assert(status === 400, `status ${status}`);
-    assert(body.error === 'invalid_request', `error: ${body.error}`);
+    // Without gaii/signature, server redirects to browser consent flow (302)
+    const res = await fetch(`${BASE}/v1/mcp/authorize?${params}`, {
+        headers: { 'Content-Type': 'application/json' },
+        redirect: 'manual',
+    });
+    assert(res.status === 302, `status ${res.status}`);
+    const location = res.headers.get('location') ?? '';
+    assert(location.includes('/v1/oauth/consent'), `redirect: ${location}`);
 });
 
 await test('6. Auth with invalid signature → 401', async () => {

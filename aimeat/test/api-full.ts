@@ -1,8 +1,34 @@
 // Full API integration test for AIMEAT Phases 1-5
 // Run: cd aimeat && pnpm exec tsx test/api-full.ts
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+import * as ed from '@noble/ed25519';
+import { createHash, randomBytes } from 'node:crypto';
+import { createServer } from '../src/server.js';
+import { loadConfig } from '../src/config.js';
+import type { Server } from 'node:http';
+
+// ─── Boot embedded server ───
+const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40251', 10);
+const BASE = process.env.E2E_BASE ?? `http://localhost:${TEST_PORT}`;
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+
+let server: Server | null = null;
+
+if (!process.env.E2E_BASE) {
+    // No external server specified — start one in-process
+    process.env.AIMEAT_PORT = String(TEST_PORT);
+    process.env.AIMEAT_DEV_MODE = 'true';
+    if (!process.env.AIMEAT_ADMIN_PASSWORD) {
+        process.env.AIMEAT_ADMIN_PASSWORD = randomBytes(16).toString('base64url');
+    }
+    const { config } = loadConfig({});
+    config.port = TEST_PORT;
+    const { app } = await createServer(config);
+    server = await new Promise<Server>((resolve) => {
+        const s = app.listen(TEST_PORT, () => resolve(s));
+    });
+    console.log(`Test server started on port ${TEST_PORT}`);
+}
 
 let passed = 0;
 let failed = 0;
@@ -33,8 +59,6 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 // Helper: sign a message with a base64 private key, return base64 signature
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 ed.etc.sha512Sync = (...m: Uint8Array[]) =>
     new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
 
@@ -2180,6 +2204,12 @@ await test('GET /v1/admin/consul returns status (disabled or enabled)', async ()
     assert(body.ok === true, `ok: ${JSON.stringify(body.error)}`);
     assert(typeof body.data.enabled === 'boolean', 'has enabled flag');
 });
+
+// ─── Shutdown ───
+if (server) {
+    await new Promise<void>((resolve) => server!.close(() => resolve()));
+    console.log('Test server stopped');
+}
 
 // ─── Summary ───
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);

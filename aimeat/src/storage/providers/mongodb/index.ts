@@ -505,6 +505,8 @@ export class MongoStorage implements Storage {
                 estimatedTimeSeconds: action.estimatedTimeSeconds,
                 maxInputSizeBytes: action.maxInputSizeBytes,
                 tags: action.tags,
+                webhookUrl: action.webhookUrl ?? null,
+                semantic: action.semantic as any ?? null,
                 createdAt: new Date(action.createdAt),
                 updatedAt: new Date(action.updatedAt),
             },
@@ -757,7 +759,7 @@ export class MongoStorage implements Storage {
                 tags: post.tags,
                 ttlExpiresAt: post.ttlExpiresAt ? new Date(post.ttlExpiresAt) : null,
                 reactions: post.reactions as any,
-                replyTo: post.replyTo,
+                replyTo: post.replyTo ?? null,
                 createdAt: new Date(post.createdAt),
             },
         });
@@ -1264,7 +1266,7 @@ export class MongoStorage implements Storage {
     }
 
     private toActionRecord(row: any): ActionRecord {
-        return { id: row.actionId, providerGaii: row.providerGaii, displayName: row.displayName, description: row.description, category: row.category ?? undefined, inputSchema: row.inputSchema as Record<string, unknown>, outputSchema: row.outputSchema as Record<string, unknown>, pricing: { baseMorsels: row.pricingBaseMorsels, perUnit: row.pricingPerUnit as any }, estimatedTimeSeconds: row.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: row.maxInputSizeBytes ?? undefined, tags: row.tags, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+        return { id: row.actionId, providerGaii: row.providerGaii, displayName: row.displayName, description: row.description, category: row.category ?? undefined, inputSchema: row.inputSchema as Record<string, unknown>, outputSchema: row.outputSchema as Record<string, unknown>, pricing: { baseMorsels: row.pricingBaseMorsels, perUnit: row.pricingPerUnit as any }, estimatedTimeSeconds: row.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: row.maxInputSizeBytes ?? undefined, tags: row.tags, webhookUrl: row.webhookUrl ?? undefined, semantic: row.semantic as any ?? undefined, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
     private toWorkRecord(row: any): WorkRecord {

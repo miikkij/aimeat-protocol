@@ -62,8 +62,9 @@ console.log('\n=== AIMEAT Extension System E2E Test ===\n');
 console.log('Phase 0 \u2014 Setup');
 
 await test('POST /v1/admin/setup/register \u2014 register owner with operator role', async () => {
-    const { status, body } = await json(`/v1/admin/setup/register?pw=${encodeURIComponent(ADMIN_PW)}`, {
+    const { status, body } = await json('/v1/admin/setup/register', {
         method: 'POST',
+        headers: { 'X-Admin-Password': ADMIN_PW },
         body: JSON.stringify({ name: ownerName }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -180,7 +181,7 @@ await test('GET /v1/extensions \u2014 echo appears in list', async () => {
     const echoExt = body.data.extensions.find((e: any) => e.name === 'test-echo');
     assert(echoExt, 'test-echo found in extensions list');
     assert(echoExt.status === 'inactive', 'status is inactive');
-    assert(echoExt.actionsCount === 1, 'has 1 action');
+    assert(echoExt.actionCount === 1, 'has 1 action');
 });
 
 // ─── Phase 2: Extension Activation ───

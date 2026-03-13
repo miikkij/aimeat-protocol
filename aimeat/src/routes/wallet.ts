@@ -21,14 +21,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     let inEscrow = 0;
     let transactions: Array<{ type: string; amount: number }> = [];
 
-    if (isOwner) {
-      // Owner accessing their own wallet — try GHII record first, fall back to owner identity
-      const ownerName = req.auth!.owner as string;
-      const ghiiRecord = await storage.getGHIIByOwner(ownerName);
-      balance = ghiiRecord?.morselBalance ?? 0;
-      identity = ghiiRecord?.ghii ?? req.auth!.sub;
-      transactions = await storage.getTransactions(identity, 100_000) as Array<{ type: string; amount: number }>;
-    } else if (isAgent) {
+    if (isAgent) {
       const gaii = req.auth!.sub;
       const agent = await storage.getAgent(gaii);
       if (!agent) {
@@ -39,6 +32,13 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       identity = gaii;
       inEscrow = await calculateEscrow(storage, gaii);
       transactions = await storage.getTransactions(gaii, 100_000) as Array<{ type: string; amount: number }>;
+    } else if (isOwner) {
+      // Owner accessing their own wallet — try GHII record first, fall back to owner identity
+      const ownerName = req.auth!.owner as string;
+      const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+      balance = ghiiRecord?.morselBalance ?? 0;
+      identity = ghiiRecord?.ghii ?? req.auth!.sub;
+      transactions = await storage.getTransactions(identity, 100_000) as Array<{ type: string; amount: number }>;
     } else {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Requires agent or owner role'));
       return;

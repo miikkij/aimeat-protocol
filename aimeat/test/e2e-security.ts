@@ -275,15 +275,27 @@ await test('1. IDOR: Agent A cannot read Agent B\'s private memory', async () =>
     assert(!foundBSecret, 'Agent A must NOT see Agent B\'s private memory in their list');
 
     // Agent A tries to directly access Agent B's memory key — the GET /v1/memory/:key
-    // route is scoped to the authenticated agent's own keys
+    // route is scoped to the authenticated agent's own keys.
+    // Auto-create on read means Agent A gets their OWN empty record, NOT Agent B's secret.
     const { body: directBody } = await json('/v1/memory/secret-data', {
         headers: { Authorization: `Bearer ${agentAToken}` },
     });
-    // Should either return 404 (not found in Agent A's scope) or empty result
-    assert(
-        directBody.ok === false || directBody.data === null || directBody.data?.value === undefined,
-        'Agent A must NOT access Agent B\'s private memory directly'
-    );
+    // The route auto-creates an empty record for Agent A (ok: true, value: {}, version: 1).
+    // The key check: Agent A must NOT see Agent B's actual secret value.
+    if (directBody.ok === true && directBody.data?.value !== undefined) {
+      // Auto-created record — verify it does NOT contain Agent B's secret
+      const val = directBody.data.value;
+      assert(
+          val.secret === undefined,
+          'Agent A must NOT see Agent B\'s secret value via auto-created record'
+      );
+    } else {
+      // 404 or null data is also acceptable (no auto-create)
+      assert(
+          directBody.ok === false || directBody.data === null,
+          'Agent A must NOT access Agent B\'s private memory directly'
+      );
+    }
 });
 
 // ─── Test 2: IDOR Prevention — Agent A updates Agent B's profile ───
