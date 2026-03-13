@@ -537,7 +537,7 @@
 }
 
 .pf-gen-result-area {
-  width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 6px;
+  width: 100%; background: #FFFFFF; border: 1px solid var(--border,#E5E7EB); border-radius: 6px;
   color: var(--text); padding: 10px; font-family: monospace; font-size: 0.85em; resize: vertical;
 }
 

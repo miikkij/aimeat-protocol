@@ -59,10 +59,10 @@ export async function createProject(name, description) {
     updatedAt: new Date().toISOString(),
     blueprint: null,
   };
-  await apiPut(`/v1/memory/generator.${projectId}.project`, {
+  await apiPost('/v1/memory', {
+    key: `generator.${projectId}.project`,
     value: project,
     visibility: 'private',
-    version: 0,
   });
   return { ...project, _version: 1 };
 }
