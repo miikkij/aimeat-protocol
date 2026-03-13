@@ -134,31 +134,41 @@ const validators = {
 
 export function validateBlueprint(result) {
   const errors = [];
+  const warnings = [];
   const json = extractCodeBlock(result, 'json') || result;
   try {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed.components)) errors.push('Missing "components" array');
     else {
-      for (const c of parsed.components) {
+      const allowedComponentKeys = new Set(['id', 'type', 'label']);
+      parsed.components = parsed.components.map(c => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
         if (!c.label) errors.push(`Component "${c.id || '?'}" missing "label" field`);
         if (c.type && !['csm', 'msm', 'extension', 'app', 'memory', 'translation'].includes(c.type)) {
           errors.push(`Component "${c.id}" has unknown type "${c.type}"`);
         }
-      }
+        // Strip extra fields (manifest, code, files, etc.) — blueprint is lightweight
+        const extraKeys = Object.keys(c).filter(k => !allowedComponentKeys.has(k));
+        if (extraKeys.length > 0) {
+          warnings.push(`Component "${c.id || '?'}" had extra fields stripped: ${extraKeys.join(', ')}`);
+        }
+        return { id: c.id, type: c.type, label: c.label };
+      });
     }
     if (!Array.isArray(parsed.phases)) errors.push('Missing "phases" array');
     else {
-      for (const p of parsed.phases) {
+      parsed.phases = parsed.phases.map(p => {
         if (!p.id) errors.push(`Phase missing "id"`);
+        if (!p.label) errors.push(`Phase "${p.id || '?'}" missing "label"`);
         if (!Array.isArray(p.componentIds)) errors.push(`Phase "${p.id || '?'}" missing "componentIds" array`);
-      }
+        return { id: p.id, label: p.label, componentIds: p.componentIds };
+      });
     }
-    return { valid: errors.length === 0, errors, parsed, extracted: json };
+    return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e) {
     errors.push(`Invalid JSON: ${e.message}`);
-    return { valid: false, errors, parsed: null, extracted: json };
+    return { valid: false, errors, warnings, parsed: null, extracted: json };
   }
 }
 

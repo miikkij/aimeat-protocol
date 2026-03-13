@@ -10,7 +10,7 @@ import {
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
   getListeners, buildAgentSetupPrompt, createGeneratorAgent,
 } from '/js/services/generator.js';
-import { buildBlueprintPrompt, buildComponentPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
+import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
 
 /* ── Agent Listener Status ───────────────────────────── */
@@ -205,7 +205,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
   if (phase === 'blueprint') {
     const fixPrompt = blueprintErrors.length > 0
-      ? buildFixPrompt(buildBlueprintPrompt(description), blueprintResult, blueprintErrors)
+      ? buildBlueprintFixPrompt(description, blueprintErrors)
       : null;
     return html`
       <div class="pf-gen-new-project">

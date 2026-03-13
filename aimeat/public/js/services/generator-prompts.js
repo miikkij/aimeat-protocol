@@ -35,9 +35,14 @@ The user wants to create this service:
 ${description}
 ---
 
-Analyze this request and produce a JSON blueprint with ALL components needed.
+Analyze this request and produce a JSON blueprint listing ALL components needed.
 
-Return ONLY valid JSON in this exact format:
+CRITICAL: Return ONLY a JSON object with "components" and "phases" arrays. Nothing else.
+Each component has EXACTLY three fields: "id", "type", "label". No other fields.
+Do NOT include manifest content, code, HTML, translations, or any implementation details.
+The blueprint is a lightweight plan — actual content is generated later per component.
+
+Format:
 {
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name" },
@@ -54,6 +59,7 @@ Return ONLY valid JSON in this exact format:
 Rules:
 - Component types: csm, msm, extension, app, memory, translation
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1)
+- Each component object has ONLY "id", "type", "label" — no "manifest", "code", "files", or other keys
 - Group components into logical phases
 - Include ALL components needed for a complete, working service
 - Only include what's actually needed — don't pad with unnecessary components`;
@@ -235,7 +241,21 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
   return template(label, context);
 }
 
-/* ── Fix Prompt ──────────────────────────────────────── */
+/* ── Fix Prompts ─────────────────────────────────────── */
+
+export function buildBlueprintFixPrompt(description, errors) {
+  return `Your previous blueprint response was not valid. DO NOT try to fix the old response — generate a fresh one.
+
+ERRORS from previous attempt:
+${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+
+Common mistakes to avoid:
+- Do NOT include manifest content, code, HTML, or implementation details in the blueprint
+- Each component must have EXACTLY three fields: "id", "type", "label"
+- The entire response must be valid JSON — no trailing commas, no unescaped quotes
+
+${buildBlueprintPrompt(description)}`;
+}
 
 export function buildFixPrompt(originalPrompt, failedResult, errors) {
   return `The following result had validation errors. Fix ONLY the errors listed below.
