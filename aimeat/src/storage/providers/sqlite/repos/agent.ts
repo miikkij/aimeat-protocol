@@ -18,14 +18,15 @@ function deserializeAgent(row: Record<string, unknown>): AgentRecord {
   if (row.description) record.description = row.description as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
   if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
+  if (row.defaultScopes) record.defaultScopes = JSON.parse(row.defaultScopes as string);
   return record;
 }
 
 export function createAgent(db: Database.Database, agent: AgentRecord): AgentRecord {
   try {
     db.prepare(
-      `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       agent.gaii, agent.name, agent.owner,
       agent.displayName ?? null, agent.description ?? null,
@@ -34,6 +35,7 @@ export function createAgent(db: Database.Database, agent: AgentRecord): AgentRec
       agent.createdAt, agent.lastSeen,
       agent.semantic ? JSON.stringify(agent.semantic) : null,
       agent.allowedOrigins ? JSON.stringify(agent.allowedOrigins) : null,
+      agent.defaultScopes ? JSON.stringify(agent.defaultScopes) : null,
     );
     return agent;
   } catch (err: unknown) {
@@ -59,7 +61,7 @@ export function updateAgent(db: Database.Database, gaii: string, updates: Partia
   db.prepare(
     `UPDATE agents SET name = ?, owner = ?, displayName = ?, description = ?, capabilities = ?,
      publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
-     allowedOrigins = ?
+     allowedOrigins = ?, defaultScopes = ?
      WHERE gaii = ?`
   ).run(
     updated.name, updated.owner,
@@ -69,6 +71,7 @@ export function updateAgent(db: Database.Database, gaii: string, updates: Partia
     updated.createdAt, updated.lastSeen,
     updated.semantic ? JSON.stringify(updated.semantic) : null,
     updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
+    updated.defaultScopes ? JSON.stringify(updated.defaultScopes) : null,
     gaii,
   );
   return updated;

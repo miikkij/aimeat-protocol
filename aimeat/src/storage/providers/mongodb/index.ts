@@ -187,6 +187,7 @@ export class MongoStorage implements Storage {
                 trustScore: agent.trustScore,
                 morselBalance: agent.morselBalance,
                 allowedOrigins: agent.allowedOrigins ?? [],
+                defaultScopes: agent.defaultScopes ?? ['*'],
                 createdAt: new Date(agent.createdAt),
                 lastSeen: new Date(agent.lastSeen),
             },
@@ -1231,7 +1232,7 @@ export class MongoStorage implements Storage {
     }
 
     private toAgentRecord(row: any): AgentRecord {
-        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
+        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
     private toMemoryRecord(row: any): MemoryRecord {

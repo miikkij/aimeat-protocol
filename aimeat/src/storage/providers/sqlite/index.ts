@@ -222,8 +222,8 @@ export class SqliteStorage implements Storage {
   async createAgent(agent: AgentRecord): Promise<AgentRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -232,6 +232,7 @@ export class SqliteStorage implements Storage {
         agent.createdAt, agent.lastSeen,
         agent.semantic ? JSON.stringify(agent.semantic) : null,
         agent.allowedOrigins ? JSON.stringify(agent.allowedOrigins) : null,
+        agent.defaultScopes ? JSON.stringify(agent.defaultScopes) : null,
       );
       return agent;
     } catch (err: unknown) {
@@ -257,7 +258,7 @@ export class SqliteStorage implements Storage {
     this.db.prepare(
       `UPDATE agents SET name = ?, owner = ?, displayName = ?, description = ?, capabilities = ?,
        publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
-       allowedOrigins = ?
+       allowedOrigins = ?, defaultScopes = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -267,6 +268,7 @@ export class SqliteStorage implements Storage {
       updated.createdAt, updated.lastSeen,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
       updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
+      updated.defaultScopes ? JSON.stringify(updated.defaultScopes) : null,
       gaii,
     );
     return updated;
@@ -348,6 +350,7 @@ export class SqliteStorage implements Storage {
     if (row.description) record.description = row.description as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
+    if (row.defaultScopes) record.defaultScopes = JSON.parse(row.defaultScopes as string);
     return record;
   }
 

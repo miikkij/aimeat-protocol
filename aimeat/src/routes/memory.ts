@@ -428,6 +428,14 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const key = decodeURIComponent(req.params.key as string);
 
     let record = await storage.getMemory(gaii, key);
+    // On-read TTL check: if TTL has expired, treat as not found and delete
+    if (record && record.ttlHours && record.ttlHours > 0) {
+      const expiresAt = new Date(record.createdAt).getTime() + record.ttlHours * 3_600_000;
+      if (Date.now() > expiresAt) {
+        await storage.deleteMemory(gaii, key);
+        record = null;
+      }
+    }
     if (!record) {
       // Auto-create empty memory key (upsert on read)
       const now = new Date().toISOString();

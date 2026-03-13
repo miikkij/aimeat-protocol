@@ -12,8 +12,8 @@
  *   AIMEAT_PORT     — port for auto-started server (default 40251)
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
+import { existsSync, unlinkSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 
 const ALL_SUITES = [
@@ -41,6 +41,7 @@ const ALL_SUITES = [
 const PORT = process.env.AIMEAT_PORT ?? '40251';
 const BASE_URL = process.env.AIMEAT_BASE_URL ?? `http://localhost:${PORT}`;
 const USE_EXTERNAL_SERVER = !!process.env.AIMEAT_BASE_URL;
+const DB_TYPE = process.env.AIMEAT_DB ?? 'memory';
 
 // ── Parse CLI args ──
 function parseArgs(): string[] {
@@ -77,7 +78,16 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_BOARDS: process.env.AIMEAT_RL_BOARDS ?? '1000',
     };
 
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts'], {
+    const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];
+    if (DB_TYPE === 'sqlite') {
+        const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
+        serverArgs.push('--db-path', dbPath);
+    } else if (DB_TYPE === 'mongodb') {
+        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
+        if (dbUrl) serverArgs.push('--db-url', dbUrl);
+    }
+
+    const child = spawn('node', serverArgs, {
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: process.cwd(),
@@ -152,10 +162,38 @@ async function main() {
     console.log(`\n${'='.repeat(50)}`);
     console.log(`  AIMEAT E2E Test Runner`);
     console.log(`  Server: ${USE_EXTERNAL_SERVER ? BASE_URL + ' (external)' : `auto-start on :${PORT}`}`);
+    console.log(`  Storage: ${DB_TYPE}`);
     console.log(`  Suites: ${suites.length}`);
     console.log(`${'='.repeat(50)}\n`);
 
     let server: ChildProcess | null = null;
+
+    // Clean up stale data so each run starts fresh
+    if (DB_TYPE === 'sqlite') {
+        const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
+        const resolved = resolve(process.cwd(), dbPath);
+        if (existsSync(resolved)) {
+            unlinkSync(resolved);
+            console.log(`Deleted stale test DB: ${resolved}`);
+        }
+    } else if (DB_TYPE === 'mongodb') {
+        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
+        if (dbUrl) {
+            // Extract database name from connection URL
+            const dbName = new URL(dbUrl).pathname.replace('/', '');
+            console.log(`Dropping MongoDB test database "${dbName}"...`);
+            try {
+                execSync(`mongosh "${dbUrl}" --eval "db.dropDatabase()" --quiet`, {
+                    cwd: process.cwd(),
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                });
+                console.log('MongoDB test database dropped.');
+            } catch {
+                // mongosh may not be installed — try to continue anyway
+                console.warn('Could not drop MongoDB database (mongosh not available?). Tests may fail if stale data exists.');
+            }
+        }
+    }
 
     if (!USE_EXTERNAL_SERVER) {
         console.log('Starting server...');

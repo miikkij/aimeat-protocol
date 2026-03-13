@@ -142,7 +142,7 @@ export async function initializeServices(
 
   return {
     maintenanceCache,
-    setMaintenanceCache: (state: MaintenanceState) => { maintenanceCache = state; },
+    setMaintenanceCache: (state: MaintenanceState) => { Object.assign(maintenanceCache, state); },
     directoryService,
     peers,
     realtimeManager,

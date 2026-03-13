@@ -31,6 +31,7 @@ model Agent {
   trustScore    Int      @default(50)
   morselBalance Int      @default(0)
   allowedOrigins String[]
+  defaultScopes  String[]
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
@@ -44,7 +45,7 @@ model Memory {
   value      Json
   visibility String   @default("private")
   tags       String[]
-  ttlHours   Int?
+  ttlHours   Float?
   version    Int      @default(1)
   flagCount  Int      @default(0)
   allowedOrigins String[]

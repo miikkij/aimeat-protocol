@@ -103,6 +103,8 @@ export class SiteService {
         this.validateTemplate(template);
 
         const data = Buffer.from(template, 'utf-8');
+        // Delete existing template first (createStorageFile uses unique constraint)
+        await this.storage.deleteStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
         await this.storage.createStorageFile({
             key: SITE_TEMPLATE_KEY,
             ownerGaii: SITE_OWNER_GAII,
@@ -142,6 +144,7 @@ export class SiteService {
         if (bundle.template) {
             this.validateTemplate(bundle.template);
             const data = Buffer.from(bundle.template, 'utf-8');
+            await this.storage.deleteStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
             await this.storage.createStorageFile({
                 key: SITE_TEMPLATE_KEY,
                 ownerGaii: SITE_OWNER_GAII,

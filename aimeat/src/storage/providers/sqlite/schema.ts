@@ -30,7 +30,8 @@ export function initializeSchema(db: Database.Database): void {
       createdAt      TEXT NOT NULL,
       lastSeen       TEXT NOT NULL,
       semantic       TEXT,
-      allowedOrigins TEXT
+      allowedOrigins TEXT,
+      defaultScopes  TEXT
     );
 
     -- ── Memory ──
