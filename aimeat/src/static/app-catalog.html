@@ -1094,12 +1094,12 @@
 
     .published-card-actions button:hover {
       border-color: var(--border-hover);
-      background: rgba(192, 132, 252, .1);
+      background: #F3F4F6;
     }
 
     .published-card-actions button.danger:hover {
       border-color: var(--accent);
-      background: rgba(233, 69, 96, .1);
+      background: rgba(232, 86, 74, .08);
       color: var(--accent);
     }
 
@@ -1133,38 +1133,38 @@
     .prompt-builder-modal h2 { margin: 0 0 16px; font-size: 1.1rem; }
     .pb-mode-row { display: flex; gap: 12px; margin-bottom: 14px; }
     .pb-mode-radio { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; }
-    .pb-mode-radio input { accent-color: var(--accent, #ff6b9d); }
+    .pb-mode-radio input { accent-color: #E8564A; }
     .pb-desc-area {
       width: 100%; min-height: 60px; max-height: 120px; resize: vertical;
-      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12);
+      background: #F9FAFB; border: 1px solid #E5E7EB;
       border-radius: 10px; padding: 10px 14px; color: inherit; font-size: .85rem;
       font-family: inherit; line-height: 1.5; margin-bottom: 14px;
     }
-    .pb-desc-area:focus { outline: none; border-color: rgba(255,107,157,.5); }
+    .pb-desc-area:focus { outline: none; border-color: #E8564A; }
     .pb-ext-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: .85rem; margin-bottom: 10px; }
-    .pb-ext-toggle input { accent-color: var(--accent, #ff6b9d); }
+    .pb-ext-toggle input { accent-color: #E8564A; }
     .pb-ext-list {
       display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px;
-      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+      background: #F9FAFB; border: 1px solid #E5E7EB;
       border-radius: 10px; max-height: 160px; overflow-y: auto;
     }
     .pb-ext-list.open { display: flex; }
     .pb-ext-chip {
       display: flex; align-items: center; gap: 6px; padding: 6px 12px;
-      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+      background: #F9FAFB; border: 1px solid #E5E7EB;
       border-radius: 8px; cursor: pointer; font-size: .8rem; transition: all .15s;
     }
-    .pb-ext-chip:hover { background: rgba(255,255,255,.1); }
-    .pb-ext-chip.selected { background: rgba(255,107,157,.15); border-color: rgba(255,107,157,.4); }
-    .pb-ext-chip input { accent-color: var(--accent, #ff6b9d); pointer-events: none; }
+    .pb-ext-chip:hover { background: #F3F4F6; }
+    .pb-ext-chip.selected { background: rgba(232,86,74,.08); border-color: rgba(232,86,74,.35); }
+    .pb-ext-chip input { accent-color: #E8564A; pointer-events: none; }
     .pb-preview {
       flex: 1; min-height: 120px; overflow-y: auto; margin-bottom: 14px; padding: 12px;
-      background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.08);
+      background: #F9FAFB; border: 1px solid #E5E7EB;
       border-radius: 10px; font-family: 'Consolas','Monaco','Courier New',monospace;
       font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
-      color: var(--text-dim, #aab);
+      color: #6B7280;
     }
-    .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted,#889); margin-bottom: 6px; }
+    .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: #6B7280; margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -1185,40 +1185,40 @@
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <h3 style="margin:0;font-size:.95rem;color:var(--text-muted,#aab)">&#x1F50C; Active Extensions</h3>
-      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted,#aab);cursor:pointer;font-size:.8rem">&#x25BC; toggle</button>
+      <h3 style="margin:0;font-size:.95rem;color:#6B7280">&#x1F50C; Active Extensions</h3>
+      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:#6B7280;cursor:pointer;font-size:.8rem">&#x25BC; toggle</button>
     </div>
     <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
   <!-- Extension Popup Overlay -->
-  <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(10,10,18,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
-    <div style="background:rgba(22,33,62,.92);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto">
+  <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.3);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
       <div id="cortex-popup-content"></div>
       <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Close</button>
+        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Close</button>
       </div>
     </div>
   </div>
 
   <!-- Cortex Extension Editor Overlay -->
-  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(10,10,18,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
-    <div style="background:rgba(22,33,62,.96);backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto">
+  <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
+    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
       <h2 style="margin-top:0;font-size:1.1rem">&#x1F6E0;&#xFE0F; Extension Editor</h2>
-      <p id="cortex-editor-name" style="color:var(--text-muted,#889);font-size:.85rem;margin-top:-.5rem"></p>
+      <p id="cortex-editor-name" style="color:#6B7280;font-size:.85rem;margin-top:-.5rem"></p>
       <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
       <div style="margin-bottom:1rem">
         <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem">Manifest (YAML)</label>
-        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
+        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:#F9FAFB;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
       </div>
       <div id="cortex-editor-libs"></div>
       <div style="margin-bottom:1.5rem">
-        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">+ Add Lib File</button>
+        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">+ Add Lib File</button>
       </div>
       <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
-        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">&#x1F4E5; Export Files</button>
-        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:var(--accent,#34d399);color:#000;font-weight:600;cursor:pointer">Save &amp; Re-install</button>
-        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Cancel</button>
+        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">&#x1F4E5; Export Files</button>
+        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:#E8564A;color:#fff;font-weight:600;cursor:pointer">Save &amp; Re-install</button>
+        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Cancel</button>
       </div>
     </div>
   </div>
@@ -1234,7 +1234,7 @@
 
   <!-- Recently Opened Strip -->
   <div id="recent-section" style="display:none;margin:0 24px 1rem">
-    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted,#aab)">&#x1F552; Recently Opened</h3>
+    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:#6B7280">&#x1F552; Recently Opened</h3>
     <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
@@ -1562,7 +1562,7 @@
   // ── Config (localStorage) ─────────────────────────
 
   const DEFAULT_CONFIG = {
-    theme: 'dark',
+    theme: 'light',
     defaultOpenMode: 'tab',
     aimeatUrl: '',
     language: 'en'
@@ -2334,7 +2334,7 @@
     section.style.display = 'block';
     strip.innerHTML = recent.map(function(app) {
       var icon = app.icon || '\u{1F4DD}';
-      return '<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" onmouseover="this.style.borderColor=\'rgba(192,132,252,.35)\'" onmouseout="this.style.borderColor=\'rgba(192,132,252,.15)\'">' +
+      return '<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" onmouseover="this.style.borderColor=\'#D1D5DB\'" onmouseout="this.style.borderColor=\'#E5E7EB\'">' +
         '<div style="font-size:1.3rem;text-align:center">' + escapeHtml(icon) + '</div>' +
         '<div style="font-size:.75rem;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">' + escapeHtml(app.name) + '</div>' +
       '</div>';
@@ -2571,7 +2571,7 @@
       '- Show each app as a clickable card with its icon and name\n' +
       '- For URL-based apps, clicking opens the URL in a new tab\n' +
       '- For local apps, show a note that they can be opened from the App Launcher\n' +
-      '- Modern, responsive design with dark theme\n' +
+      '- Modern, responsive design with light theme\n' +
       '- Group apps by their tags if they have tags\n' +
       '- Everything in one self-contained HTML file, no external dependencies\n' +
       '- Add a header with my name/title (I will customize this)\n' +
@@ -3227,7 +3227,7 @@
         var ext = data.data;
         var comps = ext.components || [];
         var html = '<h2 style="margin-top:0">' + cortexEsc(ext.name) + '</h2>';
-        html += '<p style="color:var(--text-muted,#889)">' + cortexEsc(ext.description || '') + '</p>';
+        html += '<p style="color:#6B7280">' + cortexEsc(ext.description || '') + '</p>';
         html += '<h3 style="font-size:.9rem">Available for your apps:</h3>';
 
         // Libs
@@ -3236,12 +3236,12 @@
           var tag = '<script src="' + scriptUrl + '"><\/script>';
           html += '<div style="margin-bottom:1rem">'
             + '<div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div>'
-            + '<div style="font-family:monospace;font-size:.75rem;background:rgba(0,0,0,.3);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
-            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy</button>';
+            + '<div style="font-family:monospace;font-size:.75rem;background:#F3F4F6;padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
+            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Copy</button>';
           if (lib.api_surface) {
             html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div>'
-              + '<div style="font-family:monospace;font-size:.75rem;background:rgba(0,0,0,.3);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
-              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy API</button>';
+              + '<div style="font-family:monospace;font-size:.75rem;background:#F3F4F6;padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
+              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Copy API</button>';
           }
           html += '</div>';
         });
@@ -3256,8 +3256,8 @@
           var preview = (p.content || '').substring(0, 150);
           html += '<div style="margin-bottom:.5rem">'
             + '<div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div>'
-            + '<div style="font-size:.75rem;color:var(--text-muted,#889)">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
-            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:transparent;color:var(--text-muted,#aab);cursor:pointer">Copy Prompt</button>'
+            + '<div style="font-size:.75rem;color:#6B7280">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
+            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Copy Prompt</button>'
             + '</div>';
         });
 
@@ -3265,7 +3265,7 @@
         var hasSession = false;
         try { hasSession = !!getCortexOwnerToken(); } catch(e) {}
         if (hasSession) {
-          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.08)">'
+          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #E5E7EB">'
             + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
             + '</div>';
         }
@@ -3354,12 +3354,12 @@
   }
 
   function cortexEditorLibSection(id, filename, content) {
-    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px">'
+    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid #E5E7EB;border-radius:8px;padding:12px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
-      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 6px;color:#e0e0e0;font-family:monospace;font-size:.8rem;width:200px" /></label>'
-      + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(255,100,100,.3);background:transparent;color:#f87171;cursor:pointer">Remove</button>'
+      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:4px;padding:2px 6px;color:#1A1A2E;font-family:monospace;font-size:.8rem;width:200px" /></label>'
+      + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(232,86,74,.3);background:transparent;color:#E8564A;cursor:pointer">Remove</button>'
       + '</div>'
-      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:rgba(0,0,0,.4);color:#e0e0e0;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
+      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:#F9FAFB;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
       + '</div>';
   }
 
@@ -3454,7 +3454,7 @@
     .catch(function(e) {
       saveBtn.disabled = false;
       statusEl.textContent = 'Error: ' + e.message;
-      statusEl.style.color = 'var(--accent,#e74c6f)';
+      statusEl.style.color = '#E8564A';
     });
   }
 
@@ -3745,10 +3745,10 @@
 
     // Design guidelines
     prompt += '### Design Guidelines\n';
-    prompt += 'Recommended dark theme:\n';
+    prompt += 'Recommended light theme:\n';
     prompt += '```css\n';
-    prompt += ':root { --bg:#0f0a14; --card:rgba(30,20,40,0.85); --text:#f0e6f6;\n';
-    prompt += '  --accent:#ff6b9d; --border:rgba(255,107,157,0.25); --radius:12px; }\n';
+    prompt += ':root { --bg:#FAFAF8; --card:#FFFFFF; --text:#1A1A2E;\n';
+    prompt += '  --accent:#E8564A; --border:#E5E7EB; --radius:12px; }\n';
     prompt += '```\n';
     prompt += 'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
     prompt += 'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n';
@@ -4245,10 +4245,10 @@
         'Notifications, Drag & Drop, Clipboard, Speech API, Fullscreen, Web Workers,\n' +
         'CSS Animations, SVG, Gamepad API, Share API.\n\n' +
         '### Design Guidelines\n' +
-        'Recommended dark theme:\n' +
+        'Recommended light theme:\n' +
         '```css\n' +
-        ':root { --bg:#0f0a14; --card:rgba(30,20,40,0.85); --text:#f0e6f6;\n' +
-        '  --accent:#ff6b9d; --border:rgba(255,107,157,0.25); --radius:12px; }\n' +
+        ':root { --bg:#FAFAF8; --card:#FFFFFF; --text:#1A1A2E;\n' +
+        '  --accent:#E8564A; --border:#E5E7EB; --radius:12px; }\n' +
         '```\n' +
         'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
         'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n' +

@@ -81,17 +81,17 @@ export default function AppsTab({ session, showToast, onStats }) {
 
     <!-- App launcher -->
     <div class="card" style="margin-bottom:1rem">
-      <h3 style="color:var(--love1);font-size:1rem;margin-bottom:.5rem">\u{1F680} ${t('profile.apps.launcherTitle')}</h3>
-      <p style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">${t('profile.apps.launcherDesc')}</p>
-      <a href="/v1/aimeat-os" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block">${t('profile.apps.launcherOpen')}</a>
+      <h3 style="color:var(--accent,#E8564A);font-size:1rem;margin-bottom:.5rem">\u{1F680} ${t('profile.apps.launcherTitle')}</h3>
+      <p style="font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem">${t('profile.apps.launcherDesc')}</p>
+      <a href="/app-catalog.html" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block">${t('profile.apps.launcherOpen')}</a>
     </div>
 
     <!-- Create guide -->
     <div class="card" style="margin-bottom:1rem">
-      <h3 style="color:var(--love1);font-size:1rem;margin-bottom:.5rem">\u2728 ${t('profile.apps.createGuide')}</h3>
-      <p style="font-size:.85rem;color:var(--muted);margin-bottom:.75rem">${t('profile.apps.createGuideDesc')}</p>
+      <h3 style="color:var(--accent,#E8564A);font-size:1rem;margin-bottom:.5rem">\u2728 ${t('profile.apps.createGuide')}</h3>
+      <p style="font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem">${t('profile.apps.createGuideDesc')}</p>
       <a href="/v1/aimeat-os" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block;margin-bottom:.5rem">${t('profile.apps.downloadGuide')}</a>
-      <p style="font-size:.8rem;color:var(--muted)">${t('profile.apps.guideDesc')}</p>
+      <p style="font-size:.8rem;color:var(--text-dim,#6B7280)">${t('profile.apps.guideDesc')}</p>
     </div>
 
     <!-- Upload -->

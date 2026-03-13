@@ -263,6 +263,7 @@
             <a href="/v1/classic" onClick=${(e) => handleNav(e, '/v1/classic')} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
             <a href="/v1/portal?view=dev" onClick=${(e) => handleNav(e, '/v1/portal?view=dev')}>${t('nav.devView')}</a>
             ${session && html`
+              <a href="/app-catalog.html" target="_blank" class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
               <a href="/v1/profile" class="profile-link visible" onClick=${(e) => handleNav(e, '/v1/profile')}>
                 ${t('nav.profile')}
               </a>
