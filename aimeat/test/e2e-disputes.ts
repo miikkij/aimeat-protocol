@@ -58,6 +58,11 @@ let ownerToken = '';
 let ownerPrivKey = '';
 const ownerName = `dispowner${Date.now()}`;
 
+// Second owner for provider agent (avoids SAME_OWNER_WORK)
+const provOwnerName = `dispprov${Date.now()}`;
+let provOwnerPriv = '';
+let provOwnerToken = '';
+
 // Two agents: requester and provider
 let requesterToken = '';
 let requesterPrivKey = '';
@@ -172,13 +177,34 @@ await test('Requester auth token', async () => {
     requesterToken = body.data.token;
 });
 
+await test('Register provider owner', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: provOwnerName, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    provOwnerPriv = body.data.private_key;
+});
+
+await test('Provider owner auth token', async () => {
+    const timestamp = new Date().toISOString();
+    const message = provOwnerName + NODE_ID + timestamp;
+    const signature = await signMsg(provOwnerPriv, message);
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: provOwnerName, timestamp, signature }),
+    });
+    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
+    provOwnerToken = body.data.token;
+});
+
 await test('Register provider agent', async () => {
     const { status, body } = await json('/v1/agents', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
+        headers: { Authorization: `Bearer ${provOwnerToken}` },
         body: JSON.stringify({
             name: 'provider',
-            owner: ownerName,
+            owner: provOwnerName,
             capabilities: ['work', 'actions'],
             model: 'gpt-4o',
         }),
@@ -675,6 +701,14 @@ await test('Cascade delete owner', async () => {
     const { status } = await json(`/v1/owners/${ownerName}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200 || status === 204, `status ${status}`);
+});
+
+await test('Cascade delete provider owner', async () => {
+    const { status } = await json(`/v1/owners/${provOwnerName}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${provOwnerToken}` },
     });
     assert(status === 200 || status === 204, `status ${status}`);
 });

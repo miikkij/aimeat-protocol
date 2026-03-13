@@ -278,9 +278,11 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     const reqCode = req.query.access_code as string | undefined;
 
                     // Determine if entries should be shown to anonymous users
+                    // Owner always has full access to their own sets
+                    const isOwner = record3?.gaii === gaii;
                     let showEntries = true;
                     let notice: string | undefined;
-                    if (isAnonymous) {
+                    if (isAnonymous && !isOwner) {
                         if (vis === 'private') {
                             showEntries = false;
                             notice = 'Private set — authenticate with OTK to access entries';
@@ -300,8 +302,9 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
                     }));
                 } else {
                     const sets = await storage.listMicroMemorySets(gaii);
+                    // When listing own sets (gaii matches), show all; otherwise filter private
                     const filteredSets = isAnonymous
-                        ? sets.filter(s => s.visibility !== 'private')
+                        ? sets.filter(s => s.gaii === gaii || s.visibility !== 'private')
                         : sets;
                     res.json(success(config.nodeId, {
                         gaii,

@@ -257,7 +257,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       'prompt-package': 'platform-app-builder',
     };
     const promptId = promptIdMap[path] ?? 'platform-app-builder';
-    const record = await storage.getSystemPrompt(promptId);
+    const record = await storage.getSystemPrompt(promptId)
+      ?? (promptId !== 'platform-app-builder' ? await storage.getSystemPrompt('platform-app-builder') : null);
 
     if (!record || !record.active) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available'));

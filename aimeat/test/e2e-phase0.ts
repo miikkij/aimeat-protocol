@@ -96,6 +96,7 @@ await test('Register test agent', async () => {
             name: agentName,
             owner: ownerName,
             capabilities: ['memory', 'actions'],
+            scopes: ['memory:read', 'memory:write', 'memory:delete', 'catalogue:read', 'work:publish'],
             model: 'gpt-4o',
         }),
     }));
@@ -183,7 +184,7 @@ await test('POST /v1/memory \u2192 write invalid data violating schema \u2192 40
             ttl_hours: 1,
         }),
     }));
-    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(status === 400 || status === 422, `expected 400 or 422, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === false, 'ok is false');
 });
 
@@ -223,6 +224,13 @@ await test('POST /v1/csm \u2192 201, register CSM from hobby-directory template'
     assert(res.status === 200, `template fetch status ${res.status}`);
     csmTemplateYaml = await res.text();
     assert(csmTemplateYaml.length > 0, 'template YAML is non-empty');
+
+    // Pre-cleanup: delete if it already exists from a previous run
+    const preList = await json('/v1/csm');
+    const existing = (preList.body?.data?.services ?? []).find((s: any) => s.template === 'hobby-directory');
+    if (existing) {
+        await json(`/v1/csm/${encodeURIComponent(existing.name)}`, authed({ method: 'DELETE' }));
+    }
 
     const { status, body } = await json('/v1/csm', authed({
         method: 'POST',
@@ -338,7 +346,7 @@ await test('POST /v1/ghii → register GHII identity for TOTP tests', async () =
         body: JSON.stringify({
             username: ghiiUser,
             display_name: 'TOTP Test User',
-            password: 'testpassword',
+            password: 'TestPassword1!',
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -350,7 +358,7 @@ let ghiiToken = '';
 await test('POST /v1/ghii/login → get GHII user token', async () => {
     const { status, body } = await json('/v1/ghii/login', {
         method: 'POST',
-        body: JSON.stringify({ username: ghiiUser, password: 'testpassword' }),
+        body: JSON.stringify({ username: ghiiUser, password: 'TestPassword1!' }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');

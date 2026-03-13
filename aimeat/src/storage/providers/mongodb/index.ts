@@ -772,7 +772,7 @@ export class MongoStorage implements Storage {
 
     async listPosts(boardId: string, opts?: { category?: string; cursor?: string; limit?: number }): Promise<BoardPostRecord[]> {
         this.ensureReady();
-        const where: any = { boardId };
+        const where: any = { boardId, replyTo: null };
         if (opts?.category) where.category = opts.category;
         const rows = await this.prisma.boardPost.findMany({
             where,

@@ -58,6 +58,7 @@ export function statsRouter(
     }
 
     res.json(success(config.nodeId, {
+      node_id: config.nodeId,
       ...snap,
       active_owners: owners.length,
       active_agents: agents.length,

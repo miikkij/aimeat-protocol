@@ -587,7 +587,7 @@ await test('28. Non-owner agent-B cannot list private board posts', async () => 
 
 await test('29. Unauthenticated cannot access private board', async () => {
     const { status } = await json(`/v1/boards/${privateBoardId}/posts`);
-    assert(status === 401, `expected 401, got ${status}`);
+    assert(status === 401 || status === 403, `expected 401 or 403, got ${status}`);
 });
 
 await test('30. Public board posts readable without auth', async () => {

@@ -195,7 +195,8 @@ export function requireRole(role: string) {
  * Require specific scopes. Must be used after requireAuth().
  * Checks if the agent's JWT scopes include the required scopes.
  * Supports exact match, domain wildcards (memory:*), and global wildcard (*).
- * Operators bypass all scope checks.
+ * Owner/operator role bypasses scope checks (they act as owners, not scoped agents).
+ * Agents with explicit scopes are always enforced, even if their owner is an operator.
  */
 export function requireScope(...requiredScopes: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -204,8 +205,9 @@ export function requireScope(...requiredScopes: string[]) {
       return;
     }
 
-    // Operators always have full access
-    if (req.auth.roles.includes('operator')) {
+    // Owner-role requests bypass scope checks (owners act on behalf of all their agents)
+    // But agent-role requests MUST respect scopes, even if their owner is an operator
+    if (req.auth.roles.includes('owner') && !req.auth.roles.includes('agent')) {
       next();
       return;
     }

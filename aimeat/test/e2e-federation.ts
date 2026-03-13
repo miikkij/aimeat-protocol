@@ -60,6 +60,12 @@ const fakePeerUrl = 'http://localhost:9999'; // non-existent, that's fine for AP
 const directPeerNodeId = `aimeat-direct-peer-${Date.now()}`;
 const directPeerUrl = 'http://localhost:9998';
 
+// Generate a real Ed25519 keypair for the direct peer (used to sign federation payloads)
+const directPeerPrivKeyBytes = ed.utils.randomPrivateKey();
+const directPeerPubKeyBytes = await ed.getPublicKeyAsync(directPeerPrivKeyBytes);
+const directPeerPrivKeyB64 = Buffer.from(directPeerPrivKeyBytes).toString('base64');
+const directPeerPubKeyB64 = Buffer.from(directPeerPubKeyBytes).toString('base64');
+
 console.log('\n=== T-1: Federation E2E Tests ===\n');
 
 // ─── Setup: Register owner + agent, get tokens ───
@@ -225,7 +231,7 @@ await test('8. Register peer manually', async () => {
         body: JSON.stringify({
             node_id: directPeerNodeId,
             url: directPeerUrl,
-            public_key: 'abc123pubkey',
+            public_key: directPeerPubKeyB64,
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -273,17 +279,19 @@ await test('11. Heartbeat', async () => {
 console.log('\nPhase 3 — Data Replication & Catalogue Sync');
 
 await test('12. Replicate memory entry', async () => {
+    const replicatePayload = {
+        source_node: directPeerNodeId,
+        gaii: agentGaii,
+        key: 'shared-pref',
+        value: { theme: 'dark' },
+        visibility: 'public',
+        version: 1,
+        timestamp: new Date().toISOString(),
+    };
+    const replicateSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(replicatePayload));
     const { body } = await json('/v1/federation/replicate', {
         method: 'POST',
-        body: JSON.stringify({
-            source_node: directPeerNodeId,
-            gaii: agentGaii,
-            key: 'shared-pref',
-            value: { theme: 'dark' },
-            visibility: 'public',
-            version: 1,
-            timestamp: new Date().toISOString(),
-        }),
+        body: JSON.stringify({ ...replicatePayload, signature: replicateSig }),
     });
     assert(body.ok === true, `replicate: ${JSON.stringify(body.error)}`);
     assert(body.data.replicated === true, 'replicated flag');
@@ -293,31 +301,31 @@ await test('12. Replicate memory entry', async () => {
 });
 
 await test('13. Catalogue sync (full)', async () => {
+    const catActions = [
+        {
+            id: 'remote-action-1',
+            provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
+            display_name: 'Remote Summarize',
+            description: 'Summarizes text remotely',
+            category: 'nlp',
+            pricing: { base_morsels: 5 },
+            tags: ['nlp', 'summarize'],
+        },
+        {
+            id: 'remote-action-2',
+            provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
+            display_name: 'Remote Translate',
+            description: 'Translates text remotely',
+            category: 'nlp',
+            pricing: { base_morsels: 3 },
+            tags: ['nlp', 'translate'],
+        },
+    ];
+    const catPayload = { source_node: directPeerNodeId, actions: catActions, since_timestamp: undefined, catalogue_hash: undefined };
+    const catSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(catPayload));
     const { body } = await json('/v1/federation/catalogue-sync', {
         method: 'POST',
-        body: JSON.stringify({
-            source_node: directPeerNodeId,
-            actions: [
-                {
-                    id: 'remote-action-1',
-                    provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
-                    display_name: 'Remote Summarize',
-                    description: 'Summarizes text remotely',
-                    category: 'nlp',
-                    pricing: { base_morsels: 5 },
-                    tags: ['nlp', 'summarize'],
-                },
-                {
-                    id: 'remote-action-2',
-                    provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
-                    display_name: 'Remote Translate',
-                    description: 'Translates text remotely',
-                    category: 'nlp',
-                    pricing: { base_morsels: 3 },
-                    tags: ['nlp', 'translate'],
-                },
-            ],
-        }),
+        body: JSON.stringify({ ...catPayload, signature: catSig }),
     });
     assert(body.ok === true, `sync: ${JSON.stringify(body.error)}`);
     assert(body.data.synced === 2, `synced: ${body.data.synced}`);
@@ -327,23 +335,23 @@ await test('13. Catalogue sync (full)', async () => {
 });
 
 await test('14. Catalogue sync (incremental)', async () => {
+    const incActions = [
+        {
+            id: 'remote-action-3',
+            provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
+            display_name: 'Remote New Action',
+            description: 'A new action',
+            category: 'misc',
+            pricing: { base_morsels: 1 },
+            tags: ['new'],
+        },
+    ];
+    const incSinceTimestamp = new Date(Date.now() - 60_000).toISOString();
+    const incPayload = { source_node: directPeerNodeId, actions: incActions, since_timestamp: incSinceTimestamp, catalogue_hash: undefined };
+    const incSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(incPayload));
     const { body } = await json('/v1/federation/catalogue-sync', {
         method: 'POST',
-        body: JSON.stringify({
-            source_node: directPeerNodeId,
-            since_timestamp: new Date(Date.now() - 60_000).toISOString(),
-            actions: [
-                {
-                    id: 'remote-action-3',
-                    provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
-                    display_name: 'Remote New Action',
-                    description: 'A new action',
-                    category: 'misc',
-                    pricing: { base_morsels: 1 },
-                    tags: ['new'],
-                },
-            ],
-        }),
+        body: JSON.stringify({ ...incPayload, signature: incSig }),
     });
     assert(body.ok === true, `incremental sync: ${JSON.stringify(body.error)}`);
     assert(body.data.synced === 1, `synced: ${body.data.synced}`);
@@ -351,22 +359,22 @@ await test('14. Catalogue sync (incremental)', async () => {
 });
 
 await test('14b. Catalogue sync (update existing)', async () => {
+    const updActions = [
+        {
+            id: 'remote-action-1',
+            provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
+            display_name: 'Remote Summarize v2',
+            description: 'Updated summarizer',
+            category: 'nlp',
+            pricing: { base_morsels: 8 },
+            tags: ['nlp', 'summarize'],
+        },
+    ];
+    const updPayload = { source_node: directPeerNodeId, actions: updActions, since_timestamp: undefined, catalogue_hash: undefined };
+    const updSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(updPayload));
     const { body } = await json('/v1/federation/catalogue-sync', {
         method: 'POST',
-        body: JSON.stringify({
-            source_node: directPeerNodeId,
-            actions: [
-                {
-                    id: 'remote-action-1',
-                    provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
-                    display_name: 'Remote Summarize v2',
-                    description: 'Updated summarizer',
-                    category: 'nlp',
-                    pricing: { base_morsels: 8 },
-                    tags: ['nlp', 'summarize'],
-                },
-            ],
-        }),
+        body: JSON.stringify({ ...updPayload, signature: updSig }),
     });
     assert(body.ok === true, `update sync: ${JSON.stringify(body.error)}`);
     assert(body.data.updated === 1, `updated: ${body.data.updated}`);
@@ -498,12 +506,18 @@ await test('18c. Key exchange with known peer', async () => {
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ node_id: kxPeerId, url: 'http://localhost:9994' }),
     });
+    // Activate the peer so key-exchange accepts it
+    await json(`/v1/federation/peers/${kxPeerId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ status: 'active' }),
+    });
 
     const { body } = await json('/v1/federation/key-exchange', {
         method: 'POST',
         body: JSON.stringify({
             node_id: kxPeerId,
-            public_key: 'deadbeef1234567890abcdef',
+            node_public_key: 'deadbeef1234567890abcdef',
             capabilities: ['memory', 'actions'],
         }),
     });
@@ -571,7 +585,7 @@ await test('23. Key exchange with unknown peer', async () => {
             public_key: 'abcdef',
         }),
     });
-    assert(status === 404, `status ${status}`);
+    assert(status === 400, `status ${status}`);
     assert(body.ok === false, 'not ok');
 });
 

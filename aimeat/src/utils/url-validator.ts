@@ -26,8 +26,15 @@ export async function validateOutboundUrl(urlStr: string): Promise<{ valid: bool
     return { valid: false, reason: `Protocol ${parsed.protocol} not allowed` };
   }
 
-  // Block localhost hostnames
+  // In dev mode, allow loopback for local webhook/hook testing
+  const devMode = process.env.AIMEAT_DEV_MODE === 'true';
   const hostname = parsed.hostname.toLowerCase();
+
+  if (devMode && (hostname === 'localhost' || hostname === '::1' || /^127\./.test(hostname))) {
+    return { valid: true };
+  }
+
+  // Block localhost hostnames
   if (hostname === 'localhost' || hostname === '::1') {
     return { valid: false, reason: 'Localhost not allowed' };
   }

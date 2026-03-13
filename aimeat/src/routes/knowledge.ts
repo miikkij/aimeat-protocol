@@ -193,7 +193,11 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     const manifestKey = `packages/${packageId}/manifest`;
 
     // Try public read first
-    const memories = await storage.listMemory('', { prefix: manifestKey, visibility: 'public' });
+    let memories = await storage.listMemory('', { prefix: manifestKey, visibility: 'public' });
+    // If authenticated, also check the agent's own packages (any visibility)
+    if (memories.length === 0 && req.auth?.sub) {
+      memories = await storage.listMemory(req.auth.sub as string, { prefix: manifestKey });
+    }
     const manifest = memories[0];
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));

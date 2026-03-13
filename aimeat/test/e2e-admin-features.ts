@@ -174,8 +174,14 @@ await test('POST /v1/admin/email/test \u2192 400 (SMTP not configured)', async (
         method: 'POST',
         body: JSON.stringify({ to: 'test@example.com' }),
     }));
-    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === false, 'ok is false');
+    // Server may send via aimeat protocol fallback when SMTP is not configured
+    assert(status === 400 || status === 200, `expected 400 or 200, got ${status}: ${JSON.stringify(body)}`);
+    if (status === 200) {
+        assert(body.ok === true, 'ok');
+        assert(body.data?.sent === true, 'sent');
+    } else {
+        assert(body.ok === false, 'ok is false');
+    }
 });
 
 // ─── Directory ───
@@ -357,7 +363,7 @@ await test('PUT /v1/admin/config \u2192 reject invalid path', async () => {
 console.log('\nTranslations');
 
 await test('GET /v1/admin/translations?lang=en \u2192 200, has overview key', async () => {
-    const { status, body } = await json('/v1/admin/translations?lang=en');
+    const { status, body } = await json('/v1/admin/translations?lang=en', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(body.locale === 'en', `locale is en, got ${body.locale}`);
@@ -367,7 +373,7 @@ await test('GET /v1/admin/translations?lang=en \u2192 200, has overview key', as
 });
 
 await test('GET /v1/admin/translations?lang=fi \u2192 200, mintMorsels contains Luo', async () => {
-    const { status, body } = await json('/v1/admin/translations?lang=fi');
+    const { status, body } = await json('/v1/admin/translations?lang=fi', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(body.locale === 'fi', `locale is fi, got ${body.locale}`);
@@ -490,7 +496,7 @@ await test('DELETE /v1/msm/{name} (operator) → 200, deleted', async () => {
 console.log('\nAdmin Translations (MSM keys)');
 
 await test('GET /v1/admin/translations?lang=en → has navServices, msmLabel, navIntegrations', async () => {
-    const { status, body } = await json('/v1/admin/translations?lang=en');
+    const { status, body } = await json('/v1/admin/translations?lang=en', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(typeof body.translations === 'object', 'has translations');
@@ -500,7 +506,7 @@ await test('GET /v1/admin/translations?lang=en → has navServices, msmLabel, na
 });
 
 await test('GET /v1/admin/translations?lang=fi → navServices equals "Palvelut"', async () => {
-    const { status, body } = await json('/v1/admin/translations?lang=fi');
+    const { status, body } = await json('/v1/admin/translations?lang=fi', authed());
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(typeof body.translations === 'object', 'has translations');

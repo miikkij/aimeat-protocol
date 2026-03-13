@@ -84,7 +84,12 @@ let agentGaii = '';
 let agentPrivKey = '';
 let agentToken = '';
 
-// Second agent (provider for work)
+// Second owner (for provider agent — avoids SAME_OWNER_WORK)
+const providerOwnerName = `hkprovowner${Date.now()}`;
+let providerOwnerPrivKey = '';
+let providerOwnerToken = '';
+
+// Provider agent (under second owner)
 let providerGaii = '';
 let providerPrivKey = '';
 let providerToken = '';
@@ -138,7 +143,8 @@ await test('1. Mock webhook server started', async () => {
     console.log(`    Hook server on port ${hookPort}`);
 });
 
-await test('2. Register owner (operator) + agents', async () => {
+await test('2. Register owners (operator + provider) and agents', async () => {
+    // First owner (operator) — owns the requester agent
     const { status, body } = await json('/v1/owners', {
         method: 'POST',
         body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
@@ -147,7 +153,16 @@ await test('2. Register owner (operator) + agents', async () => {
     ownerPrivKey = body.data.private_key;
     ownerToken = await getToken(ownerName, ownerPrivKey, false);
 
-    // Agent-A (requester)
+    // Second owner — owns the provider agent (avoids SAME_OWNER_WORK)
+    const { status: status2, body: body2 } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: providerOwnerName, public_key: 'placeholder' }),
+    });
+    assert(status2 === 201, `provider owner: ${status2}`);
+    providerOwnerPrivKey = body2.data.private_key;
+    providerOwnerToken = await getToken(providerOwnerName, providerOwnerPrivKey, false);
+
+    // Agent-A (requester) under first owner
     const { body: aBody } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -158,11 +173,11 @@ await test('2. Register owner (operator) + agents', async () => {
     agentPrivKey = aBody.data.private_key;
     agentToken = await getToken(agentGaii, agentPrivKey, true);
 
-    // Agent-B (provider)
+    // Agent-B (provider) under second owner
     const { body: bBody } = await json('/v1/agents', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'hk-provider', owner: ownerName, capabilities: ['work'], model: 'gpt-4o' }),
+        headers: { Authorization: `Bearer ${providerOwnerToken}` },
+        body: JSON.stringify({ name: 'hk-provider', owner: providerOwnerName, capabilities: ['work'], model: 'gpt-4o' }),
     });
     assert(bBody.ok, `agent-B: ${JSON.stringify(bBody.error)}`);
     providerGaii = bBody.data.agent.gaii;
@@ -828,12 +843,18 @@ await test('Reset hooks', async () => {
 
 hookServer.close();
 
-await test('Cascade-delete owner', async () => {
+await test('Cascade-delete owners', async () => {
     const { status } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(status === 200, `status: ${status}`);
+    assert(status === 200, `owner1 status: ${status}`);
+
+    const { status: status2 } = await json(`/v1/owners/${encodeURIComponent(providerOwnerName)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status2 === 200, `owner2 status: ${status2}`);
 });
 
 // ─── Summary ───

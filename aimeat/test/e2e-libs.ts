@@ -63,6 +63,11 @@ let agentGaii = '';
 let agentPrivKey = '';
 let agentJwt = '';
 
+// Second owner for cross-owner work tests
+const username2 = `libtest2${Date.now()}`;
+let ownerPrivKey2 = '';
+let ownerJwt2 = '';
+
 console.log(`\n=== AIMEAT Helper Libraries E2E Test ===\n`);
 console.log(`Server: ${BASE}`);
 console.log(`Username: ${username}\n`);
@@ -463,14 +468,35 @@ await test('work.getAction — action detail (public)', async () => {
     assert(data.data.display_name === 'E2E Test Action', 'display_name mismatch');
 });
 
-// Register a second agent to act as provider
+// Register a second owner + agent for cross-owner work tests
 let agent2Gaii = '';
 let agent2Jwt = '';
 
-await test('Register provider agent', async () => {
-    const data = await authApi('/v1/agents', ownerJwt, {
+await test('Register second owner via GHII', async () => {
+    const data = await api('/v1/ghii', {
         method: 'POST',
-        body: JSON.stringify({ name: 'provider', owner: username, display_name: 'Test Provider' }),
+        body: JSON.stringify({ username: username2, display_name: 'Lib Test Provider Owner' }),
+    });
+    assert(data.ok === true, `Second owner registration failed: ${data.error?.message}`);
+    ownerPrivKey2 = data.data.private_key;
+});
+
+await test('Get second owner JWT', async () => {
+    const timestamp = new Date().toISOString();
+    const message = username2 + NODE_ID + timestamp;
+    const signature = await signMsg(ownerPrivKey2, message);
+    const data = await api('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: username2, timestamp, signature }),
+    });
+    assert(data.ok === true, `Second owner auth failed: ${data.error?.message}`);
+    ownerJwt2 = data.data.token;
+});
+
+await test('Register provider agent under second owner', async () => {
+    const data = await authApi('/v1/agents', ownerJwt2, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'provider', owner: username2, display_name: 'Test Provider' }),
     });
     assert(data.ok === true, `Provider registration failed: ${data.error?.message}`);
     agent2Gaii = data.data.agent.gaii;

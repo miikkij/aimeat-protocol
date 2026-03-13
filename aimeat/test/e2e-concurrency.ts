@@ -91,12 +91,17 @@ const ownerName = `ccowner${Date.now()}`;
 let ownerPrivKey = '';
 let ownerToken = '';
 
+// Second owner (for provider agent — work requests require different owners)
+const owner2Name = `ccowner2${Date.now()}`;
+let owner2PrivKey = '';
+let owner2Token = '';
+
 // Requester agent (limited morsels for escrow tests)
 let requesterGaii = '';
 let requesterPrivKey = '';
 let requesterToken = '';
 
-// Provider agent
+// Provider agent (registered under owner2)
 let providerGaii = '';
 let providerPrivKey = '';
 let providerToken = '';
@@ -114,7 +119,8 @@ console.log('\n=== AIMEAT Concurrent Access E2E Test ===\n');
 // ─── Phase 0: Setup ───
 console.log('Phase 0 — Setup');
 
-await test('0a. Register owner + agents', async () => {
+await test('0a. Register owners + agents', async () => {
+    // First owner (for requester agents)
     const { status, body } = await json('/v1/owners', {
         method: 'POST',
         body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
@@ -123,7 +129,16 @@ await test('0a. Register owner + agents', async () => {
     ownerPrivKey = body.data.private_key;
     ownerToken = await getToken(ownerName, ownerPrivKey, false);
 
-    // Requester agent
+    // Second owner (for provider agent — work requires different owners)
+    const { status: s2, body: o2Body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
+    });
+    assert(s2 === 201, `owner2: ${s2}`);
+    owner2PrivKey = o2Body.data.private_key;
+    owner2Token = await getToken(owner2Name, owner2PrivKey, false);
+
+    // Requester agent (under owner 1)
     const { body: rBody } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -134,18 +149,18 @@ await test('0a. Register owner + agents', async () => {
     requesterPrivKey = rBody.data.private_key;
     requesterToken = await getToken(requesterGaii, requesterPrivKey, true);
 
-    // Provider agent
+    // Provider agent (under owner 2)
     const { body: pBody } = await json('/v1/agents', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'cc-provider', owner: ownerName, capabilities: ['work'], model: 'gpt-4o' }),
+        headers: { Authorization: `Bearer ${owner2Token}` },
+        body: JSON.stringify({ name: 'cc-provider', owner: owner2Name, capabilities: ['work'], model: 'gpt-4o' }),
     });
     assert(pBody.ok, `provider: ${JSON.stringify(pBody.error)}`);
     providerGaii = pBody.data.agent.gaii;
     providerPrivKey = pBody.data.private_key;
     providerToken = await getToken(providerGaii, providerPrivKey, true);
 
-    // Second requester (for parallel lifecycle)
+    // Second requester (under owner 1, for parallel lifecycle)
     const { body: r2Body } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -633,12 +648,20 @@ await test('31. OTK allows re-use within 60s window', async () => {
 // ─── Cleanup ───
 console.log('\nCleanup');
 
-await test('Cascade-delete owner', async () => {
+await test('Cascade-delete owner 1', async () => {
     const { status } = await json(`/v1/owners/${ownerName}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(status === 200 || status === 204, `delete: ${status}`);
+    assert(status === 200 || status === 204, `delete owner1: ${status}`);
+});
+
+await test('Cascade-delete owner 2', async () => {
+    const { status } = await json(`/v1/owners/${owner2Name}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(status === 200 || status === 204, `delete owner2: ${status}`);
 });
 
 // ─── Results ───

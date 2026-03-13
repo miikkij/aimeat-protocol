@@ -892,16 +892,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/mcp/authorize — Authorization endpoint (dual-path: signature or browser consent)
     router.get('/v1/mcp/authorize', async (req: Request, res: Response) => {
-        const clientId = req.query.client_id as string;
-        const redirectUri = req.query.redirect_uri as string;
-        const responseType = req.query.response_type as string;
-        const state = req.query.state as string | undefined;
-        const scope = req.query.scope as string | undefined;
-        const codeChallenge = req.query.code_challenge as string | undefined;
-        const codeChallengeMethod = req.query.code_challenge_method as string | undefined;
-        const gaii = req.query.gaii as string | undefined;
-        const signature = req.query.signature as string | undefined;
-        const timestamp = req.query.timestamp as string | undefined;
+        const q = (key: string) => { const v = req.query[key]; return Array.isArray(v) ? v[0] as string : v as string | undefined; };
+        const clientId = q('client_id')!;
+        const redirectUri = q('redirect_uri')!;
+        const responseType = q('response_type')!;
+        const state = q('state');
+        const scope = q('scope');
+        const codeChallenge = q('code_challenge');
+        const codeChallengeMethod = q('code_challenge_method');
+        const gaii = q('gaii');
+        const signature = q('signature');
+        const timestamp = q('timestamp');
 
         if (responseType !== 'code') {
             res.status(400).json({ error: 'unsupported_response_type', error_description: 'Only "code" is supported' });
@@ -1085,8 +1086,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     // GET /v1/mcp/approval-check — Check if a client+agent pair has a remembered approval
     // Used by the consent page to auto-submit when the user has previously approved this client
     router.get('/v1/mcp/approval-check', async (req: Request, res: Response) => {
-        const clientId = req.query.client_id as string;
-        const gaii = req.query.gaii as string;
+        const rawClientId = req.query.client_id; const clientId = (Array.isArray(rawClientId) ? rawClientId[0] : rawClientId) as string;
+        const rawGaii = req.query.gaii; const gaii = (Array.isArray(rawGaii) ? rawGaii[0] : rawGaii) as string;
         if (!clientId || !gaii) {
             res.json({ approved: false });
             return;

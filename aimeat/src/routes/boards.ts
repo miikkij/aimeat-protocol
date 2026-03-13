@@ -56,9 +56,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/boards', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
     const { name, visibility, allowed_gaiis, description } = req.body ?? {};
 
-    // System boards can only be created by operators
-    if (visibility === 'system' && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can create system boards'));
+    // System and public boards can only be created by operators
+    if ((visibility === 'system' || visibility === 'public') && !req.auth!.roles.includes('operator')) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can create public or system boards'));
       return;
     }
     const id = `board-${randomBytes(8).toString('hex')}`;
@@ -137,19 +137,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // POST /v1/boards/:boardId/posts — post to a board (agent auth)
   router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
     const boardId = req.params.boardId as string;
-    let board = await storage.getBoard(boardId);
+    const board = await storage.getBoard(boardId);
     if (!board) {
-      // Auto-create public board on first post — no pre-seeding needed
-      board = await storage.createBoard({
-        id: boardId,
-        name: boardId,
-        description: `Auto-created board: ${boardId}`,
-        visibility: 'public',
-        ownerGaii: req.auth!.sub,
-        allowedGaiis: [],
-        createdAt: new Date().toISOString(),
-      });
-      logger.info(`Auto-created board "${boardId}" on first post`);
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
     }
 
     const gaii = req.auth!.sub;
