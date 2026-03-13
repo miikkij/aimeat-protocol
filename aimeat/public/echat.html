@@ -153,6 +153,7 @@ function App() {
   const [participants, setParticipants] = useState([]);
   const [input, setInput] = useState('');
   const [myName, setMyName] = useState('');
+  const myNameRef = useRef('');
 
   const wsRef = useRef(null);
   const keyRef = useRef(null);
@@ -211,7 +212,7 @@ function App() {
           if (!keyRef.current) break;
           try {
             const text = await Crypto.decrypt(keyRef.current, msg.payload);
-            const isMine = msg.sender === myName;
+            const isMine = msg.sender === myNameRef.current;
             setMessages(prev => [...prev, { type: 'chat', sender: msg.sender, text, ts: msg.ts, mine: isMine }]);
           } catch {
             setMessages(prev => [...prev, { type: 'decrypt-fail', sender: msg.sender, ts: msg.ts }]);
@@ -247,7 +248,7 @@ function App() {
     } catch (e) {
       console.error('WS message parse error:', e);
     }
-  }, [passphrase, myName, addSystemMessage]);
+  }, [passphrase, addSystemMessage]);
 
   const connect = useCallback(async () => {
     setError('');
@@ -259,6 +260,7 @@ function App() {
     setConnecting(true);
     const name = displayName.trim();
     setMyName(name);
+    myNameRef.current = name;
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${proto}//${location.host}/v1/realtime/ws?echat=1&room=${encodeURIComponent(roomName.trim())}`;
@@ -378,7 +380,7 @@ function App() {
   return html`
     <div class="chat-container">
       <div class="chat-header">
-        <span class="lock">&#x1F512;</span>
+        <span class="lock">${'\u{1F512}'}</span>
         <span class="room-name">${roomName}</span>
         <span class="count">${participants.length} online</span>
         <button class="btn-leave" onClick=${leave}>Leave</button>
