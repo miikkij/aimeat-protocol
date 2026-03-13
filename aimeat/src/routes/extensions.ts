@@ -43,8 +43,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions — Install extension from YAML manifest + JS scripts ──
-  router.post('/v1/extensions', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/extensions', requireAuth(), async (req, res) => {
     try {
+      const roles = req.auth!.roles;
+      const allowOwner = config.extInstallRole === 'owner';
+      const isOperator = roles.includes('operator');
+      const isOwner = roles.includes('owner');
+
+      if (!isOperator && !(allowOwner && isOwner)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
+          `Extension install requires ${config.extInstallRole} role`));
+        return;
+      }
+
       const { manifest: manifestYaml, scripts } = req.body as {
         manifest?: string;
         scripts?: Record<string, string>;
@@ -119,6 +130,16 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
           `Maximum ${config.extensionMaxInstalled} extensions allowed`));
         return;
+      }
+
+      // Owner-level limit check
+      if (!isOperator && isOwner) {
+        const ownerExts = existing.filter(e => e.installedBy === req.auth!.owner);
+        if (ownerExts.length >= config.maxExtensionsPerOwner) {
+          res.status(429).json(error(config.nodeId, 'EXTENSION_LIMIT',
+            `Maximum ${config.maxExtensionsPerOwner} extensions per owner`));
+          return;
+        }
       }
 
       // Reject if extension name already exists
@@ -198,12 +219,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
           },
         } : {}),
-        installedBy: req.auth!.sub,
+        installedBy: req.auth!.owner,
         installedAt: new Date().toISOString(),
       };
 
       const created = await storage.createExtension(record);
-      logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.sub });
+      logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
 
       res.status(201).json(success(config.nodeId, { extension: created }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
@@ -281,7 +302,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── PATCH /v1/extensions/:name/actions/:actionId — Update action script ──
-  router.patch('/v1/extensions/:name/actions/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.patch('/v1/extensions/:name/actions/:actionId', requireAuth(), async (req, res) => {
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
@@ -289,6 +310,15 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
+      }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (config.extInstallRole !== 'owner' || !roles.includes('owner') || ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
       }
       const actionIdx = ext.actions.findIndex(a => a.id === actionId);
       if (actionIdx === -1) {
@@ -333,13 +363,22 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── DELETE /v1/extensions/:name — Uninstall extension ──────────
-  router.delete('/v1/extensions/:name', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.delete('/v1/extensions/:name', requireAuth(), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
+      }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (config.extInstallRole !== 'owner' || !roles.includes('owner') || ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
       }
 
       await storage.deleteExtension(name);
@@ -734,7 +773,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       // Build the ExtensionCtx with instance-scoped memory namespace
-      const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
+      // When extInstallRole=owner, owner-installed extensions get per-owner scoping.
+      let extMemoryOwner = `ext:${ext.name}.${instanceId}`;
+      if (config.extInstallRole === 'owner' && ext.installedBy && !req.auth!.roles.includes('operator')) {
+        const ownerScope = ext.installedBy.split('#')[1]?.split('@')[0] || ext.installedBy;
+        extMemoryOwner = `ext:${ext.name}.${ownerScope}.${instanceId}`;
+      }
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {
@@ -875,7 +919,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       // Build the ExtensionCtx
       // Extension memory uses a shared namespace (ext:{name}) so cross-user
       // workflows (e.g. buyer reads seller's listing) work correctly.
-      const extMemoryOwner = `ext:${ext.name}`;
+      // When extInstallRole=owner, owner-installed extensions get per-owner scoping.
+      let extMemoryOwner = `ext:${ext.name}`;
+      if (config.extInstallRole === 'owner' && ext.installedBy && !req.auth!.roles.includes('operator')) {
+        const ownerScope = ext.installedBy.split('#')[1]?.split('@')[0] || ext.installedBy;
+        extMemoryOwner = `ext:${ext.name}.${ownerScope}`;
+      }
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {

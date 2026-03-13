@@ -36,6 +36,7 @@ import SecurityTab from './profile/security-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
+import GeneratorTab from './profile/generator-tab.js';
 
 const TABS = [
   { id: 'portfolio',    key: 'portfolio.tabLabel',         component: PortfolioTab },
@@ -58,6 +59,7 @@ const TABS = [
   { id: 'nodeStats',    key: 'profile.tabs.nodeStats',     component: NodeStatsTab },
   { id: 'security',     key: 'profile.tabs.security',      component: SecurityTab },
   { id: 'notifications', key: 'profile.tabs.notifications', component: NotificationsTab },
+  { id: 'generator', key: 'profile.generator.tabLabel', component: GeneratorTab },
 ];
 
 export default function Profile({ navigate, locale }) {

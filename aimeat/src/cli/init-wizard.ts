@@ -152,6 +152,9 @@ const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_EXTENSIONS_ENABLED: 'false',
   AIMEAT_EXT_MAX_MEMORY_MB: '64',
   AIMEAT_EXT_TIMEOUT_MS: '5000',
+  AIMEAT_EXT_INSTALL_ROLE: 'operator',
+  AIMEAT_MAX_EXTENSIONS_PER_OWNER: '10',
+  AIMEAT_GENERATOR_ENABLED: 'true',
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────

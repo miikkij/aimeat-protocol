@@ -139,6 +139,9 @@ export interface AimeatConfig {
   // MSM installation role restriction
   msmInstallRole: 'operator' | 'owner';
 
+  // Extension installation role restriction
+  extInstallRole: 'operator' | 'owner';
+
   // Personal Node support (operator-side)
   personalNodesEnabled: boolean;
   personalNodeMaxSlots: number;
@@ -264,6 +267,10 @@ export interface AimeatConfig {
   extensionMaxApiCalls: number;
   extensionMaxCodeSizeKb: number;
   extensionMaxInstalled: number;
+  maxExtensionsPerOwner: number;
+
+  // Service Generator
+  generatorEnabled: boolean;
 
   // Cortex Extensions (Manifest-based)
   cortexEnabled: boolean;
@@ -443,6 +450,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     totpMaxFailedAttempts: parseInt(process.env.AIMEAT_TOTP_MAX_FAILED ?? '5', 10),
     totpLockoutSeconds: parseInt(process.env.AIMEAT_TOTP_LOCKOUT_SECONDS ?? '300', 10),
     msmInstallRole: (process.env.AIMEAT_MSM_INSTALL_ROLE as 'operator' | 'owner') || 'operator',
+    extInstallRole: (process.env.AIMEAT_EXT_INSTALL_ROLE as 'operator' | 'owner') || 'operator',
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),
@@ -542,6 +550,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '50', 10),
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
+    maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
+
+    // Service Generator
+    generatorEnabled: process.env.AIMEAT_GENERATOR_ENABLED !== 'false',
 
     // Cortex Extensions (Manifest-based)
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
