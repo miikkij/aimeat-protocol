@@ -10,17 +10,44 @@ import { emitChange } from '../services/event-bus.js';
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  // GET /v1/wallet — check balance (agent auth)
-  router.get('/v1/wallet', requireAuth(), requireRole('agent'), requireScope('wallet:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', 'Agent not found'));
+  // GET /v1/wallet — check balance (agent or owner auth)
+  router.get('/v1/wallet', requireAuth(), async (req, res) => {
+    const roles = req.auth!.roles;
+    const isOwner = roles.includes('owner');
+    const isAgent = roles.includes('agent');
+
+    let balance = 0;
+    let identity = '';
+    let inEscrow = 0;
+    let transactions: Array<{ type: string; amount: number }> = [];
+
+    if (isOwner) {
+      // Owner accessing their own wallet via GHII
+      const ownerName = req.auth!.owner as string;
+      const ghiiUser = await storage.getGhiiUser(req.auth!.sub);
+      if (!ghiiUser) {
+        res.status(404).json(error(config.nodeId, 'USER_NOT_FOUND', 'User not found'));
+        return;
+      }
+      balance = ghiiUser.morselBalance ?? 0;
+      identity = req.auth!.sub;
+      // Owner transactions are stored under their GHII
+      transactions = await storage.getTransactions(identity, 100_000) as Array<{ type: string; amount: number }>;
+    } else if (isAgent) {
+      const gaii = req.auth!.sub;
+      const agent = await storage.getAgent(gaii);
+      if (!agent) {
+        res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', 'Agent not found'));
+        return;
+      }
+      balance = agent.morselBalance;
+      identity = gaii;
+      inEscrow = await calculateEscrow(storage, gaii);
+      transactions = await storage.getTransactions(gaii, 100_000) as Array<{ type: string; amount: number }>;
+    } else {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Requires agent or owner role'));
       return;
     }
-
-    const inEscrow = await calculateEscrow(storage, gaii);
-    const transactions = await storage.getTransactions(gaii, 100_000);
 
     // Calculate lifetime stats from transactions
     let earned = 0, spent = 0, receivedAllowance = 0, welcomeBonus = 0;
@@ -34,10 +61,10 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       '@type': 'aimeat:Wallet',
-      gaii,
-      balance: agent.morselBalance,
+      gaii: identity,
+      balance,
       in_escrow: inEscrow,
-      available: agent.morselBalance - inEscrow,
+      available: balance - inEscrow,
       daily_allowance: {
         amount: config.dailyAllowance,
         accumulation_cap: config.dailyAllowanceCap,
