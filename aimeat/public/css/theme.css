@@ -215,9 +215,10 @@ a { color: inherit; text-decoration: none; }
 
 .topnav-brand .brand-name { white-space: nowrap; }
 
-.topnav-brand .brand-morsels {
-  display: none;
-  margin-left: 0.5rem;
+.brand-morsels {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   padding: 3px 10px;
   border-radius: var(--radius-full);
   border: 1px solid rgba(232, 86, 74, 0.15);
@@ -228,7 +229,7 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.2;
 }
 
-.topnav-brand .brand-morsels::before { content: '\2665 '; }
+.brand-morsels::before { content: '\2665 '; color: var(--accent); }
 
 .topnav-brand .heart {
   color: var(--accent);

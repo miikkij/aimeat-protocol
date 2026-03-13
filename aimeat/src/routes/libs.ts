@@ -744,7 +744,7 @@ function showLoginModal(opts, renderBtn) {
   const modal = document.createElement('div');
   modal.id = 'aimeat-modal';
   modal.innerHTML = '<style>.aimeat-inp:focus{border-color:#E8564A !important;outline:none}.aimeat-go{flex:1;padding:10px;background:#E8564A;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;letter-spacing:.3px;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s,background .15s}.aimeat-go:hover{background:#d4493f;transform:translateY(-1px);box-shadow:0 4px 14px rgba(232,86,74,.35)}.aimeat-label{display:block;margin-bottom:4px;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#6B7280}</style>'
-    + '<div style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:\'DM Sans\',system-ui,sans-serif">'
+    + '<div style="position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:system-ui,sans-serif">'
     + '<div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:14px;padding:28px;max-width:400px;width:90%;color:#1A1A2E;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.12)">'
     + '<h3 style="margin:0 0 16px;font-size:18px;color:#1A1A2E">' + escHtml(i.title || 'AIME \\u2665 AT Sign In') + '</h3>'
     + '<div id="aimeat-modal-body">'

@@ -487,58 +487,23 @@ Respond in the user's language. Be conversational.`;
 }
 
 /* ══════════════════════════════════════════════
-   THREE.JS 3D CANVAS COMPONENT
+   GENESIS BADGE COMPONENT
    ══════════════════════════════════════════════ */
 function GenesisCanvas() {
-  const containerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const animFrameRef = useRef(null);
-  const threeRef = useRef(null);
+  return html`
+    <section class="gn-hero-3d" style="display:flex;align-items:center;justify-content:center;min-height:200px">
+      <img src="/img/genesis-001-badge.png" alt="Genesis Badge" style="height:auto;filter:drop-shadow(0 4px 16px rgba(0,0,0,.12))" />
+      <div class="genesis-corner genesis-corner--tl"></div>
+      <div class="genesis-corner genesis-corner--tr"></div>
+      <div class="genesis-corner genesis-corner--bl"></div>
+      <div class="genesis-corner genesis-corner--br"></div>
+    </section>
+  `;
+}
 
-  useEffect(() => {
-    const container = containerRef.current;
-    const canvas = canvasRef.current;
-    if (!container || !canvas) return;
-
-    // Load Three.js dynamically (local first, CDN fallback)
-    let cleanup = null;
-    function loadScript(src, integrity) {
-      return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src;
-        if (integrity) {
-          s.integrity = integrity;
-          s.crossOrigin = 'anonymous';
-        }
-        s.onload = resolve;
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-    loadScript('/lib/three.min.js')
-      .catch(() => loadScript(
-        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
-        'sha512-dLRZkJFxYnrzUDxZPOSqtoPL4bv/Ph5//CYzcDBJnKsYV8naPXQdMcY0rU1NY1MBNnxeimUaVGNumzm3AtrQQ=='
-      ))
-      .then(() => { cleanup = initThreeJS(container, canvas); })
-      .catch(() => { /* Three.js unavailable — canvas stays blank */ });
-
-    return () => {
-      if (cleanup) cleanup();
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
-  }, []);
-
-  function initThreeJS(container, canvas) {
-    const THREE = window.THREE;
-    if (!THREE) return null;
-
-    // STATE
-    const state = { rotY: 0, tilt: 31, textH: 1.0, spacing: 0.9, cols: 160, rows: 100 };
-    let uiMode = 'idle', uiScore = 0, uiBlinkOn = true, uiBlinkFrame = 0;
-
-    // TEXT DEPTH MAP
-    function buildTextMap(cols, rows, mode, score, blinkOn) {
+/* Three.js 3D canvas + snake game removed — replaced with static badge image
+   Original: ~500 lines of WebGL point cloud, bitmap font renderer, and snake game
+   function buildTextMap(cols, rows, mode, score, blinkOn) {
       const TW = 960, TH = 480;
       const cv = document.createElement('canvas');
       cv.width = TW; cv.height = TH;
