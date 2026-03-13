@@ -424,6 +424,20 @@ if (subcommand === 'config') {
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
 
+    // Echat anonymous connection rate limiter (10 connections per IP per minute)
+    const echatIpCounts = new Map<string, { count: number; resetAt: number }>();
+    function echatRateCheck(ip: string): boolean {
+      const now = Date.now();
+      const entry = echatIpCounts.get(ip);
+      if (!entry || now > entry.resetAt) {
+        echatIpCounts.set(ip, { count: 1, resetAt: now + 60_000 });
+        return true;
+      }
+      if (entry.count >= 10) return false;
+      entry.count++;
+      return true;
+    }
+
     server.on('upgrade', async (request, socket, head) => {
       const url = new URL(request.url ?? '', `http://${request.headers.host}`);
 
@@ -469,6 +483,49 @@ if (subcommand === 'config') {
 
       // ── Realtime P2P upgrade ──
       if (url.pathname === '/v1/realtime/ws' && realtimeManager && realtimeWss) {
+        // ── Echat anonymous connection ──
+        const isEchat = url.searchParams.get('echat') === '1';
+        if (isEchat) {
+          const roomName = url.searchParams.get('room');
+          if (!roomName) {
+            socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+          if (!config.echatAnonymous) {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+          // Rate limit anonymous echat connections per IP
+          const clientIp = request.socket.remoteAddress ?? 'unknown';
+          if (!echatRateCheck(clientIp)) {
+            socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+          try {
+            const room = await realtimeManager.getOrCreateRoomByName(
+              roomName,
+              'echat-anonymous',
+            );
+            const anonNick = 'anon-' + Math.random().toString(16).slice(2, 6);
+            realtimeWss.handleUpgrade(request, socket, head, (ws) => {
+              realtimeManager.handleUpgrade(ws, room.id, anonNick);
+            });
+          } catch (err: unknown) {
+            if (err instanceof Error && err.message === 'ROOM_LIMIT_REACHED') {
+              socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+            } else if (err instanceof Error && err.message === 'INVALID_ROOM_NAME') {
+              socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+            } else {
+              socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+            }
+            socket.destroy();
+          }
+          return;
+        }
+
         const roomId = url.searchParams.get('room');
         const nick = url.searchParams.get('nick') ?? 'anonymous';
 
