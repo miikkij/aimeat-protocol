@@ -670,10 +670,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       <div class="kpkg-section">
         <h3>${t('knowledge.discover.title')}</h3>
         ${discoverLoading && html`<${Spinner} text="Loading..." />`}
-        ${!discoverLoading && discovered.length === 0 && html`
+        ${!discoverLoading && discovered.filter(p => p.sharing?.allow_clone !== false).length === 0 && html`
           <p class="kpkg-empty">${t('knowledge.discover.empty')}</p>
         `}
-        ${!discoverLoading && discovered.map(pkg => html`
+        ${!discoverLoading && discovered.filter(pkg => pkg.sharing?.allow_clone !== false).map(pkg => html`
           <div class="kpkg-card" key=${pkg.package_id}>
             <div class="kpkg-card-header">
               <strong>${escHtml(pkg.name || 'Untitled')}</strong>
@@ -689,13 +689,9 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               ${(pkg.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}
             </div>
             <div class="kpkg-card-actions">
-              ${pkg.sharing?.allow_clone !== false ? html`
-                <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${() => handleClone(pkg.package_id)}>
-                  ${t('knowledge.discover.cloneToMine')}
-                </button>
-              ` : html`
-                <span class="kpkg-clone-disabled">${t('knowledge.discover.cloneDisabled') || 'Cloning not available'}</span>
-              `}
+              <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${() => handleClone(pkg.package_id)}>
+                ${t('knowledge.discover.cloneToMine')}
+              </button>
             </div>
             <p class="kpkg-trust-advisory">${t('knowledge.discover.trustAdvisory')}</p>
           </div>
