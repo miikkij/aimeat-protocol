@@ -12,7 +12,7 @@ export async function getWallet() {
 
 /** Get recent transactions. Returns array. */
 export async function getTransactions(limit = 20) {
-  const data = await apiGet(`/v1/wallet/transactions?limit=${limit}`);
+  const data = await apiGet(`/v1/wallet/transactions?per_page=${limit}`);
   return data?.data?.transactions || data?.data || [];
 }
 

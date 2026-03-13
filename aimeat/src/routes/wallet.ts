@@ -22,16 +22,15 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     let transactions: Array<{ type: string; amount: number }> = [];
 
     if (isOwner) {
-      // Owner accessing their own wallet via GHII
+      // Owner accessing their own wallet via GHII record
       const ownerName = req.auth!.owner as string;
-      const ghiiUser = await storage.getGhiiUser(req.auth!.sub);
-      if (!ghiiUser) {
-        res.status(404).json(error(config.nodeId, 'USER_NOT_FOUND', 'User not found'));
+      const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+      if (!ghiiRecord) {
+        res.status(404).json(error(config.nodeId, 'USER_NOT_FOUND', 'Owner not found'));
         return;
       }
-      balance = ghiiUser.morselBalance ?? 0;
-      identity = req.auth!.sub;
-      // Owner transactions are stored under their GHII
+      balance = ghiiRecord.morselBalance ?? 0;
+      identity = ghiiRecord.ghii;
       transactions = await storage.getTransactions(identity, 100_000) as Array<{ type: string; amount: number }>;
     } else if (isAgent) {
       const gaii = req.auth!.sub;
@@ -83,13 +82,13 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/wallet/transactions — transaction history (spec path)
-  router.get('/v1/wallet/transactions', requireAuth(), requireRole('agent'), requireScope('wallet:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
+  router.get('/v1/wallet/transactions', requireAuth(), async (req, res) => {
+    const identity = req.auth!.sub;
     const typeFilter = req.query.type as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
 
-    let transactions = await storage.getTransactions(gaii, 100_000);
+    let transactions = await storage.getTransactions(identity, 100_000);
     if (typeFilter) {
       transactions = transactions.filter(tx => tx.type === typeFilter);
     }
