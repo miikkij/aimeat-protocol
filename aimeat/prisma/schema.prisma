@@ -42,7 +42,7 @@ model Memory {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   key        String
   ownerGaii  String
-  value      Json
+  value      Json?
   visibility String   @default("private")
   tags       String[]
   ttlHours   Float?
