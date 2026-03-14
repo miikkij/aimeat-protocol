@@ -43,6 +43,15 @@ Extensions run in isolated V8 with this API:
   ctx.caller = { gaii, owner, roles }
   ctx.config = extension config, ctx.instance = { id, config }
   ctx.log.info/warn/error(msg, data)
+
+AIMEAT Data Standards (MUST follow in all components):
+  Dates/times: ISO 8601 only — "2026-03-14T13:00:00.000Z". Never store RFC 2822, Unix timestamps, or locale-formatted dates.
+  Memory keys: kebab-case with dot namespaces — "alerts.by-date.2026-03-14". Dates in keys use YYYY-MM-DD.
+  IDs: URL-safe strings (kebab-case or hex hashes). No spaces, no special characters.
+  Locale codes: BCP 47 — "fi", "en", "fi-FI", "en-US".
+  Coordinates: { latitude: number, longitude: number } — WGS84 decimal degrees.
+  Currency/amounts: integers (no floats) — morsels are whole numbers.
+  ctx.memory.search(prefix) returns Array<{ key, value }> — NOT plain strings.
 `.trim();
 
 /* ── Blueprint Prompt ────────────────────────────────── */
