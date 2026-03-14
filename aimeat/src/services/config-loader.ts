@@ -41,6 +41,10 @@ export function loadFileSource(configPath?: string): { name: string; values: Rec
       if (resolved.endsWith('.json')) {
         return { name: `file:${resolved}`, values: flattenToStrings(JSON.parse(raw)) };
       }
+      if (resolved.endsWith('.env')) {
+        // .env files use AIMEAT_* env var names — convert to dot-paths
+        return { name: `file:${resolved}`, values: parseEnvFile(raw) };
+      }
       // Assume INI for all other extensions (.ini, .conf, etc.)
       const parsed = parseIni(raw);
       return { name: `file:${resolved}`, values: flattenToStrings(parsed) };
@@ -155,5 +159,36 @@ export function parseSimpleIni(raw: string): Record<string, unknown> {
     }
   }
 
+  return result;
+}
+
+/**
+ * Parse a .env file and convert AIMEAT_* env var names to dot-path keys.
+ * Lines without a matching ENV_TO_DOT_PATH entry are silently skipped.
+ */
+export function parseEnvFile(raw: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const rawLine of raw.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const eqIdx = line.indexOf('=');
+    if (eqIdx === -1) continue;
+
+    const key = line.substring(0, eqIdx).trim();
+    let value = line.substring(eqIdx + 1).trim();
+
+    // Strip surrounding quotes
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    // Convert env var name to dot-path
+    const dotPath = ENV_TO_DOT_PATH[key];
+    if (dotPath) {
+      result[dotPath] = value;
+    }
+  }
   return result;
 }
