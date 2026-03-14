@@ -103,11 +103,22 @@ export async function getComponent(projectId, componentId) {
 export async function saveComponent(projectId, component) {
   const version = component._version || 0;
   const { _version, ...data } = component;
-  await apiPut(`/v1/memory/generator.${projectId}.component.${data.id}`, {
-    value: data,
-    visibility: 'private',
-    version,
-  });
+  const key = `generator.${projectId}.component.${data.id}`;
+  if (version === 0) {
+    // New component — use POST to create
+    await apiPost('/v1/memory', {
+      key,
+      value: data,
+      visibility: 'private',
+    });
+  } else {
+    // Existing component — use PUT with optimistic locking
+    await apiPut(`/v1/memory/${key}`, {
+      value: data,
+      visibility: 'private',
+      version,
+    });
+  }
   return { ...data, _version: version + 1 };
 }
 
@@ -137,7 +148,8 @@ export async function enqueueTask(projectId, componentId, type, prompt, assigned
     createdAt: new Date().toISOString(),
     expiresAt,
   };
-  await apiPut(`/v1/memory/generator.${projectId}.queue.${id}`, {
+  await apiPost('/v1/memory', {
+    key: `generator.${projectId}.queue.${id}`,
     value: entry,
     visibility: 'owner',
   });
@@ -223,7 +235,7 @@ export async function registerComponent(type, result, session) {
       const entries = typeof result === 'string' ? JSON.parse(result) : result;
       const results = [];
       for (const [key, value] of Object.entries(entries)) {
-        results.push(await apiPut(`/v1/memory/${encodeURIComponent(key)}`, { value, visibility: 'private', version: 0 }));
+        results.push(await apiPost('/v1/memory', { key, value, visibility: 'private' }));
       }
       return { ok: true, registered: results.length };
     }

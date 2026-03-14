@@ -12,6 +12,7 @@ import {
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
+import { ConfirmDialog } from '/components/Modal.js';
 
 /* ── Agent Listener Status ───────────────────────────── */
 
@@ -275,6 +276,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const [selectedId, setSelectedId] = useState(null);
   const [agents, setAgents] = useState([]);
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => { loadData(); }, [projectId]);
 
@@ -299,8 +301,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   ).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const filteredLogs = logFilter ? allLogs.filter(l => l.componentId === logFilter) : allLogs;
 
-  async function handleDelete() {
-    if (!confirm(t('profile.generator.confirmDelete'))) return;
+  async function handleDeleteConfirmed() {
+    setShowDeleteConfirm(false);
     try {
       await deleteProject(projectId);
       showToast?.(t('profile.generator.projectDeleted'));
@@ -314,10 +316,20 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
   return html`
     <div class="pf-gen-dashboard">
+      <${ConfirmDialog}
+        open=${showDeleteConfirm}
+        onClose=${() => setShowDeleteConfirm(false)}
+        onConfirm=${handleDeleteConfirmed}
+        title=${t('profile.generator.deleteProject')}
+        message=${t('profile.generator.confirmDelete')}
+        confirmLabel=${t('profile.generator.deleteProject')}
+        cancelLabel=${t('profile.generator.back')}
+        danger=${true}
+      />
       <div class="pf-gen-dash-header">
         <button class="btn btn-ghost btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
         <h3>${project.name}</h3>
-        <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDelete}>
+        <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${() => setShowDeleteConfirm(true)}>
           ${t('profile.generator.deleteProject')}
         </button>
       </div>
