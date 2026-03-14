@@ -236,6 +236,26 @@ export async function cleanupOldEntries(projectId) {
   }
 }
 
+/* ── App Manifest Parser ─────────────────────────────── */
+
+/**
+ * Extract name, description, version from an AIMEAT App Manifest HTML comment.
+ * Expected format: <!-- AIMEAT App Manifest\nname: ...\nversion: ...\n-->
+ */
+function parseAppManifest(html) {
+  const meta = { name: '', description: '', version: '1.0.0' };
+  const match = html.match(/<!--\s*AIMEAT App Manifest\s*\n([\s\S]*?)-->/i);
+  if (!match) return meta;
+  for (const line of match[1].split('\n')) {
+    const m = line.match(/^\s*(name|description|version|entry)\s*:\s*(.+)/i);
+    if (m) {
+      const key = m[1].toLowerCase();
+      if (key in meta) meta[key] = m[2].trim();
+    }
+  }
+  return meta;
+}
+
 /* ── Registration ────────────────────────────────────── */
 
 /**
