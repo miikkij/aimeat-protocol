@@ -202,7 +202,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     if (ownerScope) {
       // Collect owner-visible keys from all owner's agents
       const callerOwner = req.auth!.owner;
-      const agents = await storage.listAgents(callerOwner);
+      const agents = await storage.getAgentsByOwner(callerOwner);
       const seen = new Set<string>();
       records = [];
       for (const agent of agents) {
