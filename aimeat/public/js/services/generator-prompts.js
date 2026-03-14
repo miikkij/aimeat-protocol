@@ -328,48 +328,63 @@ ${context}
 
 The app runs on the SAME ORIGIN as the AIMEAT node. Use relative API paths (e.g., "/v1/ext/..."), NOT absolute URLs.
 
-### Auth setup (copy this exactly into your <script>):
+### Library setup (copy this exactly — load BOTH libraries):
 \`\`\`javascript
-// Load AIMEAT auth library — handles login UI, JWT tokens, refresh
-const authScript = document.createElement('script');
-authScript.src = '/v1/libs/aimeat-auth.js';
-document.head.appendChild(authScript);
-authScript.onload = () => {
-  // Mount a login/register button into a container element
+// Load AIMEAT libraries — auth handles login/JWT, data handles memory API
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function boot() {
+  await loadScript('/v1/libs/aimeat-auth.js');
+  await loadScript('/v1/libs/aimeat-data.js');
+
   AIMEAT.auth.mountLoginButton('#auth-container', {
     onLogin: () => startApp(),
     onLogout: () => location.reload(),
   });
-  // Also auto-login if session exists from previous visit
   AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
-};
-\`\`\`
-
-### API helper (copy this exactly):
-\`\`\`javascript
-async function apiCall(path, opts = {}) {
-  const session = window.AIMEAT?.auth?.getSession?.();
-  if (!session?.jwt) throw new Error('Not logged in');
-  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.jwt, ...opts.headers };
-  const resp = await fetch(path, { ...opts, headers });
-  return resp.json();
 }
+boot();
 \`\`\`
 
-### Reading memory data:
+### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
 \`\`\`javascript
-// Read a single memory key
-const data = await apiCall('/v1/memory/my.key.name');
-// Search by prefix
-const results = await apiCall('/v1/memory?prefix=alerts.by-date.&owner_scope=true');
+// Read a memory key — returns the stored value directly, or null if not found
+const index = await AIMEAT.data.get('alerts.by-date.__index');
+console.log(index.dates);  // ["2026-03-14", ...] — direct access, no envelope unwrapping
+
+// Write a memory key
+await AIMEAT.data.set('my.key', { count: 42 });
+
+// Search by prefix — returns array of {key, value} objects
+const results = await AIMEAT.data.search('alerts.by-date.');
+results.forEach(entry => console.log(entry.key, entry.value));
+
+// Delete a memory key
+await AIMEAT.data.delete('my.key');
 \`\`\`
 
-### Calling extension actions:
+### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
 \`\`\`javascript
-// Without instance:
-const result = await apiCall('/v1/ext/EXTENSION-NAME/ACTION-ID', { method: 'POST', body: JSON.stringify({}) });
-// With instance:
-const result = await apiCall('/v1/ext/EXTENSION-NAME/INSTANCE-ID/ACTION-ID', { method: 'POST', body: JSON.stringify({}) });
+// Helper for extension calls (copy this):
+async function extCall(extName, actionId, body = {}, instanceId = null) {
+  const session = AIMEAT.auth.getSession();
+  if (!session) throw new Error('Not logged in');
+  const path = instanceId
+    ? '/v1/ext/' + extName + '/' + instanceId + '/' + actionId
+    : '/v1/ext/' + extName + '/' + actionId;
+  const resp = await session.fetch(path, { method: 'POST', body: JSON.stringify(body) });
+  if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
+  return resp.data;  // unwrapped payload
+}
+
+// Usage:
+const result = await extCall('my-extension', 'my-action', { query: 'test' });
 \`\`\`
 
 ## CDN Libraries
