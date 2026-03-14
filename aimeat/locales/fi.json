@@ -624,7 +624,16 @@
       "deactivated": "Laajennus poistettu käytöstä.",
       "delete": "Poista laajennus",
       "confirmDelete": "Poistetaanko tämä laajennus? Tätä ei voi perua.",
-      "deleted": "Laajennus poistettu."
+      "deleted": "Laajennus poistettu.",
+      "test": {
+        "btn": "Testaa",
+        "close": "Sulje",
+        "inputLabel": "Syöte (JSON)",
+        "run": "Aja",
+        "success": "Onnistui",
+        "error": "Virhe",
+        "invalidJson": "Virheellinen JSON-syöte"
+      }
     },
     "federation": {
       "title": "Federaatio & vertaiset",

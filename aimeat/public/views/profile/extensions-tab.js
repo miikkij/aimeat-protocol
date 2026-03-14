@@ -108,6 +108,10 @@ export default function ExtensionsTab({ session, showToast }) {
   const [v8Detail, setV8Detail] = useState(null);
   const [v8Instances, setV8Instances] = useState(null);
   const [newInstanceId, setNewInstanceId] = useState('');
+  const [testAction, setTestAction] = useState(null); // { actionId }
+  const [testInput, setTestInput] = useState('{}');
+  const [testResult, setTestResult] = useState(null);
+  const [testRunning, setTestRunning] = useState(false);
 
   useEffect(() => {
     if (session) { loadExtensions(); loadV8Extensions(); }
@@ -176,6 +180,21 @@ export default function ExtensionsTab({ session, showToast }) {
       setNewInstanceId('');
       setV8Instances(await v8Ext.listInstances(name));
     } catch(e) { showToast(e.message, true); }
+  }
+
+  async function handleTestAction(name, actionId) {
+    setTestRunning(true);
+    setTestResult(null);
+    try {
+      let input = {};
+      try { input = JSON.parse(testInput); } catch { throw new Error(t('profile.v8ext.test.invalidJson')); }
+      const start = performance.now();
+      const resp = await v8Ext.executeAction(name, actionId, input);
+      const elapsed = Math.round(performance.now() - start);
+      setTestResult({ ok: true, data: resp, elapsed });
+    } catch(e) {
+      setTestResult({ ok: false, error: e.message });
+    } finally { setTestRunning(false); }
   }
 
   async function handleDeleteInstance(name, instanceId) {
@@ -411,10 +430,38 @@ export default function ExtensionsTab({ session, showToast }) {
         <div class="ext-detail-section">
           <div class="ext-detail-section-title">${t('profile.v8ext.actionsTitle')}</div>
           ${actions.map(a => html`
-            <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border,#E5E7EB)">
-              <span style="font-weight:600;font-size:.9rem">${a.id}</span>
-              <span style="font-size:.8rem;color:var(--muted)">${a.method || 'POST'}</span>
-              <span style="font-size:.8rem;color:var(--muted);flex:1">${a.description || ''}</span>
+            <div style="border-bottom:1px solid var(--border,#E5E7EB);padding:.5rem 0">
+              <div style="display:flex;align-items:center;gap:.75rem">
+                <span style="font-weight:600;font-size:.9rem">${a.id}</span>
+                <span style="font-size:.8rem;color:var(--muted)">${a.method || 'POST'}</span>
+                <span style="font-size:.8rem;color:var(--muted);flex:1">${a.description || ''}</span>
+                ${isActive ? html`<button class="btn-sm" onClick=${() => {
+                  if (testAction?.actionId === a.id) { setTestAction(null); setTestResult(null); }
+                  else { setTestAction({ actionId: a.id }); setTestResult(null); setTestInput('{}'); }
+                }}>${testAction?.actionId === a.id ? t('profile.v8ext.test.close') : t('profile.v8ext.test.btn')}</button>` : null}
+              </div>
+              ${testAction?.actionId === a.id ? html`
+                <div style="margin-top:.75rem;padding:.75rem;background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px">
+                  <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem">${t('profile.v8ext.test.inputLabel')}</div>
+                  <textarea style="width:100%;min-height:80px;font-family:monospace;font-size:13px;border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:.5rem;resize:vertical"
+                    value=${testInput} onInput=${e => setTestInput(e.target.value)}
+                    placeholder='{ "key": "value" }'></textarea>
+                  <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center">
+                    <button class="btn-primary btn-sm" disabled=${testRunning} onClick=${() => handleTestAction(ext.name, a.id)}>
+                      ${testRunning ? html`<${Spinner} />` : t('profile.v8ext.test.run')}
+                    </button>
+                    ${testResult?.elapsed ? html`<span style="font-size:.75rem;color:var(--muted)">${testResult.elapsed}ms</span>` : null}
+                  </div>
+                  ${testResult ? html`
+                    <div style="margin-top:.75rem">
+                      <div style="font-size:.8rem;font-weight:600;margin-bottom:.25rem;color:${testResult.ok ? 'var(--success,#22c55e)' : 'var(--error,#ef4444)'}">
+                        ${testResult.ok ? t('profile.v8ext.test.success') : t('profile.v8ext.test.error')}
+                      </div>
+                      <pre style="font-size:.8rem;font-family:monospace;background:var(--bg,#fff);border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:.75rem;overflow-x:auto;max-height:300px;white-space:pre-wrap;word-break:break-word">${
+                        testResult.ok ? JSON.stringify(testResult.data, null, 2) : testResult.error
+                      }</pre>
+                    </div>` : null}
+                </div>` : null}
             </div>`)}
         </div>` : null}
 

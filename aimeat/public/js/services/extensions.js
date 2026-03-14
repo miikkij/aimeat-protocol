@@ -52,3 +52,10 @@ export async function createInstance(name, id, config = {}) {
 export async function deleteInstance(name, instanceId) {
   return apiDelete(`/v1/extensions/${encodeURIComponent(name)}/instances/${encodeURIComponent(instanceId)}`);
 }
+
+export async function executeAction(name, actionId, input = {}, instanceId = null) {
+  const path = instanceId
+    ? `/v1/ext/${encodeURIComponent(name)}/${encodeURIComponent(instanceId)}/${encodeURIComponent(actionId)}`
+    : `/v1/ext/${encodeURIComponent(name)}/${encodeURIComponent(actionId)}`;
+  return apiPost(path, input);
+}

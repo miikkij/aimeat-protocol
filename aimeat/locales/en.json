@@ -624,7 +624,16 @@
       "deactivated": "Extension deactivated.",
       "delete": "Delete Extension",
       "confirmDelete": "Delete this extension? This cannot be undone.",
-      "deleted": "Extension deleted."
+      "deleted": "Extension deleted.",
+      "test": {
+        "btn": "Test",
+        "close": "Close",
+        "inputLabel": "Input JSON",
+        "run": "Run",
+        "success": "Success",
+        "error": "Error",
+        "invalidJson": "Invalid JSON input"
+      }
     },
     "federation": {
       "title": "Federation & Peers",
