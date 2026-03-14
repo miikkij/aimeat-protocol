@@ -79,7 +79,11 @@ function serveSpa(res: import('express').Response, spaPath: string): void {
   .replace(/"\/js\/i18n\.js": "\/js\/i18n\.js"/, `"/js/i18n.js": "/js/i18n.js${v}"`)
   .replace(/"\/js\/utils\.js": "\/js\/utils\.js"/, `"/js/utils.js": "/js/utils.js${v}"`)
   .replace(/"\/js\/api\.js": "\/js\/api\.js"/, `"/js/api.js": "/js/api.js${v}"`)
-  .replace(/"\/js\/hooks\.js": "\/js\/hooks\.js"/, `"/js/hooks.js": "/js/hooks.js${v}"`);
+  .replace(/"\/js\/hooks\.js": "\/js\/hooks\.js"/, `"/js/hooks.js": "/js/hooks.js${v}"`)
+  .replace(/"\/js\/services\/generator-prompts\.js": "\/js\/services\/generator-prompts\.js"/, `"/js/services/generator-prompts.js": "/js/services/generator-prompts.js${v}"`)
+  .replace(/"\/js\/services\/generator-validate\.js": "\/js\/services\/generator-validate\.js"/, `"/js/services/generator-validate.js": "/js/services/generator-validate.js${v}"`)
+  .replace(/"\/js\/services\/generator\.js": "\/js\/services\/generator\.js"/, `"/js/services/generator.js": "/js/services/generator.js${v}"`)
+  .replace(/"\/js\/services\/extensions\.js": "\/js\/services\/extensions\.js"/, `"/js/services/extensions.js": "/js/services/extensions.js${v}"`);
 
   // Stamp all view CSS hrefs (preloaded in spa.html head) with the build version
   html = html.replace(
