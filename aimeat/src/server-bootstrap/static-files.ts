@@ -105,14 +105,15 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     if (existsSync(appCatalogPath)) {
       app.get('/app-catalog.html', (_req, res) => {
         const html = readFileSync(appCatalogPath, 'utf-8');
-        // Override CSP: allow 'unsafe-inline' for scripts (40+ inline onclick handlers + dynamic HTML)
+        // Override CSP: app-catalog hosts user-generated apps that load arbitrary CDN resources.
+        // Uses same permissive policy as apps.ts inline mode — allows any HTTPS script/style source.
         res.setHeader('Content-Security-Policy', [
           "default-src 'self'",
-          "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-          "style-src 'self' 'unsafe-inline'",
-          "connect-src 'self' wss: ws:",
-          "img-src 'self' data: blob:",
-          "font-src 'self'",
+          "script-src 'self' 'unsafe-inline' blob: https: http://localhost:*",
+          "style-src 'self' 'unsafe-inline' https: http://localhost:*",
+          "connect-src 'self' https: http://localhost:* wss: ws: data:",
+          "img-src * data: blob:",
+          "font-src 'self' data: https:",
           "frame-src 'self' blob: data:",
           "object-src 'none'",
           "base-uri 'self'",
