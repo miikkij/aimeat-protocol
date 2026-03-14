@@ -22,6 +22,8 @@
  *   v3.0.0 — 2026-03-14 — Major overhaul: add data standards to AIMEAT_CONTEXT,
  *     improve all prompts with sandbox limitations, real API limits, memory patterns,
  *     translation key conventions, app CDN/CSP guidance, ctx.fetch documentation
+ *   v3.1.0 — 2026-03-14 — Fix app prompt: extension data lives in ext:{name}
+ *     namespace, apps must use AIMEAT.data.getPublic() to read it, not .get()
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -354,20 +356,29 @@ boot();
 
 ### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
 \`\`\`javascript
-// Read a memory key — returns the stored value directly, or null if not found
-const index = await AIMEAT.data.get('alerts.by-date.__index');
-console.log(index.dates);  // ["2026-03-14", ...] — direct access, no envelope unwrapping
+// Read YOUR OWN memory key — returns the stored value directly, or null
+const myData = await AIMEAT.data.get('my.settings');
 
-// Write a memory key
+// Write a memory key (your own namespace)
 await AIMEAT.data.set('my.key', { count: 42 });
 
-// Search by prefix — returns array of {key, value} objects
-const results = await AIMEAT.data.search('alerts.by-date.');
-results.forEach(entry => console.log(entry.key, entry.value));
-
-// Delete a memory key
+// Delete your own memory key
 await AIMEAT.data.delete('my.key');
 \`\`\`
+
+### Reading EXTENSION-produced data (CRITICAL — most apps need this):
+Extensions store data in their OWN namespace (\`ext:{extension-name}\`).
+To read data that an extension wrote, use \`getPublic()\`:
+\`\`\`javascript
+// WRONG — this reads YOUR memory, not the extension's:
+const data = await AIMEAT.data.get('alerts.by-date.__index');  // returns null!
+
+// CORRECT — read from the extension's namespace:
+const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'alerts.by-date.__index');
+\`\`\`
+The first argument is the extension's memory owner: \`"ext:" + extensionName\` (the \`name\` field from the extension manifest metadata).
+Use this for ALL data produced by extensions (alerts, stats, risk profiles, caches, etc.).
+\`getPublic()\` returns the value directly (auto-unwraps), or null if not found.
 
 ### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
 \`\`\`javascript
