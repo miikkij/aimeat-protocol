@@ -1,5 +1,18 @@
 /**
- * Generator Validation — per-type validators for component results
+ * @file generator-validate.js
+ * @description Validators for generator component results and blueprints.
+ *   Each component type (csm, msm, extension, app, memory, translation) has a
+ *   validator that checks structure and extracts usable content from AI output.
+ * @structure
+ *   - extractCodeBlock(text, lang): pulls content from markdown code fences
+ *   - validators[type](result): per-type validation returning { valid, errors, extracted }
+ *   - validateBlueprint(result): validates + sanitizes blueprint JSON (strips extra fields)
+ *   - validateComponent(type, result): dispatches to per-type validator
+ * @usage import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
+ * @version-history
+ *   v1.0.0 — 2026-03-10 — Initial validators
+ *   v1.1.0 — 2026-03-14 — validateBlueprint now strips extra component fields
+ *     (manifest, code, files, etc.) and returns warnings array
  */
 
 /* ── Helpers ─────────────────────────────────────────── */

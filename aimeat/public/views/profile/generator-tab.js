@@ -299,6 +299,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   ).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const filteredLogs = logFilter ? allLogs.filter(l => l.componentId === logFilter) : allLogs;
 
+  async function handleDelete() {
+    if (!confirm(t('profile.generator.confirmDelete'))) return;
+    try {
+      await deleteProject(projectId);
+      showToast?.(t('profile.generator.projectDeleted'));
+      onBack();
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+  }
+
   if (!project) return html`<div class="pf-gen-loading">${t('profile.loading')}</div>`;
 
   return html`
@@ -306,6 +317,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       <div class="pf-gen-dash-header">
         <button class="btn btn-ghost btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
         <h3>${project.name}</h3>
+        <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDelete}>
+          ${t('profile.generator.deleteProject')}
+        </button>
       </div>
       <div class="pf-gen-dash-body">
         <!-- Sidebar -->

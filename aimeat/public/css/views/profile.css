@@ -476,7 +476,9 @@
 /* Dashboard layout */
 .pf-gen-dashboard { display: flex; flex-direction: column; gap: 0; }
 .pf-gen-dash-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.pf-gen-dash-header h3 { margin: 0; }
+.pf-gen-dash-header h3 { margin: 0; flex: 1; }
+.pf-gen-delete-btn { color: var(--danger,#ef4444); margin-left: auto; }
+.pf-gen-delete-btn:hover { background: rgba(239,68,68,0.08); }
 .pf-gen-dash-body { display: flex; gap: 16px; min-height: 400px; }
 
 /* Sidebar */

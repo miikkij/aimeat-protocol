@@ -1,5 +1,19 @@
 /**
- * Generator Prompts — templates for blueprint analysis and component generation
+ * @file generator-prompts.js
+ * @description Prompt templates for the service generator — blueprint analysis,
+ *   per-component-type generation prompts, and fix/retry prompts.
+ *   Used by generator-tab.js to produce copy-to-clipboard prompts for AI chat.
+ * @structure
+ *   - AIMEAT_CONTEXT: shared preamble describing building blocks
+ *   - buildBlueprintPrompt(description): lightweight JSON blueprint prompt
+ *   - buildComponentPrompt(type, label, ...): per-type generation prompt
+ *   - buildBlueprintFixPrompt(description, errors): retry prompt for blueprint failures
+ *   - buildFixPrompt(original, failed, errors): generic retry prompt for components
+ * @usage import { buildBlueprintPrompt, buildComponentPrompt } from '/js/services/generator-prompts.js';
+ * @version-history
+ *   v1.0.0 — 2026-03-10 — Initial prompt templates
+ *   v1.1.0 — 2026-03-14 — Tighten blueprint prompt to reject extra fields;
+ *     add buildBlueprintFixPrompt that regenerates instead of patching
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
