@@ -27,6 +27,7 @@ const ALL_SUITES = [
     'test/e2e-extensions.ts',
     'test/e2e-federation.ts',
     'test/e2e-generator.ts',
+    'test/e2e-memory-full.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',
     'test/e2e-libs.ts',

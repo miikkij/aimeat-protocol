@@ -16,6 +16,8 @@
  *   v1.0.0 — 2026-03-10 — Initial generator service
  *   v1.1.0 — 2026-03-14 — Rewritten buildAgentSetupPrompt with SSE, GAII docs, full HTTP examples
  *   v1.1.1 — 2026-03-14 — getListeners now queries /v1/agents instead of memory; heartbeat uses /v1/checkin
+ *   v1.2.0 — 2026-03-14 — saveComponent retries on 409 VERSION_CONFLICT;
+ *     registerComponent sends YAML as { yaml: string } for CSM/MSM instead of JSON.parse
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 
@@ -101,7 +103,7 @@ export async function getComponent(projectId, componentId) {
 }
 
 export async function saveComponent(projectId, component) {
-  const version = component._version || 0;
+  let version = component._version || 0;
   const { _version, ...data } = component;
   const key = `generator.${projectId}.component.${data.id}`;
   if (version === 0) {
@@ -112,12 +114,27 @@ export async function saveComponent(projectId, component) {
       visibility: 'private',
     });
   } else {
-    // Existing component — use PUT with optimistic locking
-    await apiPut(`/v1/memory/${key}`, {
-      value: data,
-      visibility: 'private',
-      version,
-    });
+    // Existing component — use PUT with optimistic locking; retry on conflict
+    try {
+      await apiPut(`/v1/memory/${key}`, {
+        value: data,
+        visibility: 'private',
+        version,
+      });
+    } catch (err) {
+      if (err?.message?.includes('VERSION_CONFLICT') || err?.status === 409) {
+        // Re-fetch current version and retry once
+        const fresh = await apiGet(`/v1/memory/${key}`);
+        version = fresh?.data?.version ?? version + 1;
+        await apiPut(`/v1/memory/${key}`, {
+          value: data,
+          visibility: 'private',
+          version,
+        });
+      } else {
+        throw err;
+      }
+    }
   }
   return { ...data, _version: version + 1 };
 }
@@ -221,9 +238,11 @@ export async function cleanupOldEntries(projectId) {
 export async function registerComponent(type, result, session) {
   switch (type) {
     case 'csm':
-      return apiPost('/v1/csm', typeof result === 'string' ? JSON.parse(result) : result);
+      // CSM results are YAML — send as { yaml: string } so the API parses it
+      return apiPost('/v1/csm', typeof result === 'string' ? { yaml: result } : result);
     case 'msm':
-      return apiPost('/v1/msm', typeof result === 'string' ? JSON.parse(result) : result);
+      // MSM results are YAML — same pattern
+      return apiPost('/v1/msm', typeof result === 'string' ? { yaml: result } : result);
     case 'extension': {
       // POST /v1/extensions expects { manifest: yamlString, scripts: { key: code } }
       const parts = parseExtensionResult(result);
