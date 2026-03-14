@@ -271,7 +271,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── GET /v1/extensions/:name/actions/:actionId — Get action script content ──
-  router.get('/v1/extensions/:name/actions/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/extensions/:name/actions/:actionId', requireAuth(), requireRole('owner'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
@@ -395,13 +395,22 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions/:name/activate — Activate extension ────
-  router.post('/v1/extensions/:name/activate', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/extensions/:name/activate', requireAuth(), requireRole('owner'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
+      }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
       }
 
       const updated = await storage.updateExtension(name, {
@@ -450,13 +459,22 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions/:name/deactivate — Deactivate extension ──
-  router.post('/v1/extensions/:name/deactivate', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/extensions/:name/deactivate', requireAuth(), requireRole('owner'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
+      }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
       }
 
       const updated = await storage.updateExtension(name, {
@@ -488,7 +506,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions/:name/instances — Create instance ──────────
-  router.post('/v1/extensions/:name/instances', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/extensions/:name/instances', requireAuth(), requireRole('owner'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
@@ -496,6 +514,16 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
       }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
+      }
+
       if (ext.status !== 'active') {
         res.status(409).json(error(config.nodeId, 'EXTENSION_INACTIVE', `Extension "${name}" is not active`));
         return;
@@ -608,7 +636,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── PATCH /v1/extensions/:name/instances/:instanceId — Update instance ──
-  router.patch('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.patch('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('owner'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;
@@ -616,6 +644,15 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
+      }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
       }
 
       const instance = await storage.getExtensionInstance(name, instanceId);
@@ -667,7 +704,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── DELETE /v1/extensions/:name/instances/:instanceId — Delete instance ──
-  router.delete('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.delete('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('owner'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;
@@ -675,6 +712,15 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
+      }
+
+      // Allow operator always, owner only if they installed it
+      const roles = req.auth!.roles;
+      if (!roles.includes('operator')) {
+        if (ext.installedBy !== req.auth!.owner) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+          return;
+        }
       }
 
       const instance = await storage.getExtensionInstance(name, instanceId);
