@@ -1121,7 +1121,7 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
           envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES',
           description: 'Default scopes granted to new agents',
           value: config.defaultAgentScopes.join(', '),
-          defaultVal: 'memory:read, memory:write, catalogue:read',
+          defaultVal: 'memory:read, memory:write, memory:delete, catalogue:read',
         },
         {
           envVar: 'AIMEAT_MAX_AGENT_SCOPES',
