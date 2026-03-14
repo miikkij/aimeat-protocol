@@ -21,8 +21,11 @@
  *     (service.name/category, auth.type, actions[] with display_name/endpoint);
  *     fix Extension validator to check metadata.name/version/description/author
  *     and actions[].id/method/path/script
+ *   v3.0.0 — 2026-03-14 — Replace regex sanitizeYaml with real yaml parse+stringify.
+ *     YAML is now parsed by the yaml library, then re-serialized to clean output.
+ *     No more regex hacks for block scalars, quoting, or multiline values.
  */
-import { parse as parseYaml } from '/lib/yaml.mjs';
+import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
 /* ── Helpers ─────────────────────────────────────────── */
 
@@ -34,74 +37,43 @@ function extractCodeBlock(text, lang) {
 
 /**
  * Sanitize JSON string from common AI/markdown artifacts before parsing.
- * AI chat models frequently escape brackets, add trailing commas, or wrap
- * JSON in markdown formatting that breaks JSON.parse().
  */
 function sanitizeJson(text) {
   let s = text;
-  // Strip markdown bold/italic markers that leak into values
-  // (but preserve content inside quoted strings carefully)
-  // Remove backslash-escaped brackets: \[ → [, \] → ]
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
-  // Remove backslash-escaped parens and braces (some models do this)
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   s = s.replace(/\\\(/g, '(').replace(/\\\)/g, ')');
-  // Remove trailing commas before } or ] (common AI mistake)
   s = s.replace(/,\s*([}\]])/g, '$1');
-  // Strip zero-width spaces and other invisible unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
   return s;
 }
 
 /**
- * Sanitize AI-generated YAML from common markdown artifacts.
- * Applied before validation so the YAML checks see clean content.
+ * Minimal text-level cleanup applied BEFORE YAML parsing.
+ * Only fixes characters that prevent the parser from running at all.
+ * No structural changes — the real yaml parser handles block scalars,
+ * multiline strings, etc. correctly on its own.
  */
-function sanitizeYaml(text) {
+function preCleanYaml(text) {
   if (typeof text !== 'string') return text;
   let s = text;
-  // Markdown bullets → YAML list items: `*   name:` → `  - name:`
-  s = s.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
-  s = s.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
-  // Remove backslash-escaped underscores: `\_` → `_`
+  // Remove markdown-escaped chars that aren't valid YAML
   s = s.replace(/\\_/g, '_');
-  // Remove backslash-escaped brackets and braces
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
-  // Block scalar with text on SAME line as > or | (AI mistake — invalid YAML).
-  // e.g. `description: > Data schema and consent` → `description: "Data schema and consent"`
-  // Also captures any indented continuation lines that follow.
-  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s+(.+(?:\n(?:\s+.+))*)/gm, (_match, prefix, body) => {
-    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
-    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"';
-  });
-  // Block scalar with text on NEXT lines (valid YAML syntax but AI often breaks it).
-  // e.g. `description: >\n  multi\n  line` → `description: "multi line"`
-  // Only convert when there are actual indented continuation lines.
-  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s*\n((?:\s+.*\n?)*)/gm, (_match, prefix, body) => {
-    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return _match; // no indented body → don't convert
-    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"';
-  });
-  // Auto-quote unquoted string-value fields that contain special YAML chars.
-  // Only quote if the value contains chars that actually break plain scalars: : # [ ] { } ( ) , > |
-  s = s.replace(/^(\s*(?:description|title|label|message|consent_purpose|purpose|display_name):\s+)(?!["'>|])(.+)$/gm,
-    (_match, prefix, value) => {
-      if (/[:#\[\]{}(),>|]/.test(value)) {
-        return prefix + '"' + value.replace(/"/g, '\\"') + '"';
-      }
-      return _match; // no special chars → leave as plain scalar
-    });
   return s;
 }
 
 /* ── YAML Parse ──────────────────────────────────────── */
 
 /**
- * Parse YAML text using the real yaml library. Returns { parsed, errors }.
- * Sanitizes common AI artifacts first, then attempts parse.
+ * Parse YAML using the real yaml library with multiple fallback strategies.
+ * 1. Try parsing as-is (after minimal pre-clean)
+ * 2. If that fails, try with yaml library's more tolerant options
+ * 3. Return { parsed, errors, cleaned } where cleaned is the canonical YAML
+ *    re-serialized by the yaml library (no regex hacks)
  */
 function tryParseYaml(text) {
   const errors = [];
@@ -109,13 +81,29 @@ function tryParseYaml(text) {
     errors.push('Result is empty');
     return { errors, parsed: null, cleaned: text };
   }
-  const cleaned = sanitizeYaml(text);
+
+  const preCleaned = preCleanYaml(text);
+
+  // Attempt 1: strict parse
   try {
-    const parsed = parseYaml(cleaned);
+    const parsed = parseYaml(preCleaned);
+    // Re-serialize through the real yaml library → guaranteed clean output
+    const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
     return { errors, parsed, cleaned };
-  } catch (e) {
-    errors.push(`YAML parse error: ${e.message}`);
-    return { errors, parsed: null, cleaned };
+  } catch (_e1) {
+    // Attempt 2: try stripping markdown bullets `* ` → `- ` and retry
+    let fixed = preCleaned;
+    fixed = fixed.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
+    fixed = fixed.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
+    try {
+      const parsed = parseYaml(fixed);
+      const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
+      return { errors, parsed, cleaned };
+    } catch (_e2) {
+      // Both attempts failed — report the original error
+      errors.push(`YAML parse error: ${_e1.message}`);
+      return { errors, parsed: null, cleaned: preCleaned };
+    }
   }
 }
 

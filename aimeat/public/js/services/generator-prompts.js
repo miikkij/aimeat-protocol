@@ -208,6 +208,17 @@ Create an AIMEAT Extension for: ${label}
 
 ${context}
 
+## YAML STRING RULES (read this FIRST — violations cause parse errors)
+
+Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
+NEVER use > or | (block scalars). NEVER leave strings unquoted.
+
+WRONG: description: > This is a folded string
+WRONG: description: This has (parens) and colons: here
+CORRECT: description: "This has (parens) and colons: here — all on one line"
+
+## Structure
+
 Return TWO code blocks:
 
 1. extension.yaml manifest:
@@ -215,7 +226,7 @@ Return TWO code blocks:
 metadata:
   name: kebab-case-name
   version: "1.0.0"
-  description: "What this extension does"
+  description: "What this extension does — one line, double quoted"
   author: generator
 required_apis: [memory]
 config: {}
@@ -243,14 +254,10 @@ export default async function(ctx, input) {
 }
 \`\`\`
 
-CRITICAL rules:
+## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
 - \`actions\` array MUST NOT be empty — each action needs: id, method, path, script
-- The \`script\` field value (e.g. "action-id.js") must match a JavaScript code block below
-- The JavaScript code block MUST have a comment line \`// actions/action-id.js\` matching the script field
-- ALWAYS quote description values with double quotes
-- Strings containing { } : # [ ] must be quoted
-- Do NOT use YAML block scalars (> or |) — use "quoted strings"`,
+- The \`script\` field value must match a JavaScript code block comment \`// actions/{script}\``,
 
   app: (label, context) => `${AIMEAT_CONTEXT}
 

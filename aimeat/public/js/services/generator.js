@@ -18,8 +18,11 @@
  *   v1.1.1 — 2026-03-14 — getListeners now queries /v1/agents instead of memory; heartbeat uses /v1/checkin
  *   v1.2.0 — 2026-03-14 — saveComponent retries on 409 VERSION_CONFLICT;
  *     registerComponent sends YAML as { yaml: string } for CSM/MSM instead of JSON.parse
+ *   v2.0.0 — 2026-03-14 — Replace regex sanitizeYaml with cleanYaml that uses
+ *     real yaml parse+stringify — no more regex hacks
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
 /* ── Helpers ─────────────────────────────────────────── */
 
@@ -236,58 +239,47 @@ export async function cleanupOldEntries(projectId) {
 /* ── Registration ────────────────────────────────────── */
 
 /**
- * Sanitize AI-generated YAML that may contain markdown artifacts.
- * Common issues: `*   name:` (markdown bullet) instead of `  - name:`,
- * backslash-escaped underscores `\_` instead of `_`, escaped brackets, etc.
+ * Clean YAML through the real yaml parser: parse → re-serialize.
+ * No regex hacks. If the YAML is valid, the parser handles block scalars,
+ * multiline strings, quoting, etc. correctly. Returns clean YAML string.
+ * Falls back to minimal text cleanup if parse fails entirely.
  */
-function sanitizeYaml(text) {
+function cleanYaml(text) {
   if (typeof text !== 'string') return text;
+  // Minimal pre-clean: only fix chars that prevent parsing at all
   let s = text;
-  // Markdown bullets → YAML list items: `*   name:` → `  - name:`
-  s = s.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
-  s = s.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
-  // Remove backslash-escaped underscores: `\_` → `_`
   s = s.replace(/\\_/g, '_');
-  // Remove backslash-escaped brackets and braces
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
-  // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
-  // Block scalar with text on SAME line as > or | (AI mistake — invalid YAML).
-  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s+(.+(?:\n(?:\s+.+))*)/gm, (_match, prefix, body) => {
-    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
-    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"';
-  });
-  // Block scalar with text on NEXT lines (valid syntax but often broken by AI).
-  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s*\n((?:\s+.*\n?)*)/gm, (_match, prefix, body) => {
-    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return _match;
-    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"';
-  });
-  // Auto-quote unquoted string-value fields that contain special YAML chars.
-  // Only quote if the value contains chars that actually break plain scalars: : # [ ] { } ( ) , > |
-  s = s.replace(/^(\s*(?:description|title|label|message|consent_purpose|purpose|display_name):\s+)(?!["'>|])(.+)$/gm,
-    (_match, prefix, value) => {
-      if (/[:#\[\]{}(),>|]/.test(value)) {
-        return prefix + '"' + value.replace(/"/g, '\\"') + '"';
-      }
-      return _match; // no special chars → leave as plain scalar
-    });
-  return s;
+  try {
+    const parsed = parseYaml(s);
+    return stringifyYaml(parsed, { lineWidth: 0 });
+  } catch {
+    // Try fixing markdown bullets and retry
+    s = s.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
+    s = s.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
+    try {
+      const parsed = parseYaml(s);
+      return stringifyYaml(parsed, { lineWidth: 0 });
+    } catch {
+      return s; // give up, return pre-cleaned text
+    }
+  }
 }
 
 export async function registerComponent(type, result, session) {
   switch (type) {
     case 'csm':
       // CSM results are YAML — sanitize markdown artifacts and send as { yaml: string }
-      return apiPost('/v1/csm', typeof result === 'string' ? { yaml: sanitizeYaml(result) } : result);
+      return apiPost('/v1/csm', typeof result === 'string' ? { yaml: cleanYaml(result) } : result);
     case 'msm':
       // MSM results are YAML — same pattern
-      return apiPost('/v1/msm', typeof result === 'string' ? { yaml: sanitizeYaml(result) } : result);
+      return apiPost('/v1/msm', typeof result === 'string' ? { yaml: cleanYaml(result) } : result);
     case 'extension': {
       // POST /v1/extensions expects { manifest: yamlString, scripts: { key: code } }
       const parts = parseExtensionResult(result);
-      return apiPost('/v1/extensions', { manifest: sanitizeYaml(parts.manifest), scripts: parts.scripts });
+      return apiPost('/v1/extensions', { manifest: cleanYaml(parts.manifest), scripts: parts.scripts });
     }
     case 'app':
       return apiPost('/v1/apps', typeof result === 'string' ? JSON.parse(result) : result);
