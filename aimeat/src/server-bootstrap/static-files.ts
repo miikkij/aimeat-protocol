@@ -45,10 +45,10 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
-        `style-src 'self' 'unsafe-inline'`,
+        `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
-        "font-src 'self'",
+        "font-src 'self' https://fonts.gstatic.com",
         "frame-src 'self' blob: data:",
         "object-src 'none'",
         "base-uri 'self'",

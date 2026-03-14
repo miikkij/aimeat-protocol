@@ -23,6 +23,8 @@
  *     real yaml parse+stringify — no more regex hacks
  *   v3.0.0 — 2026-03-14 — Add interview spec storage (saveInterviewSpec,
  *     getInterviewSpec); add cortex case in registerComponent with auto-activate
+ *   v3.1.0 — 2026-03-15 — Namespace CSM/MSM names with owner (owner/name) to avoid
+ *     collisions; upsert pattern (delete+recreate) on NAME_TAKEN for re-runs
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -309,14 +311,61 @@ function cleanYaml(text) {
   }
 }
 
+/**
+ * Prefix service.name in YAML with owner namespace (owner/name) to avoid collisions.
+ * If already namespaced with this owner, leaves it unchanged.
+ */
+function namespacedYaml(result, owner) {
+  const raw = typeof result === 'string' ? cleanYaml(result) : result;
+  if (!owner || typeof raw !== 'string') return typeof result === 'string' ? { yaml: raw } : result;
+  try {
+    const parsed = parseYaml(raw);
+    const name = parsed?.service?.name;
+    if (name && !name.startsWith(owner + '/')) {
+      parsed.service.name = owner + '/' + name;
+    }
+    return { yaml: stringifyYaml(parsed, { lineWidth: 0 }) };
+  } catch {
+    return { yaml: raw };
+  }
+}
+
+/**
+ * POST a CSM/MSM manifest. On 409 NAME_TAKEN, delete the old one (if owned) and retry.
+ */
+async function upsertManifest(endpoint, body, owner) {
+  try {
+    return await apiPost(endpoint, body);
+  } catch (err) {
+    const code = err?.code || '';
+    if (err?.status === 409 || code.includes('NAME_TAKEN')) {
+      // Extract name from the YAML we just tried to post
+      try {
+        const parsed = parseYaml(body.yaml);
+        const name = parsed?.service?.name;
+        if (name) {
+          await apiDelete(`${endpoint}/${encodeURIComponent(name)}`);
+          return await apiPost(endpoint, body);
+        }
+      } catch { /* delete failed — not our manifest, surface original error */ }
+    }
+    throw err;
+  }
+}
+
 export async function registerComponent(type, result, session) {
+  const owner = session?.owner;
   switch (type) {
-    case 'csm':
-      // CSM results are YAML — sanitize markdown artifacts and send as { yaml: string }
-      return apiPost('/v1/csm', typeof result === 'string' ? { yaml: cleanYaml(result) } : result);
-    case 'msm':
-      // MSM results are YAML — same pattern
-      return apiPost('/v1/msm', typeof result === 'string' ? { yaml: cleanYaml(result) } : result);
+    case 'csm': {
+      // CSM results are YAML — namespace the service name with owner to avoid collisions
+      const yaml = namespacedYaml(result, owner);
+      return upsertManifest('/v1/csm', yaml, owner);
+    }
+    case 'msm': {
+      // MSM results are YAML — namespace the service name with owner to avoid collisions
+      const yaml = namespacedYaml(result, owner);
+      return upsertManifest('/v1/msm', yaml, owner);
+    }
     case 'extension': {
       // POST /v1/extensions expects { manifest: yamlString, scripts: { key: code } }
       const parts = parseExtensionResult(result);

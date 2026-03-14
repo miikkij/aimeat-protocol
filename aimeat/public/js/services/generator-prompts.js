@@ -451,7 +451,24 @@ What IS available:
 - \`ctx\` API object (memory, fetch, wallet, consent, trust, caller, config, log)
 - \`export default async function(ctx, input) { ... }\` — the action entry point
 
-## ctx.memory.search() returns objects, NOT strings
+## ctx.memory API — CRITICAL details
+
+### ctx.memory.get(key) returns the VALUE directly, or undefined
+- It does NOT return a string — do NOT call JSON.parse() on the result
+- ALWAYS check for undefined/null before using the result
+
+WRONG:
+  const data = JSON.parse(await ctx.memory.get("my.key"));  // CRASH: "undefined" is not valid JSON
+
+CORRECT:
+  const data = await ctx.memory.get("my.key");
+  if (!data) return { error: "No data found" };
+  // data is already a JS object/array/value — use it directly
+
+### ctx.memory.set(key, value) stores any JSON-serializable value
+  await ctx.memory.set("alerts.2026-03-14", { items: [...], count: 5 });
+
+### ctx.memory.search(prefix) returns objects, NOT strings
 
 WRONG:
   const keys = await ctx.memory.search("prefix.");
@@ -461,7 +478,7 @@ CORRECT:
   const results = await ctx.memory.search("prefix.");
   for (const entry of results) {
     const key = entry.key;    // string
-    const value = entry.value; // the stored value
+    const value = entry.value; // the stored value — already parsed, NOT a string
   }
 
 ## Output format — SINGLE block, copy-paste friendly
@@ -512,7 +529,11 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 - Each action's \`script\` field value must match a \`// actions/{script}\` comment below the YAML
 - \`limits.timeout_ms\`: use 30000 for extensions that call external APIs, 5000 for memory-only
 - \`limits.max_api_calls\`: use 500 for data collectors (many memory writes per run), 100 for simple actions
-- All helper functions must be defined INSIDE the same code block — no imports allowed
+- All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
+- If two actions need the same helper, DUPLICATE the helper in both script files
+- NEVER reference functions from another action's script — each script runs in its own isolated scope
+- NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values
+- Always check for undefined/null before using memory values
 - Always convert dates to ISO 8601 before storing in memory`,
 
   app: (label, context, completedComponents) => {

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, handleImgError } from '/js/utils.js';
+import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { listApps, uploadApp, deleteApp, patchApp } from '/js/services/apps.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -105,15 +105,20 @@ export default function AppsTab({ session, showToast, onStats }) {
       : myApps.map(a => html`
         <div class="card">
           <div class="card-header">
-            <div class="card-title">${escHtml(a.filename || a.name)}</div>
+            <div class="card-title">${escHtml(a.manifest?.name || a.filename || a.name)}</div>
             <div style="display:flex;gap:.5rem;align-items:center">
-              <span class="badge badge-info">${escHtml(a.content_type || 'html')}</span>
+              ${a.manifest?.version ? html`<span class="badge">${'v' + escHtml(a.manifest.version)}</span>` : ''}
+              ${a.version_number > 1 ? html`<span class="badge badge-dim">${'#' + a.version_number}</span>` : ''}
+              <span class="badge badge-info">${escHtml(a.mime_type || a.content_type || 'html')}</span>
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
             </div>
           </div>
+          ${a.manifest?.description ? html`<div style="font-size:.8rem;color:var(--text-dim,#6B7280);margin-bottom:.35rem">${escHtml(a.manifest.description)}</div>` : ''}
           <div class="card-subtitle">
             <a href="${NODE_URL}/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}" target="_blank">${t('profile.apps.download')}</a>
             ${a.size ? ' \u2022 ' + Math.round(a.size / 1024) + ' KB' : ''}
+            ${a.created_at ? ' \u2022 ' + timeAgo(a.created_at) : ''}
+            ${a.downloads ? ' \u2022 ' + a.downloads + ' \u{2B07}' : ''}
           </div>
           <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
@@ -147,8 +152,14 @@ export default function AppsTab({ session, showToast, onStats }) {
                   ${ssUrl ? html`<img src=${ssUrl} alt=${a.filename} onError=${handleImgError} />` : html`<div class="placeholder">\u{1F4F1}</div>`}
                 </div>
                 <div class="app-info">
-                  <div class="app-name">${escHtml(a.filename)}</div>
-                  <div class="app-meta">${escHtml(a.owner)} \u2022 ${Math.round((a.size || 0) / 1024)} KB${a.protected ? ' \u2022 \u{1F512} ' + t('profile.apps.protected') : ''}</div>
+                  <div class="app-name">${escHtml(a.manifest?.name || a.filename)}</div>
+                  ${a.manifest?.description ? html`<div style="font-size:.75rem;color:var(--text-dim,#6B7280);margin:.15rem 0">${escHtml(a.manifest.description)}</div>` : ''}
+                  <div class="app-meta">
+                    ${escHtml(a.owner)} \u2022 ${Math.round((a.size || 0) / 1024)} KB
+                    ${a.manifest?.version ? ' \u2022 v' + escHtml(a.manifest.version) : ''}
+                    ${a.created_at ? ' \u2022 ' + timeAgo(a.created_at) : ''}
+                    ${a.protected ? ' \u2022 \u{1F512} ' + t('profile.apps.protected') : ''}
+                  </div>
                   <div style="margin-top:.5rem"><a href="${NODE_URL + (a.download_url || '/v1/apps/' + encodeURIComponent(a.owner) + '/' + encodeURIComponent(a.filename))}" class="btn-sm" style="text-decoration:none;display:inline-block">${t('profile.apps.download')}</a></div>
                 </div>
               </div>`;

@@ -6,8 +6,10 @@ import { apiGet, api } from '/js/api.js';
 
 /** Load personal node status. Returns array (0 or 1 node). */
 export async function listNodes() {
-  const data = await apiGet('/v1/personal/status');
-  return data?.data?.node_id ? [data.data] : [];
+  try {
+    const data = await apiGet('/v1/personal/status');
+    return data?.data?.node_id ? [data.data] : [];
+  } catch { return []; }
 }
 
 /** Register (anchor) a personal node. */
