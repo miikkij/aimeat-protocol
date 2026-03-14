@@ -459,11 +459,29 @@ function ComponentDetail({ component, project, components, agents, projectId, on
     setRegistering(false);
   }
 
+  async function handleRegeneratePrompt() {
+    const fresh = buildComponentPrompt(
+      component.type, component.label,
+      project.description, project.blueprint,
+      components.filter(c => c.status === 'done'),
+    );
+    const updated = addHistory(component, 'prompt_regenerated');
+    await saveComponent(projectId, { ...updated, status: 'prompt_ready', prompt: fresh });
+    showToast?.(t('profile.generator.promptRegenerated') || 'Prompt updated!');
+    onUpdate();
+  }
+
   async function handleCopyPrompt() {
+    // Always use the freshest prompt when copying
+    const fresh = buildComponentPrompt(
+      component.type, component.label,
+      project.description, project.blueprint,
+      components.filter(c => c.status === 'done'),
+    );
     try {
-      await navigator.clipboard.writeText(prompt);
+      await navigator.clipboard.writeText(fresh);
       const updated = addHistory(component, 'prompt_copied');
-      await saveComponent(projectId, { ...updated, status: 'waiting_user', prompt });
+      await saveComponent(projectId, { ...updated, status: 'waiting_user', prompt: fresh });
       showToast?.('Prompt copied!');
       onUpdate();
     } catch { /* clipboard fallback */ }
@@ -507,9 +525,14 @@ function ComponentDetail({ component, project, components, agents, projectId, on
         <div class="pf-gen-section">
           <label>${t('profile.generator.prompt')}</label>
           <pre class="pf-gen-prompt-box">${prompt}</pre>
-          <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}>
-            ${t('profile.generator.copyPrompt')}
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}>
+              ${t('profile.generator.copyPrompt')}
+            </button>
+            <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint') || 'Regenerate prompt with latest templates'}>
+              ${'↻ ' + (t('profile.generator.regeneratePrompt') || 'Refresh prompt')}
+            </button>
+          </div>
         </div>
         <div class="pf-gen-section">
           <label>${t('profile.generator.result')}</label>
