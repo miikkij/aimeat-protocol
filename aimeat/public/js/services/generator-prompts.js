@@ -91,13 +91,29 @@ Create a CSM (Community Service Manifest) YAML for: ${label}
 
 ${context}
 
-Return ONLY valid YAML matching this EXACT structure (this is parsed by the server — wrong keys will be rejected):
+## YAML STRING RULES (read this FIRST — violations cause parse errors)
+
+Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
+NEVER use > or | (block scalars). NEVER leave strings unquoted.
+
+WRONG — will crash the parser:
+  description: > This is a multi-line folded string
+  description: This has (parens) and special: chars
+  description: |
+    This is a literal block
+
+CORRECT — always do this:
+  description: "This has (parens) and special: chars all on one line"
+
+## Structure
+
+Return ONLY valid YAML in a yaml code block. Copy this structure EXACTLY:
 \`\`\`yaml
 csm: "1.0"
 service:
   name: kebab-case-name
   type: directory
-  description: "What this service does"
+  description: "What this service does — keep on ONE line in double quotes"
   version: "1.0"
 schema_mode: open
 data_schema:
@@ -125,21 +141,10 @@ ui_hints:
   search_fields: [fieldName]
 \`\`\`
 
-CRITICAL rules:
-- data_schema.required and data_schema.optional are MAPS, NOT arrays!
-  WRONG (will fail): ❌
-    required:
-      - name: alert
-        type: string
-  CORRECT: ✅
-    required:
-      alert:
-        type: string
+## Additional rules
+- data_schema.required and data_schema.optional are MAPS (fieldName: {type: ...}), NOT arrays (- name: ...)
 - data_schema.required MUST have at least one field
 - Field types: string, number, integer, boolean, array, object
-- ALWAYS quote description/purpose values with double quotes: description: "text here"
-- Strings containing ( ) { } : # [ ] must be quoted with double quotes
-- Do NOT use YAML block scalars (> or |) — always use "quoted strings" on the same line
 - Keep fields reasonable — only what the service actually needs`,
 
   msm: (label, context) => `${AIMEAT_CONTEXT}
@@ -148,12 +153,23 @@ Create an MSM (Micro Service Manifest) YAML for: ${label}
 
 ${context}
 
-Return ONLY valid YAML matching this EXACT structure (this is parsed by the server — wrong keys will be rejected):
+## YAML STRING RULES (read this FIRST — violations cause parse errors)
+
+Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
+NEVER use > or | (block scalars). NEVER leave strings unquoted.
+
+WRONG: description: > This is a folded string
+WRONG: description: This has (parens) and colons: here
+CORRECT: description: "This has (parens) and colons: here — all on one line"
+
+## Structure
+
+Return ONLY valid YAML in a yaml code block. Copy this structure EXACTLY:
 \`\`\`yaml
 msm: "1.0"
 service:
   name: "Human Readable Service Name"
-  description: "What this integration does"
+  description: "What this integration does — one line, double quoted"
   homepage: "https://api.example.com"
   category: data
   tags: [tag1, tag2]
@@ -179,17 +195,12 @@ actions:
         description: "The result"
 \`\`\`
 
-CRITICAL rules:
-- Top-level \`msm: "1.0"\` is REQUIRED
+## Additional rules
 - \`service\` section with \`name\`, \`description\`, \`category\` is REQUIRED
 - \`category\` must be one of: data, utility, image, communication, analytics, analysis
 - \`auth.type\` must be one of: bearer, query_param, oauth2, api_key, none
-- \`actions\` is an array (NOT "endpoints") — each action needs: id, display_name, description, endpoint (with method + url), input (field map), output (field map)
-- Each output field MUST have at least one entry
-- Input/output fields are maps of fieldName: { type, description, required }
-- ALWAYS quote description values with double quotes
-- Strings containing { } : # [ ] must be quoted
-- Do NOT use YAML block scalars (> or |) — use "quoted strings"`,
+- \`actions\` is an array — each action needs: id, display_name, description, endpoint (method + url), input, output
+- Each action output MUST have at least one field`,
 
   extension: (label, context) => `${AIMEAT_CONTEXT}
 

@@ -70,13 +70,20 @@ function sanitizeYaml(text) {
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
-  // Convert YAML block scalars (> or |) to plain quoted strings on same line.
-  // Only convert when the body actually has indented continuation lines.
-  // If body is empty (AI forgot to indent), leave as-is — don't produce empty "".
+  // Block scalar with text on SAME line as > or | (AI mistake — invalid YAML).
+  // e.g. `description: > Data schema and consent` → `description: "Data schema and consent"`
+  // Also captures any indented continuation lines that follow.
+  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s+(.+(?:\n(?:\s+.+))*)/gm, (_match, prefix, body) => {
+    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"';
+  });
+  // Block scalar with text on NEXT lines (valid YAML syntax but AI often breaks it).
+  // e.g. `description: >\n  multi\n  line` → `description: "multi line"`
+  // Only convert when there are actual indented continuation lines.
   s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s*\n((?:\s+.*\n?)*)/gm, (_match, prefix, body) => {
     const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return _match; // no indented body → don't convert
-    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"\n';
+    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"';
   });
   // Auto-quote unquoted string-value fields that contain special YAML chars.
   // Only quote if the value contains chars that actually break plain scalars: : # [ ] { } ( ) , > |
