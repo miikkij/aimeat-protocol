@@ -583,7 +583,16 @@
       "protected": "Protected",
       "launcherTitle": "App Launcher",
       "launcherDesc": "Manage all your apps in one place. Pin favorites, search by tags, publish to your node.",
-      "launcherOpen": "Open App Launcher"
+      "launcherOpen": "Open App Launcher",
+      "editAccess": "Edit Access Code",
+      "deleteBtn": "Delete",
+      "confirmDelete": "Delete this app?",
+      "deleted": "App deleted",
+      "deleteFailed": "Delete failed",
+      "updated": "App updated",
+      "updateFailed": "Update failed",
+      "save": "Save",
+      "removeProtectionHint": "Save empty to remove access code protection"
     },
     "federation": {
       "title": "Federation & Peers",

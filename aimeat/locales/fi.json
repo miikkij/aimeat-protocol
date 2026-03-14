@@ -583,7 +583,16 @@
       "protected": "Suojattu",
       "launcherTitle": "Sovelluskäynnistin",
       "launcherDesc": "Hallitse kaikkia sovelluksiasi yhdestä paikasta. Kiinnitä suosikit, hae tageilla, julkaise solmuusi.",
-      "launcherOpen": "Avaa sovelluskäynnistin"
+      "launcherOpen": "Avaa sovelluskäynnistin",
+      "editAccess": "Muokkaa pääsykoodia",
+      "deleteBtn": "Poista",
+      "confirmDelete": "Poistetaanko tämä sovellus?",
+      "deleted": "Sovellus poistettu",
+      "deleteFailed": "Poistaminen epäonnistui",
+      "updated": "Sovellus päivitetty",
+      "updateFailed": "Päivitys epäonnistui",
+      "save": "Tallenna",
+      "removeProtectionHint": "Tallenna tyhjänä poistaaksesi pääsykoodisuojauksen"
     },
     "federation": {
       "title": "Federaatio & vertaiset",
