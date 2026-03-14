@@ -15,6 +15,7 @@
  *   v1.0.0 — 2026-03-10 — Initial generator tab
  *   v2.0.0 — 2026-03-14 — Add interview phase UI, cortex registration wiring,
  *     validateInterviewSpec integration, buildInterviewPrompt support
+ *   v2.0.1 — 2026-03-15 — Fix session not passed to ComponentDetail (broke registration)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -462,6 +463,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                 projectId=${projectId}
                 onUpdate=${loadData}
                 showToast=${showToast}
+                session=${session}
               />`
             : html`<div class="pf-gen-detail-empty">${t('profile.generator.selectComponent')}</div>`
           }
@@ -491,7 +493,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   `;
 }
 
-function ComponentDetail({ component, project, components, agents, projectId, onUpdate, showToast }) {
+function ComponentDetail({ component, project, components, agents, projectId, onUpdate, showToast, session }) {
   const [mode, setMode] = useState('chat');
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);

@@ -31,6 +31,9 @@
  *   v4.1.0 — 2026-03-14 — Make app template cortex-aware: detect completed cortex
  *     components, inject cortex script loads in boot(), show cortex API docs instead
  *     of raw extension/memory docs when cortex is available
+ *   v4.2.0 — 2026-03-15 — Scope interview prompt to AIMEAT domain: remove
+ *     framework/deployment/infra questions, add style/look-and-feel section,
+ *     add style object to JSON spec output
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -178,11 +181,26 @@ ${description}
       - What actions can users take? (filter, search, create, edit, share, export?)
       - Does it need charts/visualizations? What kind?
 
-   f) TECHNICAL CONSTRAINTS
-      - Real-time vs batch updates? Explain what each means for this project
-      - Does it need to work offline?
-      - Any specific libraries or integrations required?
-      - Language/locale requirements?
+   f) STYLE & LOOK — How should it feel?
+      - Overall mood: clean/minimal, playful, data-dense/professional, dark/light?
+      - Color palette preferences? (suggest options based on the domain)
+      - Typography: standard readable, compact data-heavy, large display/kiosk?
+      - Layout: single page, tabbed, split panels, fullscreen immersive?
+      - Animations/transitions: none, subtle, rich?
+      - Is this for a specific display context? (desktop browser, mobile, wall-mounted kiosk, embedded)
+      - Any reference apps or websites whose style they admire?
+
+   g) CONSTRAINTS & PREFERENCES
+      - Data refresh: How often should data update? (every few minutes, hourly, daily, on-demand?)
+      - Language/locale: What languages should the UI support?
+      - Any specific data display preferences? (map style, chart types, color themes)
+      - Any domain-specific rules or edge cases to handle?
+
+   IMPORTANT — STAY IN SCOPE:
+   - This specification is for an AIMEAT service (extensions + cortex + app running on an AIMEAT node)
+   - Do NOT ask about frontend frameworks, backend runtimes, databases, Docker, deployment, hosting, CI/CD, or security headers
+   - The AIMEAT platform handles: storage (memory API), scheduling (extension intervals), auth, CSP, and serving
+   - Focus ONLY on WHAT the service does, not HOW it's built — the generator handles architecture
 
 3. SECTION RULES:
    - Each section MUST stay open until the user explicitly says to move on
@@ -256,13 +274,21 @@ ${description}
       "visualizations": ["bar-chart", "pie-chart", "heatmap"]
     }
   ],
+  "style": {
+    "mood": "minimal|playful|professional|data-dense",
+    "colorPalette": "Description or hex values",
+    "typography": "standard|compact|large-display",
+    "layout": "single-page|tabbed|split-panel|fullscreen",
+    "animations": "none|subtle|rich",
+    "displayContext": "desktop|mobile|kiosk|embedded",
+    "references": "Any reference apps or styles the user mentioned"
+  },
   "constraints": {
     "updateMode": "realtime|scheduled|on-demand",
     "scheduleInterval": "15m|1h|daily|null",
-    "offlineSupport": false,
     "locales": ["fi", "en"],
-    "libraries": ["leaflet", "chart.js"],
-    "notes": "Any additional technical constraints"
+    "domainRules": "Any domain-specific rules or edge cases",
+    "notes": "Any additional context that doesn't fit above"
   },
   "interviewNotes": "Any important context from the conversation that doesn't fit above"
 }
