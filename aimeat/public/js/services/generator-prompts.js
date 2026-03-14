@@ -14,6 +14,9 @@
  *   v1.0.0 — 2026-03-10 — Initial prompt templates
  *   v1.1.0 — 2026-03-14 — Tighten blueprint prompt to reject extra fields;
  *     add buildBlueprintFixPrompt that regenerates instead of patching
+ *   v2.0.0 — 2026-03-14 — Fix MSM prompt to match real parseMsm() format
+ *     (service/auth/actions structure, not name/endpoints); fix Extension prompt
+ *     to match POST /v1/extensions format (metadata/actions with script refs)
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -88,28 +91,48 @@ Create a CSM (Community Service Manifest) YAML for: ${label}
 
 ${context}
 
-Return ONLY valid YAML in CSM format:
+Return ONLY valid YAML matching this EXACT structure (this is parsed by the server — wrong keys will be rejected):
 \`\`\`yaml
-name: kebab-case-name
-version: "1.0"
-description: What this schema defines
-fields:
-  - name: fieldName
-    type: string|number|boolean|array|object
-    required: true|false
-    description: "What this field contains"
-consent:
-  default_visibility: public|private|restricted
-  requires_consent: true|false
-  retention_days: 365
+csm: "1.0"
+service:
+  name: kebab-case-name
+  type: directory
+  description: "What this service does"
+  version: "1.0"
+schema_mode: open
+data_schema:
+  required:
+    fieldName:
+      type: string
+    anotherField:
+      type: number
+  optional:
+    optionalField:
+      type: string
+      enum: [value1, value2]
+consent_requirements:
+  visibility_default: public
+  requires_consent: false
+  consent_purpose: "Why consent is needed"
+  data_retention: "365_days"
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: false
+ui_hints:
+  list_view: [fieldName, anotherField]
+  detail_view: [fieldName, anotherField, optionalField]
+  search_fields: [fieldName]
 \`\`\`
 
-CRITICAL YAML rules — your output MUST be parseable YAML:
-- ALWAYS quote description values with double quotes: description: "text here"
-- Strings containing { } : # [ ] , or > MUST be quoted
-- Use simple flat fields only — no nested objects inside field definitions
-- Keep field count reasonable (10-20 fields, not 40+) — only what the service actually needs
-- Do NOT use YAML block scalars (> or |) — use quoted strings instead`,
+CRITICAL rules:
+- data_schema.required and data_schema.optional are MAPS (key: {type: ...}), NOT arrays
+- data_schema.required MUST have at least one field
+- Field types: string, number, integer, boolean, array, object
+- ALWAYS quote description/purpose values with double quotes
+- Strings containing { } : # [ ] must be quoted
+- Do NOT use YAML block scalars (> or |) — use "quoted strings"
+- Keep fields reasonable — only what the service actually needs`,
 
   msm: (label, context) => `${AIMEAT_CONTEXT}
 
@@ -117,31 +140,48 @@ Create an MSM (Micro Service Manifest) YAML for: ${label}
 
 ${context}
 
-Return ONLY valid YAML in MSM format:
+Return ONLY valid YAML matching this EXACT structure (this is parsed by the server — wrong keys will be rejected):
 \`\`\`yaml
-name: kebab-case-name
-version: "1.0"
-description: What this integration does
+msm: "1.0"
+service:
+  name: "Human Readable Service Name"
+  description: "What this integration does"
+  homepage: "https://api.example.com"
+  category: data
+  tags: [tag1, tag2]
 auth:
-  type: api_key|oauth2|basic|none
-  config: {}
-endpoints:
-  - id: endpoint-id
-    method: GET|POST|PUT|DELETE
-    url: https://api.example.com/path
-    description: What this endpoint does
-    input_schema:
-      type: object
-      properties: {}
-    output_schema:
-      type: object
-      properties: {}
+  type: api_key
+  param_name: apikey
+  env_var: MY_API_KEY
+actions:
+  - id: action-id
+    display_name: "Human Readable Action Name"
+    description: "What this action does"
+    endpoint:
+      method: GET
+      url: "https://api.example.com/path?q={input.query}"
+    input:
+      query:
+        type: string
+        required: true
+        description: "Search query"
+    output:
+      result:
+        type: string
+        description: "The result"
 \`\`\`
 
-CRITICAL YAML rules — your output MUST be parseable YAML:
-- ALWAYS quote description values with double quotes: description: "text here"
-- Strings containing { } : # [ ] , or > MUST be quoted
-- Do NOT use YAML block scalars (> or |) — use quoted strings instead`,
+CRITICAL rules:
+- Top-level \`msm: "1.0"\` is REQUIRED
+- \`service\` section with \`name\`, \`description\`, \`category\` is REQUIRED
+- \`category\` must be one of: data, utility, image, communication, analytics, analysis
+- \`auth.type\` must be one of: bearer, query_param, oauth2, api_key, none
+- \`actions\` is an array (NOT "endpoints") — each action needs: id, display_name, description, endpoint (with method + url), input (field map), output (field map)
+- Each output field MUST have at least one entry
+- Input/output fields are maps of fieldName: { type, description, required }
+- ALWAYS quote description values with double quotes
+- Strings containing { } : # [ ] must be quoted
+- Do NOT use YAML block scalars (> or |) — use "quoted strings"`,
 
   extension: (label, context) => `${AIMEAT_CONTEXT}
 
@@ -153,11 +193,10 @@ Return TWO code blocks:
 
 1. extension.yaml manifest:
 \`\`\`yaml
-extension: "1.0"
 metadata:
   name: kebab-case-name
   version: "1.0.0"
-  description: What this extension does
+  description: "What this extension does"
   author: generator
 required_apis: [memory]
 config: {}
@@ -167,25 +206,32 @@ limits:
   max_api_calls: 100
 actions:
   - id: action-id
-    description: What this action does
+    description: "What this action does"
     method: POST
     path: /v1/ext/{name}/:instanceId/action-id
     auth: required
     input: {}
     output: {}
-    script: actions/action-id.js
+    script: action-id.js
 \`\`\`
 
-YAML rules: ALWAYS quote description values with double quotes. Strings containing { } : # must be quoted. No block scalars (> or |).
-
-2. For EACH action, a JavaScript file:
+2. For EACH action, a JavaScript file (filename must match the \`script\` field in the action):
 \`\`\`javascript
 // actions/action-id.js
 export default async function(ctx, input) {
   // Use ctx.memory, ctx.wallet, ctx.caller, ctx.log
   return { result: 'data' };
 }
-\`\`\``,
+\`\`\`
+
+CRITICAL rules:
+- \`metadata\` section MUST have: name, version, description, author
+- \`actions\` array MUST NOT be empty — each action needs: id, method, path, script
+- The \`script\` field value (e.g. "action-id.js") must match a JavaScript code block below
+- The JavaScript code block MUST have a comment line \`// actions/action-id.js\` matching the script field
+- ALWAYS quote description values with double quotes
+- Strings containing { } : # [ ] must be quoted
+- Do NOT use YAML block scalars (> or |) — use "quoted strings"`,
 
   app: (label, context) => `${AIMEAT_CONTEXT}
 

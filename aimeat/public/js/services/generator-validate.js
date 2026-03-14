@@ -17,6 +17,10 @@
  *     (\[ → [, trailing commas, zero-width chars) before JSON.parse
  *   v2.0.0 — 2026-03-14 — Use real yaml parser (yaml@2.8.2 via /lib/yaml.mjs)
  *     for CSM/MSM/Extension validation instead of regex heuristics
+ *   v2.1.0 — 2026-03-14 — Fix MSM validator to check real structure
+ *     (service.name/category, auth.type, actions[] with display_name/endpoint);
+ *     fix Extension validator to check metadata.name/version/description/author
+ *     and actions[].id/method/path/script
  */
 import { parse as parseYaml } from '/lib/yaml.mjs';
 
@@ -110,10 +114,12 @@ const validators = {
     errors.push(...parseErrors);
 
     if (parsed && typeof parsed === 'object') {
-      if (!parsed.name) errors.push('Missing required field: name');
-      if (!parsed.version) errors.push('Missing required field: version');
-      if (!parsed.fields) errors.push('Missing required field: fields');
-      if (!parsed.consent) errors.push('Missing required section: consent');
+      if (!parsed.service?.name) errors.push('Missing: service.name');
+      if (!parsed.service?.description) errors.push('Missing: service.description');
+      if (!parsed.data_schema?.required || Object.keys(parsed.data_schema.required).length === 0) {
+        errors.push('data_schema.required must have at least one field');
+      }
+      if (!parsed.consent_requirements) errors.push('Missing section: consent_requirements');
     }
 
     return { valid: errors.length === 0, errors, extracted: cleaned };
@@ -126,10 +132,24 @@ const validators = {
     errors.push(...parseErrors);
 
     if (parsed && typeof parsed === 'object') {
-      if (!parsed.name) errors.push('Missing required field: name');
-      if (!parsed.version) errors.push('Missing required field: version');
-      if (!parsed.auth) errors.push('Missing required section: auth');
-      if (!parsed.endpoints) errors.push('Missing required section: endpoints');
+      if (!parsed.service?.name) errors.push('Missing: service.name');
+      if (!parsed.service?.description) errors.push('Missing: service.description');
+      if (!parsed.service?.category) errors.push('Missing: service.category');
+      if (!parsed.auth?.type) errors.push('Missing: auth.type');
+      if (!Array.isArray(parsed.actions) || parsed.actions.length === 0) {
+        errors.push('actions must be a non-empty array');
+      } else {
+        for (const action of parsed.actions) {
+          const pfx = `action "${action?.id || '?'}"`;
+          if (!action?.id) errors.push(`${pfx}: missing id`);
+          if (!action?.display_name) errors.push(`${pfx}: missing display_name`);
+          if (!action?.endpoint?.method) errors.push(`${pfx}: missing endpoint.method`);
+          if (!action?.endpoint?.url) errors.push(`${pfx}: missing endpoint.url`);
+          if (!action?.output || Object.keys(action.output).length === 0) {
+            errors.push(`${pfx}: must have at least one output field`);
+          }
+        }
+      }
     }
 
     return { valid: errors.length === 0, errors, extracted: cleaned };
@@ -138,16 +158,28 @@ const validators = {
   extension(result) {
     const errors = [];
     const raw = extractCodeBlock(result, 'yaml');
-    const { parsed, errors: parseErrors, cleaned } = tryParseYaml(raw);
+    const { parsed, errors: parseErrors } = tryParseYaml(raw);
     errors.push(...parseErrors);
 
     if (parsed && typeof parsed === 'object') {
-      if (!parsed.extension) errors.push('Missing required field: extension (version)');
-      if (!parsed.metadata) errors.push('Missing required section: metadata');
-      if (!parsed.actions) errors.push('Missing required section: actions');
+      if (!parsed.metadata?.name) errors.push('Missing: metadata.name');
+      if (!parsed.metadata?.version) errors.push('Missing: metadata.version');
+      if (!parsed.metadata?.description) errors.push('Missing: metadata.description');
+      if (!parsed.metadata?.author) errors.push('Missing: metadata.author');
+      if (!Array.isArray(parsed.actions) || parsed.actions.length === 0) {
+        errors.push('actions array is required and must not be empty');
+      } else {
+        for (const action of parsed.actions) {
+          const pfx = `action "${action?.id || '?'}"`;
+          if (!action?.id) errors.push(`${pfx}: missing id`);
+          if (!action?.method) errors.push(`${pfx}: missing method`);
+          if (!action?.path) errors.push(`${pfx}: missing path`);
+          if (!action?.script) errors.push(`${pfx}: missing script`);
+        }
+      }
     }
 
-    // Check for action scripts
+    // Check for action scripts — each action.script must have a matching JS code block
     const jsBlocks = result.match(/```javascript[\s\S]*?```/gi) || [];
     const actionCount = Array.isArray(parsed?.actions) ? parsed.actions.length : 0;
     if (actionCount > 0 && jsBlocks.length === 0) {
