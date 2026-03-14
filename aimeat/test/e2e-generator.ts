@@ -405,6 +405,141 @@ await test('List projects by prefix filter', async () => {
     assert(projects.length >= 1, `expected at least 1 project, got ${projects.length}`);
 });
 
+// ─── Generator Interview Spec & Blueprint ───
+console.log('\nGenerator — Interview Spec & Blueprint');
+
+await test('store and retrieve interview spec', async () => {
+    const spec = {
+        version: '1.0',
+        projectName: 'Test Interview Project',
+        description: 'A test project from interview',
+        useCases: [{ id: 'uc-1', title: 'Test use case', description: 'Testing', priority: 'must-have' }],
+        audience: { type: 'personal', scale: 'single', description: 'Just me' },
+        dataSources: [],
+        dataModel: { entities: [] },
+        views: [{ id: 'view-1', type: 'list', title: 'Main view', description: 'Shows data' }],
+        constraints: { updateMode: 'on-demand', locales: ['en'] },
+    };
+
+    // Store spec using the same key pattern as generator.js
+    const storeResp = await json('/v1/memory', {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({
+            key: `generator.${projectId}.interview-spec`,
+            value: spec,
+            visibility: 'private',
+        }),
+    });
+    assert(storeResp.body.ok, 'Should store interview spec');
+
+    // Retrieve spec
+    const getResp = await json(`/v1/memory/${encodeURIComponent(`generator.${projectId}.interview-spec`)}`, {
+        headers: auth(),
+    });
+    assert(getResp.body.ok, 'Should retrieve interview spec');
+    const retrieved = getResp.body.data.value;
+    assert(retrieved.projectName === 'Test Interview Project', 'Spec projectName should match');
+    assert(Array.isArray(retrieved.useCases) && retrieved.useCases.length === 1, 'Spec should have 1 use case');
+    assert(retrieved.useCases[0].id === 'uc-1', 'Use case id should match');
+});
+
+await test('blueprint with cortex type stores and retrieves', async () => {
+    const blueprint = {
+        components: [
+            { id: 'csm-1', type: 'csm', label: 'Data Schema' },
+            { id: 'ext-1', type: 'extension', label: 'Data Collector' },
+            { id: 'cortex-1', type: 'cortex', label: 'Domain SDK' },
+            { id: 'app-1', type: 'app', label: 'Web App' },
+        ],
+        phases: [
+            { id: 'define', label: 'Define Service', componentIds: ['csm-1'] },
+            { id: 'logic', label: 'Build Logic', componentIds: ['ext-1'] },
+            { id: 'connect', label: 'Connect', componentIds: ['cortex-1'] },
+            { id: 'ui', label: 'Build UI', componentIds: ['app-1'] },
+        ],
+    };
+
+    // First get current version for optimistic locking
+    const curResp = await json(`/v1/memory/${encodeURIComponent(projectKey)}`, {
+        headers: auth(),
+    });
+    const curVersion = curResp.body.data?.version || 1;
+
+    const storeResp = await json(`/v1/memory/${encodeURIComponent(projectKey)}`, {
+        method: 'PUT',
+        headers: auth(),
+        body: JSON.stringify({
+            value: { projectId, name: 'Test', description: 'Test', blueprint, status: 'in_progress' },
+            version: curVersion,
+        }),
+    });
+    assert(storeResp.body.ok, 'Should store blueprint with cortex type');
+
+    const getResp = await json(`/v1/memory/${encodeURIComponent(projectKey)}`, {
+        headers: auth(),
+    });
+    const bp = getResp.body.data.value.blueprint;
+    assert(bp.components.some((c: any) => c.type === 'cortex'), 'Blueprint should include cortex component');
+    assert(bp.phases.some((p: any) => p.id === 'connect'), 'Blueprint should include connect phase');
+});
+
+await test('cortex extension installs and serves lib via generator flow', async () => {
+    const cortexName = `test-gen-cortex-${Date.now()}`;
+    const manifest = `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${cortexName}
+  namespace: ${ownerName}
+  description: "Test cortex from generator"
+  author: ${ownerName}
+  tags: [test]
+  labels:
+    domain: test
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: test-gen-lib
+      filename: test-gen-lib.js
+      exports: [init, getData]
+      api_surface: |
+        init() - Initialize
+        getData() - Get data`;
+
+    const libCode = '(function(A){A.testGen={init:async function(){return{ready:true}},getData:async function(){return[]}};if(A.register)A.register("testGen",A.testGen)})(window.AIMEAT||(window.AIMEAT={}));';
+
+    // Install
+    const installResp = await json('/v1/cortex', {
+        method: 'POST',
+        headers: { ...auth(), 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            manifest,
+            libs: { 'test-gen-lib.js': libCode },
+        }),
+    });
+    assert(installResp.body.ok, 'Should install cortex extension: ' + JSON.stringify(installResp.body));
+
+    // Activate
+    const activateResp = await json(`/v1/cortex/${encodeURIComponent(cortexName)}/activate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(activateResp.body.ok, 'Should activate cortex extension');
+
+    // Verify lib is served
+    const libResp = await fetch(`${BASE}/v1/cortex/${encodeURIComponent(cortexName)}/libs/test-gen-lib.js`);
+    assert(libResp.status === 200, 'Should serve cortex lib file');
+    const libText = await libResp.text();
+    assert(libText.includes('testGen'), 'Lib should contain testGen');
+
+    // Cleanup
+    await json(`/v1/cortex/${encodeURIComponent(cortexName)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+});
+
 // ─── Generator Cleanup ───
 console.log('\nGenerator — Cleanup');
 

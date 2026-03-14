@@ -1,0 +1,99 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - link "AIME ♥ AT" [ref=e5] [cursor=pointer]:
+        - /url: /v1/portal
+        - text: AIME
+        - generic [ref=e6]: ♥
+        - generic [ref=e7]: AT
+      - generic [ref=e8]: ♥ 100
+    - generic [ref=e9]:
+      - link "Try it" [ref=e10] [cursor=pointer]:
+        - /url: /v1/classic
+      - link "For Developers" [ref=e11] [cursor=pointer]:
+        - /url: /v1/portal?view=dev
+      - link "Apps" [ref=e12] [cursor=pointer]:
+        - /url: /app-catalog.html
+      - link "Profile" [ref=e13] [cursor=pointer]:
+        - /url: /v1/profile
+      - generic [ref=e14]:
+        - button "EN" [ref=e15] [cursor=pointer]
+        - button "FI" [ref=e16] [cursor=pointer]
+      - generic [ref=e18]:
+        - generic [ref=e19]: logged in
+        - generic [ref=e21]: pw-chat-collapse-1773513178262@aimeat-local-001-dev
+        - button "Logout" [ref=e22] [cursor=pointer]
+  - generic [ref=e23]:
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: 🧑
+        - generic [ref=e28]:
+          - heading "pw-chat-collapse-1773513178262" [level=1] [ref=e29]
+          - generic [ref=e30]: pw-chat-collapse-1773513178262@aimeat-local-001-dev
+          - generic [ref=e31]: "Node: http://localhost:40251"
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]: "0"
+          - generic [ref=e35]: Agents
+        - generic [ref=e36]:
+          - generic [ref=e37]: "0"
+          - generic [ref=e38]: Chat Sessions
+        - generic [ref=e39]:
+          - generic [ref=e40]: "100"
+          - generic [ref=e41]: Morsels
+        - generic [ref=e42]:
+          - generic [ref=e43]: "0"
+          - generic [ref=e44]: Memories
+        - generic [ref=e45]:
+          - generic [ref=e46]: "0"
+          - generic [ref=e47]: Services
+        - generic [ref=e48]:
+          - generic [ref=e49]: "0"
+          - generic [ref=e50]: Tasks
+        - generic [ref=e51]:
+          - generic [ref=e52]: "0"
+          - generic [ref=e53]: Apps
+        - generic [ref=e54]:
+          - generic [ref=e55]: "0"
+          - generic [ref=e56]: Files
+        - generic [ref=e57]:
+          - generic [ref=e58]: "-"
+          - generic [ref=e59]: Nodes
+      - generic [ref=e60]:
+        - button "Portfolio" [ref=e61] [cursor=pointer]
+        - button "Agents" [ref=e62] [cursor=pointer]
+        - button "Chat Sessions" [ref=e63] [cursor=pointer]
+        - button "MCP" [ref=e64] [cursor=pointer]
+        - button "Wallet" [ref=e65] [cursor=pointer]
+        - button "Knowledge" [ref=e66] [cursor=pointer]
+        - button "Organisms" [ref=e67] [cursor=pointer]
+        - button "Memory" [ref=e68] [cursor=pointer]
+        - button "Work" [ref=e69] [cursor=pointer]
+        - button "Services" [ref=e70] [cursor=pointer]
+        - button "Boards" [ref=e71] [cursor=pointer]
+        - button "Apps" [ref=e72] [cursor=pointer]
+        - button "Extensions" [ref=e73] [cursor=pointer]
+        - button "Federation" [ref=e74] [cursor=pointer]
+        - button "Nodes" [ref=e75] [cursor=pointer]
+        - button "Access" [ref=e76] [cursor=pointer]
+        - button "Data Wallet" [ref=e77] [cursor=pointer]
+        - button "Node Stats" [ref=e78] [cursor=pointer]
+        - button "Security" [ref=e79] [cursor=pointer]
+        - button "Notifications" [ref=e80] [cursor=pointer]
+        - button "Generator" [ref=e81] [cursor=pointer]
+    - generic [ref=e83]:
+      - generic [ref=e84]: Chat Sessions
+      - generic [ref=e85]: Chat sessions represent AI tools you use directly — like Claude, ChatGPT, Grok, or Copilot. Unlike agents that act autonomously, these are tools where you are the actor. Each session inherits your trust score and morsel balance.
+      - generic [ref=e86]:
+        - generic [ref=e88]: Create a Chat Session
+        - generic [ref=e89]:
+          - paragraph [ref=e90]: Copy a prompt below and paste it into your AI chat (Claude, ChatGPT, Grok, etc.) to create a new chat session connected to your AIMEAT node.
+          - generic [ref=e91]:
+            - button "Copy Quick Prompt" [ref=e92] [cursor=pointer]
+            - button "Copy Detailed Prompt" [ref=e93] [cursor=pointer]
+          - paragraph [ref=e94]: Quick Prompt works with AIs that can browse the web. Detailed Prompt includes full connection instructions for any AI.
+      - generic [ref=e95]: No active chat sessions.
+```

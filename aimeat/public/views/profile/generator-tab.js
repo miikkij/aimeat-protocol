@@ -1,3 +1,21 @@
+/**
+ * @file generator-tab.js
+ * @description Service Generator tab for the profile view — multi-phase UI for
+ *   creating AIMEAT services via AI-assisted prompts. Includes requirements
+ *   interview phase, blueprint generation, per-component generation with
+ *   validation, agent queue management, and component registration (including cortex).
+ * @structure
+ *   - AgentListenerBar: agent discovery + setup prompt copy
+ *   - ProjectList: project CRUD, archive, cleanup
+ *   - ProjectEditor: blueprint + component generation workflow
+ *   - Interview phase: structured requirements gathering before blueprint
+ *   - Component cards: generate, validate, fix, register per component type
+ * @usage Loaded as a tab in the profile view SPA
+ * @version-history
+ *   v1.0.0 — 2026-03-10 — Initial generator tab
+ *   v2.0.0 — 2026-03-14 — Add interview phase UI, cortex registration wiring,
+ *     validateInterviewSpec integration, buildInterviewPrompt support
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
@@ -9,9 +27,10 @@ import {
   loadAllComponents, saveComponent, enqueueTask, pollResults, pollLogs,
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
   getListeners, buildAgentSetupPrompt, createGeneratorAgent,
+  saveInterviewSpec, getInterviewSpec,
 } from '/js/services/generator.js';
-import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
-import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
+import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt } from '/js/services/generator-prompts.js';
+import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
 import { ConfirmDialog } from '/components/Modal.js';
 
 /* ── Agent Listener Status ───────────────────────────── */
@@ -162,6 +181,9 @@ function NewProjectView({ onBack, onCreated, showToast }) {
   const [project, setProject] = useState(null);
   const [blueprintResult, setBlueprintResult] = useState('');
   const [blueprintErrors, setBlueprintErrors] = useState([]);
+  const [interviewSpec, setInterviewSpec] = useState('');
+  const [interviewErrors, setInterviewErrors] = useState([]);
+  const [interviewParsed, setInterviewParsed] = useState(null);
 
   async function handleAnalyze() {
     if (!description.trim()) return;
@@ -169,14 +191,14 @@ function NewProjectView({ onBack, onCreated, showToast }) {
       const name = description.slice(0, 60).replace(/\n/g, ' ');
       const p = await createProject(name, description);
       setProject(p);
-      setPhase('blueprint');
+      setPhase('interview');
     } catch (e) {
       showToast?.(e.message, true);
     }
   }
 
   function handleCopyBlueprintPrompt() {
-    const prompt = buildBlueprintPrompt(description);
+    const prompt = buildBlueprintPrompt(description, interviewParsed);
     navigator.clipboard.writeText(prompt).catch(() => {});
     showToast?.('Blueprint prompt copied!');
   }
@@ -204,9 +226,84 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     }
   }
 
+  if (phase === 'interview') {
+    function handleCopyInterviewPrompt() {
+      const prompt = buildInterviewPrompt(description);
+      navigator.clipboard.writeText(prompt).catch(() => {});
+      showToast?.(t('profile.generator.interviewPromptCopied') || 'Interview prompt copied!');
+    }
+
+    async function handleSubmitSpec() {
+      const vr = validateInterviewSpec(interviewSpec);
+      if (!vr.valid) {
+        setInterviewErrors(vr.errors);
+        return;
+      }
+      setInterviewErrors([]);
+      setInterviewParsed(vr.parsed);
+      await saveInterviewSpec(project.projectId, vr.parsed);
+      await updateProject(project.projectId, {
+        interviewDone: true,
+        enhancedDescription: vr.parsed.description,
+      });
+      showToast?.(t('profile.generator.specImported') || 'Specification imported!');
+      setPhase('blueprint');
+    }
+
+    function handleSkipInterview() {
+      setPhase('blueprint');
+    }
+
+    return html`
+      <div class="pf-gen-new-project">
+        <button class="btn btn-ghost" onClick=${() => setPhase('describe')}>
+          ${t('profile.generator.back')}
+        </button>
+        <h3>${t('profile.generator.interviewTitle') || 'Requirements Interview'}</h3>
+        <p class="pf-gen-subtitle">
+          ${t('profile.generator.interviewDesc') || 'Copy the interview prompt to AI Chat. The AI will interview you about your requirements. When done, paste the JSON specification back here.'}
+        </p>
+
+        <div class="pf-gen-section">
+          <label>${t('profile.generator.interviewPrompt') || 'Step 1: Copy Interview Prompt to AI Chat'}</label>
+          <button class="btn btn-sm btn-outline" onClick=${handleCopyInterviewPrompt}>
+            ${t('profile.generator.copyPrompt')}
+          </button>
+        </div>
+
+        <div class="pf-gen-section">
+          <label>${t('profile.generator.interviewResult') || 'Step 2: Paste the JSON Specification'}</label>
+          <textarea
+            class="pf-gen-result-area"
+            rows="14"
+            placeholder=${t('profile.generator.interviewPlaceholder') || 'Paste the complete AI response here...'}
+            value=${interviewSpec}
+            onInput=${e => setInterviewSpec(e.target.value)}
+          />
+        </div>
+
+        ${interviewErrors.length > 0 && html`
+          <div class="pf-gen-errors">
+            <label>${t('profile.generator.errors')}</label>
+            <ul>${interviewErrors.map(e => html`<li>${e}</li>`)}</ul>
+          </div>
+        `}
+
+        <div class="pf-gen-actions">
+          <button class="btn btn-primary" onClick=${handleSubmitSpec} disabled=${!interviewSpec.trim()}>
+            ${t('profile.generator.importSpec') || 'Import Specification'}
+          </button>
+          <button class="btn btn-ghost" onClick=${handleSkipInterview}>
+            ${t('profile.generator.skipInterview') || 'Skip (use description only)'}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   if (phase === 'blueprint') {
     const fixPrompt = blueprintErrors.length > 0
-      ? buildBlueprintFixPrompt(description, blueprintErrors)
+      ? buildBlueprintFixPrompt(description, blueprintErrors, interviewParsed)
       : null;
     return html`
       <div class="pf-gen-new-project">
@@ -447,7 +544,19 @@ function ComponentDetail({ component, project, components, agents, projectId, on
   async function handleRegister() {
     setRegistering(true);
     try {
-      const resp = await registerComponent(component.type, validationResult?.extracted || result);
+      let resp;
+      // For cortex, pass the validated+extracted data (manifest + libs)
+      if (component.type === 'cortex') {
+        const vr = validateComponent('cortex', component.result || result);
+        if (!vr.valid) {
+          showToast?.((t('profile.generator.validationFailed') || 'Validation failed') + ': ' + vr.errors.join(', '), true);
+          setRegistering(false);
+          return;
+        }
+        resp = await registerComponent('cortex', vr.extracted, session);
+      } else {
+        resp = await registerComponent(component.type, validationResult?.extracted || result, session);
+      }
       const registered = addHistory(component, 'registered', { registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
       showToast?.('Component registered!');

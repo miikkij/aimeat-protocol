@@ -1,14 +1,17 @@
 /**
  * @file generator-validate.js
- * @description Validators for generator component results and blueprints.
- *   Each component type (csm, msm, extension, app, memory, translation) has a
+ * @description Validators for generator component results, blueprints, and interview specs.
+ *   Each component type (csm, msm, extension, app, memory, translation, cortex) has a
  *   validator that checks structure and extracts usable content from AI output.
+ *   Includes validateInterviewSpec for structured interview JSON and cortex validator
+ *   for IIFE domain library manifest + lib extraction.
  * @structure
  *   - extractCodeBlock(text, lang): pulls content from markdown code fences
  *   - validators[type](result): per-type validation returning { valid, errors, extracted }
+ *   - validateInterviewSpec(result): validates interview spec JSON from AI interviews
  *   - validateBlueprint(result): validates + sanitizes blueprint JSON (strips extra fields)
  *   - validateComponent(type, result): dispatches to per-type validator
- * @usage import { validateBlueprint, validateComponent } from '/js/services/generator-validate.js';
+ * @usage import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial validators
  *   v1.1.0 — 2026-03-14 — validateBlueprint now strips extra component fields
@@ -24,6 +27,8 @@
  *   v3.0.0 — 2026-03-14 — Replace regex sanitizeYaml with real yaml parse+stringify.
  *     YAML is now parsed by the yaml library, then re-serialized to clean output.
  *     No more regex hacks for block scalars, quoting, or multiline values.
+ *   v3.1.0 — 2026-03-14 — Add validateInterviewSpec() for structured interview JSON,
+ *     add cortex component validator, add 'cortex' to allowed blueprint types
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -252,7 +257,117 @@ const validators = {
       return { valid: false, errors, extracted: json };
     }
   },
+
+  cortex(result) {
+    const errors = [];
+    const yamlBlock = extractCodeBlock(result, 'yaml');
+    if (!yamlBlock) {
+      errors.push('No YAML code block found — cortex must include a manifest');
+      return { valid: false, errors, extracted: null };
+    }
+
+    const { parsed, errors: yamlErrors } = tryParseYaml(yamlBlock);
+    if (yamlErrors.length > 0) return { valid: false, errors: yamlErrors, extracted: null };
+
+    if (parsed.apiVersion !== 'cortex.aimeat.org/v1') {
+      errors.push('apiVersion must be "cortex.aimeat.org/v1"');
+    }
+    if (parsed.kind !== 'Extension') errors.push('kind must be "Extension"');
+    if (!parsed.metadata?.name) errors.push('metadata.name is required');
+    if (!parsed.spec?.components || !Array.isArray(parsed.spec.components)) {
+      errors.push('spec.components array is required');
+    }
+
+    // Extract JS library code blocks after the YAML
+    const jsBlocks = [];
+    const jsRegex = /```(?:javascript|js)\s*\n([\s\S]*?)```/gi;
+    let match;
+    const afterYaml = result.indexOf('```yaml') > -1
+      ? result.slice(result.indexOf('```', result.indexOf('```yaml') + 7) + 3)
+      : result;
+    while ((match = jsRegex.exec(afterYaml)) !== null) {
+      jsBlocks.push(match[1].trim());
+    }
+
+    const libComponents = (parsed.spec?.components || []).filter(c => c.type === 'lib');
+    if (libComponents.length > 0 && jsBlocks.length === 0) {
+      errors.push(`Manifest declares ${libComponents.length} lib component(s) but no JavaScript code blocks found`);
+    }
+
+    if (errors.length > 0) return { valid: false, errors, extracted: null };
+
+    return {
+      valid: true,
+      errors: [],
+      extracted: {
+        manifest: stringifyYaml(parsed),
+        libs: libComponents.map((lib, i) => ({
+          filename: lib.filename || `${lib.name}.js`,
+          code: jsBlocks[i] || '',
+        })),
+      },
+    };
+  },
 };
+
+/* ── Interview Spec Validator ────────────────────────── */
+
+/**
+ * Validate and extract an interview specification JSON from AI output.
+ * Expects a JSON code block with required fields.
+ */
+export function validateInterviewSpec(result) {
+  const errors = [];
+  const warnings = [];
+
+  try {
+    const raw = extractCodeBlock(result, 'json');
+    const cleaned = sanitizeJson(raw);
+    const spec = JSON.parse(cleaned);
+
+    if (!spec.version) errors.push('Missing "version" field');
+    if (!spec.projectName) errors.push('Missing "projectName" field');
+    if (!spec.description) errors.push('Missing "description" field');
+    if (!Array.isArray(spec.useCases) || spec.useCases.length === 0) {
+      errors.push('Missing or empty "useCases" array');
+    }
+    if (!spec.audience) errors.push('Missing "audience" object');
+    if (!Array.isArray(spec.dataSources)) errors.push('Missing "dataSources" array');
+    if (!spec.dataModel) errors.push('Missing "dataModel" object');
+    if (!Array.isArray(spec.views) || spec.views.length === 0) {
+      errors.push('Missing or empty "views" array');
+    }
+
+    if (Array.isArray(spec.useCases)) {
+      spec.useCases.forEach((uc, i) => {
+        if (!uc.id) errors.push(`useCases[${i}] missing "id"`);
+        if (!uc.title) errors.push(`useCases[${i}] missing "title"`);
+      });
+    }
+
+    if (Array.isArray(spec.dataSources)) {
+      spec.dataSources.forEach((ds, i) => {
+        if (!ds.name) errors.push(`dataSources[${i}] missing "name"`);
+        if (!ds.type) errors.push(`dataSources[${i}] missing "type"`);
+        if (ds.url && !ds.verified) {
+          warnings.push(`dataSources[${i}] "${ds.name}" URL not verified — may need manual validation`);
+        }
+      });
+    }
+
+    if (Array.isArray(spec.views)) {
+      spec.views.forEach((v, i) => {
+        if (!v.type) errors.push(`views[${i}] missing "type"`);
+        if (!v.title) errors.push(`views[${i}] missing "title"`);
+      });
+    }
+
+    if (errors.length > 0) return { valid: false, errors, warnings };
+    return { valid: true, errors: [], warnings, parsed: spec };
+  } catch (e) {
+    return { valid: false, errors: [`Failed to parse interview spec: ${e.message}`], warnings: [] };
+  }
+}
 
 /* ── Blueprint Validator ─────────────────────────────── */
 
@@ -270,7 +385,7 @@ export function validateBlueprint(result) {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
         if (!c.label) errors.push(`Component "${c.id || '?'}" missing "label" field`);
-        if (c.type && !['csm', 'msm', 'extension', 'app', 'memory', 'translation'].includes(c.type)) {
+        if (c.type && !['csm', 'msm', 'extension', 'app', 'memory', 'translation', 'cortex'].includes(c.type)) {
           errors.push(`Component "${c.id}" has unknown type "${c.type}"`);
         }
         // Strip extra fields (manifest, code, files, etc.) — blueprint is lightweight

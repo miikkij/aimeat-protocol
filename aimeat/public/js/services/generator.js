@@ -9,8 +9,9 @@
  *   - Agent queue (enqueueTask, pollResults, pollLogs, checkQueueStatus)
  *   - Agent discovery (discoverAgents, getListeners)
  *   - Agent setup (createGeneratorAgent, buildAgentSetupPrompt)
+ *   - Interview Spec (saveInterviewSpec, getInterviewSpec)
  *   - Cleanup (cleanupOldEntries)
- *   - Registration (registerComponent)
+ *   - Registration (registerComponent) — includes cortex case with auto-activate
  * @usage import { listProjects, buildAgentSetupPrompt } from '/js/services/generator.js';
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial generator service
@@ -20,6 +21,8 @@
  *     registerComponent sends YAML as { yaml: string } for CSM/MSM instead of JSON.parse
  *   v2.0.0 — 2026-03-14 — Replace regex sanitizeYaml with cleanYaml that uses
  *     real yaml parse+stringify — no more regex hacks
+ *   v3.0.0 — 2026-03-14 — Add interview spec storage (saveInterviewSpec,
+ *     getInterviewSpec); add cortex case in registerComponent with auto-activate
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -96,6 +99,24 @@ export async function deleteProject(projectId) {
   for (const item of items) {
     await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}`);
   }
+}
+
+/* ── Interview Spec ─────────────────────────────────── */
+
+export async function saveInterviewSpec(projectId, spec) {
+  return apiPost('/v1/memory', {
+    key: `generator.${projectId}.interview-spec`,
+    value: spec,
+    visibility: 'private',
+  });
+}
+
+export async function getInterviewSpec(projectId) {
+  try {
+    const resp = await apiGet(`/v1/memory/generator.${projectId}.interview-spec`);
+    if (!resp?.data?.value) return null;
+    return typeof resp.data.value === 'string' ? JSON.parse(resp.data.value) : resp.data.value;
+  } catch { return null; }
 }
 
 /* ── Component State ─────────────────────────────────── */
@@ -326,6 +347,28 @@ export async function registerComponent(type, result, session) {
     case 'translation': {
       const translations = typeof result === 'string' ? JSON.parse(result) : result;
       return { ok: true, translations };
+    }
+    case 'cortex': {
+      // Cortex result contains YAML manifest + optional JS lib code (pre-extracted by validator)
+      const extracted = typeof result === 'string' ? null : result;
+      if (!extracted || !extracted.manifest) {
+        throw new Error('Cortex result must be pre-extracted by validator (manifest + libs)');
+      }
+      const body = { manifest: extracted.manifest };
+      if (extracted.libs && extracted.libs.length > 0) {
+        const libs = {};
+        for (const lib of extracted.libs) {
+          if (lib.filename && lib.code) libs[lib.filename] = lib.code;
+        }
+        if (Object.keys(libs).length > 0) body.libs = libs;
+      }
+      const installResp = await apiPost('/v1/cortex', body);
+      // Auto-activate after install
+      const name = installResp?.data?.name || installResp?.data?.extension?.name;
+      if (name) {
+        await apiPost(`/v1/cortex/${encodeURIComponent(name)}/activate`);
+      }
+      return installResp;
     }
     default:
       throw new Error(`Unknown component type: ${type}`);

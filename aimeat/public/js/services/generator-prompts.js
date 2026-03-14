@@ -7,8 +7,10 @@
  *   - AIMEAT_CONTEXT: shared preamble describing building blocks
  *   - buildBlueprintPrompt(description): lightweight JSON blueprint prompt
  *   - buildComponentPrompt(type, label, ...): per-type generation prompt
+ *   - buildInterviewPrompt(description): structured requirements interview prompt
  *   - buildBlueprintFixPrompt(description, errors): retry prompt for blueprint failures
  *   - buildFixPrompt(original, failed, errors): generic retry prompt for components
+ *   - cortex template: IIFE domain library generation prompt
  * @usage import { buildBlueprintPrompt, buildComponentPrompt } from '/js/services/generator-prompts.js';
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial prompt templates
@@ -24,6 +26,11 @@
  *     translation key conventions, app CDN/CSP guidance, ctx.fetch documentation
  *   v3.1.0 — 2026-03-14 — Fix app prompt: extension data lives in ext:{name}
  *     namespace, apps must use AIMEAT.data.getPublic() to read it, not .get()
+ *   v4.0.0 — 2026-03-14 — Add buildInterviewPrompt for requirements interview,
+ *     add cortex component type, pass interviewSpec through blueprint prompts
+ *   v4.1.0 — 2026-03-14 — Make app template cortex-aware: detect completed cortex
+ *     components, inject cortex script loads in boot(), show cortex API docs instead
+ *     of raw extension/memory docs when cortex is available
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -38,6 +45,7 @@ Available building blocks:
 - App: HTML/JS user interface published to the apps catalog.
 - Memory: Key-value storage with namespace isolation.
 - Translation: Per-locale i18n strings.
+- Cortex: Client-side JS domain library (IIFE on AIMEAT namespace). Wraps extension APIs and memory reads into clean domain methods for apps.
 
 Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
   ctx.memory.get(key) → value or null
@@ -66,14 +74,23 @@ AIMEAT Data Standards (MUST follow in ALL components):
 
 /* ── Blueprint Prompt ────────────────────────────────── */
 
-export function buildBlueprintPrompt(description) {
+export function buildBlueprintPrompt(description, interviewSpec = null) {
+  const specContext = interviewSpec ? `
+## Refined Specification (from requirements interview)
+\`\`\`json
+${JSON.stringify(interviewSpec, null, 2)}
+\`\`\`
+
+Use the specification above to determine the exact components needed. The data sources, entities, views, and constraints have been validated with the user.
+` : '';
+
   return `${AIMEAT_CONTEXT}
 
 The user wants to create this service:
 ---
 ${description}
 ---
-
+${specContext}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
 CRITICAL: Return ONLY a JSON object with "components" and "phases" arrays. Nothing else.
@@ -86,22 +103,174 @@ Format:
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name" },
     { "id": "ext-1", "type": "extension", "label": "Human-readable name" },
+    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name" },
     { "id": "app-1", "type": "app", "label": "Human-readable name" }
   ],
   "phases": [
     { "id": "define", "label": "Define Service", "componentIds": ["csm-1"] },
     { "id": "logic", "label": "Build Logic", "componentIds": ["ext-1"] },
+    { "id": "connect", "label": "Connect & Integrate", "componentIds": ["cortex-1"] },
     { "id": "ui", "label": "Build UI", "componentIds": ["app-1"] }
   ]
 }
 
 Rules:
-- Component types: csm, msm, extension, app, memory, translation
+- Component types: csm, msm, extension, app, memory, translation, cortex
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1)
 - Each component object has ONLY "id", "type", "label" — no "manifest", "code", "files", or other keys
 - Group components into logical phases
 - Include ALL components needed for a complete, working service
+- Cortex components go in a "Connect & Integrate" phase AFTER translations, BEFORE app
+- Cortex libraries are client-side JS that wrap extension APIs into clean domain methods for the app
+- Default to ONE cortex per project unless complexity clearly warrants splitting
 - Only include what's actually needed — don't pad with unnecessary components`;
+}
+
+/* ── Interview Prompt ──────────────────────────────────── */
+
+/**
+ * Build an interview prompt that the user copies to AI Chat.
+ * AI Chat interviews the user and produces a structured JSON spec.
+ */
+export function buildInterviewPrompt(description) {
+  return `You are a requirements analyst for the AIMEAT service generator.
+The user wants to build a service. Your job is to interview them to produce a clear, structured specification.
+
+## User's Initial Description
+---
+${description}
+---
+
+## Interview Rules
+
+1. ADAPT TO THE USER'S LEVEL:
+   - Start by asking: "Are you a technical person who'd prefer detailed technical questions, or would you like me to keep things simple and explain as we go?"
+   - If non-technical: ask simple questions with examples, explain what each choice means in practice
+   - If technical: ask direct, detailed questions to speed things up
+
+2. COVER THESE AREAS (in order):
+   a) USE CASES — What will people actually do with this?
+      - Propose 3-5 concrete use cases based on the description as selectable options (A, B, C, D)
+      - Let the user add their own use cases
+      - IMPORTANT: Do NOT move to the next section until the user confirms they have listed all use cases
+      - Ask: "Are there any other use cases you'd like to add, or shall we move on?"
+
+   b) AUDIENCE & SCOPE — Who is this for?
+      - Is this for personal use or multiple users?
+      - Give examples of what each choice means for this specific project
+      - How many concurrent users do you expect? (give ranges: just me, <10, <100, 100+)
+
+   c) DATA SOURCES — Where does the data come from?
+      - Does it pull data from external APIs/feeds/websites?
+      - If the user mentions a URL or data source:
+        - Try to fetch it and describe what you see (format, fields, update frequency)
+        - If you CANNOT access it, say so honestly: "I cannot reach this URL. Could you paste a sample of the data?"
+        - NEVER pretend you accessed something you didn't
+      - Is data user-generated, imported, or computed?
+
+   d) DATA MODEL — What are the key entities?
+      - Based on use cases, propose the main data types/entities
+      - Ask about relationships between them
+      - Ask about important fields for each entity
+
+   e) VIEWS & INTERACTIONS — What should it look like?
+      - Propose view types based on use cases (map, list, dashboard, cards, timeline, etc.)
+      - What actions can users take? (filter, search, create, edit, share, export?)
+      - Does it need charts/visualizations? What kind?
+
+   f) TECHNICAL CONSTRAINTS
+      - Real-time vs batch updates? Explain what each means for this project
+      - Does it need to work offline?
+      - Any specific libraries or integrations required?
+      - Language/locale requirements?
+
+3. SECTION RULES:
+   - Each section MUST stay open until the user explicitly says to move on
+   - After each section, summarize what you understood and ask for confirmation
+   - If the user brings up something from a previous section, go back to it
+   - Number each question so the user can reference them
+
+4. HONESTY RULES:
+   - If you don't know something, say so
+   - If you can't access a URL or resource, say so explicitly
+   - Don't make assumptions about external APIs — ask the user to confirm
+   - If a use case seems technically infeasible, explain why and suggest alternatives
+
+5. WHEN THE INTERVIEW IS COMPLETE:
+   - Summarize ALL findings
+   - Ask the user to confirm the summary
+   - Then output the structured specification in this EXACT JSON format:
+
+\\\`\\\`\\\`json
+{
+  "version": "1.0",
+  "projectName": "Human-readable project name",
+  "description": "Enhanced description incorporating all interview findings",
+  "technicalLevel": "beginner|intermediate|advanced",
+  "useCases": [
+    {
+      "id": "uc-1",
+      "title": "Use case title",
+      "description": "What the user does and why",
+      "priority": "must-have|nice-to-have"
+    }
+  ],
+  "audience": {
+    "type": "personal|multi-user",
+    "scale": "single|small|medium|large",
+    "description": "Who uses this and how"
+  },
+  "dataSources": [
+    {
+      "id": "ds-1",
+      "name": "Source name",
+      "type": "rss|api|websocket|user-input|computed",
+      "url": "https://... or null",
+      "format": "xml|json|html|csv|unknown",
+      "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
+      "sampleFields": ["field1", "field2"],
+      "notes": "Any observations from fetching/analyzing the source",
+      "verified": true
+    }
+  ],
+  "dataModel": {
+    "entities": [
+      {
+        "name": "entity-name",
+        "description": "What this entity represents",
+        "fields": [
+          { "name": "fieldName", "type": "string|number|boolean|date|coordinates|array|object", "required": true, "description": "What this field holds" }
+        ],
+        "relationships": ["related-to entity-name-2 via fieldName"]
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "view-1",
+      "type": "map|list|dashboard|cards|timeline|form|detail|settings",
+      "title": "View title",
+      "description": "What this view shows",
+      "dataEntities": ["entity-name"],
+      "interactions": ["filter", "search", "create", "export"],
+      "visualizations": ["bar-chart", "pie-chart", "heatmap"]
+    }
+  ],
+  "constraints": {
+    "updateMode": "realtime|scheduled|on-demand",
+    "scheduleInterval": "15m|1h|daily|null",
+    "offlineSupport": false,
+    "locales": ["fi", "en"],
+    "libraries": ["leaflet", "chart.js"],
+    "notes": "Any additional technical constraints"
+  },
+  "interviewNotes": "Any important context from the conversation that doesn't fit above"
+}
+\\\`\\\`\\\`
+
+IMPORTANT: The JSON must be inside a \\\`\\\`\\\`json code fence so the user can easily copy it.
+
+Begin the interview now. Start by greeting the user and asking about their technical level.`;
 }
 
 /* ── Component Prompts ───────────────────────────────── */
@@ -320,7 +489,43 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 - All helper functions must be defined INSIDE the same code block — no imports allowed
 - Always convert dates to ISO 8601 before storing in memory`,
 
-  app: (label, context) => `${AIMEAT_CONTEXT}
+  app: (label, context, completedComponents) => {
+    // Check if any cortex libraries are in completed components
+    const cortexComponents = (completedComponents || []).filter(c => c.type === 'cortex');
+    const hasCortex = cortexComponents.length > 0;
+
+    let cortexInstructions = '';
+    let cortexScriptLoads = '';
+    if (hasCortex) {
+      const cortexLibs = cortexComponents.map(c => {
+        const nameMatch = c.result?.match?.(/name:\s*"?([^\s"]+)"?/);
+        const libName = nameMatch ? nameMatch[1] : c.label;
+        return { name: libName, label: c.label, result: c.result };
+      });
+
+      cortexScriptLoads = cortexLibs.map(lib =>
+        `  await loadScript('/v1/cortex/${lib.name}/libs/${lib.name}.js');`
+      ).join('\n');
+
+      cortexInstructions = `
+## CORTEX LIBRARIES (use these — do NOT call extensions or memory directly)
+
+This project has Cortex libraries that wrap all extension APIs into clean domain methods.
+Load them via <script> tags and use their API.
+
+${cortexLibs.map(lib => `### ${lib.label}
+Load: \\\`<script src="/v1/cortex/${lib.name}/libs/${lib.name}.js"></script>\\\`
+${lib.result ? `API from manifest:\n${lib.result.slice(0, 800)}` : ''}
+`).join('\n')}
+
+IMPORTANT:
+- Call \\\`AIMEAT.{libName}.init()\\\` on app start — it handles data initialization automatically
+- Use the cortex methods for ALL data access — never call extensions or memory directly
+- The cortex handles authentication, error handling, and data transformation
+`;
+    }
+
+    return `${AIMEAT_CONTEXT}
 
 Create an AIMEAT App (HTML/JS) for: ${label}
 
@@ -344,7 +549,7 @@ function loadScript(src) {
 async function boot() {
   await loadScript('/v1/libs/aimeat-auth.js');
   await loadScript('/v1/libs/aimeat-data.js');
-
+${hasCortex ? '\n' + cortexScriptLoads : ''}
   AIMEAT.auth.mountLoginButton('#auth-container', {
     onLogin: () => startApp(),
     onLogout: () => location.reload(),
@@ -354,8 +559,8 @@ async function boot() {
 boot();
 \`\`\`
 
-### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
-\`\`\`javascript
+${hasCortex ? cortexInstructions : `### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
+\\\`\\\`\\\`javascript
 // Read YOUR OWN memory key — returns the stored value directly, or null
 const myData = await AIMEAT.data.get('my.settings');
 
@@ -364,24 +569,24 @@ await AIMEAT.data.set('my.key', { count: 42 });
 
 // Delete your own memory key
 await AIMEAT.data.delete('my.key');
-\`\`\`
+\\\`\\\`\\\`
 
 ### Reading EXTENSION-produced data (CRITICAL — most apps need this):
-Extensions store data in their OWN namespace (\`ext:{extension-name}\`).
-To read data that an extension wrote, use \`getPublic()\`:
-\`\`\`javascript
+Extensions store data in their OWN namespace (\\\`ext:{extension-name}\\\`).
+To read data that an extension wrote, use \\\`getPublic()\\\`:
+\\\`\\\`\\\`javascript
 // WRONG — this reads YOUR memory, not the extension's:
 const data = await AIMEAT.data.get('alerts.by-date.__index');  // returns null!
 
 // CORRECT — read from the extension's namespace:
 const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'alerts.by-date.__index');
-\`\`\`
-The first argument is the extension's memory owner: \`"ext:" + extensionName\` (the \`name\` field from the extension manifest metadata).
+\\\`\\\`\\\`
+The first argument is the extension's memory owner: \\\`"ext:" + extensionName\\\` (the \\\`name\\\` field from the extension manifest metadata).
 Use this for ALL data produced by extensions (alerts, stats, risk profiles, caches, etc.).
-\`getPublic()\` returns the value directly (auto-unwraps), or null if not found.
+\\\`getPublic()\\\` returns the value directly (auto-unwraps), or null if not found.
 
 ### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
-\`\`\`javascript
+\\\`\\\`\\\`javascript
 // Helper for extension calls (copy this):
 async function extCall(extName, actionId, body = {}, instanceId = null) {
   const session = AIMEAT.auth.getSession();
@@ -396,7 +601,7 @@ async function extCall(extName, actionId, body = {}, instanceId = null) {
 
 // Usage:
 const result = await extCall('my-extension', 'my-action', { query: 'test' });
-\`\`\`
+\\\`\\\`\\\``}
 
 ## CDN Libraries
 
@@ -414,6 +619,7 @@ The AIMEAT app catalog allows external CDN scripts. You may use these via <scrip
 - All dates displayed to users should be formatted from ISO 8601 strings (never store display-formatted dates)
 - Has a clean, responsive UI with good mobile support
 - Use CSS custom properties for theming where possible
+${hasCortex ? '- Call cortex init() on app start — it handles everything automatically\n- Focus on UX/UI — the cortex handles data access and initialization' : ''}
 
 Return a complete HTML file with an app manifest comment at the top:
 
@@ -435,7 +641,8 @@ entry: index.html
   </script>
 </body>
 </html>
-\`\`\``,
+\`\`\``;
+  },
 
   memory: (label, context) => `${AIMEAT_CONTEXT}
 
@@ -530,6 +737,191 @@ Return JSON with translations for each locale:
   }
 }
 \`\`\``,
+
+  cortex: (label, context, completedComponents) => {
+    // Build extension reference from completed components
+    const extComponents = (completedComponents || []).filter(c => c.type === 'extension');
+    let extRef = '';
+    if (extComponents.length > 0) {
+      extRef = `\n## Registered Extensions (your cortex wraps these)\n`;
+      for (const ext of extComponents) {
+        const nameMatch = ext.result?.match?.(/name:\s*"?([^\s"]+)"?/);
+        const extName = nameMatch ? nameMatch[1] : ext.label;
+        extRef += `- **${extName}** (${ext.label}): memory owner = \`ext:${extName}\`\n`;
+        if (ext.result) {
+          const preview = ext.result.length > 400 ? ext.result.slice(0, 400) + '...' : ext.result;
+          extRef += `  Manifest preview:\n${preview}\n`;
+        }
+      }
+    }
+
+    return `${AIMEAT_CONTEXT}
+
+Create a Cortex extension (client-side JS domain library) for: ${label}
+
+${context}
+${extRef}
+## What is a Cortex Library?
+
+A Cortex library is a client-side JavaScript library that bridges V8 extensions and the app layer.
+It wraps raw AIMEAT API calls (extension actions, memory reads from extension namespaces) into
+clean, documented domain methods. Apps import the cortex and call simple methods like
+\`AIMEAT.myLib.getData()\` instead of knowing about memory namespaces and extension names.
+
+## Design Principles
+
+1. **Domain Cohesion**: Group related operations into a single API surface
+2. **Facade Pattern**: Hide extension namespaces (\`ext:{name}\`), memory key patterns, and error handling
+3. **DRY / Genericity**: If a capability is reusable across projects, make it generic
+4. **Smart Init**: \`init()\` should actually trigger data collectors/processors if no data exists yet
+5. **Composability**: Cortex libs can use other cortex libs via \`AIMEAT.{otherLib}\`
+6. **Self-Documenting**: Export clear, named functions with consistent patterns
+
+## IMPORTANT: How Extension Memory Works
+
+Extensions store data in their OWN namespace. To read extension data from client-side:
+\\\`\\\`\\\`javascript
+// If AIMEAT.data is loaded (preferred):
+const value = await AIMEAT.data.getPublic('ext:my-collector', 'alerts.by-date.__index');
+
+// Fallback without AIMEAT.data:
+const url = NODE_URL + '/v1/memory/' + encodeURIComponent('ext:my-collector') + '/' + encodeURIComponent(key);
+const resp = await fetch(url);
+const json = await resp.json();
+const value = json.ok ? json.data.value : null;
+\\\`\\\`\\\`
+
+## Extension Action Calls (authenticated)
+
+\\\`\\\`\\\`javascript
+async function callExt(extName, actionId, body) {
+  const session = AIMEAT.auth && AIMEAT.auth.getSession();
+  if (!session) throw new Error('Not logged in');
+  const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, {
+    method: 'POST', body: JSON.stringify(body || {}),
+  });
+  if (!resp.ok) throw new Error((resp.error && resp.error.message) || 'Extension call failed');
+  return resp.data;
+}
+\\\`\\\`\\\`
+
+## Output Format
+
+Return TWO code blocks:
+
+1. A \\\`\\\`\\\`yaml block with the Cortex manifest
+2. A \\\`\\\`\\\`javascript block with the library code
+
+### YAML Manifest Structure:
+\\\`\\\`\\\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: my-domain-lib
+  namespace: community
+  description: "What this library does"
+  author: generator
+  tags: [domain, tag1, tag2]
+  labels:
+    domain: specific-domain
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: domain-assistant
+      content: |
+        You are using the {{metadata.name}} cortex library.
+        Node URL: {{node_url}}
+
+        Available API:
+        AIMEAT.myLib.init() — Initialize and trigger data collection if needed
+        AIMEAT.myLib.getData(filters) — Get filtered data
+        AIMEAT.myLib.getStats(date) — Get statistics for a date
+
+        To load in an app:
+        <script src="{{node_url}}/v1/cortex/my-domain-lib/libs/my-domain-lib.js"></script>
+
+    - type: lib
+      name: my-domain-lib
+      filename: my-domain-lib.js
+      exports: [init, getData, getStats]
+      api_surface: |
+        AIMEAT.myLib.init() — Smart initialization, triggers collectors if no data
+        AIMEAT.myLib.getData({hours, type}) — Filtered domain data
+        AIMEAT.myLib.getStats(date) — Aggregated statistics
+\\\`\\\`\\\`
+
+### JavaScript Library Pattern:
+\\\`\\\`\\\`javascript
+(function (AIMEAT) {
+  'use strict';
+
+  const LIB_NAME = 'myLib';
+  // Extension names this cortex wraps — MUST match the registered extension names
+  const EXT = {
+    collector: 'my-collector-extension',
+    aggregator: 'my-aggregator-extension',
+  };
+
+  // ── Internal helpers ──
+
+  function nodeUrl() { return window.location.origin; }
+
+  async function readExtMemory(extName, key) {
+    if (AIMEAT.data && AIMEAT.data.getPublic) {
+      return AIMEAT.data.getPublic('ext:' + extName, key);
+    }
+    const url = nodeUrl() + '/v1/memory/' + encodeURIComponent('ext:' + extName) + '/' + encodeURIComponent(key);
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const json = await resp.json();
+    return json.ok ? json.data.value : null;
+  }
+
+  async function callExt(extName, actionId, body) {
+    const session = AIMEAT.auth && AIMEAT.auth.getSession();
+    if (!session) throw new Error('Not logged in');
+    const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, {
+      method: 'POST', body: JSON.stringify(body || {}),
+    });
+    if (!resp.ok) throw new Error((resp.error && resp.error.message) || 'Extension call failed');
+    return resp.data;
+  }
+
+  // ── Public API ──
+
+  async function init() {
+    const index = await readExtMemory(EXT.collector, 'my-data.__index');
+    if (!index || !index.dates || index.dates.length === 0) {
+      await callExt(EXT.collector, 'collect', {});
+    }
+    return { ready: true };
+  }
+
+  async function getData(filters) {
+    // Read from extension memory, apply filters, return clean data
+  }
+
+  // ── Register ──
+  const exports = { init, getData };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+
+})(window.AIMEAT || (window.AIMEAT = {}));
+\\\`\\\`\\\`
+
+## Rules
+- The library MUST be a single IIFE that registers on \`window.AIMEAT\`
+- Use \`AIMEAT.register(name, exports)\` if available, always set \`AIMEAT[name] = exports\`
+- Use \`AIMEAT.data.getPublic()\` when aimeat-data.js is loaded, fallback to raw fetch
+- Use \`AIMEAT.auth.getSession()\` for authenticated extension calls
+- Extension names in \`EXT\` object MUST exactly match the registered extension \`metadata.name\`
+- \`init()\` MUST be smart: check for data, trigger collectors if empty
+- All public methods must be async (return Promises)
+- Handle errors gracefully — return null or empty arrays, don't throw for missing data
+- Include the prompt component with documented API surface for downstream AI consumers`;
+  },
 };
 
 export function buildComponentPrompt(type, label, projectDescription, blueprint, completedComponents) {
@@ -551,12 +943,17 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
+  // App and cortex templates receive completedComponents for cross-referencing
+  if (type === 'app' || type === 'cortex') {
+    return template(label, context, completedComponents);
+  }
+
   return template(label, context);
 }
 
 /* ── Fix Prompts ─────────────────────────────────────── */
 
-export function buildBlueprintFixPrompt(description, errors) {
+export function buildBlueprintFixPrompt(description, errors, interviewSpec = null) {
   return `Your previous blueprint response was not valid. DO NOT try to fix the old response — generate a fresh one.
 
 ERRORS from previous attempt:
@@ -567,7 +964,7 @@ Common mistakes to avoid:
 - Each component must have EXACTLY three fields: "id", "type", "label"
 - The entire response must be valid JSON — no trailing commas, no unescaped quotes
 
-${buildBlueprintPrompt(description)}`;
+${buildBlueprintPrompt(description, interviewSpec)}`;
 }
 
 export function buildFixPrompt(originalPrompt, failedResult, errors) {

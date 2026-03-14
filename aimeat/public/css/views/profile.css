@@ -511,6 +511,7 @@
 .pf-gen-type-badge.type-app { background: rgba(59,130,246,0.12); color: #2563eb; }
 .pf-gen-type-badge.type-memory { background: rgba(107,114,128,0.12); color: #4b5563; }
 .pf-gen-type-badge.type-translation { background: rgba(6,182,212,0.12); color: #0891b2; }
+.pf-gen-type-badge.type-cortex { background: rgba(155,89,182,0.12); color: #9b59b6; }
 
 /* Detail panel */
 .pf-gen-detail { flex: 1; min-width: 0; }
