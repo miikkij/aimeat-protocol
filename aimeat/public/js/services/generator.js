@@ -67,7 +67,7 @@ export async function createProject(name, description) {
   await apiPost('/v1/memory', {
     key: `generator.${projectId}.project`,
     value: project,
-    visibility: 'private',
+    visibility: 'owner',
   });
   return { ...project, _version: 1 };
 }
@@ -80,7 +80,7 @@ export async function updateProject(projectId, updates) {
   const updated = { ...rest, ...updates, updatedAt: new Date().toISOString() };
   await apiPut(`/v1/memory/generator.${projectId}.project`, {
     value: updated,
-    visibility: 'private',
+    visibility: 'owner',
     version,
   });
   return { ...updated, _version: version + 1 };
@@ -114,14 +114,14 @@ export async function saveComponent(projectId, component) {
     await apiPost('/v1/memory', {
       key,
       value: data,
-      visibility: 'private',
+      visibility: 'owner',
     });
   } else {
     // Existing component — use PUT with optimistic locking; retry on conflict
     try {
       await apiPut(`/v1/memory/${key}`, {
         value: data,
-        visibility: 'private',
+        visibility: 'owner',
         version,
       });
     } catch (err) {
@@ -131,7 +131,7 @@ export async function saveComponent(projectId, component) {
         version = fresh?.data?.version ?? version + 1;
         await apiPut(`/v1/memory/${key}`, {
           value: data,
-          visibility: 'private',
+          visibility: 'owner',
           version,
         });
       } else {

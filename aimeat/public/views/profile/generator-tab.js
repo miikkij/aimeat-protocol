@@ -24,7 +24,7 @@ function AgentListenerBar({ showToast, session }) {
 
   useEffect(() => {
     loadListeners();
-    apiGet('/v1/node').then(resp => {
+    apiGet('/?format=json').then(resp => {
       setNodeUrl(resp?.data?.this_node?.base_url || resp?.data?.base_url || window.location.origin);
     }).catch(() => setNodeUrl(window.location.origin));
   }, []);
@@ -574,7 +574,7 @@ export default function GeneratorTab({ session, showToast }) {
   const [generatorEnabled, setGeneratorEnabled] = useState(true);
 
   useEffect(() => {
-    apiGet('/v1/node').then(resp => {
+    apiGet('/?format=json').then(resp => {
       const cfg = resp?.data?.config || resp?.data || {};
       if (cfg.generator?.enabled === false || cfg.generatorEnabled === false) {
         setGeneratorEnabled(false);

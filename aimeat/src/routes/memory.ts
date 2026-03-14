@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
@@ -174,9 +174,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory — list memory keys (agent auth required)
   // Optional ?agent=GAII — owner can view any of their own agents' memory
+  // Optional ?owner_scope=true — list owner-visible keys across all owner's agents
   router.get('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
+    const ownerScope = req.query.owner_scope === 'true';
 
     // Allow owner to view another of their agents' memory
     if (agentParam && agentParam !== gaii) {
@@ -196,7 +198,25 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const maxFlagsParam = req.query.max_flags as string | undefined;
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
 
-    const records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
+    let records: MemoryRecord[];
+    if (ownerScope) {
+      // Collect owner-visible keys from all owner's agents
+      const callerOwner = req.auth!.owner;
+      const agents = await storage.listAgents(callerOwner);
+      const seen = new Set<string>();
+      records = [];
+      for (const agent of agents) {
+        const agentRecords = await storage.listMemory(agent.gaii, { prefix, visibility: visibility || 'owner', tags, maxFlags });
+        for (const r of agentRecords) {
+          if (!seen.has(r.key)) {
+            seen.add(r.key);
+            records.push(r);
+          }
+        }
+      }
+    } else {
+      records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
+    }
 
     // Calculate total size for quota reporting
     let totalBytes = 0;
