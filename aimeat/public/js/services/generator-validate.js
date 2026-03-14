@@ -63,6 +63,15 @@ function sanitizeYaml(text) {
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  // Convert YAML block scalars (> or |) to plain strings on same line
+  // e.g., "description: >\n  multi\n  line" → "description: multi line"
+  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s*\n((?:\s+.*\n?)*)/gm, (_match, prefix, body) => {
+    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"\n';
+  });
+  // Auto-quote unquoted YAML values containing { } which YAML misparses as flow mappings
+  s = s.replace(/^(\s*(?:description|title|label|message):\s+)(?!["'>|])(.+\{.+\}.*)$/gm,
+    (_match, prefix, value) => prefix + '"' + value.replace(/"/g, '\\"') + '"');
   return s;
 }
 

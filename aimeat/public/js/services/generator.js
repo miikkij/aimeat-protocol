@@ -245,7 +245,6 @@ function sanitizeYaml(text) {
   let s = text;
   // Markdown bullets → YAML list items: `*   name:` → `  - name:`
   s = s.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
-  // Also handle `* name:` with single space
   s = s.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
   // Remove backslash-escaped underscores: `\_` → `_`
   s = s.replace(/\\_/g, '_');
@@ -254,6 +253,14 @@ function sanitizeYaml(text) {
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  // Convert YAML block scalars (> or |) to plain quoted strings
+  s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s*\n((?:\s+.*\n?)*)/gm, (_match, prefix, body) => {
+    const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+    return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"\n';
+  });
+  // Auto-quote unquoted values containing { } which YAML misparses as flow mappings
+  s = s.replace(/^(\s*(?:description|title|label|message):\s+)(?!["'>|])(.+\{.+\}.*)$/gm,
+    (_match, prefix, value) => prefix + '"' + value.replace(/"/g, '\\"') + '"');
   return s;
 }
 

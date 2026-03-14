@@ -97,12 +97,19 @@ fields:
   - name: fieldName
     type: string|number|boolean|array|object
     required: true|false
-    description: What this field contains
+    description: "What this field contains"
 consent:
   default_visibility: public|private|restricted
   requires_consent: true|false
   retention_days: 365
-\`\`\``,
+\`\`\`
+
+CRITICAL YAML rules — your output MUST be parseable YAML:
+- ALWAYS quote description values with double quotes: description: "text here"
+- Strings containing { } : # [ ] , or > MUST be quoted
+- Use simple flat fields only — no nested objects inside field definitions
+- Keep field count reasonable (10-20 fields, not 40+) — only what the service actually needs
+- Do NOT use YAML block scalars (> or |) — use quoted strings instead`,
 
   msm: (label, context) => `${AIMEAT_CONTEXT}
 
@@ -129,7 +136,12 @@ endpoints:
     output_schema:
       type: object
       properties: {}
-\`\`\``,
+\`\`\`
+
+CRITICAL YAML rules — your output MUST be parseable YAML:
+- ALWAYS quote description values with double quotes: description: "text here"
+- Strings containing { } : # [ ] , or > MUST be quoted
+- Do NOT use YAML block scalars (> or |) — use quoted strings instead`,
 
   extension: (label, context) => `${AIMEAT_CONTEXT}
 
@@ -163,6 +175,8 @@ actions:
     output: {}
     script: actions/action-id.js
 \`\`\`
+
+YAML rules: ALWAYS quote description values with double quotes. Strings containing { } : # must be quoted. No block scalars (> or |).
 
 2. For EACH action, a JavaScript file:
 \`\`\`javascript
