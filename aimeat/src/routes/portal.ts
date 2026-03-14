@@ -64,26 +64,19 @@ function serveSpa(res: import('express').Response, spaPath: string): void {
   const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
   html = html.replace('</head>', `<script${nonceAttr}>window.__B="${v}";</script>\n</head>`);
 
-  // Stamp all importmap entries with the build version
+  // Stamp ALL importmap values with the build version — generic regex replaces
+  // any value starting with "/" (local path), so new importmap entries are
+  // automatically cache-busted without touching this code.
   html = html.replace(
-    /"preact": "\/lib\/preact\.mjs"/,
-    `"preact": "/lib/preact.mjs${v}"`
-  ).replace(
-    /"preact\/hooks": "\/lib\/preact-hooks\.mjs"/,
-    `"preact/hooks": "/lib/preact-hooks.mjs${v}"`
-  ).replace(
-    /"htm": "\/lib\/htm\.mjs"/,
-    `"htm": "/lib/htm.mjs${v}"`
-  )
-  // Stamp utility module importmap entries (added to spa.html importmap)
-  .replace(/"\/js\/i18n\.js": "\/js\/i18n\.js"/, `"/js/i18n.js": "/js/i18n.js${v}"`)
-  .replace(/"\/js\/utils\.js": "\/js\/utils\.js"/, `"/js/utils.js": "/js/utils.js${v}"`)
-  .replace(/"\/js\/api\.js": "\/js\/api\.js"/, `"/js/api.js": "/js/api.js${v}"`)
-  .replace(/"\/js\/hooks\.js": "\/js\/hooks\.js"/, `"/js/hooks.js": "/js/hooks.js${v}"`)
-  .replace(/"\/js\/services\/generator-prompts\.js": "\/js\/services\/generator-prompts\.js"/, `"/js/services/generator-prompts.js": "/js/services/generator-prompts.js${v}"`)
-  .replace(/"\/js\/services\/generator-validate\.js": "\/js\/services\/generator-validate\.js"/, `"/js/services/generator-validate.js": "/js/services/generator-validate.js${v}"`)
-  .replace(/"\/js\/services\/generator\.js": "\/js\/services\/generator\.js"/, `"/js/services/generator.js": "/js/services/generator.js${v}"`)
-  .replace(/"\/js\/services\/extensions\.js": "\/js\/services\/extensions\.js"/, `"/js/services/extensions.js": "/js/services/extensions.js${v}"`);
+    /("imports"\s*:\s*\{)([\s\S]*?)(\})/,
+    (_match, prefix, entries, suffix) => {
+      const stamped = entries.replace(
+        /:\s*"(\/[^"?]+\.(js|mjs))"/g,
+        `: "$1${v}"`,
+      );
+      return prefix + stamped + suffix;
+    },
+  );
 
   // Stamp all view CSS hrefs (preloaded in spa.html head) with the build version
   html = html.replace(

@@ -188,6 +188,129 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Encrypted Chat (mutable) ──
   { key: 'echatAnonymous', dotPath: 'echat.anonymous', envVar: 'AIMEAT_ECHAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous encrypted chat WebSocket connections' },
 
+  // ── Node (immutable, additional) ──
+  { key: 'baseUrl', dotPath: 'node.base_url', envVar: 'AIMEAT_BASE_URL', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Public base URL of this node' },
+  { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (relaxes security checks)', adminDisplay: 'visible' },
+  { key: 'anonymousMode', dotPath: 'node.anonymous_mode', envVar: 'AIMEAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous access without authentication' },
+
+  // ── Federation (mutable, additional) ──
+  { key: 'depeeringGracePeriodHours', dotPath: 'federation.depeering_grace_hours', envVar: 'AIMEAT_DEPEERING_GRACE_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Grace period before depeering in hours', range: '1-720' },
+  { key: 'keyCacheRefreshMinutes', dotPath: 'federation.key_cache_refresh_minutes', envVar: 'AIMEAT_KEY_CACHE_REFRESH_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Minutes between key cache refreshes', range: '1-60' },
+  { key: 'federationRole', dotPath: 'federation.role', envVar: 'AIMEAT_FEDERATION_ROLE', type: 'string', validate: v => ['operator', 'contributor', 'standalone'].includes(v as string), immutable: false, description: 'Federation role: operator, contributor, or standalone' },
+  { key: 'genesisUrl', dotPath: 'federation.genesis_url', envVar: 'AIMEAT_GENESIS_URL', type: 'string', validate: () => true, immutable: false, description: 'Genesis node URL for federation' },
+
+  // ── Quotas (mutable, additional) ──
+  { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },
+  { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory keys per agent', range: '1-100000' },
+  { key: 'storageMaxFileSizeMb', dotPath: 'quota.storage_max_file_size_mb', envVar: 'AIMEAT_STORAGE_MAX_FILE_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max file size for storage in MB', range: '1-1024' },
+  { key: 'storageMaxChunkedFileSizeGb', dotPath: 'quota.storage_max_chunked_file_size_gb', envVar: 'AIMEAT_STORAGE_MAX_CHUNKED_FILE_SIZE_GB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max chunked file size in GB', range: '1-100' },
+  { key: 'microMemoryMaxSetsPerAgent', dotPath: 'quota.micro_memory_max_sets', envVar: 'AIMEAT_MICRO_MEMORY_MAX_SETS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max micro-memory sets per agent', range: '1-1000' },
+  { key: 'microMemoryMaxKeysPerSet', dotPath: 'quota.micro_memory_max_keys_per_set', envVar: 'AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max keys per micro-memory set', range: '1-10000' },
+  { key: 'microMemoryMaxValueSizeBytes', dotPath: 'quota.micro_memory_max_value_size_bytes', envVar: 'AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max micro-memory value size in bytes', range: '1-65536' },
+  { key: 'maxActionsPerAgent', dotPath: 'quota.max_actions_per_agent', envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max actions per agent', range: '1-1000' },
+  { key: 'minTrustForPaidActions', dotPath: 'quota.min_trust_paid_actions', envVar: 'AIMEAT_MIN_TRUST_PAID_ACTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Min trust score for paid actions', range: '0-100' },
+  { key: 'appMaxSizeMb', dotPath: 'quota.app_max_size_mb', envVar: 'AIMEAT_APP_MAX_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max app package size in MB', range: '1-100' },
+  { key: 'maxAppsPerAgent', dotPath: 'quota.max_apps_per_agent', envVar: 'AIMEAT_MAX_APPS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max apps per agent', range: '1-1000' },
+
+  // ── Morsel Policy (mutable, additional) ──
+  { key: 'agentPortingFeeMorsels', dotPath: 'morsel_policy.agent_porting_fee', envVar: 'AIMEAT_AGENT_PORTING_FEE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel fee for agent porting', range: '0-10000' },
+  { key: 'memoryOverageMorselsPerMbMonth', dotPath: 'morsel_policy.memory_overage_morsels', envVar: 'AIMEAT_MEMORY_OVERAGE_MORSELS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel cost per MB/month overage', range: '0-1000' },
+  { key: 'storageOverageMorselsPerGbMonth', dotPath: 'morsel_policy.storage_overage_morsels', envVar: 'AIMEAT_STORAGE_OVERAGE_MORSELS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel cost per GB/month overage', range: '0-10000' },
+
+  // ── Work (mutable, additional) ──
+  { key: 'appAnnouncementBoardId', dotPath: 'work.app_announcement_board_id', envVar: 'AIMEAT_APP_ANNOUNCEMENT_BOARD_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Board ID for app announcements' },
+  { key: 'otkTtlMs', dotPath: 'work.otk_ttl_ms', envVar: 'AIMEAT_OTK_TTL_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'One-time-key TTL in milliseconds', range: '1000-3600000' },
+  { key: 'otkGraceMs', dotPath: 'work.otk_grace_ms', envVar: 'AIMEAT_OTK_GRACE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'One-time-key grace period in milliseconds', range: '0-600000' },
+  { key: 'maxUrlLength', dotPath: 'work.max_url_length', envVar: 'AIMEAT_MAX_URL_LENGTH', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 256, immutable: false, description: 'Max URL length allowed', range: '256-65536' },
+
+  // ── Indexing (immutable) ──
+  { key: 'indexNowKey', dotPath: 'indexing.indexnow_key', envVar: 'AIMEAT_INDEXNOW_KEY', type: 'string', validate: () => true, immutable: true, description: 'IndexNow API key for SEO', adminDisplay: 'configured' },
+
+  // ── TOTP (immutable, additional) ──
+  { key: 'totpIssuer', dotPath: 'totp.issuer', envVar: 'AIMEAT_TOTP_ISSUER', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'TOTP issuer name shown in authenticator apps' },
+  { key: 'totpBackupCodeCount', dotPath: 'totp.backup_code_count', envVar: 'AIMEAT_TOTP_BACKUP_CODE_COUNT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: true, description: 'Number of TOTP backup codes to generate', range: '1-20' },
+
+  // ── MSM (mutable) ──
+  { key: 'msmInstallRole', dotPath: 'msm.install_role', envVar: 'AIMEAT_MSM_INSTALL_ROLE', type: 'string', validate: v => ['operator', 'owner'].includes(v as string), immutable: false, description: 'Role required to install MSM modules: operator or owner' },
+
+  // ── Personal Nodes (mutable, additional) ──
+  { key: 'personalNodeMailboxQuotaMb', dotPath: 'personal_nodes.mailbox_quota_mb', envVar: 'AIMEAT_PERSONAL_MAILBOX_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Personal node mailbox quota in MB', range: '1-1000' },
+  { key: 'personalNodeMailboxRetentionDays', dotPath: 'personal_nodes.mailbox_retention_days', envVar: 'AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Personal node mailbox retention in days', range: '1-365' },
+  { key: 'personalNodeHeartbeatIntervalMs', dotPath: 'personal_nodes.heartbeat_interval_ms', envVar: 'AIMEAT_PERSONAL_HEARTBEAT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Personal node heartbeat interval in ms', range: '1000-300000' },
+  { key: 'personalNodeOfflineThresholdMs', dotPath: 'personal_nodes.offline_threshold_ms', envVar: 'AIMEAT_PERSONAL_OFFLINE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10000, immutable: false, description: 'Personal node offline threshold in ms', range: '10000-3600000' },
+  { key: 'personalNodeRequestTimeoutMs', dotPath: 'personal_nodes.request_timeout_ms', envVar: 'AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Personal node request timeout in ms', range: '1000-300000' },
+
+  // ── Push Notifications (mutable, additional) ──
+  { key: 'vapidSubject', dotPath: 'push.vapid_subject', envVar: 'AIMEAT_VAPID_SUBJECT', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'VAPID subject (mailto: or https: URI)' },
+  { key: 'pushNotifyTypes', dotPath: 'push.notify_types', envVar: 'AIMEAT_PUSH_NOTIFY_TYPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Comma-separated notification types to push' },
+  { key: 'pushCooldownMin', dotPath: 'push.cooldown_min', envVar: 'AIMEAT_PUSH_COOLDOWN_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Push notification cooldown in minutes', range: '1-1440' },
+  { key: 'pushMaxSubscriptionsPerNode', dotPath: 'push.max_subscriptions_per_node', envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max push subscriptions per node', range: '1-100' },
+  { key: 'pushMaxFailures', dotPath: 'push.max_failures', envVar: 'AIMEAT_PUSH_MAX_FAILURES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max push failures before disabling', range: '1-50' },
+
+  // ── Email (mutable, additional) ──
+  { key: 'emailRateLimitMin', dotPath: 'email.rate_limit_min', envVar: 'AIMEAT_EMAIL_RATE_LIMIT_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Email rate limit cooldown in minutes', range: '1-1440' },
+
+  // ── EUDIW / Identity (mutable, additional) ──
+  { key: 'eudiwClientId', dotPath: 'eudiw.client_id', envVar: 'AIMEAT_EUDIW_CLIENT_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'EUDIW verifier client ID' },
+  { key: 'eudiwRedirectUri', dotPath: 'eudiw.redirect_uri', envVar: 'AIMEAT_EUDIW_REDIRECT_URI', type: 'string', validate: () => true, immutable: false, description: 'EUDIW redirect URI' },
+  { key: 'ftnProviderUrl', dotPath: 'eudiw.ftn_provider_url', envVar: 'AIMEAT_FTN_PROVIDER_URL', type: 'string', validate: () => true, immutable: false, description: 'Finnish Trust Network provider URL' },
+  { key: 'vcIssuerDid', dotPath: 'eudiw.vc_issuer_did', envVar: 'AIMEAT_VC_ISSUER_DID', type: 'string', validate: () => true, immutable: false, description: 'Verifiable credential issuer DID' },
+
+  // ── Setup (immutable) ──
+  { key: 'setupAllowedIps', dotPath: 'setup.allowed_ips', envVar: 'AIMEAT_SETUP_ALLOWED_IPS', type: 'string', validate: () => true, immutable: true, description: 'Comma-separated IPs allowed for setup', adminDisplay: 'configured' },
+
+  // ── Moderation (mutable) ──
+  { key: 'autoHideThreshold', dotPath: 'moderation.auto_hide_threshold', envVar: 'AIMEAT_AUTO_HIDE_THRESHOLD', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Flag count to auto-hide content', range: '1-100' },
+
+  // ── Stats & Metrics (mutable) ──
+  { key: 'statsEnabled', dotPath: 'stats.enabled', envVar: 'AIMEAT_STATS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable stats API' },
+  { key: 'statsAccess', dotPath: 'stats.access', envVar: 'AIMEAT_STATS_ACCESS', type: 'string', validate: v => ['public', 'authenticated', 'operator'].includes(v as string), immutable: false, description: 'Stats API visibility: public, authenticated, or operator' },
+  { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Prometheus metrics endpoint' },
+  { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', validate: v => ['public', 'authenticated', 'operator'].includes(v as string), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
+
+  // ── Scoped Agent Capabilities (mutable) ──
+  { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Default agent capability scopes (comma-separated)' },
+  { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Max available agent scopes (comma-separated, * = all)' },
+
+  // ── Cortex Extensions (mutable) ──
+  { key: 'cortexEnabled', dotPath: 'cortex.enabled', envVar: 'AIMEAT_CORTEX_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable manifest-based cortex extensions' },
+  { key: 'cortexMaxInstalled', dotPath: 'cortex.max_installed', envVar: 'AIMEAT_CORTEX_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Max installed cortex modules', range: '1-1000' },
+  { key: 'cortexMaxLibSizeKb', dotPath: 'cortex.max_lib_size_kb', envVar: 'AIMEAT_CORTEX_MAX_LIB_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16, immutable: false, description: 'Max cortex library size in KB', range: '16-4096' },
+
+  // ── Portfolio (mutable) ──
+  { key: 'portfolioEnabled', dotPath: 'portfolio.enabled', envVar: 'AIMEAT_PORTFOLIO', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable portfolio feature' },
+  { key: 'portfolioMaxSizeKb', dotPath: 'portfolio.max_size_kb', envVar: 'AIMEAT_PORTFOLIO_MAX_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max portfolio size in KB', range: '1-10240' },
+  { key: 'portfolioMaxImages', dotPath: 'portfolio.max_images', envVar: 'AIMEAT_PORTFOLIO_MAX_IMAGES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max images per portfolio', range: '1-100' },
+
+  // ── Cookie Consent (mutable) ──
+  { key: 'cookieConsentEnabled', dotPath: 'cookies.consent_enabled', envVar: 'AIMEAT_COOKIE_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable cookie consent banner' },
+  { key: 'cookieConsentCategories', dotPath: 'cookies.consent_categories', envVar: 'AIMEAT_COOKIE_CONSENT_CATEGORIES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Cookie consent categories (comma-separated)' },
+  { key: 'cookieConsentPolicyUrl', dotPath: 'cookies.consent_policy_url', envVar: 'AIMEAT_COOKIE_CONSENT_POLICY_URL', type: 'string', validate: () => true, immutable: false, description: 'Cookie consent privacy policy URL' },
+
+  // ── CORS (mutable) ──
+  { key: 'corsAllowedOrigins', dotPath: 'cors.allowed_origins', envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'CORS allowed origins (comma-separated, * = all)' },
+
+  // ── Realtime P2P (mutable) ──
+  { key: 'realtimeEnabled', dotPath: 'realtime.enabled', envVar: 'AIMEAT_REALTIME_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable realtime P2P signaling' },
+  { key: 'realtimeMaxRooms', dotPath: 'realtime.max_rooms', envVar: 'AIMEAT_REALTIME_MAX_ROOMS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max P2P rooms', range: '1-10000' },
+  { key: 'realtimeMaxPeersPerRoom', dotPath: 'realtime.max_peers_per_room', envVar: 'AIMEAT_REALTIME_MAX_PEERS_PER_ROOM', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max peers per P2P room', range: '1-100' },
+  { key: 'realtimeRoomIdleTimeoutMs', dotPath: 'realtime.room_idle_timeout_ms', envVar: 'AIMEAT_REALTIME_ROOM_IDLE_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'P2P room idle timeout in ms', range: '1000-86400000' },
+  { key: 'realtimeMaxMessageSizeBytes', dotPath: 'realtime.max_message_size_bytes', envVar: 'AIMEAT_REALTIME_MAX_MESSAGE_SIZE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 256, immutable: false, description: 'Max P2P message size in bytes', range: '256-1048576' },
+  { key: 'realtimeRateLimitPerSecond', dotPath: 'realtime.rate_limit_per_second', envVar: 'AIMEAT_REALTIME_RATE_LIMIT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'P2P messages per second rate limit', range: '1-1000' },
+  { key: 'stunServers', dotPath: 'realtime.stun_servers', envVar: 'AIMEAT_STUN_SERVERS', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'STUN servers for P2P (comma-separated)' },
+  { key: 'turnServer', dotPath: 'realtime.turn_server', envVar: 'AIMEAT_TURN_SERVER', type: 'string', validate: () => true, immutable: false, description: 'TURN server URL for P2P relay' },
+  { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'TURN server username', adminDisplay: 'configured' },
+  { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'TURN server credential', adminDisplay: 'configured' },
+
+  // ── Site / Portal (mutable) ──
+  { key: 'siteEnabled', dotPath: 'site.enabled', envVar: 'AIMEAT_SITE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable site portal' },
+  { key: 'siteMaxTemplateSizeKb', dotPath: 'site.max_template_size_kb', envVar: 'AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max site template size in KB', range: '1-4096' },
+  { key: 'siteCacheTtlSeconds', dotPath: 'site.cache_ttl_seconds', envVar: 'AIMEAT_SITE_CACHE_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Site template cache TTL in seconds (0 = no cache)', range: '0-86400' },
+  { key: 'siteLbEnabled', dotPath: 'site.lb_enabled', envVar: 'AIMEAT_SITE_LB_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable site load balancing' },
+  { key: 'siteLbOriginUrl', dotPath: 'site.lb_origin_url', envVar: 'AIMEAT_SITE_LB_ORIGIN_URL', type: 'string', validate: () => true, immutable: false, description: 'Load balancer origin URL' },
+  { key: 'siteLbSyncIntervalMin', dotPath: 'site.lb_sync_interval_min', envVar: 'AIMEAT_SITE_LB_SYNC_INTERVAL_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'LB template sync interval in minutes', range: '1-1440' },
+  { key: 'siteLbSyncOnStartup', dotPath: 'site.lb_sync_on_startup', envVar: 'AIMEAT_SITE_LB_SYNC_ON_STARTUP', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sync templates from origin on startup' },
+
   // ── Consul (immutable — set before startup) ──
   { key: 'consulEnabled', dotPath: 'consul.enabled', envVar: 'AIMEAT_CONSUL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Enable Consul integration' },
   { key: 'consulUrl', dotPath: 'consul.url', envVar: 'AIMEAT_CONSUL_URL', type: 'string', validate: () => true, immutable: true, description: 'Consul HTTP URL' },
