@@ -544,7 +544,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     metricsAccess: (process.env.AIMEAT_METRICS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'operator',
 
     // Scoped Agent Capabilities (REQ-006)
-    defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,catalogue:read').split(',').map(s => s.trim()),
+    defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,memory:delete,catalogue:read').split(',').map(s => s.trim()),
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
 
     // Node Extensions (V8 Isolates)
