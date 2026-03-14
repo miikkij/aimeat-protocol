@@ -37,7 +37,7 @@ function taskId() {
 /* ── Project CRUD ────────────────────────────────────── */
 
 export async function listProjects() {
-  const resp = await apiGet('/v1/memory?prefix=generator.');
+  const resp = await apiGet('/v1/memory?prefix=generator.&owner_scope=true');
   const items = resp?.data?.items || resp?.data?.entries || [];
   return items
     .filter(i => i.key.endsWith('.project'))
