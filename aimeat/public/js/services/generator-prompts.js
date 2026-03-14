@@ -17,6 +17,8 @@
  *   v2.0.0 — 2026-03-14 — Fix MSM prompt to match real parseMsm() format
  *     (service/auth/actions structure, not name/endpoints); fix Extension prompt
  *     to match POST /v1/extensions format (metadata/actions with script refs)
+ *   v2.1.0 — 2026-03-14 — Rewrite App prompt to use aimeat-auth.js library
+ *     for automatic authentication instead of manual token/URL configuration
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -263,11 +265,55 @@ Create an AIMEAT App (HTML/JS) for: ${label}
 
 ${context}
 
-Return a complete HTML file that:
-- Uses vanilla JS (no build step needed)
-- Calls AIMEAT APIs via fetch() with Bearer token auth
+## CRITICAL: Authentication & API Calls
+
+The app runs inline on an AIMEAT node. It MUST use the built-in auth library — NEVER ask the user to paste tokens or configure API URLs manually.
+
+### Auth setup (copy this exactly into your <script>):
+\`\`\`javascript
+// Load AIMEAT auth library — handles login UI, JWT tokens, refresh
+const authScript = document.createElement('script');
+authScript.src = '/v1/libs/aimeat-auth.js';
+document.head.appendChild(authScript);
+authScript.onload = () => {
+  window.AIMEAT.auth.init({
+    onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+    onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+  });
+  startApp();
+};
+\`\`\`
+
+### API helper (copy this exactly):
+\`\`\`javascript
+const NODE_URL = window.location.origin;
+
+async function apiCall(path, opts = {}) {
+  const session = window.AIMEAT?.auth?.getSession?.();
+  if (!session?.jwt) throw new Error('Not logged in');
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.jwt, ...opts.headers };
+  const resp = await fetch(NODE_URL + path, { ...opts, headers });
+  return resp.json();
+}
+\`\`\`
+
+### Calling extension actions:
+\`\`\`javascript
+// Without instance:
+const result = await apiCall('/v1/ext/EXTENSION-NAME/ACTION-ID', { method: 'POST', body: JSON.stringify({ input: data }) });
+// With instance:
+const result = await apiCall('/v1/ext/EXTENSION-NAME/INSTANCE-ID/ACTION-ID', { method: 'POST', body: JSON.stringify({ input: data }) });
+\`\`\`
+
+## Rules
+- DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
+- DO NOT use prompt() or manual token entry — the auth library handles everything
+- The app is served from the same origin as the AIMEAT node — use relative paths
+- Use \`window.AIMEAT.auth.getSession()\` to check if logged in; show a "Sign in" message if not
+- Use vanilla JS (no build step needed)
 - Has a clean, responsive UI
-- Include an app manifest comment at the top:
+
+Return a complete HTML file with an app manifest comment at the top:
 
 \`\`\`html
 <!-- AIMEAT App Manifest
@@ -282,7 +328,7 @@ entry: index.html
 <body>
   <!-- App UI here -->
   <script>
-    // AIMEAT API calls here
+    // Auth setup + API helper + app logic here
   </script>
 </body>
 </html>
