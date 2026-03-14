@@ -451,6 +451,8 @@ function ComponentDetail({ component, project, components, agents, projectId, on
       const registered = addHistory(component, 'registered', { registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
       showToast?.('Component registered!');
+      // Notify other tabs (extensions, services, etc.) even if SSE is disconnected
+      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       onUpdate();
     } catch (e) {
       setValidationResult({ valid: false, errors: [`Registration failed: ${e.message}`] });
