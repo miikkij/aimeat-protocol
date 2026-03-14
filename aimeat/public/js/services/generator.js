@@ -91,7 +91,7 @@ export async function archiveProject(projectId) {
 }
 
 export async function deleteProject(projectId) {
-  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.`);
+  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
   for (const item of items) {
     await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}`);
@@ -143,7 +143,7 @@ export async function saveComponent(projectId, component) {
 }
 
 export async function loadAllComponents(projectId) {
-  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.component.`);
+  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.component.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
   return items.map(i => {
     const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
@@ -177,7 +177,7 @@ export async function enqueueTask(projectId, componentId, type, prompt, assigned
 }
 
 export async function pollResults(projectId) {
-  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.results.`);
+  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.results.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
   return items.map(i => typeof i.value === 'string' ? JSON.parse(i.value) : i.value);
 }
@@ -190,7 +190,7 @@ export async function pollLogs(projectId, taskIdVal) {
 }
 
 export async function checkQueueStatus(projectId) {
-  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.queue.`);
+  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.queue.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
   const now = Date.now();
   return items.map(i => {
@@ -223,7 +223,7 @@ export async function cleanupOldEntries(projectId) {
   const prefixes = ['queue', 'results', 'logs'];
   for (const pfx of prefixes) {
     try {
-      const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.${pfx}.`);
+      const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.${pfx}.&owner_scope=true`);
       const items = resp?.data?.items || [];
       for (const item of items) {
         const val = typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
