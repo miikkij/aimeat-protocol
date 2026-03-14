@@ -281,8 +281,20 @@ export async function registerComponent(type, result, session) {
       const parts = parseExtensionResult(result);
       return apiPost('/v1/extensions', { manifest: cleanYaml(parts.manifest), scripts: parts.scripts });
     }
-    case 'app':
-      return apiPost('/v1/apps', typeof result === 'string' ? JSON.parse(result) : result);
+    case 'app': {
+      // App result is HTML. POST /v1/apps expects { filename, content (base64), name, description, ... }
+      const html = typeof result === 'string' ? result : String(result);
+      const appMeta = parseAppManifest(html);
+      const content = btoa(unescape(encodeURIComponent(html))); // UTF-8 safe base64
+      return apiPost('/v1/apps', {
+        filename: (appMeta.name || 'app') + '.html',
+        content,
+        mime_type: 'text/html',
+        name: appMeta.name || 'Generated App',
+        description: appMeta.description || '',
+        version: appMeta.version || '1.0.0',
+      });
+    }
     case 'memory': {
       const entries = typeof result === 'string' ? JSON.parse(result) : result;
       const results = [];
