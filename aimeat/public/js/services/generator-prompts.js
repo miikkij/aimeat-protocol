@@ -217,12 +217,11 @@ WRONG: description: > This is a folded string
 WRONG: description: This has (parens) and colons: here
 CORRECT: description: "This has (parens) and colons: here — all on one line"
 
-## Structure
+## Output format — SINGLE block, copy-paste friendly
 
-Return TWO code blocks:
+Return EVERYTHING in ONE code block. The YAML manifest first, then all JavaScript files separated by // actions/filename.js comments. The user will copy-paste the entire response at once.
 
-1. extension.yaml manifest:
-\`\`\`yaml
+\`\`\`
 metadata:
   name: kebab-case-name
   version: "1.0.0"
@@ -243,10 +242,6 @@ actions:
     input: {}
     output: {}
     script: action-id.js
-\`\`\`
-
-2. For EACH action, a JavaScript file (filename must match the \`script\` field in the action):
-\`\`\`javascript
 // actions/action-id.js
 export default async function(ctx, input) {
   // Use ctx.memory, ctx.wallet, ctx.caller, ctx.log
@@ -254,10 +249,13 @@ export default async function(ctx, input) {
 }
 \`\`\`
 
+CRITICAL: Do NOT use separate code blocks. Put YAML manifest and ALL JavaScript files in ONE block.
+Each JavaScript file MUST start with a comment line: // actions/{filename}.js
+
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
 - \`actions\` array MUST NOT be empty — each action needs: id, method, path, script
-- The \`script\` field value must match a JavaScript code block comment \`// actions/{script}\``,
+- Each action's \`script\` field value must match a \`// actions/{script}\` comment below the YAML`,
 
   app: (label, context) => `${AIMEAT_CONTEXT}
 

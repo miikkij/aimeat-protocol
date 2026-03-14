@@ -866,6 +866,8 @@
       "copyPrompt": "Kopioi prompt",
       "result": "Tulos",
       "resultPlaceholder": "Liit\u00e4 AI:n vastaus t\u00e4h\u00e4n...",
+      "extensionResultPlaceholder": "Liit\u00e4 KOKO AI:n vastaus t\u00e4h\u00e4n \u2014 YAML-manifesti ja kaikki JavaScript-koodilohkot yhteen...",
+      "extensionPasteHint": "Extensionissa on useita koodilohkoja. Kopioi koko AI:n vastaus (YAML + kaikki JavaScript-tiedostot) ja liit\u00e4 se kokonaisuudessaan t\u00e4h\u00e4n.",
       "validate": "Validoi",
       "register": "Rekister\u00f6i",
       "errors": "Validointivirheet",

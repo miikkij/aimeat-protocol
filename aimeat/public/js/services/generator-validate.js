@@ -160,7 +160,13 @@ const validators = {
 
   extension(result) {
     const errors = [];
-    const raw = extractCodeBlock(result, 'yaml');
+    // Try fenced yaml block first; if not found, take everything before first // actions/ comment
+    let raw = extractCodeBlock(result, 'yaml');
+    if (raw === result.trim()) {
+      // extractCodeBlock returned full text = no fence found. Cut at first JS file comment.
+      const jsStart = result.search(/^\/\/\s*actions\//m);
+      raw = jsStart > 0 ? result.slice(0, jsStart).trim() : result.trim();
+    }
     const { parsed, errors: parseErrors } = tryParseYaml(raw);
     errors.push(...parseErrors);
 
@@ -182,10 +188,12 @@ const validators = {
       }
     }
 
-    // Check for action scripts — each action.script must have a matching JS code block
-    const jsBlocks = result.match(/```javascript[\s\S]*?```/gi) || [];
+    // Check for action scripts — look for fenced JS blocks OR unfenced // actions/file.js comments
+    const fencedJs = result.match(/```javascript[\s\S]*?```/gi) || [];
+    const unfencedJs = result.match(/^\/\/\s*actions\/[\w-]+\.js\s*$/gm) || [];
+    const jsBlockCount = Math.max(fencedJs.length, unfencedJs.length);
     const actionCount = Array.isArray(parsed?.actions) ? parsed.actions.length : 0;
-    if (actionCount > 0 && jsBlocks.length === 0) {
+    if (actionCount > 0 && jsBlockCount === 0) {
       errors.push(`Extension defines ${actionCount} action(s) but no JavaScript code blocks found`);
     }
 

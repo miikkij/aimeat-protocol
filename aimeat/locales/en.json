@@ -866,6 +866,8 @@
       "copyPrompt": "Copy Prompt",
       "result": "Result",
       "resultPlaceholder": "Paste the AI response here...",
+      "extensionResultPlaceholder": "Paste the ENTIRE AI response here — YAML manifest and all JavaScript code blocks together...",
+      "extensionPasteHint": "Extensions have multiple code blocks. Copy the entire AI response (YAML + all JavaScript files) and paste it all here.",
       "validate": "Validate",
       "register": "Register",
       "errors": "Validation Errors",

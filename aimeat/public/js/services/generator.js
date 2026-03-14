@@ -687,15 +687,49 @@ authenticate → checkin → get SSE ticket → connect SSE stream
 
 function parseExtensionResult(result) {
   const text = typeof result === 'string' ? result : JSON.stringify(result);
-  // Extract YAML manifest (first ```yaml block)
+
+  // Strategy 1: markdown fences present — use them
   const yamlMatch = text.match(/```yaml\s*\n([\s\S]*?)```/i);
-  const manifest = yamlMatch ? yamlMatch[1].trim() : '';
-  // Extract JS script blocks (```javascript blocks with // actions/... comments)
-  const jsBlocks = [...text.matchAll(/```javascript\s*\n\/\/\s*(actions\/[\w-]+\.js)\s*\n([\s\S]*?)```/gi)];
-  const scripts = {};
-  for (const m of jsBlocks) {
-    const filename = m[1].replace('actions/', '');
-    scripts[filename] = m[2].trim();
+  const fencedJs = [...text.matchAll(/```javascript\s*\n\/\/\s*(actions\/[\w-]+\.js)\s*\n([\s\S]*?)```/gi)];
+
+  if (yamlMatch && fencedJs.length > 0) {
+    const scripts = {};
+    for (const m of fencedJs) {
+      scripts[m[1].replace('actions/', '')] = m[2].trim();
+    }
+    return { manifest: yamlMatch[1].trim(), scripts };
   }
+
+  // Strategy 2: no fences — split on `// actions/filename.js` comment boundaries
+  // The YAML manifest is everything before the first `// actions/` line.
+  // Each JS file starts at `// actions/filename.js` and ends before the next one.
+  const actionCommentRegex = /^\/\/\s*actions\/([\w-]+\.js)\s*$/gm;
+  const boundaries = [];
+  let m;
+  while ((m = actionCommentRegex.exec(text)) !== null) {
+    boundaries.push({ filename: m[1], index: m.index, afterComment: m.index + m[0].length });
+  }
+
+  if (boundaries.length === 0) {
+    // No JS blocks found at all — return whatever we have as manifest
+    const manifest = yamlMatch ? yamlMatch[1].trim() : text.trim();
+    return { manifest, scripts: {} };
+  }
+
+  // Everything before first // actions/ comment is the YAML manifest
+  let manifest = text.slice(0, boundaries[0].index).trim();
+  // Strip any markdown fences or stray ``` from the manifest
+  manifest = manifest.replace(/^```\w*\s*\n?/gm, '').replace(/```\s*$/gm, '').trim();
+
+  const scripts = {};
+  for (let i = 0; i < boundaries.length; i++) {
+    const start = boundaries[i].afterComment;
+    const end = i + 1 < boundaries.length ? boundaries[i + 1].index : text.length;
+    let code = text.slice(start, end).trim();
+    // Strip any trailing/leading markdown fences
+    code = code.replace(/^```\w*\s*\n?/gm, '').replace(/```\s*$/gm, '').trim();
+    scripts[boundaries[i].filename] = code;
+  }
+
   return { manifest, scripts };
 }

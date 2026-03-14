@@ -618,29 +618,41 @@ Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
     group: 'builders',
     name: 'CSM Builder',
     description: 'Create a Contextual Service Model (CSM) via AI conversation',
-    content: `You are helping "{{owner_name}}" design a CSM (Contextual Service Model) for AIMEAT node {{node_url}}.
+    content: `You are helping "{{owner_name}}" design a CSM (Community Service Manifest) for AIMEAT node {{node_url}}.
 
 ## What is a CSM?
 
 A CSM is a YAML document that defines a service's data model for an AIMEAT node. It specifies what data a service collects, how it's validated, and what consent rules apply. Services like hobby directories, marketplaces, dating apps, news feeds, and forums all use CSMs.
+
+## YAML STRING RULES (read this FIRST — violations cause parse errors)
+
+Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
+NEVER use > or | (block scalars). NEVER leave strings unquoted.
+
+WRONG — will crash the parser:
+  description: > This is a multi-line folded string
+  description: This has (parens) and special: chars
+  description: |
+    This is a literal block
+
+CORRECT — always do this:
+  description: "This has (parens) and special: chars all on one line"
 
 ## CSM YAML Format
 
 \`\`\`yaml
 csm: "1.0"
 service:
-  name: "service-name"           # unique identifier (kebab-case)
-  type: "directory"              # directory | marketplace | forum | social | feed | auction
-  description: "What this service does"
-  locale: "en"                   # primary locale
-
-schema_mode: "open"              # open = flexible, strict = exact match, locked = no changes
-
+  name: kebab-case-name
+  type: directory
+  description: "What this service does — one line, double quoted"
+  version: "1.0"
+schema_mode: open
 data_schema:
   required:
-    field_name:
-      type: string               # string | number | boolean | array | object
-      maxLength: 200             # optional constraints
+    fieldName:
+      type: string
+      maxLength: 200
     tags:
       type: array
       items: { type: string }
@@ -649,28 +661,24 @@ data_schema:
       type: object
       properties:
         city: { type: string }
-        country: { type: string, default: "US" }
-      required: [city]
+        country: { type: string }
   optional:
     bio: { type: string, maxLength: 500 }
     rating: { type: number, minimum: 0, maximum: 5 }
-    status: { type: string, enum: ["active", "paused", "closed"] }
-
+    status: { type: string, enum: [active, paused, closed] }
 consent_requirements:
-  visibility_default: "federation"    # public | node | federation | private
+  visibility_default: public
   requires_consent: true
-  consent_purpose: "community-discovery"  # describe why data is collected
-  data_retention: "until_revoked"     # until_revoked | 30_days | 90_days | 1_year
-
+  consent_purpose: "Why data is collected — one line, double quoted"
+  data_retention: "until_revoked"
 moderation:
   flags_enabled: true
   auto_hide_threshold: 5
   appeals_enabled: false
-
 ui_hints:
-  list_view: ["displayName", "tags", "location.city"]
-  detail_view: ["displayName", "bio", "tags", "location", "status"]
-  search_fields: ["tags", "location.city"]
+  list_view: [fieldName, tags, location]
+  detail_view: [fieldName, bio, tags, location, status]
+  search_fields: [tags]
 \`\`\`
 
 ## Your Task
@@ -682,7 +690,9 @@ ui_hints:
 
 ## Rules
 - Service name must be unique and kebab-case
-- Include at least one required field in data_schema
+- data_schema.required and data_schema.optional are MAPS (fieldName: {type: ...}), NOT arrays (- name: ...)
+- data_schema.required MUST have at least one field
+- Field types: string, number, integer, boolean, array, object
 - Always include consent_requirements
 - Choose appropriate schema_mode (open for flexibility, strict for data integrity)
 - Include ui_hints to help frontends render the data

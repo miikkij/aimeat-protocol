@@ -467,6 +467,7 @@
 
 .pf-gen-new-project { max-width: 700px; }
 .pf-gen-subtitle { color: var(--muted); margin-bottom: 1rem; }
+.pf-gen-hint { color: #92400E; font-size: 0.85em; margin: 0 0 8px; padding: 8px 12px; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 6px; }
 .pf-gen-description {
   width: 100%; background: #FFFFFF; border: 1px solid var(--border,#E5E7EB); border-radius: 8px;
   color: var(--text); padding: 12px; font-family: inherit; font-size: 0.95em; resize: vertical;

@@ -513,10 +513,15 @@ function ComponentDetail({ component, project, components, agents, projectId, on
         </div>
         <div class="pf-gen-section">
           <label>${t('profile.generator.result')}</label>
+          ${component.type === 'extension' && html`
+            <p class="pf-gen-hint">${t('profile.generator.extensionPasteHint')}</p>
+          `}
           <textarea
             class="pf-gen-result-area"
             rows="12"
-            placeholder=${t('profile.generator.resultPlaceholder')}
+            placeholder=${component.type === 'extension'
+              ? t('profile.generator.extensionResultPlaceholder')
+              : t('profile.generator.resultPlaceholder')}
             value=${result}
             onInput=${e => setResult(e.target.value)}
           />
