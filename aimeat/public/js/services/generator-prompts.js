@@ -282,11 +282,13 @@ const authScript = document.createElement('script');
 authScript.src = NODE_URL + '/v1/libs/aimeat-auth.js';
 document.head.appendChild(authScript);
 authScript.onload = () => {
-  window.AIMEAT.auth.init({
-    onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
-    onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+  // Mount a login/register button into a container element
+  AIMEAT.auth.mountLoginButton('#auth-container', {
+    onLogin: () => startApp(),
+    onLogout: () => location.reload(),
   });
-  startApp();
+  // Also auto-login if session exists from previous visit
+  AIMEAT.auth.login().then(() => startApp()).catch(() => {});
 };
 \`\`\`
 
