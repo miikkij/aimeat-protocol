@@ -271,9 +271,15 @@ The app runs inline on an AIMEAT node. It MUST use the built-in auth library —
 
 ### Auth setup (copy this exactly into your <script>):
 \`\`\`javascript
+// Detect node URL — works inline (same origin), localhost dev, and file:// open
+const NODE_URL = (location.protocol === 'file:' || location.origin === 'null')
+  ? (localStorage.getItem('aimeat_node_url') || prompt('Enter AIMEAT node URL:', 'https://aimeat.io'))
+  : location.origin;
+if (location.protocol === 'file:' && NODE_URL) localStorage.setItem('aimeat_node_url', NODE_URL);
+
 // Load AIMEAT auth library — handles login UI, JWT tokens, refresh
 const authScript = document.createElement('script');
-authScript.src = '/v1/libs/aimeat-auth.js';
+authScript.src = NODE_URL + '/v1/libs/aimeat-auth.js';
 document.head.appendChild(authScript);
 authScript.onload = () => {
   window.AIMEAT.auth.init({
@@ -286,7 +292,6 @@ authScript.onload = () => {
 
 ### API helper (copy this exactly):
 \`\`\`javascript
-const NODE_URL = window.location.origin;
 
 async function apiCall(path, opts = {}) {
   const session = window.AIMEAT?.auth?.getSession?.();
