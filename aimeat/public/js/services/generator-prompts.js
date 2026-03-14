@@ -126,12 +126,20 @@ ui_hints:
 \`\`\`
 
 CRITICAL rules:
-- data_schema.required and data_schema.optional are MAPS (key: {type: ...}), NOT arrays
+- data_schema.required and data_schema.optional are MAPS, NOT arrays!
+  WRONG (will fail): ❌
+    required:
+      - name: alert
+        type: string
+  CORRECT: ✅
+    required:
+      alert:
+        type: string
 - data_schema.required MUST have at least one field
 - Field types: string, number, integer, boolean, array, object
-- ALWAYS quote description/purpose values with double quotes
-- Strings containing { } : # [ ] must be quoted
-- Do NOT use YAML block scalars (> or |) — use "quoted strings"
+- ALWAYS quote description/purpose values with double quotes: description: "text here"
+- Strings containing ( ) { } : # [ ] must be quoted with double quotes
+- Do NOT use YAML block scalars (> or |) — always use "quoted strings" on the same line
 - Keep fields reasonable — only what the service actually needs`,
 
   msm: (label, context) => `${AIMEAT_CONTEXT}

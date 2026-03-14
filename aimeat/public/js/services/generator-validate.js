@@ -70,15 +70,23 @@ function sanitizeYaml(text) {
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
-  // Convert YAML block scalars (> or |) to plain strings on same line
-  // e.g., "description: >\n  multi\n  line" → "description: multi line"
+  // Convert YAML block scalars (> or |) to plain quoted strings on same line.
+  // Only convert when the body actually has indented continuation lines.
+  // If body is empty (AI forgot to indent), leave as-is — don't produce empty "".
   s = s.replace(/^(\s*\w[\w_-]*:\s*)[>|]-?\s*\n((?:\s+.*\n?)*)/gm, (_match, prefix, body) => {
     const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return _match; // no indented body → don't convert
     return prefix + '"' + lines.join(' ').replace(/"/g, '\\"') + '"\n';
   });
-  // Auto-quote unquoted YAML values containing { } which YAML misparses as flow mappings
-  s = s.replace(/^(\s*(?:description|title|label|message):\s+)(?!["'>|])(.+\{.+\}.*)$/gm,
-    (_match, prefix, value) => prefix + '"' + value.replace(/"/g, '\\"') + '"');
+  // Auto-quote unquoted string-value fields that contain special YAML chars.
+  // Only quote if the value contains chars that actually break plain scalars: : # [ ] { } ( ) , > |
+  s = s.replace(/^(\s*(?:description|title|label|message|consent_purpose|purpose|display_name):\s+)(?!["'>|])(.+)$/gm,
+    (_match, prefix, value) => {
+      if (/[:#\[\]{}(),>|]/.test(value)) {
+        return prefix + '"' + value.replace(/"/g, '\\"') + '"';
+      }
+      return _match; // no special chars → leave as plain scalar
+    });
   return s;
 }
 
