@@ -6,6 +6,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import * as cortexService from '/js/services/cortex.js';
+import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
 
 const COMP_ICONS = {schema:'\u{1F4D0}',prompt:'\u{1F4AC}',action:'\u26A1','board-template':'\u{1F4CC}',ontology:'\u{1F9EC}','seed-data':'\u{1F331}',lib:'\u{1F4E6}'};
@@ -102,8 +103,14 @@ export default function ExtensionsTab({ session, showToast }) {
   const [libEntries, setLibEntries] = useState([{filename:'', code:''}]);
   const [bundledInstalling, setBundledInstalling] = useState(null);
 
+  // V8 extension state
+  const [v8Exts, setV8Exts] = useState(null);
+  const [v8Detail, setV8Detail] = useState(null);
+  const [v8Instances, setV8Instances] = useState(null);
+  const [newInstanceId, setNewInstanceId] = useState('');
+
   useEffect(() => {
-    if (session) loadExtensions();
+    if (session) { loadExtensions(); loadV8Extensions(); }
   }, [session]);
 
   async function loadExtensions() {
@@ -111,6 +118,74 @@ export default function ExtensionsTab({ session, showToast }) {
       const resp = await cortexService.listExtensions();
       setExtensions(resp?.extensions || []);
     } catch { setExtensions([]); }
+  }
+
+  async function loadV8Extensions() {
+    try { setV8Exts(await v8Ext.listV8Extensions()); } catch { setV8Exts([]); }
+  }
+
+  async function loadV8Detail(name) {
+    setV8Detail(null);
+    setV8Instances(null);
+    setNewInstanceId('');
+    try {
+      const ext = await v8Ext.getV8Extension(name);
+      setV8Detail(ext);
+      try { setV8Instances(await v8Ext.listInstances(name)); } catch { setV8Instances([]); }
+    } catch(e) { setV8Detail({ error: e.message }); }
+  }
+
+  async function handleV8Activate(name) {
+    try {
+      const resp = await v8Ext.activateV8Extension(name);
+      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+      showToast(t('profile.v8ext.activated'));
+      loadV8Extensions();
+      if (v8Detail?.name === name) loadV8Detail(name);
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function handleV8Deactivate(name) {
+    try {
+      const resp = await v8Ext.deactivateV8Extension(name);
+      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+      showToast(t('profile.v8ext.deactivated'));
+      loadV8Extensions();
+      if (v8Detail?.name === name) loadV8Detail(name);
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function handleV8Delete(name) {
+    if (!confirm(t('profile.v8ext.confirmDelete'))) return;
+    try {
+      const resp = await v8Ext.deleteV8Extension(name);
+      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+      showToast(t('profile.v8ext.deleted'));
+      setV8Detail(null);
+      loadV8Extensions();
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function handleCreateInstance(name) {
+    const id = newInstanceId.trim();
+    if (!id) { showToast(t('profile.v8ext.instanceIdRequired'), true); return; }
+    try {
+      const resp = await v8Ext.createInstance(name, id, {});
+      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+      showToast(t('profile.v8ext.instanceCreated'));
+      setNewInstanceId('');
+      setV8Instances(await v8Ext.listInstances(name));
+    } catch(e) { showToast(e.message, true); }
+  }
+
+  async function handleDeleteInstance(name, instanceId) {
+    if (!confirm(t('profile.v8ext.confirmDeleteInstance'))) return;
+    try {
+      const resp = await v8Ext.deleteInstance(name, instanceId);
+      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+      showToast(t('profile.v8ext.instanceDeleted'));
+      setV8Instances(await v8Ext.listInstances(name));
+    } catch(e) { showToast(e.message, true); }
   }
 
   async function loadDetail(name) {
@@ -309,12 +384,113 @@ export default function ExtensionsTab({ session, showToast }) {
     </div>`;
   }
 
+  // ── V8 detail view ──
+  if (v8Detail) {
+    if (v8Detail.error) return html`<div><button class="btn-outline" onClick=${() => setV8Detail(null)}>${t('profile.v8ext.back')}</button><div class="empty">Error: ${v8Detail.error}</div></div>`;
+    const ext = v8Detail;
+    const isActive = ext.status === 'active';
+    const actions = ext.actions || [];
+    const supportsInstances = ext.instances?.supported;
+
+    return html`<div>
+      <button class="btn-outline" onClick=${() => setV8Detail(null)}>${t('profile.v8ext.back')}</button>
+      <div style="margin:1.5rem 0">
+        <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">
+          ${ext.name}
+          <span style="font-size:.8rem;font-weight:400;color:var(--muted)">v${ext.version || '?'}</span>
+        </div>
+        <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${ext.description || ''}</div>
+        <div style="display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);margin-bottom:1rem;flex-wrap:wrap">
+          <span>${t('profile.v8ext.author')}: ${ext.author || '?'}</span>
+          <span><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
+          <span>${t('profile.v8ext.actions')}: ${actions.length}</span>
+        </div>
+      </div>
+
+      ${actions.length > 0 ? html`
+        <div class="ext-detail-section">
+          <div class="ext-detail-section-title">${t('profile.v8ext.actionsTitle')}</div>
+          ${actions.map(a => html`
+            <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border,#E5E7EB)">
+              <span style="font-weight:600;font-size:.9rem">${a.id}</span>
+              <span style="font-size:.8rem;color:var(--muted)">${a.method || 'POST'}</span>
+              <span style="font-size:.8rem;color:var(--muted);flex:1">${a.description || ''}</span>
+            </div>`)}
+        </div>` : null}
+
+      ${supportsInstances ? html`
+        <div class="ext-detail-section" style="margin-top:1.5rem">
+          <div class="ext-detail-section-title">${t('profile.v8ext.instancesTitle')}</div>
+          ${!v8Instances ? html`<${Spinner} />` : v8Instances.length === 0
+            ? html`<div style="font-size:.85rem;color:var(--muted);padding:.5rem 0">${t('profile.v8ext.noInstances')}</div>`
+            : v8Instances.map(inst => html`
+              <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;margin-bottom:.5rem;background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px">
+                <span style="font-weight:600;font-size:.9rem;flex:1">${inst.id}</span>
+                <span class="ext-status-dot ${inst.status}"></span>
+                <span style="font-size:.8rem;color:var(--muted)">${inst.status}</span>
+                <button class="btn-sm" onClick=${() => { copyToClipboard(inst.id); showToast(t('profile.v8ext.instanceIdCopied')); }}>${t('profile.v8ext.copyId')}</button>
+                <button class="btn-sm btn-danger" onClick=${() => handleDeleteInstance(ext.name, inst.id)}>${t('profile.v8ext.deleteInstance')}</button>
+              </div>`)}
+          ${isActive ? html`
+            <div style="display:flex;gap:.5rem;margin-top:.75rem;align-items:center">
+              <input class="input-field" style="flex:1;max-width:300px" placeholder=${t('profile.v8ext.instanceIdPlaceholder')} value=${newInstanceId} onInput=${e => setNewInstanceId(e.target.value)} />
+              <button class="btn-primary btn-sm" onClick=${() => handleCreateInstance(ext.name)}>${t('profile.v8ext.createInstance')}</button>
+            </div>` : html`<div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">${t('profile.v8ext.activateFirst')}</div>`}
+        </div>` : html`
+        <div class="ext-detail-section" style="margin-top:1.5rem">
+          <div class="ext-detail-section-title">${t('profile.v8ext.apiEndpoint')}</div>
+          <div style="font-size:.85rem;padding:.75rem;background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px;font-family:monospace;word-break:break-all">
+            POST ${NODE_URL}/v1/ext/${ext.name}/{actionId}
+          </div>
+          <button class="btn-sm" style="margin-top:.5rem" onClick=${() => { copyToClipboard(NODE_URL + '/v1/ext/' + ext.name + '/'); showToast(t('profile.v8ext.copied')); }}>${t('profile.v8ext.copyEndpoint')}</button>
+        </div>`}
+
+      <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap">
+        ${isActive
+          ? html`<button class="btn-outline" onClick=${() => handleV8Deactivate(ext.name)}>${t('profile.v8ext.deactivate')}</button>`
+          : html`<button class="btn-primary" onClick=${() => handleV8Activate(ext.name)}>${t('profile.v8ext.activate')}</button>`}
+        <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
+      </div>
+    </div>`;
+  }
+
   // ── Grid view ──
   const hasExtensions = extensions && extensions.length > 0;
   const installedNames = (extensions || []).map(e => e.name);
   const unbundled = BUNDLED.filter(b => !installedNames.includes(b.id));
+  const hasV8 = v8Exts && v8Exts.length > 0;
 
   return html`<div>
+    ${hasV8 ? html`
+      <div style="margin-bottom:2rem">
+        <div class="section-title">${t('profile.v8ext.title')}</div>
+        <div class="section-desc">${t('profile.v8ext.desc')}</div>
+        <div class="ext-grid" style="margin-top:1rem">
+          ${v8Exts.map(ext => {
+            const isActive = ext.status === 'active';
+            return html`
+              <div class="ext-card" onClick=${() => loadV8Detail(ext.name)}>
+                <div class="ext-card-header">
+                  <span class="ext-card-name">${ext.name}</span>
+                  <span class="ext-card-version">v${ext.version || '?'}</span>
+                </div>
+                <div class="ext-card-desc">${ext.description || ''}</div>
+                <div class="ext-card-tags">
+                  ${(ext.actions || []).map(a => html`<span class="ext-comp-tag" style="color:#f59e0b">${a.id}</span>`)}
+                </div>
+                <div class="ext-card-footer">
+                  <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
+                  <span class="ext-card-actions">
+                    ${isActive
+                      ? html`<button onClick=${(e) => { e.stopPropagation(); handleV8Deactivate(ext.name); }}>${t('profile.v8ext.deactivate')}</button>`
+                      : html`<button onClick=${(e) => { e.stopPropagation(); handleV8Activate(ext.name); }}>${t('profile.v8ext.activate')}</button>`}
+                  </span>
+                </div>
+              </div>`;
+          })}
+        </div>
+      </div>` : null}
+
     <div class="ext-hero">
       <div class="section-title">${'\u{1F9E9}'} ${t('profile.extensions.title')}</div>
       ${!hasExtensions
