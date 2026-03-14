@@ -896,7 +896,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       };
 
       // Execute the action in the V8 isolate sandbox
-      const limits = ext.limits;
+      // Use the higher of stored vs config limits so admin can raise limits without reinstalling
+      const limits = {
+        memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),
+        timeoutMs: Math.max(ext.limits.timeoutMs, config.extensionTimeoutMs),
+        maxApiCalls: Math.max(ext.limits.maxApiCalls, config.extensionMaxApiCalls),
+      };
       const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
 
       res.json(success(config.nodeId, result, [
@@ -1057,7 +1062,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       };
 
       // Execute the action in the V8 isolate sandbox
-      const limits = ext.limits;
+      // Use the higher of stored vs config limits so admin can raise limits without reinstalling
+      const limits = {
+        memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),
+        timeoutMs: Math.max(ext.limits.timeoutMs, config.extensionTimeoutMs),
+        maxApiCalls: Math.max(ext.limits.maxApiCalls, config.extensionMaxApiCalls),
+      };
       const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
 
       res.json(success(config.nodeId, result, [
