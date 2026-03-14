@@ -19,6 +19,9 @@
  *     to match POST /v1/extensions format (metadata/actions with script refs)
  *   v2.1.0 — 2026-03-14 — Rewrite App prompt to use aimeat-auth.js library
  *     for automatic authentication instead of manual token/URL configuration
+ *   v3.0.0 — 2026-03-14 — Major overhaul: add data standards to AIMEAT_CONTEXT,
+ *     improve all prompts with sandbox limitations, real API limits, memory patterns,
+ *     translation key conventions, app CDN/CSP guidance, ctx.fetch documentation
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -34,24 +37,29 @@ Available building blocks:
 - Memory: Key-value storage with namespace isolation.
 - Translation: Per-locale i18n strings.
 
-Extensions run in isolated V8 with this API:
-  ctx.memory.get(key), ctx.memory.set(key, value), ctx.memory.search(prefix), ctx.memory.delete(key)
-  ctx.fetch(url, { method, headers, body }) — returns { status, ok, text, headers }. Use this for ALL HTTP requests (RSS feeds, external APIs, etc). Global fetch() is NOT available.
+Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
+  ctx.memory.get(key) → value or null
+  ctx.memory.set(key, value) → void
+  ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
+  ctx.memory.delete(key) → boolean
+  ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
+    Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
+    Response body is always .text (string) — parse JSON with JSON.parse(resp.text).
   ctx.wallet.consume(amount, reason), ctx.wallet.getBalance()
   ctx.consent.check(gaii, scope), ctx.consent.require(gaii, scope)
   ctx.trust.getScore(gaii)
   ctx.caller = { gaii, owner, roles }
-  ctx.config = extension config, ctx.instance = { id, config }
+  ctx.config = extension config object (from manifest config section)
+  ctx.instance = { id, config } (when called via instance endpoint)
   ctx.log.info/warn/error(msg, data)
 
-AIMEAT Data Standards (MUST follow in all components):
-  Dates/times: ISO 8601 only — "2026-03-14T13:00:00.000Z". Never store RFC 2822, Unix timestamps, or locale-formatted dates.
-  Memory keys: kebab-case with dot namespaces — "alerts.by-date.2026-03-14". Dates in keys use YYYY-MM-DD.
+AIMEAT Data Standards (MUST follow in ALL components):
+  Dates/times: ISO 8601 ONLY — "2026-03-14T13:00:00.000Z". NEVER store RFC 2822 ("Sat, 14 Mar ..."), Unix timestamps, or locale-formatted dates. Convert all dates to ISO before storing.
+  Memory keys: lowercase dot-namespaced — "alerts.by-date.2026-03-14". Dates in keys MUST use YYYY-MM-DD.
   IDs: URL-safe strings (kebab-case or hex hashes). No spaces, no special characters.
   Locale codes: BCP 47 — "fi", "en", "fi-FI", "en-US".
   Coordinates: { latitude: number, longitude: number } — WGS84 decimal degrees.
   Currency/amounts: integers (no floats) — morsels are whole numbers.
-  ctx.memory.search(prefix) returns Array<{ key, value }> — NOT plain strings.
 `.trim();
 
 /* ── Blueprint Prompt ────────────────────────────────── */
@@ -157,6 +165,7 @@ ui_hints:
 - data_schema.required and data_schema.optional are MAPS (fieldName: {type: ...}), NOT arrays (- name: ...)
 - data_schema.required MUST have at least one field
 - Field types: string, number, integer, boolean, array, object
+- All date/time fields MUST be type: string with description mentioning ISO 8601 format
 - Keep fields reasonable — only what the service actually needs`,
 
   msm: (label, context) => `${AIMEAT_CONTEXT}
@@ -186,9 +195,9 @@ service:
   category: data
   tags: [tag1, tag2]
 auth:
-  type: api_key
-  param_name: apikey
-  env_var: MY_API_KEY
+  type: none
+  param_name: ""
+  env_var: ""
 actions:
   - id: action-id
     display_name: "Human Readable Action Name"
@@ -211,6 +220,7 @@ actions:
 - \`service\` section with \`name\`, \`description\`, \`category\` is REQUIRED
 - \`category\` must be one of: data, utility, image, communication, analytics, analysis
 - \`auth.type\` must be one of: bearer, query_param, oauth2, api_key, none
+- For public APIs (RSS feeds, open data) use \`auth.type: none\` — many APIs don't require authentication
 - \`actions\` is an array — each action needs: id, display_name, description, endpoint (method + url), input, output
 - Each action output MUST have at least one field`,
 
@@ -229,6 +239,34 @@ WRONG: description: > This is a folded string
 WRONG: description: This has (parens) and colons: here
 CORRECT: description: "This has (parens) and colons: here — all on one line"
 
+## V8 Sandbox Constraints (CRITICAL — read before writing code)
+
+Extension code runs in an ISOLATED V8 sandbox. The following are NOT available:
+- No \`require()\`, no \`import\` (except \`export default\` for the action entry point)
+- No Node.js APIs (fs, path, crypto, Buffer, process, etc.)
+- No \`fetch()\` global — use \`ctx.fetch()\` instead
+- No \`setTimeout\`, \`setInterval\`, \`setImmediate\`
+- No \`console.log\` — use \`ctx.log.info/warn/error()\`
+- No DOM APIs (document, window, etc.)
+
+What IS available:
+- Standard JS built-ins: JSON, Math, Date, String, Array, Object, Map, Set, RegExp, Promise, etc.
+- \`ctx\` API object (memory, fetch, wallet, consent, trust, caller, config, log)
+- \`export default async function(ctx, input) { ... }\` — the action entry point
+
+## ctx.memory.search() returns objects, NOT strings
+
+WRONG:
+  const keys = await ctx.memory.search("prefix.");
+  for (const key of keys) { await ctx.memory.get(key); }  // ERROR: key is {key,value} not string
+
+CORRECT:
+  const results = await ctx.memory.search("prefix.");
+  for (const entry of results) {
+    const key = entry.key;    // string
+    const value = entry.value; // the stored value
+  }
+
 ## Output format — SINGLE block, copy-paste friendly
 
 Return EVERYTHING in ONE code block. The YAML manifest first, then all JavaScript files separated by // actions/filename.js comments. The user will copy-paste the entire response at once.
@@ -243,8 +281,8 @@ required_apis: [memory]
 config: {}
 limits:
   memory_mb: 128
-  timeout_ms: 5000
-  max_api_calls: 100
+  timeout_ms: 30000
+  max_api_calls: 500
 actions:
   - id: action-id
     description: "What this action does"
@@ -259,6 +297,10 @@ export default async function(ctx, input) {
   // Use ctx.memory, ctx.wallet, ctx.caller, ctx.log
   // Use ctx.fetch(url, opts) for HTTP requests — global fetch() is NOT available
   const resp = await ctx.fetch('https://example.com/api');
+  if (!resp.ok) {
+    ctx.log.error('API request failed', { status: resp.status });
+    return { error: 'Request failed with status ' + resp.status };
+  }
   const data = JSON.parse(resp.text);
   return { result: data };
 }
@@ -270,7 +312,11 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
 - \`actions\` array MUST NOT be empty — each action needs: id, method, path, script
-- Each action's \`script\` field value must match a \`// actions/{script}\` comment below the YAML`,
+- Each action's \`script\` field value must match a \`// actions/{script}\` comment below the YAML
+- \`limits.timeout_ms\`: use 30000 for extensions that call external APIs, 5000 for memory-only
+- \`limits.max_api_calls\`: use 500 for data collectors (many memory writes per run), 100 for simple actions
+- All helper functions must be defined INSIDE the same code block — no imports allowed
+- Always convert dates to ISO 8601 before storing in memory`,
 
   app: (label, context) => `${AIMEAT_CONTEXT}
 
@@ -280,19 +326,13 @@ ${context}
 
 ## CRITICAL: Authentication & API Calls
 
-The app runs inline on an AIMEAT node. It MUST use the built-in auth library — NEVER ask the user to paste tokens or configure API URLs manually.
+The app runs on the SAME ORIGIN as the AIMEAT node. Use relative API paths (e.g., "/v1/ext/..."), NOT absolute URLs.
 
 ### Auth setup (copy this exactly into your <script>):
 \`\`\`javascript
-// Detect node URL — works inline (same origin), localhost dev, and file:// open
-const NODE_URL = (location.protocol === 'file:' || location.origin === 'null')
-  ? (localStorage.getItem('aimeat_node_url') || prompt('Enter AIMEAT node URL:', 'https://aimeat.io'))
-  : location.origin;
-if (location.protocol === 'file:' && NODE_URL) localStorage.setItem('aimeat_node_url', NODE_URL);
-
 // Load AIMEAT auth library — handles login UI, JWT tokens, refresh
 const authScript = document.createElement('script');
-authScript.src = NODE_URL + '/v1/libs/aimeat-auth.js';
+authScript.src = '/v1/libs/aimeat-auth.js';
 document.head.appendChild(authScript);
 authScript.onload = () => {
   // Mount a login/register button into a container element
@@ -301,37 +341,53 @@ authScript.onload = () => {
     onLogout: () => location.reload(),
   });
   // Also auto-login if session exists from previous visit
-  AIMEAT.auth.login().then(() => startApp()).catch(() => {});
+  AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
 };
 \`\`\`
 
 ### API helper (copy this exactly):
 \`\`\`javascript
-
 async function apiCall(path, opts = {}) {
   const session = window.AIMEAT?.auth?.getSession?.();
   if (!session?.jwt) throw new Error('Not logged in');
   const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.jwt, ...opts.headers };
-  const resp = await fetch(NODE_URL + path, { ...opts, headers });
+  const resp = await fetch(path, { ...opts, headers });
   return resp.json();
 }
+\`\`\`
+
+### Reading memory data:
+\`\`\`javascript
+// Read a single memory key
+const data = await apiCall('/v1/memory/my.key.name');
+// Search by prefix
+const results = await apiCall('/v1/memory?prefix=alerts.by-date.&owner_scope=true');
 \`\`\`
 
 ### Calling extension actions:
 \`\`\`javascript
 // Without instance:
-const result = await apiCall('/v1/ext/EXTENSION-NAME/ACTION-ID', { method: 'POST', body: JSON.stringify({ input: data }) });
+const result = await apiCall('/v1/ext/EXTENSION-NAME/ACTION-ID', { method: 'POST', body: JSON.stringify({}) });
 // With instance:
-const result = await apiCall('/v1/ext/EXTENSION-NAME/INSTANCE-ID/ACTION-ID', { method: 'POST', body: JSON.stringify({ input: data }) });
+const result = await apiCall('/v1/ext/EXTENSION-NAME/INSTANCE-ID/ACTION-ID', { method: 'POST', body: JSON.stringify({}) });
 \`\`\`
+
+## CDN Libraries
+
+The AIMEAT app catalog allows external CDN scripts. You may use these via <script> tags:
+- Leaflet (maps): https://unpkg.com/leaflet@1/dist/leaflet.js + leaflet.css
+- Chart.js (charts): https://cdn.jsdelivr.net/npm/chart.js
+- Other CDN libraries from unpkg.com, cdn.jsdelivr.net, or cdnjs.cloudflare.com
 
 ## Rules
 - DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
 - DO NOT use prompt() or manual token entry — the auth library handles everything
-- The app is served from the same origin as the AIMEAT node — use relative paths
+- ALL API paths MUST be relative (start with /) — never use absolute URLs or NODE_URL
 - Use \`window.AIMEAT.auth.getSession()\` to check if logged in; show a "Sign in" message if not
 - Use vanilla JS (no build step needed)
-- Has a clean, responsive UI
+- All dates displayed to users should be formatted from ISO 8601 strings (never store display-formatted dates)
+- Has a clean, responsive UI with good mobile support
+- Use CSS custom properties for theming where possible
 
 Return a complete HTML file with an app manifest comment at the top:
 
@@ -344,9 +400,10 @@ entry: index.html
 -->
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><title>App Name</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>App Name</title></head>
 <body>
-  <!-- App UI here -->
+  <div id="auth-container"></div>
+  <div id="app"></div>
   <script>
     // Auth setup + API helper + app logic here
   </script>
@@ -360,11 +417,45 @@ Define memory structure for: ${label}
 
 ${context}
 
-Return a JSON object where keys are memory key names and values are the initial data:
+## Memory Key Conventions
+
+AIMEAT memory uses dot-namespaced keys with a standard metadata pattern:
+
+- \`namespace.__meta\` — describes the namespace (version, key format, description)
+- \`namespace.__index\` — lightweight index for fast lookups (list of dates, counts, rankings)
+- \`namespace.__config\` — configuration for the namespace (TTLs, thresholds, weights)
+- \`namespace.YYYY-MM-DD\` — date-bucketed data (one key per day)
+- \`namespace.item-id\` — individual items
+
+Values are JSON objects. Keep individual values under 100KB.
+
+## Rules
+- All keys MUST be lowercase with dots as namespace separators
+- Date-bucketed keys MUST use YYYY-MM-DD format: "alerts.by-date.2026-03-14"
+- All date/time values inside objects MUST be ISO 8601: "2026-03-14T13:00:00.000Z"
+- Include __meta with version and description for every namespace
+- Include __index if consumers need to discover which keys exist (e.g., list of dates with data)
+- Keep __index lightweight — just key names, counts, and pointers. NOT full data copies.
+- Use arrays for ordered collections within a bucket (e.g., alerts per day)
+- Use meaningful field names that match the CSM data_schema where applicable
+
+Return a JSON object where keys are memory key names and values are the initial/template data:
 \`\`\`json
 {
-  "namespace.key1": { "field": "value" },
-  "namespace.key2": { "field": "value" }
+  "namespace.__meta": {
+    "version": "1.0",
+    "description": "What this namespace stores",
+    "keyFormat": "namespace.YYYY-MM-DD"
+  },
+  "namespace.__index": {
+    "dates": [],
+    "totalItems": 0,
+    "lastUpdated": ""
+  },
+  "namespace.YYYY-MM-DD": {
+    "date": "YYYY-MM-DD",
+    "items": []
+  }
 }
 \`\`\``,
 
@@ -374,11 +465,43 @@ Create translations for: ${label}
 
 ${context}
 
+## Translation Key Conventions
+
+- Keys use dot-namespaced paths matching the UI structure: "app.alerts.title", "app.filters.severity"
+- Group by UI section: "app.nav.*", "app.map.*", "app.filters.*", "app.stats.*"
+- Include domain-specific terms: incident types, severity levels, status labels
+- Use interpolation with \${variable} syntax for dynamic values: "Found \${count} alerts"
+
+## Rules
+- MUST include BOTH "en" and "fi" locales
+- Finnish translations must be natural Finnish, not machine-translated
+- Include ALL text that appears in the UI — labels, buttons, tooltips, empty states, error messages
+- Keep keys consistent with what the App component will reference
+- Use plural-aware keys where needed: "alert.one" / "alert.many"
+
 Return JSON with translations for each locale:
 \`\`\`json
 {
-  "en": { "key.path": "English text" },
-  "fi": { "key.path": "Finnish text" }
+  "en": {
+    "app.title": "App Title",
+    "app.nav.home": "Home",
+    "app.filters.severity": "Severity",
+    "app.filters.all": "All",
+    "app.empty": "No data found",
+    "app.error": "Something went wrong",
+    "domain.type.fire": "Fire",
+    "domain.severity.small": "Small"
+  },
+  "fi": {
+    "app.title": "Sovelluksen nimi",
+    "app.nav.home": "Etusivu",
+    "app.filters.severity": "Vakavuus",
+    "app.filters.all": "Kaikki",
+    "app.empty": "Tietoja ei löytynyt",
+    "app.error": "Jokin meni pieleen",
+    "domain.type.fire": "Tulipalo",
+    "domain.severity.small": "Pieni"
+  }
 }
 \`\`\``,
 };
