@@ -236,6 +236,18 @@ export class Scheduler {
         },
         delete: async (key) => this.storage.deleteMemory(extMemoryOwner, key),
       },
+      fetch: async (url, opts) => {
+        const resp = await fetch(url, {
+          method: opts?.method || 'GET',
+          headers: opts?.headers,
+          body: opts?.body,
+          signal: AbortSignal.timeout(30_000),
+        });
+        const text = await resp.text();
+        const headers: Record<string, string> = {};
+        resp.headers.forEach((v, k) => { headers[k] = v; });
+        return { status: resp.status, ok: resp.ok, text, headers };
+      },
       wallet: {
         // Scheduler jobs run as system — no wallet operations
       },

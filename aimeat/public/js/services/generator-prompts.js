@@ -29,13 +29,14 @@ You are helping create an AIMEAT service. AIMEAT is an AI agent infrastructure p
 Available building blocks:
 - CSM (Community Service Manifest): YAML defining data schemas, fields, consent rules, validation.
 - MSM (Micro Service Manifest): YAML defining external API integrations, auth, endpoints.
-- Extension: V8-sandboxed JavaScript logic with YAML manifest. Actions get ctx object with memory, wallet, consent, trust APIs.
+- Extension: V8-sandboxed JavaScript logic with YAML manifest. Actions get ctx object with memory, wallet, consent, trust, fetch APIs.
 - App: HTML/JS user interface published to the apps catalog.
 - Memory: Key-value storage with namespace isolation.
 - Translation: Per-locale i18n strings.
 
 Extensions run in isolated V8 with this API:
   ctx.memory.get(key), ctx.memory.set(key, value), ctx.memory.search(prefix), ctx.memory.delete(key)
+  ctx.fetch(url, { method, headers, body }) — returns { status, ok, text, headers }. Use this for ALL HTTP requests (RSS feeds, external APIs, etc). Global fetch() is NOT available.
   ctx.wallet.consume(amount, reason), ctx.wallet.getBalance()
   ctx.consent.check(gaii, scope), ctx.consent.require(gaii, scope)
   ctx.trust.getScore(gaii)
@@ -247,7 +248,10 @@ actions:
 // actions/action-id.js
 export default async function(ctx, input) {
   // Use ctx.memory, ctx.wallet, ctx.caller, ctx.log
-  return { result: 'data' };
+  // Use ctx.fetch(url, opts) for HTTP requests — global fetch() is NOT available
+  const resp = await ctx.fetch('https://example.com/api');
+  const data = JSON.parse(resp.text);
+  return { result: data };
 }
 \`\`\`
 

@@ -27,6 +27,7 @@ export interface ExtensionCtx {
     trust: {
         getScore?(gaii: string): Promise<number>;
     };
+    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
     caller: { gaii: string; owner: string; roles: string[] };
     config: Record<string, unknown>;
     instance?: {
@@ -132,6 +133,7 @@ ${userFnDecl}
             search: async (prefix, opts) => __call(__memory_search, [prefix, opts ? JSON.stringify(opts) : '{}']),
             delete: async (key)        => __call(__memory_delete, [key]),
         },
+        fetch: async (url, opts) => __call(__fetch, [url, opts ? JSON.stringify(opts) : '{}']),
         wallet: {
             consume:    __wallet_consume   ? (async (amount, reason) => __call(__wallet_consume, [amount, reason]))               : undefined,
             getBalance: __wallet_balance   ? (async () => __call(__wallet_balance, []))                                            : undefined,
@@ -207,6 +209,26 @@ export async function executeExtensionAction(
 
         jail.setSync('__memory_delete', makeRef(
             async (key) => ctx.memory.delete(key as string),
+            counter, limits.maxApiCalls,
+        ));
+
+        // ── Fetch API reference (proxied HTTP) ─────────────
+        jail.setSync('__fetch', makeRef(
+            async (url, optsJson) => {
+                const opts = JSON.parse((optsJson as string) || '{}') as {
+                    method?: string; headers?: Record<string, string>; body?: string;
+                };
+                const resp = await fetch(url as string, {
+                    method: opts.method || 'GET',
+                    headers: opts.headers,
+                    body: opts.body,
+                    signal: AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000)),
+                });
+                const text = await resp.text();
+                const headers: Record<string, string> = {};
+                resp.headers.forEach((v, k) => { headers[k] = v; });
+                return { status: resp.status, ok: resp.ok, text, headers };
+            },
             counter, limits.maxApiCalls,
         ));
 

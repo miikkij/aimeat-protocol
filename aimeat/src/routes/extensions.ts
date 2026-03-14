@@ -832,6 +832,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
         },
+        fetch: async (url, opts) => {
+          const resp = await fetch(url, {
+            method: opts?.method || 'GET',
+            headers: opts?.headers,
+            body: opts?.body,
+            signal: AbortSignal.timeout(30_000),
+          });
+          const text = await resp.text();
+          const headers: Record<string, string> = {};
+          resp.headers.forEach((v, k) => { headers[k] = v; });
+          return { status: resp.status, ok: resp.ok, text, headers };
+        },
         wallet: {
           consume: async (amount: number, reason: string) => {
             const debited = await storage.debitBalance(callerGaii, amount);
@@ -977,6 +989,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return records.map(r => ({ key: r.key, value: r.value }));
           },
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
+        },
+        fetch: async (url, opts) => {
+          const resp = await fetch(url, {
+            method: opts?.method || 'GET',
+            headers: opts?.headers,
+            body: opts?.body,
+            signal: AbortSignal.timeout(30_000),
+          });
+          const text = await resp.text();
+          const headers: Record<string, string> = {};
+          resp.headers.forEach((v, k) => { headers[k] = v; });
+          return { status: resp.status, ok: resp.ok, text, headers };
         },
         wallet: {
           // SECURITY: Extensions can only debit the calling agent's own balance
