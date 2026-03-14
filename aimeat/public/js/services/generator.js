@@ -659,7 +659,7 @@ Content-Type: application/json
 ### Step 5: Process the task
 
 Read \`task.prompt\` — it contains the full generation instructions.
-Execute the prompt to generate the requested output (CSM, MSM, extension, app HTML, memory entries, or translations).
+Execute the prompt to generate the requested output (CSM, MSM, extension, cortex, app HTML, memory entries, or translations).
 
 ### Step 6: Write result
 
