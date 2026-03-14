@@ -10853,7 +10853,7 @@ paths:
       summary: Activate an extension
       description: |
         Start the extension runtime and register its action routes.
-        Requires operator role.
+        Requires owner role. Owners can only activate extensions they installed; operators can activate any.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -10889,7 +10889,7 @@ paths:
       summary: Deactivate an extension
       description: |
         Stop the extension runtime and unregister its action routes.
-        Requires operator role.
+        Requires owner role. Owners can only deactivate extensions they installed; operators can deactivate any.
       tags: [Extensions]
       security:
         - BearerAuth: []

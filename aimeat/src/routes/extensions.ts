@@ -404,15 +404,6 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
-      }
-
       const updated = await storage.updateExtension(name, {
         status: 'active',
         activatedAt: new Date().toISOString(),
@@ -466,15 +457,6 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
-      }
-
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
       }
 
       const updated = await storage.updateExtension(name, {
