@@ -13,6 +13,8 @@
  *   v1.0.0 — 2026-03-10 — Initial validators
  *   v1.1.0 — 2026-03-14 — validateBlueprint now strips extra component fields
  *     (manifest, code, files, etc.) and returns warnings array
+ *   v1.2.0 — 2026-03-14 — Add sanitizeJson() to fix AI markdown artifacts
+ *     (\[ → [, trailing commas, zero-width chars) before JSON.parse
  */
 
 /* ── Helpers ─────────────────────────────────────────── */
@@ -21,6 +23,27 @@ function extractCodeBlock(text, lang) {
   const regex = new RegExp('```' + (lang || '') + '\\s*\\n([\\s\\S]*?)```', 'i');
   const match = text.match(regex);
   return match ? match[1].trim() : text.trim();
+}
+
+/**
+ * Sanitize JSON string from common AI/markdown artifacts before parsing.
+ * AI chat models frequently escape brackets, add trailing commas, or wrap
+ * JSON in markdown formatting that breaks JSON.parse().
+ */
+function sanitizeJson(text) {
+  let s = text;
+  // Strip markdown bold/italic markers that leak into values
+  // (but preserve content inside quoted strings carefully)
+  // Remove backslash-escaped brackets: \[ → [, \] → ]
+  s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
+  // Remove backslash-escaped parens and braces (some models do this)
+  s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
+  s = s.replace(/\\\(/g, '(').replace(/\\\)/g, ')');
+  // Remove trailing commas before } or ] (common AI mistake)
+  s = s.replace(/,\s*([}\]])/g, '$1');
+  // Strip zero-width spaces and other invisible unicode
+  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  return s;
 }
 
 /* ── YAML Parse (lightweight) ────────────────────────── */
@@ -107,7 +130,7 @@ const validators = {
 
   memory(result) {
     const errors = [];
-    const json = extractCodeBlock(result, 'json');
+    const json = sanitizeJson(extractCodeBlock(result, 'json'));
     try {
       const parsed = JSON.parse(json);
       if (typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -124,7 +147,7 @@ const validators = {
 
   translation(result) {
     const errors = [];
-    const json = extractCodeBlock(result, 'json');
+    const json = sanitizeJson(extractCodeBlock(result, 'json'));
     try {
       const parsed = JSON.parse(json);
       if (!parsed.en) errors.push('Missing "en" (English) locale');
@@ -148,7 +171,8 @@ const validators = {
 export function validateBlueprint(result) {
   const errors = [];
   const warnings = [];
-  const json = extractCodeBlock(result, 'json') || result;
+  const raw = extractCodeBlock(result, 'json') || result;
+  const json = sanitizeJson(raw);
   try {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed.components)) errors.push('Missing "components" array');
