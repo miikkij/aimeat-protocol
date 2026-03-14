@@ -297,6 +297,27 @@
         try { await window.AIMEAT.auth.login(); } catch (_) {}
       }
 
+      // Listen for session expiry — show notification and trigger re-login
+      if (window.AIMEAT?.auth?.on) {
+        window.AIMEAT.auth.on('expired', () => {
+          console.warn('[aimeat] Session expired — attempting re-login');
+          window.dispatchEvent(new Event('aimeat-auth-change'));
+          // Try silent re-login from stored credentials
+          if (window.AIMEAT.auth.login) {
+            window.AIMEAT.auth.login().then(session => {
+              if (session) {
+                window.dispatchEvent(new Event('aimeat-auth-change'));
+              } else {
+                // Show login UI if silent re-login fails
+                window.dispatchEvent(new CustomEvent('aimeat-session-expired'));
+              }
+            }).catch(() => {
+              window.dispatchEvent(new CustomEvent('aimeat-session-expired'));
+            });
+          }
+        });
+      }
+
       // Mount Preact app
       render(html`<${App} />`, document.getElementById('app'));
 

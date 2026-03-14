@@ -345,6 +345,29 @@ async function authApi(path, jwt, opts = {}) {
 // ── Session object ──
 
 let currentSession = null;
+let refreshTimer = null;
+
+function scheduleAutoRefresh(session) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (!session?.jwt) return;
+  try {
+    const payload = JSON.parse(atob(session.jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!payload.exp) return;
+    // Refresh 5 minutes before expiry (or immediately if less than 5 min left)
+    const msUntilExpiry = (payload.exp * 1000) - Date.now();
+    const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1000, 10_000); // min 10s
+    refreshTimer = setTimeout(async () => {
+      try {
+        await session.refresh();
+        emit('refreshed', session);
+        scheduleAutoRefresh(session); // Schedule next refresh
+      } catch (e) {
+        console.warn('[aimeat-auth] Auto-refresh failed:', e.message);
+        emit('expired', { reason: 'refresh_failed', error: e.message });
+      }
+    }, refreshIn);
+  } catch (_) { /* invalid JWT, skip scheduling */ }
+}
 
 function createSession(data) {
   const session = {
@@ -392,6 +415,7 @@ function createSession(data) {
         owner: session.owner, gaii: session.gaii, ghii: session.ghii,
         jwt: session.jwt, publicKey: session.publicKey,
       });
+      scheduleAutoRefresh(session);
       return session;
     },
 
@@ -493,6 +517,7 @@ const auth = {
     });
 
     currentSession = session;
+    scheduleAutoRefresh(session);
     emit('login', session);
     return session;
   },
@@ -525,6 +550,7 @@ const auth = {
     }
 
     currentSession = session;
+    scheduleAutoRefresh(session);
     emit('login', session);
     return session;
   },
@@ -568,6 +594,7 @@ const auth = {
     });
 
     currentSession = session;
+    scheduleAutoRefresh(session);
     emit('login', session);
     return session;
   },
@@ -579,6 +606,7 @@ const auth = {
 
   /** Logout — clear stored credentials from localStorage and IndexedDB */
   async logout() {
+    if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
     currentSession = null;
     remove('session');
     remove('owner_key');

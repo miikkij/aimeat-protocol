@@ -117,6 +117,13 @@ export default function ExtensionsTab({ session, showToast }) {
     if (session) { loadExtensions(); loadV8Extensions(); }
   }, [session]);
 
+  // Auto-refresh on SSE live updates (extension install/activate/etc)
+  useEffect(() => {
+    const handler = () => { loadExtensions(); loadV8Extensions(); };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+
   async function loadExtensions() {
     try {
       const resp = await cortexService.listExtensions();
