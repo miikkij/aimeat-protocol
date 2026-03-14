@@ -46,6 +46,26 @@ function sanitizeJson(text) {
   return s;
 }
 
+/**
+ * Sanitize AI-generated YAML from common markdown artifacts.
+ * Applied before validation so the YAML checks see clean content.
+ */
+function sanitizeYaml(text) {
+  if (typeof text !== 'string') return text;
+  let s = text;
+  // Markdown bullets → YAML list items: `*   name:` → `  - name:`
+  s = s.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
+  s = s.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
+  // Remove backslash-escaped underscores: `\_` → `_`
+  s = s.replace(/\\_/g, '_');
+  // Remove backslash-escaped brackets and braces
+  s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
+  s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
+  // Remove zero-width unicode
+  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  return s;
+}
+
 /* ── YAML Parse (lightweight) ────────────────────────── */
 
 function basicYamlCheck(text) {
@@ -66,7 +86,7 @@ function basicYamlCheck(text) {
 const validators = {
   csm(result) {
     const errors = [];
-    const yaml = extractCodeBlock(result, 'yaml');
+    const yaml = sanitizeYaml(extractCodeBlock(result, 'yaml'));
     const check = basicYamlCheck(yaml);
     errors.push(...check.errors);
 
@@ -80,7 +100,7 @@ const validators = {
 
   msm(result) {
     const errors = [];
-    const yaml = extractCodeBlock(result, 'yaml');
+    const yaml = sanitizeYaml(extractCodeBlock(result, 'yaml'));
     const check = basicYamlCheck(yaml);
     errors.push(...check.errors);
 
@@ -94,7 +114,7 @@ const validators = {
 
   extension(result) {
     const errors = [];
-    const yaml = extractCodeBlock(result, 'yaml');
+    const yaml = sanitizeYaml(extractCodeBlock(result, 'yaml'));
     const check = basicYamlCheck(yaml);
     errors.push(...check.errors);
 

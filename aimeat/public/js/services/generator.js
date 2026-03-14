@@ -122,7 +122,7 @@ export async function saveComponent(projectId, component) {
         version,
       });
     } catch (err) {
-      if (err?.message?.includes('VERSION_CONFLICT') || err?.status === 409) {
+      if (err?.code === 'VERSION_CONFLICT' || err?.status === 409) {
         // Re-fetch current version and retry once
         const fresh = await apiGet(`/v1/memory/${key}`);
         version = fresh?.data?.version ?? version + 1;
@@ -235,18 +235,40 @@ export async function cleanupOldEntries(projectId) {
 
 /* ── Registration ────────────────────────────────────── */
 
+/**
+ * Sanitize AI-generated YAML that may contain markdown artifacts.
+ * Common issues: `*   name:` (markdown bullet) instead of `  - name:`,
+ * backslash-escaped underscores `\_` instead of `_`, escaped brackets, etc.
+ */
+function sanitizeYaml(text) {
+  if (typeof text !== 'string') return text;
+  let s = text;
+  // Markdown bullets → YAML list items: `*   name:` → `  - name:`
+  s = s.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
+  // Also handle `* name:` with single space
+  s = s.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
+  // Remove backslash-escaped underscores: `\_` → `_`
+  s = s.replace(/\\_/g, '_');
+  // Remove backslash-escaped brackets and braces
+  s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
+  s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
+  // Remove zero-width unicode
+  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  return s;
+}
+
 export async function registerComponent(type, result, session) {
   switch (type) {
     case 'csm':
-      // CSM results are YAML — send as { yaml: string } so the API parses it
-      return apiPost('/v1/csm', typeof result === 'string' ? { yaml: result } : result);
+      // CSM results are YAML — sanitize markdown artifacts and send as { yaml: string }
+      return apiPost('/v1/csm', typeof result === 'string' ? { yaml: sanitizeYaml(result) } : result);
     case 'msm':
       // MSM results are YAML — same pattern
-      return apiPost('/v1/msm', typeof result === 'string' ? { yaml: result } : result);
+      return apiPost('/v1/msm', typeof result === 'string' ? { yaml: sanitizeYaml(result) } : result);
     case 'extension': {
       // POST /v1/extensions expects { manifest: yamlString, scripts: { key: code } }
       const parts = parseExtensionResult(result);
-      return apiPost('/v1/extensions', { manifest: parts.manifest, scripts: parts.scripts });
+      return apiPost('/v1/extensions', { manifest: sanitizeYaml(parts.manifest), scripts: parts.scripts });
     }
     case 'app':
       return apiPost('/v1/apps', typeof result === 'string' ? JSON.parse(result) : result);
