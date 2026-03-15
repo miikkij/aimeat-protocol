@@ -162,6 +162,10 @@ Rules:
 - Cortex libraries are client-side JS that wrap extension APIs into clean domain methods for the app
 - Default to ONE cortex per project unless complexity clearly warrants splitting
 - Only include what's actually needed — don't pad with unnecessary components
+- TRANSLATIONS: Create ONE translation component PER locale. If the spec has locales ["fi", "en"], create translation-1 for fi AND translation-2 for en. NEVER combine multiple locales into one component.
+- MSM: Only create an MSM if the external API requires authentication, API keys, or complex endpoint configuration. Public URLs (RSS feeds, open APIs, open data) do NOT need an MSM — extensions fetch them directly with ctx.fetch().
+- MEMORY: Create memory components for (a) static/seed data provided by the user (lookup tables, reference datasets) and (b) default settings/configuration that the service needs on first run. Pre-populating defaults in memory means the app works immediately without hardcoded fallbacks.
+- CORTEX: Cortex is the middleware between memory and apps. It wraps ALL memory access into clean domain methods: data queries, settings, i18n, computed values. Apps should NEVER read memory directly — they call cortex methods.
 
 ## Data Pipeline Verification (do this BEFORE listing components)
 
@@ -194,10 +198,10 @@ An extension MUST do something that a browser CANNOT do. If a browser can do it,
 
 **Everything else is cortex or app:**
 - Reading/filtering/transforming data already in memory → cortex
-- User preferences, settings, personal data CRUD → app (AIMEAT.data.get/set/delete)
-- Computed/derived values (math, sorting, grouping, statistics) → cortex or app
+- User preferences, settings, i18n → cortex (wraps memory reads/writes into clean methods)
+- Computed/derived values (math, sorting, grouping, statistics) → cortex
 - Export/download generation (CSV, JSON, PDF) → app (browser generates the file)
-- Display formatting, localization, UI logic → app
+- Display formatting, UI logic → app (calls cortex methods, never reads memory directly)
 
 ### Quick Test (apply to EVERY proposed extension)
 Ask: "Does this action fetch from an external server or run on a schedule?"
@@ -212,7 +216,7 @@ Place it in an early phase (before extensions that consume it).
 
 ### Common Mistakes to Avoid
 - Do NOT create an "export" extension — apps generate files client-side
-- Do NOT create a "settings" extension — apps read/write user prefs via AIMEAT.data
+- Do NOT create a "settings" extension — settings go in a memory component (defaults) and cortex (read/write methods)
 - Do NOT create a "query" or "filter" extension — cortex reads memory directly
 - Do NOT create a "compute" extension for math/stats — cortex/app does client-side math
 
