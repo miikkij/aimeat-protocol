@@ -15,6 +15,7 @@ export interface ExtensionCtx {
         set(key: string, value: unknown): Promise<void>;
         search(prefix: string, opts?: Record<string, unknown>): Promise<Array<{ key: string; value: unknown }>>;
         delete(key: string): Promise<boolean>;
+        getPublic(namespace: string, key: string): Promise<unknown | null>;
     };
     wallet: {
         consume?(amount: number, reason: string): Promise<{ success: boolean; error?: string }>;
@@ -132,6 +133,7 @@ ${userFnDecl}
             set:    async (key, value) => __call(__memory_set, [key, JSON.stringify(value)]),
             search: async (prefix, opts) => __call(__memory_search, [prefix, opts ? JSON.stringify(opts) : '{}']),
             delete: async (key)        => __call(__memory_delete, [key]),
+            getPublic: async (namespace, key) => __call(__memory_getPublic, [namespace, key]),
         },
         fetch: async (url, opts) => __call(__fetch, [url, opts ? JSON.stringify(opts) : '{}']),
         wallet: {
@@ -209,6 +211,11 @@ export async function executeExtensionAction(
 
         jail.setSync('__memory_delete', makeRef(
             async (key) => ctx.memory.delete(key as string),
+            counter, limits.maxApiCalls,
+        ));
+
+        jail.setSync('__memory_getPublic', makeRef(
+            async (namespace, key) => ctx.memory.getPublic(namespace as string, key as string),
             counter, limits.maxApiCalls,
         ));
 

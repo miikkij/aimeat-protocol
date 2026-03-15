@@ -841,6 +841,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return records.map(r => ({ key: r.key, value: r.value }));
           },
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
+          getPublic: async (namespace, key) => {
+            const record = await storage.getMemory(namespace, key);
+            return (record && record.visibility === 'public') ? record.value : null;
+          },
         },
         fetch: async (url, opts) => {
           const resp = await fetch(url, {
@@ -1010,6 +1014,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return records.map(r => ({ key: r.key, value: r.value }));
           },
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
+          // Read public data from another extension's namespace (read-only cross-extension access)
+          getPublic: async (namespace, key) => {
+            const record = await storage.getMemory(namespace, key);
+            return (record && record.visibility === 'public') ? record.value : null;
+          },
         },
         fetch: async (url, opts) => {
           const resp = await fetch(url, {

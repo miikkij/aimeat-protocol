@@ -77,6 +77,9 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
   ctx.memory.set(key, value) → void
   ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
   ctx.memory.delete(key) → boolean
+  ctx.memory.getPublic(namespace, key) → value or null (read another extension's public data)
+    Example: await ctx.memory.getPublic('ext:halytyskartta-rss', 'alerts.by-date.2026-03-14')
+    Use this when your extension needs to read data written by ANOTHER extension.
   ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
     Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
     Response body is always .text (string) — parse JSON with JSON.parse(resp.text).
@@ -731,8 +734,15 @@ Load them via <script> tags and use their API.
 
 ${cortexLibs.map(lib => `### ${lib.label}
 Load: \\\`<script src="/v1/cortex/${lib.name}/libs/${lib.name}.js"></script>\\\`
-${lib.result ? `API from manifest:\n${lib.result.slice(0, 800)}` : ''}
+${lib.result ? `Full cortex code (use EXACTLY these method names and return shapes):\n${lib.result}` : ''}
 `).join('\n')}
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Read the cortex code above CAREFULLY.                                 ║
+║  Use EXACTLY the method names shown (e.g., getAlerts, getDailyStats).  ║
+║  Use EXACTLY the return value shapes — do NOT invent field names.      ║
+║  If cortex returns { items: [...] }, use .items, NOT .data or .entries. ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
 IMPORTANT:
 - Call \\\`AIMEAT.{libName}.init()\\\` on app start — it handles data initialization automatically
@@ -1091,8 +1101,9 @@ Example — if label is "English (en) Strings":
         const extName = nameMatch ? nameMatch[1] : ext.label;
         extRef += `- **${extName}** (${ext.label}): memory owner = \`ext:${extName}\`\n`;
         if (ext.result) {
-          const preview = ext.result.length > 400 ? ext.result.slice(0, 400) + '...' : ext.result;
-          extRef += `  Manifest preview:\n${preview}\n`;
+          // Include FULL extension code — cortex MUST see exact memory keys, data
+          // shapes, and action logic to generate correct wrapper methods.
+          extRef += `  Full extension code:\n${ext.result}\n`;
         }
       }
     }
@@ -1109,6 +1120,23 @@ A Cortex library is a client-side JavaScript library that bridges V8 extensions 
 It wraps raw AIMEAT API calls (extension actions, memory reads from extension namespaces) into
 clean, documented domain methods. Apps import the cortex and call simple methods like
 \`AIMEAT.myLib.getData()\` instead of knowing about memory namespaces and extension names.
+
+## CRITICAL: Read the Extension Code Above CAREFULLY
+
+The extension code shown above is the ACTUAL code running on the server. Your cortex MUST match it EXACTLY:
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  1. Find every ctx.memory.set() call → those are the EXACT keys        ║
+║  2. Look at the value passed to set() → that is the EXACT data shape   ║
+║  3. Find every ctx.memory.get() call → those are keys you can read     ║
+║  4. Your getPublic() calls MUST use those EXACT same keys              ║
+║  5. Your methods MUST return data in the EXACT shape the extension     ║
+║     stores it — do NOT invent new field names or structures            ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Example: if the extension does \`ctx.memory.set("alerts.by-date.2026-03-14", { items: [...] })\`
+then your cortex must read \`getPublic('ext:extension-name', 'alerts.by-date.2026-03-14')\`
+and return objects with an \`items\` array — NOT \`data\`, NOT \`entries\`, NOT \`results\`.
 
 ## Design Principles
 
@@ -1315,11 +1343,11 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     context += '\nAlready completed:\n';
     for (const c of completedComponents) {
       context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
-      // Only include result previews for types that downstream prompts need to reference
-      // (extensions for cortex, cortex for app). Skip for csm, msm, memory, translation.
+      // Include full result for extensions and cortex — downstream components MUST see
+      // the complete code to know exact memory keys, data shapes, and API methods.
+      // Truncating caused downstream components to guess keys/shapes incorrectly.
       if (c.result && (c.type === 'extension' || c.type === 'cortex')) {
-        const preview = c.result.length > 300 ? c.result.slice(0, 300) + '...' : c.result;
-        context += `  Result preview:\n${preview}\n`;
+        context += `  Full code:\n${c.result}\n`;
       }
     }
   }

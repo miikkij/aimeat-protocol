@@ -235,6 +235,10 @@ export class Scheduler {
           return records.map(r => ({ key: r.key, value: r.value }));
         },
         delete: async (key) => this.storage.deleteMemory(extMemoryOwner, key),
+        getPublic: async (namespace, key) => {
+          const record = await this.storage.getMemory(namespace, key);
+          return (record && record.visibility === 'public') ? record.value : null;
+        },
       },
       fetch: async (url, opts) => {
         const resp = await fetch(url, {
@@ -243,7 +247,18 @@ export class Scheduler {
           body: opts?.body,
           signal: AbortSignal.timeout(30_000),
         });
-        const text = await resp.text();
+        // Decode response body respecting charset from Content-Type header
+        const ct = resp.headers.get('content-type') || '';
+        const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
+        const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+        let text: string;
+        if (charset !== 'utf-8' && charset !== 'utf8') {
+          const buf = await resp.arrayBuffer();
+          const decoder = new TextDecoder(charset);
+          text = decoder.decode(buf);
+        } else {
+          text = await resp.text();
+        }
         const headers: Record<string, string> = {};
         resp.headers.forEach((v, k) => { headers[k] = v; });
         return { status: resp.status, ok: resp.ok, text, headers };
