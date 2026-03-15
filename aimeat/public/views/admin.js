@@ -43,6 +43,7 @@ import ConsulTab       from './admin/consul-tab.js';
 import SchedulerTab      from './admin/scheduler-tab.js';
 import KnowledgeAdminTab from './admin/knowledge-tab.js';
 import PromptsTab        from './admin/prompts-tab.js';
+import PackagesAdminTab  from './admin/packages-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -81,6 +82,7 @@ const NAV_GROUPS = [
     { id: 'services',    icon: '\u{1F9E9}', key: 'dashboard.services',       component: ServicesTab },
     { id: 'csm',         icon: '\u{1F4E6}', key: 'dashboard.csmManagement',  component: CsmTab },
     { id: 'knowledge',   icon: '\u{1F9E0}', key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
+    { id: 'packages',    icon: '\u{1F9F0}', key: 'dashboard.packagesTab',      component: PackagesAdminTab },
   ]},
   { key: 'dashboard.navIntegrations', items: [
     { id: 'msm', icon: '\u{1F50C}', key: 'dashboard.msmManagement', component: MsmTab, count: 'msm' },

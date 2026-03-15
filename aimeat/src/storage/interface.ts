@@ -1062,6 +1062,152 @@ export interface SystemPromptVersionRecord {
   changeNote?: string;
 }
 
+// ── Packages & Templates ────────────────────────────────────────────
+
+/** Shared type alias for all AIMEAT component types that can be included in a package. */
+export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation';
+
+/** A single component within a package version. */
+export interface PackageComponent {
+  id: string;                      // "csm-signage", "app-kiosk", "cortex-signage"
+  type: PackageComponentType;
+  label: string;                   // human-readable "Kiosk Display App"
+  content: string;                 // raw content (YAML, JS, HTML, JSON)
+  contentHash: string;             // SHA-256 of content (for change detection)
+  dependencies: string[];          // references to other component IDs ["csm-signage"]
+}
+
+/**
+ * One record per package version. All versions of the same package share a packageGroupId.
+ * Version format: v{YYYY}-{MM}-{DD}-{HHmm} — e.g. v2026-03-15-1701
+ */
+export interface PackageRecord {
+  id: string;                      // UUID — unique per version
+  packageGroupId: string;          // "{name}::{author}" — groups all versions
+  name: string;                    // "digital-signage" (unique per author)
+  author: string;                  // owner name or "operator"
+  authorGhii: string;             // creator's GHII
+
+  version: string;                 // "v2026-03-15-1701" (date-time sortable)
+  changelog: string;               // what changed from previous version
+
+  description: string;             // short description
+  category: string;                // "signage" | "marketplace" | "iot" | "social" | "productivity" | "communication" | "other"
+  tags: string[];                  // free-form tags for search
+  visibility: 'private' | 'public';
+  status: 'draft' | 'published' | 'archived';
+
+  components: PackageComponent[];  // all components in this version
+  manifest: string;                // full package YAML manifest (human-readable)
+
+  createdAt: string;               // ISO 8601
+  updatedAt: string;               // ISO 8601 — updated when metadata changes
+}
+
+export interface PackageFilter {
+  author?: string;
+  category?: string;
+  status?: string;
+  visibility?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Social/discovery layer. One record per package group (not per version). */
+export interface TemplateListingRecord {
+  id: string;                      // UUID
+  packageGroupId: string;          // links to PackageRecord group
+  packageName: string;             // denormalized for queries
+  packageAuthor: string;           // denormalized
+
+  publishedBy: string;             // who created the listing
+  publishedByGhii: string;        // publisher's GHII
+
+  title: string;                   // display name
+  description: string;             // longer markdown description
+  screenshots: string[];           // base64 data URIs or relative URLs
+  category: string;                // gallery category
+  tags: string[];                  // gallery tags
+
+  featured: boolean;               // operator-promoted
+  installCount: number;            // incremented on each install
+  rating: number;                  // average 0.0–5.0 (denormalized)
+  reviewCount: number;             // denormalized count
+
+  status: 'listed' | 'unlisted' | 'moderated';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateReview {
+  id: string;                      // UUID
+  listingId: string;               // FK to TemplateListingRecord.id
+  authorGhii: string;             // reviewer's GHII
+  authorName: string;              // display name
+  rating: number;                  // 1–5
+  comment: string;                 // review text
+  createdAt: string;
+}
+
+export interface TemplateDiscussion {
+  id: string;                      // UUID
+  listingId: string;               // FK to TemplateListingRecord.id
+  authorGhii: string;
+  authorName: string;
+  message: string;                 // discussion message
+  parentId?: string;               // for threading (reply to another message)
+  createdAt: string;
+}
+
+export interface TemplateFilter {
+  category?: string;
+  tags?: string[];
+  featured?: boolean;
+  status?: string;
+  sort?: 'rating' | 'installs' | 'newest';
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Tracks an installed copy of a package. */
+export interface PackageInstanceRecord {
+  id: string;                      // UUID
+  packageGroupId: string;          // which package group
+  packageVersion: string;          // which version was installed
+  packageRecordId: string;         // direct reference to the PackageRecord.id
+
+  owner: string;                   // who installed it
+  ownerGhii: string;              // installer's GHII
+
+  label: string;                   // user's name for this instance
+
+  installedComponents: InstalledComponent[];
+
+  status: 'active' | 'paused' | 'removed';
+  installedAt: string;
+  updatedAt: string;
+}
+
+export interface InstalledComponent {
+  componentId: string;             // original ID from package "app-kiosk"
+  type: PackageComponentType;
+  registeredAs: string;            // actual name in system "signage-user1-app-kiosk"
+  originalHash: string;            // SHA-256 at install time (for customization detection)
+  customized: boolean;             // true if current hash differs from originalHash
+  customizedAt?: string;           // when first customization was detected
+}
+
+export interface InstanceFilter {
+  owner?: string;
+  ownerGhii?: string;
+  packageGroupId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1097,6 +1243,9 @@ import type { ReplicationQueueRepository } from './repositories/replication-queu
 import type { DeviceAuthRepository } from './repositories/device-auth.repository.js';
 import type { OAuthRepository } from './repositories/oauth.repository.js';
 import type { SystemPromptRepository } from './repositories/system-prompt.repository.js';
+import type { PackageRepository } from './repositories/package.repository.js';
+import type { TemplateListingRepository } from './repositories/template-listing.repository.js';
+import type { PackageInstanceRepository } from './repositories/package-instance.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1112,4 +1261,5 @@ export interface Storage extends
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,
   DeviceAuthRepository,
-  OAuthRepository, SystemPromptRepository { }
+  OAuthRepository, SystemPromptRepository,
+  PackageRepository, TemplateListingRepository, PackageInstanceRepository { }

@@ -64,6 +64,9 @@ import { adminFeaturesRouter } from '../routes/admin-features.js';
 import { setupRouter } from '../routes/setup.js';
 import { extensionsRouter } from '../routes/extensions.js';
 import { cortexRouter } from '../routes/cortex.js';
+import { packagesRouter } from '../routes/packages.js';
+import { instancesRouter } from '../routes/instances.js';
+import { templatesRouter } from '../routes/templates.js';
 import { adminSchedulerRouter } from '../routes/admin-scheduler.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
 import { adminPromptsRouter } from '../routes/admin-prompts.js';
@@ -288,6 +291,15 @@ export function mountRoutes(
   if (config.cortexEnabled) {
     app.use(cortexRouter(config, storage));
     logger.info('Cortex extension system enabled');
+  }
+
+  // Packages, Instances & Templates
+  if (config.packagesEnabled) {
+    app.use(packagesRouter(config, storage));
+    app.use(instancesRouter(config, storage));
+  }
+  if (config.packagesEnabled && config.templatesEnabled) {
+    app.use(templatesRouter(config, storage));
   }
 
   // Scheduler admin routes

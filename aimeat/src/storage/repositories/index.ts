@@ -28,3 +28,6 @@ export type { ReplicationQueueRepository } from './replication-queue.repository.
 export type { DeviceAuthRepository } from './device-auth.repository.js';
 export type { OAuthRepository } from './oauth.repository.js';
 export type { SystemPromptRepository } from './system-prompt.repository.js';
+export type { PackageRepository } from './package.repository.js';
+export type { TemplateListingRepository } from './template-listing.repository.js';
+export type { PackageInstanceRepository } from './package-instance.repository.js';

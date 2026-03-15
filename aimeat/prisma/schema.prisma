@@ -965,3 +965,93 @@ model SystemPromptVersion {
 
   @@unique([promptId, version])
 }
+
+model Package {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  packageGroupId  String
+  name            String
+  author          String
+  authorGhii      String
+  version         String
+  changelog       String   @default("")
+  description     String   @default("")
+  category        String   @default("other")
+  tags            String[]
+  visibility      String   @default("private")
+  status          String   @default("draft")
+  components      Json     // PackageComponent[]
+  manifest        String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([packageGroupId, version])
+  @@index([packageGroupId])
+  @@index([author])
+  @@index([status])
+}
+
+model TemplateListing {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  packageGroupId  String   @unique
+  packageName     String
+  packageAuthor   String
+  publishedBy     String
+  publishedByGhii String
+  title           String
+  description     String   @default("")
+  screenshots     String[]
+  category        String   @default("other")
+  tags            String[]
+  featured        Boolean  @default(false)
+  installCount    Int      @default(0)
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  status          String   @default("listed")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([featured])
+}
+
+model TemplateReview {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  listingId   String
+  authorGhii  String
+  authorName  String
+  rating      Int
+  comment     String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@unique([listingId, authorGhii])
+  @@index([listingId])
+}
+
+model TemplateDiscussion {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  listingId   String
+  authorGhii  String
+  authorName  String
+  message     String
+  parentId    String?
+  createdAt   DateTime @default(now())
+
+  @@index([listingId])
+}
+
+model PackageInstance {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  packageGroupId      String
+  packageVersion      String
+  packageRecordId     String
+  owner               String
+  ownerGhii           String
+  label               String   @default("")
+  installedComponents Json     // InstalledComponent[]
+  status              String   @default("active")
+  installedAt         DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([owner])
+  @@index([packageGroupId])
+}
