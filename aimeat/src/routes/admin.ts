@@ -510,7 +510,9 @@ export function adminRouter(
 
             for (const def of examples) {
                 // Check if already seeded
-                const existing = await storage.getLatestPublishedPackage(`${def.name}::${operator}`);
+                const groupId = `${def.name}::${operator}`;
+                const { packages: existingPkgs } = await storage.listPackages({ author: operator, search: def.name, limit: 1, offset: 0 });
+                const existing = existingPkgs.find(p => p.packageGroupId === groupId);
                 if (existing) {
                     results.push({ name: def.name, packageGroupId: existing.packageGroupId, templateId: '(already exists)' });
                     continue;

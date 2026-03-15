@@ -17,12 +17,15 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { StatsGrid, Empty, Spinner, Badge, dt } from './shared.js';
 import * as pkgService from '/js/services/packages.js';
+import { seedExamples } from '/js/services/admin.js';
 
 export default function PackagesAdminTab({ data, reload, session }) {
   const [packages, setPackages] = useState([]);
   const [instances, setInstances] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState('');
   const [subtab, setSubtab] = useState('packages');
 
   const loadData = useCallback(async () => {
@@ -59,9 +62,35 @@ export default function PackagesAdminTab({ data, reload, session }) {
     { label: t('dashboard.pkgPublished') || 'Published', value: published, color: 'var(--amber, #fbbf24)' },
   ];
 
+  const handleSeed = async () => {
+    setSeeding(true);
+    setSeedMsg('');
+    try {
+      const res = await seedExamples();
+      if (res.ok !== false) {
+        const names = (res.data?.seeded ?? []).map(s => s.name).join(', ');
+        setSeedMsg(names ? `Seeded: ${names}` : 'Done');
+        loadData();
+      } else {
+        setSeedMsg(res.error?.message ?? 'Failed');
+      }
+    } catch (e) { setSeedMsg('Error: ' + e.message); }
+    setSeeding(false);
+  };
+
   return html`
     <div>
       <${StatsGrid} items=${stats} />
+
+      ${packages.length === 0 && templates.length === 0 && html`
+        <div class="adm-card" style="margin-bottom:16px;text-align:center;padding:24px">
+          <p style="margin-bottom:12px">${t('dashboard.pkgNoPackages') || 'No packages yet. Seed example packages to get started.'}</p>
+          <button class="adm-btn adm-btn-active" onClick=${handleSeed} disabled=${seeding}>
+            ${seeding ? (t('dashboard.loading') || 'Loading...') : (t('dashboard.pkgSeedExamples') || 'Seed Example Packages')}
+          </button>
+          ${seedMsg && html`<p style="margin-top:8px;font-size:0.85rem;color:var(--green,#34d399)">${seedMsg}</p>`}
+        </div>
+      `}
 
       <div class="adm-subtabs" style="display:flex;gap:8px;margin:16px 0">
         <button class=${'adm-btn' + (subtab === 'packages' ? ' adm-btn-active' : '')} onClick=${() => setSubtab('packages')}>

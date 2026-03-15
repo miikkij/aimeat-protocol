@@ -94,6 +94,8 @@ export function buildRecords(def: ExamplePackageDef, author: string, authorGhii:
   const listing: TemplateListingRecord = {
     id: randomUUID(),
     packageGroupId,
+    packageName: def.name,
+    packageAuthor: author,
     publishedBy: author,
     publishedByGhii: authorGhii,
     title: def.templateListing.title,
