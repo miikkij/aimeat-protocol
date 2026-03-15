@@ -14,6 +14,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial test suite
  *   v1.1.0 — 2026-03-15 — add dry_run tests, fix YAML export assertion, fix draft install assertion
+ *   v1.2.0 — 2026-03-15 — add config validation tests (component count limit, package size limit)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-packages.ts
@@ -1035,6 +1036,47 @@ await test('Non-existent instance returns 404', async () => {
 await test('Non-existent template returns 404', async () => {
   const { status } = await json('/v1/templates/00000000-0000-0000-0000-000000000000');
   assert(status === 404, `Expected 404, got ${status}`);
+});
+
+await test('rejects package with too many components (config limit)', async () => {
+  // Default max is 20 components
+  const manyComponents = Array.from({ length: 21 }, (_, i) => ({
+    id: `comp-${i}`,
+    type: 'memory',
+    label: `Component ${i}`,
+    content: JSON.stringify({ entries: [{ key: `k${i}`, value: `v${i}` }] }),
+    dependencies: [],
+  }));
+  const { status } = await json('/v1/bundles', {
+    method: 'POST',
+    headers: { ...authed(ownerToken) },
+    body: JSON.stringify({
+      name: 'too-many-comps',
+      description: 'Test max components',
+      components: manyComponents,
+    }),
+  });
+  assert(status === 413, `Expected 413, got ${status}`);
+});
+
+await test('rejects oversized package (config limit)', async () => {
+  const bigContent = 'x'.repeat(11 * 1024 * 1024);
+  const { status } = await json('/v1/bundles', {
+    method: 'POST',
+    headers: { ...authed(ownerToken) },
+    body: JSON.stringify({
+      name: 'too-big-pack',
+      description: 'Test size limit',
+      components: [{
+        id: 'big-comp',
+        type: 'memory',
+        label: 'Big',
+        content: bigContent,
+        dependencies: [],
+      }],
+    }),
+  });
+  assert(status === 413, `Expected 413, got ${status}`);
 });
 
 // ─── Delete template listing before cleanup ─────────────────────────
