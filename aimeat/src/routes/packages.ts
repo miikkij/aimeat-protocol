@@ -22,9 +22,10 @@
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 2)
  *   v1.1.0 — 2026-03-15 — rename routes from /v1/packages to /v1/bundles to avoid collision with knowledge system
  *   v1.2.0 — 2026-03-15 — GHII resolution, YAML export, import validation, duplicate detection
+ *   v1.3.0 — 2026-03-15 — support YAML bundle string import (text/yaml Content-Type) for POST /v1/bundles/import
  */
 
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
@@ -32,16 +33,7 @@ import type { Storage, PackageRecord, PackageComponent } from '../storage/interf
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-
-/** Resolve owner's GHII, falling back to agent GAII */
-async function resolveGhii(storage: Storage, ownerName: string, fallback: string): Promise<string> {
-  try {
-    const ghiiRecord = await storage.getGHIIByOwner(ownerName);
-    return ghiiRecord?.ghii ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
+import { resolveGhii } from '../utils/ghii-resolver.js';
 
 /** Generate a date-based version string: v{YYYY}-{MM}-{DD}-{HHmm} */
 function generateVersion(): string {
@@ -65,19 +57,70 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   // ── Static routes FIRST (before parameterized :groupId) ──────────
 
   // POST /v1/bundles/import — import from YAML bundle
-  router.post('/v1/bundles/import', requireAuth(), async (req, res) => {
+  router.post('/v1/bundles/import', express.text({ type: ['text/yaml', 'application/x-yaml'] }), requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
     // Role check: operator always allowed, owner only if configured
-    const createRole = (config as any).packageCreateRole ?? 'owner';
+    const createRole = config.packageCreateRole ?? 'owner';
     if (!roles.includes('operator') && createRole === 'operator') {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can import packages'));
       return;
     }
 
-    // Accept either { package: { ... } } wrapper or direct { name, components, ... }
-    const raw = req.body;
+    // Accept either YAML bundle string, { package: { ... } } wrapper, or direct { name, components, ... }
+    let raw: any = req.body;
+    if (typeof raw === 'string') {
+      try {
+        // Split on YAML document separators, preserving component ID comments
+        const sections = raw.split(/^---\s*/m).filter(Boolean);
+        if (sections.length === 0) {
+          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Empty YAML bundle'));
+          return;
+        }
+
+        // First section is the manifest
+        const manifest = YAML.parse(sections[0]) as Record<string, unknown>;
+        const manifestComps = (manifest.components ?? []) as Array<Record<string, unknown>>;
+        const compMetaMap = new Map(manifestComps.map(c => [c.id as string, c]));
+
+        // Remaining sections are component contents with "# component: {id}" headers
+        const yamlComponents: any[] = [];
+        for (let i = 1; i < sections.length; i++) {
+          const section = sections[i];
+          // Parse component ID from "# component: {id}\n" prefix
+          const idMatch = section.match(/^#\s*component:\s*(\S+)\s*\n/);
+          const compId = idMatch?.[1];
+          const content = idMatch ? section.slice(idMatch[0].length) : section;
+
+          if (compId && compMetaMap.has(compId)) {
+            const meta = compMetaMap.get(compId)!;
+            yamlComponents.push({
+              id: compId,
+              type: meta.type,
+              label: meta.label ?? '',
+              content: content.trim(),
+              dependencies: meta.dependencies ?? [],
+            });
+          }
+        }
+
+        raw = {
+          name: manifest.name as string,
+          description: (manifest.description as string) ?? '',
+          category: (manifest.category as string) ?? 'other',
+          tags: manifest.tags ?? [],
+          changelog: (manifest.changelog as string) ?? 'Imported from YAML',
+          visibility: 'private',
+          status: 'draft',
+          manifest: YAML.stringify(manifest),
+          components: yamlComponents,
+        };
+      } catch (yamlErr: any) {
+        res.status(400).json(error(config.nodeId, 'INVALID_YAML', yamlErr.message ?? 'Invalid YAML bundle'));
+        return;
+      }
+    }
     if (!raw || typeof raw !== 'object') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Request body must be a valid package object'));
       return;
@@ -90,6 +133,23 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     }
     if (!Array.isArray(body.components) || body.components.length === 0) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'components must be an array with at least 1 item'));
+      return;
+    }
+
+    // Check max components
+    if (body.components.length > config.packageMaxComponents) {
+      res.status(413).json(error(config.nodeId, 'COMPONENT_LIMIT_EXCEEDED',
+        `Package has ${body.components.length} components, max is ${config.packageMaxComponents}`));
+      return;
+    }
+
+    // Check total size
+    const importSizeBytes = (body.components as any[]).reduce((sum: number, c: any) =>
+      sum + Buffer.byteLength(c.content ?? '', 'utf-8'), 0);
+    const importMaxBytes = config.packageMaxSizeMb * 1024 * 1024;
+    if (importSizeBytes > importMaxBytes) {
+      res.status(413).json(error(config.nodeId, 'SIZE_EXCEEDED',
+        `Total component size ${(importSizeBytes / 1024 / 1024).toFixed(1)}MB exceeds limit of ${config.packageMaxSizeMb}MB`));
       return;
     }
 
@@ -176,7 +236,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     const roles = req.auth!.roles;
 
     // Role check: operator always allowed, owner only if configured
-    const createRole = (config as any).packageCreateRole ?? 'owner';
+    const createRole = config.packageCreateRole ?? 'owner';
     if (!roles.includes('operator') && createRole === 'operator') {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
       return;
@@ -195,8 +255,25 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Check max components
+    if (components.length > config.packageMaxComponents) {
+      res.status(413).json(error(config.nodeId, 'COMPONENT_LIMIT_EXCEEDED',
+        `Package has ${components.length} components, max is ${config.packageMaxComponents}`));
+      return;
+    }
+
+    // Check total size
+    const totalSizeBytes = components.reduce((sum: number, c: any) =>
+      sum + Buffer.byteLength(c.content ?? '', 'utf-8'), 0);
+    const maxSizeBytes = config.packageMaxSizeMb * 1024 * 1024;
+    if (totalSizeBytes > maxSizeBytes) {
+      res.status(413).json(error(config.nodeId, 'SIZE_EXCEEDED',
+        `Total component size ${(totalSizeBytes / 1024 / 1024).toFixed(1)}MB exceeds limit of ${config.packageMaxSizeMb}MB`));
+      return;
+    }
+
     // Check max packages per author
-    const maxPerAuthor = (config as any).packageMaxPerAuthor ?? MAX_PACKAGES_PER_AUTHOR;
+    const maxPerAuthor = config.packageMaxPerAuthor ?? MAX_PACKAGES_PER_AUTHOR;
     const existing = await storage.listPackages({ author: owner, limit: 1, offset: 0 });
     if (existing.total >= maxPerAuthor) {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
@@ -291,6 +368,23 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       contentHash: c.contentHash ?? hashContent(c.content ?? ''),
       dependencies: c.dependencies ?? [],
     }));
+
+    // Check max components
+    if (processedComponents.length > config.packageMaxComponents) {
+      res.status(413).json(error(config.nodeId, 'COMPONENT_LIMIT_EXCEEDED',
+        `Package has ${processedComponents.length} components, max is ${config.packageMaxComponents}`));
+      return;
+    }
+
+    // Check total size
+    const versionSizeBytes = processedComponents.reduce((sum, c) =>
+      sum + Buffer.byteLength(c.content ?? '', 'utf-8'), 0);
+    const versionMaxBytes = config.packageMaxSizeMb * 1024 * 1024;
+    if (versionSizeBytes > versionMaxBytes) {
+      res.status(413).json(error(config.nodeId, 'SIZE_EXCEEDED',
+        `Total component size ${(versionSizeBytes / 1024 / 1024).toFixed(1)}MB exceeds limit of ${config.packageMaxSizeMb}MB`));
+      return;
+    }
 
     const now = new Date().toISOString();
     const record: PackageRecord = {

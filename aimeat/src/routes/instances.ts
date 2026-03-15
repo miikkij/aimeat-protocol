@@ -43,6 +43,7 @@ import {
   fetchComponentContent,
   computeHash,
 } from '../services/component-registrar.js';
+import { resolveGhii } from '../utils/ghii-resolver.js';
 
 // ── Types for migration diff ──────────────────────────────────────────
 
@@ -52,16 +53,6 @@ interface ComponentDiff {
   status: 'unchanged' | 'updated' | 'new' | 'removed';
   action: 'no_change' | 'safe_overwrite' | 'migration_needed' | 'install_new' | 'remove';
   customized?: boolean;
-}
-
-/** Resolve owner's GHII, falling back to agent GAII */
-async function resolveGhii(storage: Storage, ownerName: string, fallback: string): Promise<string> {
-  try {
-    const ghiiRecord = await storage.getGHIIByOwner(ownerName);
-    return ghiiRecord?.ghii ?? fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 // ── Helper: topological sort of components by dependencies ────────────
@@ -176,7 +167,8 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
 
     for (const compId of componentOrder) {
       const comp = componentMap.get(compId)!;
-      const registeredAs = `${pkg.name}-${owner}-${comp.id}`;
+      const planned = plannedComponents.find(p => p.componentId === comp.id)!;
+      const registeredAs = planned.registeredAs;
 
       const result = await registerComponent(storage, {
         componentId: comp.id,
@@ -586,6 +578,16 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
 
       if (!original || !updated) continue;
 
+      // Fetch user's current version from native storage
+      const installed = instance.installedComponents.find(ic => ic.componentId === compId);
+      let userCurrentContent = original.content; // fallback
+      if (installed) {
+        const current = await fetchComponentContent(
+          storage, installed.type, installed.registeredAs, req.auth!.sub,
+        );
+        if (current !== null) userCurrentContent = current;
+      }
+
       // Phase 1: Analyze prompt
       analyzePromptParts.push(
         `You are an AIMEAT migration assistant.\n` +
@@ -602,8 +604,8 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
         `${original.content}\n` +
         `---\n` +
         `\n` +
-        `--- NEW TEMPLATE VERSION (${latestPkg.version}) ---\n` +
-        `${updated.content}\n` +
+        `--- USER'S CURRENT VERSION ---\n` +
+        `${userCurrentContent}\n` +
         `---\n` +
         `\n` +
         `INSTRUCTIONS:\n` +

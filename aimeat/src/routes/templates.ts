@@ -29,16 +29,7 @@ import type { Storage, TemplateListingRecord, TemplateReview, TemplateDiscussion
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-
-/** Resolve owner's GHII, falling back to agent GAII */
-async function resolveGhii(storage: Storage, ownerName: string, fallback: string): Promise<string> {
-  try {
-    const ghiiRecord = await storage.getGHIIByOwner(ownerName);
-    return ghiiRecord?.ghii ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
+import { resolveGhii } from '../utils/ghii-resolver.js';
 
 const VALID_SORTS = ['rating', 'installs', 'newest'] as const;
 
