@@ -83,7 +83,7 @@ async function main() {
 
   // Check server is reachable
   try {
-    const probe = await fetch(`${BASE_URL}/v1/node`);
+    const probe = await fetch(`${BASE_URL}/v1/health`);
     if (!probe.ok) throw new Error(`HTTP ${probe.status}`);
   } catch {
     console.error(`\n  Server not reachable at ${BASE_URL}`);
