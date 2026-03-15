@@ -960,9 +960,18 @@ function ComponentDetail({ component, project, components, agents, projectId, on
       } else {
         resp = await registerComponent(component.type, validationResult?.extracted || result, session);
       }
-      const registered = addHistory(component, 'registered', { registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
-      await saveComponent(projectId, { ...registered, status: 'done', registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
-      showToast?.('Component registered!');
+      // Extract registered name from response — each type returns a different shape
+      const d = resp?.data || {};
+      const regName = d.csm?.name           // CSM: { csm: { name } }
+        || d.integration?.name              // MSM: { integration: { name } }
+        || d.extension?.name                // Extension: { extension: { name } }
+        || d.filename                       // App: { filename }
+        || d.name                           // Cortex: { name }
+        || d.id
+        || null;
+      const registered = addHistory(component, 'registered', { registeredAs: regName });
+      await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName });
+      showToast?.(`Component registered${regName ? ': ' + regName : ''}!`);
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       await onUpdate();
       // Auto-advance to next component after successful registration
