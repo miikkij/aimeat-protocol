@@ -24,6 +24,10 @@
  *   v3.0.0 — 2026-03-14 — Major overhaul: add data standards to AIMEAT_CONTEXT,
  *     improve all prompts with sandbox limitations, real API limits, memory patterns,
  *     translation key conventions, app CDN/CSP guidance, ctx.fetch documentation
+ *   v3.1.0 — 2026-03-15 — Generalize ext/cortex/app decision from case list to
+ *     principle-based framework; harden JSON.parse prevention; fix translation locale
+ *     key enforcement; add empty-state handling to cortex+app; HTML entity warnings;
+ *     reduce completed-component context bloat
  *   v3.1.0 — 2026-03-14 — Fix app prompt: extension data lives in ext:{name}
  *     namespace, apps must use AIMEAT.data.getPublic() to read it, not .get()
  *   v4.0.0 — 2026-03-14 — Add buildInterviewPrompt for requirements interview,
@@ -132,26 +136,38 @@ Rules:
 - Default to ONE cortex per project unless complexity clearly warrants splitting
 - Only include what's actually needed — don't pad with unnecessary components
 
-## CRITICAL: When to use extension vs cortex vs app
+## CRITICAL: Extension vs Cortex vs App — Decision Framework
 
-Extensions run in a V8 SANDBOX on the server. Use an extension ONLY when:
-- Scheduled/recurring server-side work (fetch RSS every 15 min, nightly aggregation)
-- Server-to-server API calls that the browser cannot make (CORS, auth, rate limits)
-- Heavy computation that must run even when no browser is open
-- Writing seed/reference data to memory that other components depend on
+### The One Rule: EXTENSION = SERVER-ONLY WORK
+An extension MUST do something that a browser CANNOT do. If a browser can do it, it MUST NOT be an extension.
 
-Do NOT create an extension for:
-- Querying/filtering data that already exists in memory — cortex reads memory directly
-- Distance/proximity calculations — cortex or app does math client-side
-- Export (CSV/JSON generation) — app generates files in the browser
-- User preferences / settings — app reads/writes memory directly via AIMEAT.data
-- Data transformations for display — cortex methods transform data for the app
-- CRUD on the user's own data — app uses AIMEAT.data.get/set/delete
+**Use extension when ALL of these are true:**
+1. The work REQUIRES the server (external API behind CORS/auth, scheduled cron, server-to-server calls)
+2. The work must happen even when NO browser is open
+3. There is no way to achieve it with client-side JS + AIMEAT.data API
 
-Cortex wraps memory reads + extension action calls into clean domain methods.
-App handles all UI, user interaction, client-side computation, and display logic.
+**Everything else is cortex or app:**
+- Reading/filtering/transforming data already in memory → cortex
+- User preferences, settings, personal data CRUD → app (AIMEAT.data.get/set/delete)
+- Computed/derived values (math, sorting, grouping, statistics) → cortex or app
+- Export/download generation (CSV, JSON, PDF) → app (browser generates the file)
+- Display formatting, localization, UI logic → app
 
-Rule of thumb: if a browser can do it, don't make it an extension.`;
+### Quick Test (apply to EVERY proposed extension)
+Ask: "Does this action fetch from an external server or run on a schedule?"
+- YES → extension ✓
+- NO → it should be cortex (data logic) or app (UI/interaction) ✗
+
+### Common Mistakes to Avoid
+- Do NOT create an "export" extension — apps generate files client-side
+- Do NOT create a "settings" extension — apps read/write user prefs via AIMEAT.data
+- Do NOT create a "query" or "filter" extension — cortex reads memory directly
+- Do NOT create a "compute" extension for math/stats — cortex/app does client-side math
+
+### How They Work Together
+- Extension: fetches external data → stores in memory (scheduled, server-side)
+- Cortex: reads extension memory → transforms → exposes clean domain API (client-side library)
+- App: calls cortex methods → renders UI → handles user interaction (client-side HTML/JS)`;
 }
 
 /* ── Interview Prompt ──────────────────────────────────── */
@@ -496,12 +512,20 @@ What IS available:
 
 ## ctx.memory API — CRITICAL details
 
-### ctx.memory.get(key) returns the VALUE directly, or undefined
-- It does NOT return a string — do NOT call JSON.parse() on the result
-- ALWAYS check for undefined/null before using the result
+### ctx.memory.get(key) — WILL CRASH if you use JSON.parse()
 
-WRONG:
-  const data = JSON.parse(await ctx.memory.get("my.key"));  // CRASH: "undefined" is not valid JSON
+ctx.memory.get() returns the VALUE directly (already a JS object/array/value), or undefined.
+It is NOT a string. Calling JSON.parse() on it will CRASH with "undefined is not valid JSON".
+
+╔══════════════════════════════════════════════════════════════╗
+║  NEVER WRITE: JSON.parse(await ctx.memory.get(...))         ║
+║  NEVER WRITE: JSON.parse(ctx.memory.get(...))               ║
+║  NEVER WRITE: const x = JSON.parse(someMemoryValue)         ║
+║  These ALL crash. The value is ALREADY PARSED.               ║
+╚══════════════════════════════════════════════════════════════╝
+
+WRONG (CRASHES EVERY TIME):
+  const data = JSON.parse(await ctx.memory.get("my.key"));  // "undefined" is not valid JSON
 
 CORRECT:
   const data = await ctx.memory.get("my.key");
@@ -575,9 +599,10 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 - All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
 - If two actions need the same helper, DUPLICATE the helper in both script files
 - NEVER reference functions from another action's script — each script runs in its own isolated scope
-- NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values
-- Always check for undefined/null before using memory values
-- Always convert dates to ISO 8601 before storing in memory`,
+- ╔═ NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values ═╗
+- Always check for undefined/null before using memory values — on first run, NOTHING exists yet
+- Always convert dates to ISO 8601 before storing in memory
+- NEVER output HTML entities (&gt; &lt; &amp;) in JavaScript code — use actual operators (> < &)`,
 
   app: (label, context, completedComponents) => {
     // Check if any cortex libraries are in completed components
@@ -711,6 +736,23 @@ The AIMEAT app catalog allows external CDN scripts. You may use these via <scrip
 - Use CSS custom properties for theming where possible
 ${hasCortex ? '- Call cortex init() on app start — it handles everything automatically\n- Focus on UX/UI — the cortex handles data access and initialization' : ''}
 
+## CRITICAL: Empty-State Handling
+
+On first run, extension data does NOT exist yet. The app MUST show a friendly empty state:
+- Check every data response for null/empty before rendering
+- Show helpful messages: "No data yet — extensions will collect data on their next scheduled run"
+- NEVER crash on null/undefined data — always provide fallback UI
+
+## CRITICAL: Code Quality — No HTML Entities in JavaScript
+
+Your output MUST use proper JavaScript operators. NEVER output HTML entities in code:
+- Use => NOT =&gt;
+- Use && NOT &amp;&amp;
+- Use >= NOT &gt;=
+- Use < NOT &lt;
+- Use > NOT &gt;
+If your output contains &amp; &lt; &gt; inside JavaScript code, the app WILL crash.
+
 Return a complete HTML file with an app manifest comment at the top:
 
 \`\`\`html
@@ -797,12 +839,20 @@ ${context}
 
 ## Rules
 - MUST include BOTH "en" and "fi" locales
-- Finnish translations must be natural Finnish, not machine-translated
+- The root key MUST match the locale: "en" for English, "fi" for Finnish — NEVER use "en" as root for Finnish content
+- Finnish translations must be natural Finnish with correct characters (ä, ö, å) — not machine-translated
+- English content goes under "en" root key, Finnish content goes under "fi" root key
 - Include ALL text that appears in the UI — labels, buttons, tooltips, empty states, error messages
 - Keep keys consistent with what the App component will reference
 - Use plural-aware keys where needed: "alert.one" / "alert.many"
 
-Return JSON with translations for each locale:
+CRITICAL: If the label says "Finnish translations" or "fi locale", the root key MUST be "fi" with Finnish text.
+If the label says "English translations" or "en locale", the root key MUST be "en" with English text.
+NEVER output English text under a "fi" root key or Finnish text under an "en" root key.
+
+Return JSON with translations for the requested locale(s):
+
+If generating BOTH locales in one component:
 \`\`\`json
 {
   "en": {
@@ -824,6 +874,16 @@ Return JSON with translations for each locale:
     "app.error": "Jokin meni pieleen",
     "domain.type.fire": "Tulipalo",
     "domain.severity.small": "Pieni"
+  }
+}
+\`\`\`
+
+If generating a SINGLE locale (e.g., "Finnish translations"):
+\`\`\`json
+{
+  "fi": {
+    "app.title": "Sovelluksen nimi",
+    "app.nav.home": "Etusivu"
   }
 }
 \`\`\``,
@@ -1010,7 +1070,30 @@ spec:
 - \`init()\` MUST be smart: check for data, trigger collectors if empty
 - All public methods must be async (return Promises)
 - Handle errors gracefully — return null or empty arrays, don't throw for missing data
-- Include the prompt component with documented API surface for downstream AI consumers`;
+- Include the prompt component with documented API surface for downstream AI consumers
+
+## CRITICAL: Empty-State Handling (first-run scenario)
+
+On first run, NO extension data exists yet (no RSS collected, no aggregation done).
+Every method MUST handle missing data gracefully:
+
+\\\`\\\`\\\`javascript
+// WRONG — crashes if index doesn't exist:
+async function getAlerts() {
+  const index = await readExtMemory(EXT.collector, 'alerts.__index');
+  return index.dates.map(d => ...);  // TypeError: Cannot read 'dates' of null
+}
+
+// CORRECT — return empty data:
+async function getAlerts() {
+  const index = await readExtMemory(EXT.collector, 'alerts.__index');
+  if (!index || !index.dates || index.dates.length === 0) return [];
+  // ... process data
+}
+\\\`\\\`\\\`
+
+EVERY readExtMemory/getPublic call must be followed by a null/undefined check.
+NEVER assume data exists — the user may open the app before any extension has run.`;
   },
 };
 
@@ -1026,8 +1109,10 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     context += '\nAlready completed:\n';
     for (const c of completedComponents) {
       context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
-      if (c.result) {
-        const preview = c.result.length > 500 ? c.result.slice(0, 500) + '...' : c.result;
+      // Only include result previews for types that downstream prompts need to reference
+      // (extensions for cortex, cortex for app). Skip for csm, msm, memory, translation.
+      if (c.result && (c.type === 'extension' || c.type === 'cortex')) {
+        const preview = c.result.length > 300 ? c.result.slice(0, 300) + '...' : c.result;
         context += `  Result preview:\n${preview}\n`;
       }
     }
@@ -1059,6 +1144,13 @@ ${buildBlueprintPrompt(description, interviewSpec)}`;
 
 export function buildFixPrompt(originalPrompt, failedResult, errors) {
   return `The following result had validation errors. Fix ONLY the errors listed below.
+
+CRITICAL: Your output MUST use proper JavaScript/YAML syntax. NEVER output HTML entities:
+- Use => NOT =&gt;
+- Use && NOT &amp;&amp;
+- Use >= NOT &gt;=
+- Use < NOT &lt;  and > NOT &gt;
+HTML entities in code will crash the V8 sandbox or the browser.
 
 ORIGINAL PROMPT:
 ${originalPrompt}
