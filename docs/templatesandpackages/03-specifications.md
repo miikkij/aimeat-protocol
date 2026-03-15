@@ -287,8 +287,8 @@ Notes: version defaults to latest published. Creates real component copies.
 ```
 GET /v1/instances
 Auth: requireAuth()
-Query: ?status=active&packageGroupId=
-Response: 200 { instances: PackageInstanceRecord[] }
+Query: ?status=active&packageGroupId=&limit=&offset=
+Response: 200 { instances: PackageInstanceRecord[], total }
 ```
 
 #### Get Instance
@@ -498,7 +498,7 @@ interface PackageRepository {
   getPackageByGroupAndVersion(groupId: string, version: string): Promise<PackageRecord | null>;
   getLatestPublished(groupId: string): Promise<PackageRecord | null>;
   listPackages(filter: PackageFilter): Promise<{ packages: PackageRecord[]; total: number }>;
-  listVersions(groupId: string): Promise<PackageRecord[]>;
+  listVersions(groupId: string, limit?: number, offset?: number): Promise<{ versions: PackageRecord[]; total: number }>;
   updatePackage(id: string, updates: Partial<PackageRecord>): Promise<PackageRecord | null>;
   archivePackage(id: string): Promise<boolean>;  // sets status to 'archived', never physically deletes
 }
