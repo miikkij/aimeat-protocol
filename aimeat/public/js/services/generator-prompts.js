@@ -67,6 +67,11 @@
  *   v6.1.0 — 2026-03-15 — Fix extension path template: remove :instanceId from default
  *     action paths. Most extensions are single-instance; instanceId only when blueprint
  *     explicitly requires multi-instance support.
+ *   v7.0.0 — 2026-03-15 — Fix responsibility boundaries across all three prompts:
+ *     Blueprint: extension components can now declare "schedules" (action + cron).
+ *     Extension: add schedules YAML section, inject blueprint schedules into prompt.
+ *     Cortex: init() is now UI readiness check only — NEVER triggers backend logic.
+ *     Scheduled work belongs exclusively to extension scheduler, not cortex/app.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -141,7 +146,7 @@ ${specContext}${langNote}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
 CRITICAL: Return ONLY a JSON object with "components", "phases", and "dataModel". Nothing else.
-Each component has EXACTLY five fields: "id", "type", "label", "produces", "consumes". No other fields.
+Each component has these fields: "id", "type", "label", "produces", "consumes". Extension components may also have "schedules".
 Do NOT include manifest content, code, HTML, translations, or any implementation details.
 The blueprint is a lightweight plan — actual content is generated later per component.
 
@@ -150,7 +155,7 @@ Format:
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
     { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:municipalities.data"], "consumes": [] },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": ["memory:municipalities.data"] },
+    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": ["memory:municipalities.data"], "schedules": [{"action":"ingest","cron":"*/15 * * * *"},{"action":"aggregate","cron":"0 2 * * *"}] },
     { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getAlerts"], "consumes": ["memory:alerts.by-date.*", "memory:municipalities.data"] },
     { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getAlerts"] }
   ],
@@ -197,6 +202,9 @@ Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1)
 - Each component object has these fields: "id", "type", "label", "produces", "consumes"
+- Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
+- Use "schedules" for any work that must happen automatically without a browser (data collection, nightly aggregation, periodic computation)
+- If an extension has NO scheduled actions, omit the "schedules" field entirely
 - "produces": array of data outputs (format: "memory:namespace.*" for memory, "api:methodName" for cortex/app)
 - "consumes": array of data inputs this component reads from
 - Group components into logical phases
@@ -252,6 +260,8 @@ An extension MUST do something that a browser CANNOT do. If a browser can do it,
 1. The work REQUIRES the server (external API behind CORS/auth, scheduled cron, server-to-server calls)
 2. The work must happen even when NO browser is open
 3. There is no way to achieve it with client-side JS + AIMEAT.data API
+
+**Scheduled work ALWAYS belongs to the extension** — the extension manifest declares \`schedules\` entries and AIMEAT's built-in scheduler runs them automatically. The cortex and app NEVER schedule or trigger recurring background work.
 
 **Everything else is cortex or app:**
 - Reading/filtering/transforming data already in memory → cortex
@@ -724,6 +734,7 @@ actions:
     input: {}
     output: {}
     script: action-id.js
+schedules: []
 // actions/action-id.js
 export default async function(ctx, input) {
   // ── Reading from EXTERNAL APIs (ctx.fetch) ──
@@ -761,6 +772,37 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 
 - Default (single-instance): \`path: /v1/ext/{name}/action-id\`
 - Multi-instance (only if needed): \`path: /v1/ext/{name}/:instanceId/action-id\`
+
+## Scheduled Jobs (schedules section)
+
+Extensions can declare recurring background jobs via \`schedules\` in the manifest.
+AIMEAT's built-in scheduler runs these automatically — no browser needed.
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  If the blueprint has "schedules" for this extension, you MUST include  ║
+║  a schedules section in the YAML manifest. This is the ONLY way to     ║
+║  register recurring jobs — cortex and apps CANNOT schedule work.       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Format:
+\`\`\`yaml
+schedules:
+  - id: unique-job-id
+    action: action-id-from-actions-list
+    cron: "*/15 * * * *"
+    description: "What this scheduled job does"
+    instance_scope: false
+    input: {}
+\`\`\`
+
+Rules:
+- \`action\` MUST reference an existing action id from the \`actions\` array
+- \`cron\` uses standard 5-field cron syntax (minute hour day-of-month month day-of-week)
+- \`instance_scope: false\` for single-instance extensions (most cases)
+- \`input\` is optional static input passed to the action on each run
+- Common patterns: \`*/15 * * * *\` (every 15 min), \`0 2 * * *\` (daily at 02:00), \`0 */6 * * *\` (every 6 hours)
+- If a nightly job depends on data from a periodic job (e.g., aggregation needs fresh alerts), schedule it AFTER the last periodic run (e.g., periodic at */15, nightly at 02:00)
+- If the blueprint has no "schedules" for this extension, set \`schedules: []\`
 
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
@@ -1251,9 +1293,24 @@ and return objects with an \`items\` array — NOT \`data\`, NOT \`entries\`, NO
 1. **Domain Cohesion**: Group related operations into a single API surface
 2. **Facade Pattern**: Hide extension namespaces (\`ext:{name}\`), memory key patterns, and error handling
 3. **DRY / Genericity**: If a capability is reusable across projects, make it generic
-4. **Smart Init**: \`init()\` checks if data exists; if not, triggers extension collectors — see init() rules below
+4. **Smart Init**: \`init()\` checks if data exists and returns status — see init() rules below
 5. **Composability**: Cortex libs can use other cortex libs via \`AIMEAT.{otherLib}\`
 6. **Self-Documenting**: Export clear, named functions with consistent patterns
+
+## What Cortex Libraries Can Contain
+
+Cortex is a CLIENT-SIDE JavaScript library. It can contain:
+
+- **Data access methods**: read/write AIMEAT memory, call extension actions (on-demand only)
+- **UI components**: functions that create DOM elements, render HTML, inject CSS
+- **Visualization helpers**: chart builders, map renderers, interactive widgets
+- **Event handling**: click handlers, ResizeObserver, custom events
+- **Domain logic**: client-side data transformation, filtering, sorting, formatting
+
+Example: \`aimeat-charts\` cortex exports \`ChartPanel()\` and \`ChartBuilder()\` — functions that create \`<canvas>\` elements, inject CSS styles, and render interactive Chart.js visualizations.
+
+A cortex library is NOT limited to data access — it can be a full UI component library.
+However, it MUST NOT contain backend/server logic (no scheduling, no data collection, no recurring tasks — that belongs to extensions).
 
 ## IMPORTANT: How Extension Memory Works
 
@@ -1327,7 +1384,7 @@ spec:
         Node URL: {{node_url}}
 
         Available API:
-        AIMEAT.myLib.init() — Initialize and trigger data collection if needed
+        AIMEAT.myLib.init() — Check data readiness and return status
         AIMEAT.myLib.getData(filters) — Get filtered data
         AIMEAT.myLib.getStats(date) — Get statistics for a date
 
@@ -1339,7 +1396,7 @@ spec:
       filename: my-domain-lib.js
       exports: [init, getData, getStats]
       api_surface: |
-        AIMEAT.myLib.init() — Smart initialization, triggers collectors if no data
+        AIMEAT.myLib.init() — Check data readiness, returns { ready, hasData }
         AIMEAT.myLib.getData({hours, type}) — Filtered domain data
         AIMEAT.myLib.getStats(date) — Aggregated statistics
 \\\`\\\`\\\`
@@ -1384,11 +1441,10 @@ spec:
   // ── Public API ──
 
   async function init() {
-    const index = await readExtMemory(EXT.collector, 'my-data.__index');
-    if (!index || !index.dates || index.dates.length === 0) {
-      await callExt(EXT.collector, 'collect', {});
-    }
-    return { ready: true };
+    // Check if extension scheduler has produced data yet
+    const cursor = await readExtMemory(EXT.collector, 'data.cursor');
+    return { ready: true, hasData: !!cursor };
+    // App shows empty state if hasData is false — scheduler will populate data in background
   }
 
   async function getData(filters) {
@@ -1427,38 +1483,40 @@ Example: YAML name \`alert-map-lib\` → LIB_NAME = \`alertMapLib\` → \`AIMEAT
 
 ## init() Contract (MUST follow exactly)
 
+╔══════════════════════════════════════════════════════════════════════════╗
+║  init() is a UI READINESS CHECK — it does NOT trigger backend logic.    ║
+║  The extension scheduler handles all data collection and computation.   ║
+║  Cortex init() only checks what data is available and returns status.  ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 \\\`\\\`\\\`javascript
 async function init() {
-  // 1. Check if data exists by reading the primary index/key
-  const index = await readExtMemory(EXT.collector, 'data.__index');
+  // 1. Check if data exists by reading the primary cursor/index key
+  const cursor = await readExtMemory(EXT.collector, 'data.cursor');
 
-  // 2. If data exists → return { ready: true }, do NOT trigger collection
-  if (index && Array.isArray(index.dates) && index.dates.length > 0) {
-    return { ready: true };
+  // 2. Return status so the app knows what to show
+  if (cursor) {
+    return { ready: true, hasData: true };
   }
 
-  // 3. If NO data → trigger collector(s) once, return { ready: true, triggered: true }
-  try {
-    await callExt(EXT.collector, 'collect', {});
-  } catch (err) {
-    // Log but don't throw — app should still render empty state
-    console.warn('init: collector failed:', err.message);
-  }
-  return { ready: true, triggered: true };
+  // 3. No data yet — scheduler hasn't run. App should show empty/loading state.
+  return { ready: true, hasData: false };
 }
 \\\`\\\`\\\`
 
 Rules for init():
-- NEVER set up intervals, timers, or recurring triggers — scheduled jobs handle that
+- NEVER trigger extension actions (callExt) from init() — the extension scheduler handles all recurring work
+- NEVER set up intervals, timers, or recurring triggers
 - NEVER call init() automatically inside the cortex IIFE — let the app call it
-- NEVER trigger MULTIPLE collectors simultaneously — call them sequentially
-- init() MUST be idempotent — calling it twice must not cause duplicate data
+- init() MUST be idempotent — calling it twice returns the same status
 - Return \`{ ready: true }\` always — the app checks this to know the cortex is loaded
-- If collector fails, return \`{ ready: true, triggered: true }\` anyway (app shows empty state)
+- Return \`{ hasData: false }\` when no data exists yet — the app shows an appropriate empty state ("Data is being collected, please wait...")
+- The ONLY place where callExt() is appropriate in a cortex is for ON-DEMAND user actions (e.g., findNearby, manual refresh button) — never for scheduled/background work
 
 ## CRITICAL: Empty-State Handling (first-run scenario)
 
-On first run, NO extension data exists yet (no RSS collected, no aggregation done).
+On first run, the extension scheduler may not have run yet — NO data exists.
+init() returns \`{ ready: true, hasData: false }\` and the app shows a waiting state.
 Every method MUST handle missing data gracefully:
 
 \\\`\\\`\\\`javascript
@@ -1551,6 +1609,22 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
+  // Inject scheduled jobs from blueprint to extension prompts
+  if (type === 'extension' && blueprint?.components) {
+    const componentId = blueprint.components.find(c => c.label === label)?.id;
+    const comp = componentId && blueprint.components.find(c => c.id === componentId);
+    if (comp?.schedules && comp.schedules.length > 0) {
+      context += '\n## Scheduled Jobs (from blueprint — MUST include in manifest)\n';
+      context += 'This extension has recurring background jobs. Add a `schedules` section to the YAML manifest:\n\n';
+      context += '```yaml\nschedules:\n';
+      for (const s of comp.schedules) {
+        context += `  - id: ${s.action}-scheduled\n    action: ${s.action}\n    cron: "${s.cron}"\n    description: "Scheduled: ${s.action}"\n    instance_scope: false\n    input: {}\n`;
+      }
+      context += '```\n\n';
+      context += 'The scheduler runs these automatically in the background — no browser needed.\n';
+    }
+  }
+
   // Thread interview data source details to extension prompts
   if (type === 'extension' && interviewSpec?.dataSources) {
     context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';
@@ -1607,7 +1681,7 @@ ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
 
 Common mistakes to avoid:
 - Do NOT include manifest content, code, HTML, or implementation details in the blueprint
-- Each component must have EXACTLY five fields: "id", "type", "label", "produces", "consumes"
+- Each component must have: "id", "type", "label", "produces", "consumes". Extension components may also have "schedules".
 - The entire response must be valid JSON — no trailing commas, no unescaped quotes
 
 ${buildBlueprintPrompt(description, interviewSpec)}`;
