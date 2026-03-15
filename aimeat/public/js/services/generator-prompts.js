@@ -10,6 +10,8 @@
  *   - buildInterviewPrompt(description): structured requirements interview prompt
  *   - buildBlueprintFixPrompt(description, errors): retry prompt for blueprint failures
  *   - buildFixPrompt(original, failed, errors): generic retry prompt for components
+ *   - buildImpactPrompt(changeRequest, blueprint): change impact analysis prompt
+ *   - buildEditPrompt(type, label, currentCode, changeRequest, upstreamChanges): targeted edit prompt
  *   - cortex template: IIFE domain library generation prompt
  * @usage import { buildBlueprintPrompt, buildComponentPrompt } from '/js/services/generator-prompts.js';
  * @version-history
@@ -28,6 +30,8 @@
  *     principle-based framework; harden JSON.parse prevention; fix translation locale
  *     key enforcement; add empty-state handling to cortex+app; HTML entity warnings;
  *     reduce completed-component context bloat
+ *   v3.2.0 — 2026-03-15 — Add buildImpactPrompt and buildEditPrompt for Phase 6
+ *     edit & change propagation
  *   v3.1.0 — 2026-03-14 — Fix app prompt: extension data lives in ext:{name}
  *     namespace, apps must use AIMEAT.data.getPublic() to read it, not .get()
  *   v4.0.0 — 2026-03-14 — Add buildInterviewPrompt for requirements interview,
@@ -42,6 +46,11 @@
  *     explicit "YOU DECIDE" list for implementation details, batch questions per section,
  *     prioritize use cases (up to 8 questions), reduce other sections to 2-3 each,
  *     shorter summaries between sections
+ *   v5.0.0 — 2026-03-15 — Phase 1-3 hardening: interview captures sample data + encoding,
+ *     blueprint traces data pipeline + declares produces/consumes dependencies,
+ *     extension prompt separates ctx.fetch from ctx.memory examples,
+ *     app prompt adds CSS design system + CDN library menu + auth layout,
+ *     buildComponentPrompt threads interviewSpec to extension prompts
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -105,17 +114,17 @@ ${specContext}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
 CRITICAL: Return ONLY a JSON object with "components" and "phases" arrays. Nothing else.
-Each component has EXACTLY three fields: "id", "type", "label". No other fields.
+Each component has EXACTLY five fields: "id", "type", "label", "produces", "consumes". No other fields.
 Do NOT include manifest content, code, HTML, translations, or any implementation details.
 The blueprint is a lightweight plan — actual content is generated later per component.
 
 Format:
 {
   "components": [
-    { "id": "csm-1", "type": "csm", "label": "Human-readable name" },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name" },
-    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name" },
-    { "id": "app-1", "type": "app", "label": "Human-readable name" }
+    { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
+    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": [] },
+    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getAlerts"], "consumes": ["memory:alerts.by-date.*"] },
+    { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getAlerts"] }
   ],
   "phases": [
     { "id": "define", "label": "Define Service", "componentIds": ["csm-1"] },
@@ -128,13 +137,34 @@ Format:
 Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1)
-- Each component object has ONLY "id", "type", "label" — no "manifest", "code", "files", or other keys
+- Each component object has these fields: "id", "type", "label", "produces", "consumes"
+- "produces": array of data outputs (format: "memory:namespace.*" for memory, "api:methodName" for cortex/app)
+- "consumes": array of data inputs this component reads from
 - Group components into logical phases
 - Include ALL components needed for a complete, working service
 - Cortex components go in a "Connect & Integrate" phase AFTER translations, BEFORE app
 - Cortex libraries are client-side JS that wrap extension APIs into clean domain methods for the app
 - Default to ONE cortex per project unless complexity clearly warrants splitting
 - Only include what's actually needed — don't pad with unnecessary components
+
+## Data Pipeline Verification (do this BEFORE listing components)
+
+For each VIEW in the spec, trace the data path:
+1. What fields does this view need to render?
+2. Where does each field come from? (external source, computed, user input)
+3. Does the source provide this field directly, or does a component need to transform/enrich it?
+4. If a field has no clear path from source to view, add a component that produces it.
+
+Example: A map view needs lat/lng coordinates. If the data source only has city names,
+the blueprint must include a component that maps city names to coordinates.
+
+## Component Dependencies
+
+Each component MUST declare what it produces and consumes:
+- Extensions produce memory keys (e.g., "memory:alerts.by-date.*")
+- Cortex libraries produce API methods (e.g., "api:getAlerts") and consume memory keys
+- Apps consume API methods or memory keys
+- Every "consumes" entry must be matched by a "produces" entry in another component
 
 ## CRITICAL: Extension vs Cortex vs App — Decision Framework
 
@@ -218,16 +248,23 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       - IMPORTANT: Do NOT move to the next section until the user confirms all use cases
       - Ask: "Any other use cases, or shall we move on?"
 
-   b) AUDIENCE & SCOPE — Who is this for? (2-3 questions)
+   b) AUDIENCE & SCOPE — Who is this for? (1-2 questions)
       Ask in ONE batch:
       - Personal or multi-user?
       - Scale: just me / <10 / <100 / 100+?
       - Any special display context? (kiosk, mobile, embedded)
+      NOTE: Do NOT ask about login/auth — AIMEAT apps run from app-catalog which already requires a logged-in user. Auth is handled by the platform.
 
    c) DATA SOURCES — Where does the data come from? (2-3 questions)
       - What external feeds/APIs/URLs does it use?
       - If the user mentions a URL: try to fetch it and describe what you see
         - If you CANNOT access it, say so honestly — NEVER pretend you accessed something
+      - For EVERY external source: capture at least ONE real sample entry in the spec
+        - If you can fetch it, include one raw entry verbatim (one RSS <item>, one JSON object, etc.)
+        - If you CANNOT fetch it, ask the user to paste one real sample entry
+        - NEVER generate parsing code based on assumed format — you need real evidence
+      - Note any non-obvious characteristics: encoding declaration, nested structures,
+        timestamps with ambiguous formats, mixed-language content
       - Is any data user-generated or computed from other data?
 
    d) DATA MODEL — What are the key entities? (1-2 questions)
@@ -304,6 +341,8 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "type": "rss|api|websocket|user-input|computed",
       "url": "https://... or null",
       "format": "xml|json|html|csv|unknown",
+      "encoding": "utf-8|iso-8859-1|auto",
+      "sampleEntry": "One raw entry from the source, copy-pasted exactly as-is",
       "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
       "sampleFields": ["field1", "field2"],
       "notes": "Any observations from fetching/analyzing the source",
@@ -575,15 +614,24 @@ actions:
     script: action-id.js
 // actions/action-id.js
 export default async function(ctx, input) {
-  // Use ctx.memory, ctx.wallet, ctx.caller, ctx.log
-  // Use ctx.fetch(url, opts) for HTTP requests — global fetch() is NOT available
+  // ── Reading from EXTERNAL APIs (ctx.fetch) ──
+  // ctx.fetch() returns { ok, status, text } — text is a RAW string, parse it yourself
   const resp = await ctx.fetch('https://example.com/api');
   if (!resp.ok) {
     ctx.log.error('API request failed', { status: resp.status });
     return { error: 'Request failed with status ' + resp.status };
   }
-  const data = JSON.parse(resp.text);
-  return { result: data };
+  const data = JSON.parse(resp.text);  // ← correct: resp.text IS a string
+
+  // ── Reading from AIMEAT MEMORY (ctx.memory) ──
+  // ctx.memory.get() returns a JS value directly — NEVER use JSON.parse
+  const stored = await ctx.memory.get("my.key");
+  if (!stored) return { items: [] };  // ← stored is already an object, or undefined
+
+  // ── Writing to AIMEAT MEMORY ──
+  await ctx.memory.set("results.today", { items: data.results, fetchedAt: new Date().toISOString() });
+
+  return { result: stored };
 }
 \`\`\`
 
@@ -718,12 +766,64 @@ async function extCall(extName, actionId, body = {}, instanceId = null) {
 const result = await extCall('my-extension', 'my-action', { query: 'test' });
 \\\`\\\`\\\``}
 
-## CDN Libraries
+## CDN Libraries & Design Resources
 
-The AIMEAT app catalog allows external CDN scripts. You may use these via <script> tags:
-- Leaflet (maps): https://unpkg.com/leaflet@1/dist/leaflet.js + leaflet.css
-- Chart.js (charts): https://cdn.jsdelivr.net/npm/chart.js
-- Other CDN libraries from unpkg.com, cdn.jsdelivr.net, or cdnjs.cloudflare.com
+The AIMEAT app catalog allows external CDN scripts. Available libraries:
+
+| Library | Script Tag | Use for |
+|---------|-----------|---------|
+| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS | Maps, markers, geospatial |
+| Chart.js | \`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\` | Bar, line, pie, radar charts |
+| Motion | \`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\` | Animations via \`Motion.animate(el, {x: 100}, {duration: 0.5})\` |
+| Phaser 3 | \`<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/phaser.min.js"></script>\` | Games, interactive canvas, physics |
+
+For UI inspiration, reference uiverse.io for fancy buttons, cards, toggles, and loaders (CSS-only patterns).
+
+## CSS Design System
+
+Use CSS custom properties for ALL styling. Define a theme at the top, then use var() everywhere:
+\`\`\`css
+:root {
+  --color-primary: #3b82f6;      /* main action color — customize per project */
+  --color-secondary: #64748b;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-bg: #ffffff;
+  --color-bg-card: #f8fafc;
+  --color-text: #1e293b;
+  --color-text-dim: #64748b;
+  --color-border: #e2e8f0;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+  --transition: 150ms ease;
+}
+\`\`\`
+
+NEVER use hardcoded hex colors in component styles. Always use var(--color-*).
+Customize the palette based on the project's domain and the style preferences from the spec.
+
+## Auth UI Layout
+
+The #auth-container renders a login button and session bar at the top of the page.
+Reserve space for it in your layout — do not overlap or hide it:
+\`\`\`html
+<body>
+  <div id="auth-container"></div>  <!-- AIMEAT login/session UI — always at top -->
+  <header><!-- your app header --></header>
+  <main id="app"><!-- your content --></main>
+</body>
+\`\`\`
 
 ## Rules
 - DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
@@ -742,6 +842,30 @@ On first run, extension data does NOT exist yet. The app MUST show a friendly em
 - Check every data response for null/empty before rendering
 - Show helpful messages: "No data yet — extensions will collect data on their next scheduled run"
 - NEVER crash on null/undefined data — always provide fallback UI
+
+## Built-in Error Collector (diagnostics)
+
+Add this error collector at the TOP of your main <script>, before any other code:
+\\\`\\\`\\\`javascript
+// Error collector — surfaces runtime errors in the UI for diagnostics
+(function() {
+  var errors = [];
+  window.onerror = function(msg, src, line, col) {
+    errors.push({ msg: msg, src: src, line: line, col: col, at: new Date().toISOString() });
+    showErrors();
+  };
+  window.addEventListener('unhandledrejection', function(e) {
+    errors.push({ msg: String(e.reason), src: 'promise', line: 0, col: 0, at: new Date().toISOString() });
+    showErrors();
+  });
+  function showErrors() {
+    var el = document.getElementById('app-errors');
+    if (!el) { el = document.createElement('div'); el.id = 'app-errors'; el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font-size:12px;padding:8px 12px;max-height:120px;overflow:auto;z-index:9999;font-family:monospace;border-top:2px solid #ff4444'; document.body.appendChild(el); }
+    el.innerHTML = errors.map(function(e) { return e.at.slice(11,19) + ' ' + e.msg + ' (' + e.src + ':' + e.line + ')'; }).join('<br>');
+  }
+})();
+\\\`\\\`\\\`
+This lets users see runtime errors without opening the browser console.
 
 ## CRITICAL: Code Quality — No HTML Entities in JavaScript
 
@@ -1097,7 +1221,7 @@ NEVER assume data exists — the user may open the app before any extension has 
   },
 };
 
-export function buildComponentPrompt(type, label, projectDescription, blueprint, completedComponents) {
+export function buildComponentPrompt(type, label, projectDescription, blueprint, completedComponents, interviewSpec) {
   const template = COMPONENT_TEMPLATES[type];
   if (!template) throw new Error(`No template for type: ${type}`);
 
@@ -1115,6 +1239,16 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
         const preview = c.result.length > 300 ? c.result.slice(0, 300) + '...' : c.result;
         context += `  Result preview:\n${preview}\n`;
       }
+    }
+  }
+
+  // Thread interview data source details to extension prompts
+  if (type === 'extension' && interviewSpec?.dataSources) {
+    context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';
+    for (const ds of interviewSpec.dataSources) {
+      context += `- **${ds.name}** (${ds.type}): ${ds.url || 'user-input'}\n`;
+      if (ds.encoding) context += `  Encoding: ${ds.encoding}\n`;
+      if (ds.sampleEntry) context += `  Sample entry (REAL DATA — write your parser against this):\n  \`\`\`\n  ${ds.sampleEntry}\n  \`\`\`\n`;
     }
   }
 
@@ -1136,7 +1270,7 @@ ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
 
 Common mistakes to avoid:
 - Do NOT include manifest content, code, HTML, or implementation details in the blueprint
-- Each component must have EXACTLY three fields: "id", "type", "label"
+- Each component must have EXACTLY five fields: "id", "type", "label", "produces", "consumes"
 - The entire response must be valid JSON — no trailing commas, no unescaped quotes
 
 ${buildBlueprintPrompt(description, interviewSpec)}`;
@@ -1162,4 +1296,111 @@ ERRORS:
 ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
 
 Return the corrected result in the same format as the original.`;
+}
+
+/* ── Impact & Edit Prompts (Phase 6) ────────────────── */
+
+/**
+ * Build a prompt that analyzes which components are affected by a proposed change.
+ * User copies this to AI Chat to get an impact analysis.
+ */
+export function buildImpactPrompt(changeRequest, blueprint) {
+  const componentList = (blueprint?.components || []).map(c => {
+    const produces = (c.produces || []).join(', ') || 'none';
+    const consumes = (c.consumes || []).join(', ') || 'none';
+    return `- ${c.id} (${c.type}: ${c.label})\n  produces: ${produces}\n  consumes: ${consumes}`;
+  }).join('\n');
+
+  return `You are analyzing the impact of a change to an AIMEAT service.
+
+## Service Blueprint
+
+${componentList}
+
+## Proposed Change
+
+${changeRequest}
+
+## Your Task
+
+Analyze which components need to be modified for this change. For EACH component, classify as:
+
+- **ROOT CAUSE** — this component directly causes the problem or is the primary target of the change
+- **NEEDS UPDATE** — this component must change because upstream data shape or API changed
+- **NO CHANGE** — this component is unaffected
+
+Return a JSON object:
+\`\`\`json
+{
+  "analysis": [
+    {
+      "id": "ext-1",
+      "label": "Component Label",
+      "impact": "root|update|none",
+      "reason": "One sentence explaining why this component is/isn't affected",
+      "suggestedChange": "Brief description of what to change, or null if no change needed"
+    }
+  ],
+  "summary": "One paragraph overview of the change and its blast radius"
+}
+\`\`\`
+
+Rules:
+- Be conservative — if you're unsure whether a component needs updating, mark it as "update" not "none"
+- If the change affects data shape (fields, types, formats), ALL downstream consumers need "update"
+- If the change is purely visual/UI, only the app needs updating
+- Include ALL components in the analysis, even those with "none" impact`;
+}
+
+/**
+ * Build a targeted edit prompt for modifying a single component.
+ * Includes the current installed code and the specific change request.
+ */
+export function buildEditPrompt(type, label, currentCode, changeRequest, upstreamChanges) {
+  const typeLabel = type === 'csm' ? 'CSM manifest' :
+    type === 'msm' ? 'MSM manifest' :
+    type === 'extension' ? 'Extension' :
+    type === 'cortex' ? 'Cortex library' :
+    type === 'app' ? 'App (HTML/JS)' :
+    type === 'translation' ? 'Translation file' :
+    type === 'memory' ? 'Memory structure' : type;
+
+  let upstreamSection = '';
+  if (upstreamChanges) {
+    upstreamSection = `
+## Upstream Data Changes
+
+The following upstream components have been modified. Your code may need to adapt:
+
+${upstreamChanges}
+
+Make sure your code correctly handles the new data format described above.
+`;
+  }
+
+  return `${AIMEAT_CONTEXT}
+
+You are modifying an existing AIMEAT ${typeLabel}: **${label}**
+
+## Current Installed Code
+
+\`\`\`
+${currentCode}
+\`\`\`
+
+## Change Request
+
+${changeRequest}
+${upstreamSection}
+## Rules
+
+- Modify ONLY what the change request asks for
+- Keep ALL other code, structure, and logic identical
+- Do NOT refactor, restyle, rename, or "improve" unrelated code
+- Do NOT add features, comments, or documentation beyond what's requested
+- Return the COMPLETE modified component in the same format as the original
+- If the component is YAML + JavaScript (extension), return both in the same format
+- If the change request is unclear, make the minimal change that addresses it
+
+Return the complete modified ${typeLabel} — not a diff, not a partial snippet.`;
 }

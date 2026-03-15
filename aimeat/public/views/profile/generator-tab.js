@@ -16,6 +16,8 @@
  *   v2.0.0 — 2026-03-14 — Add interview phase UI, cortex registration wiring,
  *     validateInterviewSpec integration, buildInterviewPrompt support
  *   v2.0.1 — 2026-03-15 — Fix session not passed to ComponentDetail (broke registration)
+ *   v3.0.0 — 2026-03-15 — Add lifecycle management (activate/deactivate/launch/remove),
+ *     edit service UI (impact analysis + targeted edit prompts), diagnostics panel
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -29,8 +31,9 @@ import {
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
   getListeners, buildAgentSetupPrompt, createGeneratorAgent,
   saveInterviewSpec, getInterviewSpec,
+  getComponentStatuses, activateAll, deactivateAll, removeComponents, getAppLaunchUrl,
 } from '/js/services/generator.js';
-import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt } from '/js/services/generator-prompts.js';
+import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
 import { ConfirmDialog } from '/components/Modal.js';
 
@@ -376,6 +379,23 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Phase 5: Lifecycle state
+  const [liveStatuses, setLiveStatuses] = useState({});
+  const [lifecycleLoading, setLifecycleLoading] = useState(null); // 'activate' | 'deactivate' | null
+  const [showRemovePanel, setShowRemovePanel] = useState(false);
+  const [removeSelection, setRemoveSelection] = useState({});
+  const [removeMemory, setRemoveMemory] = useState(false);
+
+  // Phase 6: Edit service state
+  const [editMode, setEditMode] = useState(null); // null | 'request' | 'impact' | 'editing'
+  const [changeRequest, setChangeRequest] = useState('');
+  const [impactResult, setImpactResult] = useState('');
+  const [impactParsed, setImpactParsed] = useState(null);
+  const [impactErrors, setImpactErrors] = useState([]);
+
+  // Phase 7: Diagnostics state
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+
   useEffect(() => { loadData(); }, [projectId]);
 
   async function loadData() {
@@ -386,8 +406,111 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       setComponents(comps.length > 0 ? comps : p.blueprint.components.map(c => ({ ...c, status: 'not_started', history: [], _version: 0 })));
     }
     setAgents(await discoverAgents());
-    // Housekeeping: clean old queue/result/log entries
     cleanupOldEntries(projectId).catch(() => {});
+  }
+
+  // Phase 5: Refresh live statuses
+  async function refreshStatuses() {
+    try {
+      const s = await getComponentStatuses(projectId);
+      setLiveStatuses(s);
+    } catch { /* best effort */ }
+  }
+
+  useEffect(() => { if (project) refreshStatuses(); }, [project]);
+
+  async function handleActivateAll() {
+    setLifecycleLoading('activate');
+    try {
+      const result = await activateAll(projectId);
+      if (result.errors.length > 0) {
+        showToast?.(`Activated ${result.activated.length}, ${result.errors.length} errors`, true);
+      } else {
+        showToast?.(`Activated ${result.activated.length} components`);
+      }
+      await refreshStatuses();
+    } catch (e) { showToast?.(e.message, true); }
+    setLifecycleLoading(null);
+  }
+
+  async function handleDeactivateAll() {
+    setLifecycleLoading('deactivate');
+    try {
+      const result = await deactivateAll(projectId);
+      if (result.errors.length > 0) {
+        showToast?.(`Deactivated ${result.deactivated.length}, ${result.errors.length} errors`, true);
+      } else {
+        showToast?.(`Deactivated ${result.deactivated.length} components`);
+      }
+      await refreshStatuses();
+    } catch (e) { showToast?.(e.message, true); }
+    setLifecycleLoading(null);
+  }
+
+  async function handleRemoveConfirmed() {
+    const ids = Object.entries(removeSelection).filter(([, v]) => v).map(([k]) => k);
+    if (ids.length === 0) return;
+    setLifecycleLoading('remove');
+    try {
+      const result = await removeComponents(projectId, ids, removeMemory, session);
+      if (result.errors.length > 0) {
+        showToast?.(`Removed ${result.removed.length}, ${result.errors.length} errors`, true);
+      } else {
+        showToast?.(`Removed ${result.removed.length} components`);
+      }
+      setShowRemovePanel(false);
+      setRemoveSelection({});
+      await loadData();
+      await refreshStatuses();
+    } catch (e) { showToast?.(e.message, true); }
+    setLifecycleLoading(null);
+  }
+
+  function handleLaunchApp() {
+    const url = getAppLaunchUrl(components, session);
+    if (url) window.open(url, '_blank');
+    else showToast?.('No registered app found');
+  }
+
+  // Phase 6: Edit service handlers
+  function handleCopyImpactPrompt() {
+    const prompt = buildImpactPrompt(changeRequest, project?.blueprint);
+    navigator.clipboard.writeText(prompt).catch(() => {});
+    showToast?.('Impact analysis prompt copied!');
+    setEditMode('impact');
+  }
+
+  function handleParseImpact() {
+    try {
+      let text = impactResult.trim();
+      const jsonMatch = text.match(/```json\s*\n([\s\S]*?)```/i);
+      if (jsonMatch) text = jsonMatch[1].trim();
+      const parsed = JSON.parse(text);
+      if (!parsed.analysis || !Array.isArray(parsed.analysis)) {
+        setImpactErrors(['Response must contain an "analysis" array']);
+        return;
+      }
+      setImpactParsed(parsed);
+      setImpactErrors([]);
+      setEditMode('editing');
+    } catch (e) {
+      setImpactErrors([`Invalid JSON: ${e.message}`]);
+    }
+  }
+
+  function handleCopyEditPrompt(comp, suggestedChange) {
+    const upstream = impactParsed?.analysis
+      ?.filter(a => a.impact === 'root' && a.id !== comp.id)
+      ?.map(a => `- ${a.label}: ${a.suggestedChange}`)
+      ?.join('\n') || '';
+    const prompt = buildEditPrompt(
+      comp.type, comp.label,
+      comp.result || '(no current code)',
+      suggestedChange || changeRequest,
+      upstream || null,
+    );
+    navigator.clipboard.writeText(prompt).catch(() => {});
+    showToast?.(`Edit prompt for ${comp.label} copied!`);
   }
 
   const selected = components.find(c => c.id === selectedId);
@@ -398,6 +521,25 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     (c.history || []).map(h => ({ ...h, componentId: c.id, componentLabel: c.label }))
   ).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const filteredLogs = logFilter ? allLogs.filter(l => l.componentId === logFilter) : allLogs;
+
+  // Phase 5: Compute summary for lifecycle toolbar
+  const registeredCount = components.filter(c => c.registeredAs).length;
+  const activeCount = Object.values(liveStatuses).filter(s => s.active).length;
+  const hasApp = components.some(c => c.type === 'app' && c.registeredAs);
+
+  // Phase 7: Diagnostics data
+  const diagnosticsData = components.map(c => {
+    const live = liveStatuses[c.id] || {};
+    return {
+      id: c.id, label: c.label, type: c.type,
+      generatorStatus: c.status,
+      registeredAs: c.registeredAs,
+      liveStatus: live.status || 'unknown',
+      active: live.active || false,
+      installed: live.installed || false,
+      lastAction: (c.history || []).slice(-1)[0] || null,
+    };
+  });
 
   async function handleDeleteConfirmed() {
     setShowDeleteConfirm(false);
@@ -431,6 +573,187 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
           ${t('profile.generator.deleteProject')}
         </button>
       </div>
+
+      <!-- Phase 5: Lifecycle Toolbar -->
+      ${registeredCount > 0 && html`
+        <div class="pf-gen-lifecycle-toolbar">
+          <div class="pf-gen-lifecycle-status">
+            <span>${registeredCount} registered</span>
+            <span class="pf-gen-lifecycle-sep">/</span>
+            <span>${activeCount} active</span>
+          </div>
+          <div class="pf-gen-lifecycle-actions">
+            <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#000"
+              onClick=${handleActivateAll}
+              disabled=${lifecycleLoading !== null || registeredCount === 0}>
+              ${lifecycleLoading === 'activate' ? '...' : 'Activate All'}
+            </button>
+            <button class="btn btn-sm btn-outline"
+              onClick=${handleDeactivateAll}
+              disabled=${lifecycleLoading !== null || activeCount === 0}>
+              ${lifecycleLoading === 'deactivate' ? '...' : 'Deactivate All'}
+            </button>
+            ${hasApp && html`
+              <button class="btn btn-sm btn-primary" onClick=${handleLaunchApp}>
+                Launch App
+              </button>
+            `}
+            <button class="btn btn-sm btn-outline" onClick=${() => refreshStatuses()} title="Refresh live statuses">
+              Refresh
+            </button>
+            <button class="btn btn-sm btn-ghost" onClick=${() => setEditMode(editMode ? null : 'request')}>
+              ${editMode ? 'Cancel Edit' : 'Edit Service'}
+            </button>
+            <button class="btn btn-sm btn-ghost" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
+              ${showDiagnostics ? 'Hide Diagnostics' : 'Diagnostics'}
+            </button>
+            <button class="btn btn-sm btn-ghost" style="color:var(--error,#ef4444)"
+              onClick=${() => { setShowRemovePanel(!showRemovePanel); setRemoveSelection({}); }}>
+              ${showRemovePanel ? 'Cancel' : 'Remove...'}
+            </button>
+          </div>
+        </div>
+      `}
+
+      <!-- Phase 5: Remove Panel -->
+      ${showRemovePanel && html`
+        <div class="pf-gen-remove-panel">
+          <p style="margin:0 0 8px;font-weight:600">Select components to remove from the node:</p>
+          <div class="pf-gen-remove-list">
+            ${components.filter(c => c.registeredAs).map(c => html`
+              <label class="pf-gen-remove-item">
+                <input type="checkbox"
+                  checked=${!!removeSelection[c.id]}
+                  onChange=${e => setRemoveSelection({ ...removeSelection, [c.id]: e.target.checked })}
+                />
+                <span>${c.label}</span>
+                <span class="pf-gen-type-badge type-${c.type}">${c.type}</span>
+                <span class="pf-gen-remove-name">${c.registeredAs}</span>
+              </label>
+            `)}
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+            <label style="display:flex;align-items:center;gap:4px;font-size:0.85em">
+              <input type="checkbox" checked=${removeMemory} onChange=${e => setRemoveMemory(e.target.checked)} />
+              Also delete extension memory data
+            </label>
+            <button class="btn btn-sm" style="background:var(--error,#ef4444);color:#fff"
+              onClick=${handleRemoveConfirmed}
+              disabled=${lifecycleLoading === 'remove' || Object.values(removeSelection).filter(Boolean).length === 0}>
+              ${lifecycleLoading === 'remove' ? 'Removing...' : `Remove ${Object.values(removeSelection).filter(Boolean).length} selected`}
+            </button>
+          </div>
+        </div>
+      `}
+
+      <!-- Phase 6: Edit Service Panel -->
+      ${editMode === 'request' && html`
+        <div class="pf-gen-edit-panel">
+          <h4>Edit Service</h4>
+          <p class="pf-gen-subtitle">Describe the problem or change you want to make:</p>
+          <textarea class="pf-gen-result-area" rows="4"
+            placeholder="e.g., Municipality and Type fields show numbers instead of names. The RSS title format is HH:MM:SS Municipality Type: Severity"
+            value=${changeRequest}
+            onInput=${e => setChangeRequest(e.target.value)}
+          />
+          <div class="pf-gen-actions" style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" onClick=${handleCopyImpactPrompt} disabled=${!changeRequest.trim()}>
+              Copy Impact Analysis Prompt
+            </button>
+          </div>
+        </div>
+      `}
+
+      ${editMode === 'impact' && html`
+        <div class="pf-gen-edit-panel">
+          <h4>Impact Analysis</h4>
+          <p class="pf-gen-subtitle">Paste the AI's impact analysis response:</p>
+          <textarea class="pf-gen-result-area" rows="8"
+            placeholder="Paste the JSON response from AI Chat..."
+            value=${impactResult}
+            onInput=${e => setImpactResult(e.target.value)}
+          />
+          ${impactErrors.length > 0 && html`
+            <div class="pf-gen-errors">
+              <ul>${impactErrors.map(e => html`<li>${e}</li>`)}</ul>
+            </div>
+          `}
+          <div class="pf-gen-actions" style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" onClick=${handleParseImpact} disabled=${!impactResult.trim()}>
+              Analyze Impact
+            </button>
+            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('request')}>Back</button>
+          </div>
+        </div>
+      `}
+
+      ${editMode === 'editing' && impactParsed && html`
+        <div class="pf-gen-edit-panel">
+          <h4>Impact Results</h4>
+          ${impactParsed.summary && html`<p class="pf-gen-subtitle">${impactParsed.summary}</p>`}
+          <div class="pf-gen-impact-list">
+            ${impactParsed.analysis.map(a => {
+              const comp = components.find(c => c.id === a.id);
+              const impactClass = a.impact === 'root' ? 'impact-root' : a.impact === 'update' ? 'impact-update' : 'impact-none';
+              return html`
+                <div class="pf-gen-impact-item ${impactClass}">
+                  <div class="pf-gen-impact-header">
+                    <span class="pf-gen-impact-badge ${impactClass}">${a.impact.toUpperCase()}</span>
+                    <span class="pf-gen-impact-label">${a.label}</span>
+                  </div>
+                  <div class="pf-gen-impact-reason">${a.reason}</div>
+                  ${(a.impact === 'root' || a.impact === 'update') && comp && html`
+                    <button class="btn btn-sm btn-outline" style="margin-top:4px"
+                      onClick=${() => handleCopyEditPrompt(comp, a.suggestedChange)}>
+                      Copy Edit Prompt
+                    </button>
+                  `}
+                </div>
+              `;
+            })}
+          </div>
+          <div class="pf-gen-actions" style="margin-top:8px">
+            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('impact')}>Back to Impact</button>
+            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode(null)}>Done</button>
+          </div>
+        </div>
+      `}
+
+      <!-- Phase 7: Diagnostics Panel -->
+      ${showDiagnostics && html`
+        <div class="pf-gen-diagnostics-panel">
+          <h4>Diagnostics</h4>
+          <table class="pf-gen-diag-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Type</th>
+                <th>Gen Status</th>
+                <th>Live Status</th>
+                <th>Last Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${diagnosticsData.map(d => html`
+                <tr class=${d.active ? 'diag-active' : d.installed ? 'diag-installed' : ''}>
+                  <td>${d.label}</td>
+                  <td><span class="pf-gen-type-badge type-${d.type}">${d.type}</span></td>
+                  <td><span class="pf-gen-status-badge status-${d.generatorStatus}">${d.generatorStatus}</span></td>
+                  <td>
+                    <span class=${d.active ? 'pf-gen-live-active' : d.installed ? 'pf-gen-live-installed' : 'pf-gen-live-missing'}>
+                      ${d.liveStatus}
+                    </span>
+                  </td>
+                  <td class="pf-gen-diag-action">
+                    ${d.lastAction ? `${d.lastAction.action} (${new Date(d.lastAction.at).toLocaleTimeString()})` : '-'}
+                  </td>
+                </tr>
+              `)}
+            </tbody>
+          </table>
+        </div>
+      `}
+
       <div class="pf-gen-dash-body">
         <!-- Sidebar -->
         <div class="pf-gen-sidebar">
@@ -439,12 +762,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               <div class="pf-gen-phase-label">${phase.label}</div>
               ${(phase.componentIds || []).map(cid => {
                 const comp = components.find(c => c.id === cid) || { id: cid, label: cid, type: '?', status: 'not_started' };
+                const live = liveStatuses[cid];
                 return html`
                   <div
                     class="pf-gen-comp-item ${selectedId === cid ? 'active' : ''} status-${comp.status}"
                     onClick=${() => setSelectedId(cid)}
                   >
                     <span class="pf-gen-comp-name">${comp.label}</span>
+                    ${live && html`
+                      <span class="pf-gen-live-dot ${live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing'}"
+                        title=${live.status}></span>
+                    `}
                     <span class="pf-gen-type-badge type-${comp.type}">${comp.type.toUpperCase()}</span>
                   </div>
                 `;

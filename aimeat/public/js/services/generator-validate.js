@@ -29,6 +29,9 @@
  *     No more regex hacks for block scalars, quoting, or multiline values.
  *   v3.1.0 — 2026-03-14 — Add validateInterviewSpec() for structured interview JSON,
  *     add cortex component validator, add 'cortex' to allowed blueprint types
+ *   v4.0.0 — 2026-03-15 — Add validateAntiPatterns() for universal crash-prevention
+ *     checks (JSON.parse on memory, require/import in sandbox, HTML entities,
+ *     translation locale mismatch); integrate into extension/app/translation validators
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -110,6 +113,82 @@ function tryParseYaml(text) {
       return { errors, parsed: null, cleaned: preCleaned };
     }
   }
+}
+
+/* ── Anti-Pattern Validation ─────────────────────────── */
+
+/**
+ * Scan generated code for universal anti-patterns that always indicate bugs.
+ * Returns { warnings: string[], errors: string[] }
+ * - errors: patterns that will definitely crash (block install)
+ * - warnings: patterns that are suspicious (show warning, allow install)
+ */
+export function validateAntiPatterns(type, code) {
+  const errors = [];
+  const warnings = [];
+  if (!code || typeof code !== 'string') return { errors, warnings };
+
+  // === Extension-specific anti-patterns ===
+  if (type === 'extension') {
+    // JSON.parse on memory.get — always crashes with "undefined is not valid JSON"
+    if (/JSON\.parse\s*\(\s*(await\s+)?ctx\.memory\.get/i.test(code)) {
+      errors.push('CRASH: JSON.parse(ctx.memory.get(...)) — memory.get() already returns parsed values. Remove JSON.parse().');
+    }
+    // JSON.parse wrapping a variable that came from memory.get
+    if (/=\s*(await\s+)?ctx\.memory\.get\s*\([^)]+\)\s*;[\s\S]{0,100}JSON\.parse\s*\(\s*\w+\s*\)/m.test(code)) {
+      warnings.push('Suspicious: variable from ctx.memory.get() passed to JSON.parse() — memory values are already parsed.');
+    }
+    // require() — not available in V8 sandbox
+    if (/\brequire\s*\(/m.test(code)) {
+      errors.push('CRASH: require() is not available in the V8 sandbox. All code must be self-contained.');
+    }
+    // import ... from (but allow export default)
+    if (/\bimport\s+.+\s+from\s+/m.test(code)) {
+      errors.push('CRASH: import...from is not available in the V8 sandbox. Only "export default" is allowed.');
+    }
+    // global fetch() without ctx prefix
+    if (/(?<!ctx\.)fetch\s*\(/m.test(code) && !/function\s+fetch/m.test(code)) {
+      warnings.push('Suspicious: fetch() called without ctx prefix — use ctx.fetch() in the V8 sandbox. Global fetch is not available.');
+    }
+    // console.log — not available
+    if (/\bconsole\.(log|warn|error|info)\s*\(/m.test(code)) {
+      warnings.push('console.log is not available in the V8 sandbox. Use ctx.log.info/warn/error() instead.');
+    }
+    // setTimeout/setInterval — not available
+    if (/\b(setTimeout|setInterval|setImmediate)\s*\(/m.test(code)) {
+      errors.push('CRASH: setTimeout/setInterval/setImmediate are not available in the V8 sandbox.');
+    }
+  }
+
+  // === HTML entity corruption (any type) ===
+  // These appear when AI retries render HTML entities in code
+  if (/&gt;|&lt;|&amp;(?!amp;)|&quot;/.test(code)) {
+    const codeLines = code.split('\n');
+    const entityLines = codeLines.filter(line => {
+      // Skip lines that are clearly HTML text content
+      if (/^\s*<[^>]+>[^<]*&/.test(line)) return false;
+      // Flag lines with entities in code context
+      return /&gt;|&lt;|&amp;[a-z]|&quot;/.test(line) && /[=(){}\[\];]/.test(line);
+    });
+    if (entityLines.length > 0) {
+      errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the V8 sandbox.`);
+    }
+  }
+
+  // === Translation anti-patterns ===
+  if (type === 'translation') {
+    try {
+      const parsed = JSON.parse(code);
+      if (parsed.en && !parsed.fi && Object.values(parsed.en).some(v => /[äöåÄÖÅ]/.test(String(v)))) {
+        warnings.push('Suspicious: "en" locale contains Finnish characters (ä, ö, å) — check if root key should be "fi".');
+      }
+      if (parsed.fi && Object.values(parsed.fi).every(v => !/[äöåÄÖÅ]/.test(String(v)))) {
+        warnings.push('Suspicious: "fi" locale has no Finnish characters (ä, ö, å) — may contain English text under wrong locale key.');
+      }
+    } catch { /* not valid JSON, other validators will catch this */ }
+  }
+
+  return { errors, warnings };
 }
 
 /* ── Validators ──────────────────────────────────────── */
@@ -202,6 +281,10 @@ const validators = {
       errors.push(`Extension defines ${actionCount} action(s) but no JavaScript code blocks found`);
     }
 
+    // Anti-pattern scan
+    const ap = validateAntiPatterns('extension', result);
+    errors.push(...ap.errors);
+
     return { valid: errors.length === 0, errors, extracted: result };
   },
 
@@ -217,6 +300,10 @@ const validators = {
     if (!html.includes('AIMEAT App Manifest') && !html.match(/name:\s*.+/)) {
       errors.push('Missing AIMEAT App Manifest comment');
     }
+
+    // Anti-pattern scan
+    const ap = validateAntiPatterns('app', html);
+    errors.push(...ap.errors);
 
     return { valid: errors.length === 0, errors, extracted: html };
   },
@@ -251,6 +338,10 @@ const validators = {
         const missing = enKeys.filter(k => !fiKeys.includes(k));
         if (missing.length > 0) errors.push(`Finnish translations missing for: ${missing.join(', ')}`);
       }
+      // Anti-pattern scan
+      const ap = validateAntiPatterns('translation', json);
+      // translation anti-patterns are warnings only, don't block validation
+
       return { valid: errors.length === 0, errors, extracted: json };
     } catch (e) {
       errors.push(`Invalid JSON: ${e.message}`);

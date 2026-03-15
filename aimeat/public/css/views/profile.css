@@ -589,9 +589,75 @@
 .pf-gen-log-comp { color: #7c3aed; flex-shrink: 0; }
 .pf-gen-log-msg { color: var(--muted); }
 
+/* Lifecycle Toolbar (Phase 5) */
+.pf-gen-lifecycle-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; margin-bottom: 12px;
+  background: var(--card, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px;
+}
+.pf-gen-lifecycle-status { font-size: 0.85em; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+.pf-gen-lifecycle-sep { color: var(--border); }
+.pf-gen-lifecycle-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Live status dots in sidebar */
+.pf-gen-live-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.pf-gen-live-dot.live-active { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }
+.pf-gen-live-dot.live-installed { background: #fbbf24; }
+.pf-gen-live-dot.live-missing { background: #d1d5db; }
+
+/* Remove Panel (Phase 5) */
+.pf-gen-remove-panel {
+  padding: 12px 16px; margin-bottom: 12px;
+  background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px;
+}
+.pf-gen-remove-list { display: flex; flex-direction: column; gap: 4px; }
+.pf-gen-remove-item { display: flex; align-items: center; gap: 8px; font-size: 0.85em; cursor: pointer; padding: 4px 0; }
+.pf-gen-remove-name { color: var(--muted); font-size: 0.9em; margin-left: auto; }
+
+/* Edit Service Panel (Phase 6) */
+.pf-gen-edit-panel {
+  padding: 12px 16px; margin-bottom: 12px;
+  background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px;
+}
+.pf-gen-edit-panel h4 { margin: 0 0 8px; }
+
+.pf-gen-impact-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.pf-gen-impact-item { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border, #E5E7EB); background: #FFFFFF; }
+.pf-gen-impact-item.impact-root { border-left: 3px solid #ef4444; }
+.pf-gen-impact-item.impact-update { border-left: 3px solid #f59e0b; }
+.pf-gen-impact-item.impact-none { border-left: 3px solid #d1d5db; opacity: 0.7; }
+
+.pf-gen-impact-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pf-gen-impact-badge { font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+.pf-gen-impact-badge.impact-root { background: rgba(239,68,68,0.12); color: #dc2626; }
+.pf-gen-impact-badge.impact-update { background: rgba(245,158,11,0.12); color: #b45309; }
+.pf-gen-impact-badge.impact-none { background: rgba(107,114,128,0.12); color: #6b7280; }
+.pf-gen-impact-label { font-weight: 600; font-size: 0.9em; }
+.pf-gen-impact-reason { font-size: 0.82em; color: var(--muted); }
+
+/* Diagnostics Panel (Phase 7) */
+.pf-gen-diagnostics-panel {
+  padding: 12px 16px; margin-bottom: 12px;
+  background: var(--card, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px;
+  overflow-x: auto;
+}
+.pf-gen-diagnostics-panel h4 { margin: 0 0 8px; }
+
+.pf-gen-diag-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
+.pf-gen-diag-table th { text-align: left; font-size: 0.75em; text-transform: uppercase; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.pf-gen-diag-table td { padding: 5px 8px; border-bottom: 1px solid rgba(0,0,0,0.04); }
+.pf-gen-diag-table tr.diag-active td:first-child { font-weight: 600; }
+
+.pf-gen-live-active { color: #16a34a; font-weight: 500; }
+.pf-gen-live-installed { color: #b45309; }
+.pf-gen-live-missing { color: #9ca3af; }
+.pf-gen-diag-action { color: var(--muted); font-size: 0.9em; }
+
 @media(max-width:700px) {
   .pf-gen-dash-body { flex-direction: column; }
   .pf-gen-sidebar { width: 100%; display: flex; gap: 4px; flex-wrap: wrap; }
   .pf-gen-phase-group { margin-bottom: 0; }
   .pf-gen-header-actions { flex-wrap: wrap; }
+  .pf-gen-lifecycle-toolbar { flex-direction: column; gap: 8px; }
+  .pf-gen-lifecycle-actions { justify-content: center; }
 }

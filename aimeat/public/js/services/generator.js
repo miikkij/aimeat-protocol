@@ -12,6 +12,7 @@
  *   - Interview Spec (saveInterviewSpec, getInterviewSpec)
  *   - Cleanup (cleanupOldEntries)
  *   - Registration (registerComponent) — includes cortex case with auto-activate
+ *   - Lifecycle (getComponentStatuses, activateAll, deactivateAll, removeComponents, getAppLaunchUrl)
  * @usage import { listProjects, buildAgentSetupPrompt } from '/js/services/generator.js';
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial generator service
@@ -25,6 +26,8 @@
  *     getInterviewSpec); add cortex case in registerComponent with auto-activate
  *   v3.1.0 — 2026-03-15 — Namespace CSM/MSM names with owner (owner/name) to avoid
  *     collisions; upsert pattern (delete+recreate) on NAME_TAKEN for re-runs
+ *   v4.0.0 — 2026-03-15 — Add lifecycle management: getComponentStatuses,
+ *     activateAll, deactivateAll, removeComponents, getAppLaunchUrl
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -422,6 +425,185 @@ export async function registerComponent(type, result, session) {
     default:
       throw new Error(`Unknown component type: ${type}`);
   }
+}
+
+/* ── Lifecycle Management ────────────────────────────── */
+
+/**
+ * Get live status for all registered components in a project.
+ * Checks extensions, cortex, and apps APIs for current state.
+ */
+export async function getComponentStatuses(projectId) {
+  const components = await loadAllComponents(projectId);
+  const statuses = {};
+
+  // Fetch live extension list
+  let liveExtensions = [];
+  try {
+    const resp = await apiGet('/v1/extensions');
+    liveExtensions = resp?.data?.extensions || resp?.data || [];
+  } catch { /* extensions API may not exist */ }
+
+  // Fetch live cortex list
+  let liveCortexes = [];
+  try {
+    const resp = await apiGet('/v1/cortex');
+    liveCortexes = resp?.data?.extensions || resp?.data || [];
+  } catch { /* cortex API may not exist */ }
+
+  // Fetch live apps list
+  let liveApps = [];
+  try {
+    const resp = await apiGet('/v1/apps');
+    liveApps = resp?.data?.apps || resp?.data || [];
+  } catch { /* apps API may not exist */ }
+
+  for (const comp of components) {
+    const name = comp.registeredAs;
+    if (!name) {
+      statuses[comp.id] = { installed: false, status: 'not_registered' };
+      continue;
+    }
+
+    if (comp.type === 'extension') {
+      const ext = liveExtensions.find(e => e.name === name || e.metadata?.name === name);
+      statuses[comp.id] = ext
+        ? { installed: true, status: ext.status || 'installed', active: ext.status === 'active' }
+        : { installed: false, status: 'not_found' };
+    } else if (comp.type === 'cortex') {
+      const ctx = liveCortexes.find(c => c.name === name || c.metadata?.name === name);
+      statuses[comp.id] = ctx
+        ? { installed: true, status: ctx.status || 'installed', active: ctx.status === 'active' }
+        : { installed: false, status: 'not_found' };
+    } else if (comp.type === 'app') {
+      const app = liveApps.find(a => a.filename === name || a.name === name);
+      statuses[comp.id] = app
+        ? { installed: true, status: 'published', active: true }
+        : { installed: false, status: 'not_found' };
+    } else {
+      // csm, msm, memory, translation — no live status to check
+      statuses[comp.id] = { installed: !!name, status: name ? 'registered' : 'not_registered' };
+    }
+  }
+
+  return statuses;
+}
+
+/**
+ * Activate all extensions and cortexes in a project.
+ * Returns { activated: string[], errors: string[] }
+ */
+export async function activateAll(projectId) {
+  const components = await loadAllComponents(projectId);
+  const activated = [];
+  const errors = [];
+
+  for (const comp of components) {
+    if (!comp.registeredAs) continue;
+    try {
+      if (comp.type === 'extension') {
+        await apiPost(`/v1/extensions/${encodeURIComponent(comp.registeredAs)}/activate`);
+        activated.push(comp.registeredAs);
+      } else if (comp.type === 'cortex') {
+        await apiPost(`/v1/cortex/${encodeURIComponent(comp.registeredAs)}/activate`);
+        activated.push(comp.registeredAs);
+      }
+    } catch (e) {
+      errors.push(`${comp.registeredAs}: ${e.message || 'activation failed'}`);
+    }
+  }
+
+  return { activated, errors };
+}
+
+/**
+ * Deactivate all extensions and cortexes in a project.
+ * Returns { deactivated: string[], errors: string[] }
+ */
+export async function deactivateAll(projectId) {
+  const components = await loadAllComponents(projectId);
+  const deactivated = [];
+  const errors = [];
+
+  for (const comp of components) {
+    if (!comp.registeredAs) continue;
+    try {
+      if (comp.type === 'extension') {
+        await apiPost(`/v1/extensions/${encodeURIComponent(comp.registeredAs)}/deactivate`);
+        deactivated.push(comp.registeredAs);
+      } else if (comp.type === 'cortex') {
+        await apiPost(`/v1/cortex/${encodeURIComponent(comp.registeredAs)}/deactivate`);
+        deactivated.push(comp.registeredAs);
+      }
+    } catch (e) {
+      errors.push(`${comp.registeredAs}: ${e.message || 'deactivation failed'}`);
+    }
+  }
+
+  return { deactivated, errors };
+}
+
+/**
+ * Remove selected components from the AIMEAT node.
+ * @param {string} projectId
+ * @param {string[]} componentIds - which component IDs to remove
+ * @param {boolean} includeMemory - also delete memory keys written by extensions
+ * @param {object} session - user session for owner context
+ * Returns { removed: string[], errors: string[] }
+ */
+export async function removeComponents(projectId, componentIds, includeMemory, session) {
+  const components = await loadAllComponents(projectId);
+  const toRemove = components.filter(c => componentIds.includes(c.id) && c.registeredAs);
+  const removed = [];
+  const errors = [];
+
+  for (const comp of toRemove) {
+    const name = comp.registeredAs;
+    try {
+      if (comp.type === 'extension') {
+        // Deactivate first, then delete
+        try { await apiPost(`/v1/extensions/${encodeURIComponent(name)}/deactivate`); } catch { /* ok */ }
+        await apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
+        if (includeMemory) {
+          // Clean up extension memory (ext:{name} namespace)
+          try {
+            const resp = await apiGet(`/v1/memory?prefix=&owner=ext:${encodeURIComponent(name)}&owner_scope=true`);
+            const items = resp?.data?.items || [];
+            for (const item of items) {
+              try { await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}?owner=ext:${encodeURIComponent(name)}`); } catch { /* best effort */ }
+            }
+          } catch { /* memory cleanup is best effort */ }
+        }
+      } else if (comp.type === 'cortex') {
+        try { await apiPost(`/v1/cortex/${encodeURIComponent(name)}/deactivate`); } catch { /* ok */ }
+        await apiDelete(`/v1/cortex/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'app') {
+        const owner = session?.owner || '';
+        await apiDelete(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'csm') {
+        await apiDelete(`/v1/csm/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'msm') {
+        await apiDelete(`/v1/msm/${encodeURIComponent(name)}`);
+      }
+      removed.push(name);
+      // Clear registeredAs in component state
+      await saveComponent(projectId, { ...comp, registeredAs: null, status: 'not_started' });
+    } catch (e) {
+      errors.push(`${name}: ${e.message || 'removal failed'}`);
+    }
+  }
+
+  return { removed, errors };
+}
+
+/**
+ * Get the launch URL for the app component in a project.
+ */
+export function getAppLaunchUrl(components, session) {
+  const appComp = components.find(c => c.type === 'app' && c.registeredAs);
+  if (!appComp) return null;
+  const owner = session?.owner || '';
+  return `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(appComp.registeredAs)}?mode=inline`;
 }
 
 /* ── Agent Listeners ─────────────────────────────────── */
