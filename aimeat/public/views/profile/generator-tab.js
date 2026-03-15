@@ -23,7 +23,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
@@ -232,7 +232,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
   if (phase === 'interview') {
     function handleCopyInterviewPrompt() {
-      const prompt = buildInterviewPrompt(description);
+      const prompt = buildInterviewPrompt(description, getLocale());
       navigator.clipboard.writeText(prompt).catch(() => {});
       showToast?.(t('profile.generator.interviewPromptCopied') || 'Interview prompt copied!');
     }
@@ -396,11 +396,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   // Phase 7: Diagnostics state
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
+  // Interview spec (loaded for locale threading to component prompts)
+  const [interviewSpec, setInterviewSpec] = useState(null);
+
   useEffect(() => { loadData(); }, [projectId]);
 
   async function loadData() {
     const p = await getProject(projectId);
     setProject(p);
+    // Load interview spec for locale and data source threading
+    getInterviewSpec(projectId).then(spec => setInterviewSpec(spec)).catch(() => {});
     if (p?.blueprint?.components) {
       const comps = await loadAllComponents(projectId);
       setComponents(comps.length > 0 ? comps : p.blueprint.components.map(c => ({ ...c, status: 'not_started', history: [], _version: 0 })));
@@ -818,6 +823,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                 components=${components}
                 agents=${agents}
                 projectId=${projectId}
+                interviewSpec=${interviewSpec}
                 onUpdate=${loadData}
                 onAdvance=${advanceToNext}
                 showToast=${showToast}
@@ -892,7 +898,7 @@ function NextStepGuide({ step, onAction }) {
   `;
 }
 
-function ComponentDetail({ component, project, components, agents, projectId, onUpdate, onAdvance, showToast, session }) {
+function ComponentDetail({ component, project, components, agents, projectId, interviewSpec, onUpdate, onAdvance, showToast, session }) {
   const [mode, setMode] = useState('chat');
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
@@ -908,6 +914,7 @@ function ComponentDetail({ component, project, components, agents, projectId, on
         component.type, component.label,
         project.description, project.blueprint,
         components.filter(c => c.status === 'done'),
+        interviewSpec,
       );
       saveComponent(projectId, {
         ...component, status: 'prompt_ready', prompt,
@@ -920,6 +927,7 @@ function ComponentDetail({ component, project, components, agents, projectId, on
   const prompt = component.prompt || buildComponentPrompt(
     component.type, component.label,
     project.description, project.blueprint, completedComponents,
+    interviewSpec,
   );
 
   // Workflow step for guided UI
@@ -988,6 +996,7 @@ function ComponentDetail({ component, project, components, agents, projectId, on
       component.type, component.label,
       project.description, project.blueprint,
       components.filter(c => c.status === 'done'),
+      interviewSpec,
     );
     const updated = addHistory(component, 'prompt_regenerated');
     await saveComponent(projectId, { ...updated, status: 'prompt_ready', prompt: fresh });
@@ -1000,6 +1009,7 @@ function ComponentDetail({ component, project, components, agents, projectId, on
       component.type, component.label,
       project.description, project.blueprint,
       components.filter(c => c.status === 'done'),
+      interviewSpec,
     );
     try {
       await navigator.clipboard.writeText(fresh);

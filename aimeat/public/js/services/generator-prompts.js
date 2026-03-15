@@ -104,13 +104,19 @@ ${JSON.stringify(interviewSpec, null, 2)}
 Use the specification above to determine the exact components needed. The data sources, entities, views, and constraints have been validated with the user.
 ` : '';
 
+  // Thread language from interview spec to blueprint prompt
+  const specLocale = interviewSpec?.locale;
+  const langNote = specLocale && specLocale !== 'en'
+    ? `\n## LANGUAGE\n\nThe user's language is "${specLocale}". Write all human-readable labels and descriptions in that language.\nJSON keys and technical identifiers stay in English.\n`
+    : '';
+
   return `${AIMEAT_CONTEXT}
 
 The user wants to create this service:
 ---
 ${description}
 ---
-${specContext}
+${specContext}${langNote}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
 CRITICAL: Return ONLY a JSON object with "components" and "phases" arrays. Nothing else.
@@ -206,10 +212,16 @@ Ask: "Does this action fetch from an external server or run on a schedule?"
  * Build an interview prompt that the user copies to AI Chat.
  * AI Chat interviews the user and produces a structured JSON spec.
  */
-export function buildInterviewPrompt(description) {
+export function buildInterviewPrompt(description, locale = 'en') {
+  const langMap = { fi: 'Finnish (suomi)', en: 'English', sv: 'Swedish (svenska)', de: 'German (Deutsch)', fr: 'French (français)', es: 'Spanish (español)', ja: 'Japanese (日本語)', zh: 'Chinese (中文)' };
+  const langName = langMap[locale] || locale;
+  const langInstruction = locale !== 'en'
+    ? `\n## LANGUAGE\n\nCONDUCT THIS ENTIRE INTERVIEW IN ${langName.toUpperCase()}.\nAll your questions, summaries, options, and explanations must be in ${langName}.\nThe final JSON specification field values (descriptions, titles, notes) should also be in ${langName}.\nJSON keys and technical identifiers (field names, type values) stay in English.\nInclude "locale": "${locale}" in the output JSON root so downstream prompts continue in the same language.\n`
+    : '';
+
   return `You are a requirements analyst for the AIMEAT service generator.
 The user wants to build a service. Your job is to interview them to produce a clear, structured specification.
-
+${langInstruction}
 ## User's Initial Description
 ---
 ${description}
@@ -318,6 +330,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
 \\\`\\\`\\\`json
 {
   "version": "1.0",
+  "locale": "${locale}",
   "projectName": "Human-readable project name",
   "description": "Enhanced description incorporating all interview findings",
   "technicalLevel": "beginner|intermediate|advanced",
@@ -1250,6 +1263,12 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       if (ds.encoding) context += `  Encoding: ${ds.encoding}\n`;
       if (ds.sampleEntry) context += `  Sample entry (REAL DATA — write your parser against this):\n  \`\`\`\n  ${ds.sampleEntry}\n  \`\`\`\n`;
     }
+  }
+
+  // Thread language preference from interview spec to all component prompts
+  const specLocale = interviewSpec?.locale;
+  if (specLocale && specLocale !== 'en') {
+    context += `\n## LANGUAGE\n\nThe user works in "${specLocale}". Write all human-readable text (labels, descriptions, comments, UI strings, variable names for display) in that language.\nCode identifiers, JSON keys, YAML keys, and API names stay in English.\n`;
   }
 
   // App and cortex templates receive completedComponents for cross-referencing
