@@ -32,6 +32,9 @@
  *   v4.0.0 — 2026-03-15 — Add validateAntiPatterns() for universal crash-prevention
  *     checks (JSON.parse on memory, require/import in sandbox, HTML entities,
  *     translation locale mismatch); integrate into extension/app/translation validators
+ *   v4.1.0 — 2026-03-15 — Fix HTML entity false positives: strip string literals
+ *     and regex patterns before checking for entities in code — prevents flagging
+ *     legitimate entity-decoding code like .replace(/&amp;/g, "&")
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -167,8 +170,16 @@ export function validateAntiPatterns(type, code) {
     const entityLines = codeLines.filter(line => {
       // Skip lines that are clearly HTML text content
       if (/^\s*<[^>]+>[^<]*&/.test(line)) return false;
+      // Skip lines where entities appear only inside string literals (e.g., .replace(/&amp;/g, "&"))
+      // Strip quoted strings and regex literals before checking for entities
+      const stripped = line
+        .replace(/"(?:[^"\\]|\\.)*"/g, '""')       // remove double-quoted strings
+        .replace(/'(?:[^'\\]|\\.)*'/g, "''")        // remove single-quoted strings
+        .replace(/`(?:[^`\\]|\\.)*`/g, '``')        // remove template literals
+        .replace(/\/(?:[^/\\]|\\.)+\/[gimsuy]*/g, '//'); // remove regex literals
+      if (!/&gt;|&lt;|&amp;[a-z]|&quot;/.test(stripped)) return false;
       // Flag lines with entities in code context
-      return /&gt;|&lt;|&amp;[a-z]|&quot;/.test(line) && /[=(){}\[\];]/.test(line);
+      return /[=(){}\[\];]/.test(line);
     });
     if (entityLines.length > 0) {
       errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the V8 sandbox.`);

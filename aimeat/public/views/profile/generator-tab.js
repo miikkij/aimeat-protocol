@@ -953,12 +953,14 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       }
       // Extract registered name from response — each type returns a different shape
       const d = resp?.data || {};
-      const regName = d.csm?.name           // CSM: { csm: { name } }
-        || d.integration?.name              // MSM: { integration: { name } }
-        || d.extension?.name                // Extension: { extension: { name } }
-        || d.filename                       // App: { filename }
-        || d.name                           // Cortex: { name }
+      const regName = d.csm?.name           // CSM: { data: { csm: { name } } }
+        || d.integration?.name              // MSM: { data: { integration: { name } } }
+        || d.extension?.name                // Extension: { data: { extension: { name } } }
+        || d.filename                       // App: { data: { filename } }
+        || d.name                           // Cortex/Translation: { data: { name } }
         || d.id
+        || (d.locales ? `i18n-${d.locales.join('-')}` : null) // Translation fallback
+        || (d.registered ? `memory-${d.registered}` : null)   // Memory fallback
         || null;
       const registered = addHistory(component, 'registered', { registeredAs: regName });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName });

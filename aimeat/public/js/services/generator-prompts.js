@@ -51,6 +51,11 @@
  *     extension prompt separates ctx.fetch from ctx.memory examples,
  *     app prompt adds CSS design system + CDN library menu + auth layout,
  *     buildComponentPrompt threads interviewSpec to extension prompts
+ *   v5.1.0 — 2026-03-15 — Fix translation prompt: remove "MUST include BOTH locales"
+ *     contradiction that caused duplicate generation; each component now generates
+ *     only the single locale indicated by its label. Strengthen HTML entity prevention
+ *     in extension prompt with prominent box warning. Improve examples to show
+ *     single-locale output only.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -75,6 +80,8 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
   ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
     Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
     Response body is always .text (string) — parse JSON with JSON.parse(resp.text).
+    Encoding is handled automatically — the sandbox reads charset from the Content-Type header
+    and decodes accordingly (e.g., ISO-8859-1 for RSS feeds). You get correct Unicode text.
   ctx.wallet.consume(amount, reason), ctx.wallet.getBalance()
   ctx.consent.check(gaii, scope), ctx.consent.require(gaii, scope)
   ctx.trust.getScore(gaii)
@@ -663,7 +670,19 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 - ╔═ NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values ═╗
 - Always check for undefined/null before using memory values — on first run, NOTHING exists yet
 - Always convert dates to ISO 8601 before storing in memory
-- NEVER output HTML entities (&gt; &lt; &amp;) in JavaScript code — use actual operators (> < &)`,
+- NEVER output HTML entities in JavaScript code — this crashes the V8 sandbox. See rules below.
+
+## CRITICAL: No HTML Entities in JavaScript (violations CRASH the sandbox)
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Your JavaScript code MUST use real operators, NOT HTML entities.  ║
+║  The V8 sandbox executes raw JS — HTML entities are syntax errors. ║
+╚════════════════════════════════════════════════════════════════════╝
+
+WRONG (crashes):  const gt = a =&gt; a &gt; 0 &amp;&amp; b;
+CORRECT:          const gt = a => a > 0 && b;
+
+Check your ENTIRE output before responding. If you see &gt; &lt; &amp; &quot; &#39; anywhere in JavaScript code, replace them with > < & " ' respectively.`,
 
   app: (label, context, completedComponents) => {
     // Check if any cortex libraries are in completed components
@@ -760,6 +779,16 @@ const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'alerts.b
 The first argument is the extension's memory owner: \\\`"ext:" + extensionName\\\` (the \\\`name\\\` field from the extension manifest metadata).
 Use this for ALL data produced by extensions (alerts, stats, risk profiles, caches, etc.).
 \\\`getPublic()\\\` returns the value directly (auto-unwraps), or null if not found.
+
+### Reading TRANSLATIONS (stored in owner memory, NOT a /v1/i18n route):
+Translations are stored in memory at \\\`i18n.{locale}\\\` keys. Read them with \\\`AIMEAT.data.get()\\\`:
+\\\`\\\`\\\`javascript
+// Read translation strings for a locale:
+const enStrings = await AIMEAT.data.get('i18n.en');  // { "app.title": "My App", ... }
+const fiStrings = await AIMEAT.data.get('i18n.fi');  // { "app.title": "Sovellus", ... }
+\\\`\\\`\\\`
+There is NO /v1/i18n/ route. NEVER fetch from /v1/i18n/. Use AIMEAT.data.get('i18n.{locale}').
+If a cortex library has a getI18n(locale) method, use that instead.
 
 ### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
 \\\`\\\`\\\`javascript
@@ -974,34 +1003,33 @@ ${context}
 - Include domain-specific terms: incident types, severity levels, status labels
 - Use interpolation with \${variable} syntax for dynamic values: "Found \${count} alerts"
 
+## CRITICAL: Generate ONLY the locale indicated by the label
+
+Each translation component covers ONE locale. The label tells you which one:
+- "Finnish (fi) Strings" → generate ONLY Finnish translations under the "fi" root key
+- "English (en) Strings" → generate ONLY English translations under the "en" root key
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER generate both locales in one component.                         ║
+║  If the label says "Finnish", output ONLY { "fi": { ... } }.           ║
+║  If the label says "English", output ONLY { "en": { ... } }.           ║
+║  The other locale is handled by a SEPARATE component in the blueprint. ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 ## Rules
-- MUST include BOTH "en" and "fi" locales
-- The root key MUST match the locale: "en" for English, "fi" for Finnish — NEVER use "en" as root for Finnish content
+- The root key MUST match the locale in the label: "en" for English, "fi" for Finnish
+- NEVER include the other locale — it will be generated in its own component
 - Finnish translations must be natural Finnish with correct characters (ä, ö, å) — not machine-translated
-- English content goes under "en" root key, Finnish content goes under "fi" root key
 - Include ALL text that appears in the UI — labels, buttons, tooltips, empty states, error messages
 - Keep keys consistent with what the App component will reference
 - Use plural-aware keys where needed: "alert.one" / "alert.many"
+- Both locale components MUST use the SAME key structure — the app uses the same keys for both
 
-CRITICAL: If the label says "Finnish translations" or "fi locale", the root key MUST be "fi" with Finnish text.
-If the label says "English translations" or "en locale", the root key MUST be "en" with English text.
-NEVER output English text under a "fi" root key or Finnish text under an "en" root key.
+Return JSON with translations for the SINGLE locale from the label:
 
-Return JSON with translations for the requested locale(s):
-
-If generating BOTH locales in one component:
+Example — if label is "Finnish (fi) Strings":
 \`\`\`json
 {
-  "en": {
-    "app.title": "App Title",
-    "app.nav.home": "Home",
-    "app.filters.severity": "Severity",
-    "app.filters.all": "All",
-    "app.empty": "No data found",
-    "app.error": "Something went wrong",
-    "domain.type.fire": "Fire",
-    "domain.severity.small": "Small"
-  },
   "fi": {
     "app.title": "Sovelluksen nimi",
     "app.nav.home": "Etusivu",
@@ -1015,12 +1043,18 @@ If generating BOTH locales in one component:
 }
 \`\`\`
 
-If generating a SINGLE locale (e.g., "Finnish translations"):
+Example — if label is "English (en) Strings":
 \`\`\`json
 {
-  "fi": {
-    "app.title": "Sovelluksen nimi",
-    "app.nav.home": "Etusivu"
+  "en": {
+    "app.title": "App Title",
+    "app.nav.home": "Home",
+    "app.filters.severity": "Severity",
+    "app.filters.all": "All",
+    "app.empty": "No data found",
+    "app.error": "Something went wrong",
+    "domain.type.fire": "Fire",
+    "domain.severity.small": "Small"
   }
 }
 \`\`\``,
@@ -1077,6 +1111,20 @@ const resp = await fetch(url);
 const json = await resp.json();
 const value = json.ok ? json.data.value : null;
 \\\`\\\`\\\`
+
+## IMPORTANT: How Translations Work
+
+Translation components store i18n strings in the OWNER's memory at \\\`i18n.{locale}\\\` keys.
+To read translations, use AIMEAT.data.get() (NOT getPublic — translations are in the owner's namespace):
+\\\`\\\`\\\`javascript
+// Read translation for a locale — returns flat { "app.title": "...", "app.nav.home": "..." } object
+const enStrings = await AIMEAT.data.get('i18n.en');
+const fiStrings = await AIMEAT.data.get('i18n.fi');
+\\\`\\\`\\\`
+
+There is NO /v1/i18n/ route. Translations are stored in memory, NOT served from a dedicated API.
+Your cortex's getI18n() method should read from AIMEAT.data.get('i18n.' + locale).
+The translation keys use dot-namespaced paths like "app.title", "app.nav.home", "domain.type.fire".
 
 ## Extension Action Calls (authenticated)
 

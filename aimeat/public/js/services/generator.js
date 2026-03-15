@@ -28,6 +28,8 @@
  *     collisions; upsert pattern (delete+recreate) on NAME_TAKEN for re-runs
  *   v4.0.0 — 2026-03-15 — Add lifecycle management: getComponentStatuses,
  *     activateAll, deactivateAll, removeComponents, getAppLaunchUrl
+ *   v4.1.0 — 2026-03-15 — Improve saveComponent retry: up to 3 retries on
+ *     409 VERSION_CONFLICT instead of 1, preventing 409 spam on rapid updates
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -143,25 +145,25 @@ export async function saveComponent(projectId, component) {
       visibility: 'owner',
     });
   } else {
-    // Existing component — use PUT with optimistic locking; retry on conflict
-    try {
-      await apiPut(`/v1/memory/${key}`, {
-        value: data,
-        visibility: 'owner',
-        version,
-      });
-    } catch (err) {
-      if (err?.code === 'VERSION_CONFLICT' || err?.status === 409) {
-        // Re-fetch current version and retry once
-        const fresh = await apiGet(`/v1/memory/${key}`);
-        version = fresh?.data?.version ?? version + 1;
+    // Existing component — use PUT with optimistic locking; retry up to 3 times on conflict
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
         await apiPut(`/v1/memory/${key}`, {
           value: data,
           visibility: 'owner',
           version,
         });
-      } else {
-        throw err;
+        break; // success
+      } catch (err) {
+        const isConflict = err?.code === 'VERSION_CONFLICT' || err?.status === 409;
+        if (isConflict && attempt < MAX_RETRIES) {
+          // Re-fetch current version and retry
+          const fresh = await apiGet(`/v1/memory/${key}`);
+          version = fresh?.data?.version ?? version + 1;
+        } else {
+          throw err;
+        }
       }
     }
   }
@@ -398,7 +400,19 @@ export async function registerComponent(type, result, session) {
     }
     case 'translation': {
       const translations = typeof result === 'string' ? JSON.parse(result) : result;
-      return { ok: true, translations };
+      // Store each locale's translations in memory as i18n.{locale} keys
+      const locales = [];
+      for (const [locale, strings] of Object.entries(translations)) {
+        if (locale && typeof strings === 'object') {
+          await apiPost('/v1/memory', {
+            key: `i18n.${locale}`,
+            value: strings,
+            visibility: 'public',
+          });
+          locales.push(locale);
+        }
+      }
+      return { ok: true, data: { locales, name: `i18n-${locales.join('-')}` } };
     }
     case 'cortex': {
       // Cortex result contains YAML manifest + optional JS lib code (pre-extracted by validator)

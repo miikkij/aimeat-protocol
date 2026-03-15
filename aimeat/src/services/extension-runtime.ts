@@ -224,7 +224,19 @@ export async function executeExtensionAction(
                     body: opts.body,
                     signal: AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000)),
                 });
-                const text = await resp.text();
+                // Decode response body respecting charset from Content-Type header
+                // (e.g., ISO-8859-1 for RSS feeds) — defaults to UTF-8 if not specified
+                const ct = resp.headers.get('content-type') || '';
+                const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
+                const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+                let text: string;
+                if (charset !== 'utf-8' && charset !== 'utf8') {
+                    const buf = await resp.arrayBuffer();
+                    const decoder = new TextDecoder(charset);
+                    text = decoder.decode(buf);
+                } else {
+                    text = await resp.text();
+                }
                 const headers: Record<string, string> = {};
                 resp.headers.forEach((v, k) => { headers[k] = v; });
                 return { status: resp.status, ok: resp.ok, text, headers };
