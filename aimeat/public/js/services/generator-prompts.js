@@ -64,6 +64,9 @@
  *     section with JSON Schema definitions for every memory key. buildComponentPrompt
  *     injects relevant dataModel entries per component type. Replaces ad-hoc memory
  *     shape guessing with centralized data contract.
+ *   v6.1.0 — 2026-03-15 — Fix extension path template: remove :instanceId from default
+ *     action paths. Most extensions are single-instance; instanceId only when blueprint
+ *     explicitly requires multi-instance support.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -716,7 +719,7 @@ actions:
   - id: action-id
     description: "What this action does"
     method: POST
-    path: /v1/ext/{name}/:instanceId/action-id
+    path: /v1/ext/{name}/action-id
     auth: required
     input: {}
     output: {}
@@ -746,6 +749,18 @@ export default async function(ctx, input) {
 
 CRITICAL: Do NOT use separate code blocks. Put YAML manifest and ALL JavaScript files in ONE block.
 Each JavaScript file MUST start with a comment line: // actions/{filename}.js
+
+## Action path — instance vs non-instance
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Most extensions are SINGLE-INSTANCE (no :instanceId in path).          ║
+║  Use: /v1/ext/{name}/action-id                                          ║
+║  NEVER add :instanceId unless the blueprint explicitly requires          ║
+║  multi-instance support (e.g., per-store, per-tenant separation).       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+- Default (single-instance): \`path: /v1/ext/{name}/action-id\`
+- Multi-instance (only if needed): \`path: /v1/ext/{name}/:instanceId/action-id\`
 
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
@@ -1516,16 +1531,22 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
-  // For memory components with static data: include the full dataset from interviewSpec
-  if (type === 'memory' && interviewSpec?.dataSources) {
-    const staticSources = interviewSpec.dataSources.filter(ds => ds.staticData && Array.isArray(ds.staticData));
-    if (staticSources.length > 0) {
-      context += '\n## Static Data from Interview\n';
-      context += 'The user provided complete datasets. Store each as a SINGLE memory key (one array value, not one key per entry).\n';
-      context += 'The dataModel above shows the exact schema. Include ALL entries in the value.\n\n';
-      for (const ds of staticSources) {
-        context += `### ${ds.name} (${ds.staticData.length} entries)\n`;
-        context += '```json\n' + JSON.stringify(ds.staticData, null, 2) + '\n```\n\n';
+  // For memory components with static data: only include if this component's dataModel has source:"static"
+  if (type === 'memory' && interviewSpec?.dataSources && blueprint?.dataModel) {
+    const componentId = blueprint.components?.find(c => c.label === label)?.id;
+    const hasStaticKey = componentId && Object.values(blueprint.dataModel).some(
+      schema => schema.source === 'static' && schema.producedBy === componentId
+    );
+    if (hasStaticKey) {
+      const staticSources = interviewSpec.dataSources.filter(ds => ds.staticData && Array.isArray(ds.staticData));
+      if (staticSources.length > 0) {
+        context += '\n## Static Data from Interview\n';
+        context += 'The user provided complete datasets. Store each as a SINGLE memory key (one array value, not one key per entry).\n';
+        context += 'The dataModel above shows the exact schema. Include ALL entries in the value.\n\n';
+        for (const ds of staticSources) {
+          context += `### ${ds.name} (${ds.staticData.length} entries)\n`;
+          context += '```json\n' + JSON.stringify(ds.staticData, null, 2) + '\n```\n\n';
+        }
       }
     }
   }
