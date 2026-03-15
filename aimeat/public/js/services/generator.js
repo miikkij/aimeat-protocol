@@ -644,6 +644,12 @@ export async function removeComponents(projectId, componentIds, includeMemory, s
         await apiDelete(`/v1/csm/${encodeURIComponent(name)}`);
       } else if (comp.type === 'msm') {
         await apiDelete(`/v1/msm/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'translation') {
+        // Translation keys are stored as i18n.{locale} — extract locale from name (e.g., "i18n-fi" → "fi")
+        const locale = name.replace(/^i18n-/, '');
+        if (locale) {
+          try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
+        }
       }
       removed.push(name);
       // Clear registeredAs in component state
