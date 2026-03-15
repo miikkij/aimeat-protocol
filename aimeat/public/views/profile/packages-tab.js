@@ -5,15 +5,13 @@
  *   packages with status/update/remove), Browse Packages (search/filter/install), and
  *   Template Gallery (community listings with ratings).
  * @structure
- *   - PackagesTab (default export) — main tab component
- *   - InstanceCard — card for an installed package instance
- *   - PackageCard — card for a browsable package
- *   - TemplateCard — card for a template gallery listing
+ *   - PackagesTab (default export) — main tab component with sub-view navigation
  * @usage
  *   import PackagesTab from './profile/packages-tab.js';
  *   <PackagesTab session={session} showToast={showToast} navigate={navigate} locale={locale} />
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
+ *   v1.1.0 — 2026-03-16 — restyle to match extensions-tab pattern (grid cards, consistent CSS)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -21,6 +19,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { Spinner } from './shared.js';
 import * as pkgService from '/js/services/packages.js';
 
 export default function PackagesTab({ session, showToast, navigate, locale }) {
@@ -28,7 +27,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
   const [packages, setPackages] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState('instances'); // 'instances' | 'browse' | 'gallery'
+  const [view, setView] = useState('instances');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
 
@@ -58,7 +57,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
 
   const handleInstall = async (groupId) => {
     const label = prompt(t('packages.labelPrompt') || 'Instance label (optional):');
-    if (label === null) return; // cancelled
+    if (label === null) return;
     const res = await pkgService.installPackage(groupId, { label: label || '' });
     if (res.ok) {
       showToast(t('packages.installed'));
@@ -92,19 +91,25 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     }
   };
 
-  if (loading) return html`<div class="p-loading">${t('loading') || 'Loading...'}</div>`;
+  if (loading) return html`<${Spinner} />`;
+
+  const filtered = packages.filter(p => {
+    if (search && !p.name?.toLowerCase().includes(search.toLowerCase()) && !p.description?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (category && p.category !== category) return false;
+    return true;
+  });
 
   return html`
     <div class="pkg-tab">
       <div class="pkg-nav">
         <button class=${view === 'instances' ? 'active' : ''} onClick=${() => setView('instances')}>
-          ${t('packages.myInstances') || 'My Instances'} (${instances.length})
+          \u{1F4E6} ${t('packages.myInstances') || 'My Instances'} (${instances.length})
         </button>
         <button class=${view === 'browse' ? 'active' : ''} onClick=${() => setView('browse')}>
-          ${t('packages.browse') || 'Browse Packages'}
+          \u{1F50D} ${t('packages.browse') || 'Browse Packages'}
         </button>
         <button class=${view === 'gallery' ? 'active' : ''} onClick=${() => setView('gallery')}>
-          ${t('packages.gallery') || 'Template Gallery'}
+          \u{2B50} ${t('packages.gallery') || 'Template Gallery'}
         </button>
       </div>
 
@@ -113,22 +118,28 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
           <h3>${t('packages.myInstances') || 'My Instances'}</h3>
           ${instances.length === 0 ? html`
             <p class="pkg-empty">${t('packages.noInstances') || 'No packages installed yet.'}</p>
-          ` : instances.map(inst => html`
-            <div class="pkg-card" key=${inst.id}>
-              <div class="pkg-card-header">
-                <strong>${escHtml(inst.label || inst.packageGroupId)}</strong>
-                <span class="pkg-badge pkg-badge-${inst.status}">${inst.status}</span>
-              </div>
-              <div class="pkg-card-meta">
-                ${t('packages.version') || 'Version'}: ${escHtml(inst.packageVersion)}
-                · ${inst.installedComponents?.length ?? 0} ${t('packages.components') || 'components'}
-              </div>
-              <div class="pkg-card-actions">
-                <button onClick=${() => handleCheckUpdate(inst.id)}>${t('packages.checkUpdate') || 'Check Update'}</button>
-                <button class="danger" onClick=${() => handleRemove(inst.id)}>${t('packages.remove') || 'Remove'}</button>
-              </div>
+          ` : html`
+            <div class="pkg-grid">
+              ${instances.map(inst => html`
+                <div class="pkg-card" key=${inst.id}>
+                  <div class="pkg-card-header">
+                    <span class="pkg-card-name">${escHtml(inst.label || inst.packageGroupId)}</span>
+                    <span class="pkg-badge pkg-badge-${inst.status}">${inst.status}</span>
+                  </div>
+                  <div class="pkg-card-meta">
+                    <span class="pkg-card-version">${escHtml(inst.packageVersion)}</span>
+                    <span>\u00B7 ${inst.installedComponents?.length ?? 0} ${t('packages.components') || 'components'}</span>
+                  </div>
+                  <div class="pkg-card-footer">
+                    <div class="pkg-card-actions">
+                      <button onClick=${() => handleCheckUpdate(inst.id)}>${t('packages.checkUpdate') || 'Check Update'}</button>
+                      <button class="danger" onClick=${() => handleRemove(inst.id)}>${t('packages.remove') || 'Remove'}</button>
+                    </div>
+                  </div>
+                </div>
+              `)}
             </div>
-          `)}
+          `}
         </div>
       `}
 
@@ -149,28 +160,33 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
               <option value="other">Other</option>
             </select>
           </div>
-          ${packages.filter(p => {
-            if (search && !p.name?.toLowerCase().includes(search.toLowerCase()) && !p.description?.toLowerCase().includes(search.toLowerCase())) return false;
-            if (category && p.category !== category) return false;
-            return true;
-          }).map(pkg => html`
-            <div class="pkg-card" key=${pkg.id}>
-              <div class="pkg-card-header">
-                <strong>${escHtml(pkg.name)}</strong>
-                <span class="pkg-tag">${pkg.category}</span>
-              </div>
-              <div class="pkg-card-meta">${escHtml(pkg.description || '')}</div>
-              <div class="pkg-card-meta">
-                ${t('packages.by') || 'by'} ${escHtml(pkg.author)} · ${pkg.version}
-                · ${pkg.components?.length ?? 0} ${t('packages.components') || 'components'}
-              </div>
-              <div class="pkg-card-actions">
-                <button onClick=${() => handleInstall(pkg.packageGroupId)}>
-                  ${t('packages.install') || 'Install'}
-                </button>
-              </div>
+          ${filtered.length === 0 ? html`
+            <p class="pkg-empty">${t('packages.noPackages') || 'No packages available.'}</p>
+          ` : html`
+            <div class="pkg-grid">
+              ${filtered.map(pkg => html`
+                <div class="pkg-card" key=${pkg.id}>
+                  <div class="pkg-card-header">
+                    <span class="pkg-card-name">${escHtml(pkg.name)}</span>
+                    ${pkg.category && html`<span class="pkg-tag">${pkg.category}</span>`}
+                  </div>
+                  <div class="pkg-card-desc">${escHtml(pkg.description || '')}</div>
+                  <div class="pkg-card-meta">
+                    <span class="pkg-card-version">${pkg.version}</span>
+                    <span>${t('packages.by') || 'by'} ${escHtml(pkg.author)}</span>
+                    <span>\u00B7 ${pkg.components?.length ?? 0} ${t('packages.components') || 'components'}</span>
+                  </div>
+                  <div class="pkg-card-footer">
+                    <div class="pkg-card-actions">
+                      <button class="primary" onClick=${() => handleInstall(pkg.packageGroupId)}>
+                        ${t('packages.install') || 'Install'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `)}
             </div>
-          `)}
+          `}
         </div>
       `}
 
@@ -179,25 +195,31 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
           <h3>${t('packages.gallery') || 'Template Gallery'}</h3>
           ${templates.length === 0 ? html`
             <p class="pkg-empty">${t('packages.noTemplates') || 'No templates available yet.'}</p>
-          ` : templates.map(tpl => html`
-            <div class="pkg-card pkg-card-template" key=${tpl.id}>
-              <div class="pkg-card-header">
-                <strong>${escHtml(tpl.title)}</strong>
-                ${tpl.featured && html`<span class="pkg-badge pkg-badge-featured">Featured</span>`}
-              </div>
-              <div class="pkg-card-meta">${escHtml(tpl.description || '')}</div>
-              <div class="pkg-card-meta">
-                ${t('packages.by') || 'by'} ${escHtml(tpl.packageAuthor)}
-                · ${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount ?? 0})
-                · ${tpl.installCount ?? 0} ${t('packages.installs') || 'installs'}
-              </div>
-              <div class="pkg-card-actions">
-                <button onClick=${() => handleInstall(tpl.packageGroupId)}>
-                  ${t('packages.install') || 'Install'}
-                </button>
-              </div>
+          ` : html`
+            <div class="pkg-grid">
+              ${templates.map(tpl => html`
+                <div class="pkg-card" key=${tpl.id}>
+                  <div class="pkg-card-header">
+                    <span class="pkg-card-name">${escHtml(tpl.title)}</span>
+                    ${tpl.featured && html`<span class="pkg-badge pkg-badge-featured">\u2B50 Featured</span>`}
+                  </div>
+                  <div class="pkg-card-desc">${escHtml(tpl.description || '')}</div>
+                  <div class="pkg-card-meta">
+                    <span>${t('packages.by') || 'by'} ${escHtml(tpl.packageAuthor)}</span>
+                    <span>\u00B7 \u2B50 ${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount ?? 0})</span>
+                    <span>\u00B7 ${tpl.installCount ?? 0} ${t('packages.installs') || 'installs'}</span>
+                  </div>
+                  <div class="pkg-card-footer">
+                    <div class="pkg-card-actions">
+                      <button class="primary" onClick=${() => handleInstall(tpl.packageGroupId)}>
+                        ${t('packages.install') || 'Install'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `)}
             </div>
-          `)}
+          `}
         </div>
       `}
     </div>
