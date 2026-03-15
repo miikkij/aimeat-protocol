@@ -813,12 +813,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       // Build the ExtensionCtx with instance-scoped memory namespace
-      // When extInstallRole=owner, owner-installed extensions get per-owner scoping.
-      let extMemoryOwner = `ext:${ext.name}.${instanceId}`;
-      if (config.extInstallRole === 'owner' && ext.installedBy && !req.auth!.roles.includes('operator')) {
-        const ownerScope = ext.installedBy.split('#')[1]?.split('@')[0] || ext.installedBy;
-        extMemoryOwner = `ext:${ext.name}.${ownerScope}.${instanceId}`;
-      }
+      // Extension namespace is always ext:{name}.{instanceId} — no owner scoping,
+      // because ext:{name} is already unique and owner-scoping breaks client reads
+      // (apps call getPublic('ext:{name}', key) without knowing the owner suffix).
+      const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {
@@ -851,7 +849,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             body: opts?.body,
             signal: AbortSignal.timeout(30_000),
           });
-          const text = await resp.text();
+          // Decode response body respecting charset from Content-Type header
+          const ct = resp.headers.get('content-type') || '';
+          const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
+          const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+          let text: string;
+          if (charset !== 'utf-8' && charset !== 'utf8') {
+            const buf = await resp.arrayBuffer();
+            const decoder = new TextDecoder(charset);
+            text = decoder.decode(buf);
+          } else {
+            text = await resp.text();
+          }
           const headers: Record<string, string> = {};
           resp.headers.forEach((v, k) => { headers[k] = v; });
           return { status: resp.status, ok: resp.ok, text, headers };
@@ -974,14 +983,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       // Build the ExtensionCtx
-      // Extension memory uses a shared namespace (ext:{name}) so cross-user
-      // workflows (e.g. buyer reads seller's listing) work correctly.
-      // When extInstallRole=owner, owner-installed extensions get per-owner scoping.
-      let extMemoryOwner = `ext:${ext.name}`;
-      if (config.extInstallRole === 'owner' && ext.installedBy && !req.auth!.roles.includes('operator')) {
-        const ownerScope = ext.installedBy.split('#')[1]?.split('@')[0] || ext.installedBy;
-        extMemoryOwner = `ext:${ext.name}.${ownerScope}`;
-      }
+      // Extension memory uses a flat namespace (ext:{name}) so apps can
+      // read data via getPublic('ext:{name}', key) without knowing the owner.
+      const extMemoryOwner = `ext:${ext.name}`;
       const ctx: ExtensionCtx = {
         memory: {
           get: async (key) => {
@@ -1014,7 +1018,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             body: opts?.body,
             signal: AbortSignal.timeout(30_000),
           });
-          const text = await resp.text();
+          // Decode response body respecting charset from Content-Type header
+          const ct = resp.headers.get('content-type') || '';
+          const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
+          const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
+          let text: string;
+          if (charset !== 'utf-8' && charset !== 'utf8') {
+            const buf = await resp.arrayBuffer();
+            const decoder = new TextDecoder(charset);
+            text = decoder.decode(buf);
+          } else {
+            text = await resp.text();
+          }
           const headers: Record<string, string> = {};
           resp.headers.forEach((v, k) => { headers[k] = v; });
           return { status: resp.status, ok: resp.ok, text, headers };

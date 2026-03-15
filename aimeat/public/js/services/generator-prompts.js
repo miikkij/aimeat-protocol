@@ -73,7 +73,7 @@ Available building blocks:
 - Cortex: Client-side JS domain library (IIFE on AIMEAT namespace). Wraps extension APIs and memory reads into clean domain methods for apps.
 
 Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
-  ctx.memory.get(key) → value or null
+  ctx.memory.get(key) → value or null (ALWAYS null-check before using: `|| []` or `|| {}`)
   ctx.memory.set(key, value) → void
   ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
   ctx.memory.delete(key) → boolean
@@ -573,8 +573,8 @@ What IS available:
 
 ### ctx.memory.get(key) — WILL CRASH if you use JSON.parse()
 
-ctx.memory.get() returns the VALUE directly (already a JS object/array/value), or undefined.
-It is NOT a string. Calling JSON.parse() on it will CRASH with "undefined is not valid JSON".
+ctx.memory.get() returns the VALUE directly (already a JS object/array/value), or null.
+It is NOT a string. Calling JSON.parse() on it will CRASH with "null is not valid JSON".
 
 ╔══════════════════════════════════════════════════════════════╗
 ║  NEVER WRITE: JSON.parse(await ctx.memory.get(...))         ║
@@ -590,6 +590,27 @@ CORRECT:
   const data = await ctx.memory.get("my.key");
   if (!data) return { error: "No data found" };
   // data is already a JS object/array/value — use it directly
+
+### ctx.memory.get() returns null when key does not exist — ALWAYS null-check!
+
+╔══════════════════════════════════════════════════════════════╗
+║  ALWAYS check the return value before using it.              ║
+║  Arrays and objects from memory may be null on first run.    ║
+╚══════════════════════════════════════════════════════════════╝
+
+WRONG (CRASHES on first run when no data exists yet):
+  const index = await ctx.memory.get("alerts.__index");
+  index.some(...)     // 💥 Cannot read properties of null (reading 'some')
+  index.push(...)     // 💥 Cannot read properties of null (reading 'push')
+  index.length        // 💥 Cannot read properties of null (reading 'length')
+
+CORRECT:
+  const index = await ctx.memory.get("alerts.__index") || [];
+  index.some(...)     // ✓ works — falls back to empty array
+
+CORRECT (for objects):
+  const stats = await ctx.memory.get("daily.stats") || {};
+  stats.count = (stats.count || 0) + 1;
 
 ### ctx.memory.set(key, value) stores any JSON-serializable value
   await ctx.memory.set("alerts.2026-03-14", { items: [...], count: 5 });
