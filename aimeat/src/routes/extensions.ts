@@ -861,18 +861,22 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             body: opts?.body,
             signal: AbortSignal.timeout(30_000),
           });
-          // Decode response body respecting charset from Content-Type header
+          // Always read raw bytes first so we can detect charset from multiple sources
+          const buf = await resp.arrayBuffer();
           const ct = resp.headers.get('content-type') || '';
-          const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
-          const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
-          let text: string;
-          if (charset !== 'utf-8' && charset !== 'utf8') {
-            const buf = await resp.arrayBuffer();
-            const decoder = new TextDecoder(charset);
-            text = decoder.decode(buf);
-          } else {
-            text = await resp.text();
+          const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
+          let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
+
+          // If Content-Type didn't specify charset, peek at XML/HTML prolog for encoding declaration
+          if (!charset) {
+            const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
+            const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
+            const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
+            charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
           }
+
+          const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
+          const text = decoder.decode(buf);
           const headers: Record<string, string> = {};
           resp.headers.forEach((v, k) => { headers[k] = v; });
           return { status: resp.status, ok: resp.ok, text, headers };
@@ -1037,18 +1041,22 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             body: opts?.body,
             signal: AbortSignal.timeout(30_000),
           });
-          // Decode response body respecting charset from Content-Type header
+          // Always read raw bytes first so we can detect charset from multiple sources
+          const buf = await resp.arrayBuffer();
           const ct = resp.headers.get('content-type') || '';
-          const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
-          const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
-          let text: string;
-          if (charset !== 'utf-8' && charset !== 'utf8') {
-            const buf = await resp.arrayBuffer();
-            const decoder = new TextDecoder(charset);
-            text = decoder.decode(buf);
-          } else {
-            text = await resp.text();
+          const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
+          let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
+
+          // If Content-Type didn't specify charset, peek at XML/HTML prolog for encoding declaration
+          if (!charset) {
+            const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
+            const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
+            const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
+            charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
           }
+
+          const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
+          const text = decoder.decode(buf);
           const headers: Record<string, string> = {};
           resp.headers.forEach((v, k) => { headers[k] = v; });
           return { status: resp.status, ok: resp.ok, text, headers };

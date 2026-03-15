@@ -81,6 +81,14 @@
  *     cron "@activate" for init jobs that run on extension activation AND every server
  *     restart. Extension prompt documents @activate semantics, idempotent init pattern,
  *     and dependency ordering (init checks stale data before populating).
+ *   v7.3.0 — 2026-03-15 — Fix app CSP template: add tile server to connect-src
+ *     (Leaflet maps blocked without it), add guidance for map tile CSP requirements
+ *   v8.0.0 — 2026-03-16 — Fix critical namespace issue: owner data (memory components,
+ *     settings, translations) lives in owner namespace, NOT extension namespace.
+ *     Extensions must use ctx.memory.getPublic(ctx.caller.owner, key) to read shared data.
+ *     ctx.memory.get() only reads ext:{name} namespace. Updated AIMEAT_CONTEXT, extension
+ *     template example, and additional rules with prominent box warning.
+ *     Also fix ctx.fetch() encoding docs: now detects charset from XML prolog and HTML meta.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -102,14 +110,22 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
   ctx.memory.set(key, value) → void
   ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
   ctx.memory.delete(key) → boolean
-  ctx.memory.getPublic(namespace, key) → value or null (read another extension's public data)
-    Example: await ctx.memory.getPublic('ext:halytyskartta-rss', 'alerts.by-date.2026-03-14')
-    Use this when your extension needs to read data written by ANOTHER extension.
+  ctx.memory.getPublic(namespace, key) → value or null (read data from a DIFFERENT namespace)
+    Use this to read: (a) another extension's public data, (b) the OWNER's shared data (memory components, translations, settings).
+    Example — read another extension's data: await ctx.memory.getPublic('ext:other-ext', 'some.key')
+    Example — read owner's shared data: await ctx.memory.getPublic(ctx.caller.owner, 'municipalities.data')
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
+    ║  IMPORTANT: ctx.memory.get() ONLY reads from the extension's OWN namespace. ║
+    ║  Data stored by memory components (seed data, settings, translations) lives  ║
+    ║  in the OWNER's namespace — use ctx.memory.getPublic(ctx.caller.owner, key)  ║
+    ║  to access it. ctx.caller.owner is automatically set to the installing user. ║
+    ╚═══════════════════════════════════════════════════════════════════════════════╝
   ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
     Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
     Response body is always .text (string) — parse JSON with JSON.parse(resp.text).
-    Encoding is handled automatically — the sandbox reads charset from the Content-Type header
-    and decodes accordingly (e.g., ISO-8859-1 for RSS feeds). You get correct Unicode text.
+    Encoding is handled automatically — the runtime detects charset from: (1) Content-Type header,
+    (2) XML prolog encoding attribute, (3) HTML meta charset tag. Falls back to UTF-8.
+    You always get correct Unicode text — no manual decoding needed, even for ISO-8859-1 feeds.
   ctx.wallet.consume(amount, reason), ctx.wallet.getBalance()
   ctx.consent.check(gaii, scope), ctx.consent.require(gaii, scope)
   ctx.trust.getScore(gaii)
@@ -775,20 +791,28 @@ schedules: []
 // actions/action-id.js
 export default async function(ctx, input) {
   // ── Reading from EXTERNAL APIs (ctx.fetch) ──
-  // ctx.fetch() returns { ok, status, text } — text is a RAW string, parse it yourself
+  // ctx.fetch() returns { ok, status, text, headers } — text is a RAW string, parse it yourself
+  // Encoding is auto-detected (Content-Type header, XML prolog, HTML meta) — you get Unicode text
   const resp = await ctx.fetch('https://example.com/api');
   if (!resp.ok) {
     ctx.log.error('API request failed', { status: resp.status });
     return { error: 'Request failed with status ' + resp.status };
   }
-  const data = JSON.parse(resp.text);  // ← correct: resp.text IS a string
+  const data = JSON.parse(resp.text);  // ← correct: resp.text IS a string (for JSON APIs)
+  // For XML/RSS: resp.text is already decoded Unicode — parse with regex or string methods
 
-  // ── Reading from AIMEAT MEMORY (ctx.memory) ──
+  // ── Reading from EXTENSION'S OWN MEMORY (ctx.memory.get) ──
   // ctx.memory.get() returns a JS value directly — NEVER use JSON.parse
   const stored = await ctx.memory.get("my.key");
-  if (!stored) return { items: [] };  // ← stored is already an object, or undefined
+  if (!stored) return { items: [] };  // ← stored is already an object, or null
 
-  // ── Writing to AIMEAT MEMORY ──
+  // ── Reading OWNER'S SHARED DATA (memory components, settings, translations) ──
+  // Data stored by memory-1, memory-2 etc. lives in the OWNER's namespace, NOT the extension's.
+  // Use getPublic(ctx.caller.owner, key) to read it:
+  const munis = await ctx.memory.getPublic(ctx.caller.owner, "municipalities.data") || [];
+  const settings = await ctx.memory.getPublic(ctx.caller.owner, "settings.config") || {};
+
+  // ── Writing to EXTENSION'S OWN MEMORY ──
   await ctx.memory.set("results.today", { items: data.results, fetchedAt: new Date().toISOString() });
 
   return { result: stored };
@@ -889,6 +913,10 @@ IMPORTANT: @activate actions MUST be idempotent — they will run multiple times
 - ╔═ NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values ═╗
 - Always check for undefined/null before using memory values — on first run, NOTHING exists yet
 - Always convert dates to ISO 8601 before storing in memory
+- ╔═ OWNER DATA: seed data (memory components), settings, and translations are in the OWNER's namespace ═╗
+  Use \`ctx.memory.getPublic(ctx.caller.owner, key)\` to read them — NOT \`ctx.memory.get(key)\`.
+  \`ctx.memory.get()\` only reads from the extension's own \`ext:{name}\` namespace.
+  Common pattern: \`const munis = await ctx.memory.getPublic(ctx.caller.owner, "municipalities.data") || [];\`
 - NEVER output HTML entities in JavaScript code — this crashes the V8 sandbox. See rules below.
 
 ## CRITICAL: No HTML Entities in JavaScript (violations CRASH the sandbox)
@@ -1064,10 +1092,14 @@ AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add 
   style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
   img-src 'self' data: https: blob:;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self';
+  connect-src 'self' https://*.tile.openstreetmap.org;
 ">
 \\\`\\\`\\\`
 Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
+
+IMPORTANT: If your app uses Leaflet or any map library that loads tiles from external servers,
+you MUST add the tile server domain to \`connect-src\`. For OpenStreetMap: \`https://*.tile.openstreetmap.org\`.
+Without this, the map will appear but tiles will be blocked and it shows a grey/empty map.
 
 For UI inspiration, reference uiverse.io for fancy buttons, cards, toggles, and loaders (CSS-only patterns).
 
