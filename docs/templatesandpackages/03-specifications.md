@@ -32,11 +32,15 @@ interface PackageRecord {
   manifest: string;                // full package YAML manifest (human-readable)
 
   createdAt: string;               // ISO 8601
+  updatedAt: string;               // ISO 8601 — updated when metadata changes
 }
+
+// Shared type alias for all component types
+type ComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation';
 
 interface PackageComponent {
   id: string;                      // "csm-signage", "app-kiosk", "cortex-signage"
-  type: 'csm' | 'extension' | 'cortex' | 'app' | 'msm' | 'memory' | 'translation';
+  type: ComponentType;
   label: string;                   // human-readable "Kiosk Display App"
   content: string;                 // raw content (YAML, JS, HTML, JSON)
   contentHash: string;             // SHA-256 of content (for change detection)
@@ -72,19 +76,20 @@ interface TemplateListingRecord {
 
   featured: boolean;               // operator-promoted
   installCount: number;            // incremented on each install
-  rating: number;                  // average 0.0–5.0
-  reviewCount: number;
-
-  reviews: TemplateReview[];
-  discussions: TemplateDiscussion[];
+  rating: number;                  // average 0.0–5.0 (denormalized, recalculated on review change)
+  reviewCount: number;             // denormalized count
 
   status: 'listed' | 'unlisted' | 'moderated';
   createdAt: string;
   updatedAt: string;
 }
 
+// Reviews and discussions are stored in SEPARATE tables (not embedded)
+// to avoid read-modify-write race conditions and unbounded record growth.
+
 interface TemplateReview {
   id: string;                      // UUID
+  listingId: string;               // FK to TemplateListingRecord.id
   authorGhii: string;             // reviewer's GHII
   authorName: string;              // display name
   rating: number;                  // 1–5
@@ -94,6 +99,7 @@ interface TemplateReview {
 
 interface TemplateDiscussion {
   id: string;                      // UUID
+  listingId: string;               // FK to TemplateListingRecord.id
   authorGhii: string;
   authorName: string;
   message: string;                 // discussion message
@@ -127,7 +133,7 @@ interface PackageInstanceRecord {
 
 interface InstalledComponent {
   componentId: string;             // original ID from package "app-kiosk"
-  type: string;                    // "app", "csm", "cortex", etc.
+  type: ComponentType;             // "app", "csm", "cortex", etc.
   registeredAs: string;            // actual name in system "signage-user1-app-kiosk"
   originalHash: string;            // SHA-256 at install time (for customization detection)
   customized: boolean;             // true if current hash differs from originalHash
@@ -179,7 +185,8 @@ Response: 200 { PackageRecord }
 ```
 GET /v1/packages/:groupId/versions
 Auth: none (if public)
-Response: 200 { versions: PackageRecord[] }
+Query: ?limit=&offset=
+Response: 200 { versions: PackageRecord[], total }
 ```
 
 #### Get Specific Version
@@ -189,14 +196,23 @@ Auth: none (if public)
 Response: 200 { PackageRecord }
 ```
 
-#### Update Metadata
+#### Update Group Metadata
 ```
 PATCH /v1/packages/:groupId
 Auth: requireAuth(), must be package author
-Body: { description?, tags?, visibility?, status? }
+Body: { description?, tags?, visibility? }
 Response: 200 { PackageRecord }
-Notes: Updates ALL versions' shared metadata (description, tags, visibility).
-       Status change only affects the specified version if :version provided.
+Notes: Updates shared metadata across ALL versions in this group.
+       Does NOT change per-version fields (status, components, changelog).
+```
+
+#### Update Version Status
+```
+PATCH /v1/packages/:groupId/versions/:version
+Auth: requireAuth(), must be package author
+Body: { status: 'draft' | 'published' | 'archived' }
+Response: 200 { PackageRecord }
+Notes: Changes status of a SINGLE version only.
 ```
 
 #### Archive Version
@@ -233,6 +249,9 @@ Body: { label, version? }
 Response: 201 { PackageInstanceRecord }
 Notes: version defaults to latest published. Creates real component copies.
        Component names are prefixed: "{packageName}-{ownerName}-{componentId}"
+       Owner identity: `req.auth!.owner` provides the owner name. GHII is looked up
+       from IdentityRepository via `getIdentityByOwner(ownerName)` — same pattern as
+       other owner-scoped endpoints (e.g., apps, extensions).
 ```
 
 **Install Flow (internal):**
@@ -249,8 +268,20 @@ Notes: version defaults to latest published. Creates real component copies.
       - Memory: `POST /v1/memory` per key
       - Translation: merge into user's i18n namespace
    c. Record InstalledComponent with registeredAs and originalHash
-4. If any component fails: rollback (delete already-created components)
-5. Return instance record
+4. If any component fails → **rollback**:
+   a. For each already-created component (in reverse order), call native delete API:
+      - CSM: `DELETE /v1/csm/:name`
+      - Extension: `POST /v1/extensions/:name/deactivate` then `DELETE /v1/extensions/:name`
+      - Cortex: `POST /v1/cortex/:name/deactivate` then `DELETE /v1/cortex/:name`
+      - App: `DELETE /v1/apps/:filename`
+      - MSM: `DELETE /v1/msm/:name`
+      - Memory: `DELETE /v1/memory/:key` per created key
+   b. Delete the PackageInstanceRecord (it was created in step 2 but install failed)
+   c. If any rollback deletion itself fails, log the error but continue rolling back remaining components.
+      Return error response with `partialRollback: true` and list of orphaned components for manual cleanup.
+   d. Note: PackageInstanceRecord is created BEFORE component registration, so it always needs cleanup on failure.
+5. Increment template install count (if template listing exists)
+6. Return instance record
 
 #### List My Instances
 ```
@@ -283,7 +314,7 @@ Notes: Fetches each component from its native repo, computes current hash,
 
 #### Check for Updates
 ```
-POST /v1/instances/:id/check-update
+GET /v1/instances/:id/check-update
 Auth: requireAuth(), must be instance owner
 Response: 200 {
   currentVersion: "v2026-03-15-1701",
@@ -469,8 +500,7 @@ interface PackageRepository {
   listPackages(filter: PackageFilter): Promise<{ packages: PackageRecord[]; total: number }>;
   listVersions(groupId: string): Promise<PackageRecord[]>;
   updatePackage(id: string, updates: Partial<PackageRecord>): Promise<PackageRecord | null>;
-  deletePackage(id: string): Promise<boolean>;  // archive, not physical delete
-  searchPackages(query: string, filter?: PackageFilter): Promise<{ packages: PackageRecord[]; total: number }>;
+  archivePackage(id: string): Promise<boolean>;  // sets status to 'archived', never physically deletes
 }
 
 interface PackageFilter {
@@ -492,10 +522,21 @@ interface TemplateListingRepository {
   getListingByPackage(packageGroupId: string): Promise<TemplateListingRecord | null>;
   listListings(filter: TemplateFilter): Promise<{ listings: TemplateListingRecord[]; total: number }>;
   updateListing(id: string, updates: Partial<TemplateListingRecord>): Promise<TemplateListingRecord | null>;
-  deleteListing(id: string): Promise<boolean>;
-  addReview(listingId: string, review: TemplateReview): Promise<TemplateListingRecord>;
-  addDiscussion(listingId: string, discussion: TemplateDiscussion): Promise<TemplateListingRecord>;
+  deleteListing(id: string): Promise<boolean>;  // hard delete — listing only, package remains
   incrementInstallCount(listingId: string): Promise<void>;
+
+  // Reviews (separate table)
+  addReview(review: TemplateReview): Promise<TemplateReview>;
+  getReviewsByListing(listingId: string, limit?: number, offset?: number): Promise<{ reviews: TemplateReview[]; total: number }>;
+  getReviewByAuthor(listingId: string, authorGhii: string): Promise<TemplateReview | null>;
+  updateReview(id: string, updates: Partial<TemplateReview>): Promise<TemplateReview | null>;
+  deleteReview(id: string): Promise<boolean>;
+  recalculateRating(listingId: string): Promise<{ rating: number; reviewCount: number }>;
+
+  // Discussions (separate table)
+  addDiscussion(discussion: TemplateDiscussion): Promise<TemplateDiscussion>;
+  getDiscussionsByListing(listingId: string, limit?: number, offset?: number): Promise<{ discussions: TemplateDiscussion[]; total: number }>;
+  deleteDiscussion(id: string): Promise<boolean>;
 }
 
 interface TemplateFilter {
@@ -516,10 +557,10 @@ interface TemplateFilter {
 interface PackageInstanceRepository {
   createInstance(record: PackageInstanceRecord): Promise<PackageInstanceRecord>;
   getInstance(id: string): Promise<PackageInstanceRecord | null>;
-  listInstances(filter: InstanceFilter): Promise<PackageInstanceRecord[]>;
+  listInstances(filter: InstanceFilter): Promise<{ instances: PackageInstanceRecord[]; total: number }>;
   updateInstance(id: string, updates: Partial<PackageInstanceRecord>): Promise<PackageInstanceRecord | null>;
   deleteInstance(id: string): Promise<boolean>;
-  listInstancesByPackage(packageGroupId: string): Promise<PackageInstanceRecord[]>;
+  listInstancesByPackage(packageGroupId: string): Promise<{ instances: PackageInstanceRecord[]; total: number }>;
 }
 
 interface InstanceFilter {
@@ -527,6 +568,8 @@ interface InstanceFilter {
   ownerGhii?: string;
   packageGroupId?: string;
   status?: string;
+  limit?: number;
+  offset?: number;
 }
 ```
 
@@ -653,6 +696,17 @@ changelog: |
   advertisements, display configuration, and kiosk mode.
 ```
 
+**Bundle format for export/import:** The YAML bundle is a single multi-document YAML file. The first document is the manifest (above). Subsequent documents are the component contents, each prefixed with a `--- # component: {id}` separator. The `file` field in the manifest is a display label only — all content is inline in the bundle, matching the `PackageComponent.content` field. Binary content (app HTML) is included as-is (YAML block scalar `|`).
+
+**Translation component format:** The content is a JSON object with locale keys at the top level:
+```json
+{
+  "en": { "signage.residents": "Residents", "signage.floor": "Floor", ... },
+  "fi": { "signage.residents": "Asukkaat", "signage.floor": "Kerros", ... }
+}
+```
+During install, keys are merged into the user's namespace. Key conflicts (user already has a key with the same name) are resolved by prefixing with the package name: `{packageName}.{key}`. The user is notified of any renames.
+
 ---
 
 ## 7. Security Considerations
@@ -663,3 +717,4 @@ changelog: |
 4. **Review moderation** — Operator can set listing status to 'moderated' to hide inappropriate content.
 5. **Size limits** — `AIMEAT_PACKAGE_MAX_SIZE_MB` prevents storage abuse.
 6. **No cross-user access** — Instance owner can only manage their own instances. Operator sees all in admin view.
+7. **Rate limiting** — Review and discussion endpoints (`POST /v1/templates/:id/review`, `POST /v1/templates/:id/discussion`) use AIMEAT's existing rate limiting middleware to prevent abuse.

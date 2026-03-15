@@ -23,30 +23,32 @@
 
 ## Phase 1: Storage Layer
 
-### Task 1.1: Storage Interface
+### Task 1.1: Storage Interface — Types & Repository Interfaces
 
 **Files to modify:**
-- `src/storage/interface.ts`
+- `src/storage/interface.ts` — add record types (`PackageRecord`, `PackageComponent`, `ComponentType`, `TemplateListingRecord`, `TemplateReview`, `TemplateDiscussion`, `PackageInstanceRecord`, `InstalledComponent`) and filter types (`PackageFilter`, `TemplateFilter`, `InstanceFilter`)
 
-**Changes:**
-- Add `PackageRecord`, `PackageComponent`, `PackageVersion` types
-- Add `TemplateListingRecord`, `TemplateReview`, `TemplateDiscussion` types
-- Add `PackageInstanceRecord`, `InstalledComponent` types
-- Add `PackageRepository` interface
-- Add `TemplateListingRepository` interface
-- Add `PackageInstanceRepository` interface
-- Add `PackageFilter`, `TemplateFilter`, `InstanceFilter` interfaces
-- Compose new repositories into `Storage` interface
+**Files to create (repository interfaces — follows established pattern, see `app.repository.ts`):**
+- `src/storage/repositories/package.repository.ts` — `PackageRepository` interface
+- `src/storage/repositories/template-listing.repository.ts` — `TemplateListingRepository` interface (includes review/discussion methods)
+- `src/storage/repositories/package-instance.repository.ts` — `PackageInstanceRepository` interface
+
+**Files to modify:**
+- `src/storage/interface.ts` — import and compose new repositories into `Storage` interface (same pattern as `ExtensionRepository`, `CortexExtensionRepository`, etc.)
+
+**Note:** Repository INTERFACES go in `src/storage/repositories/*.repository.ts`. Record TYPES go in `src/storage/interface.ts`. This matches the existing pattern.
 
 ### Task 1.2: SQLite Implementation
 
-**Files to create:**
-- `src/storage/repositories/package.repository.ts`
-- `src/storage/repositories/template-listing.repository.ts`
-- `src/storage/repositories/package-instance.repository.ts`
+**Files to create (SQLite implementations of repository interfaces):**
+- `src/storage/providers/sqlite/package.repository.ts`
+- `src/storage/providers/sqlite/template-listing.repository.ts`
+- `src/storage/providers/sqlite/package-instance.repository.ts`
 
 **Files to modify:**
 - `src/storage/providers/sqlite/index.ts` — add tables, compose repositories
+
+**Note:** Foreign keys are documented for referential integrity understanding. Whether to enforce with `PRAGMA foreign_keys = ON` depends on existing codebase pattern — check `sqlite/index.ts` during implementation.
 
 **Tables:**
 ```sql
@@ -66,6 +68,7 @@ CREATE TABLE packages (
   components TEXT NOT NULL,          -- JSON array of PackageComponent
   manifest TEXT DEFAULT '',
   created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   UNIQUE(package_group_id, version)
 );
 CREATE INDEX idx_packages_group ON packages(package_group_id);
@@ -74,7 +77,7 @@ CREATE INDEX idx_packages_status ON packages(status);
 
 CREATE TABLE template_listings (
   id TEXT PRIMARY KEY,
-  package_group_id TEXT NOT NULL UNIQUE,
+  package_group_id TEXT NOT NULL UNIQUE, -- references packages.package_group_id
   package_name TEXT NOT NULL,
   package_author TEXT NOT NULL,
   published_by TEXT NOT NULL,
@@ -88,8 +91,6 @@ CREATE TABLE template_listings (
   install_count INTEGER DEFAULT 0,
   rating REAL DEFAULT 0,
   review_count INTEGER DEFAULT 0,
-  reviews TEXT DEFAULT '[]',         -- JSON array of TemplateReview
-  discussions TEXT DEFAULT '[]',     -- JSON array of TemplateDiscussion
   status TEXT DEFAULT 'listed',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -97,11 +98,36 @@ CREATE TABLE template_listings (
 CREATE INDEX idx_template_listings_category ON template_listings(category);
 CREATE INDEX idx_template_listings_featured ON template_listings(featured);
 
+-- Reviews and discussions are SEPARATE tables to avoid
+-- read-modify-write race conditions and unbounded record growth.
+CREATE TABLE template_reviews (
+  id TEXT PRIMARY KEY,
+  listing_id TEXT NOT NULL,          -- references template_listings.id
+  author_ghii TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  rating INTEGER NOT NULL,           -- 1-5
+  comment TEXT DEFAULT '',
+  created_at TEXT NOT NULL,
+  UNIQUE(listing_id, author_ghii)    -- one review per user per listing
+);
+CREATE INDEX idx_template_reviews_listing ON template_reviews(listing_id);
+
+CREATE TABLE template_discussions (
+  id TEXT PRIMARY KEY,
+  listing_id TEXT NOT NULL,          -- references template_listings.id
+  author_ghii TEXT NOT NULL,
+  author_name TEXT NOT NULL,
+  message TEXT NOT NULL,
+  parent_id TEXT,                     -- for threading
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_template_discussions_listing ON template_discussions(listing_id);
+
 CREATE TABLE package_instances (
   id TEXT PRIMARY KEY,
-  package_group_id TEXT NOT NULL,
+  package_group_id TEXT NOT NULL,    -- references packages.package_group_id
   package_version TEXT NOT NULL,
-  package_record_id TEXT NOT NULL,
+  package_record_id TEXT NOT NULL,   -- references packages.id
   owner TEXT NOT NULL,
   owner_ghii TEXT NOT NULL,
   label TEXT DEFAULT '',
@@ -114,28 +140,38 @@ CREATE INDEX idx_package_instances_owner ON package_instances(owner);
 CREATE INDEX idx_package_instances_package ON package_instances(package_group_id);
 ```
 
-### Task 1.3: MongoDB Implementation
+### Task 1.3: MongoDB Implementation (Prisma)
 
-**Files to modify:**
-- `src/storage/providers/mongodb/index.ts` — add collections, compose repositories
-- `prisma/schema.prisma` — add models (if Prisma is used for MongoDB)
-
-**Collections:** `packages`, `templateListings`, `packageInstances`
-
-Indexes mirror SQLite indexes above.
-
-### Task 1.4: E2E Tests for Storage
+The codebase uses Prisma for MongoDB. Full Prisma model definitions are required.
 
 **Files to create:**
-- `test/e2e-packages.ts` — Package CRUD, version management
-- `test/e2e-templates.ts` — Template listing CRUD, reviews, discussions
-- `test/e2e-package-instances.ts` — Install, status, remove
+- `src/storage/providers/mongodb/package.repository.ts`
+- `src/storage/providers/mongodb/template-listing.repository.ts`
+- `src/storage/providers/mongodb/package-instance.repository.ts`
 
-**Run against both backends:**
-```bash
-pnpm test:e2e:mongodb  # includes new test files
-pnpm test:e2e:sqlite   # includes new test files
-```
+**Files to modify:**
+- `prisma/schema.prisma` — add models: `Package`, `TemplateListing`, `TemplateReview`, `TemplateDiscussion`, `PackageInstance`
+- `src/storage/providers/mongodb/index.ts` — add collections, compose repositories
+
+**Collections:** `packages`, `templateListings`, `templateReviews`, `templateDiscussions`, `packageInstances`
+
+**Prisma models** mirror the SQLite schemas above. Indexes:
+- `packages`: `@@index([packageGroupId])`, `@@index([author])`, `@@index([status])`, `@@unique([packageGroupId, version])`
+- `templateListings`: `@@unique([packageGroupId])`, `@@index([category])`, `@@index([featured])`
+- `templateReviews`: `@@index([listingId])`, `@@unique([listingId, authorGhii])`
+- `templateDiscussions`: `@@index([listingId])`
+- `packageInstances`: `@@index([owner])`, `@@index([packageGroupId])`
+
+### Task 1.4: Storage Unit Tests
+
+**Note:** E2E tests require API routes (Phase 2+). Phase 1 creates storage-level tests only.
+
+**Files to create:**
+- `test/unit/package-repository.test.ts` — PackageRepository CRUD, version queries
+- `test/unit/template-listing-repository.test.ts` — TemplateListing CRUD, reviews, discussions
+- `test/unit/package-instance-repository.test.ts` — Instance CRUD, queries
+
+E2E tests (`test/e2e-packages.ts`, `test/e2e-templates.ts`, `test/e2e-package-instances.ts`) are created in their respective API phases (Phases 2-5).
 
 ---
 
@@ -171,6 +207,12 @@ pnpm test:e2e:sqlite   # includes new test files
 **Files to modify:**
 - `src/server.ts` — mount `packageRouter(config, storage)`
 
+**Note:** Three separate route files will be created across phases:
+- `src/routes/packages.ts` (Phase 2) — package CRUD + versioning
+- `src/routes/instances.ts` (Phase 3) — install, manage, migrate
+- `src/routes/templates.ts` (Phase 5) — gallery, reviews, discussions
+This follows the one-file-per-domain convention used by `csm.ts`, `extensions.ts`, `cortex.ts`, etc.
+
 ### Task 2.4: OpenAPI Spec
 
 **Files to modify:**
@@ -188,8 +230,8 @@ pnpm test:e2e:sqlite   # includes new test files
 
 ### Task 3.1: Install Flow
 
-**Files to modify:**
-- `src/routes/packages.ts` — add install endpoint
+**Files to create:**
+- `src/routes/instances.ts` — instance routes (separate file per one-file-per-domain convention)
 
 **Logic:**
 1. Validate package exists and version is published
@@ -204,7 +246,7 @@ pnpm test:e2e:sqlite   # includes new test files
 ### Task 3.2: Instance Management Routes
 
 **Files to modify:**
-- `src/routes/packages.ts` — add instance endpoints
+- `src/routes/instances.ts` — add management endpoints
 
 **Endpoints:**
 - `GET /v1/instances` — list my instances
@@ -233,7 +275,7 @@ pnpm test:e2e:sqlite   # includes new test files
 ### Task 4.1: Check-Update Endpoint
 
 **Files to modify:**
-- `src/routes/packages.ts`
+- `src/routes/instances.ts`
 
 **Logic:**
 1. Get instance's current version
@@ -260,7 +302,7 @@ pnpm test:e2e:sqlite   # includes new test files
 ### Task 4.3: Apply Migration Endpoint
 
 **Files to modify:**
-- `src/routes/packages.ts`
+- `src/routes/instances.ts`
 
 **Logic:**
 1. For each component action:
@@ -278,8 +320,8 @@ pnpm test:e2e:sqlite   # includes new test files
 
 ### Task 5.1: Template Routes
 
-**Files to create or modify:**
-- `src/routes/templates.ts` (or extend `src/routes/packages.ts`)
+**Files to create:**
+- `src/routes/templates.ts` — separate route file (one-file-per-domain convention)
 
 **Endpoints:**
 - `POST /v1/templates` — create listing
@@ -294,7 +336,7 @@ pnpm test:e2e:sqlite   # includes new test files
 ### Task 5.2: Server Registration
 
 **Files to modify:**
-- `src/server.ts` — mount `templateRouter(config, storage)` (if separate file)
+- `src/server.ts` — mount `templateRouter(config, storage)` and `instanceRouter(config, storage)`
 
 ### Task 5.3: i18n
 
@@ -413,9 +455,12 @@ Each phase includes E2E tests run against both SQLite and MongoDB:
 
 | Test Suite | Phase | Coverage |
 |-----------|-------|----------|
-| `e2e-packages.ts` | 1–2 | Package CRUD, versioning, export/import, role enforcement |
-| `e2e-templates.ts` | 5 | Template CRUD, reviews, discussions, gallery queries |
+| `unit/package-repository.test.ts` | 1 | Storage-level CRUD, version queries |
+| `unit/template-listing-repository.test.ts` | 1 | Storage-level CRUD, review/discussion tables |
+| `unit/package-instance-repository.test.ts` | 1 | Storage-level CRUD |
+| `e2e-packages.ts` | 2 | Package API CRUD, versioning, export/import, role enforcement |
 | `e2e-package-instances.ts` | 3–4 | Install, status, customization detection, migration, remove |
+| `e2e-templates.ts` | 5 | Template CRUD, reviews, discussions, gallery queries |
 
 ### Playwright Tests (per CLAUDE.md Rule 1b)
 
