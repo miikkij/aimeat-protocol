@@ -4,9 +4,22 @@
  */
 import { apiGet, api } from '/js/api.js';
 
+/** Cached personal_nodes_enabled flag from bootstrap. */
+let _personalEnabled = null;
+
+async function isPersonalEnabled() {
+  if (_personalEnabled !== null) return _personalEnabled;
+  try {
+    const data = await apiGet('/v1/');
+    _personalEnabled = !!data?.data?.this_node?.personal_nodes_enabled;
+  } catch { _personalEnabled = false; }
+  return _personalEnabled;
+}
+
 /** Load personal node status. Returns array (0 or 1 node). */
 export async function listNodes() {
   try {
+    if (!(await isPersonalEnabled())) return [];
     const data = await apiGet('/v1/personal/status');
     return data?.data?.node_id ? [data.data] : [];
   } catch { return []; }

@@ -499,6 +499,36 @@ export function adminRouter(
         }
     });
 
+    // POST /v1/admin/seed-examples — seed example packages into the system
+    router.post('/v1/admin/seed-examples', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const { getExamplePackages, buildRecords } = await import('../data/example-packages.js');
+            const examples = getExamplePackages();
+            const operator = req.auth!.sub;
+            const operatorGhii = req.auth!.owner ?? operator;
+            const results: { name: string; packageGroupId: string; templateId: string }[] = [];
+
+            for (const def of examples) {
+                // Check if already seeded
+                const existing = await storage.getLatestPublishedPackage(`${def.name}::${operator}`);
+                if (existing) {
+                    results.push({ name: def.name, packageGroupId: existing.packageGroupId, templateId: '(already exists)' });
+                    continue;
+                }
+
+                const { pkg, listing } = buildRecords(def, operator, operatorGhii);
+                await storage.createPackage(pkg);
+                await storage.createTemplateListing(listing);
+                results.push({ name: def.name, packageGroupId: pkg.packageGroupId, templateId: listing.id });
+            }
+
+            emitChange('packages');
+            res.json(success(config.nodeId, { seeded: results }));
+        } catch (e: any) {
+            res.status(500).json(error(config.nodeId, 'SEED_FAILED', e.message ?? 'Seed failed'));
+        }
+    });
+
     // ── Mount domain sub-routers ──
     router.use(adminConfigRouter(config, storage, provenance, consulService));
     router.use(adminMonitoringRouter(config, storage));

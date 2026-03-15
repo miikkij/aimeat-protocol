@@ -36,6 +36,9 @@ export const getAdminWork    = ()       => apiGet('/v1/admin/work');
 export const getMaintenance  = ()       => apiGet('/v1/admin/maintenance');
 export const setMaintenance  = (enabled, message) => apiPost('/v1/admin/maintenance', { enabled, message });
 
+// ── Seed Examples ──
+export const seedExamples    = ()       => apiPost('/v1/admin/seed-examples');
+
 // ── Backup & Restore ──
 export const getBackup       = ()       => apiGet('/v1/admin/backup');
 export const doRestore       = (data)   => apiPost('/v1/admin/restore', data);
