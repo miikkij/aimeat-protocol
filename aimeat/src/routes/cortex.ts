@@ -514,6 +514,7 @@ async function activateExtension(
       // 2. ontology → store as memory under __cortex__/{ext.name}/ontology/{comp.name}
       case 'ontology': {
         const ontKey = `__cortex__/${ext.name}/ontology/${comp.name}`;
+        const existingOnt = await storage.getMemory(gaii, ontKey);
         await storage.setMemory({
           key: ontKey,
           ownerGaii: gaii,
@@ -521,8 +522,8 @@ async function activateExtension(
           visibility: 'public',
           tags: ['cortex', 'ontology', ext.name],
           ttlHours: null,
-          version: 1,
-          createdAt: now,
+          version: existingOnt ? existingOnt.version + 1 : 1,
+          createdAt: existingOnt ? existingOnt.createdAt : now,
           updatedAt: now,
         });
         artifacts.ontologyKeys.push(ontKey);
@@ -533,6 +534,7 @@ async function activateExtension(
       // 3. prompt → store as memory under __cortex__/{ext.name}/prompts/{comp.name}
       case 'prompt': {
         const promptKey = `__cortex__/${ext.name}/prompts/${comp.name}`;
+        const existingPrompt = await storage.getMemory(gaii, promptKey);
         await storage.setMemory({
           key: promptKey,
           ownerGaii: gaii,
@@ -540,8 +542,8 @@ async function activateExtension(
           visibility: 'public',
           tags: ['cortex', 'prompt', ext.name],
           ttlHours: null,
-          version: 1,
-          createdAt: now,
+          version: existingPrompt ? existingPrompt.version + 1 : 1,
+          createdAt: existingPrompt ? existingPrompt.createdAt : now,
           updatedAt: now,
         });
         artifacts.promptKeys.push(promptKey);
@@ -622,6 +624,7 @@ async function activateExtension(
       // 6. seed-data
       case 'seed-data': {
         for (const entry of comp.entries) {
+          const existingSeed = await storage.getMemory(gaii, entry.key);
           await storage.setMemory({
             key: entry.key,
             ownerGaii: gaii,
@@ -629,8 +632,8 @@ async function activateExtension(
             visibility: 'public',
             tags: ['cortex', 'seed-data', ext.name],
             ttlHours: null,
-            version: 1,
-            createdAt: now,
+            version: existingSeed ? existingSeed.version + 1 : 1,
+            createdAt: existingSeed ? existingSeed.createdAt : now,
             updatedAt: now,
           });
           if (!artifacts.seedDataKeys.includes(entry.key)) {

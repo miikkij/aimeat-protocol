@@ -135,15 +135,14 @@ export async function deleteProject(projectId, session) {
     } catch { /* best effort — component may already be gone */ }
   }
 
-  // Phase 2: Clean translation memory keys (i18n.*)
+  // Phase 2: Clean translation memory keys — only delete this project's locale keys
   const translationComps = components.filter(c => c.type === 'translation' && c.registeredAs);
-  if (translationComps.length > 0) {
-    try {
-      const i18nResp = await apiGet('/v1/memory?prefix=i18n.&owner_scope=true');
-      for (const item of (i18nResp?.data?.items || [])) {
-        try { await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}`); } catch { /* best effort */ }
-      }
-    } catch { /* best effort */ }
+  for (const comp of translationComps) {
+    // registeredAs is the locale name (e.g. "fi", "en")
+    const locale = comp.registeredAs;
+    if (locale) {
+      try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
+    }
   }
 
   // Phase 3: Delete all generator state keys

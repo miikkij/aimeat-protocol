@@ -215,8 +215,11 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     }
     try {
       await updateProject(project.projectId, { blueprint: vr.parsed, status: 'in_progress' });
-      // Initialize components from blueprint
+      // Initialize components from blueprint — skip existing ones to preserve progress
+      const existing = await loadAllComponents(project.projectId);
+      const existingIds = new Set(existing.map(c => c.id));
       for (const comp of vr.parsed.components) {
+        if (existingIds.has(comp.id)) continue; // don't overwrite existing progress
         await saveComponent(project.projectId, {
           id: comp.id, type: comp.type, label: comp.label,
           status: 'not_started', prompt: null, result: null,
@@ -404,8 +407,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   async function loadData() {
     const p = await getProject(projectId);
     setProject(p);
-    // Load interview spec for locale and data source threading
-    getInterviewSpec(projectId).then(spec => setInterviewSpec(spec)).catch(() => {});
+    // Load interview spec BEFORE components — prompts need it for locale/data source threading
+    try {
+      const spec = await getInterviewSpec(projectId);
+      setInterviewSpec(spec);
+    } catch { /* no interview spec — that's fine */ }
     if (p?.blueprint?.components) {
       const comps = await loadAllComponents(projectId);
       setComponents(comps.length > 0 ? comps : p.blueprint.components.map(c => ({ ...c, status: 'not_started', history: [], _version: 0 })));
@@ -906,7 +912,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     }
   }, [component.id]);
 
-  const completedComponents = components.filter(c => c.status === 'done');
+  const completedComponents = components.filter(c => c.status === 'done' && c.registeredAs);
   const prompt = component.prompt || buildComponentPrompt(
     component.type, component.label,
     project.description, project.blueprint, completedComponents,
@@ -962,9 +968,15 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         || (d.locales ? `i18n-${d.locales.join('-')}` : null) // Translation fallback
         || (d.registered ? `memory-${d.registered}` : null)   // Memory fallback
         || null;
+      if (!regName) {
+        // Registration succeeded but we couldn't extract the name — warn user
+        showToast?.((t('profile.generator.registrationNameMissing') || 'Registered but name could not be determined — re-register recommended'), true);
+        setRegistering(false);
+        return;
+      }
       const registered = addHistory(component, 'registered', { registeredAs: regName });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName });
-      showToast?.(`Component registered${regName ? ': ' + regName : ''}!`);
+      showToast?.(`Component registered: ${regName}`);
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       await onUpdate();
       // Auto-advance to next component after successful registration
@@ -1015,7 +1027,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
   }
 
   const fixPrompt = validationResult && !validationResult.valid
-    ? buildFixPrompt(prompt, result, validationResult.errors)
+    ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
     : null;
 
   return html`

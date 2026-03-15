@@ -270,14 +270,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       - IMPORTANT: Do NOT move to the next section until the user confirms all use cases
       - Ask: "Any other use cases, or shall we move on?"
 
-   b) AUDIENCE & SCOPE — Who is this for? (1-2 questions)
-      Ask in ONE batch:
-      - Personal or multi-user?
-      - Scale: just me / <10 / <100 / 100+?
-      - Any special display context? (kiosk, mobile, embedded)
-      NOTE: Do NOT ask about login/auth — AIMEAT apps run from app-catalog which already requires a logged-in user. Auth is handled by the platform.
-
-   c) DATA SOURCES — Where does the data come from? (2-3 questions)
+   b) DATA SOURCES — Where does the data come from? (2-3 questions)
       - What external feeds/APIs/URLs does it use?
       - If the user mentions a URL: try to fetch it and describe what you see
         - If you CANNOT access it, say so honestly — NEVER pretend you accessed something
@@ -289,25 +282,25 @@ The user describes WHAT they want and WHY. The generator decides HOW.
         timestamps with ambiguous formats, mixed-language content
       - Is any data user-generated or computed from other data?
 
-   d) DATA MODEL — What are the key entities? (1-2 questions)
+   c) DATA MODEL — What are the key entities? (1-2 questions)
       - Propose entities based on use cases (just name + one-line description each)
       - Ask: "Does this cover your data, or is anything missing?"
       - Do NOT ask about individual fields, ID formats, or storage details — the generator decides those
 
-   e) VIEWS & INTERACTIONS — What should it look like? (2-3 questions)
+   d) VIEWS & INTERACTIONS — What should it look like? (2-3 questions)
       - Propose views based on use cases (map, list, dashboard, cards, timeline, etc.)
       - Ask which views are essential vs optional
       - Ask about key interactions (filter, search, create, export)
       - Do NOT ask about individual UI controls, column orders, or widget placement
 
-   f) STYLE & LOOK — How should it feel? (2-3 questions)
+   e) STYLE & LOOK — How should it feel? (2-3 questions)
       Ask in ONE batch:
       - Mood: clean/minimal, playful, data-dense/professional?
       - Color feel: suggest a palette based on the domain (e.g., "neutral + severity colors" for alerts)
       - Layout preference: tabs, single page, split panels?
       - Any apps or websites whose look they admire?
 
-   g) CONSTRAINTS & PREFERENCES (1-2 questions)
+   f) CONSTRAINTS & PREFERENCES (1-2 questions)
       Ask in ONE batch:
       - How often should data refresh?
       - What languages does the UI need?
@@ -352,11 +345,6 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "priority": "must-have|nice-to-have"
     }
   ],
-  "audience": {
-    "type": "personal|multi-user",
-    "scale": "single|small|medium|large",
-    "description": "Who uses this and how"
-  },
   "dataSources": [
     {
       "id": "ds-1",
@@ -618,7 +606,8 @@ CORRECT (for objects):
 ### ctx.memory.set(key, value) stores any JSON-serializable value
   await ctx.memory.set("alerts.2026-03-14", { items: [...], count: 5 });
 
-### ctx.memory.search(prefix) returns objects, NOT strings
+### ctx.memory.search(prefix) returns objects, NOT strings — returns ALL matching keys (no pagination)
+WARNING: search() loads ALL matching keys into memory at once. If your prefix matches thousands of keys, the V8 sandbox may run out of memory. Use specific prefixes (e.g., "alerts.by-date.2026-03-14" not "alerts.")
 
 WRONG:
   const keys = await ctx.memory.search("prefix.");
@@ -689,8 +678,9 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 - \`limits.timeout_ms\`: use 30000 for extensions that call external APIs, 5000 for memory-only
 - \`limits.max_api_calls\`: use 500 for data collectors (many memory writes per run), 100 for simple actions
 - All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
-- If two actions need the same helper, DUPLICATE the helper in both script files
-- NEVER reference functions from another action's script — each script runs in its own isolated scope
+- If two actions need the same helper (e.g., date parsing, data normalization), DUPLICATE the helper in BOTH script files — copy it exactly, do NOT refactor into a shared module
+- NEVER reference functions from another action's script — each script runs in its own ISOLATED V8 sandbox scope
+- When duplicating helpers across actions, keep them IDENTICAL — if you fix a bug in one copy, fix it in all copies
 - ╔═ NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values ═╗
 - Always check for undefined/null before using memory values — on first run, NOTHING exists yet
 - Always convert dates to ISO 8601 before storing in memory
@@ -717,8 +707,11 @@ Check your ENTIRE output before responding. If you see &gt; &lt; &amp; &quot; &#
     let cortexScriptLoads = '';
     if (hasCortex) {
       const cortexLibs = cortexComponents.map(c => {
-        const nameMatch = c.result?.match?.(/name:\s*"?([^\s"]+)"?/);
-        const libName = nameMatch ? nameMatch[1] : c.label;
+        // Use registeredAs (set during registration) — it's the canonical name
+        // Fallback: try regex on YAML metadata.name, then label
+        const libName = c.registeredAs
+          || c.result?.match?.(/metadata:\s*\n\s+name:\s*"?([^\s"]+)"?/)?.[1]
+          || c.label;
         return { name: libName, label: c.label, result: c.result };
       });
 
@@ -745,7 +738,7 @@ ${lib.result ? `Full cortex code (use EXACTLY these method names and return shap
 ╚══════════════════════════════════════════════════════════════════════════╝
 
 IMPORTANT:
-- Call \\\`AIMEAT.{libName}.init()\\\` on app start — it handles data initialization automatically
+- Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`alert-map-lib\\\` → \\\`AIMEAT.alertMapLib.init()\\\`)
 - Use the cortex methods for ALL data access — never call extensions or memory directly
 - The cortex handles authentication, error handling, and data transformation
 `;
@@ -773,14 +766,20 @@ function loadScript(src) {
 }
 
 async function boot() {
-  await loadScript('/v1/libs/aimeat-auth.js');
-  await loadScript('/v1/libs/aimeat-data.js');
+  try {
+    await loadScript('/v1/libs/aimeat-auth.js');
+    await loadScript('/v1/libs/aimeat-data.js');
 ${hasCortex ? '\n' + cortexScriptLoads : ''}
-  AIMEAT.auth.mountLoginButton('#auth-container', {
-    onLogin: () => startApp(),
-    onLogout: () => location.reload(),
-  });
-  AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
+    AIMEAT.auth.mountLoginButton('#auth-container', {
+      onLogin: () => startApp(),
+      onLogout: () => location.reload(),
+    });
+    AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
+  } catch (err) {
+    document.body.innerHTML = '<div style="padding:2rem;color:#ef4444;font-family:system-ui">'
+      + '<h2>Failed to load application</h2><p>' + err.message + '</p>'
+      + '<p>Make sure the AIMEAT node is running and accessible.</p></div>';
+  }
 }
 boot();
 \`\`\`
@@ -845,10 +844,25 @@ The AIMEAT app catalog allows external CDN scripts. Available libraries:
 
 | Library | Script Tag | Use for |
 |---------|-----------|---------|
-| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS | Maps, markers, geospatial |
+| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS link: \`<link rel="stylesheet" href="https://unpkg.com/leaflet@1/dist/leaflet.css">\` | Maps, markers, geospatial |
 | Chart.js | \`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\` | Bar, line, pie, radar charts |
 | Motion | \`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\` | Animations via \`Motion.animate(el, {x: 100}, {duration: 0.5})\` |
 | Phaser 3 | \`<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/phaser.min.js"></script>\` | Games, interactive canvas, physics |
+
+### CSP (Content Security Policy) — the app HTML MUST include a meta tag
+
+AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add a \`<meta>\` tag:
+\\\`\\\`\\\`html
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
+  img-src 'self' data: https: blob:;
+  font-src 'self' https://fonts.gstatic.com;
+  connect-src 'self';
+">
+\\\`\\\`\\\`
+Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
 
 For UI inspiration, reference uiverse.io for fancy buttons, cards, toggles, and loaders (CSS-only patterns).
 
@@ -1097,8 +1111,10 @@ Example — if label is "English (en) Strings":
     if (extComponents.length > 0) {
       extRef = `\n## Registered Extensions (your cortex wraps these)\n`;
       for (const ext of extComponents) {
-        const nameMatch = ext.result?.match?.(/name:\s*"?([^\s"]+)"?/);
-        const extName = nameMatch ? nameMatch[1] : ext.label;
+        // Use registeredAs (canonical name from registration), fallback to regex then label
+        const extName = ext.registeredAs
+          || ext.result?.match?.(/name:\s*"?([^\s"]+)"?/)?.[1]
+          || ext.label;
         extRef += `- **${extName}** (${ext.label}): memory owner = \`ext:${extName}\`\n`;
         if (ext.result) {
           // Include FULL extension code — cortex MUST see exact memory keys, data
@@ -1143,7 +1159,7 @@ and return objects with an \`items\` array — NOT \`data\`, NOT \`entries\`, NO
 1. **Domain Cohesion**: Group related operations into a single API surface
 2. **Facade Pattern**: Hide extension namespaces (\`ext:{name}\`), memory key patterns, and error handling
 3. **DRY / Genericity**: If a capability is reusable across projects, make it generic
-4. **Smart Init**: \`init()\` should actually trigger data collectors/processors if no data exists yet
+4. **Smart Init**: \`init()\` checks if data exists; if not, triggers extension collectors — see init() rules below
 5. **Composability**: Cortex libs can use other cortex libs via \`AIMEAT.{otherLib}\`
 6. **Self-Documenting**: Export clear, named functions with consistent patterns
 
@@ -1296,15 +1312,57 @@ spec:
 \\\`\\\`\\\`
 
 ## Rules
+
+### CRITICAL: Name Consistency
+The YAML \`metadata.name\` and the JS \`LIB_NAME\` MUST follow this convention:
+- YAML \`metadata.name\`: kebab-case (e.g., \`my-domain-lib\`)
+- JS \`LIB_NAME\`: camelCase version of the SAME name (e.g., \`myDomainLib\`)
+- \`AIMEAT.register(LIB_NAME, exports)\` uses the camelCase name
+- Apps load via: \`/v1/cortex/{metadata.name}/libs/{metadata.name}.js\`
+- Apps access via: \`AIMEAT.{LIB_NAME}.method()\`
+
+Example: YAML name \`alert-map-lib\` → LIB_NAME = \`alertMapLib\` → \`AIMEAT.alertMapLib.init()\`
+
 - The library MUST be a single IIFE that registers on \`window.AIMEAT\`
 - Use \`AIMEAT.register(name, exports)\` if available, always set \`AIMEAT[name] = exports\`
 - Use \`AIMEAT.data.getPublic()\` when aimeat-data.js is loaded, fallback to raw fetch
 - Use \`AIMEAT.auth.getSession()\` for authenticated extension calls
 - Extension names in \`EXT\` object MUST exactly match the registered extension \`metadata.name\`
-- \`init()\` MUST be smart: check for data, trigger collectors if empty
+- \`init()\` MUST follow the init() contract below — no custom behavior
 - All public methods must be async (return Promises)
 - Handle errors gracefully — return null or empty arrays, don't throw for missing data
 - Include the prompt component with documented API surface for downstream AI consumers
+
+## init() Contract (MUST follow exactly)
+
+\\\`\\\`\\\`javascript
+async function init() {
+  // 1. Check if data exists by reading the primary index/key
+  const index = await readExtMemory(EXT.collector, 'data.__index');
+
+  // 2. If data exists → return { ready: true }, do NOT trigger collection
+  if (index && Array.isArray(index.dates) && index.dates.length > 0) {
+    return { ready: true };
+  }
+
+  // 3. If NO data → trigger collector(s) once, return { ready: true, triggered: true }
+  try {
+    await callExt(EXT.collector, 'collect', {});
+  } catch (err) {
+    // Log but don't throw — app should still render empty state
+    console.warn('init: collector failed:', err.message);
+  }
+  return { ready: true, triggered: true };
+}
+\\\`\\\`\\\`
+
+Rules for init():
+- NEVER set up intervals, timers, or recurring triggers — scheduled jobs handle that
+- NEVER call init() automatically inside the cortex IIFE — let the app call it
+- NEVER trigger MULTIPLE collectors simultaneously — call them sequentially
+- init() MUST be idempotent — calling it twice must not cause duplicate data
+- Return \`{ ready: true }\` always — the app checks this to know the cortex is loaded
+- If collector fails, return \`{ ready: true, triggered: true }\` anyway (app shows empty state)
 
 ## CRITICAL: Empty-State Handling (first-run scenario)
 
@@ -1368,6 +1426,25 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     context += `\n## LANGUAGE\n\nThe user works in "${specLocale}". Write all human-readable text (labels, descriptions, comments, UI strings, variable names for display) in that language.\nCode identifiers, JSON keys, YAML keys, and API names stay in English.\n`;
   }
 
+  // For translation components: if another locale is already done, inject its keys
+  // so AI generates matching keys for this locale
+  if (type === 'translation' && completedComponents?.length > 0) {
+    const otherTranslations = completedComponents.filter(c => c.type === 'translation' && c.result);
+    for (const t of otherTranslations) {
+      try {
+        const parsed = JSON.parse(typeof t.result === 'string' ? t.result : JSON.stringify(t.result));
+        const locale = Object.keys(parsed).find(k => typeof parsed[k] === 'object');
+        if (locale && parsed[locale]) {
+          const keys = Object.keys(parsed[locale]);
+          context += `\n## REQUIRED: Match these EXACT keys from the "${locale}" translation\n`;
+          context += `The other locale has these ${keys.length} keys. You MUST use the SAME keys:\n`;
+          context += `\`\`\`\n${keys.join('\n')}\n\`\`\`\n`;
+          context += `Do NOT add extra keys and do NOT omit any keys — the sets must be identical.\n`;
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }
+
   // App and cortex templates receive completedComponents for cross-referencing
   if (type === 'app' || type === 'cortex') {
     return template(label, context, completedComponents);
@@ -1392,7 +1469,33 @@ Common mistakes to avoid:
 ${buildBlueprintPrompt(description, interviewSpec)}`;
 }
 
-export function buildFixPrompt(originalPrompt, failedResult, errors) {
+export function buildFixPrompt(originalPrompt, failedResult, errors, componentType) {
+  // Type-specific constraints that must be preserved during fixes
+  const typeRules = {
+    extension: `
+EXTENSION CONSTRAINTS (V8 sandbox):
+- No require(), no import (except export default for entry point)
+- No Node.js APIs (fs, path, crypto, Buffer, process)
+- No fetch() global — use ctx.fetch() instead
+- No setTimeout, setInterval, console.log — use ctx.log.*
+- All helpers must be INSIDE the same script file
+- Always null-check ctx.memory.get() results: \`const data = await ctx.memory.get("key") || []\``,
+    cortex: `
+CORTEX CONSTRAINTS (browser IIFE):
+- Must be a single IIFE registering on window.AIMEAT
+- YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must match
+- init() must follow the init() contract: check data, trigger collector if empty, return { ready: true }
+- Every readExtMemory/getPublic call must be null-checked`,
+    app: `
+APP CONSTRAINTS (browser HTML):
+- Include CSP meta tag if using CDN scripts
+- Use AIMEAT.auth for login, AIMEAT.data for memory access
+- Call cortex init() before accessing data
+- Handle empty state gracefully (no data on first run)`,
+  };
+
+  const typeConstraint = typeRules[componentType] || '';
+
   return `The following result had validation errors. Fix ONLY the errors listed below.
 
 CRITICAL: Your output MUST use proper JavaScript/YAML syntax. NEVER output HTML entities:
@@ -1401,7 +1504,7 @@ CRITICAL: Your output MUST use proper JavaScript/YAML syntax. NEVER output HTML 
 - Use >= NOT &gt;=
 - Use < NOT &lt;  and > NOT &gt;
 HTML entities in code will crash the V8 sandbox or the browser.
-
+${typeConstraint}
 ORIGINAL PROMPT:
 ${originalPrompt}
 
@@ -1481,6 +1584,26 @@ export function buildEditPrompt(type, label, currentCode, changeRequest, upstrea
     type === 'translation' ? 'Translation file' :
     type === 'memory' ? 'Memory structure' : type;
 
+  // Type-specific constraints to include in edit prompt
+  const typeConstraints = {
+    extension: `
+## Extension Constraints (V8 sandbox — do NOT violate during edit)
+- No require(), no import, no Node.js APIs, no fetch() global — use ctx.fetch()
+- No setTimeout/setInterval/console.log — use ctx.log.*
+- All helpers INSIDE the same script file — no cross-file references
+- Always null-check ctx.memory.get() results`,
+    cortex: `
+## Cortex Constraints (browser IIFE — do NOT violate during edit)
+- Must remain a single IIFE on window.AIMEAT
+- init() must follow contract: check data, trigger if empty, return { ready: true }
+- Every readExtMemory/getPublic call must be null-checked`,
+    app: `
+## App Constraints (browser HTML — do NOT violate during edit)
+- Keep CSP meta tag if using CDN scripts
+- Keep AIMEAT.auth/data setup intact
+- Handle empty state gracefully`,
+  };
+
   let upstreamSection = '';
   if (upstreamChanges) {
     upstreamSection = `
@@ -1497,7 +1620,7 @@ Make sure your code correctly handles the new data format described above.
   return `${AIMEAT_CONTEXT}
 
 You are modifying an existing AIMEAT ${typeLabel}: **${label}**
-
+${typeConstraints[type] || ''}
 ## Current Installed Code
 
 \`\`\`

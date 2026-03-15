@@ -218,6 +218,8 @@ export class Scheduler {
           return record ? record.value : null;
         },
         set: async (key, value) => {
+          const existing = await this.storage.getMemory(extMemoryOwner, key);
+          const now = new Date().toISOString();
           await this.storage.setMemory({
             key,
             ownerGaii: extMemoryOwner,
@@ -225,9 +227,9 @@ export class Scheduler {
             visibility: 'public',
             tags: [],
             ttlHours: null,
-            version: 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            version: existing ? existing.version + 1 : 1,
+            createdAt: existing ? existing.createdAt : now,
+            updatedAt: now,
           });
         },
         search: async (prefix) => {
@@ -290,6 +292,10 @@ export class Scheduler {
         roles: ['operator'],
       },
       config: ext.config,
+      instance: job.instanceId ? {
+        id: job.instanceId,
+        config: job.input ?? {},
+      } : undefined,
       log: {
         info: (msg, data) => logger.info(`[ext:${ext.name}:scheduler] ${msg}`, data),
         warn: (msg, data) => logger.warn(`[ext:${ext.name}:scheduler] ${msg}`, data),
@@ -297,7 +303,14 @@ export class Scheduler {
       },
     };
 
-    const input = job.input ?? {};
+    // Validate input is a plain object — reject non-serializable values
+    const rawInput = job.input ?? {};
+    let input: Record<string, unknown>;
+    try {
+      input = JSON.parse(JSON.stringify(rawInput)) as Record<string, unknown>;
+    } catch {
+      throw new Error(`Scheduled job "${job.id}" has non-serializable input`);
+    }
     await executeExtensionAction(action.scriptContent, ctx, input, ext.limits);
   }
 }

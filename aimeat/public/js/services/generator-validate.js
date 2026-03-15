@@ -267,6 +267,8 @@ const validators = {
 
     if (parsed && typeof parsed === 'object') {
       if (!parsed.metadata?.name) errors.push('Missing: metadata.name');
+      else if (/\./.test(parsed.metadata.name)) errors.push('metadata.name must not contain dots (.) — dots cause namespace collisions in memory owner keys');
+      else if (!/^[a-z][a-z0-9-]*$/.test(parsed.metadata.name)) errors.push('metadata.name must be lowercase kebab-case (e.g., "my-collector")');
       if (!parsed.metadata?.version) errors.push('Missing: metadata.version');
       if (!parsed.metadata?.description) errors.push('Missing: metadata.description');
       if (!parsed.metadata?.author) errors.push('Missing: metadata.author');
@@ -382,6 +384,8 @@ const validators = {
     }
     if (parsed.kind !== 'Extension') errors.push('kind must be "Extension"');
     if (!parsed.metadata?.name) errors.push('metadata.name is required');
+    else if (/\./.test(parsed.metadata.name)) errors.push('metadata.name must not contain dots (.)');
+    else if (!/^[a-z][a-z0-9-]*$/.test(parsed.metadata.name)) errors.push('metadata.name must be lowercase kebab-case (e.g., "my-domain-lib")');
     if (!parsed.spec?.components || !Array.isArray(parsed.spec.components)) {
       errors.push('spec.components array is required');
     }
@@ -439,7 +443,6 @@ export function validateInterviewSpec(result) {
     if (!Array.isArray(spec.useCases) || spec.useCases.length === 0) {
       errors.push('Missing or empty "useCases" array');
     }
-    if (!spec.audience) errors.push('Missing "audience" object');
     if (!Array.isArray(spec.dataSources)) errors.push('Missing "dataSources" array');
     if (!spec.dataModel) errors.push('Missing "dataModel" object');
     if (!Array.isArray(spec.views) || spec.views.length === 0) {
@@ -488,7 +491,7 @@ export function validateBlueprint(result) {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed.components)) errors.push('Missing "components" array');
     else {
-      const allowedComponentKeys = new Set(['id', 'type', 'label']);
+      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes']);
       parsed.components = parsed.components.map(c => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
@@ -496,14 +499,36 @@ export function validateBlueprint(result) {
         if (c.type && !['csm', 'msm', 'extension', 'app', 'memory', 'translation', 'cortex'].includes(c.type)) {
           errors.push(`Component "${c.id}" has unknown type "${c.type}"`);
         }
+        // Validate produces/consumes are arrays of strings (if present)
+        if (c.produces && !Array.isArray(c.produces)) {
+          warnings.push(`Component "${c.id || '?'}": "produces" should be an array`);
+        }
+        if (c.consumes && !Array.isArray(c.consumes)) {
+          warnings.push(`Component "${c.id || '?'}": "consumes" should be an array`);
+        }
         // Strip extra fields (manifest, code, files, etc.) — blueprint is lightweight
         const extraKeys = Object.keys(c).filter(k => !allowedComponentKeys.has(k));
         if (extraKeys.length > 0) {
           warnings.push(`Component "${c.id || '?'}" had extra fields stripped: ${extraKeys.join(', ')}`);
         }
-        return { id: c.id, type: c.type, label: c.label };
+        const clean = { id: c.id, type: c.type, label: c.label };
+        if (Array.isArray(c.produces)) clean.produces = c.produces;
+        if (Array.isArray(c.consumes)) clean.consumes = c.consumes;
+        return clean;
       });
     }
+    // Cross-validate produces/consumes: warn if a consumed key has no producer
+    if (parsed.components) {
+      const allProduced = new Set(parsed.components.flatMap(c => c.produces || []));
+      for (const c of parsed.components) {
+        for (const consumed of (c.consumes || [])) {
+          if (!allProduced.has(consumed)) {
+            warnings.push(`Component "${c.id}" consumes "${consumed}" but no component produces it`);
+          }
+        }
+      }
+    }
+
     if (!Array.isArray(parsed.phases)) errors.push('Missing "phases" array');
     else {
       parsed.phases = parsed.phases.map(p => {

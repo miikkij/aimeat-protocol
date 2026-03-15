@@ -824,6 +824,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return record ? record.value : null;
           },
           set: async (key, value) => {
+            const existing = await storage.getMemory(extMemoryOwner, key);
+            const now = new Date().toISOString();
             await storage.setMemory({
               key,
               ownerGaii: extMemoryOwner,
@@ -831,9 +833,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
               visibility: 'public',
               tags: [],
               ttlHours: null,
-              version: 1,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              version: existing ? existing.version + 1 : 1,
+              createdAt: existing ? existing.createdAt : now,
+              updatedAt: now,
             });
           },
           search: async (prefix) => {
@@ -997,6 +999,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return record ? record.value : null;
           },
           set: async (key, value) => {
+            const existing = await storage.getMemory(extMemoryOwner, key);
+            const now = new Date().toISOString();
             await storage.setMemory({
               key,
               ownerGaii: extMemoryOwner,
@@ -1004,9 +1008,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
               visibility: 'public',
               tags: [],
               ttlHours: null,
-              version: 1,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              version: existing ? existing.version + 1 : 1,
+              createdAt: existing ? existing.createdAt : now,
+              updatedAt: now,
             });
           },
           search: async (prefix) => {
