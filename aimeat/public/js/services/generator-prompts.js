@@ -492,7 +492,9 @@ ui_hints:
 - data_schema.required MUST have at least one field
 - Field types: string, number, integer, boolean, array, object
 - All date/time fields MUST be type: string with description mentioning ISO 8601 format
-- Keep fields reasonable — only what the service actually needs`,
+- service.name: short kebab-case identifier, max 3 words (e.g. "alert-monitor", "hobby-directory"). Do NOT repeat the project name or add redundant suffixes.
+- ONLY include fields that exist in the raw source data. Computed/derived values (aggregates, scores, trends, risk levels, statistics) are calculated by extensions and stored in separate memory keys — they do NOT belong in the CSM data_schema.
+- Avoid redundant fields. If the source provides a unique identifier (e.g. guid), do not add a second id field. If a value is always the same (e.g. single data source), do not include it as a field.`,
 
   msm: (label, context) => `${AIMEAT_CONTEXT}
 
