@@ -500,12 +500,36 @@ export function adminRouter(
     });
 
     // POST /v1/admin/seed-examples — seed example packages into the system
-    router.post('/v1/admin/seed-examples', requireAuth(), requireRole('operator'), async (req, res) => {
+    // Accepts either: JWT (operator role) OR admin password via x-admin-password header
+    router.post('/v1/admin/seed-examples', async (req, res) => {
+        // Auth: JWT operator OR admin password
+        let operator = 'system';
+        let operatorGhii = 'system';
+
+        if (req.auth?.sub && req.auth.roles?.includes('operator')) {
+            operator = req.auth.sub;
+            operatorGhii = req.auth.owner ?? operator;
+        } else {
+            // Check admin password
+            const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
+            const pw = (req.headers['x-admin-password'] as string) ?? '';
+            if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
+                res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Requires operator JWT or admin password'));
+                return;
+            }
+            // Find the first operator owner to attribute packages to
+            const allOwners = await storage.listOwners();
+            const opOwner = allOwners.find((o: any) => o.roles?.includes('operator'));
+            if (opOwner) {
+                operator = opOwner.name;
+                operatorGhii = opOwner.name;
+            }
+        }
+
         try {
             const { getExamplePackages, buildRecords } = await import('../data/example-packages.js');
             const examples = getExamplePackages();
-            const operator = req.auth!.sub;
-            const operatorGhii = req.auth!.owner ?? operator;
+
             const results: { name: string; packageGroupId: string; templateId: string }[] = [];
 
             for (const def of examples) {

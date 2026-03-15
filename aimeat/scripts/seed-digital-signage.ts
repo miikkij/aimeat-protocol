@@ -1,81 +1,40 @@
 /**
  * @file seed-digital-signage.ts
- * @description Seeds example packages via the API. Auto-authenticates by
- *   registering a temporary owner or using an existing OWNER_TOKEN.
+ * @description Seeds example packages via the admin API. Uses admin password
+ *   from .env (AIMEAT_ADMIN_PASSWORD) to authenticate without needing a JWT.
  * @usage
  *   cd aimeat && pnpm seed:examples
- *   # Or with explicit token:
- *   cd aimeat && OWNER_TOKEN=<jwt> pnpm exec tsx scripts/seed-digital-signage.ts
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation
- *   v2.0.0 — 2026-03-16 — auto-auth, uses shared example-packages data module
+ *   v2.0.0 — 2026-03-16 — auto-auth via admin password, uses admin seed endpoint
+ *   v2.0.1 — 2026-03-16 — fix: support AIMEAT_ADMIN_PASSWORD env var name and quoted values
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(ed.etc as any).sha512Sync = (...m: Uint8Array[]) =>
-  new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load admin password from .env file
+function loadAdminPassword(): string {
+  const envPaths = [
+    resolve(__dirname, '..', '.env'),
+    resolve(__dirname, '..', '.env.local'),
+  ];
+  for (const envPath of envPaths) {
+    try {
+      const content = readFileSync(envPath, 'utf8');
+      // Support both AIMEAT_ADMIN_PASSWORD and ADMIN_PASSWORD
+      const match = content.match(/^(?:AIMEAT_)?ADMIN_PASSWORD=(?:"([^"]*)"|'([^']*)'|(.+))$/m);
+      if (match) return (match[1] ?? match[2] ?? match[3] ?? '').trim();
+    } catch { /* file not found */ }
+  }
+  return process.env.AIMEAT_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? '';
+}
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:40050';
-const NODE_ID = process.env.NODE_ID ?? 'aimeat-local-001-dev';
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-async function api(method: string, path: string, body?: unknown, token?: string): Promise<any> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method, headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  return res.json();
-}
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const privKey = Buffer.from(privateKeyB64, 'base64');
-  const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-  return Buffer.from(sig).toString('base64');
-}
-
-// ── Auto-auth: register temp owner, get token ───────────────────────
-
-async function getToken(): Promise<{ token: string; ownerName: string; cleanup: () => Promise<void> }> {
-  // If user provided a token, use it
-  if (process.env.OWNER_TOKEN) {
-    return {
-      token: process.env.OWNER_TOKEN,
-      ownerName: 'operator',
-      cleanup: async () => {},
-    };
-  }
-
-  const ownerName = `seed-${Date.now()}`;
-  console.log(`  Registering temporary owner "${ownerName}"...`);
-
-  const reg = await api('POST', '/v1/owners', { name: ownerName, public_key: 'placeholder' });
-  if (!reg.ok) throw new Error(`Registration failed: ${reg.error?.message ?? JSON.stringify(reg)}`);
-  const privKey = reg.data.private_key;
-
-  const timestamp = new Date().toISOString();
-  const message = ownerName + NODE_ID + timestamp;
-  const signature = await signMsg(privKey, message);
-
-  const auth = await api('POST', '/v1/auth/token', { owner: ownerName, timestamp, signature });
-  if (!auth.ok) throw new Error(`Auth failed: ${auth.error?.message ?? JSON.stringify(auth)}`);
-
-  return {
-    token: auth.data.token,
-    ownerName,
-    cleanup: async () => {
-      console.log(`  Cleaning up temporary owner "${ownerName}"...`);
-      await api('DELETE', `/v1/owners/${ownerName}`, undefined, auth.data.token);
-    },
-  };
-}
-
-// ── Main ─────────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = process.env.AIMEAT_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? loadAdminPassword();
 
 async function main() {
   console.log('\n=== AIMEAT Example Package Seeder ===\n');
@@ -88,65 +47,44 @@ async function main() {
   } catch {
     console.error(`\n  Server not reachable at ${BASE_URL}`);
     console.error(`  Start the server first in another terminal: cd aimeat && pnpm dev\n`);
-    // Delay exit to let Node.js drain fetch handles (Windows UV_HANDLE_CLOSING fix)
     setTimeout(() => process.exit(1), 100);
     return;
   }
 
-  const { token, ownerName, cleanup } = await getToken();
-  console.log(`  Authenticated as: ${ownerName}\n`);
-
-  // Create packages from shared definitions
-  const { getExamplePackages } = await import('../src/data/example-packages.js');
-  const examples = getExamplePackages();
-
-  for (const def of examples) {
-    console.log(`  Creating "${def.name}" package (${def.components.length} components)...`);
-
-    const createRes = await api('POST', '/v1/bundles', {
-      name: def.name,
-      description: def.description,
-      category: def.category,
-      tags: def.tags,
-      visibility: def.visibility,
-      components: def.components,
-    }, token);
-
-    if (!createRes.ok) {
-      if (createRes.error?.code === 'CONFLICT') {
-        console.log(`  Package "${def.name}" already exists — skipping.`);
-        continue;
-      }
-      throw new Error(`Create failed: ${createRes.error?.message ?? JSON.stringify(createRes)}`);
-    }
-
-    const groupId = createRes.data.packageGroupId;
-    const version = createRes.data.version;
-    const encodedGroupId = encodeURIComponent(groupId);
-    console.log(`  Created: ${groupId} (${version})`);
-
-    // Publish
-    await api('PATCH', `/v1/bundles/${encodedGroupId}/versions/${version}`, { status: 'published' }, token);
-    console.log(`  Published: ${version}`);
-
-    // Create template listing
-    const tplRes = await api('POST', '/v1/templates', {
-      packageGroupId: groupId,
-      title: def.templateListing.title,
-      description: def.templateListing.description,
-      category: def.templateListing.category,
-      tags: def.templateListing.tags,
-    }, token);
-
-    if (tplRes.ok) {
-      console.log(`  Template listing created: ${tplRes.data?.listing?.id ?? 'ok'}`);
-    }
-
-    console.log(`\n  Browse:  ${BASE_URL}/v1/bundles/${encodedGroupId}`);
-    console.log(`  Install: POST ${BASE_URL}/v1/bundles/${encodedGroupId}/install`);
+  if (!ADMIN_PASSWORD) {
+    console.error('\n  AIMEAT_ADMIN_PASSWORD not found in .env or environment.');
+    console.error('  Set it in .env or pass it: AIMEAT_ADMIN_PASSWORD=xxx pnpm seed:examples\n');
+    setTimeout(() => process.exit(1), 100);
+    return;
   }
 
-  await cleanup();
+  console.log('  Seeding example packages via admin API...\n');
+
+  const res = await fetch(`${BASE_URL}/v1/admin/seed-examples`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-password': ADMIN_PASSWORD,
+    },
+  });
+
+  const data = await res.json() as any;
+
+  if (!data.ok) {
+    console.error(`  Failed: ${data.error?.message ?? JSON.stringify(data)}`);
+    setTimeout(() => process.exit(1), 100);
+    return;
+  }
+
+  const seeded = data.data?.seeded ?? [];
+  for (const pkg of seeded) {
+    const status = pkg.templateId === '(already exists)' ? 'already exists' : 'created';
+    console.log(`  ${status === 'created' ? '+' : '='} ${pkg.name} (${status})`);
+    if (status === 'created') {
+      console.log(`    Browse:  ${BASE_URL}/v1/bundles/${encodeURIComponent(pkg.packageGroupId)}`);
+    }
+  }
+
   console.log('\n  Done!\n');
 }
 

@@ -73,7 +73,7 @@
     "db:push": "prisma db push",
     "db:init": "node --env-file=.env --import tsx scripts/db-init.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
-    "seed:examples": "tsx scripts/seed-digital-signage.ts",
+    "seed:examples": "node --import tsx scripts/seed-digital-signage.ts",
     "indexnow": "node --env-file=.env --import tsx scripts/indexnow.ts",
     "audit": "pnpm audit --audit-level=high",
     "audit:fix": "pnpm audit --fix"

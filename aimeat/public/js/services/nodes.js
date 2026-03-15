@@ -10,7 +10,7 @@ let _personalEnabled = null;
 async function isPersonalEnabled() {
   if (_personalEnabled !== null) return _personalEnabled;
   try {
-    const data = await apiGet('/v1/');
+    const data = await apiGet('/');
     _personalEnabled = !!data?.data?.this_node?.personal_nodes_enabled;
   } catch { _personalEnabled = false; }
   return _personalEnabled;
