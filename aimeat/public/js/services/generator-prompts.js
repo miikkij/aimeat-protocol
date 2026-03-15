@@ -77,6 +77,10 @@
  *     existing libraries (e.g., aimeat-charts, aimeat-canvas). Blueprint cortex
  *     components can declare "uses" to reference existing libs. Cortex prompt now
  *     describes full capability range (UI components, DOM, CSS, not just data access).
+ *   v7.2.0 — 2026-03-15 — Add @activate trigger support: blueprint schedules can use
+ *     cron "@activate" for init jobs that run on extension activation AND every server
+ *     restart. Extension prompt documents @activate semantics, idempotent init pattern,
+ *     and dependency ordering (init checks stale data before populating).
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -185,7 +189,7 @@ Format:
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
     { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:municipalities.data"], "consumes": [] },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": ["memory:municipalities.data"], "schedules": [{"action":"ingest","cron":"*/15 * * * *"},{"action":"aggregate","cron":"0 2 * * *"}] },
+    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": ["memory:municipalities.data"], "schedules": [{"action":"init","cron":"@activate"},{"action":"ingest","cron":"*/15 * * * *"},{"action":"aggregate","cron":"0 2 * * *"}] },
     { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getAlerts"], "consumes": ["memory:alerts.by-date.*", "memory:municipalities.data"] },
     { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getAlerts"] }
   ],
@@ -233,7 +237,10 @@ Rules:
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1)
 - Each component object has these fields: "id", "type", "label", "produces", "consumes"
 - Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
+- Valid cron values: standard 5-field cron syntax OR the special value "@activate"
+- "@activate" means: runs on extension activation AND on every server restart. Use for init/bootstrap jobs that populate initial data, verify data integrity, or recover from missed scheduled runs. These MUST be idempotent (safe to run repeatedly).
 - Use "schedules" for any work that must happen automatically without a browser (data collection, nightly aggregation, periodic computation)
+- If an extension collects or computes data, it SHOULD have an "@activate" init job that checks for stale/missing data and populates it — this solves the cold-start problem (empty data after first install or server restart)
 - If an extension has NO scheduled actions, omit the "schedules" field entirely
 - "produces": array of data outputs (format: "memory:namespace.*" for memory, "api:methodName" for cortex/app)
 - "consumes": array of data inputs this component reads from
@@ -827,12 +834,47 @@ schedules:
 
 Rules:
 - \`action\` MUST reference an existing action id from the \`actions\` array
-- \`cron\` uses standard 5-field cron syntax (minute hour day-of-month month day-of-week)
+- \`cron\` uses standard 5-field cron syntax (minute hour day-of-month month day-of-week) OR the special value \`@activate\`
+- \`@activate\` trigger: runs when the extension is activated AND on every server restart. Use for init/bootstrap jobs.
 - \`instance_scope: false\` for single-instance extensions (most cases)
 - \`input\` is optional static input passed to the action on each run
-- Common patterns: \`*/15 * * * *\` (every 15 min), \`0 2 * * *\` (daily at 02:00), \`0 */6 * * *\` (every 6 hours)
+- Common patterns: \`@activate\` (init/bootstrap), \`*/15 * * * *\` (every 15 min), \`0 2 * * *\` (daily at 02:00), \`0 */6 * * *\` (every 6 hours)
 - If a nightly job depends on data from a periodic job (e.g., aggregation needs fresh alerts), schedule it AFTER the last periodic run (e.g., periodic at */15, nightly at 02:00)
 - If the blueprint has no "schedules" for this extension, set \`schedules: []\`
+
+### @activate Init Pattern
+
+If the extension collects or computes data, add an \`@activate\` scheduled job that:
+1. Checks if data exists and is fresh (not stale)
+2. If missing or stale, runs the init/collection logic
+3. If data is already fresh, does nothing (returns early)
+
+This solves the cold-start problem: after first activation or a server restart, the extension's data is immediately populated instead of waiting for the next cron tick.
+
+Example @activate action script pattern:
+\`\`\`javascript
+// Check if data already exists and is recent
+const lastRun = await ctx.memory.get('last-ingest-timestamp');
+if (lastRun) {
+  const age = Date.now() - new Date(lastRun).getTime();
+  if (age < 15 * 60 * 1000) return; // Data is fresh (< 15 min), skip
+}
+// Data is missing or stale — run the init/collection logic
+// ... fetch data, store in memory ...
+await ctx.memory.set('last-ingest-timestamp', new Date().toISOString());
+\`\`\`
+
+Schedule entry:
+\`\`\`yaml
+  - id: init-data
+    action: init
+    cron: "@activate"
+    description: "Initialize/refresh data on activation and server restart"
+    instance_scope: false
+    input: {}
+\`\`\`
+
+IMPORTANT: @activate actions MUST be idempotent — they will run multiple times (every restart). Always check existing data before overwriting.
 
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
