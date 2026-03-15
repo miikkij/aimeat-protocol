@@ -30,6 +30,9 @@
  *     activateAll, deactivateAll, removeComponents, getAppLaunchUrl
  *   v4.1.0 — 2026-03-15 — Improve saveComponent retry: up to 3 retries on
  *     409 VERSION_CONFLICT instead of 1, preventing 409 spam on rapid updates
+ *   v4.2.0 — 2026-03-15 — deleteProject now fully cleans up all registered
+ *     components (extensions, cortex, apps, csm, msm) + extension memory +
+ *     translation i18n keys before removing generator state
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -100,7 +103,50 @@ export async function archiveProject(projectId) {
   return updateProject(projectId, { status: 'archived' });
 }
 
-export async function deleteProject(projectId) {
+export async function deleteProject(projectId, session) {
+  // Phase 1: Unregister all live components (extensions, cortex, apps, csm, msm)
+  const components = await loadAllComponents(projectId);
+  const registered = components.filter(c => c.registeredAs);
+
+  for (const comp of registered) {
+    const name = comp.registeredAs;
+    try {
+      if (comp.type === 'extension') {
+        try { await apiPost(`/v1/extensions/${encodeURIComponent(name)}/deactivate`); } catch { /* ok */ }
+        await apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
+        // Clean extension memory (ext:{name} namespace)
+        try {
+          const memResp = await apiGet(`/v1/memory?prefix=&owner=ext:${encodeURIComponent(name)}&owner_scope=true`);
+          for (const item of (memResp?.data?.items || [])) {
+            try { await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}?owner=ext:${encodeURIComponent(name)}`); } catch { /* best effort */ }
+          }
+        } catch { /* best effort */ }
+      } else if (comp.type === 'cortex') {
+        try { await apiPost(`/v1/cortex/${encodeURIComponent(name)}/deactivate`); } catch { /* ok */ }
+        await apiDelete(`/v1/cortex/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'app') {
+        const owner = session?.owner || '';
+        await apiDelete(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'csm') {
+        await apiDelete(`/v1/csm/${encodeURIComponent(name)}`);
+      } else if (comp.type === 'msm') {
+        await apiDelete(`/v1/msm/${encodeURIComponent(name)}`);
+      }
+    } catch { /* best effort — component may already be gone */ }
+  }
+
+  // Phase 2: Clean translation memory keys (i18n.*)
+  const translationComps = components.filter(c => c.type === 'translation' && c.registeredAs);
+  if (translationComps.length > 0) {
+    try {
+      const i18nResp = await apiGet('/v1/memory?prefix=i18n.&owner_scope=true');
+      for (const item of (i18nResp?.data?.items || [])) {
+        try { await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}`); } catch { /* best effort */ }
+      }
+    } catch { /* best effort */ }
+  }
+
+  // Phase 3: Delete all generator state keys
   const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
   for (const item of items) {

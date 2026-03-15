@@ -381,6 +381,18 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         }
       }
 
+      // Clean scheduled jobs before deletion (same as deactivate)
+      if (scheduler) {
+        const jobs = await storage.listScheduledJobs({ extensionName: name });
+        for (const job of jobs) {
+          scheduler.removeJob(job.id);
+          await storage.deleteScheduledJob(job.id);
+        }
+        if (jobs.length > 0) {
+          logger.info(`Removed ${jobs.length} scheduled jobs for extension: ${name}`);
+        }
+      }
+
       await storage.deleteExtension(name);
       logger.info(`Extension uninstalled: ${name}`, { by: req.auth!.sub });
 

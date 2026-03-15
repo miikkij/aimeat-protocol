@@ -578,7 +578,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   async function handleDeleteConfirmed() {
     setShowDeleteConfirm(false);
     try {
-      await deleteProject(projectId);
+      await deleteProject(projectId, session);
       showToast?.(t('profile.generator.projectDeleted'));
       onBack();
     } catch (e) {
