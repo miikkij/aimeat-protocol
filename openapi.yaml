@@ -12424,6 +12424,23 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Package exceeds size or component count limit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [SIZE_EXCEEDED, COMPONENT_LIMIT_EXCEEDED, QUOTA_EXCEEDED]
+                      message:
+                        type: string
     get:
       operationId: listPackages
       summary: List packages
@@ -12469,11 +12486,32 @@ paths:
               required: [bundle]
               properties:
                 bundle: { type: string, description: 'Base64-encoded or JSON package bundle' }
+          text/yaml:
+            schema:
+              type: string
+              description: YAML bundle string (multi-document YAML with manifest + components)
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Package exceeds size or component count limit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [SIZE_EXCEEDED, COMPONENT_LIMIT_EXCEEDED, QUOTA_EXCEEDED]
+                      message:
+                        type: string
 
   /v1/bundles/{groupId}:
     get:
@@ -12570,6 +12608,23 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Package exceeds size or component count limit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [SIZE_EXCEEDED, COMPONENT_LIMIT_EXCEEDED, QUOTA_EXCEEDED]
+                      message:
+                        type: string
     get:
       operationId: listPackageVersions
       summary: List package versions
@@ -13090,6 +13145,23 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Feature is disabled via configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [DISABLED, FORBIDDEN]
+                      message:
+                        type: string
 
   /v1/templates/{id}/reviews:
     get:
@@ -13140,6 +13212,23 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Feature is disabled via configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodeId:
+                    type: string
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: [DISABLED, FORBIDDEN]
+                      message:
+                        type: string
 
   /v1/templates/{id}/discussions:
     get:
