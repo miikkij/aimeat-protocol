@@ -442,7 +442,7 @@ export async function registerComponent(type, result, session) {
       for (const [key, value] of Object.entries(entries)) {
         results.push(await apiPost('/v1/memory', { key, value, visibility: 'public' }));
       }
-      return { ok: true, registered: results.length };
+      return { data: { registered: results.length, keys: results.map((_, i) => Object.keys(entries)[i]) } };
     }
     case 'translation': {
       const translations = typeof result === 'string' ? JSON.parse(result) : result;
