@@ -87,8 +87,10 @@ async function main() {
     if (!probe.ok) throw new Error(`HTTP ${probe.status}`);
   } catch {
     console.error(`\n  Server not reachable at ${BASE_URL}`);
-    console.error(`  Start the server first: cd aimeat && pnpm dev\n`);
-    process.exit(1);
+    console.error(`  Start the server first in another terminal: cd aimeat && pnpm dev\n`);
+    // Delay exit to let Node.js drain fetch handles (Windows UV_HANDLE_CLOSING fix)
+    setTimeout(() => process.exit(1), 100);
+    return;
   }
 
   const { token, ownerName, cleanup } = await getToken();
@@ -150,5 +152,5 @@ async function main() {
 
 main().catch(err => {
   console.error('\nFATAL:', err.message);
-  process.exit(1);
+  setTimeout(() => process.exit(1), 100);
 });
