@@ -552,7 +552,20 @@ export function validateBlueprint(result) {
         const clean = { id: c.id, type: c.type, label: c.label };
         if (Array.isArray(c.produces)) clean.produces = c.produces;
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes;
-        if (Array.isArray(c.schedules) && c.type === 'extension') clean.schedules = c.schedules;
+        if (Array.isArray(c.schedules) && c.type === 'extension') {
+          // Validate each schedule entry has valid cron syntax
+          for (const s of c.schedules) {
+            if (!s.action) errors.push(`Component "${c.id}": schedule missing "action" field`);
+            if (!s.cron) errors.push(`Component "${c.id}": schedule missing "cron" field`);
+            else if (s.cron !== '@activate') {
+              const fields = String(s.cron).trim().split(/\s+/);
+              if (fields.length !== 5) {
+                errors.push(`Component "${c.id}": cron "${s.cron}" must have exactly 5 fields (got ${fields.length}). Example: "*/15 * * * *"`);
+              }
+            }
+          }
+          clean.schedules = c.schedules;
+        }
         if (Array.isArray(c.uses) && c.type === 'cortex') clean.uses = c.uses;
         return clean;
       });

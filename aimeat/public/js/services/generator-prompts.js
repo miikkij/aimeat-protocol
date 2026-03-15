@@ -89,6 +89,12 @@
  *     ctx.memory.get() only reads ext:{name} namespace. Updated AIMEAT_CONTEXT, extension
  *     template example, and additional rules with prominent box warning.
  *     Also fix ctx.fetch() encoding docs: now detects charset from XML prolog and HTML meta.
+ *   v8.1.0 — 2026-03-16 — Blueprint prompt hardening: enforce cron 5-field syntax with
+ *     explicit warning, enforce short ID prefixes (ext-1 not extension-1), enforce static
+ *     data schema must match interview format, standardize enum naming conventions
+ *     (trends: rising/falling/steady, field names: English camelCase, source values: keep as-is),
+ *     add memory key naming conventions (settings.config, i18n.{locale}, domain namespaces),
+ *     fix static data injection to use getPublic instead of get
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -113,7 +119,7 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
   ctx.memory.getPublic(namespace, key) → value or null (read data from a DIFFERENT namespace)
     Use this to read: (a) another extension's public data, (b) the OWNER's shared data (memory components, translations, settings).
     Example — read another extension's data: await ctx.memory.getPublic('ext:other-ext', 'some.key')
-    Example — read owner's shared data: await ctx.memory.getPublic(ctx.caller.owner, 'municipalities.data')
+    Example — read owner's shared data: await ctx.memory.getPublic(ctx.caller.owner, 'lookup.data')
     ╔═══════════════════════════════════════════════════════════════════════════════╗
     ║  IMPORTANT: ctx.memory.get() ONLY reads from the extension's OWN namespace. ║
     ║  Data stored by memory components (seed data, settings, translations) lives  ║
@@ -136,7 +142,7 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
 
 AIMEAT Data Standards (MUST follow in ALL components):
   Dates/times: ISO 8601 ONLY — "2026-03-14T13:00:00.000Z". NEVER store RFC 2822 ("Sat, 14 Mar ..."), Unix timestamps, or locale-formatted dates. Convert all dates to ISO before storing.
-  Memory keys: lowercase dot-namespaced — "alerts.by-date.2026-03-14". Dates in keys MUST use YYYY-MM-DD.
+  Memory keys: lowercase dot-namespaced — "items.by-date.2026-03-14". Dates in keys MUST use YYYY-MM-DD.
   IDs: URL-safe strings (kebab-case or hex hashes). No spaces, no special characters.
   Locale codes: BCP 47 — "fi", "en", "fi-FI", "en-US".
   Coordinates: { latitude: number, longitude: number } — WGS84 decimal degrees.
@@ -204,43 +210,38 @@ Format:
 {
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
-    { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:municipalities.data"], "consumes": [] },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": ["memory:municipalities.data"], "schedules": [{"action":"init","cron":"@activate"},{"action":"ingest","cron":"*/15 * * * *"},{"action":"aggregate","cron":"0 2 * * *"}] },
-    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getAlerts"], "consumes": ["memory:alerts.by-date.*", "memory:municipalities.data"] },
-    { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getAlerts"] }
+    { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:lookup.data"], "consumes": [] },
+    { "id": "memory-2", "type": "memory", "label": "Human-readable name", "produces": ["memory:settings.config"], "consumes": [] },
+    { "id": "translation-1", "type": "translation", "label": "Human-readable name (locale)", "produces": ["memory:i18n.fi"], "consumes": [] },
+    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:items.by-date.*", "memory:stats.daily.*"], "consumes": ["memory:lookup.data", "memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"*/15 * * * *"},{"action":"aggregate","cron":"0 2 * * *"}] },
+    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getItems", "api:getStats", "api:getSettings"], "consumes": ["memory:items.by-date.*", "memory:lookup.data", "memory:settings.config", "memory:i18n.fi"] },
+    { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getItems", "api:getStats", "api:getSettings"] }
   ],
   "phases": [
     { "id": "define", "label": "Define Service", "componentIds": ["csm-1"] },
-    { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1"] },
+    { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1", "memory-2", "translation-1"] },
     { "id": "logic", "label": "Build Logic", "componentIds": ["ext-1"] },
     { "id": "connect", "label": "Connect & Integrate", "componentIds": ["cortex-1"] },
     { "id": "ui", "label": "Build UI", "componentIds": ["app-1"] }
   ],
   "dataModel": {
-    "municipalities.data": {
+    "lookup.data": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "key": { "type": "string", "description": "Municipality name" },
-          "value": { "type": "object", "properties": { "lat": { "type": "number" }, "lon": { "type": "number" } } }
-        }
-      },
+      "items": { "type": "object", "properties": { "key": { "type": "string" }, "value": { "type": "object" } } },
       "source": "static",
       "producedBy": "memory-1",
       "consumedBy": ["ext-1", "cortex-1"]
     },
-    "alerts.by-date.YYYY-MM-DD": {
+    "settings.config": {
+      "type": "object",
+      "properties": { "refreshMinutes": { "type": "number" }, "defaultLocale": { "type": "string" } },
+      "source": "config",
+      "producedBy": "memory-2",
+      "consumedBy": ["ext-1", "cortex-1"]
+    },
+    "items.by-date.YYYY-MM-DD": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "guid": { "type": "string" },
-          "title": { "type": "string" },
-          "municipality": { "type": "string" },
-          "timestamp": { "type": "string" }
-        }
-      },
+      "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "timestamp": { "type": "string" } } },
       "source": "external",
       "producedBy": "ext-1",
       "consumedBy": ["cortex-1"]
@@ -248,12 +249,15 @@ Format:
   }
 }
 
+NOTE: The example above uses GENERIC placeholder names (lookup.data, items.by-date, etc.). Replace them with domain-specific names from YOUR project (e.g., products.catalog, events.by-date, sensors.readings). Do NOT copy these placeholder names.
+
 Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
-- IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1)
+- IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1). Use SHORT type prefixes: csm, msm, ext, app, memory, translation, cortex. Do NOT use full type names like "extension-1" — use "ext-1".
 - Each component object has these fields: "id", "type", "label", "produces", "consumes"
 - Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
 - Valid cron values: standard 5-field cron syntax OR the special value "@activate"
+- CRITICAL: cron expressions MUST have exactly 5 fields separated by spaces. Every asterisk MUST be literal: "*/15 * * * *" (NOT "/15 * * * " — the asterisks are required). Double-check your output.
 - "@activate" means: runs on extension activation AND on every server restart. Use for init/bootstrap jobs that populate initial data, verify data integrity, or recover from missed scheduled runs. These MUST be idempotent (safe to run repeatedly).
 - Use "schedules" for any work that must happen automatically without a browser (data collection, nightly aggregation, periodic computation)
 - If an extension collects or computes data, it SHOULD have an "@activate" init job that checks for stale/missing data and populates it — this solves the cold-start problem (empty data after first install or server restart)
@@ -269,6 +273,7 @@ Rules:
 - TRANSLATIONS: Create ONE translation component PER locale. If the spec has locales ["fi", "en"], create translation-1 for fi AND translation-2 for en. NEVER combine multiple locales into one component.
 - MSM: Only create an MSM if the external API requires authentication, API keys, or complex endpoint configuration. Public URLs (RSS feeds, open APIs, open data) do NOT need an MSM — extensions fetch them directly with ctx.fetch().
 - MEMORY: Create memory components for (a) static/seed data provided by the user (lookup tables, reference datasets) and (b) default settings/configuration that the service needs on first run. Pre-populating defaults in memory means the app works immediately without hardcoded fallbacks.
+- MEMORY KEY NAMING: Use consistent namespace prefixes. Standard conventions: "settings.config" for config, "i18n.{locale}" for translations, descriptive namespace for domain data (e.g., "orders.by-date.*", "stats.daily.*", "scores.by-date.*"). Use dot-separated namespaces, not nested objects.
 - CORTEX: Cortex is the middleware between memory and apps. It wraps ALL memory access into clean domain methods: data queries, settings, i18n, computed values. Apps should NEVER read memory directly — they call cortex methods.
 
 ## dataModel — Domain Data Model (REQUIRED)
@@ -284,6 +289,9 @@ Rules for dataModel:
 - Every memory key referenced in produces/consumes MUST have a dataModel entry
 - Prefer fewer, larger keys. A lookup table or dataset should be ONE key (array/object), not split per entry.
 - Include i18n keys (i18n.fi, i18n.en) with source "static" and translation component as producer
+- CRITICAL: If the interview provides static data in a specific format (e.g., array of {key, value} pairs), the dataModel schema MUST match that exact format. Do NOT redesign the data shape — the memory component will store it as-is.
+- Enum values: use consistent naming across all components. For computed enums (trends, levels, statuses), use lowercase English: "rising"/"falling"/"steady" for trends, "low"/"medium"/"high"/"critical" for levels. If source data uses locale-specific values, keep those as-is in storage — do NOT translate them. Store what the source provides.
+- Field names inside stored objects MUST use English camelCase (e.g., "itemCount", "categoryBreakdown", "statusSplit"). This applies even if the source data uses different naming.
 
 ## Data Pipeline Verification (do this BEFORE listing components)
 
@@ -293,14 +301,14 @@ For each VIEW in the spec, trace the data path:
 3. Does the source provide this field directly, or does a component need to transform/enrich it?
 4. If a field has no clear path from source to view, add a component that produces it.
 
-Example: A map view needs lat/lng coordinates. If the data source only has city names,
-the blueprint must include a component that maps city names to coordinates.
+Example: A view needs enriched data. If the source only provides raw identifiers,
+the blueprint must include a component that enriches them (e.g., resolving IDs to names, adding computed scores).
 
 ## Component Dependencies
 
 Each component MUST declare what it produces and consumes:
-- Extensions produce memory keys (e.g., "memory:alerts.by-date.*")
-- Cortex libraries produce API methods (e.g., "api:getAlerts") and consume memory keys
+- Extensions produce memory keys (e.g., "memory:items.by-date.*")
+- Cortex libraries produce API methods (e.g., "api:getItems") and consume memory keys
 - Apps consume API methods or memory keys
 - Every "consumes" entry must be matched by a "produces" entry in another component
 
@@ -331,7 +339,7 @@ Ask: "Does this action fetch from an external server or run on a schedule?"
 ### Static Data → Memory Component
 If a dataSource has type "user-input" with a "staticData" array, you MUST create a memory component for it.
 This memory component will pre-load the static data into memory so extensions and cortex can read it.
-The memory component's "produces" should reflect the memory key pattern (e.g., "memory:municipalities.*").
+The memory component's "produces" should reflect the memory key pattern (e.g., "memory:catalog.data").
 Place it in an early phase (before extensions that consume it).
 
 ### Common Mistakes to Avoid
@@ -417,7 +425,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
         you MUST capture the ENTIRE dataset in the "staticData" field as a JSON array of {key, value} objects.
       - Do NOT truncate, summarize, or put only one sample row — include EVERY row the user provides.
       - Parse the user's format (TSV, CSV, pasted table, etc.) into clean JSON objects.
-        Example: "Helsinki\\t60.166°N, 24.943°E" → { "key": "Helsinki", "value": { "lat": 60.166, "lon": 24.943 } }
+        Example: "Item A\\t42.5\\tactive" → { "key": "Item A", "value": { "score": 42.5, "status": "active" } }
       - The staticData will be written directly to memory as initial data when the service is installed.
       - "sampleEntry" still holds ONE example for documentation; "staticData" holds the FULL dataset.
 
@@ -435,7 +443,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
    e) STYLE & LOOK — How should it feel? (2-3 questions)
       Ask in ONE batch:
       - Mood: clean/minimal, playful, data-dense/professional?
-      - Color feel: suggest a palette based on the domain (e.g., "neutral + severity colors" for alerts)
+      - Color feel: suggest a palette based on the domain (e.g., "warm earth tones for food", "clean blues for data")
       - Layout preference: tabs, single page, split panels?
       - Any apps or websites whose look they admire?
 
@@ -732,13 +740,13 @@ CORRECT:
 ╚══════════════════════════════════════════════════════════════╝
 
 WRONG (CRASHES on first run when no data exists yet):
-  const index = await ctx.memory.get("alerts.__index");
+  const index = await ctx.memory.get("items.__index");
   index.some(...)     // 💥 Cannot read properties of null (reading 'some')
   index.push(...)     // 💥 Cannot read properties of null (reading 'push')
   index.length        // 💥 Cannot read properties of null (reading 'length')
 
 CORRECT:
-  const index = await ctx.memory.get("alerts.__index") || [];
+  const index = await ctx.memory.get("items.__index") || [];
   index.some(...)     // ✓ works — falls back to empty array
 
 CORRECT (for objects):
@@ -746,10 +754,10 @@ CORRECT (for objects):
   stats.count = (stats.count || 0) + 1;
 
 ### ctx.memory.set(key, value) stores any JSON-serializable value
-  await ctx.memory.set("alerts.2026-03-14", { items: [...], count: 5 });
+  await ctx.memory.set("items.2026-03-14", { entries: [...], count: 5 });
 
 ### ctx.memory.search(prefix) returns objects, NOT strings — returns ALL matching keys (no pagination)
-WARNING: search() loads ALL matching keys into memory at once. If your prefix matches thousands of keys, the V8 sandbox may run out of memory. Use specific prefixes (e.g., "alerts.by-date.2026-03-14" not "alerts.")
+WARNING: search() loads ALL matching keys into memory at once. If your prefix matches thousands of keys, the V8 sandbox may run out of memory. Use specific prefixes (e.g., "items.by-date.2026-03-14" not "items.")
 
 WRONG:
   const keys = await ctx.memory.search("prefix.");
@@ -809,7 +817,7 @@ export default async function(ctx, input) {
   // ── Reading OWNER'S SHARED DATA (memory components, settings, translations) ──
   // Data stored by memory-1, memory-2 etc. lives in the OWNER's namespace, NOT the extension's.
   // Use getPublic(ctx.caller.owner, key) to read it:
-  const munis = await ctx.memory.getPublic(ctx.caller.owner, "municipalities.data") || [];
+  const lookup = await ctx.memory.getPublic(ctx.caller.owner, "lookup.data") || [];
   const settings = await ctx.memory.getPublic(ctx.caller.owner, "settings.config") || {};
 
   // ── Writing to EXTENSION'S OWN MEMORY ──
@@ -863,7 +871,7 @@ Rules:
 - \`instance_scope: false\` for single-instance extensions (most cases)
 - \`input\` is optional static input passed to the action on each run
 - Common patterns: \`@activate\` (init/bootstrap), \`*/15 * * * *\` (every 15 min), \`0 2 * * *\` (daily at 02:00), \`0 */6 * * *\` (every 6 hours)
-- If a nightly job depends on data from a periodic job (e.g., aggregation needs fresh alerts), schedule it AFTER the last periodic run (e.g., periodic at */15, nightly at 02:00)
+- If a nightly job depends on data from a periodic job (e.g., aggregation needs fresh data), schedule it AFTER the last periodic run (e.g., collection at */15, aggregation at 02:00)
 - If the blueprint has no "schedules" for this extension, set \`schedules: []\`
 
 ### @activate Init Pattern
@@ -916,7 +924,7 @@ IMPORTANT: @activate actions MUST be idempotent — they will run multiple times
 - ╔═ OWNER DATA: seed data (memory components), settings, and translations are in the OWNER's namespace ═╗
   Use \`ctx.memory.getPublic(ctx.caller.owner, key)\` to read them — NOT \`ctx.memory.get(key)\`.
   \`ctx.memory.get()\` only reads from the extension's own \`ext:{name}\` namespace.
-  Common pattern: \`const munis = await ctx.memory.getPublic(ctx.caller.owner, "municipalities.data") || [];\`
+  Common pattern: \`const data = await ctx.memory.getPublic(ctx.caller.owner, "lookup.data") || [];\`
 - NEVER output HTML entities in JavaScript code — this crashes the V8 sandbox. See rules below.
 
 ## CRITICAL: No HTML Entities in JavaScript (violations CRASH the sandbox)
@@ -965,13 +973,13 @@ ${lib.result ? `Full cortex code (use EXACTLY these method names and return shap
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  Read the cortex code above CAREFULLY.                                 ║
-║  Use EXACTLY the method names shown (e.g., getAlerts, getDailyStats).  ║
+║  Use EXACTLY the method names shown (e.g., getItems, getStats).        ║
 ║  Use EXACTLY the return value shapes — do NOT invent field names.      ║
 ║  If cortex returns { items: [...] }, use .items, NOT .data or .entries. ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
 IMPORTANT:
-- Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`alert-map-lib\\\` → \\\`AIMEAT.alertMapLib.init()\\\`)
+- Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`my-domain-lib\\\` → \\\`AIMEAT.myDomainLib.init()\\\`)
 - Use the cortex methods for ALL data access — never call extensions or memory directly
 - The cortex handles authentication, error handling, and data transformation
 `;
@@ -1034,13 +1042,13 @@ Extensions store data in their OWN namespace (\\\`ext:{extension-name}\\\`).
 To read data that an extension wrote, use \\\`getPublic()\\\`:
 \\\`\\\`\\\`javascript
 // WRONG — this reads YOUR memory, not the extension's:
-const data = await AIMEAT.data.get('alerts.by-date.__index');  // returns null!
+const data = await AIMEAT.data.get('items.by-date.__index');  // returns null!
 
 // CORRECT — read from the extension's namespace:
-const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'alerts.by-date.__index');
+const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'items.by-date.__index');
 \\\`\\\`\\\`
 The first argument is the extension's memory owner: \\\`"ext:" + extensionName\\\` (the \\\`name\\\` field from the extension manifest metadata).
-Use this for ALL data produced by extensions (alerts, stats, risk profiles, caches, etc.).
+Use this for ALL data produced by extensions (collected data, computed stats, caches, etc.).
 \\\`getPublic()\\\` returns the value directly (auto-unwraps), or null if not found.
 
 ### Reading TRANSLATIONS (stored in owner memory, NOT a /v1/i18n route):
@@ -1244,14 +1252,14 @@ Values are JSON objects — a single value can hold arrays, nested objects, and 
 
 ## Rules
 - All keys MUST be lowercase with dots as namespace separators
-- Date-bucketed keys MUST use YYYY-MM-DD format: "alerts.by-date.2026-03-14"
+- Date-bucketed keys MUST use YYYY-MM-DD format: "items.by-date.2026-03-14"
 - All date/time values inside objects MUST be ISO 8601: "2026-03-14T13:00:00.000Z"
 - Include __meta with version and description for every namespace
 - Include __index if consumers need to discover which keys exist (e.g., list of dates with data)
 - Keep __index lightweight — just key names, counts, and pointers. NOT full data copies.
-- Use arrays for ordered collections within a bucket (e.g., alerts per day)
+- Use arrays for ordered collections within a bucket (e.g., entries per day)
 - Use meaningful field names that match the CSM data_schema where applicable
-- PREFER fewer, larger keys over many small keys. A lookup table, reference dataset, or configuration object should be ONE key containing the full data structure (object or array), NOT split into one key per entry. For example, a list of 300 municipalities with coordinates should be ONE key "municipalities.data" containing the full array — NOT 300 separate keys.
+- PREFER fewer, larger keys over many small keys. A lookup table, reference dataset, or configuration object should be ONE key containing the full data structure (object or array), NOT split into one key per entry. For example, a list of 300 items should be ONE key "catalog.data" containing the full array — NOT 300 separate keys.
 
 Return a JSON object where keys are memory key names and values are the initial/template data:
 \`\`\`json
@@ -1281,10 +1289,10 @@ ${context}
 
 ## Translation Key Conventions
 
-- Keys use dot-namespaced paths matching the UI structure: "app.alerts.title", "app.filters.severity"
+- Keys use dot-namespaced paths matching the UI structure: "app.list.title", "app.filters.status"
 - Group by UI section: "app.nav.*", "app.map.*", "app.filters.*", "app.stats.*"
-- Include domain-specific terms: incident types, severity levels, status labels
-- Use interpolation with \${variable} syntax for dynamic values: "Found \${count} alerts"
+- Include domain-specific terms: categories, statuses, types relevant to the project
+- Use interpolation with \${variable} syntax for dynamic values: "Found \${count} items"
 
 ## CRITICAL: Generate ONLY the locale indicated by the label
 
@@ -1305,7 +1313,7 @@ Each translation component covers ONE locale. The label tells you which one:
 - Finnish translations must be natural Finnish with correct characters (ä, ö, å) — not machine-translated
 - Include ALL text that appears in the UI — labels, buttons, tooltips, empty states, error messages
 - Keep keys consistent with what the App component will reference
-- Use plural-aware keys where needed: "alert.one" / "alert.many"
+- Use plural-aware keys where needed: "item.one" / "item.many"
 - Both locale components MUST use the SAME key structure — the app uses the same keys for both
 
 Return JSON with translations for the SINGLE locale from the label:
@@ -1316,12 +1324,12 @@ Example — if label is "Finnish (fi) Strings":
   "fi": {
     "app.title": "Sovelluksen nimi",
     "app.nav.home": "Etusivu",
-    "app.filters.severity": "Vakavuus",
+    "app.filters.status": "Tila",
     "app.filters.all": "Kaikki",
     "app.empty": "Tietoja ei löytynyt",
     "app.error": "Jokin meni pieleen",
-    "domain.type.fire": "Tulipalo",
-    "domain.severity.small": "Pieni"
+    "domain.type.example_category": "Esimerkkikategoria",
+    "domain.status.active": "Aktiivinen"
   }
 }
 \`\`\`
@@ -1332,12 +1340,12 @@ Example — if label is "English (en) Strings":
   "en": {
     "app.title": "App Title",
     "app.nav.home": "Home",
-    "app.filters.severity": "Severity",
+    "app.filters.status": "Status",
     "app.filters.all": "All",
     "app.empty": "No data found",
     "app.error": "Something went wrong",
-    "domain.type.fire": "Fire",
-    "domain.severity.small": "Small"
+    "domain.type.example_category": "Example Category",
+    "domain.status.active": "Active"
   }
 }
 \`\`\``,
@@ -1388,9 +1396,9 @@ The extension code shown above is the ACTUAL code running on the server. Your co
 ║     stores it — do NOT invent new field names or structures            ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-Example: if the extension does \`ctx.memory.set("alerts.by-date.2026-03-14", { items: [...] })\`
-then your cortex must read \`getPublic('ext:extension-name', 'alerts.by-date.2026-03-14')\`
-and return objects with an \`items\` array — NOT \`data\`, NOT \`entries\`, NOT \`results\`.
+Example: if the extension does \`ctx.memory.set("orders.by-date.2026-03-14", [{ id, title, ... }])\`
+then your cortex must read \`getPublic('ext:extension-name', 'orders.by-date.2026-03-14')\`
+and return objects with the SAME array structure — NOT \`data\`, NOT \`entries\`, NOT \`results\`.
 
 ## Design Principles
 
@@ -1421,7 +1429,7 @@ However, it MUST NOT contain backend/server logic (no scheduling, no data collec
 Extensions store data in their OWN namespace. To read extension data from client-side:
 \\\`\\\`\\\`javascript
 // If AIMEAT.data is loaded (preferred):
-const value = await AIMEAT.data.getPublic('ext:my-collector', 'alerts.by-date.__index');
+const value = await AIMEAT.data.getPublic('ext:my-collector', 'items.by-date.__index');
 
 // Fallback without AIMEAT.data:
 const url = NODE_URL + '/v1/memory/' + encodeURIComponent('ext:my-collector') + '/' + encodeURIComponent(key);
@@ -1442,7 +1450,7 @@ const fiStrings = await AIMEAT.data.get('i18n.fi');
 
 There is NO /v1/i18n/ route. Translations are stored in memory, NOT served from a dedicated API.
 Your cortex's getI18n() method should read from AIMEAT.data.get('i18n.' + locale).
-The translation keys use dot-namespaced paths like "app.title", "app.nav.home", "domain.type.fire".
+The translation keys use dot-namespaced paths like "app.title", "app.nav.home", "domain.type.example".
 
 ## Extension Action Calls (authenticated)
 
@@ -1573,7 +1581,7 @@ The YAML \`metadata.name\` and the JS \`LIB_NAME\` MUST follow this convention:
 - Apps load via: \`/v1/cortex/{metadata.name}/libs/{metadata.name}.js\`
 - Apps access via: \`AIMEAT.{LIB_NAME}.method()\`
 
-Example: YAML name \`alert-map-lib\` → LIB_NAME = \`alertMapLib\` → \`AIMEAT.alertMapLib.init()\`
+Example: YAML name \`my-domain-lib\` → LIB_NAME = \`myDomainLib\` → \`AIMEAT.myDomainLib.init()\`
 
 - The library MUST be a single IIFE that registers on \`window.AIMEAT\`
 - Use \`AIMEAT.register(name, exports)\` if available, always set \`AIMEAT[name] = exports\`
@@ -1625,14 +1633,14 @@ Every method MUST handle missing data gracefully:
 
 \\\`\\\`\\\`javascript
 // WRONG — crashes if index doesn't exist:
-async function getAlerts() {
-  const index = await readExtMemory(EXT.collector, 'alerts.__index');
+async function getData() {
+  const index = await readExtMemory(EXT.collector, 'items.__index');
   return index.dates.map(d => ...);  // TypeError: Cannot read 'dates' of null
 }
 
 // CORRECT — return empty data:
-async function getAlerts() {
-  const index = await readExtMemory(EXT.collector, 'alerts.__index');
+async function getData() {
+  const index = await readExtMemory(EXT.collector, 'items.__index');
   if (!index || !index.dates || index.dates.length === 0) return [];
   // ... process data
 }
@@ -1737,7 +1745,7 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       if (ds.encoding) context += `  Encoding: ${ds.encoding}\n`;
       if (ds.sampleEntry) context += `  Sample entry (REAL DATA — write your parser against this):\n  \`\`\`\n  ${ds.sampleEntry}\n  \`\`\`\n`;
       if (ds.staticData && Array.isArray(ds.staticData)) {
-        context += `  **STATIC DATA (${ds.staticData.length} entries) — pre-loaded in memory. Read with ctx.memory.get(), do NOT re-create it.**\n`;
+        context += `  **STATIC DATA (${ds.staticData.length} entries) — pre-loaded in OWNER memory. Read with ctx.memory.getPublic(ctx.caller.owner, key), do NOT re-create it.**\n`;
       }
     }
   }
