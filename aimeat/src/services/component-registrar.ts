@@ -1,0 +1,375 @@
+/**
+ * @file component-registrar.ts
+ * @description Service for registering, deleting, and fetching package components
+ *   via native AIMEAT storage APIs. Adapts PackageComponent content strings into
+ *   the format each storage repository expects. Used by the install, migration,
+ *   and uninstall flows in instances.ts.
+ * @structure
+ *   - registerComponent() — register a single component in its native storage
+ *   - deleteComponent() — remove a component from its native storage
+ *   - fetchComponentContent() — retrieve current content for hash comparison
+ *   - computeHash() — SHA-256 hash utility
+ *   - ComponentRegistrationResult — result type
+ * @usage
+ *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
+ * @version-history
+ *   v1.0.0 — 2026-03-15 — initial implementation
+ */
+
+import { createHash } from 'node:crypto';
+import YAML from 'yaml';
+import type { Storage, PackageComponentType } from '../storage/interface.js';
+
+// ── Types ────────────────────────────────────────────────────────────
+
+export interface ComponentRegistrationResult {
+  success: boolean;
+  componentId: string;
+  registeredAs: string;
+  error?: string;
+}
+
+export interface ComponentRegistrationInput {
+  componentId: string;
+  type: PackageComponentType;
+  registeredAs: string;
+  content: string;
+  label: string;
+  owner: string;
+  ownerGaii: string;
+  packageName: string;
+}
+
+// ── Hash utility ─────────────────────────────────────────────────────
+
+/** Compute SHA-256 hash of content string */
+export function computeHash(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+// ── Register component ───────────────────────────────────────────────
+
+/** Register a single component in its native storage repository */
+export async function registerComponent(
+  storage: Storage,
+  input: ComponentRegistrationInput,
+): Promise<ComponentRegistrationResult> {
+  const { componentId, type, registeredAs, content, label, owner, ownerGaii, packageName } = input;
+  const now = new Date().toISOString();
+
+  try {
+    switch (type) {
+      case 'csm': {
+        let definition: Record<string, unknown>;
+        try {
+          definition = YAML.parse(content) as Record<string, unknown>;
+        } catch {
+          // Content might be JSON
+          try { definition = JSON.parse(content) as Record<string, unknown>; }
+          catch { definition = { raw: content }; }
+        }
+        const serviceObj = definition.service as Record<string, unknown> | undefined;
+        const serviceType = (serviceObj?.type as string) ?? 'other';
+        await storage.createCsm({
+          name: registeredAs,
+          definition,
+          jsonSchemaKey: `csm.${registeredAs}`,
+          serviceType,
+          registeredBy: owner,
+          registeredAt: now,
+          updatedAt: now,
+        });
+        break;
+      }
+
+      case 'extension': {
+        // Content: JSON { manifest: "YAML", scripts: { "name": "code" } } or raw string
+        let parsed: { manifest?: string; scripts?: Record<string, string> };
+        try { parsed = JSON.parse(content); }
+        catch { parsed = { manifest: content }; }
+
+        const manifest = parsed.manifest ?? '';
+        const scripts = parsed.scripts ?? {};
+
+        let meta: Record<string, unknown> = {};
+        try { meta = (YAML.parse(manifest) as Record<string, unknown>) ?? {}; }
+        catch { /* use defaults */ }
+
+        const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
+        const actionsRaw = (meta.actions ?? []) as Array<Record<string, unknown>>;
+
+        const actions = actionsRaw.map(a => ({
+          id: (a.id as string) ?? '',
+          method: (a.method as string) ?? 'POST',
+          path: (a.path as string) ?? '',
+          inputSchema: (a.input_schema ?? a.inputSchema ?? {}) as Record<string, unknown>,
+          outputSchema: (a.output_schema ?? a.outputSchema ?? {}) as Record<string, unknown>,
+          scriptContent: scripts[(a.script as string) ?? ''] ?? '',
+        }));
+
+        await storage.createExtension({
+          name: registeredAs,
+          version: (metadata.version as string) ?? '1.0.0',
+          description: (metadata.description as string) ?? label,
+          author: (metadata.author as string) ?? owner,
+          status: 'inactive',
+          requiredApis: (meta.required_apis as string[]) ?? [],
+          actions,
+          config: (meta.config ?? {}) as Record<string, unknown>,
+          limits: { memoryMb: 64, timeoutMs: 30000, maxApiCalls: 100 },
+          federation: { advertise: false, capabilities: [] },
+          installedBy: owner,
+          installedAt: now,
+        });
+        break;
+      }
+
+      case 'cortex': {
+        // Content: JSON { manifest: "YAML", libs: { "file.js": "code" } } or raw string
+        let parsed: { manifest?: string; libs?: Record<string, string> };
+        try { parsed = JSON.parse(content); }
+        catch { parsed = { manifest: content }; }
+
+        const manifestStr = parsed.manifest ?? content;
+        const libs = parsed.libs ?? {};
+
+        let meta: Record<string, unknown> = {};
+        try { meta = (YAML.parse(manifestStr) as Record<string, unknown>) ?? {}; }
+        catch { /* use defaults */ }
+
+        const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
+        const componentsRaw = (meta.components ?? []) as Array<Record<string, unknown>>;
+
+        await storage.createCortexExtension({
+          name: registeredAs,
+          namespace: owner,
+          shortName: (metadata.name as string) ?? label,
+          apiVersion: (metadata.api_version as string) ?? 'v1',
+          version: (metadata.version as string) ?? '1.0.0',
+          description: (metadata.description as string) ?? label,
+          author: (metadata.author as string) ?? owner,
+          tags: (metadata.tags as string[]) ?? [],
+          labels: {},
+          status: 'inactive',
+          visibility: 'private',
+          installedAt: now,
+          installedBy: owner,
+          manifest: manifestStr,
+          components: componentsRaw.map(c => ({
+            type: (c.type as string) ?? 'lib',
+            name: (c.name as string) ?? '',
+            content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? ''),
+          })) as any,
+          activationArtifacts: {
+            schemaKeys: [],
+            promptKeys: [],
+            actionIds: [],
+            boardIds: [],
+            seedDataKeys: [],
+            ontologyKeys: [],
+            libFiles: Object.keys(libs),
+          },
+        });
+
+        // Store lib files
+        for (const [libName, libContent] of Object.entries(libs)) {
+          await storage.setCortexLibFile(registeredAs, libName, libContent);
+        }
+        break;
+      }
+
+      case 'app': {
+        await storage.createApp({
+          ownerGaii,
+          ownerName: owner,
+          filename: registeredAs,
+          versionNumber: 1,
+          manifest: {
+            name: label,
+            description: `Installed from package: ${packageName}`,
+            version: '1.0.0',
+            category: 'utility',
+            tags: ['package-installed'],
+            authorDisplay: owner,
+            usesCortex: [],
+          },
+          mimeType: 'text/html',
+          size: Buffer.byteLength(content, 'utf-8'),
+          data: Buffer.from(content, 'utf-8'),
+          createdAt: now,
+        });
+        break;
+      }
+
+      case 'msm': {
+        let definition: Record<string, unknown>;
+        try { definition = YAML.parse(content) as Record<string, unknown>; }
+        catch {
+          try { definition = JSON.parse(content) as Record<string, unknown>; }
+          catch { definition = { raw: content }; }
+        }
+        const auth = definition.auth as Record<string, unknown> | undefined;
+        const actionsArr = (definition.actions ?? []) as unknown[];
+        await storage.createMsm({
+          name: registeredAs,
+          definition,
+          category: (definition.category as string) ?? 'utility',
+          authType: (auth?.type as string) ?? 'none',
+          actionsCount: actionsArr.length,
+          registeredBy: owner,
+          registeredAt: now,
+          updatedAt: now,
+        });
+        break;
+      }
+
+      case 'memory': {
+        // Content: JSON { entries: [{ key, value, visibility?, tags? }] } or simple object
+        let parsed: { entries?: Array<{ key: string; value: unknown; visibility?: string; tags?: string[] }> };
+        try { parsed = JSON.parse(content); }
+        catch { parsed = { entries: [{ key: registeredAs, value: content }] }; }
+
+        const entries = parsed.entries ?? [{ key: registeredAs, value: parsed }];
+        for (const entry of entries) {
+          const memKey = entry.key.startsWith(registeredAs) ? entry.key : `${registeredAs}.${entry.key}`;
+          await storage.setMemory({
+            key: memKey,
+            ownerGaii,
+            value: entry.value,
+            visibility: (entry.visibility as 'private' | 'owner' | 'public') ?? 'private',
+            tags: entry.tags ?? ['package-installed'],
+            ttlHours: null,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+        break;
+      }
+
+      case 'translation': {
+        // Content: JSON { "en": { ... }, "fi": { ... } }
+        const memKey = `i18n.${registeredAs}`;
+        let value: unknown;
+        try { value = JSON.parse(content); }
+        catch { value = { raw: content }; }
+        await storage.setMemory({
+          key: memKey,
+          ownerGaii,
+          value,
+          visibility: 'public',
+          tags: ['translation', 'package-installed'],
+          ttlHours: null,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+        break;
+      }
+
+      default:
+        return { success: false, componentId, registeredAs, error: `Unknown component type: ${type}` };
+    }
+
+    return { success: true, componentId, registeredAs };
+  } catch (err: any) {
+    return { success: false, componentId, registeredAs, error: err.message ?? String(err) };
+  }
+}
+
+// ── Delete component ─────────────────────────────────────────────────
+
+/** Delete a previously registered component from its native storage */
+export async function deleteComponent(
+  storage: Storage,
+  type: PackageComponentType,
+  registeredAs: string,
+  ownerGaii: string,
+): Promise<boolean> {
+  try {
+    switch (type) {
+      case 'csm':
+        return await storage.deleteCsm(registeredAs);
+      case 'extension':
+        return await storage.deleteExtension(registeredAs);
+      case 'cortex':
+        return await storage.deleteCortexExtension(registeredAs);
+      case 'app':
+        return await storage.deleteApp(ownerGaii, registeredAs);
+      case 'msm':
+        return await storage.deleteMsm(registeredAs);
+      case 'memory': {
+        const memories = await storage.listMemory(ownerGaii, { prefix: registeredAs });
+        for (const mem of memories) {
+          await storage.deleteMemory(ownerGaii, mem.key);
+        }
+        return true;
+      }
+      case 'translation':
+        return await storage.deleteMemory(ownerGaii, `i18n.${registeredAs}`);
+      default:
+        return false;
+    }
+  } catch {
+    return false;
+  }
+}
+
+// ── Fetch component content ──────────────────────────────────────────
+
+/** Fetch current content string for a component (for hash comparison) */
+export async function fetchComponentContent(
+  storage: Storage,
+  type: PackageComponentType,
+  registeredAs: string,
+  ownerGaii: string,
+): Promise<string | null> {
+  try {
+    switch (type) {
+      case 'csm': {
+        const csm = await storage.getCsm(registeredAs);
+        if (!csm) return null;
+        return JSON.stringify(csm.definition);
+      }
+      case 'extension': {
+        const ext = await storage.getExtension(registeredAs);
+        if (!ext) return null;
+        return JSON.stringify({
+          name: ext.name,
+          version: ext.version,
+          actions: ext.actions.map(a => ({ id: a.id, scriptContent: a.scriptContent })),
+        });
+      }
+      case 'cortex': {
+        const ctx = await storage.getCortexExtension(registeredAs);
+        if (!ctx) return null;
+        return ctx.manifest;
+      }
+      case 'app': {
+        const app = await storage.getApp(ownerGaii, registeredAs);
+        if (!app) return null;
+        return app.data.toString('utf-8');
+      }
+      case 'msm': {
+        const msm = await storage.getMsm(registeredAs);
+        if (!msm) return null;
+        return JSON.stringify(msm.definition);
+      }
+      case 'memory': {
+        const memories = await storage.listMemory(ownerGaii, { prefix: registeredAs });
+        if (memories.length === 0) return null;
+        const sorted = [...memories].sort((a, b) => a.key.localeCompare(b.key));
+        return JSON.stringify(sorted.map(m => ({ key: m.key, value: m.value })));
+      }
+      case 'translation': {
+        const mem = await storage.getMemory(ownerGaii, `i18n.${registeredAs}`);
+        if (!mem) return null;
+        return JSON.stringify(mem.value);
+      }
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}

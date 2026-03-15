@@ -280,6 +280,16 @@ export interface AimeatConfig {
   cortexMaxInstalled: number;
   cortexMaxLibSizeKb: number;
 
+  // Packages & Templates
+  packagesEnabled: boolean;
+  packageCreateRole: 'operator' | 'owner';
+  packageMaxSizeMb: number;
+  packageMaxComponents: number;
+  packageMaxPerAuthor: number;
+  templatesEnabled: boolean;
+  templateReviewsEnabled: boolean;
+  templateDiscussionsEnabled: boolean;
+
   // Portfolio
   portfolioEnabled: boolean;
   portfolioMaxSizeKb: number;
@@ -563,6 +573,16 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
     cortexMaxInstalled: parseInt(process.env.AIMEAT_CORTEX_MAX_INSTALLED ?? '50', 10),
     cortexMaxLibSizeKb: parseInt(process.env.AIMEAT_CORTEX_MAX_LIB_SIZE_KB ?? '512', 10),
+
+    // Packages & Templates
+    packagesEnabled: process.env.AIMEAT_PACKAGES_ENABLED !== 'false',
+    packageCreateRole: (process.env.AIMEAT_PACKAGE_CREATE_ROLE as 'operator' | 'owner') || 'operator',
+    packageMaxSizeMb: parseInt(process.env.AIMEAT_PACKAGE_MAX_SIZE_MB ?? '10', 10),
+    packageMaxComponents: parseInt(process.env.AIMEAT_PACKAGE_MAX_COMPONENTS ?? '20', 10),
+    packageMaxPerAuthor: parseInt(process.env.AIMEAT_PACKAGE_MAX_PER_AUTHOR ?? '50', 10),
+    templatesEnabled: process.env.AIMEAT_TEMPLATES_ENABLED !== 'false',
+    templateReviewsEnabled: process.env.AIMEAT_TEMPLATE_REVIEWS_ENABLED !== 'false',
+    templateDiscussionsEnabled: process.env.AIMEAT_TEMPLATE_DISCUSSIONS_ENABLED !== 'false',
 
     // Portfolio
     portfolioEnabled: process.env.AIMEAT_PORTFOLIO !== 'false',

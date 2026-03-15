@@ -57,6 +57,9 @@ import type {
     SystemPromptRecord,
     SystemPromptVersionRecord,
     ExecutionLogEntry,
+    PackageRecord, PackageComponent, PackageComponentType, PackageFilter,
+    TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter,
+    PackageInstanceRecord, InstalledComponent, InstanceFilter,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -4157,6 +4160,540 @@ export class MongoStorage implements Storage {
             changedBy: row.changedBy,
             changedAt: row.changedAt instanceof Date ? row.changedAt.toISOString() : row.changedAt,
             changeNote: row.changeNote ?? undefined,
+        };
+    }
+
+    // ── Package Repository ─────────────────────────────────────────────
+
+    async createPackage(record: PackageRecord): Promise<PackageRecord> {
+        this.ensureReady();
+        try {
+            const row = await this.prisma.package.create({
+                data: {
+                    packageGroupId: record.packageGroupId,
+                    name: record.name,
+                    author: record.author,
+                    authorGhii: record.authorGhii,
+                    version: record.version,
+                    changelog: record.changelog,
+                    description: record.description,
+                    category: record.category,
+                    tags: record.tags,
+                    visibility: record.visibility,
+                    status: record.status,
+                    components: record.components as any,
+                    manifest: record.manifest,
+                    createdAt: new Date(record.createdAt),
+                    updatedAt: new Date(record.updatedAt),
+                },
+            });
+            return this.toPackageRecord(row);
+        } catch (e: any) {
+            if (e.code === 'P2002') {
+                throw new Error('PACKAGE_EXISTS');
+            }
+            throw e;
+        }
+    }
+
+    async getPackage(id: string): Promise<PackageRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.package.findUnique({ where: { id } });
+        return row ? this.toPackageRecord(row) : null;
+    }
+
+    async getPackageByGroupAndVersion(groupId: string, version: string): Promise<PackageRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.package.findFirst({ where: { packageGroupId: groupId, version } });
+        return row ? this.toPackageRecord(row) : null;
+    }
+
+    async getLatestPublished(groupId: string): Promise<PackageRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.package.findFirst({
+            where: { packageGroupId: groupId, status: 'published' },
+            orderBy: { version: 'desc' },
+        });
+        return row ? this.toPackageRecord(row) : null;
+    }
+
+    async listPackages(filter: PackageFilter): Promise<{ packages: PackageRecord[]; total: number }> {
+        this.ensureReady();
+        const where: any = {};
+        if (filter.author) where.author = filter.author;
+        if (filter.category) where.category = filter.category;
+        if (filter.status) where.status = filter.status;
+        if (filter.visibility) where.visibility = filter.visibility;
+        if (filter.search) {
+            where.OR = [
+                { name: { contains: filter.search, mode: 'insensitive' } },
+                { description: { contains: filter.search, mode: 'insensitive' } },
+            ];
+        }
+        const [rows, total] = await Promise.all([
+            this.prisma.package.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip: filter.offset ?? 0,
+                take: filter.limit ?? 50,
+            }),
+            this.prisma.package.count({ where }),
+        ]);
+        return { packages: rows.map((r: any) => this.toPackageRecord(r)), total };
+    }
+
+    async listVersions(groupId: string, limit?: number, offset?: number): Promise<{ versions: PackageRecord[]; total: number }> {
+        this.ensureReady();
+        const where = { packageGroupId: groupId };
+        const [rows, total] = await Promise.all([
+            this.prisma.package.findMany({
+                where,
+                orderBy: { version: 'desc' },
+                skip: offset ?? 0,
+                take: limit ?? 50,
+            }),
+            this.prisma.package.count({ where }),
+        ]);
+        return { versions: rows.map((r: any) => this.toPackageRecord(r)), total };
+    }
+
+    async updatePackage(id: string, updates: Partial<PackageRecord>): Promise<PackageRecord | null> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.name !== undefined) data.name = updates.name;
+        if (updates.description !== undefined) data.description = updates.description;
+        if (updates.changelog !== undefined) data.changelog = updates.changelog;
+        if (updates.category !== undefined) data.category = updates.category;
+        if (updates.tags !== undefined) data.tags = updates.tags;
+        if (updates.visibility !== undefined) data.visibility = updates.visibility;
+        if (updates.status !== undefined) data.status = updates.status;
+        if (updates.components !== undefined) data.components = updates.components as any;
+        if (updates.manifest !== undefined) data.manifest = updates.manifest;
+        data.updatedAt = new Date();
+        try {
+            const row = await this.prisma.package.update({ where: { id }, data });
+            return this.toPackageRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async archivePackage(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.package.update({ where: { id }, data: { status: 'archived', updatedAt: new Date() } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private toPackageRecord(row: any): PackageRecord {
+        return {
+            id: row.id,
+            packageGroupId: row.packageGroupId,
+            name: row.name,
+            author: row.author,
+            authorGhii: row.authorGhii,
+            version: row.version,
+            changelog: row.changelog ?? '',
+            description: row.description ?? '',
+            category: row.category ?? 'other',
+            tags: row.tags ?? [],
+            visibility: row.visibility ?? 'private',
+            status: row.status ?? 'draft',
+            components: (row.components ?? []) as PackageComponent[],
+            manifest: row.manifest ?? '',
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
+    // ── Template Listing Repository ────────────────────────────────────
+
+    async createTemplateListing(record: TemplateListingRecord): Promise<TemplateListingRecord> {
+        this.ensureReady();
+        const row = await this.prisma.templateListing.create({
+            data: {
+                packageGroupId: record.packageGroupId,
+                packageName: record.packageName,
+                packageAuthor: record.packageAuthor,
+                publishedBy: record.publishedBy,
+                publishedByGhii: record.publishedByGhii,
+                title: record.title,
+                description: record.description,
+                screenshots: record.screenshots,
+                category: record.category,
+                tags: record.tags,
+                featured: record.featured,
+                installCount: record.installCount,
+                rating: record.rating,
+                reviewCount: record.reviewCount,
+                status: record.status,
+                createdAt: new Date(record.createdAt),
+                updatedAt: new Date(record.updatedAt),
+            },
+        });
+        return this.toTemplateListingRecord(row);
+    }
+
+    async getTemplateListing(id: string): Promise<TemplateListingRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.templateListing.findUnique({ where: { id } });
+        return row ? this.toTemplateListingRecord(row) : null;
+    }
+
+    async getListingByPackage(packageGroupId: string): Promise<TemplateListingRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.templateListing.findUnique({ where: { packageGroupId } });
+        return row ? this.toTemplateListingRecord(row) : null;
+    }
+
+    async listTemplateListings(filter: TemplateFilter): Promise<{ listings: TemplateListingRecord[]; total: number }> {
+        this.ensureReady();
+        const where: any = {};
+        if (filter.category) where.category = filter.category;
+        if (filter.status) where.status = filter.status;
+        if (filter.featured !== undefined) where.featured = filter.featured;
+        if (filter.tags && filter.tags.length > 0) where.tags = { hasSome: filter.tags };
+        if (filter.search) {
+            where.OR = [
+                { title: { contains: filter.search, mode: 'insensitive' } },
+                { description: { contains: filter.search, mode: 'insensitive' } },
+            ];
+        }
+        let orderBy: any = { createdAt: 'desc' };
+        if (filter.sort === 'rating') orderBy = { rating: 'desc' };
+        else if (filter.sort === 'installs') orderBy = { installCount: 'desc' };
+        else if (filter.sort === 'newest') orderBy = { createdAt: 'desc' };
+
+        const [rows, total] = await Promise.all([
+            this.prisma.templateListing.findMany({
+                where,
+                orderBy,
+                skip: filter.offset ?? 0,
+                take: filter.limit ?? 50,
+            }),
+            this.prisma.templateListing.count({ where }),
+        ]);
+        return { listings: rows.map((r: any) => this.toTemplateListingRecord(r)), total };
+    }
+
+    async updateTemplateListing(id: string, updates: Partial<TemplateListingRecord>): Promise<TemplateListingRecord | null> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.title !== undefined) data.title = updates.title;
+        if (updates.description !== undefined) data.description = updates.description;
+        if (updates.screenshots !== undefined) data.screenshots = updates.screenshots;
+        if (updates.category !== undefined) data.category = updates.category;
+        if (updates.tags !== undefined) data.tags = updates.tags;
+        if (updates.featured !== undefined) data.featured = updates.featured;
+        if (updates.status !== undefined) data.status = updates.status;
+        data.updatedAt = new Date();
+        try {
+            const row = await this.prisma.templateListing.update({ where: { id }, data });
+            return this.toTemplateListingRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async deleteTemplateListing(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.templateReview.deleteMany({ where: { listingId: id } });
+            await this.prisma.templateDiscussion.deleteMany({ where: { listingId: id } });
+            await this.prisma.templateListing.delete({ where: { id } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async incrementInstallCount(listingId: string): Promise<void> {
+        this.ensureReady();
+        await this.prisma.templateListing.update({
+            where: { id: listingId },
+            data: { installCount: { increment: 1 } },
+        });
+    }
+
+    // ── Reviews ──
+
+    async addReview(review: TemplateReview): Promise<TemplateReview> {
+        this.ensureReady();
+        const row = await this.prisma.templateReview.upsert({
+            where: { listingId_authorGhii: { listingId: review.listingId, authorGhii: review.authorGhii } },
+            create: {
+                listingId: review.listingId,
+                authorGhii: review.authorGhii,
+                authorName: review.authorName,
+                rating: review.rating,
+                comment: review.comment,
+                createdAt: new Date(review.createdAt),
+            },
+            update: {
+                authorName: review.authorName,
+                rating: review.rating,
+                comment: review.comment,
+            },
+        });
+        await this.recalculateRating(review.listingId);
+        return this.toTemplateReview(row);
+    }
+
+    async getReviewsByListing(listingId: string, limit?: number, offset?: number): Promise<{ reviews: TemplateReview[]; total: number }> {
+        this.ensureReady();
+        const where = { listingId };
+        const [rows, total] = await Promise.all([
+            this.prisma.templateReview.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip: offset ?? 0,
+                take: limit ?? 50,
+            }),
+            this.prisma.templateReview.count({ where }),
+        ]);
+        return { reviews: rows.map((r: any) => this.toTemplateReview(r)), total };
+    }
+
+    async getReviewByAuthor(listingId: string, authorGhii: string): Promise<TemplateReview | null> {
+        this.ensureReady();
+        const row = await this.prisma.templateReview.findUnique({
+            where: { listingId_authorGhii: { listingId, authorGhii } },
+        });
+        return row ? this.toTemplateReview(row) : null;
+    }
+
+    async updateReview(id: string, updates: Partial<TemplateReview>): Promise<TemplateReview | null> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.rating !== undefined) data.rating = updates.rating;
+        if (updates.comment !== undefined) data.comment = updates.comment;
+        if (updates.authorName !== undefined) data.authorName = updates.authorName;
+        try {
+            const row = await this.prisma.templateReview.update({ where: { id }, data });
+            await this.recalculateRating(row.listingId);
+            return this.toTemplateReview(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async deleteReview(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            const row = await this.prisma.templateReview.findUnique({ where: { id } });
+            if (!row) return false;
+            await this.prisma.templateReview.delete({ where: { id } });
+            await this.recalculateRating(row.listingId);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async recalculateRating(listingId: string): Promise<{ rating: number; reviewCount: number }> {
+        this.ensureReady();
+        const agg = await this.prisma.templateReview.aggregate({
+            where: { listingId },
+            _avg: { rating: true },
+            _count: { rating: true },
+        });
+        const rating = Math.round((agg._avg.rating ?? 0) * 10) / 10;
+        const reviewCount = agg._count.rating ?? 0;
+        await this.prisma.templateListing.update({
+            where: { id: listingId },
+            data: { rating, reviewCount },
+        });
+        return { rating, reviewCount };
+    }
+
+    private toTemplateReview(row: any): TemplateReview {
+        return {
+            id: row.id,
+            listingId: row.listingId,
+            authorGhii: row.authorGhii,
+            authorName: row.authorName,
+            rating: row.rating,
+            comment: row.comment ?? '',
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+    }
+
+    // ── Discussions ──
+
+    async addDiscussion(discussion: TemplateDiscussion): Promise<TemplateDiscussion> {
+        this.ensureReady();
+        const row = await this.prisma.templateDiscussion.create({
+            data: {
+                listingId: discussion.listingId,
+                authorGhii: discussion.authorGhii,
+                authorName: discussion.authorName,
+                message: discussion.message,
+                parentId: discussion.parentId ?? null,
+                createdAt: new Date(discussion.createdAt),
+            },
+        });
+        return this.toTemplateDiscussion(row);
+    }
+
+    async getDiscussionsByListing(listingId: string, limit?: number, offset?: number): Promise<{ discussions: TemplateDiscussion[]; total: number }> {
+        this.ensureReady();
+        const where = { listingId };
+        const [rows, total] = await Promise.all([
+            this.prisma.templateDiscussion.findMany({
+                where,
+                orderBy: { createdAt: 'asc' },
+                skip: offset ?? 0,
+                take: limit ?? 50,
+            }),
+            this.prisma.templateDiscussion.count({ where }),
+        ]);
+        return { discussions: rows.map((r: any) => this.toTemplateDiscussion(r)), total };
+    }
+
+    async deleteDiscussion(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.templateDiscussion.delete({ where: { id } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private toTemplateListingRecord(row: any): TemplateListingRecord {
+        return {
+            id: row.id,
+            packageGroupId: row.packageGroupId,
+            packageName: row.packageName,
+            packageAuthor: row.packageAuthor,
+            publishedBy: row.publishedBy,
+            publishedByGhii: row.publishedByGhii,
+            title: row.title,
+            description: row.description ?? '',
+            screenshots: row.screenshots ?? [],
+            category: row.category ?? 'other',
+            tags: row.tags ?? [],
+            featured: row.featured ?? false,
+            installCount: row.installCount ?? 0,
+            rating: row.rating ?? 0,
+            reviewCount: row.reviewCount ?? 0,
+            status: row.status ?? 'listed',
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
+    private toTemplateDiscussion(row: any): TemplateDiscussion {
+        return {
+            id: row.id,
+            listingId: row.listingId,
+            authorGhii: row.authorGhii,
+            authorName: row.authorName,
+            message: row.message,
+            parentId: row.parentId ?? undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+    }
+
+    // ── Package Instance Repository ────────────────────────────────────
+
+    async createInstance(record: PackageInstanceRecord): Promise<PackageInstanceRecord> {
+        this.ensureReady();
+        const row = await this.prisma.packageInstance.create({
+            data: {
+                packageGroupId: record.packageGroupId,
+                packageVersion: record.packageVersion,
+                packageRecordId: record.packageRecordId,
+                owner: record.owner,
+                ownerGhii: record.ownerGhii,
+                label: record.label,
+                installedComponents: record.installedComponents as any,
+                status: record.status,
+                installedAt: new Date(record.installedAt),
+                updatedAt: new Date(record.updatedAt),
+            },
+        });
+        return this.toPackageInstanceRecord(row);
+    }
+
+    async getInstance(id: string): Promise<PackageInstanceRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.packageInstance.findUnique({ where: { id } });
+        return row ? this.toPackageInstanceRecord(row) : null;
+    }
+
+    async listInstances(filter: InstanceFilter): Promise<{ instances: PackageInstanceRecord[]; total: number }> {
+        this.ensureReady();
+        const where: any = {};
+        if (filter.owner) where.owner = filter.owner;
+        if (filter.ownerGhii) where.ownerGhii = filter.ownerGhii;
+        if (filter.packageGroupId) where.packageGroupId = filter.packageGroupId;
+        if (filter.status) where.status = filter.status;
+        const [rows, total] = await Promise.all([
+            this.prisma.packageInstance.findMany({
+                where,
+                orderBy: { installedAt: 'desc' },
+                skip: filter.offset ?? 0,
+                take: filter.limit ?? 50,
+            }),
+            this.prisma.packageInstance.count({ where }),
+        ]);
+        return { instances: rows.map((r: any) => this.toPackageInstanceRecord(r)), total };
+    }
+
+    async updateInstance(id: string, updates: Partial<PackageInstanceRecord>): Promise<PackageInstanceRecord | null> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.label !== undefined) data.label = updates.label;
+        if (updates.status !== undefined) data.status = updates.status;
+        if (updates.installedComponents !== undefined) data.installedComponents = updates.installedComponents as any;
+        if (updates.packageVersion !== undefined) data.packageVersion = updates.packageVersion;
+        if (updates.packageRecordId !== undefined) data.packageRecordId = updates.packageRecordId;
+        data.updatedAt = new Date();
+        try {
+            const row = await this.prisma.packageInstance.update({ where: { id }, data });
+            return this.toPackageInstanceRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async deleteInstance(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.packageInstance.delete({ where: { id } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async listInstancesByPackage(packageGroupId: string): Promise<{ instances: PackageInstanceRecord[]; total: number }> {
+        this.ensureReady();
+        const where = { packageGroupId };
+        const [rows, total] = await Promise.all([
+            this.prisma.packageInstance.findMany({ where, orderBy: { installedAt: 'desc' } }),
+            this.prisma.packageInstance.count({ where }),
+        ]);
+        return { instances: rows.map((r: any) => this.toPackageInstanceRecord(r)), total };
+    }
+
+    private toPackageInstanceRecord(row: any): PackageInstanceRecord {
+        return {
+            id: row.id,
+            packageGroupId: row.packageGroupId,
+            packageVersion: row.packageVersion,
+            packageRecordId: row.packageRecordId,
+            owner: row.owner,
+            ownerGhii: row.ownerGhii,
+            label: row.label ?? '',
+            installedComponents: (row.installedComponents ?? []) as InstalledComponent[],
+            status: row.status ?? 'active',
+            installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
         };
     }
 }

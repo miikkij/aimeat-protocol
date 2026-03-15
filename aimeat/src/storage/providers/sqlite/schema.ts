@@ -969,6 +969,96 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (promptId, version)
     );
 
+    -- ── Packages ──
+    CREATE TABLE IF NOT EXISTS packages (
+      id                TEXT PRIMARY KEY,
+      packageGroupId    TEXT NOT NULL,
+      name              TEXT NOT NULL,
+      author            TEXT NOT NULL,
+      authorGhii        TEXT NOT NULL,
+      version           TEXT NOT NULL,
+      changelog         TEXT DEFAULT '',
+      description       TEXT DEFAULT '',
+      category          TEXT DEFAULT 'other',
+      tags              TEXT NOT NULL DEFAULT '[]',
+      visibility        TEXT DEFAULT 'private',
+      status            TEXT DEFAULT 'draft',
+      components        TEXT NOT NULL,
+      manifest          TEXT DEFAULT '',
+      createdAt         TEXT NOT NULL,
+      updatedAt         TEXT NOT NULL,
+      UNIQUE(packageGroupId, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_packages_group ON packages(packageGroupId);
+    CREATE INDEX IF NOT EXISTS idx_packages_author ON packages(author);
+    CREATE INDEX IF NOT EXISTS idx_packages_status ON packages(status);
+
+    -- ── Template Listings ──
+    CREATE TABLE IF NOT EXISTS template_listings (
+      id                TEXT PRIMARY KEY,
+      packageGroupId    TEXT NOT NULL UNIQUE,
+      packageName       TEXT NOT NULL,
+      packageAuthor     TEXT NOT NULL,
+      publishedBy       TEXT NOT NULL,
+      publishedByGhii   TEXT NOT NULL,
+      title             TEXT NOT NULL,
+      description       TEXT DEFAULT '',
+      screenshots       TEXT NOT NULL DEFAULT '[]',
+      category          TEXT DEFAULT 'other',
+      tags              TEXT NOT NULL DEFAULT '[]',
+      featured          INTEGER DEFAULT 0,
+      installCount      INTEGER DEFAULT 0,
+      rating            REAL DEFAULT 0,
+      reviewCount       INTEGER DEFAULT 0,
+      status            TEXT DEFAULT 'listed',
+      createdAt         TEXT NOT NULL,
+      updatedAt         TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_template_listings_category ON template_listings(category);
+    CREATE INDEX IF NOT EXISTS idx_template_listings_featured ON template_listings(featured);
+
+    -- ── Template Reviews (separate table — avoids race conditions) ──
+    CREATE TABLE IF NOT EXISTS template_reviews (
+      id                TEXT PRIMARY KEY,
+      listingId         TEXT NOT NULL,
+      authorGhii        TEXT NOT NULL,
+      authorName        TEXT NOT NULL,
+      rating            INTEGER NOT NULL,
+      comment           TEXT DEFAULT '',
+      createdAt         TEXT NOT NULL,
+      UNIQUE(listingId, authorGhii)
+    );
+    CREATE INDEX IF NOT EXISTS idx_template_reviews_listing ON template_reviews(listingId);
+
+    -- ── Template Discussions (separate table — threaded) ──
+    CREATE TABLE IF NOT EXISTS template_discussions (
+      id                TEXT PRIMARY KEY,
+      listingId         TEXT NOT NULL,
+      authorGhii        TEXT NOT NULL,
+      authorName        TEXT NOT NULL,
+      message           TEXT NOT NULL,
+      parentId          TEXT,
+      createdAt         TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_template_discussions_listing ON template_discussions(listingId);
+
+    -- ── Package Instances ──
+    CREATE TABLE IF NOT EXISTS package_instances (
+      id                  TEXT PRIMARY KEY,
+      packageGroupId      TEXT NOT NULL,
+      packageVersion      TEXT NOT NULL,
+      packageRecordId     TEXT NOT NULL,
+      owner               TEXT NOT NULL,
+      ownerGhii           TEXT NOT NULL,
+      label               TEXT DEFAULT '',
+      installedComponents TEXT NOT NULL,
+      status              TEXT DEFAULT 'active',
+      installedAt         TEXT NOT NULL,
+      updatedAt           TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_package_instances_owner ON package_instances(owner);
+    CREATE INDEX IF NOT EXISTS idx_package_instances_package ON package_instances(packageGroupId);
+
   `);
 
   // ── Schema migrations for existing databases ──
