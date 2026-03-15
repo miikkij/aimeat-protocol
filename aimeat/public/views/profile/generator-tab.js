@@ -857,45 +857,28 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   `;
 }
 
-/* ── Next Step Guide ─────────────────────────────────── */
+/* ── Next Step Pointer ────────────────────────────────── */
 
 /**
  * Determines which workflow step a component is at.
- * Returns { step, label, description } for the guide indicator.
+ * Returns step id string used to place the pointer arrow next to the right element.
  */
 function getWorkflowStep(component, validationResult, result) {
-  const isRegistered = !!component.registeredAs;
-  const hasResult = !!(result || '').trim();
-  const isValid = validationResult?.valid === true;
-  const hasErrors = validationResult?.valid === false;
-
-  if (isRegistered) return { step: 'done', label: 'Registered', description: 'This component is registered and ready' };
-  if (isValid) return { step: 'register', label: 'Register', description: 'Validation passed — register this component' };
-  if (hasErrors) return { step: 'fix', label: 'Fix errors', description: 'Copy fix prompt, paste corrected result, and re-validate' };
-  if (hasResult) return { step: 'validate', label: 'Validate', description: 'Paste received — validate the result' };
-  if (component.status === 'waiting_user' || component.status === 'prompt_ready') {
-    return { step: 'paste', label: 'Paste result', description: 'Copy the prompt to AI Chat, then paste the response here' };
-  }
-  return { step: 'copy', label: 'Copy prompt', description: 'Copy the generation prompt to AI Chat' };
+  if (component.registeredAs) return 'done';
+  if (validationResult?.valid === true) return 'register';
+  if (validationResult?.valid === false) return 'fix';
+  if ((result || '').trim()) return 'validate';
+  if (component.status === 'waiting_user' || component.status === 'prompt_ready') return 'paste';
+  return 'copy';
 }
 
-function NextStepGuide({ step, onAction }) {
-  if (step.step === 'done') return null;
-
-  const arrowSvg = html`<svg class="pf-gen-guide-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-    <circle cx="12" cy="12" r="10" fill="var(--accent,#E8564A)" stroke="none" opacity="0.12"/>
-    <path d="M10 8l4 4-4 4" stroke="var(--accent,#E8564A)" stroke-linecap="round" stroke-linejoin="round"/>
+/** Small circle-with-arrow SVG placed inline next to the current action target. */
+function StepArrow() {
+  return html`<svg class="pf-gen-step-arrow" viewBox="0 0 24 24" width="22" height="22">
+    <circle cx="12" cy="12" r="10" fill="var(--accent,#E8564A)" opacity="0.15"/>
+    <circle cx="12" cy="12" r="10" fill="none" stroke="var(--accent,#E8564A)" stroke-width="1.5"/>
+    <path d="M10 8l4 4-4 4" fill="none" stroke="var(--accent,#E8564A)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
-
-  return html`
-    <div class="pf-gen-guide" onClick=${onAction}>
-      ${arrowSvg}
-      <div class="pf-gen-guide-text">
-        <span class="pf-gen-guide-label">${step.label}</span>
-        <span class="pf-gen-guide-desc">${step.description}</span>
-      </div>
-    </div>
-  `;
 }
 
 function ComponentDetail({ component, project, components, agents, projectId, interviewSpec, onUpdate, onAdvance, showToast, session }) {
@@ -1029,19 +1012,6 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     onUpdate();
   }
 
-  // Guide click handler — scrolls to or triggers the relevant action
-  function handleGuideClick() {
-    if (workflowStep.step === 'copy') handleCopyPrompt();
-    else if (workflowStep.step === 'paste' && resultRef.current) resultRef.current.focus();
-    else if (workflowStep.step === 'validate') handleValidate();
-    else if (workflowStep.step === 'register') handleRegister();
-    else if (workflowStep.step === 'fix') {
-      const fp = buildFixPrompt(prompt, result, validationResult?.errors || []);
-      navigator.clipboard.writeText(fp).catch(() => {});
-      showToast?.('Fix prompt copied!');
-    }
-  }
-
   const fixPrompt = validationResult && !validationResult.valid
     ? buildFixPrompt(prompt, result, validationResult.errors)
     : null;
@@ -1053,9 +1023,6 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         <span class="pf-gen-type-badge type-${component.type}">${component.type.toUpperCase()}</span>
         <span class="pf-gen-status-badge status-${component.status}">${component.status}</span>
       </div>
-
-      <!-- Next Step Guide -->
-      <${NextStepGuide} step=${workflowStep} onAction=${handleGuideClick} />
 
       <!-- Mode toggle -->
       <div class="pf-gen-mode-toggle">
@@ -1074,8 +1041,9 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         <div class="pf-gen-section">
           <label>${t('profile.generator.prompt')}</label>
           <pre class="pf-gen-prompt-box">${prompt}</pre>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-sm btn-outline ${workflowStep.step === 'copy' ? 'pf-gen-guide-highlight' : ''}" onClick=${handleCopyPrompt}>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            ${workflowStep === 'copy' && html`<${StepArrow} />`}
+            <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}>
               ${t('profile.generator.copyPrompt')}
             </button>
             <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint') || 'Regenerate prompt with latest templates'}>
@@ -1084,13 +1052,16 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           </div>
         </div>
         <div class="pf-gen-section">
-          <label>${t('profile.generator.result')}</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <label style="margin:0">${t('profile.generator.result')}</label>
+            ${workflowStep === 'paste' && html`<${StepArrow} />`}
+          </div>
           ${component.type === 'extension' && html`
             <p class="pf-gen-hint">${t('profile.generator.extensionPasteHint')}</p>
           `}
           <textarea
             ref=${el => { resultRef.current = el; }}
-            class="pf-gen-result-area ${workflowStep.step === 'paste' ? 'pf-gen-guide-highlight' : ''}"
+            class="pf-gen-result-area"
             rows="12"
             placeholder=${component.type === 'extension'
               ? t('profile.generator.extensionResultPlaceholder')
@@ -1098,12 +1069,14 @@ function ComponentDetail({ component, project, components, agents, projectId, in
             value=${result}
             onInput=${e => setResult(e.target.value)}
           />
-          <div class="pf-gen-actions">
-            <button class="btn btn-primary btn-sm ${workflowStep.step === 'validate' ? 'pf-gen-guide-highlight' : ''}" onClick=${handleValidate} disabled=${!result.trim()}>
+          <div class="pf-gen-actions" style="align-items:center">
+            ${workflowStep === 'validate' && html`<${StepArrow} />`}
+            <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}>
               ${t('profile.generator.validate')}
             </button>
             ${validationResult?.valid && html`
-              <button class="btn btn-sm ${workflowStep.step === 'register' ? 'pf-gen-guide-highlight' : ''}" style="background:var(--success);color:#000" onClick=${handleRegister} disabled=${registering}>
+              ${workflowStep === 'register' && html`<${StepArrow} />`}
+              <button class="btn btn-sm" style="background:var(--success);color:#000" onClick=${handleRegister} disabled=${registering}>
                 ${registering ? '...' : t('profile.generator.register')}
               </button>
             `}
@@ -1129,9 +1102,12 @@ function ComponentDetail({ component, project, components, agents, projectId, in
             ${validationResult.errors.map(e => html`<li>${e}</li>`)}
           </ul>
           ${fixPrompt && html`
-            <button class="btn btn-sm btn-outline ${workflowStep.step === 'fix' ? 'pf-gen-guide-highlight' : ''}" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
-              ${t('profile.generator.copyFixPrompt')}
-            </button>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${workflowStep === 'fix' && html`<${StepArrow} />`}
+              <button class="btn btn-sm btn-outline" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
+                ${t('profile.generator.copyFixPrompt')}
+              </button>
+            </div>
           `}
         </div>
       `}
