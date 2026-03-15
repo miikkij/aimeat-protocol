@@ -501,7 +501,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "format": "xml|json|html|csv|unknown",
       "encoding": "utf-8|iso-8859-1|auto",
       "sampleEntry": "One raw entry from the source, copy-pasted exactly as-is",
-      "staticData": "For type 'user-input' ONLY: the COMPLETE dataset as an array of {key, value} objects. Include EVERY row the user provided, parsed into clean JSON. Example: [{ \"key\": \"Helsinki\", \"value\": { \"lat\": 60.166, \"lon\": 24.943 } }]. Omit this field for non-user-input sources.",
+      "staticData": "For type 'user-input' ONLY: the COMPLETE dataset as an array of {key, value} objects. Include EVERY row the user provided, parsed into clean JSON. Example: [{ \"key\": \"Item A\", \"value\": { \"score\": 42.5, \"status\": \"active\" } }]. Omit this field for non-user-input sources.",
       "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
       "sampleFields": ["field1", "field2"],
       "notes": "Any observations from fetching/analyzing the source",
