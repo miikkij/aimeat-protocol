@@ -16,19 +16,19 @@
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 
 // ── Packages ──
-export const listPackages = (params) => apiGet('/v1/packages' + buildQuery(params));
-export const getPackage = (groupId) => apiGet(`/v1/packages/${enc(groupId)}`);
-export const getPackageVersions = (groupId) => apiGet(`/v1/packages/${enc(groupId)}/versions`);
-export const createPackage = (data) => apiPost('/v1/packages', data);
-export const createVersion = (groupId, data) => apiPost(`/v1/packages/${enc(groupId)}/versions`, data);
-export const updatePackage = (groupId, data) => apiPatch(`/v1/packages/${enc(groupId)}`, data);
-export const archiveVersion = (groupId, version) => apiDelete(`/v1/packages/${enc(groupId)}/versions/${enc(version)}`);
+export const listPackages = (params) => apiGet('/v1/bundles' + buildQuery(params));
+export const getPackage = (groupId) => apiGet(`/v1/bundles/${enc(groupId)}`);
+export const getPackageVersions = (groupId) => apiGet(`/v1/bundles/${enc(groupId)}/versions`);
+export const createPackage = (data) => apiPost('/v1/bundles', data);
+export const createVersion = (groupId, data) => apiPost(`/v1/bundles/${enc(groupId)}/versions`, data);
+export const updatePackage = (groupId, data) => apiPatch(`/v1/bundles/${enc(groupId)}`, data);
+export const archiveVersion = (groupId, version) => apiDelete(`/v1/bundles/${enc(groupId)}/versions/${enc(version)}`);
 
 // ── Instances ──
 export const listInstances = (params) => apiGet('/v1/instances' + buildQuery(params));
 export const getInstance = (id) => apiGet(`/v1/instances/${enc(id)}`);
 export const getInstanceStatus = (id) => apiGet(`/v1/instances/${enc(id)}/status`);
-export const installPackage = (groupId, data) => apiPost(`/v1/packages/${enc(groupId)}/install`, data);
+export const installPackage = (groupId, data) => apiPost(`/v1/bundles/${enc(groupId)}/install`, data);
 export const checkUpdate = (id) => apiGet(`/v1/instances/${enc(id)}/check-update`);
 export const getMigrationPrompt = (id, data) => apiPost(`/v1/instances/${enc(id)}/migration-prompt`, data);
 export const applyMigration = (id, data) => apiPost(`/v1/instances/${enc(id)}/apply-migration`, data);

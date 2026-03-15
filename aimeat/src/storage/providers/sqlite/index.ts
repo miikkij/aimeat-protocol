@@ -4586,16 +4586,23 @@ export class SqliteStorage implements Storage {
   }
 
   async createPackage(record: PackageRecord): Promise<PackageRecord> {
-    this.db.prepare(
-      `INSERT INTO packages (id, packageGroupId, name, author, authorGhii, version, changelog, description, category, tags, visibility, status, components, manifest, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.id, record.packageGroupId, record.name, record.author,
-      record.authorGhii, record.version, record.changelog, record.description,
-      record.category, JSON.stringify(record.tags), record.visibility,
-      record.status, JSON.stringify(record.components), record.manifest,
-      record.createdAt, record.updatedAt,
-    );
+    try {
+      this.db.prepare(
+        `INSERT INTO packages (id, packageGroupId, name, author, authorGhii, version, changelog, description, category, tags, visibility, status, components, manifest, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        record.id, record.packageGroupId, record.name, record.author,
+        record.authorGhii, record.version, record.changelog, record.description,
+        record.category, JSON.stringify(record.tags), record.visibility,
+        record.status, JSON.stringify(record.components), record.manifest,
+        record.createdAt, record.updatedAt,
+      );
+    } catch (e: any) {
+      if (e.message?.includes('UNIQUE constraint failed')) {
+        throw new Error('PACKAGE_EXISTS');
+      }
+      throw e;
+    }
     return record;
   }
 

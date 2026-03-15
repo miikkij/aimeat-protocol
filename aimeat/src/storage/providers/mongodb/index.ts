@@ -4083,26 +4083,33 @@ export class MongoStorage implements Storage {
 
     async createPackage(record: PackageRecord): Promise<PackageRecord> {
         this.ensureReady();
-        const row = await this.prisma.package.create({
-            data: {
-                packageGroupId: record.packageGroupId,
-                name: record.name,
-                author: record.author,
-                authorGhii: record.authorGhii,
-                version: record.version,
-                changelog: record.changelog,
-                description: record.description,
-                category: record.category,
-                tags: record.tags,
-                visibility: record.visibility,
-                status: record.status,
-                components: record.components as any,
-                manifest: record.manifest,
-                createdAt: new Date(record.createdAt),
-                updatedAt: new Date(record.updatedAt),
-            },
-        });
-        return this.toPackageRecord(row);
+        try {
+            const row = await this.prisma.package.create({
+                data: {
+                    packageGroupId: record.packageGroupId,
+                    name: record.name,
+                    author: record.author,
+                    authorGhii: record.authorGhii,
+                    version: record.version,
+                    changelog: record.changelog,
+                    description: record.description,
+                    category: record.category,
+                    tags: record.tags,
+                    visibility: record.visibility,
+                    status: record.status,
+                    components: record.components as any,
+                    manifest: record.manifest,
+                    createdAt: new Date(record.createdAt),
+                    updatedAt: new Date(record.updatedAt),
+                },
+            });
+            return this.toPackageRecord(row);
+        } catch (e: any) {
+            if (e.code === 'P2002') {
+                throw new Error('PACKAGE_EXISTS');
+            }
+            throw e;
+        }
     }
 
     async getPackage(id: string): Promise<PackageRecord | null> {

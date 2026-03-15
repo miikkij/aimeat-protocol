@@ -4,7 +4,7 @@
  *   check for updates, generate migration prompts, and apply migrations.
  * @structure
  *   - instancesRouter() — main router factory
- *   - POST /v1/packages/:groupId/install — install package as instance
+ *   - POST /v1/bundles/:groupId/install — install package as instance
  *   - GET /v1/instances — list my instances
  *   - GET /v1/instances/:id — get instance details
  *   - GET /v1/instances/:id/status — component status
@@ -17,6 +17,7 @@
  *   app.use(instancesRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phases 3-4)
+ *   v1.1.0 — 2026-03-15 — rename install route from /v1/packages to /v1/bundles to avoid collision with knowledge system
  */
 
 import { Router } from 'express';
@@ -75,8 +76,8 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
   // Phase 3: Instance Management
   // ══════════════════════════════════════════════════════════════════════
 
-  // POST /v1/packages/:groupId/install — Install package as instance
-  router.post('/v1/packages/:groupId/install', requireAuth(), async (req, res) => {
+  // POST /v1/bundles/:groupId/install — Install package as instance
+  router.post('/v1/bundles/:groupId/install', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
     // TODO: resolve owner's GHII via identity system when integration is confirmed

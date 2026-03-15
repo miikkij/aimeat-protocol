@@ -4,22 +4,23 @@
  *   Packages are versioned bundles of AIMEAT components (CSM, Extension, Cortex, App, MSM, Memory, Translation).
  * @structure
  *   - packagesRouter() — main router factory
- *   - POST /v1/packages — create package (first version)
- *   - POST /v1/packages/:groupId/versions — publish new version
- *   - GET /v1/packages — list packages
- *   - GET /v1/packages/:groupId — get latest published
- *   - GET /v1/packages/:groupId/versions — list all versions
- *   - GET /v1/packages/:groupId/versions/:version — get specific version
- *   - PATCH /v1/packages/:groupId — update group metadata
- *   - PATCH /v1/packages/:groupId/versions/:version — update version status
- *   - DELETE /v1/packages/:groupId/versions/:version — archive version
- *   - GET /v1/packages/:groupId/export — export as YAML bundle
- *   - POST /v1/packages/import — import from YAML bundle
+ *   - POST /v1/bundles — create package (first version)
+ *   - POST /v1/bundles/:groupId/versions — publish new version
+ *   - GET /v1/bundles — list packages
+ *   - GET /v1/bundles/:groupId — get latest published
+ *   - GET /v1/bundles/:groupId/versions — list all versions
+ *   - GET /v1/bundles/:groupId/versions/:version — get specific version
+ *   - PATCH /v1/bundles/:groupId — update group metadata
+ *   - PATCH /v1/bundles/:groupId/versions/:version — update version status
+ *   - DELETE /v1/bundles/:groupId/versions/:version — archive version
+ *   - GET /v1/bundles/:groupId/export — export as YAML bundle
+ *   - POST /v1/bundles/import — import from YAML bundle
  * @usage
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 2)
+ *   v1.1.0 — 2026-03-15 — rename routes from /v1/packages to /v1/bundles to avoid collision with knowledge system
  */
 
 import { Router } from 'express';
@@ -51,8 +52,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
 
-  // POST /v1/packages/import — import from YAML bundle
-  router.post('/v1/packages/import', requireAuth(), async (req, res) => {
+  // POST /v1/bundles/import — import from YAML bundle
+  router.post('/v1/bundles/import', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
@@ -109,7 +110,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
 
       const created = await storage.createPackage(record);
       res.status(201).json(success(config.nodeId, created, [
-        { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
+        { description: 'View package', method: 'GET', url: `/v1/bundles/${encodeURIComponent(packageGroupId)}` },
       ]));
       emitChange('packages');
     } catch (e: any) {
@@ -117,8 +118,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  // GET /v1/packages — list packages
-  router.get('/v1/packages', async (req, res) => {
+  // GET /v1/bundles — list packages
+  router.get('/v1/bundles', async (req, res) => {
     const author = req.query.author as string | undefined;
     const category = req.query.category as string | undefined;
     const status = (req.query.status as string) ?? 'published';
@@ -143,8 +144,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { packages: result.packages, total: result.total }));
   });
 
-  // POST /v1/packages — create package (first version)
-  router.post('/v1/packages', requireAuth(), async (req, res) => {
+  // POST /v1/bundles — create package (first version)
+  router.post('/v1/bundles', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
@@ -215,8 +216,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       const created = await storage.createPackage(record);
       res.status(201).json(success(config.nodeId, created, [
-        { description: 'Publish new version', method: 'POST', url: `/v1/packages/${encodeURIComponent(packageGroupId)}/versions` },
-        { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
+        { description: 'Publish new version', method: 'POST', url: `/v1/bundles/${encodeURIComponent(packageGroupId)}/versions` },
+        { description: 'View package', method: 'GET', url: `/v1/bundles/${encodeURIComponent(packageGroupId)}` },
       ]));
       emitChange('packages');
     } catch (e: any) {
@@ -230,8 +231,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── Parameterized routes ─────────────────────────────────────────
 
-  // POST /v1/packages/:groupId/versions — publish new version
-  router.post('/v1/packages/:groupId/versions', requireAuth(), async (req, res) => {
+  // POST /v1/bundles/:groupId/versions — publish new version
+  router.post('/v1/bundles/:groupId/versions', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
 
@@ -288,13 +289,13 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
 
     const created = await storage.createPackage(record);
     res.status(201).json(success(config.nodeId, created, [
-      { description: 'View version', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions/${version}` },
+      { description: 'View version', method: 'GET', url: `/v1/bundles/${encodeURIComponent(groupId)}/versions/${version}` },
     ]));
     emitChange('packages');
   });
 
-  // GET /v1/packages/:groupId/versions/:version — get specific version
-  router.get('/v1/packages/:groupId/versions/:version', async (req, res) => {
+  // GET /v1/bundles/:groupId/versions/:version — get specific version
+  router.get('/v1/bundles/:groupId/versions/:version', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
 
@@ -313,8 +314,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, pkg));
   });
 
-  // GET /v1/packages/:groupId/versions — list all versions
-  router.get('/v1/packages/:groupId/versions', async (req, res) => {
+  // GET /v1/bundles/:groupId/versions — list all versions
+  router.get('/v1/bundles/:groupId/versions', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string ?? '50', 10)));
     const offset = Math.max(0, parseInt(req.query.offset as string ?? '0', 10));
@@ -330,8 +331,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { versions: filtered, total: result.total }));
   });
 
-  // GET /v1/packages/:groupId/export — export as YAML bundle
-  router.get('/v1/packages/:groupId/export', async (req, res) => {
+  // GET /v1/bundles/:groupId/export — export as YAML bundle
+  router.get('/v1/bundles/:groupId/export', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const versionParam = req.query.version as string | undefined;
 
@@ -358,8 +359,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     res.send(JSON.stringify(pkg, null, 2));
   });
 
-  // GET /v1/packages/:groupId — get latest published version
-  router.get('/v1/packages/:groupId', async (req, res) => {
+  // GET /v1/bundles/:groupId — get latest published version
+  router.get('/v1/bundles/:groupId', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
 
     const pkg = await storage.getLatestPublished(groupId);
@@ -375,13 +376,13 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.json(success(config.nodeId, pkg, [
-      { description: 'List all versions', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
-      { description: 'Export as YAML', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/export` },
+      { description: 'List all versions', method: 'GET', url: `/v1/bundles/${encodeURIComponent(groupId)}/versions` },
+      { description: 'Export as YAML', method: 'GET', url: `/v1/bundles/${encodeURIComponent(groupId)}/export` },
     ]));
   });
 
-  // PATCH /v1/packages/:groupId/versions/:version — update version status
-  router.patch('/v1/packages/:groupId/versions/:version', requireAuth(), async (req, res) => {
+  // PATCH /v1/bundles/:groupId/versions/:version — update version status
+  router.patch('/v1/bundles/:groupId/versions/:version', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
     const owner = req.auth!.owner;
@@ -412,8 +413,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('packages');
   });
 
-  // PATCH /v1/packages/:groupId — update group metadata (all versions)
-  router.patch('/v1/packages/:groupId', requireAuth(), async (req, res) => {
+  // PATCH /v1/bundles/:groupId — update group metadata (all versions)
+  router.patch('/v1/bundles/:groupId', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
 
@@ -455,8 +456,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('packages');
   });
 
-  // DELETE /v1/packages/:groupId/versions/:version — archive version
-  router.delete('/v1/packages/:groupId/versions/:version', requireAuth(), async (req, res) => {
+  // DELETE /v1/bundles/:groupId/versions/:version — archive version
+  router.delete('/v1/bundles/:groupId/versions/:version', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
     const owner = req.auth!.owner;
@@ -478,7 +479,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.json(success(config.nodeId, { archived: true, id: pkg.id, version }, [
-      { description: 'List remaining versions', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
+      { description: 'List remaining versions', method: 'GET', url: `/v1/bundles/${encodeURIComponent(groupId)}/versions` },
     ]));
     emitChange('packages');
   });

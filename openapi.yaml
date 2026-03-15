@@ -108,6 +108,12 @@ tags:
     description: Node Extension System — V8 isolate sandbox for operator-installed plugins
   - name: CORS
     description: Per-entity CORS origin management (node → GHII → agent → memory)
+  - name: Packages
+    description: Package creation, versioning, import/export
+  - name: Instances
+    description: Package installation, instance management, migrations
+  - name: Templates
+    description: Template gallery, reviews, discussions
 
 components:
   securitySchemes:
@@ -1999,6 +2005,242 @@ components:
         changedBy: { type: string }
         changedAt: { type: string, format: date-time }
         changeNote: { type: string }
+
+    # === Package & Template Schemas ===
+    PackageComponent:
+      type: object
+      required: [id, type, label, content, contentHash, dependencies]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [csm, extension, cortex, app, msm, memory, translation]
+        label:
+          type: string
+        content:
+          type: string
+        contentHash:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+
+    PackageRecord:
+      type: object
+      required: [id, packageGroupId, name, author, authorGhii, version, status, visibility, components, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        packageGroupId:
+          type: string
+          description: '{name}::{author}'
+        name:
+          type: string
+        author:
+          type: string
+        authorGhii:
+          type: string
+        version:
+          type: string
+          description: 'v{YYYY}-{MM}-{DD}-{HHmm}'
+        changelog:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [signage, marketplace, iot, social, productivity, communication, other]
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+          enum: [private, public]
+        status:
+          type: string
+          enum: [draft, published, archived]
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageComponent'
+        manifest:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PackageInstanceRecord:
+      type: object
+      required: [id, packageGroupId, packageVersion, packageRecordId, owner, ownerGhii, label, installedComponents, status, installedAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        packageGroupId:
+          type: string
+        packageVersion:
+          type: string
+        packageRecordId:
+          type: string
+          format: uuid
+        owner:
+          type: string
+        ownerGhii:
+          type: string
+        label:
+          type: string
+        installedComponents:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstalledComponent'
+        status:
+          type: string
+          enum: [active, paused, removed]
+        installedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    InstalledComponent:
+      type: object
+      required: [componentId, type, registeredAs, originalHash, customized]
+      properties:
+        componentId:
+          type: string
+        type:
+          type: string
+          enum: [csm, extension, cortex, app, msm, memory, translation]
+        registeredAs:
+          type: string
+        originalHash:
+          type: string
+        customized:
+          type: boolean
+        customizedAt:
+          type: string
+          format: date-time
+
+    TemplateListingRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        packageGroupId:
+          type: string
+        packageName:
+          type: string
+        packageAuthor:
+          type: string
+        publishedBy:
+          type: string
+        publishedByGhii:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        screenshots:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        featured:
+          type: boolean
+        installCount:
+          type: integer
+        rating:
+          type: number
+          minimum: 0
+          maximum: 5
+        reviewCount:
+          type: integer
+        status:
+          type: string
+          enum: [listed, unlisted, moderated]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TemplateReview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        listingId:
+          type: string
+          format: uuid
+        authorGhii:
+          type: string
+        authorName:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TemplateDiscussion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        listingId:
+          type: string
+          format: uuid
+        authorGhii:
+          type: string
+        authorName:
+          type: string
+        message:
+          type: string
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ComponentDiff:
+      type: object
+      properties:
+        componentId:
+          type: string
+        type:
+          type: string
+          enum: [csm, extension, cortex, app, msm, memory, translation]
+        status:
+          type: string
+          enum: [unchanged, updated, new, removed]
+        action:
+          type: string
+          enum: [no_change, safe_overwrite, migration_needed, install_new, remove]
+        customized:
+          type: boolean
 
   # === Reusable Response Wrappers ===
   responses:
@@ -12144,4 +12386,809 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  # ── Bundles (Component Packages) ──────────────────────────
+  /v1/bundles:
+    post:
+      operationId: createPackage
+      summary: Create package
+      description: Create a new package with components.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, components]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
+                tags: { type: array, items: { type: string } }
+                visibility: { type: string, enum: [private, public] }
+                components:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, label, content]
+                    properties:
+                      type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation] }
+                      label: { type: string }
+                      content: { type: string }
+                      dependencies: { type: array, items: { type: string } }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      operationId: listPackages
+      summary: List packages
+      description: List packages with optional filtering. Public packages visible without auth.
+      tags: [Packages]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: author
+          in: query
+          schema: { type: string }
+        - name: visibility
+          in: query
+          schema: { type: string, enum: [private, public] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/bundles/import:
+    post:
+      operationId: importPackage
+      summary: Import package
+      description: Import a package from an exported bundle.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bundle]
+              properties:
+                bundle: { type: string, description: 'Base64-encoded or JSON package bundle' }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/bundles/{groupId}:
+    get:
+      operationId: getLatestPackage
+      summary: Get latest published package
+      description: Retrieve the latest published version of a package group.
+      tags: [Packages]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Latest published package
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageRecord'
+        '404':
+          description: Package not found
+    patch:
+      operationId: updatePackageGroup
+      summary: Update package group metadata
+      description: Update shared metadata across all versions of a package group (e.g., description, tags, category).
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description: { type: string }
+                category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
+                tags: { type: array, items: { type: string } }
+                visibility: { type: string, enum: [private, public] }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/bundles/{groupId}/versions:
+    post:
+      operationId: publishPackageVersion
+      summary: Publish new version
+      description: Publish a new version of an existing package group.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [components]
+              properties:
+                changelog: { type: string }
+                components:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, label, content]
+                    properties:
+                      type: { type: string, enum: [csm, extension, cortex, app, msm, memory, translation] }
+                      label: { type: string }
+                      content: { type: string }
+                      dependencies: { type: array, items: { type: string } }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    get:
+      operationId: listPackageVersions
+      summary: List package versions
+      description: List all versions of a package group.
+      tags: [Packages]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [draft, published, archived] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/bundles/{groupId}/versions/{version}:
+    get:
+      operationId: getPackageVersion
+      summary: Get specific version
+      description: Retrieve a specific version of a package.
+      tags: [Packages]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Package version
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageRecord'
+        '404':
+          description: Version not found
+    patch:
+      operationId: updatePackageVersionStatus
+      summary: Update version status
+      description: Update the status of a specific package version (e.g., publish, archive).
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [draft, published, archived] }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      operationId: archivePackageVersion
+      summary: Archive version
+      description: Archive a specific package version. Sets status to archived.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/bundles/{groupId}/export:
+    get:
+      operationId: exportPackage
+      summary: Export package
+      description: Export a package as a portable bundle for import on other nodes.
+      tags: [Packages]
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: query
+          description: Specific version to export; defaults to latest published.
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          description: Package not found
+
+  # ── Instances ─────────────────────────────────────────────
+  /v1/bundles/{groupId}/install:
+    post:
+      operationId: installPackage
+      summary: Install package
+      description: Install a package, creating an instance with registered components.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string }
+                version: { type: string, description: 'Specific version to install; defaults to latest published.' }
+      responses:
+        '201':
+          description: Package installed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Package not found
+
+  /v1/instances:
+    get:
+      operationId: listInstances
+      summary: List instances
+      description: List all package instances owned by the authenticated user.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, paused, removed] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/instances/{id}:
+    get:
+      operationId: getInstance
+      summary: Get instance
+      description: Retrieve details of a specific package instance.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Instance details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Instance not found
+    delete:
+      operationId: removeInstance
+      summary: Remove instance
+      description: Remove a package instance. Sets status to removed.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Instance not found
+
+  /v1/instances/{id}/status:
+    get:
+      operationId: getInstanceComponentStatus
+      summary: Component status
+      description: Get the current status of all installed components in an instance.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Instance not found
+
+  /v1/instances/{id}/check-update:
+    get:
+      operationId: checkInstanceUpdate
+      summary: Check for updates
+      description: Check if a newer version of the package is available and return a component diff.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Update check result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          updateAvailable: { type: boolean }
+                          currentVersion: { type: string }
+                          latestVersion: { type: string }
+                          diff:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ComponentDiff'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Instance not found
+
+  /v1/instances/{id}/migration-prompt:
+    post:
+      operationId: generateMigrationPrompt
+      summary: Generate migration prompts
+      description: Generate AI-friendly prompts for migrating customized components to a new package version.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Instance not found
+
+  /v1/instances/{id}/apply-migration:
+    post:
+      operationId: applyMigration
+      summary: Apply migration
+      description: Apply a migration to update an instance to a newer package version.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetVersion: { type: string }
+                componentUpdates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      componentId: { type: string }
+                      action: { type: string, enum: [safe_overwrite, install_new, remove, skip] }
+                      newContent: { type: string, description: 'Migrated content for components needing migration.' }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Instance not found
+
+  # ── Templates ─────────────────────────────────────────────
+  /v1/templates:
+    post:
+      operationId: createTemplateListing
+      summary: Create listing
+      description: Create a template gallery listing for a published package.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packageGroupId, title]
+              properties:
+                packageGroupId: { type: string }
+                title: { type: string }
+                description: { type: string }
+                screenshots: { type: array, items: { type: string } }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      operationId: listTemplates
+      summary: Gallery listing
+      description: Browse the template gallery with optional filtering and search.
+      tags: [Templates]
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: featured
+          in: query
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [newest, popular, rating] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/templates/{id}:
+    get:
+      operationId: getTemplateListing
+      summary: Get listing
+      description: Retrieve a specific template listing with full details.
+      tags: [Templates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Template listing
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TemplateListingRecord'
+        '404':
+          description: Listing not found
+    patch:
+      operationId: updateTemplateListing
+      summary: Update listing
+      description: Update a template listing's metadata.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                screenshots: { type: array, items: { type: string } }
+                category: { type: string }
+                tags: { type: array, items: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      operationId: deleteTemplateListing
+      summary: Delete listing
+      description: Delete a template listing from the gallery.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/templates/{id}/review:
+    post:
+      operationId: addTemplateReview
+      summary: Add review
+      description: Submit a review for a template listing.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: string }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/templates/{id}/reviews:
+    get:
+      operationId: listTemplateReviews
+      summary: List reviews
+      description: List reviews for a template listing.
+      tags: [Templates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/templates/{id}/discussion:
+    post:
+      operationId: addTemplateDiscussion
+      summary: Add discussion
+      description: Post a discussion message on a template listing.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string }
+                parentId: { type: string, format: uuid, description: 'Parent message ID for threaded replies.' }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/templates/{id}/discussions:
+    get:
+      operationId: listTemplateDiscussions
+      summary: List discussions
+      description: List discussion threads for a template listing.
+      tags: [Templates]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/templates/{id}/featured:
+    patch:
+      operationId: toggleTemplateFeatured
+      summary: Toggle featured
+      description: Toggle the featured status of a template listing. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [featured]
+              properties:
+                featured: { type: boolean }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
