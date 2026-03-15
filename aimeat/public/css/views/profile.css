@@ -635,6 +635,30 @@
 .pf-gen-impact-label { font-weight: 600; font-size: 0.9em; }
 .pf-gen-impact-reason { font-size: 0.82em; color: var(--muted); }
 
+/* Next Step Guide */
+.pf-gen-guide {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(232,86,74,0.06), rgba(232,86,74,0.02));
+  border: 1px solid rgba(232,86,74,0.2); border-radius: 8px;
+  cursor: pointer; transition: all 0.2s;
+}
+.pf-gen-guide:hover { border-color: var(--accent,#E8564A); background: rgba(232,86,74,0.08); }
+.pf-gen-guide-arrow { width: 28px; height: 28px; flex-shrink: 0; }
+.pf-gen-guide-text { display: flex; flex-direction: column; gap: 1px; }
+.pf-gen-guide-label { font-weight: 700; font-size: 0.9em; color: var(--accent,#E8564A); }
+.pf-gen-guide-desc { font-size: 0.8em; color: var(--muted); }
+
+/* Highlight pulse for the current action target */
+.pf-gen-guide-highlight {
+  animation: pf-gen-pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(232,86,74,0.3);
+}
+@keyframes pf-gen-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(232,86,74,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(232,86,74,0.15); }
+}
+
 /* Diagnostics Panel (Phase 7) */
 .pf-gen-diagnostics-panel {
   padding: 12px 16px; margin-bottom: 12px;

@@ -527,6 +527,35 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const activeCount = Object.values(liveStatuses).filter(s => s.active).length;
   const hasApp = components.some(c => c.type === 'app' && c.registeredAs);
 
+  // Compute phase-ordered component list for auto-advance
+  const phaseOrder = phases.flatMap(p => p.componentIds || []);
+
+  function advanceToNext(currentId) {
+    const idx = phaseOrder.indexOf(currentId);
+    // Find the next component that isn't fully registered
+    for (let i = idx + 1; i < phaseOrder.length; i++) {
+      const comp = components.find(c => c.id === phaseOrder[i]);
+      if (comp && !comp.registeredAs) {
+        setSelectedId(phaseOrder[i]);
+        return;
+      }
+    }
+    // All done — select nothing, show completion state
+    showToast?.('All components registered!');
+  }
+
+  // Auto-select first incomplete component if nothing is selected
+  useEffect(() => {
+    if (!selectedId && phaseOrder.length > 0 && components.length > 0) {
+      const firstIncomplete = phaseOrder.find(cid => {
+        const comp = components.find(c => c.id === cid);
+        return comp && !comp.registeredAs;
+      });
+      if (firstIncomplete) setSelectedId(firstIncomplete);
+      else if (phaseOrder.length > 0) setSelectedId(phaseOrder[0]);
+    }
+  }, [components.length]);
+
   // Phase 7: Diagnostics data
   const diagnosticsData = components.map(c => {
     const live = liveStatuses[c.id] || {};
@@ -790,6 +819,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                 agents=${agents}
                 projectId=${projectId}
                 onUpdate=${loadData}
+                onAdvance=${advanceToNext}
                 showToast=${showToast}
                 session=${session}
               />`
@@ -821,11 +851,53 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   `;
 }
 
-function ComponentDetail({ component, project, components, agents, projectId, onUpdate, showToast, session }) {
+/* ── Next Step Guide ─────────────────────────────────── */
+
+/**
+ * Determines which workflow step a component is at.
+ * Returns { step, label, description } for the guide indicator.
+ */
+function getWorkflowStep(component, validationResult, result) {
+  const isRegistered = !!component.registeredAs;
+  const hasResult = !!(result || '').trim();
+  const isValid = validationResult?.valid === true;
+  const hasErrors = validationResult?.valid === false;
+
+  if (isRegistered) return { step: 'done', label: 'Registered', description: 'This component is registered and ready' };
+  if (isValid) return { step: 'register', label: 'Register', description: 'Validation passed — register this component' };
+  if (hasErrors) return { step: 'fix', label: 'Fix errors', description: 'Copy fix prompt, paste corrected result, and re-validate' };
+  if (hasResult) return { step: 'validate', label: 'Validate', description: 'Paste received — validate the result' };
+  if (component.status === 'waiting_user' || component.status === 'prompt_ready') {
+    return { step: 'paste', label: 'Paste result', description: 'Copy the prompt to AI Chat, then paste the response here' };
+  }
+  return { step: 'copy', label: 'Copy prompt', description: 'Copy the generation prompt to AI Chat' };
+}
+
+function NextStepGuide({ step, onAction }) {
+  if (step.step === 'done') return null;
+
+  const arrowSvg = html`<svg class="pf-gen-guide-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <circle cx="12" cy="12" r="10" fill="var(--accent,#E8564A)" stroke="none" opacity="0.12"/>
+    <path d="M10 8l4 4-4 4" stroke="var(--accent,#E8564A)" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  return html`
+    <div class="pf-gen-guide" onClick=${onAction}>
+      ${arrowSvg}
+      <div class="pf-gen-guide-text">
+        <span class="pf-gen-guide-label">${step.label}</span>
+        <span class="pf-gen-guide-desc">${step.description}</span>
+      </div>
+    </div>
+  `;
+}
+
+function ComponentDetail({ component, project, components, agents, projectId, onUpdate, onAdvance, showToast, session }) {
   const [mode, setMode] = useState('chat');
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
   const [registering, setRegistering] = useState(false);
+  const resultRef = { current: null };
 
   useEffect(() => {
     setResult(component.result || '');
@@ -850,12 +922,14 @@ function ComponentDetail({ component, project, components, agents, projectId, on
     project.description, project.blueprint, completedComponents,
   );
 
+  // Workflow step for guided UI
+  const workflowStep = getWorkflowStep(component, validationResult, result);
+
   function addHistory(comp, action, extra = {}) {
     return { ...comp, history: [...(comp.history || []), { action, at: new Date().toISOString(), by: 'user', ...extra }] };
   }
 
   async function handleValidate() {
-    // Set validating status first
     const validating = addHistory(component, 'validating');
     await saveComponent(projectId, { ...validating, status: 'validating', result });
 
@@ -875,7 +949,6 @@ function ComponentDetail({ component, project, components, agents, projectId, on
     setRegistering(true);
     try {
       let resp;
-      // For cortex, pass the validated+extracted data (manifest + libs)
       if (component.type === 'cortex') {
         const vr = validateComponent('cortex', component.result || result);
         if (!vr.valid) {
@@ -890,9 +963,10 @@ function ComponentDetail({ component, project, components, agents, projectId, on
       const registered = addHistory(component, 'registered', { registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: resp?.data?.name || resp?.data?.id || 'registered' });
       showToast?.('Component registered!');
-      // Notify other tabs (extensions, services, etc.) even if SSE is disconnected
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
-      onUpdate();
+      await onUpdate();
+      // Auto-advance to next component after successful registration
+      if (onAdvance) onAdvance(component.id);
     } catch (e) {
       setValidationResult({ valid: false, errors: [`Registration failed: ${e.message}`] });
       showToast?.(e.message, true);
@@ -913,7 +987,6 @@ function ComponentDetail({ component, project, components, agents, projectId, on
   }
 
   async function handleCopyPrompt() {
-    // Always use the freshest prompt when copying
     const fresh = buildComponentPrompt(
       component.type, component.label,
       project.description, project.blueprint,
@@ -937,6 +1010,19 @@ function ComponentDetail({ component, project, components, agents, projectId, on
     onUpdate();
   }
 
+  // Guide click handler — scrolls to or triggers the relevant action
+  function handleGuideClick() {
+    if (workflowStep.step === 'copy') handleCopyPrompt();
+    else if (workflowStep.step === 'paste' && resultRef.current) resultRef.current.focus();
+    else if (workflowStep.step === 'validate') handleValidate();
+    else if (workflowStep.step === 'register') handleRegister();
+    else if (workflowStep.step === 'fix') {
+      const fp = buildFixPrompt(prompt, result, validationResult?.errors || []);
+      navigator.clipboard.writeText(fp).catch(() => {});
+      showToast?.('Fix prompt copied!');
+    }
+  }
+
   const fixPrompt = validationResult && !validationResult.valid
     ? buildFixPrompt(prompt, result, validationResult.errors)
     : null;
@@ -948,6 +1034,9 @@ function ComponentDetail({ component, project, components, agents, projectId, on
         <span class="pf-gen-type-badge type-${component.type}">${component.type.toUpperCase()}</span>
         <span class="pf-gen-status-badge status-${component.status}">${component.status}</span>
       </div>
+
+      <!-- Next Step Guide -->
+      <${NextStepGuide} step=${workflowStep} onAction=${handleGuideClick} />
 
       <!-- Mode toggle -->
       <div class="pf-gen-mode-toggle">
@@ -967,7 +1056,7 @@ function ComponentDetail({ component, project, components, agents, projectId, on
           <label>${t('profile.generator.prompt')}</label>
           <pre class="pf-gen-prompt-box">${prompt}</pre>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}>
+            <button class="btn btn-sm btn-outline ${workflowStep.step === 'copy' ? 'pf-gen-guide-highlight' : ''}" onClick=${handleCopyPrompt}>
               ${t('profile.generator.copyPrompt')}
             </button>
             <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint') || 'Regenerate prompt with latest templates'}>
@@ -981,7 +1070,8 @@ function ComponentDetail({ component, project, components, agents, projectId, on
             <p class="pf-gen-hint">${t('profile.generator.extensionPasteHint')}</p>
           `}
           <textarea
-            class="pf-gen-result-area"
+            ref=${el => { resultRef.current = el; }}
+            class="pf-gen-result-area ${workflowStep.step === 'paste' ? 'pf-gen-guide-highlight' : ''}"
             rows="12"
             placeholder=${component.type === 'extension'
               ? t('profile.generator.extensionResultPlaceholder')
@@ -990,11 +1080,11 @@ function ComponentDetail({ component, project, components, agents, projectId, on
             onInput=${e => setResult(e.target.value)}
           />
           <div class="pf-gen-actions">
-            <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}>
+            <button class="btn btn-primary btn-sm ${workflowStep.step === 'validate' ? 'pf-gen-guide-highlight' : ''}" onClick=${handleValidate} disabled=${!result.trim()}>
               ${t('profile.generator.validate')}
             </button>
             ${validationResult?.valid && html`
-              <button class="btn btn-sm" style="background:var(--success);color:#000" onClick=${handleRegister} disabled=${registering}>
+              <button class="btn btn-sm ${workflowStep.step === 'register' ? 'pf-gen-guide-highlight' : ''}" style="background:var(--success);color:#000" onClick=${handleRegister} disabled=${registering}>
                 ${registering ? '...' : t('profile.generator.register')}
               </button>
             `}
@@ -1020,7 +1110,7 @@ function ComponentDetail({ component, project, components, agents, projectId, on
             ${validationResult.errors.map(e => html`<li>${e}</li>`)}
           </ul>
           ${fixPrompt && html`
-            <button class="btn btn-sm btn-outline" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
+            <button class="btn btn-sm btn-outline ${workflowStep.step === 'fix' ? 'pf-gen-guide-highlight' : ''}" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
               ${t('profile.generator.copyFixPrompt')}
             </button>
           `}
