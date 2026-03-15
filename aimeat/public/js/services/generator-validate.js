@@ -39,6 +39,8 @@
  *     producedBy/consumedBy reference valid component IDs, warns on missing schemas
  *   v4.3.0 — 2026-03-15 — Allow "schedules" field on extension components and "uses"
  *     field on cortex components in blueprint validation (not stripped as extra fields)
+ *   v4.4.0 — 2026-03-15 — Cortex validator cross-checks YAML metadata.name against
+ *     JS LIB_NAME (kebab→camelCase), verifies IIFE pattern and AIMEAT.register usage
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -408,6 +410,38 @@ const validators = {
     const libComponents = (parsed.spec?.components || []).filter(c => c.type === 'lib');
     if (libComponents.length > 0 && jsBlocks.length === 0) {
       errors.push(`Manifest declares ${libComponents.length} lib component(s) but no JavaScript code blocks found`);
+    }
+
+    // ── Cross-check: YAML metadata.name ↔ JS LIB_NAME consistency ──
+    if (parsed.metadata?.name && jsBlocks.length > 0) {
+      const yamlName = parsed.metadata.name; // kebab-case e.g. "halytyskartta-cortex"
+      const expectedCamel = yamlName.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase()); // → "halytyskarttaCortex"
+      const jsCode = jsBlocks.join('\n');
+
+      // Check LIB_NAME matches expected camelCase
+      const libNameMatch = jsCode.match(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
+      if (libNameMatch) {
+        const actualLibName = libNameMatch[1];
+        if (actualLibName !== expectedCamel) {
+          errors.push(`LIB_NAME mismatch: JS has "${actualLibName}" but YAML name "${yamlName}" expects "${expectedCamel}"`);
+        }
+      } else {
+        errors.push('No LIB_NAME constant found in JS code — cortex must declare const LIB_NAME = \'...\';');
+      }
+
+      // Check AIMEAT.register uses correct name
+      const registerMatch = jsCode.match(/AIMEAT\.register\s*\(\s*LIB_NAME/);
+      if (!registerMatch) {
+        const hardcodedRegister = jsCode.match(/AIMEAT\.register\s*\(\s*['"]([^'"]+)['"]/);
+        if (hardcodedRegister && hardcodedRegister[1] !== expectedCamel) {
+          errors.push(`AIMEAT.register uses "${hardcodedRegister[1]}" but expected "${expectedCamel}"`);
+        }
+      }
+
+      // Check IIFE pattern exists
+      if (!/\(function\s*\(\s*AIMEAT\s*\)/.test(jsCode)) {
+        errors.push('Cortex JS must use IIFE pattern: (function (AIMEAT) { ... })(window.AIMEAT || ...)');
+      }
     }
 
     if (errors.length > 0) return { valid: false, errors, extracted: null };
