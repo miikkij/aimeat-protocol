@@ -53,10 +53,20 @@ function taskId() {
 export async function listProjects() {
   const resp = await apiGet('/v1/memory?prefix=generator.&owner_scope=true');
   const items = resp?.data?.items || resp?.data?.entries || [];
-  return items
+  const all = items
     .filter(i => i.key.endsWith('.project'))
-    .map(i => ({ key: i.key, ...(typeof i.value === 'string' ? JSON.parse(i.value) : i.value) }))
-    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    .map(i => ({ key: i.key, ...(typeof i.value === 'string' ? JSON.parse(i.value) : i.value) }));
+
+  // Auto-clean corrupted/orphaned project entries (missing projectId or name)
+  const valid = [];
+  for (const p of all) {
+    if (!p.projectId || !p.name) {
+      try { await apiDelete(`/v1/memory/${encodeURIComponent(p.key)}`); } catch { /* best effort */ }
+      continue;
+    }
+    valid.push(p);
+  }
+  return valid.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
 
 export async function getProject(projectId) {
@@ -657,6 +667,11 @@ export async function removeComponents(projectId, componentIds, includeMemory, s
     } catch (e) {
       errors.push(`${name}: ${e.message || 'removal failed'}`);
     }
+  }
+
+  // Update project timestamp so it doesn't show "Invalid Date"
+  if (removed.length > 0) {
+    try { await updateProject(projectId, {}); } catch { /* best effort */ }
   }
 
   return { removed, errors };

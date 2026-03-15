@@ -161,7 +161,7 @@ function ProjectListView({ onSelect, onCreate, showToast, session }) {
           <div class="pf-gen-project-name">${p.name}</div>
           <div class="pf-gen-project-meta">
             <span class="pf-gen-project-status">${p.status}</span>
-            <span class="pf-gen-project-date">${new Date(p.updatedAt).toLocaleDateString()}</span>
+            <span class="pf-gen-project-date">${p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : '—'}</span>
             ${p.status !== 'archived' && html`
               <button class="btn btn-ghost btn-xs" onClick=${e => handleArchive(e, p)}>${t('profile.generator.archive')}</button>
             `}
