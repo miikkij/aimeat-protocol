@@ -20,6 +20,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 5)
  *   v1.1.0 — 2026-03-15 — GHII resolution via identity system
+ *   v1.2.0 — 2026-03-15 — enforce templateReviewsEnabled/templateDiscussionsEnabled config; remove (config as any) cast
  */
 
 import { Router } from 'express';
@@ -42,7 +43,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
     const roles = req.auth!.roles;
 
     // Role check: operator always allowed, owner only if configured
-    const createRole = (config as any).packageCreateRole ?? 'owner';
+    const createRole = config.packageCreateRole ?? 'owner';
     if (!roles.includes('operator') && createRole === 'operator') {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create template listings'));
       return;
@@ -231,6 +232,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── POST /v1/templates/:id/review — Add/update review ──────────────
   router.post('/v1/templates/:id/review', requireAuth(), async (req, res) => {
+    if (!config.templateReviewsEnabled) {
+      res.status(403).json(error(config.nodeId, 'DISABLED', 'Reviews are disabled'));
+      return;
+    }
+
     const listingId = req.params.id as string;
     const owner = req.auth!.owner;
     // TODO: resolve owner's GHII via identity system when integration is confirmed
@@ -288,6 +294,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── GET /v1/templates/:id/reviews — List reviews ───────────────────
   router.get('/v1/templates/:id/reviews', async (req, res) => {
+    if (!config.templateReviewsEnabled) {
+      res.json(success(config.nodeId, { reviews: [], total: 0 }));
+      return;
+    }
+
     const listingId = req.params.id as string;
     const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 100);
     const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
@@ -302,6 +313,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── POST /v1/templates/:id/discussion — Add discussion message ─────
   router.post('/v1/templates/:id/discussion', requireAuth(), async (req, res) => {
+    if (!config.templateDiscussionsEnabled) {
+      res.status(403).json(error(config.nodeId, 'DISABLED', 'Discussions are disabled'));
+      return;
+    }
+
     const listingId = req.params.id as string;
     const owner = req.auth!.owner;
     // TODO: resolve owner's GHII via identity system when integration is confirmed
@@ -343,6 +359,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── GET /v1/templates/:id/discussions — List discussions ────────────
   router.get('/v1/templates/:id/discussions', async (req, res) => {
+    if (!config.templateDiscussionsEnabled) {
+      res.json(success(config.nodeId, { discussions: [], total: 0 }));
+      return;
+    }
+
     const listingId = req.params.id as string;
     const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 100);
     const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
