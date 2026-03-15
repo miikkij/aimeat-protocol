@@ -56,6 +56,14 @@
  *     only the single locale indicated by its label. Strengthen HTML entity prevention
  *     in extension prompt with prominent box warning. Improve examples to show
  *     single-locale output only.
+ *   v5.2.0 — 2026-03-15 — Fix CSM prompt: no derived/computed fields in schema,
+ *     short service.name, no redundant fields. Fix memory prompt: prefer fewer large
+ *     keys over many small ones, add __staticData placeholder for auto-injection of
+ *     interview datasets at registration time.
+ *   v6.0.0 — 2026-03-15 — Add Domain Data Model: blueprint now produces "dataModel"
+ *     section with JSON Schema definitions for every memory key. buildComponentPrompt
+ *     injects relevant dataModel entries per component type. Replaces ad-hoc memory
+ *     shape guessing with centralized data contract.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -129,7 +137,7 @@ ${description}
 ${specContext}${langNote}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
-CRITICAL: Return ONLY a JSON object with "components" and "phases" arrays. Nothing else.
+CRITICAL: Return ONLY a JSON object with "components", "phases", and "dataModel". Nothing else.
 Each component has EXACTLY five fields: "id", "type", "label", "produces", "consumes". No other fields.
 Do NOT include manifest content, code, HTML, translations, or any implementation details.
 The blueprint is a lightweight plan — actual content is generated later per component.
@@ -138,16 +146,48 @@ Format:
 {
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": [] },
-    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getAlerts"], "consumes": ["memory:alerts.by-date.*"] },
+    { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:municipalities.data"], "consumes": [] },
+    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:alerts.by-date.*"], "consumes": ["memory:municipalities.data"] },
+    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getAlerts"], "consumes": ["memory:alerts.by-date.*", "memory:municipalities.data"] },
     { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getAlerts"] }
   ],
   "phases": [
     { "id": "define", "label": "Define Service", "componentIds": ["csm-1"] },
+    { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1"] },
     { "id": "logic", "label": "Build Logic", "componentIds": ["ext-1"] },
     { "id": "connect", "label": "Connect & Integrate", "componentIds": ["cortex-1"] },
     { "id": "ui", "label": "Build UI", "componentIds": ["app-1"] }
-  ]
+  ],
+  "dataModel": {
+    "municipalities.data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string", "description": "Municipality name" },
+          "value": { "type": "object", "properties": { "lat": { "type": "number" }, "lon": { "type": "number" } } }
+        }
+      },
+      "source": "static",
+      "producedBy": "memory-1",
+      "consumedBy": ["ext-1", "cortex-1"]
+    },
+    "alerts.by-date.YYYY-MM-DD": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "guid": { "type": "string" },
+          "title": { "type": "string" },
+          "municipality": { "type": "string" },
+          "timestamp": { "type": "string" }
+        }
+      },
+      "source": "external",
+      "producedBy": "ext-1",
+      "consumedBy": ["cortex-1"]
+    }
+  }
 }
 
 Rules:
@@ -166,6 +206,20 @@ Rules:
 - MSM: Only create an MSM if the external API requires authentication, API keys, or complex endpoint configuration. Public URLs (RSS feeds, open APIs, open data) do NOT need an MSM — extensions fetch them directly with ctx.fetch().
 - MEMORY: Create memory components for (a) static/seed data provided by the user (lookup tables, reference datasets) and (b) default settings/configuration that the service needs on first run. Pre-populating defaults in memory means the app works immediately without hardcoded fallbacks.
 - CORTEX: Cortex is the middleware between memory and apps. It wraps ALL memory access into clean domain methods: data queries, settings, i18n, computed values. Apps should NEVER read memory directly — they call cortex methods.
+
+## dataModel — Domain Data Model (REQUIRED)
+
+The dataModel is a JSON Schema based map of EVERY memory key in the project. It is the single source of truth — all components reference it to know exact data shapes.
+
+Rules for dataModel:
+- One entry per memory key pattern (use YYYY-MM-DD for date-bucketed keys)
+- Each entry uses JSON Schema (draft 2020-12): type, properties, items, enum, description
+- "source": one of "static" (user-provided data), "external" (fetched from API/feed), "computed" (calculated by extension), "config" (default settings)
+- "producedBy": exactly ONE component ID that writes this key
+- "consumedBy": array of component IDs that read this key
+- Every memory key referenced in produces/consumes MUST have a dataModel entry
+- Prefer fewer, larger keys. A lookup table or dataset should be ONE key (array/object), not split per entry.
+- Include i18n keys (i18n.fi, i18n.en) with source "static" and translation component as producer
 
 ## Data Pipeline Verification (do this BEFORE listing components)
 
@@ -1025,7 +1079,7 @@ AIMEAT memory uses dot-namespaced keys with a standard metadata pattern:
 - \`namespace.YYYY-MM-DD\` — date-bucketed data (one key per day)
 - \`namespace.item-id\` — individual items
 
-Values are JSON objects. Keep individual values under 100KB.
+Values are JSON objects — a single value can hold arrays, nested objects, and large datasets (up to several MB). There is NO reason to split a dataset across multiple keys when it logically belongs together.
 
 ## Rules
 - All keys MUST be lowercase with dots as namespace separators
@@ -1036,6 +1090,7 @@ Values are JSON objects. Keep individual values under 100KB.
 - Keep __index lightweight — just key names, counts, and pointers. NOT full data copies.
 - Use arrays for ordered collections within a bucket (e.g., alerts per day)
 - Use meaningful field names that match the CSM data_schema where applicable
+- PREFER fewer, larger keys over many small keys. A lookup table, reference dataset, or configuration object should be ONE key containing the full data structure (object or array), NOT split into one key per entry. For example, a list of 300 municipalities with coordinates should be ONE key "municipalities.data" containing the full array — NOT 300 separate keys.
 
 Return a JSON object where keys are memory key names and values are the initial/template data:
 \`\`\`json
@@ -1419,26 +1474,55 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
   if (blueprint) {
     context += `\nBlueprint components: ${blueprint.components.map(c => `${c.id} (${c.type}: ${c.label})`).join(', ')}\n`;
   }
+
+  // Inject relevant dataModel entries — the centralized data contract
+  if (blueprint?.dataModel) {
+    const componentId = blueprint.components?.find(c => c.label === label)?.id;
+    const relevant = {};
+    for (const [key, schema] of Object.entries(blueprint.dataModel)) {
+      // Memory component: show keys it produces
+      if (type === 'memory' && schema.producedBy === componentId) {
+        relevant[key] = schema;
+      }
+      // Extension: show keys it produces AND consumes
+      if (type === 'extension' && (schema.producedBy === componentId || schema.consumedBy?.includes(componentId))) {
+        relevant[key] = schema;
+      }
+      // Cortex: show all keys it consumes
+      if (type === 'cortex' && schema.consumedBy?.includes(componentId)) {
+        relevant[key] = schema;
+      }
+      // Translation: show i18n keys it produces
+      if (type === 'translation' && schema.producedBy === componentId) {
+        relevant[key] = schema;
+      }
+    }
+    if (Object.keys(relevant).length > 0) {
+      context += '\n## Domain Data Model (EXACT schemas — follow these precisely)\n';
+      context += 'These are the memory key schemas for this component. Use these exact key names and data shapes.\n\n';
+      context += '```json\n' + JSON.stringify(relevant, null, 2) + '\n```\n\n';
+    }
+  }
+
   if (completedComponents && completedComponents.length > 0) {
     context += '\nAlready completed:\n';
     for (const c of completedComponents) {
       context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
-      // Include full result for extensions and cortex — downstream components MUST see
-      // the complete code to know exact memory keys, data shapes, and API methods.
-      // Truncating caused downstream components to guess keys/shapes incorrectly.
+      // Include full result for extensions and cortex — downstream components
+      // MUST see the complete code to know exact API methods and implementation.
       if (c.result && (c.type === 'extension' || c.type === 'cortex')) {
         context += `  Full code:\n${c.result}\n`;
       }
     }
   }
 
-  // Thread staticData to memory component prompts — include the FULL dataset
+  // For memory components with static data: include the full dataset from interviewSpec
   if (type === 'memory' && interviewSpec?.dataSources) {
     const staticSources = interviewSpec.dataSources.filter(ds => ds.staticData && Array.isArray(ds.staticData));
     if (staticSources.length > 0) {
-      context += '\n## Static Data to Include (from interview — include ALL entries as memory keys)\n';
-      context += 'The user provided complete datasets during the interview. Write EVERY entry as a memory key.\n';
-      context += 'Use the pattern: namespace.{key} for each entry.\n\n';
+      context += '\n## Static Data from Interview\n';
+      context += 'The user provided complete datasets. Store each as a SINGLE memory key (one array value, not one key per entry).\n';
+      context += 'The dataModel above shows the exact schema. Include ALL entries in the value.\n\n';
       for (const ds of staticSources) {
         context += `### ${ds.name} (${ds.staticData.length} entries)\n`;
         context += '```json\n' + JSON.stringify(ds.staticData, null, 2) + '\n```\n\n';

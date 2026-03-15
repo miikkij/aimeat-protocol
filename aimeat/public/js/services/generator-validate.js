@@ -35,6 +35,8 @@
  *   v4.1.0 — 2026-03-15 — Fix HTML entity false positives: strip string literals
  *     and regex patterns before checking for entities in code — prevents flagging
  *     legitimate entity-decoding code like .replace(/&amp;/g, "&")
+ *   v4.2.0 — 2026-03-15 — validateBlueprint now validates dataModel: checks
+ *     producedBy/consumedBy reference valid component IDs, warns on missing schemas
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -538,6 +540,32 @@ export function validateBlueprint(result) {
         return { id: p.id, label: p.label, componentIds: p.componentIds };
       });
     }
+
+    // Validate dataModel if present
+    if (parsed.dataModel && typeof parsed.dataModel === 'object') {
+      const componentIds = new Set((parsed.components || []).map(c => c.id));
+      for (const [key, schema] of Object.entries(parsed.dataModel)) {
+        if (!schema.type) warnings.push(`dataModel "${key}" missing "type"`);
+        if (!schema.source) warnings.push(`dataModel "${key}" missing "source"`);
+        if (!schema.producedBy) {
+          errors.push(`dataModel "${key}" missing "producedBy"`);
+        } else if (!componentIds.has(schema.producedBy)) {
+          errors.push(`dataModel "${key}" producedBy "${schema.producedBy}" does not match any component`);
+        }
+        if (!Array.isArray(schema.consumedBy) || schema.consumedBy.length === 0) {
+          warnings.push(`dataModel "${key}" has no consumers`);
+        } else {
+          for (const cid of schema.consumedBy) {
+            if (!componentIds.has(cid)) {
+              errors.push(`dataModel "${key}" consumedBy "${cid}" does not match any component`);
+            }
+          }
+        }
+      }
+    } else {
+      warnings.push('Missing "dataModel" — downstream components will not have schema guidance');
+    }
+
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e) {
     errors.push(`Invalid JSON: ${e.message}`);

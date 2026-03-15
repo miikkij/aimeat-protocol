@@ -33,6 +33,7 @@
  *   v4.2.0 — 2026-03-15 — deleteProject now fully cleans up all registered
  *     components (extensions, cortex, apps, csm, msm) + extension memory +
  *     translation i18n keys before removing generator state
+ *   v4.3.0 — 2026-03-15 — Memory visibility changed to 'public' for cross-component access
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
