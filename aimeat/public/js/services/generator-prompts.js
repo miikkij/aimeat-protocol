@@ -130,7 +130,28 @@ Rules:
 - Cortex components go in a "Connect & Integrate" phase AFTER translations, BEFORE app
 - Cortex libraries are client-side JS that wrap extension APIs into clean domain methods for the app
 - Default to ONE cortex per project unless complexity clearly warrants splitting
-- Only include what's actually needed — don't pad with unnecessary components`;
+- Only include what's actually needed — don't pad with unnecessary components
+
+## CRITICAL: When to use extension vs cortex vs app
+
+Extensions run in a V8 SANDBOX on the server. Use an extension ONLY when:
+- Scheduled/recurring server-side work (fetch RSS every 15 min, nightly aggregation)
+- Server-to-server API calls that the browser cannot make (CORS, auth, rate limits)
+- Heavy computation that must run even when no browser is open
+- Writing seed/reference data to memory that other components depend on
+
+Do NOT create an extension for:
+- Querying/filtering data that already exists in memory — cortex reads memory directly
+- Distance/proximity calculations — cortex or app does math client-side
+- Export (CSV/JSON generation) — app generates files in the browser
+- User preferences / settings — app reads/writes memory directly via AIMEAT.data
+- Data transformations for display — cortex methods transform data for the app
+- CRUD on the user's own data — app uses AIMEAT.data.get/set/delete
+
+Cortex wraps memory reads + extension action calls into clean domain methods.
+App handles all UI, user interaction, client-side computation, and display logic.
+
+Rule of thumb: if a browser can do it, don't make it an extension.`;
 }
 
 /* ── Interview Prompt ──────────────────────────────────── */
