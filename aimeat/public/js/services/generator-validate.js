@@ -341,13 +341,19 @@ const validators = {
     const json = sanitizeJson(extractCodeBlock(result, 'json'));
     try {
       const parsed = JSON.parse(json);
-      if (!parsed.en) errors.push('Missing "en" (English) locale');
-      if (!parsed.fi) errors.push('Missing "fi" (Finnish) locale');
-      if (parsed.en && parsed.fi) {
-        const enKeys = Object.keys(parsed.en);
-        const fiKeys = Object.keys(parsed.fi);
-        const missing = enKeys.filter(k => !fiKeys.includes(k));
-        if (missing.length > 0) errors.push(`Finnish translations missing for: ${missing.join(', ')}`);
+      // Each translation component produces ONE locale (e.g., { "fi": { ... } } or { "en": { ... } })
+      const locales = Object.keys(parsed).filter(k => typeof parsed[k] === 'object' && parsed[k] !== null);
+      if (locales.length === 0) {
+        errors.push('No locale object found — expected e.g. { "fi": { ... } } or { "en": { ... } }');
+      } else if (locales.length > 1) {
+        errors.push(`Multiple locales found (${locales.join(', ')}) — each translation component should contain only ONE locale`);
+      } else {
+        // Validate the single locale has content
+        const locale = locales[0];
+        const keys = Object.keys(parsed[locale]);
+        if (keys.length === 0) {
+          errors.push(`Locale "${locale}" is empty — no translation keys found`);
+        }
       }
       // Anti-pattern scan
       const ap = validateAntiPatterns('translation', json);
