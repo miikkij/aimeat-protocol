@@ -201,8 +201,18 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     }
   }
 
-  function handleCopyBlueprintPrompt() {
-    const prompt = buildBlueprintPrompt(description, interviewParsed);
+  async function handleCopyBlueprintPrompt() {
+    // Fetch installed cortex libraries for the catalog
+    let cortexLibs = null;
+    try {
+      const resp = await apiGet('/v1/cortex');
+      if (resp.ok !== false && resp.data?.extensions) {
+        cortexLibs = resp.data.extensions
+          .filter(e => e.status === 'active')
+          .map(e => ({ name: e.name, description: e.description, components: e.components }));
+      }
+    } catch { /* proceed without catalog */ }
+    const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
     navigator.clipboard.writeText(prompt).catch(() => {});
     showToast?.('Blueprint prompt copied!');
   }

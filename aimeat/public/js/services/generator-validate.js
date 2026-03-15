@@ -37,8 +37,8 @@
  *     legitimate entity-decoding code like .replace(/&amp;/g, "&")
  *   v4.2.0 — 2026-03-15 — validateBlueprint now validates dataModel: checks
  *     producedBy/consumedBy reference valid component IDs, warns on missing schemas
- *   v4.3.0 — 2026-03-15 — Allow "schedules" field on extension components in blueprint
- *     validation (not stripped as extra field)
+ *   v4.3.0 — 2026-03-15 — Allow "schedules" field on extension components and "uses"
+ *     field on cortex components in blueprint validation (not stripped as extra fields)
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -495,7 +495,7 @@ export function validateBlueprint(result) {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed.components)) errors.push('Missing "components" array');
     else {
-      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules']);
+      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses']);
       parsed.components = parsed.components.map(c => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
@@ -519,6 +519,7 @@ export function validateBlueprint(result) {
         if (Array.isArray(c.produces)) clean.produces = c.produces;
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes;
         if (Array.isArray(c.schedules) && c.type === 'extension') clean.schedules = c.schedules;
+        if (Array.isArray(c.uses) && c.type === 'cortex') clean.uses = c.uses;
         return clean;
       });
     }

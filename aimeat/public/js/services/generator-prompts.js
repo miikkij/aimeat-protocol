@@ -72,6 +72,11 @@
  *     Extension: add schedules YAML section, inject blueprint schedules into prompt.
  *     Cortex: init() is now UI readiness check only — NEVER triggers backend logic.
  *     Scheduled work belongs exclusively to extension scheduler, not cortex/app.
+ *   v7.1.0 — 2026-03-15 — Add cortex library catalog to blueprint prompt: dynamically
+ *     fetches installed cortex libs and injects their API surfaces so LLM can reuse
+ *     existing libraries (e.g., aimeat-charts, aimeat-canvas). Blueprint cortex
+ *     components can declare "uses" to reference existing libs. Cortex prompt now
+ *     describes full capability range (UI components, DOM, CSS, not just data access).
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -120,7 +125,7 @@ AIMEAT Data Standards (MUST follow in ALL components):
 
 /* ── Blueprint Prompt ────────────────────────────────── */
 
-export function buildBlueprintPrompt(description, interviewSpec = null) {
+export function buildBlueprintPrompt(description, interviewSpec = null, availableCortexLibs = null) {
   const specContext = interviewSpec ? `
 ## Refined Specification (from requirements interview)
 \`\`\`json
@@ -129,6 +134,31 @@ ${JSON.stringify(interviewSpec, null, 2)}
 
 Use the specification above to determine the exact components needed. The data sources, entities, views, and constraints have been validated with the user.
 ` : '';
+
+  // Build cortex catalog if available
+  let cortexCatalog = '';
+  if (availableCortexLibs && availableCortexLibs.length > 0) {
+    cortexCatalog = `
+## Available Cortex Libraries (reuse these — do NOT recreate)
+
+The following cortex libraries are already installed on this node. If the project needs their capabilities, reference them in the cortex component's "uses" field instead of reimplementing.
+
+${availableCortexLibs.map(lib => {
+  const libComps = (lib.components || []).filter(c => c.type === 'lib');
+  const exports = libComps.map(c => c.exports || []).flat();
+  const apiSurface = libComps.map(c => c.api_surface || '').filter(Boolean).join('\n');
+  return `### ${lib.name} — ${lib.description || 'no description'}
+- **Exports:** ${exports.join(', ') || 'none'}
+${apiSurface ? `- **API:**\n\`\`\`\n${apiSurface.trim()}\n\`\`\`` : ''}
+- **Load:** \`<script src="/v1/cortex/${lib.name}/libs/${libComps[0]?.filename || lib.name + '.js'}"></script>\``;
+}).join('\n\n')}
+
+When the blueprint's cortex component needs an existing library, add a "uses" field listing the library names:
+{ "id": "cortex-1", "type": "cortex", "label": "...", "produces": [...], "consumes": [...], "uses": ["aimeat-charts"] }
+
+The generated cortex should load the used library via <script> and call its API (e.g., AIMEAT.charts.ChartBuilder) — NOT reimplement chart rendering.
+`;
+  }
 
   // Thread language from interview spec to blueprint prompt
   const specLocale = interviewSpec?.locale;
@@ -142,7 +172,7 @@ The user wants to create this service:
 ---
 ${description}
 ---
-${specContext}${langNote}
+${specContext}${langNote}${cortexCatalog}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
 CRITICAL: Return ONLY a JSON object with "components", "phases", and "dataModel". Nothing else.
@@ -1660,6 +1690,23 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
           context += `Do NOT add extra keys and do NOT omit any keys — the sets must be identical.\n`;
         }
       } catch { /* ignore parse errors */ }
+    }
+  }
+
+  // Inject "uses" cortex dependencies from blueprint
+  if (type === 'cortex' && blueprint?.components) {
+    const componentId = blueprint.components.find(c => c.label === label)?.id;
+    const comp = componentId && blueprint.components.find(c => c.id === componentId);
+    if (comp?.uses && comp.uses.length > 0) {
+      context += '\n## Reusable Cortex Libraries (from blueprint — load and use these)\n';
+      context += 'This cortex component should use the following existing cortex libraries.\n';
+      context += 'Load them via `<script>` tags in the prompt component and call their API.\n';
+      context += 'Do NOT reimplement their functionality.\n\n';
+      for (const libName of comp.uses) {
+        context += `- **${libName}**: Load via \`<script src="/v1/cortex/${libName}/libs/${libName}.js"></script>\`\n`;
+        context += `  Access via \`AIMEAT.${libName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())}.*\`\n`;
+      }
+      context += '\n';
     }
   }
 
