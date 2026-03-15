@@ -439,7 +439,7 @@ export async function registerComponent(type, result, session) {
       const entries = typeof result === 'string' ? JSON.parse(result) : result;
       const results = [];
       for (const [key, value] of Object.entries(entries)) {
-        results.push(await apiPost('/v1/memory', { key, value, visibility: 'private' }));
+        results.push(await apiPost('/v1/memory', { key, value, visibility: 'public' }));
       }
       return { ok: true, registered: results.length };
     }

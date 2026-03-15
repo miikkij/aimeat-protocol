@@ -204,6 +204,12 @@ Ask: "Does this action fetch from an external server or run on a schedule?"
 - YES → extension ✓
 - NO → it should be cortex (data logic) or app (UI/interaction) ✗
 
+### Static Data → Memory Component
+If a dataSource has type "user-input" with a "staticData" array, you MUST create a memory component for it.
+This memory component will pre-load the static data into memory so extensions and cortex can read it.
+The memory component's "produces" should reflect the memory key pattern (e.g., "memory:municipalities.*").
+Place it in an early phase (before extensions that consume it).
+
 ### Common Mistakes to Avoid
 - Do NOT create an "export" extension — apps generate files client-side
 - Do NOT create a "settings" extension — apps read/write user prefs via AIMEAT.data
@@ -282,6 +288,15 @@ The user describes WHAT they want and WHY. The generator decides HOW.
         timestamps with ambiguous formats, mixed-language content
       - Is any data user-generated or computed from other data?
 
+      STATIC / USER-PROVIDED DATA (type: "user-input"):
+      - If the user provides a complete dataset (coordinate lists, lookup tables, category mappings, etc.),
+        you MUST capture the ENTIRE dataset in the "staticData" field as a JSON array of {key, value} objects.
+      - Do NOT truncate, summarize, or put only one sample row — include EVERY row the user provides.
+      - Parse the user's format (TSV, CSV, pasted table, etc.) into clean JSON objects.
+        Example: "Helsinki\\t60.166°N, 24.943°E" → { "key": "Helsinki", "value": { "lat": 60.166, "lon": 24.943 } }
+      - The staticData will be written directly to memory as initial data when the service is installed.
+      - "sampleEntry" still holds ONE example for documentation; "staticData" holds the FULL dataset.
+
    c) DATA MODEL — What are the key entities? (1-2 questions)
       - Propose entities based on use cases (just name + one-line description each)
       - Ask: "Does this cover your data, or is anything missing?"
@@ -354,6 +369,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "format": "xml|json|html|csv|unknown",
       "encoding": "utf-8|iso-8859-1|auto",
       "sampleEntry": "One raw entry from the source, copy-pasted exactly as-is",
+      "staticData": "For type 'user-input' ONLY: the COMPLETE dataset as an array of {key, value} objects. Include EVERY row the user provided, parsed into clean JSON. Example: [{ \"key\": \"Helsinki\", \"value\": { \"lat\": 60.166, \"lon\": 24.943 } }]. Omit this field for non-user-input sources.",
       "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
       "sampleFields": ["field1", "field2"],
       "notes": "Any observations from fetching/analyzing the source",
@@ -1410,6 +1426,20 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
+  // Thread staticData to memory component prompts — include the FULL dataset
+  if (type === 'memory' && interviewSpec?.dataSources) {
+    const staticSources = interviewSpec.dataSources.filter(ds => ds.staticData && Array.isArray(ds.staticData));
+    if (staticSources.length > 0) {
+      context += '\n## Static Data to Include (from interview — include ALL entries as memory keys)\n';
+      context += 'The user provided complete datasets during the interview. Write EVERY entry as a memory key.\n';
+      context += 'Use the pattern: namespace.{key} for each entry.\n\n';
+      for (const ds of staticSources) {
+        context += `### ${ds.name} (${ds.staticData.length} entries)\n`;
+        context += '```json\n' + JSON.stringify(ds.staticData, null, 2) + '\n```\n\n';
+      }
+    }
+  }
+
   // Thread interview data source details to extension prompts
   if (type === 'extension' && interviewSpec?.dataSources) {
     context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';
@@ -1417,6 +1447,9 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       context += `- **${ds.name}** (${ds.type}): ${ds.url || 'user-input'}\n`;
       if (ds.encoding) context += `  Encoding: ${ds.encoding}\n`;
       if (ds.sampleEntry) context += `  Sample entry (REAL DATA — write your parser against this):\n  \`\`\`\n  ${ds.sampleEntry}\n  \`\`\`\n`;
+      if (ds.staticData && Array.isArray(ds.staticData)) {
+        context += `  **STATIC DATA (${ds.staticData.length} entries) — pre-loaded in memory. Read with ctx.memory.get(), do NOT re-create it.**\n`;
+      }
     }
   }
 
