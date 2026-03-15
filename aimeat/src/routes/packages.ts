@@ -23,6 +23,7 @@
  *   v1.1.0 — 2026-03-15 — rename routes from /v1/packages to /v1/bundles to avoid collision with knowledge system
  *   v1.2.0 — 2026-03-15 — GHII resolution, YAML export, import validation, duplicate detection
  *   v1.3.0 — 2026-03-15 — support YAML bundle string import (text/yaml Content-Type) for POST /v1/bundles/import
+ *   v1.4.0 — 2026-03-15 — enforce packageMaxSizeMb, packageMaxComponents limits; remove (config as any) casts
  */
 
 import express, { Router } from 'express';
