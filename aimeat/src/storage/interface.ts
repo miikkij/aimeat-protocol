@@ -812,6 +812,24 @@ export interface ScheduledJobRecord {
   updatedAt: string;
 }
 
+// ── Execution Log (Scheduler Run History) ────────────────────────────
+
+export interface ExecutionLogEntry {
+  id: string;
+  jobId: string;
+  jobName: string;
+  type: 'extension' | 'core';
+  extensionName?: string;
+  actionId?: string;
+  trigger: 'cron' | 'manual' | 'activate';
+  result: 'success' | 'error' | 'skipped';
+  errorMessage?: string;
+  durationMs: number;
+  memoryReads: string[];   // memory keys read during execution
+  memoryWrites: string[];  // memory keys written during execution
+  createdAt: string;
+}
+
 // ── Extension Instances ──────────────────────────────────────────────
 
 export interface ExtensionInstanceRecord {

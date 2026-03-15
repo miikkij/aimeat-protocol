@@ -235,6 +235,9 @@ export default function Admin({ navigate, locale }) {
       d.extensions      = features[12].status === 'fulfilled' ? features[12].value.data : null;
       d.systemPrompts   = features[13].status === 'fulfilled' ? features[13].value?.data : null;
 
+      // Scheduler execution log (non-blocking)
+      d.schedulerLog = await api.fetchSchedulerExecutionLog({ limit: 50 }).catch(() => ({ entries: [], total: 0 }));
+
       // Phase 4: portal + stats + owners
       try {
         const [portalMeta, portalTemplate, portalChangelog] = await Promise.all([

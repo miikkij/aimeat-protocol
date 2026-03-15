@@ -448,6 +448,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         }
       }
 
+      // Run @activate jobs immediately after activation
+      if (scheduler) {
+        scheduler.runActivateJobs(name).catch(err =>
+          logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
+      }
+
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
 
       res.json(success(config.nodeId, { extension: updated }, [

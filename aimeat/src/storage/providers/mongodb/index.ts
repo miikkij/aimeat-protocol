@@ -56,6 +56,7 @@ import type {
     OAuthApprovalRecord,
     SystemPromptRecord,
     SystemPromptVersionRecord,
+    ExecutionLogEntry,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -3565,6 +3566,89 @@ export class MongoStorage implements Storage {
         this.ensureReady();
         const result = await this.prisma.scheduledJob.deleteMany({ where: { id } });
         return result.count > 0;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Execution Log ──
+    // ══════════════════════════════════════════════════════════
+
+    async createExecutionLog(entry: ExecutionLogEntry): Promise<ExecutionLogEntry> {
+        this.ensureReady();
+        await this.prisma.executionLog.create({
+            data: {
+                id: entry.id,
+                jobId: entry.jobId,
+                jobName: entry.jobName,
+                type: entry.type,
+                extensionName: entry.extensionName,
+                actionId: entry.actionId,
+                trigger: entry.trigger,
+                result: entry.result,
+                errorMessage: entry.errorMessage,
+                durationMs: entry.durationMs,
+                memoryReads: entry.memoryReads as any,
+                memoryWrites: entry.memoryWrites as any,
+                createdAt: new Date(entry.createdAt),
+            },
+        });
+        return entry;
+    }
+
+    async listExecutionLogs(filter?: {
+        jobId?: string; extensionName?: string; trigger?: string; result?: string;
+        limit?: number; offset?: number;
+    }): Promise<ExecutionLogEntry[]> {
+        this.ensureReady();
+        const where: any = {};
+        if (filter?.jobId) where.jobId = filter.jobId;
+        if (filter?.extensionName) where.extensionName = filter.extensionName;
+        if (filter?.trigger) where.trigger = filter.trigger;
+        if (filter?.result) where.result = filter.result;
+        const rows = await this.prisma.executionLog.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: filter?.limit ?? 100,
+            skip: filter?.offset ?? 0,
+        });
+        return rows.map((r: any) => this.toExecutionLogEntry(r));
+    }
+
+    async countExecutionLogs(filter?: {
+        jobId?: string; extensionName?: string; trigger?: string; result?: string;
+    }): Promise<number> {
+        this.ensureReady();
+        const where: any = {};
+        if (filter?.jobId) where.jobId = filter.jobId;
+        if (filter?.extensionName) where.extensionName = filter.extensionName;
+        if (filter?.trigger) where.trigger = filter.trigger;
+        if (filter?.result) where.result = filter.result;
+        return this.prisma.executionLog.count({ where });
+    }
+
+    async pruneExecutionLogs(beforeDate: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.executionLog.deleteMany({
+            where: { createdAt: { lt: new Date(beforeDate) } },
+        });
+        return result.count;
+    }
+
+    private toExecutionLogEntry(row: any): ExecutionLogEntry {
+        return {
+            id: row.id,
+            jobId: row.jobId,
+            jobName: row.jobName,
+            type: row.type as 'extension' | 'core',
+            extensionName: row.extensionName ?? undefined,
+            actionId: row.actionId ?? undefined,
+            trigger: row.trigger as 'cron' | 'manual' | 'activate',
+            result: row.result as 'success' | 'error' | 'skipped',
+            errorMessage: row.errorMessage ?? undefined,
+            durationMs: row.durationMs,
+            memoryReads: Array.isArray(row.memoryReads) ? row.memoryReads : JSON.parse(row.memoryReads || '[]'),
+            memoryWrites: Array.isArray(row.memoryWrites) ? row.memoryWrites : JSON.parse(row.memoryWrites || '[]'),
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
     }
 
     // ══════════════════════════════════════════════════════════

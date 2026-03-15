@@ -8,7 +8,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, DataTable, Empty, useToast, Toast } from './shared.js';
-import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob } from '/js/services/admin.js';
+import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob, fetchSchedulerExecutionLog } from '/js/services/admin.js';
 
 export default function SchedulerTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
@@ -102,10 +102,50 @@ export default function SchedulerTab({ data, reload }) {
     </div>`,
   ]);
 
+  // ── Execution History ──
+  const logEntries = data.schedulerLog?.entries || data.schedulerLog?.data?.entries || [];
+
+  const logResultBadge = (result) => {
+    if (result === 'success') return 'healthy';
+    if (result === 'error') return 'critical';
+    if (result === 'skipped') return 'unknown';
+    return 'unknown';
+  };
+
+  const logTriggerBadge = (trigger) => {
+    if (trigger === 'cron') return 'core';
+    if (trigger === 'manual') return 'extension';
+    return 'unknown';
+  };
+
+  const logHeaders = [
+    t('dashboard.schedulerLogTime'),
+    t('dashboard.schedulerLogJob'),
+    t('dashboard.schedulerLogTrigger'),
+    t('dashboard.schedulerResult'),
+    t('dashboard.schedulerLogDuration'),
+    t('dashboard.schedulerLogMemory'),
+  ];
+
+  const logRows = logEntries.map(entry => [
+    dt(entry.startedAt || entry.createdAt),
+    escHtml(entry.jobName || entry.jobId || ''),
+    html`<${Badge} type=${logTriggerBadge(entry.trigger)} />`,
+    html`<${Badge} type=${logResultBadge(entry.result)} />`,
+    entry.durationMs != null ? `${entry.durationMs}ms` : '\u2014',
+    entry.memoryRead != null || entry.memoryWritten != null
+      ? `${entry.memoryRead || 0} / ${entry.memoryWritten || 0}`
+      : '\u2014',
+  ]);
+
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${StatsGrid} items=${statsItems} />
     <h3 style="margin:16px 0 8px">${t('dashboard.schedulerJobs')}</h3>
     <${DataTable} headers=${headers} rows=${rows} scroll=${true} />
+    <h3 style="margin:24px 0 8px">${t('dashboard.schedulerLogTitle')}</h3>
+    ${logRows.length
+      ? html`<${DataTable} headers=${logHeaders} rows=${logRows} scroll=${true} />`
+      : html`<${Empty} text="No execution history" />`}
   `;
 }

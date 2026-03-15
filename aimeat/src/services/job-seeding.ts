@@ -19,6 +19,7 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:memory-ttl-cleanup', name: 'Memory TTL Cleanup', coreHandler: 'memory-ttl-cleanup', cron: '*/5 * * * *' },
     { id: 'core:board-post-ttl-cleanup', name: 'Board Post TTL Cleanup', coreHandler: 'board-post-ttl-cleanup', cron: '*/10 * * * *' },
     { id: 'core:dispute-timeout', name: 'Dispute Auto-Escalation', coreHandler: 'dispute-timeout', cron: '0 * * * *' },
+    { id: 'core:execution-log-prune', name: 'Execution Log Prune', coreHandler: 'execution-log-prune', cron: '0 3 * * *' },
   ];
 
   if (config.consentEnabled) {

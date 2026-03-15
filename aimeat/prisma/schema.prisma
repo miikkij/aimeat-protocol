@@ -890,6 +890,27 @@ model ScheduledJob {
   @@index([enabled])
 }
 
+model ExecutionLog {
+  id              String   @id @map("_id")
+  jobId           String
+  jobName         String
+  type            String
+  extensionName   String?
+  actionId        String?
+  trigger         String
+  result          String
+  errorMessage    String?
+  durationMs      Int      @default(0)
+  memoryReads     Json     @default("[]")
+  memoryWrites    Json     @default("[]")
+  createdAt       DateTime @default(now())
+
+  @@index([jobId])
+  @@index([extensionName])
+  @@index([createdAt])
+  @@index([trigger])
+}
+
 model DeviceAuth {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   deviceCode       String   @unique

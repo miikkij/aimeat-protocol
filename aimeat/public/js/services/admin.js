@@ -175,6 +175,16 @@ export const getSchedulerJobs    = ()              => apiGet('/v1/admin/schedule
 export const triggerSchedulerJob = (id)            => apiPost(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}/trigger`);
 export const updateSchedulerJob  = (id, updates)   => apiPut(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`, updates);
 export const deleteSchedulerJob  = (id)            => apiDelete(`/v1/admin/scheduler/jobs/${encodeURIComponent(id)}`);
+export async function fetchSchedulerExecutionLog(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.jobId) qs.set('jobId', params.jobId);
+  if (params.extensionName) qs.set('extensionName', params.extensionName);
+  if (params.trigger) qs.set('trigger', params.trigger);
+  if (params.result) qs.set('result', params.result);
+  if (params.limit) qs.set('limit', String(params.limit));
+  if (params.offset) qs.set('offset', String(params.offset));
+  return apiGet(`/v1/admin/scheduler/execution-log?${qs.toString()}`);
+}
 
 // ── Knowledge Management ──
 export const getKnowledgePackages = (opts = {}) => {

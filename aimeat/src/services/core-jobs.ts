@@ -16,6 +16,7 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('memory-ttl-cleanup', () => runMemoryTtlCleanupJob(storage));
   scheduler.registerCoreHandler('board-post-ttl-cleanup', () => runBoardPostTtlCleanupJob(storage));
   scheduler.registerCoreHandler('dispute-timeout', () => runDisputeTimeoutJob(config, storage));
+  scheduler.registerCoreHandler('execution-log-prune', () => runExecutionLogPruneJob(storage));
   if (config.consentEnabled) {
     scheduler.registerCoreHandler('consent-expiry', () => runConsentExpiryJob(storage));
   }
@@ -178,4 +179,10 @@ async function runMailboxCleanupJob(storage: Storage): Promise<void> {
 async function runConsentExpiryJob(storage: Storage): Promise<void> {
   const { expireConsents } = await import('./consent.js');
   await expireConsents(storage);
+}
+
+async function runExecutionLogPruneJob(storage: Storage): Promise<void> {
+  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+  const pruned = await storage.pruneExecutionLogs(cutoff);
+  if (pruned > 0) logger.info(`Pruned ${pruned} execution log entries older than 30 days`);
 }

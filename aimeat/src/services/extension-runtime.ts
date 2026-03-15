@@ -1,9 +1,12 @@
 /**
- * V8 Isolate Sandbox Runtime for AIMEAT Extension Actions
- *
- * Executes user-provided extension scripts in a sandboxed V8 isolate
- * using `isolated-vm`. The sandbox has NO access to Node.js globals
- * (process, require, Buffer, etc.) — only a controlled `ctx` API proxy.
+ * @file extension-runtime.ts
+ * @description V8 Isolate Sandbox Runtime for AIMEAT Extension Actions.
+ *   Executes user-provided extension scripts in a sandboxed V8 isolate
+ *   using `isolated-vm`. The sandbox has NO access to Node.js globals
+ *   (process, require, Buffer, etc.) — only a controlled `ctx` API proxy.
+ * @version-history
+ *   v1.0.0 — 2026-03-01 — Initial V8 sandbox implementation
+ *   v1.1.0 — 2026-03-15 — Add memory access tracking (MemoryAccessLog + trackMemoryAccess)
  */
 import ivm from 'isolated-vm';
 
@@ -162,6 +165,51 @@ ${userFnDecl}
     return JSON.stringify(result ?? {});
 })()
 `;
+}
+
+// ── Memory access tracking ───────────────────────────────────
+
+/** Tracks memory keys read/written during an extension execution */
+export interface MemoryAccessLog {
+    reads: string[];
+    writes: string[];
+}
+
+/**
+ * Wraps an ExtensionCtx's memory methods to track read/write keys.
+ * Returns the wrapped ctx + the access log for post-execution recording.
+ */
+export function trackMemoryAccess(ctx: ExtensionCtx): { ctx: ExtensionCtx; accessLog: MemoryAccessLog } {
+    const accessLog: MemoryAccessLog = { reads: [], writes: [] };
+    const origMemory = ctx.memory;
+
+    const trackedMemory: ExtensionCtx['memory'] = {
+        get: async (key) => {
+            accessLog.reads.push(key);
+            return origMemory.get(key);
+        },
+        set: async (key, value) => {
+            accessLog.writes.push(key);
+            return origMemory.set(key, value);
+        },
+        search: async (prefix, opts) => {
+            accessLog.reads.push(`${prefix}*`);
+            return origMemory.search(prefix, opts);
+        },
+        delete: async (key) => {
+            accessLog.writes.push(`-${key}`);
+            return origMemory.delete(key);
+        },
+        getPublic: async (namespace, key) => {
+            accessLog.reads.push(`${namespace}:${key}`);
+            return origMemory.getPublic(namespace, key);
+        },
+    };
+
+    return {
+        ctx: { ...ctx, memory: trackedMemory },
+        accessLog,
+    };
 }
 
 // ── Main entry point ─────────────────────────────────────────

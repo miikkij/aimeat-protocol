@@ -31,6 +31,7 @@ import type {
   OAuthApprovalRecord,
   SystemPromptRecord,
   SystemPromptVersionRecord,
+  ExecutionLogEntry,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -4086,6 +4087,84 @@ export class SqliteStorage implements Storage {
     if (row.lastRunDurationMs !== null && row.lastRunDurationMs !== undefined) record.lastRunDurationMs = row.lastRunDurationMs as number;
     if (row.nextRunAt) record.nextRunAt = row.nextRunAt as string;
     return record;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Execution Log ──
+  // ══════════════════════════════════════════════════════════
+
+  async createExecutionLog(entry: ExecutionLogEntry): Promise<ExecutionLogEntry> {
+    this.db.prepare(
+      `INSERT INTO execution_log (id, jobId, jobName, type, extensionName, actionId,
+       "trigger", result, errorMessage, durationMs, memoryReads, memoryWrites, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      entry.id, entry.jobId, entry.jobName, entry.type,
+      entry.extensionName ?? null, entry.actionId ?? null,
+      entry.trigger, entry.result, entry.errorMessage ?? null,
+      entry.durationMs,
+      JSON.stringify(entry.memoryReads),
+      JSON.stringify(entry.memoryWrites),
+      entry.createdAt,
+    );
+    return entry;
+  }
+
+  async listExecutionLogs(filter?: {
+    jobId?: string; extensionName?: string; trigger?: string; result?: string;
+    limit?: number; offset?: number;
+  }): Promise<ExecutionLogEntry[]> {
+    let sql = 'SELECT * FROM execution_log';
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filter?.jobId) { conditions.push('jobId = ?'); params.push(filter.jobId); }
+    if (filter?.extensionName) { conditions.push('extensionName = ?'); params.push(filter.extensionName); }
+    if (filter?.trigger) { conditions.push('"trigger" = ?'); params.push(filter.trigger); }
+    if (filter?.result) { conditions.push('result = ?'); params.push(filter.result); }
+    if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+    sql += ' ORDER BY createdAt DESC';
+    if (filter?.limit) { sql += ' LIMIT ?'; params.push(filter.limit); }
+    if (filter?.offset) { sql += ' OFFSET ?'; params.push(filter.offset); }
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeExecutionLog(r));
+  }
+
+  async countExecutionLogs(filter?: {
+    jobId?: string; extensionName?: string; trigger?: string; result?: string;
+  }): Promise<number> {
+    let sql = 'SELECT COUNT(*) as cnt FROM execution_log';
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (filter?.jobId) { conditions.push('jobId = ?'); params.push(filter.jobId); }
+    if (filter?.extensionName) { conditions.push('extensionName = ?'); params.push(filter.extensionName); }
+    if (filter?.trigger) { conditions.push('"trigger" = ?'); params.push(filter.trigger); }
+    if (filter?.result) { conditions.push('result = ?'); params.push(filter.result); }
+    if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+    const row = this.db.prepare(sql).get(...params) as Record<string, unknown>;
+    return (row.cnt as number) ?? 0;
+  }
+
+  async pruneExecutionLogs(beforeDate: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM execution_log WHERE createdAt < ?').run(beforeDate);
+    return result.changes;
+  }
+
+  private deserializeExecutionLog(row: Record<string, unknown>): ExecutionLogEntry {
+    return {
+      id: row.id as string,
+      jobId: row.jobId as string,
+      jobName: row.jobName as string,
+      type: row.type as ExecutionLogEntry['type'],
+      extensionName: (row.extensionName as string) || undefined,
+      actionId: (row.actionId as string) || undefined,
+      trigger: row.trigger as ExecutionLogEntry['trigger'],
+      result: row.result as ExecutionLogEntry['result'],
+      errorMessage: (row.errorMessage as string) || undefined,
+      durationMs: row.durationMs as number,
+      memoryReads: JSON.parse(row.memoryReads as string || '[]'),
+      memoryWrites: JSON.parse(row.memoryWrites as string || '[]'),
+      createdAt: row.createdAt as string,
+    };
   }
 
   // ══════════════════════════════════════════════════════════

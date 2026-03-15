@@ -1,17 +1,22 @@
 /**
- * Internal Scheduler System for AIMEAT
- *
- * Centralized cron-based job scheduler that replaces ad-hoc setInterval calls.
- * Both core services and V8 sandbox extensions register jobs here.
- *
- * Uses `croner` (pure JS, no native deps) for cron expression parsing.
+ * @file scheduler.ts
+ * @description Internal Scheduler System for AIMEAT — centralized cron-based job scheduler.
+ *   Both core services and V8 sandbox extensions register jobs here.
+ *   Supports special @activate trigger: runs on extension activation AND every server startup.
+ *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
+ * @version-history
+ *   v1.0.0 — 2026-03-01 — Initial implementation with croner
+ *   v2.0.0 — 2026-03-15 — Add @activate trigger, execution log, memory access tracking
  */
 import { Cron } from 'croner';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { executeExtensionAction } from './extension-runtime.js';
+import type { Storage, ScheduledJobRecord, ExecutionLogEntry } from '../storage/interface.js';
+import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { logger } from '../utils/logger.js';
+
+export type JobTrigger = 'cron' | 'manual' | 'activate';
 
 export class Scheduler {
   private config: AimeatConfig;
@@ -35,17 +40,30 @@ export class Scheduler {
 
   /**
    * Load all enabled jobs from storage and start scheduling them.
+   * Also runs @activate jobs for all active extensions.
    */
   async start(): Promise<void> {
     if (this.running) return;
     this.running = true;
 
     const jobs = await this.storage.listScheduledJobs({ enabled: true });
+    const activateJobs: ScheduledJobRecord[] = [];
+
     for (const job of jobs) {
-      this.scheduleJob(job);
+      if (job.cron === '@activate') {
+        activateJobs.push(job);
+      } else {
+        this.scheduleJob(job);
+      }
     }
 
-    logger.info(`Scheduler started with ${jobs.length} enabled jobs`);
+    logger.info(`Scheduler started with ${jobs.length} enabled jobs (${activateJobs.length} @activate)`);
+
+    // Run @activate jobs sequentially after scheduler is running
+    if (activateJobs.length > 0) {
+      this.runActivateJobsList(activateJobs).catch(err =>
+        logger.error('Scheduler @activate jobs failed', { error: String(err) }));
+    }
   }
 
   /**
@@ -63,9 +81,10 @@ export class Scheduler {
 
   /**
    * Add a new job and start scheduling it if enabled.
+   * @activate jobs are stored but not scheduled via cron (they run on demand).
    */
   addJob(record: ScheduledJobRecord): void {
-    if (record.enabled) {
+    if (record.enabled && record.cron !== '@activate') {
       this.scheduleJob(record);
     }
   }
@@ -88,7 +107,20 @@ export class Scheduler {
   async triggerNow(id: string): Promise<void> {
     const job = await this.storage.getScheduledJob(id);
     if (!job) throw new Error(`Job "${id}" not found`);
-    await this.executeJob(job);
+    await this.executeJob(job, 'manual');
+  }
+
+  /**
+   * Run all @activate jobs for a specific extension (called after activation).
+   * Jobs are executed sequentially in storage order.
+   */
+  async runActivateJobs(extensionName: string): Promise<void> {
+    const jobs = await this.storage.listScheduledJobs({ extensionName, enabled: true });
+    const activateJobs = jobs.filter(j => j.cron === '@activate');
+    if (activateJobs.length === 0) return;
+
+    logger.info(`Running ${activateJobs.length} @activate jobs for extension: ${extensionName}`);
+    await this.runActivateJobsList(activateJobs);
   }
 
   /**
@@ -97,12 +129,23 @@ export class Scheduler {
   async reschedule(id: string): Promise<void> {
     this.removeJob(id);
     const job = await this.storage.getScheduledJob(id);
-    if (job && job.enabled) {
+    if (job && job.enabled && job.cron !== '@activate') {
       this.scheduleJob(job);
     }
   }
 
   // ── Private ────────────────────────────────────────────────────
+
+  private async runActivateJobsList(jobs: ScheduledJobRecord[]): Promise<void> {
+    for (const job of jobs) {
+      try {
+        await this.executeJob(job, 'activate');
+      } catch (err) {
+        // Log but don't abort remaining @activate jobs
+        logger.error(`@activate job failed: ${job.id}`, { error: String(err) });
+      }
+    }
+  }
 
   private scheduleJob(job: ScheduledJobRecord): void {
     // Stop any existing cron for this job
@@ -111,7 +154,7 @@ export class Scheduler {
 
     try {
       const cron = new Cron(job.cron, { name: job.id }, async () => {
-        await this.executeJob(job);
+        await this.executeJob(job, 'cron');
       });
 
       this.cronJobs.set(job.id, cron);
@@ -134,44 +177,71 @@ export class Scheduler {
     }
   }
 
-  private async executeJob(job: ScheduledJobRecord): Promise<void> {
+  private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<void> {
     const startTime = Date.now();
-    logger.info(`Scheduler executing job: ${job.id} (${job.name})`);
+    const logId = randomUUID();
+    logger.info(`Scheduler executing job: ${job.id} (${job.name}) [${trigger}]`);
+
+    let result: ExecutionLogEntry['result'] = 'success';
+    let errorMessage: string | undefined;
+    let memoryReads: string[] = [];
+    let memoryWrites: string[] = [];
 
     try {
       if (job.type === 'core') {
         await this.executeCoreJob(job);
       } else if (job.type === 'extension') {
-        await this.executeExtensionJob(job);
+        const accessLog = await this.executeExtensionJob(job);
+        memoryReads = accessLog.reads;
+        memoryWrites = accessLog.writes;
       }
-
-      const durationMs = Date.now() - startTime;
-      const cron = this.cronJobs.get(job.id);
-      const nextRun = cron?.nextRun();
-
-      await this.storage.updateScheduledJob(job.id, {
-        lastRunAt: new Date().toISOString(),
-        lastRunResult: 'success',
-        lastRunError: undefined,
-        lastRunDurationMs: durationMs,
-        nextRunAt: nextRun ? nextRun.toISOString() : undefined,
-        updatedAt: new Date().toISOString(),
-      });
-
-      logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms)`);
     } catch (err) {
-      const durationMs = Date.now() - startTime;
-      const message = err instanceof Error ? err.message : String(err);
+      result = 'error';
+      errorMessage = err instanceof Error ? err.message : String(err);
+    }
 
-      await this.storage.updateScheduledJob(job.id, {
-        lastRunAt: new Date().toISOString(),
-        lastRunResult: 'error',
-        lastRunError: message,
-        lastRunDurationMs: durationMs,
-        updatedAt: new Date().toISOString(),
-      }).catch(() => { /* don't let update failure mask original error */ });
+    const durationMs = Date.now() - startTime;
 
-      logger.error(`Scheduler job failed: ${job.id}`, { error: message, durationMs });
+    // Update lastRun on the job record
+    const cron = this.cronJobs.get(job.id);
+    const nextRun = cron?.nextRun();
+
+    await this.storage.updateScheduledJob(job.id, {
+      lastRunAt: new Date().toISOString(),
+      lastRunResult: result === 'error' ? 'error' : 'success',
+      lastRunError: errorMessage,
+      lastRunDurationMs: durationMs,
+      nextRunAt: nextRun ? nextRun.toISOString() : undefined,
+      updatedAt: new Date().toISOString(),
+    }).catch(() => { /* don't let update failure mask original error */ });
+
+    // Write execution log entry
+    const logEntry: ExecutionLogEntry = {
+      id: logId,
+      jobId: job.id,
+      jobName: job.name,
+      type: job.type,
+      extensionName: job.extensionName,
+      actionId: job.actionId,
+      trigger,
+      result,
+      errorMessage,
+      durationMs,
+      memoryReads,
+      memoryWrites,
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.storage.createExecutionLog(logEntry).catch(err =>
+      logger.error('Failed to write execution log', { jobId: job.id, error: String(err) }));
+
+    if (result === 'error') {
+      logger.error(`Scheduler job failed: ${job.id}`, { error: errorMessage, durationMs, trigger });
+    } else {
+      logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms) [${trigger}]`, {
+        memoryReads: memoryReads.length,
+        memoryWrites: memoryWrites.length,
+      });
     }
   }
 
@@ -188,7 +258,7 @@ export class Scheduler {
     await handler();
   }
 
-  private async executeExtensionJob(job: ScheduledJobRecord): Promise<void> {
+  private async executeExtensionJob(job: ScheduledJobRecord): Promise<{ reads: string[]; writes: string[] }> {
     if (!job.extensionName || !job.actionId) {
       throw new Error(`Extension job "${job.id}" missing extensionName or actionId`);
     }
@@ -211,7 +281,7 @@ export class Scheduler {
       ? `ext:${ext.name}.${job.instanceId}`
       : `ext:${ext.name}`;
 
-    const ctx: ExtensionCtx = {
+    const baseCtx: ExtensionCtx = {
       memory: {
         get: async (key) => {
           const record = await this.storage.getMemory(extMemoryOwner, key);
@@ -303,6 +373,9 @@ export class Scheduler {
       },
     };
 
+    // Wrap with memory access tracking
+    const { ctx, accessLog } = trackMemoryAccess(baseCtx);
+
     // Validate input is a plain object — reject non-serializable values
     const rawInput = job.input ?? {};
     let input: Record<string, unknown>;
@@ -312,5 +385,7 @@ export class Scheduler {
       throw new Error(`Scheduled job "${job.id}" has non-serializable input`);
     }
     await executeExtensionAction(action.scriptContent, ctx, input, ext.limits);
+
+    return { reads: accessLog.reads, writes: accessLog.writes };
   }
 }

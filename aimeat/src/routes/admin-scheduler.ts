@@ -114,5 +114,49 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
     }
   });
 
+  // ── GET /v1/admin/scheduler/execution-log — List execution history ──
+  router.get('/v1/admin/scheduler/execution-log', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const filter: {
+        jobId?: string; extensionName?: string; trigger?: string; result?: string;
+        limit?: number; offset?: number;
+      } = {};
+      if (req.query.jobId) filter.jobId = req.query.jobId as string;
+      if (req.query.extensionName) filter.extensionName = req.query.extensionName as string;
+      if (req.query.trigger) filter.trigger = req.query.trigger as string;
+      if (req.query.result) filter.result = req.query.result as string;
+      filter.limit = Math.min(parseInt(req.query.limit as string || '50', 10), 200);
+      filter.offset = parseInt(req.query.offset as string || '0', 10);
+
+      const [entries, total] = await Promise.all([
+        storage.listExecutionLogs(filter),
+        storage.countExecutionLogs({
+          jobId: filter.jobId,
+          extensionName: filter.extensionName,
+          trigger: filter.trigger,
+          result: filter.result,
+        }),
+      ]);
+
+      res.json(success(config.nodeId, { entries, total, limit: filter.limit, offset: filter.offset }));
+    } catch (err) {
+      logger.error('Failed to list execution logs', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list execution logs'));
+    }
+  });
+
+  // ── DELETE /v1/admin/scheduler/execution-log — Prune old entries ────
+  router.delete('/v1/admin/scheduler/execution-log', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const days = parseInt(req.query.olderThanDays as string || '30', 10);
+      const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+      const pruned = await storage.pruneExecutionLogs(cutoff);
+      res.json(success(config.nodeId, { pruned, cutoffDate: cutoff }));
+    } catch (err) {
+      logger.error('Failed to prune execution logs', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to prune execution logs'));
+    }
+  });
+
   return router;
 }

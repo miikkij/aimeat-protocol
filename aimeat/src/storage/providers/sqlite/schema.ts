@@ -846,6 +846,25 @@ export function initializeSchema(db: Database.Database): void {
       updatedAt       TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS execution_log (
+      id              TEXT PRIMARY KEY,
+      jobId           TEXT NOT NULL,
+      jobName         TEXT NOT NULL,
+      type            TEXT NOT NULL,
+      extensionName   TEXT,
+      actionId        TEXT,
+      "trigger"       TEXT NOT NULL,
+      result          TEXT NOT NULL,
+      errorMessage    TEXT,
+      durationMs      INTEGER NOT NULL DEFAULT 0,
+      memoryReads     TEXT NOT NULL DEFAULT '[]',
+      memoryWrites    TEXT NOT NULL DEFAULT '[]',
+      createdAt       TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_execution_log_jobId ON execution_log(jobId);
+    CREATE INDEX IF NOT EXISTS idx_execution_log_createdAt ON execution_log(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_execution_log_extensionName ON execution_log(extensionName);
+
     -- ── Replication Queue (B.1) ──
     CREATE TABLE IF NOT EXISTS replication_queue (
       id              TEXT PRIMARY KEY,
