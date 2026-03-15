@@ -976,7 +976,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         || d.name                           // Cortex/Translation: { data: { name } }
         || d.id
         || (d.locales ? `i18n-${d.locales.join('-')}` : null) // Translation fallback
-        || (d.registered ? `memory-${d.registered}` : null)   // Memory fallback
+        || (d.keys?.length ? `memory:${d.keys[d.keys.length - 1]}` : null)   // Memory: use last key name (e.g. "memory:municipalities.data")
         || null;
       if (!regName) {
         // Registration succeeded but we couldn't extract the name — warn user
