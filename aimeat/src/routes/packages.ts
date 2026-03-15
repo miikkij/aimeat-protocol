@@ -21,15 +21,27 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 2)
  *   v1.1.0 — 2026-03-15 — rename routes from /v1/packages to /v1/bundles to avoid collision with knowledge system
+ *   v1.2.0 — 2026-03-15 — GHII resolution, YAML export, import validation, duplicate detection
  */
 
 import { Router } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
+import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, PackageComponent } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+
+/** Resolve owner's GHII, falling back to agent GAII */
+async function resolveGhii(storage: Storage, ownerName: string, fallback: string): Promise<string> {
+  try {
+    const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+    return ghiiRecord?.ghii ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 /** Generate a date-based version string: v{YYYY}-{MM}-{DD}-{HHmm} */
 function generateVersion(): string {
@@ -64,9 +76,20 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const body = req.body;
-    if (!body || typeof body !== 'object') {
+    // Accept either { package: { ... } } wrapper or direct { name, components, ... }
+    const raw = req.body;
+    if (!raw || typeof raw !== 'object') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Request body must be a valid package object'));
+      return;
+    }
+    const body = (raw.package && typeof raw.package === 'object') ? raw.package : raw;
+
+    if (!body.name || typeof body.name !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name is required for import'));
+      return;
+    }
+    if (!Array.isArray(body.components) || body.components.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'components must be an array with at least 1 item'));
       return;
     }
 
@@ -75,8 +98,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       const id = randomUUID();
       const name = body.name as string;
       const author = owner;
-      // TODO: resolve owner's GHII via identity system when integration is confirmed
-      const authorGhii = req.auth!.sub;
+      const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
       const packageGroupId = `${name}::${author}`;
       const version = generateVersion();
 
@@ -114,6 +136,10 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       ]));
       emitChange('packages');
     } catch (e: any) {
+      if (e.message === 'PACKAGE_EXISTS' || e.code === 'SQLITE_CONSTRAINT_UNIQUE' || e.code === 'P2002') {
+        res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${body.name}" already exists for this author`));
+        return;
+      }
       res.status(500).json(error(config.nodeId, 'IMPORT_FAILED', e.message ?? 'Import failed'));
     }
   });
@@ -182,8 +208,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     const id = randomUUID();
     const version = generateVersion();
     const packageGroupId = `${name}::${owner}`;
-    // TODO: resolve owner's GHII via identity system when integration is confirmed
-    const authorGhii = req.auth!.sub;
+    const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
 
     const processedComponents: PackageComponent[] = components.map((c: any) => ({
       id: c.id,
@@ -354,9 +379,31 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // YAML placeholder — returns JSON stringified for now; full YAML export can be enhanced later
+    // Build YAML bundle: manifest document + component content documents
+    const manifest = {
+      'aimeat-package': '1.0',
+      name: pkg.name,
+      author: pkg.author,
+      version: pkg.version,
+      description: pkg.description,
+      category: pkg.category,
+      tags: pkg.tags,
+      changelog: pkg.changelog,
+      components: pkg.components.map(c => ({
+        id: c.id,
+        type: c.type,
+        label: c.label,
+        dependencies: c.dependencies,
+      })),
+    };
+
+    const parts = [YAML.stringify(manifest)];
+    for (const comp of pkg.components) {
+      parts.push(`--- # component: ${comp.id}\n${comp.content}`);
+    }
+
     res.setHeader('Content-Type', 'text/yaml');
-    res.send(JSON.stringify(pkg, null, 2));
+    res.send(parts.join('\n'));
   });
 
   // GET /v1/bundles/:groupId — get latest published version

@@ -19,6 +19,7 @@
  *   app.use(templatesRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 5)
+ *   v1.1.0 — 2026-03-15 — GHII resolution via identity system
  */
 
 import { Router } from 'express';
@@ -28,6 +29,16 @@ import type { Storage, TemplateListingRecord, TemplateReview, TemplateDiscussion
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+
+/** Resolve owner's GHII, falling back to agent GAII */
+async function resolveGhii(storage: Storage, ownerName: string, fallback: string): Promise<string> {
+  try {
+    const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+    return ghiiRecord?.ghii ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 const VALID_SORTS = ['rating', 'installs', 'newest'] as const;
 
@@ -77,8 +88,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       const now = new Date().toISOString();
-      // TODO: resolve owner's GHII via identity system when integration is confirmed
-      const authorGhii = req.auth!.sub;
+      const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
 
       const record: TemplateListingRecord = {
         id: randomUUID(),

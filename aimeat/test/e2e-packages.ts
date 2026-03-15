@@ -13,6 +13,7 @@
  *   - Phase 7: Auth & Validation
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial test suite
+ *   v1.1.0 — 2026-03-15 — add dry_run tests, fix YAML export assertion, fix draft install assertion
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-packages.ts
@@ -345,9 +346,10 @@ await test('Export package (GET /v1/bundles/:groupId/export)', async () => {
   assert(status === 200, `Expected 200, got ${status}`);
   const ct = headers.get('content-type') ?? '';
   assert(ct.includes('text/yaml'), `Expected text/yaml, got ${ct}`);
-  // Body is JSON stringified in text/yaml — parse it
-  const parsed = typeof body === 'object' && body._raw ? JSON.parse(body._raw) : body;
-  assert(parsed.packageGroupId === groupId, 'Export groupId mismatch');
+  // Body is YAML — check it contains package name
+  const raw = typeof body === 'object' && body._raw ? body._raw : JSON.stringify(body);
+  assert(raw.includes(pkgName), `Export should contain package name "${pkgName}"`);
+  assert(raw.includes('aimeat-package'), 'Export should contain aimeat-package header');
 });
 
 await test('Archive first version (DELETE /v1/bundles/:groupId/versions/:version)', async () => {
@@ -418,6 +420,25 @@ await test('Invalid visibility returns 400', async () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 console.log('\nPhase 4 — Instance Lifecycle');
+
+await test('Dry run install (POST /v1/bundles/:groupId/install with dry_run=true)', async () => {
+  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({ label: 'Dry Run Test', dry_run: true }),
+  });
+  assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data?.dry_run === true, 'Expected dry_run=true in response');
+  assert(body.data?.packageGroupId === groupId, 'groupId mismatch');
+  assert(body.data?.componentCount === 3, `Expected 3 components, got ${body.data?.componentCount}`);
+  assert(Array.isArray(body.data?.installOrder), 'Expected installOrder array');
+  assert(Array.isArray(body.data?.components), 'Expected components array');
+  // Verify no instance was actually created
+  const { body: listBody } = await json('/v1/instances', { headers: authed(ownerToken) });
+  const instances = listBody.data?.instances ?? [];
+  const dryRunInstance = instances.find((i: any) => i.label === 'Dry Run Test');
+  assert(!dryRunInstance, 'Dry run should not create an actual instance');
+});
 
 await test('Install package (POST /v1/bundles/:groupId/install)', async () => {
   const { status, body } = await json(`/v1/bundles/${encodedGroupId}/install`, {
@@ -495,21 +516,25 @@ await test('Component status (GET /v1/instances/:id/status)', async () => {
   assert(customized.length === 0, 'No components should be customized yet');
 });
 
-await test('Delete instance (DELETE /v1/instances/:id)', async () => {
-  // Create a throwaway instance to delete
-  const { body: inst } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+await test('Delete instance with removeComponents (DELETE /v1/instances/:id)', async () => {
+  // Install the imported-pack (a different package) to get a throwaway instance
+  const importedGroupId = encodeURIComponent(`imported-pack::${ownerName}`);
+  const { status: instStatus, body: inst } = await json(`/v1/bundles/${importedGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ label: 'To be deleted' }),
   });
+  assert(instStatus === 201, `Install for delete test failed: ${instStatus} — ${JSON.stringify(inst)}`);
   const delId = inst.data.id;
 
   const { status, body } = await json(`/v1/instances/${delId}`, {
     method: 'DELETE',
     headers: authed(ownerToken),
+    body: JSON.stringify({ removeComponents: true }),
   });
   assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
   assert(body.data?.removed === true, 'Expected removed=true');
+  assert(typeof body.data?.componentsRemoved === 'number', 'Expected componentsRemoved count');
 
   // Verify it's gone
   const { status: getStatus } = await json(`/v1/instances/${delId}`, {
