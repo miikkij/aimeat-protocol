@@ -877,7 +877,7 @@ function StepArrow() {
   return html`<svg class="pf-gen-step-arrow" viewBox="0 0 24 24" width="22" height="22">
     <circle cx="12" cy="12" r="10" fill="var(--accent,#E8564A)" opacity="0.15"/>
     <circle cx="12" cy="12" r="10" fill="none" stroke="var(--accent,#E8564A)" stroke-width="1.5"/>
-    <path d="M10 8l4 4-4 4" fill="none" stroke="var(--accent,#E8564A)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M8 10l4 4 4-4" fill="none" stroke="var(--accent,#E8564A)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 }
 
