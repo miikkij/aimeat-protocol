@@ -38,6 +38,7 @@
     "test:e2e:portal": "tsx test/e2e-portal.ts",
     "test:e2e:security": "tsx test/e2e-security.ts",
     "test:e2e:storage-visibility": "tsx test/e2e-storage-visibility.ts",
+    "test:e2e:cortex-ui": "tsx test/cortex-ui-e2e.ts",
     "test:e2e:docker": "bash test/docker/e2e-runner.sh --all",
     "test:e2e:docker:full": "bash test/docker/e2e-runner.sh test/api-full.ts",
     "test:e2e:docker:admin-features": "bash test/docker/e2e-runner.sh test/e2e-admin-features.ts",
