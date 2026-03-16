@@ -14,6 +14,7 @@ import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { Scheduler } from '../services/scheduler.js';
+import { createEmailService } from '../services/email.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
@@ -53,7 +54,8 @@ export async function initializeServices(
   }
 
   // Internal Scheduler System — centralized cron-based job scheduler
-  const scheduler = new Scheduler(config, storage);
+  const emailService = createEmailService(config);
+  const scheduler = new Scheduler(config, storage, emailService);
 
   // Register core job handlers
   registerCoreHandlers(scheduler, config, storage);

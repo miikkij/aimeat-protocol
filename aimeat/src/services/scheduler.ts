@@ -14,6 +14,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ExecutionLogEntry } from '../storage/interface.js';
 import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
 import type { ExtensionCtx } from './extension-runtime.js';
+import type { EmailService } from './email.js';
 import { logger } from '../utils/logger.js';
 
 export type JobTrigger = 'cron' | 'manual' | 'activate';
@@ -24,10 +25,12 @@ export class Scheduler {
   private cronJobs = new Map<string, Cron>();
   private coreHandlers = new Map<string, () => Promise<void>>();
   private running = false;
+  private emailService?: EmailService;
 
-  constructor(config: AimeatConfig, storage: Storage) {
+  constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
     this.config = config;
     this.storage = storage;
+    this.emailService = emailService;
   }
 
   /**
@@ -401,6 +404,38 @@ export class Scheduler {
         info: (msg, data) => logger.info(`[ext:${ext.name}:scheduler] ${msg}`, data),
         warn: (msg, data) => logger.warn(`[ext:${ext.name}:scheduler] ${msg}`, data),
         error: (msg, data) => logger.error(`[ext:${ext.name}:scheduler] ${msg}`, data),
+      },
+      notify: async (message, opts) => {
+        const key = `notifications.${ext.installedBy}`;
+        const existing = await this.storage.getMemory(ext.installedBy, key);
+        const list = Array.isArray(existing?.value) ? existing.value : [];
+        list.push({
+          id: randomUUID(),
+          message,
+          title: opts?.title || ext.name,
+          priority: opts?.priority || 'normal',
+          channel: opts?.channel || 'extension',
+          source: ext.name,
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+        // Keep last 100 notifications
+        const trimmed = list.slice(-100);
+        await this.storage.setMemory({
+          key, ownerGaii: ext.installedBy, value: trimmed,
+          visibility: 'private', tags: ['notifications'], ttlHours: null,
+          version: (existing?.version || 0) + 1,
+          createdAt: existing?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        return true;
+      },
+      email: async (to, subject, body) => {
+        if (!this.emailService?.enabled) {
+          logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`);
+          return false;
+        }
+        return this.emailService.sendNotification(to, subject, body);
       },
     };
 

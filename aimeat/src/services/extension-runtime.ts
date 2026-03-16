@@ -43,6 +43,8 @@ export interface ExtensionCtx {
         warn(msg: string, data?: Record<string, unknown>): void;
         error(msg: string, data?: Record<string, unknown>): void;
     };
+    notify?(message: string, opts?: { title?: string; priority?: string; channel?: string }): Promise<boolean>;
+    email?(to: string, subject: string, body: string): Promise<boolean>;
 }
 
 export interface ExtensionLimits {
@@ -158,6 +160,8 @@ ${userFnDecl}
             warn:  (msg, data) => __logCall(__log_warn, msg, data),
             error: (msg, data) => __logCall(__log_error, msg, data),
         },
+        notify: __notify ? (async (message, opts) => __call(__notify, [message, opts ? JSON.stringify(opts) : '{}'])) : undefined,
+        email:  __email  ? (async (to, subject, body) => __call(__email, [to, subject, body]))                        : undefined,
     };
 
     const input = JSON.parse(__inputJson);
@@ -368,6 +372,22 @@ export async function executeExtensionAction(
         jail.setSync('__log_info', makeLogRef(ctx.log.info));
         jail.setSync('__log_warn', makeLogRef(ctx.log.warn));
         jail.setSync('__log_error', makeLogRef(ctx.log.error));
+
+        // ── Notify & Email references ────────────────────────
+        jail.setSync('__notify', ctx.notify
+            ? makeRef(
+                async (message, opts) => ctx.notify!(message as string, opts as Record<string, string> | undefined),
+                counter, limits.maxApiCalls,
+            )
+            : null,
+        );
+        jail.setSync('__email', ctx.email
+            ? makeRef(
+                async (to, subject, body) => ctx.email!(to as string, subject as string, body as string),
+                counter, limits.maxApiCalls,
+            )
+            : null,
+        );
 
         // ── Compile and run ──────────────────────────────────
         const userFnDecl = transformScript(scriptContent);

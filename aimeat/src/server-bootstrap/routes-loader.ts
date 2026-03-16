@@ -283,7 +283,7 @@ export function mountRoutes(
   app.use(appStoreRouter(config, storage));
   // Node Extensions (V8 Isolates)
   if (config.extensionsEnabled) {
-    app.use(extensionsRouter(config, storage, scheduler));
+    app.use(extensionsRouter(config, storage, scheduler, emailService));
     logger.info('Extension system enabled');
   }
 

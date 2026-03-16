@@ -731,6 +731,8 @@ Extension code runs in an ISOLATED V8 sandbox. The following are NOT available:
 ║  ctx.caller (gaii/owner/roles)                                          ║
 ║  ctx.config (extension config object)                                   ║
 ║  ctx.log (info/warn/error)                                              ║
+║  ctx.notify(message, {title?, priority?, channel?}) → boolean           ║
+║  ctx.email(to, subject, body) → boolean (requires SMTP configured)      ║
 ║  ctx.instance (id/config — only for instance-scoped actions)            ║
 ║  NOTHING ELSE. Do NOT invent methods that are not listed here.          ║
 ╚══════════════════════════════════════════════════════════════════════════╝

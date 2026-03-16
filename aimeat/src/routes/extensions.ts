@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, ExtensionInstanceRecord, ScheduledJobRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
@@ -10,7 +11,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
 
-export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler): Router {
+export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
   const router = Router();
 
   // ── GET /v1/extensions — List installed extensions ────────────
@@ -957,6 +958,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           warn: (msg, data) => logger.warn(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
           error: (msg, data) => logger.error(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
         },
+        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
+          const key = `notifications.${req.auth!.owner}`;
+          const existing = await storage.getMemory(req.auth!.sub, key);
+          const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
+          list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
+          const trimmed = list.slice(-100);
+          await storage.setMemory({ key, ownerGaii: req.auth!.sub, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+          return true;
+        },
+        email: async (to: string, subject: string, body: string) => {
+          if (!emailService?.enabled) { logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`); return false; }
+          return emailService.sendNotification(to, subject, body);
+        },
       };
 
       // Execute the action in the V8 isolate sandbox
@@ -1166,6 +1180,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           info: (msg, data) => logger.info(`[ext:${ext.name}] ${msg}`, data),
           warn: (msg, data) => logger.warn(`[ext:${ext.name}] ${msg}`, data),
           error: (msg, data) => logger.error(`[ext:${ext.name}] ${msg}`, data),
+        },
+        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
+          const key = `notifications.${req.auth!.owner}`;
+          const existing = await storage.getMemory(req.auth!.sub, key);
+          const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
+          list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
+          const trimmed = list.slice(-100);
+          await storage.setMemory({ key, ownerGaii: req.auth!.sub, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+          return true;
+        },
+        email: async (to: string, subject: string, body: string) => {
+          if (!emailService?.enabled) { logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`); return false; }
+          return emailService.sendNotification(to, subject, body);
         },
       };
 
