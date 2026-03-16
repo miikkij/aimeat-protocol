@@ -57,9 +57,8 @@ function extractCodeBlock(text, lang) {
  */
 function sanitizeJson(text) {
   let s = text;
-  s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
-  s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
-  s = s.replace(/\\\(/g, '(').replace(/\\\)/g, ')');
+  // Strip markdown backslash escaping: \[ \] \{ \} \( \) \* \_ \` \| \~ \#
+  s = s.replace(/\\([[\]{}()*_`|~#])/g, '$1');
   s = s.replace(/,\s*([}\]])/g, '$1');
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
   return s;
