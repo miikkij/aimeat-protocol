@@ -483,3 +483,36 @@
   display: flex; align-items: center; justify-content: center;
   z-index: 1000;
 }
+
+/* ── Memory Tab ── */
+.adm-mem-stats {
+  display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.adm-mem-stat {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 10px; padding: 12px 20px; text-align: center; min-width: 100px;
+}
+.adm-mem-stat-value { display: block; font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+.adm-mem-stat-label { display: block; font-size: .75rem; color: var(--text-dim); margin-top: 2px; }
+.adm-mem-filters {
+  display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+}
+.adm-mem-filters .adm-input {
+  padding: 6px 10px; border: 1px solid var(--glass-border); border-radius: 6px;
+  font-size: .85rem; background: var(--glass-bg); color: inherit; min-width: 160px;
+}
+.adm-mem-value-label { font-size: .8rem; color: var(--text-dim); margin-bottom: 4px; }
+.adm-mem-value {
+  background: #f1f5f9; border: 1px solid var(--glass-border); border-radius: 6px;
+  padding: 10px; font-size: .8rem; max-height: 300px; overflow: auto;
+  white-space: pre-wrap; word-break: break-all; font-family: 'JetBrains Mono', monospace;
+}
+.adm-mem-pagination {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 12px 0; border-top: 1px solid var(--glass-border); margin-top: 8px;
+}
+.adm-mem-page-info { font-size: .85rem; color: var(--text-dim); }
+.adm-btn-danger {
+  color: #dc2626; border-color: #fecaca;
+}
+.adm-btn-danger:hover { background: #fef2f2; }

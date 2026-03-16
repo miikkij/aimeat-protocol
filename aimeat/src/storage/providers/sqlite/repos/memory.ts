@@ -99,6 +99,46 @@ export function listMemory(db: Database.Database, ownerGaii: string, opts?: { pr
   return results;
 }
 
+export function listAllMemory(db: Database.Database, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): { items: MemoryRecord[]; total: number } {
+  let whereClauses = '';
+  const params: unknown[] = [];
+
+  if (opts?.ownerPrefix) {
+    whereClauses += ' AND ownerGaii LIKE ?';
+    params.push(opts.ownerPrefix + '%');
+  }
+  if (opts?.prefix) {
+    whereClauses += ' AND key LIKE ?';
+    params.push(opts.prefix + '%');
+  }
+  if (opts?.visibility) {
+    whereClauses += ' AND visibility = ?';
+    params.push(opts.visibility);
+  }
+
+  const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
+
+  // Count total
+  const countRow = db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
+  const total = countRow.cnt;
+
+  // Fetch page
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+  const rows = db.prepare('SELECT * FROM memory' + whereStr + ' ORDER BY updatedAt DESC LIMIT ? OFFSET ?').all(...params, limit, offset) as Record<string, unknown>[];
+
+  const items: MemoryRecord[] = [];
+  for (const row of rows) {
+    const record = deserializeMemory(row);
+    if (isMemoryExpired(record)) {
+      db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+      continue;
+    }
+    items.push(record);
+  }
+  return { items, total };
+}
+
 export function deleteMemory(db: Database.Database, ownerGaii: string, key: string): boolean {
   const result = db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
   return result.changes > 0;

@@ -152,6 +152,18 @@ export const triggerLbSync    = ()      => apiPost('/v1/admin/site/sync');
 export const addMemory       = (key, value) => apiPost('/v1/memory', { key, value, visibility: 'private' });
 export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURIComponent(key)}`);
 
+// ── Admin Memory (all-owner memory browser) ──
+export const getAdminMemory = (params = {}) => {
+  const q = new URLSearchParams();
+  if (params.prefix) q.set('prefix', params.prefix);
+  if (params.owner) q.set('owner', params.owner);
+  if (params.visibility) q.set('visibility', params.visibility);
+  if (params.limit) q.set('limit', String(params.limit));
+  if (params.offset) q.set('offset', String(params.offset));
+  return apiGet('/v1/admin/memory?' + q.toString());
+};
+export const deleteAdminMemory = (owner, key) => apiDelete(`/v1/admin/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`);
+
 // ── Stats ──
 export const getStats        = ()       => apiGet('/v1/stats');
 

@@ -457,6 +457,44 @@ export class SqliteStorage implements Storage {
     return results;
   }
 
+  async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
+    let whereClauses = '';
+    const params: unknown[] = [];
+
+    if (opts?.ownerPrefix) {
+      whereClauses += ' AND ownerGaii LIKE ?';
+      params.push(opts.ownerPrefix + '%');
+    }
+    if (opts?.prefix) {
+      whereClauses += ' AND key LIKE ?';
+      params.push(opts.prefix + '%');
+    }
+    if (opts?.visibility) {
+      whereClauses += ' AND visibility = ?';
+      params.push(opts.visibility);
+    }
+
+    const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
+
+    const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
+    const total = countRow.cnt;
+
+    const limit = opts?.limit ?? 50;
+    const offset = opts?.offset ?? 0;
+    const rows = this.db.prepare('SELECT * FROM memory' + whereStr + ' ORDER BY updatedAt DESC LIMIT ? OFFSET ?').all(...params, limit, offset) as Record<string, unknown>[];
+
+    const items: MemoryRecord[] = [];
+    for (const row of rows) {
+      const record = this.deserializeMemory(row);
+      if (this.isMemoryExpired(record)) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+        continue;
+      }
+      items.push(record);
+    }
+    return { items, total };
+  }
+
   async deleteMemory(ownerGaii: string, key: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
     return result.changes > 0;

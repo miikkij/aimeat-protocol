@@ -436,6 +436,33 @@ export class MongoStorage implements Storage {
             });
     }
 
+    async listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
+        this.ensureReady();
+        const where: any = {};
+        if (opts?.ownerPrefix) where.ownerGaii = { startsWith: opts.ownerPrefix };
+        if (opts?.prefix) where.key = { startsWith: opts.prefix };
+        if (opts?.visibility) where.visibility = opts.visibility;
+
+        const [rows, total] = await Promise.all([
+            this.prisma.memory.findMany({
+                where,
+                orderBy: { updatedAt: 'desc' },
+                take: opts?.limit ?? 50,
+                skip: opts?.offset ?? 0,
+            }),
+            this.prisma.memory.count({ where }),
+        ]);
+
+        const items = rows
+            .filter((r: any) => {
+                if (!r.ttlHours) return true;
+                return Date.now() <= new Date(r.createdAt).getTime() + r.ttlHours * 3600_000;
+            })
+            .map((r: any) => this.toMemoryRecord(r));
+
+        return { items, total };
+    }
+
     async deleteMemory(ownerGaii: string, key: string): Promise<boolean> {
         this.ensureReady();
         try {

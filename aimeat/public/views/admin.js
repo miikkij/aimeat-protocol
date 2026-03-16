@@ -44,6 +44,7 @@ import SchedulerTab      from './admin/scheduler-tab.js';
 import KnowledgeAdminTab from './admin/knowledge-tab.js';
 import PromptsTab        from './admin/prompts-tab.js';
 import PackagesAdminTab  from './admin/packages-tab.js';
+import MemoryAdminTab    from './admin/memory-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -69,6 +70,7 @@ const NAV_GROUPS = [
     { id: 'chatInstances', icon: '\u{1F4AC}',  key: 'dashboard.chatInstances', component: ChatInstancesTab,  count: 'chatInstances' },
     { id: 'realtime',      icon: '\u{1F4E1}',  key: 'dashboard.realtime',      component: RealtimeTab,       count: 'rooms' },
     { id: 'work',          icon: '\u{1F4E6}',  key: 'dashboard.work',          component: WorkTab,           count: 'work' },
+    { id: 'memory-admin',  icon: '\u{1F5C4}',  key: 'dashboard.memoryAdmin',   component: MemoryAdminTab },
   ]},
   { key: 'dashboard.navInfrastructure', items: [
     { id: 'email',  icon: '\u2709',     key: 'dashboard.email',  component: EmailTab },

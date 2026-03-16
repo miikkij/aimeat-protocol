@@ -24,6 +24,7 @@ import { adminMonitoringRouter } from './admin-monitoring.js';
 import { adminAgentsRouter } from './admin-agents.js';
 import { adminMaintenanceRouter } from './admin-maintenance.js';
 import { adminEconomyRouter } from './admin-economy.js';
+import { adminMemoryRouter } from './admin-memory.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -561,6 +562,7 @@ export function adminRouter(
     router.use(adminAgentsRouter(config, storage));
     router.use(adminMaintenanceRouter(config, storage, maintenanceCache));
     router.use(adminEconomyRouter(config, storage));
+    router.use(adminMemoryRouter(config, storage));
 
     return router;
 }
