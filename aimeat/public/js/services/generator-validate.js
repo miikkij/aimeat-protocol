@@ -534,6 +534,11 @@ export function validateBlueprint(result) {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
         if (!c.label) errors.push(`Component "${c.id || '?'}" missing "label" field`);
+        // Auto-fix common AI shorthand: "ext" → "extension"
+        if (c.type === 'ext') {
+          c.type = 'extension';
+          warnings.push(`Component "${c.id}": auto-corrected type "ext" → "extension"`);
+        }
         if (c.type && !['csm', 'msm', 'extension', 'app', 'memory', 'translation', 'cortex'].includes(c.type)) {
           errors.push(`Component "${c.id}" has unknown type "${c.type}"`);
         }
@@ -553,13 +558,27 @@ export function validateBlueprint(result) {
         if (Array.isArray(c.produces)) clean.produces = c.produces;
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes;
         if (Array.isArray(c.schedules) && c.type === 'extension') {
-          // Validate each schedule entry has valid cron syntax
+          // Validate and auto-fix each schedule entry
           for (const s of c.schedules) {
             if (!s.action) errors.push(`Component "${c.id}": schedule missing "action" field`);
             if (!s.cron) errors.push(`Component "${c.id}": schedule missing "cron" field`);
             else if (s.cron !== '@activate') {
-              const fields = String(s.cron).trim().split(/\s+/);
-              if (fields.length !== 5) {
+              // Auto-fix: "/15" → "*/15" (AI commonly drops leading asterisk)
+              let cron = String(s.cron).trim();
+              if (/^\/\d/.test(cron)) {
+                const fixed = '*' + cron;
+                warnings.push(`Component "${c.id}": auto-corrected cron "${cron}" → "${fixed}"`);
+                cron = fixed;
+                s.cron = fixed;
+              }
+              // Auto-fix: pad to 5 fields with * if fields are missing
+              const fields = cron.split(/\s+/);
+              if (fields.length < 5 && fields.length >= 3) {
+                while (fields.length < 5) fields.push('*');
+                const fixed = fields.join(' ');
+                warnings.push(`Component "${c.id}": auto-padded cron to 5 fields: "${fixed}"`);
+                s.cron = fixed;
+              } else if (fields.length !== 5) {
                 errors.push(`Component "${c.id}": cron "${s.cron}" must have exactly 5 fields (got ${fields.length}). Example: "*/15 * * * *"`);
               }
             }
