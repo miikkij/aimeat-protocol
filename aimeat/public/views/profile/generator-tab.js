@@ -940,7 +940,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     const validating = addHistory(component, 'validating');
     await saveComponent(projectId, { ...validating, status: 'validating', result });
 
-    const vr = validateComponent(component.type, result);
+    const vr = validateComponent(component.type, result, project.blueprint);
     setValidationResult(vr);
     if (vr.valid) {
       const done = addHistory(validating, 'validation_passed');
@@ -957,7 +957,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     try {
       let resp;
       if (component.type === 'cortex') {
-        const vr = validateComponent('cortex', component.result || result);
+        const vr = validateComponent('cortex', component.result || result, project.blueprint);
         if (!vr.valid) {
           showToast?.((t('profile.generator.validationFailed') || 'Validation failed') + ': ' + vr.errors.join(', '), true);
           setRegistering(false);

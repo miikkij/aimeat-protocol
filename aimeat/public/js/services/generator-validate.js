@@ -373,7 +373,7 @@ const validators = {
     }
   },
 
-  cortex(result) {
+  cortex(result, blueprint) {
     const errors = [];
     const yamlBlock = extractCodeBlock(result, 'yaml');
     if (!yamlBlock) {
@@ -440,6 +440,29 @@ const validators = {
       // Check IIFE pattern exists
       if (!/\(function\s*\(\s*AIMEAT\s*\)/.test(jsCode)) {
         errors.push('Cortex JS must use IIFE pattern: (function (AIMEAT) { ... })(window.AIMEAT || ...)');
+      }
+
+      // Check exports object includes all required methods from blueprint
+      const exportsMatch = jsCode.match(/(?:const|let|var)\s+exports\s*=\s*\{([^}]+)\}/);
+      if (exportsMatch) {
+        const exportedMethods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
+
+        // Cross-check with blueprint produces API methods if available
+        if (blueprint?.components) {
+          const cortexComp = blueprint.components.find(c => c.type === 'cortex');
+          if (cortexComp?.produces) {
+            const requiredMethods = cortexComp.produces
+              .filter(p => p.startsWith('api:'))
+              .map(p => p.replace('api:', ''));
+            for (const method of requiredMethods) {
+              if (!exportedMethods.includes(method)) {
+                errors.push(`Blueprint requires method "${method}" but it's not in the exports object. Found: ${exportedMethods.join(', ')}`);
+              }
+            }
+          }
+        }
+      } else {
+        errors.push('No exports object found — cortex must have: const exports = { init, method1, method2, ... };');
       }
     }
 
@@ -649,8 +672,8 @@ export function validateBlueprint(result) {
 
 /* ── Main Validate Function ──────────────────────────── */
 
-export function validateComponent(type, result) {
+export function validateComponent(type, result, blueprint = null) {
   const validator = validators[type];
   if (!validator) return { valid: false, errors: [`No validator for type: ${type}`], extracted: result };
-  return validator(result);
+  return validator(result, blueprint);
 }

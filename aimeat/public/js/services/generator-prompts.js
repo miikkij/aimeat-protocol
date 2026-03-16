@@ -974,6 +974,29 @@ Check your ENTIRE output before responding. If you see &gt; &lt; &amp; &quot; &#
         `  await loadScript('/v1/cortex/${lib.name}/libs/${lib.name}.js');`
       ).join('\n');
 
+      // Extract actual method names from cortex code exports
+      const extractedMethods = [];
+      for (const lib of cortexLibs) {
+        const camelName = lib.name.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
+        const exportsMatch = lib.result?.match?.(/(?:const|let|var)\s+exports\s*=\s*\{([^}]+)\}/);
+        if (exportsMatch) {
+          const methods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
+          for (const m of methods) {
+            extractedMethods.push('- `AIMEAT.' + camelName + '.' + m + '()`');
+          }
+        }
+      }
+
+      let methodList = '';
+      if (extractedMethods.length > 0) {
+        methodList = `
+### AVAILABLE CORTEX METHODS (extracted from actual code — use ONLY these):
+${extractedMethods.join('\n')}
+
+Do NOT call any method not in this list. Do NOT rename these methods.
+`;
+      }
+
       cortexInstructions = `
 ## CORTEX LIBRARIES (use these — do NOT call extensions or memory directly)
 
@@ -991,7 +1014,7 @@ ${lib.result ? `Full cortex code (use EXACTLY these method names and return shap
 ║  Use EXACTLY the return value shapes — do NOT invent field names.      ║
 ║  If cortex returns { items: [...] }, use .items, NOT .data or .entries. ║
 ╚══════════════════════════════════════════════════════════════════════════╝
-
+${methodList}
 IMPORTANT:
 - Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`my-domain-lib\\\` → \\\`AIMEAT.myDomainLib.init()\\\`)
 - Use the cortex methods for ALL data access — never call extensions or memory directly
@@ -1114,7 +1137,7 @@ AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add 
   style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
   img-src 'self' data: https: blob:;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://*.tile.openstreetmap.org;
+  connect-src 'self' https://*.tile.openstreetmap.org https://cdn.jsdelivr.net;
 ">
 \\\`\\\`\\\`
 Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
@@ -1793,6 +1816,46 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
           context += `Do NOT add extra keys and do NOT omit any keys — the sets must be identical.\n`;
         }
       } catch { /* ignore parse errors */ }
+    }
+  }
+
+  // Inject MANDATORY API methods from blueprint produces list into cortex prompt
+  // This is THE critical contract: cortex MUST implement exactly these methods
+  if (type === 'cortex' && blueprint?.components) {
+    const componentId = blueprint.components.find(c => c.label === label)?.id;
+    const comp = componentId && blueprint.components.find(c => c.id === componentId);
+    if (comp?.produces && comp.produces.length > 0) {
+      const apiMethods = comp.produces
+        .filter(p => p.startsWith('api:'))
+        .map(p => p.replace('api:', ''));
+      if (apiMethods.length > 0) {
+        context += '\n## MANDATORY API METHODS (from blueprint — you MUST implement ALL of these)\n\n';
+        context += '╔══════════════════════════════════════════════════════════════════════════╗\n';
+        context += '║  Your cortex MUST export EXACTLY these methods. Do NOT rename them.     ║\n';
+        context += '║  Do NOT add extra public methods. Do NOT omit any method.               ║\n';
+        context += '║  The app component depends on these EXACT names.                        ║\n';
+        context += '╚══════════════════════════════════════════════════════════════════════════╝\n\n';
+        context += 'Required exports:\n';
+        for (const m of apiMethods) {
+          context += `- \`${m}()\` — MUST be in the exports object\n`;
+        }
+        context += '\nThe `exports` object at the bottom of your IIFE must include ALL of these:\n';
+        context += '```javascript\nconst exports = { ' + apiMethods.join(', ') + ' };\n```\n\n';
+      }
+    }
+
+    // Also inject consumes so cortex knows which memory keys to read
+    if (comp?.consumes && comp.consumes.length > 0) {
+      const memoryKeys = comp.consumes
+        .filter(c => c.startsWith('memory:'))
+        .map(c => c.replace('memory:', ''));
+      if (memoryKeys.length > 0) {
+        context += '\n## CONSUMED DATA (memory keys this cortex reads)\n';
+        for (const k of memoryKeys) {
+          context += `- \`${k}\`\n`;
+        }
+        context += '\n';
+      }
     }
   }
 
