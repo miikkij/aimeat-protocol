@@ -850,7 +850,17 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
           getPublic: async (namespace, key) => {
-            const record = await storage.getMemory(namespace, key);
+            // Try direct namespace lookup first
+            let record = await storage.getMemory(namespace, key);
+            // If not found and namespace looks like an owner name (no @ or #),
+            // resolve to the owner's default agent GAII and retry
+            if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
+              const agents = await storage.getAgentsByOwner(namespace);
+              for (const agent of agents) {
+                record = await storage.getMemory(agent.gaii, key);
+                if (record) break;
+              }
+            }
             return (record && record.visibility === 'public') ? record.value : null;
           },
         },
@@ -1047,7 +1057,17 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
           // Read public data from another extension's namespace (read-only cross-extension access)
           getPublic: async (namespace, key) => {
-            const record = await storage.getMemory(namespace, key);
+            // Try direct namespace lookup first
+            let record = await storage.getMemory(namespace, key);
+            // If not found and namespace looks like an owner name (no @ or #),
+            // resolve to the owner's default agent GAII and retry
+            if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
+              const agents = await storage.getAgentsByOwner(namespace);
+              for (const agent of agents) {
+                record = await storage.getMemory(agent.gaii, key);
+                if (record) break;
+              }
+            }
             return (record && record.visibility === 'public') ? record.value : null;
           },
         },

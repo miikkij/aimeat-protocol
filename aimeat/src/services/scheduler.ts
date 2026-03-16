@@ -308,7 +308,17 @@ export class Scheduler {
         },
         delete: async (key) => this.storage.deleteMemory(extMemoryOwner, key),
         getPublic: async (namespace, key) => {
-          const record = await this.storage.getMemory(namespace, key);
+          // Try direct namespace lookup first
+          let record = await this.storage.getMemory(namespace, key);
+          // If not found and namespace looks like an owner name (no @ or #),
+          // resolve to the owner's default agent GAII and retry
+          if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
+            const agents = await this.storage.getAgentsByOwner(namespace);
+            for (const agent of agents) {
+              record = await this.storage.getMemory(agent.gaii, key);
+              if (record) break;
+            }
+          }
           return (record && record.visibility === 'public') ? record.value : null;
         },
       },
