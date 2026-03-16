@@ -6,9 +6,11 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 
 export default function KnowledgeTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importText, setImportText] = useState('');
@@ -180,17 +182,18 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const handleDelete = useCallback(async (pkg) => {
     const manifest = pkg.value;
     const name = manifest?.name || 'Untitled';
-    if (!confirm(t('knowledge.myKnowledge.confirmDelete')?.replace('{name}', name)
-        || `Delete "${name}"? This cannot be undone.`)) return;
-    setDeleting(pkg.key);
-    try {
-      await knowledgeService.deletePackage(ghii, manifest?.id || pkg.key.split('/')[1] || pkg.key);
-      showToast(t('knowledge.myKnowledge.deleted') || 'Package deleted');
-      setExpandedPkg(null);
-      loadPackages();
-    } catch {
-      showToast(t('knowledge.myKnowledge.deleteError') || 'Failed to delete package');
-    } finally { setDeleting(null); }
+    confirm(t('knowledge.myKnowledge.confirmDelete')?.replace('{name}', name)
+        || `Delete "${name}"? This cannot be undone.`, async () => {
+      setDeleting(pkg.key);
+      try {
+        await knowledgeService.deletePackage(ghii, manifest?.id || pkg.key.split('/')[1] || pkg.key);
+        showToast(t('knowledge.myKnowledge.deleted') || 'Package deleted');
+        setExpandedPkg(null);
+        loadPackages();
+      } catch {
+        showToast(t('knowledge.myKnowledge.deleteError') || 'Failed to delete package');
+      } finally { setDeleting(null); }
+    }, { danger: true });
   }, [ghii, showToast, loadPackages]);
 
   /* ── Export ── */
@@ -698,6 +701,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         `)}
       </div>
 
+      <${ConfirmUI} />
     </div>
   `;
 }

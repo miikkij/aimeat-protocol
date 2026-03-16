@@ -5,10 +5,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
 
 export default function NodesTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const tunnelUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
   const [nodes, setNodes] = useState(null);
@@ -47,11 +49,12 @@ export default function NodesTab({ session, showToast, onStats }) {
   }
 
   async function handleDetach(nodeId) {
-    if (!confirm(t('profile.nodes.detachConfirm'))) return;
-    const resp = await nodesService.detachNode(nodeId);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.nodes.detachedToast'));
-    loadData();
+    confirm(t('profile.nodes.detachConfirm'), async () => {
+      const resp = await nodesService.detachNode(nodeId);
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+      showToast(t('profile.nodes.detachedToast'));
+      loadData();
+    }, { danger: true });
   }
 
   async function handleSetVis(nodeId, vis) {
@@ -153,7 +156,8 @@ export default function NodesTab({ session, showToast, onStats }) {
               `}
             </div>`;
         })
-    }`;
+    }
+    <${ConfirmUI} />`;
 }
 
 function NodeForm({ onRegister, onCancel }) {

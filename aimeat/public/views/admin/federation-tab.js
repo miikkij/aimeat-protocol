@@ -10,6 +10,7 @@ import {
   activatePeer, addPeerDirect, removePeer, removePeerEmergency, testFederationNode,
   joinGenesisNetwork,
 } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function FederationTab({ data, reload }) {
   const peeringRequests = data.federation || [];
@@ -38,38 +39,45 @@ export default function FederationTab({ data, reload }) {
   const approvedRequests = peeringRequests.filter(r => r.status === 'approved');
   const rejectedRequests = peeringRequests.filter(r => r.status === 'rejected');
 
+  const { confirm, ConfirmUI } = useConfirm();
+
   function flash(msg) { setActionSuccess(msg); setActionError(null); setTimeout(() => setActionSuccess(null), 4000); }
   function flashErr(msg) { setActionError(msg); setActionSuccess(null); setTimeout(() => setActionError(null), 6000); }
 
   // ── Actions ──
-  const doApprove = useCallback(async (id) => {
-    if (!confirm(t('dashboard.fedApprovePeerConfirm'))) return;
-    try { await approvePeeringRequest(id); flash(t('dashboard.fedPeerApproved')); reload(); }
-    catch (e) { flashErr(e.message); }
+  const doApprove = useCallback((id) => {
+    confirm(t('dashboard.fedApprovePeerConfirm'), async () => {
+      try { await approvePeeringRequest(id); flash(t('dashboard.fedPeerApproved')); reload(); }
+      catch (e) { flashErr(e.message); }
+    });
   }, [reload]);
 
-  const doReject = useCallback(async (id) => {
-    if (!confirm(t('dashboard.fedRejectPeerConfirm'))) return;
-    try { await rejectPeeringRequest(id); flash(t('dashboard.fedPeerRejected')); reload(); }
-    catch (e) { flashErr(e.message); }
+  const doReject = useCallback((id) => {
+    confirm(t('dashboard.fedRejectPeerConfirm'), async () => {
+      try { await rejectPeeringRequest(id); flash(t('dashboard.fedPeerRejected')); reload(); }
+      catch (e) { flashErr(e.message); }
+    }, { danger: true });
   }, [reload]);
 
-  const doActivate = useCallback(async (nodeId) => {
-    if (!confirm(t('dashboard.fedActivateConfirm'))) return;
-    try { await activatePeer(nodeId); flash(t('dashboard.fedPeerActivated')); reload(); }
-    catch (e) { flashErr(e.message); }
+  const doActivate = useCallback((nodeId) => {
+    confirm(t('dashboard.fedActivateConfirm'), async () => {
+      try { await activatePeer(nodeId); flash(t('dashboard.fedPeerActivated')); reload(); }
+      catch (e) { flashErr(e.message); }
+    });
   }, [reload]);
 
-  const doRemove = useCallback(async (nodeId) => {
-    if (!confirm(t('dashboard.fedRemoveConfirm'))) return;
-    try { await removePeer(nodeId); flash(t('dashboard.fedPeerRemoved')); reload(); }
-    catch (e) { flashErr(e.message); }
+  const doRemove = useCallback((nodeId) => {
+    confirm(t('dashboard.fedRemoveConfirm'), async () => {
+      try { await removePeer(nodeId); flash(t('dashboard.fedPeerRemoved')); reload(); }
+      catch (e) { flashErr(e.message); }
+    }, { danger: true });
   }, [reload]);
 
-  const doEmergencyRemove = useCallback(async (nodeId) => {
-    if (!confirm(t('dashboard.fedEmergencyRemoveConfirm'))) return;
-    try { await removePeerEmergency(nodeId); flash(t('dashboard.fedPeerEmergencyRemoved')); reload(); }
-    catch (e) { flashErr(e.message); }
+  const doEmergencyRemove = useCallback((nodeId) => {
+    confirm(t('dashboard.fedEmergencyRemoveConfirm'), async () => {
+      try { await removePeerEmergency(nodeId); flash(t('dashboard.fedPeerEmergencyRemoved')); reload(); }
+      catch (e) { flashErr(e.message); }
+    }, { danger: true });
   }, [reload]);
 
   const doTest = useCallback(async () => {
@@ -399,5 +407,6 @@ export default function FederationTab({ data, reload }) {
         `)}
       </div>
     `}
+    <${ConfirmUI} />
   `;
 }

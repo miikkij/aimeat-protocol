@@ -11,8 +11,10 @@ import { getKeyPermissions } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const [memories, setMemories] = useState(null);
   const [files, setFiles] = useState(null);
@@ -76,12 +78,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   }
 
   async function handleDeleteMemory(key) {
-    if (!confirm(t('profile.memory.deleteConfirm') + ': ' + key + '?')) return;
-    const resp = await memoryService.deleteMemory(key);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.memory.deleted'));
-    setExpandedMem(null);
-    loadMemories();
+    confirm(t('profile.memory.deleteConfirm') + ': ' + key + '?', async () => {
+      const resp = await memoryService.deleteMemory(key);
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+      showToast(t('profile.memory.deleted'));
+      setExpandedMem(null);
+      loadMemories();
+    }, { danger: true });
   }
 
   async function handleSaveEdit(key, value, visibility, version) {
@@ -126,11 +129,12 @@ export default function MemoryTab({ session, showToast, onStats }) {
   }
 
   async function handleDeleteFile(key) {
-    if (!confirm(t('profile.files.deleteConfirm'))) return;
-    const resp = await memoryService.deleteFile(key);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.files.deleted'));
-    loadFiles();
+    confirm(t('profile.files.deleteConfirm'), async () => {
+      const resp = await memoryService.deleteFile(key);
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+      showToast(t('profile.files.deleted'));
+      loadFiles();
+    }, { danger: true });
   }
 
   async function loadKeyPerms(key) {
@@ -352,6 +356,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
       initialVersion=${editModal.version}
       onSave=${(v, vis, ver) => handleSaveEdit(editModal.key, v, vis, ver)}
       onCancel=${() => setEditModal(null)} />`}
+    <${ConfirmUI} />
   `;
 }
 

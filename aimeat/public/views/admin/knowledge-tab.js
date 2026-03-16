@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, Spinner, Empty } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as adminService from '/js/services/admin.js';
 
 const CONTENT_TYPES = ['document', 'research', 'idea', 'plan', 'dataset', 'tutorial', 'collection', 'article', 'story', 'fiction'];
@@ -18,6 +19,7 @@ export default function KnowledgeAdminTab({ data, reload }) {
   const [reviewForm, setReviewForm] = useState({ reason: 'routine_review', action: 'approve', customText: '' });
 
   /* ── Create form state ── */
+  const { confirm, ConfirmUI } = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
@@ -75,13 +77,14 @@ export default function KnowledgeAdminTab({ data, reload }) {
   }, [form, loadPackages]);
 
   /* ── Delete package ── */
-  const deletePackage = useCallback(async (packageId) => {
-    if (!confirm(t('knowledge.operator.confirmDelete'))) return;
-    try {
-      await adminService.deleteKnowledgePackage(packageId);
-      loadPackages();
-    } catch (err) { console.error('Delete failed:', err); }
-  }, [loadPackages]);
+  const deletePackage = useCallback((packageId) => {
+    confirm(t('knowledge.operator.confirmDelete'), async () => {
+      try {
+        await adminService.deleteKnowledgePackage(packageId);
+        loadPackages();
+      } catch (err) { console.error('Delete failed:', err); }
+    }, { danger: true });
+  }, [loadPackages, confirm]);
 
   /* ── Entry management ── */
   const addEntry = () => setForm(f => ({ ...f, entries: [...f.entries, { title: '', content: '' }] }));
@@ -288,6 +291,7 @@ export default function KnowledgeAdminTab({ data, reload }) {
           </div>
         `)}
       </div>
+      <${ConfirmUI} />
     </div>
   `;
 }

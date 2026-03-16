@@ -16,6 +16,7 @@ import {
   uninstallExtension, getActionScript, updateActionScript, scaffoldExtension,
   getDiskScript, saveDiskScript, addDiskAction, reinstallExtension,
 } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 const inputStyle = 'adm-input';
 const labelStyle = 'adm-text-sm adm-text-dim';
@@ -429,6 +430,7 @@ function ScaffoldForm({ onCreated }) {
 // ── Inline instance panel for a single extension ──
 function ExtensionPanel({ ext, onUninstall }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const [expanded, setExpanded] = useState(false);
   const [instances, setInstances] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -482,12 +484,13 @@ function ExtensionPanel({ ext, onUninstall }) {
     } catch (e) { showErr(e.message); }
   }
 
-  async function handleDelete(inst) {
-    if (!confirm(t('dashboard.servicesDeleteConfirm') + ': ' + inst.id + '?')) return;
-    try {
-      await deleteExtensionInstance(ext.name, inst.id);
-      loadInstances();
-    } catch (e) { showErr(e.message); }
+  function handleDelete(inst) {
+    confirm(t('dashboard.servicesDeleteConfirm') + ': ' + inst.id + '?', async () => {
+      try {
+        await deleteExtensionInstance(ext.name, inst.id);
+        loadInstances();
+      } catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   async function handleSaveTranslations(extName, instId, translations) {
@@ -821,11 +824,13 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
         </div>
       `}
     </div>
+    <${ConfirmUI} />
   `;
 }
 
 export default function ServicesTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const extensions = data.extensions?.extensions || [];
   const [available, setAvailable] = useState([]);
   const [loadingAvailable, setLoadingAvailable] = useState(false);
@@ -854,14 +859,15 @@ export default function ServicesTab({ data, reload }) {
     }
   }
 
-  async function handleUninstall(name) {
-    if (!confirm(t('dashboard.servicesUninstallConfirm') + ': ' + name + '?')) return;
-    try {
-      await uninstallExtension(name);
-      reload();
-    } catch (e) {
-      showErr(e.message);
-    }
+  function handleUninstall(name) {
+    confirm(t('dashboard.servicesUninstallConfirm') + ': ' + name + '?', async () => {
+      try {
+        await uninstallExtension(name);
+        reload();
+      } catch (e) {
+        showErr(e.message);
+      }
+    }, { danger: true });
   }
 
   async function handleReinstall(name) {
@@ -969,5 +975,6 @@ return { ok: true, data: {} }; // ${t('dashboard.servicesManualCtxReturn')}</cod
         </ul>
       </div>
     </div>
+    <${ConfirmUI} />
   `;
 }

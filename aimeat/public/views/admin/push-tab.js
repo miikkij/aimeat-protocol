@@ -6,6 +6,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import * as api from '/js/services/admin.js';
 import { dt, StatCard, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function PushTab({ data, reload }) {
   const push = data.push;
@@ -21,6 +22,7 @@ export default function PushTab({ data, reload }) {
   const [resetStatus, setResetStatus] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [subStatus, setSubStatus] = useState(null); // null | 'subscribing' | 'subscribed' | 'unsubscribing' | 'error'
+  const { confirm, ConfirmUI } = useConfirm();
   const [toast, showErr, showOk, clearToast] = useToast();
 
   const localeTpls = templates.filter(tpl => tpl.locale === tplLocale);
@@ -50,17 +52,18 @@ export default function PushTab({ data, reload }) {
     }
   };
 
-  const handleReset = async () => {
-    if (!confirm(t('dashboard.pushResetConfirm'))) return;
-    setResetStatus('resetting');
-    try {
-      await api.resetPushTemplates();
-      setResetStatus(null);
-      reload();
-    } catch {
-      setResetStatus('error');
-      setTimeout(() => setResetStatus(null), 3000);
-    }
+  const handleReset = () => {
+    confirm(t('dashboard.pushResetConfirm'), async () => {
+      setResetStatus('resetting');
+      try {
+        await api.resetPushTemplates();
+        setResetStatus(null);
+        reload();
+      } catch {
+        setResetStatus('error');
+        setTimeout(() => setResetStatus(null), 3000);
+      }
+    }, { danger: true });
   };
 
   const handleSubscribe = async () => {
@@ -283,5 +286,6 @@ export default function PushTab({ data, reload }) {
         </tbody>
       </table></div></div>`
     }
+    <${ConfirmUI} />
   `;
 }

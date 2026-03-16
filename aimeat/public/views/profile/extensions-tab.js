@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as cortexService from '/js/services/cortex.js';
 import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
@@ -93,6 +94,7 @@ To install: go to Profile > Extensions > + Add > paste the YAML manifest > add J
 }
 
 export default function ExtensionsTab({ session, showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const [extensions, setExtensions] = useState(null);
   const [extDetailName, setExtDetailName] = useState(null);
@@ -167,14 +169,15 @@ export default function ExtensionsTab({ session, showToast }) {
   }
 
   async function handleV8Delete(name) {
-    if (!confirm(t('profile.v8ext.confirmDelete'))) return;
-    try {
-      const resp = await v8Ext.deleteV8Extension(name);
-      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
-      showToast(t('profile.v8ext.deleted'));
-      setV8Detail(null);
-      loadV8Extensions();
-    } catch(e) { showToast(e.message, true); }
+    confirm(t('profile.v8ext.confirmDelete'), async () => {
+      try {
+        const resp = await v8Ext.deleteV8Extension(name);
+        if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+        showToast(t('profile.v8ext.deleted'));
+        setV8Detail(null);
+        loadV8Extensions();
+      } catch(e) { showToast(e.message, true); }
+    }, { danger: true });
   }
 
   async function handleCreateInstance(name) {
@@ -205,13 +208,14 @@ export default function ExtensionsTab({ session, showToast }) {
   }
 
   async function handleDeleteInstance(name, instanceId) {
-    if (!confirm(t('profile.v8ext.confirmDeleteInstance'))) return;
-    try {
-      const resp = await v8Ext.deleteInstance(name, instanceId);
-      if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
-      showToast(t('profile.v8ext.instanceDeleted'));
-      setV8Instances(await v8Ext.listInstances(name));
-    } catch(e) { showToast(e.message, true); }
+    confirm(t('profile.v8ext.confirmDeleteInstance'), async () => {
+      try {
+        const resp = await v8Ext.deleteInstance(name, instanceId);
+        if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
+        showToast(t('profile.v8ext.instanceDeleted'));
+        setV8Instances(await v8Ext.listInstances(name));
+      } catch(e) { showToast(e.message, true); }
+    }, { danger: true });
   }
 
   async function loadDetail(name) {
@@ -244,14 +248,15 @@ export default function ExtensionsTab({ session, showToast }) {
   }
 
   async function uninstallExt(name) {
-    if (!confirm(t('profile.extensions.uninstallConfirm'))) return;
-    try {
-      const resp = await cortexService.uninstallExtension(name);
-      if (resp.ok === false) throw new Error(resp.error?.message || 'Uninstall failed');
-      showToast(t('profile.extensions.success.uninstalled'));
-      loadExtensions();
-      setExtDetailName(null);
-    } catch(e) { showToast(e.message, true); }
+    confirm(t('profile.extensions.uninstallConfirm'), async () => {
+      try {
+        const resp = await cortexService.uninstallExtension(name);
+        if (resp.ok === false) throw new Error(resp.error?.message || 'Uninstall failed');
+        showToast(t('profile.extensions.success.uninstalled'));
+        loadExtensions();
+        setExtDetailName(null);
+      } catch(e) { showToast(e.message, true); }
+    }, { danger: true });
   }
 
   async function handleToggleVisibility(name, currentVis) {
@@ -407,6 +412,7 @@ export default function ExtensionsTab({ session, showToast }) {
         </button>
         <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
       </div>
+      <${ConfirmUI} />
     </div>`;
   }
 
@@ -505,6 +511,7 @@ export default function ExtensionsTab({ session, showToast }) {
           : html`<button class="btn-primary" onClick=${() => handleV8Activate(ext.name)}>${t('profile.v8ext.activate')}</button>`}
         <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
       </div>
+      <${ConfirmUI} />
     </div>`;
   }
 
@@ -650,5 +657,6 @@ export default function ExtensionsTab({ session, showToast }) {
           </form>
         </div>
       </div>` : null}
+    <${ConfirmUI} />
   </div>`;
 }

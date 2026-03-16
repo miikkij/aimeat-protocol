@@ -5,16 +5,19 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Empty, useToast, Toast } from './shared.js';
 import { grantRole } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function OwnersTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const owners = data.owners || [];
   if (owners.length === 0) return html`<${Empty} text=${t('dashboard.noOwnersFound')} />`;
 
-  async function doGrant(name) {
-    if (!confirm(t('dashboard.grantConfirm').replace('{name}', name))) return;
-    try { await grantRole(name, 'operator'); reload(); }
-    catch (e) { showErr(e.message); }
+  function doGrant(name) {
+    confirm(t('dashboard.grantConfirm').replace('{name}', name), async () => {
+      try { await grantRole(name, 'operator'); reload(); }
+      catch (e) { showErr(e.message); }
+    });
   }
 
   return html`
@@ -47,5 +50,6 @@ export default function OwnersTab({ data, reload }) {
         </table>
       </div>
     </div>
+    <${ConfirmUI} />
   `;
 }

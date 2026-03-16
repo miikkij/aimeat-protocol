@@ -9,9 +9,11 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, DataTable, Empty, useToast, Toast } from './shared.js';
 import { triggerSchedulerJob, updateSchedulerJob, deleteSchedulerJob, fetchSchedulerExecutionLog } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function SchedulerTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const jobs = data.schedulerJobs?.jobs || [];
 
   const totalJobs = jobs.length;
@@ -37,14 +39,15 @@ export default function SchedulerTab({ data, reload }) {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm(t('dashboard.deleteLabel') + ': ' + id + '?')) return;
-    try {
-      await deleteSchedulerJob(id);
-      reload();
-    } catch (e) {
-      showErr(e.message);
-    }
+  function handleDelete(id) {
+    confirm(t('dashboard.deleteLabel') + ': ' + id + '?', async () => {
+      try {
+        await deleteSchedulerJob(id);
+        reload();
+      } catch (e) {
+        showErr(e.message);
+      }
+    }, { danger: true });
   }
 
   const statsItems = [
@@ -59,6 +62,7 @@ export default function SchedulerTab({ data, reload }) {
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <${StatsGrid} items=${statsItems} />
       <${Empty} text=${t('dashboard.schedulerNoJobs')} />
+      <${ConfirmUI} />
     `;
   }
 
@@ -147,5 +151,6 @@ export default function SchedulerTab({ data, reload }) {
     ${logRows.length
       ? html`<${DataTable} headers=${logHeaders} rows=${logRows} scroll=${true} />`
       : html`<${Empty} text="No execution history" />`}
+    <${ConfirmUI} />
   `;
 }

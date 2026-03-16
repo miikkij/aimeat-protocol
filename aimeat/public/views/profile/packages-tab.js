@@ -20,9 +20,11 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
 
 export default function PackagesTab({ session, showToast, navigate, locale }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [instances, setInstances] = useState([]);
   const [packages, setPackages] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -68,14 +70,15 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
   };
 
   const handleRemove = async (id) => {
-    if (!confirm(t('packages.confirmRemove') || 'Remove this instance?')) return;
-    const res = await pkgService.removeInstance(id, false);
-    if (res.ok) {
-      showToast(t('packages.instanceRemoved'));
-      loadData();
-    } else {
-      showToast(res.error || 'Remove failed', true);
-    }
+    confirm(t('packages.confirmRemove') || 'Remove this instance?', async () => {
+      const res = await pkgService.removeInstance(id, false);
+      if (res.ok) {
+        showToast(t('packages.instanceRemoved'));
+        loadData();
+      } else {
+        showToast(res.error || 'Remove failed', true);
+      }
+    }, { danger: true });
   };
 
   const handleCheckUpdate = async (id) => {
@@ -222,6 +225,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
           `}
         </div>
       `}
+      <${ConfirmUI} />
     </div>
   `;
 }

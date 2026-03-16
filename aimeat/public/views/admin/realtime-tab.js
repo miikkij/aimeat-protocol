@@ -5,19 +5,22 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { num, StatsGrid, Empty, useToast, Toast } from './shared.js';
 import { closeRoom } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function RealtimeTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const rt = data.realtime;
   if (!rt) return html`<${Empty} text=${t('dashboard.realtimeUnavailable')} />`;
 
   const rooms = rt.rooms || [];
   const docs = rt.yjs_documents || [];
 
-  async function doClose(roomId) {
-    if (!confirm(t('dashboard.closeRoomConfirm'))) return;
-    try { await closeRoom(roomId); reload(); }
-    catch (e) { showErr(e.message); }
+  function doClose(roomId) {
+    confirm(t('dashboard.closeRoomConfirm'), async () => {
+      try { await closeRoom(roomId); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   return html`
@@ -60,5 +63,6 @@ export default function RealtimeTab({ data, reload }) {
         </table>
       </div>
     `}
+    <${ConfirmUI} />
   `;
 }

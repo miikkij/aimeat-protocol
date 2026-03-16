@@ -5,9 +5,11 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { updateGhiiLevel, deleteGhii } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function GhiiTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const users = data.ghiiUsers || [];
 
   async function setLevel(ghii, level) {
@@ -15,10 +17,11 @@ export default function GhiiTab({ data, reload }) {
     catch (e) { showErr(e.message); }
   }
 
-  async function doDelete(ghii) {
-    if (!confirm(t('dashboard.deleteGhiiConfirm') + ' ' + ghii + '?')) return;
-    try { await deleteGhii(ghii); reload(); }
-    catch (e) { showErr(e.message); }
+  function doDelete(ghii) {
+    confirm(t('dashboard.deleteGhiiConfirm') + ' ' + ghii + '?', async () => {
+      try { await deleteGhii(ghii); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   return html`
@@ -80,5 +83,6 @@ export default function GhiiTab({ data, reload }) {
         </tbody>
       </table>`
     }
+    <${ConfirmUI} />
   `;
 }

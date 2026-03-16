@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
 
 export default function CsmTab({ data, reload }) {
@@ -18,6 +19,7 @@ export default function CsmTab({ data, reload }) {
   const [prompt, setPrompt] = useState('');
   const [copied, setCopied] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
 
   async function showDetail(name) {
     try {
@@ -29,13 +31,14 @@ export default function CsmTab({ data, reload }) {
 
   async function doDelete(name) {
     const msg = t('dashboard.csmDeleteConfirm').replace('{name}', name);
-    if (!confirm(msg)) return;
-    try {
-      await deleteCsm(name);
-      setView('list');
-      setDetail(null);
-      reload();
-    } catch (e) { showErr(e.message); }
+    confirm(msg, async () => {
+      try {
+        await deleteCsm(name);
+        setView('list');
+        setDetail(null);
+        reload();
+      } catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   async function openCreate() {
@@ -130,6 +133,7 @@ export default function CsmTab({ data, reload }) {
           <h5 style="margin:16px 0 4px">${t('dashboard.csmDefinition')}</h5>
           <pre style="background:var(--bg-card);padding:12px;border-radius:6px;overflow:auto;font-size:.75rem">${JSON.stringify(def, null, 2)}</pre>
         </div>
+        <${ConfirmUI} />
       </div>
     `;
   }
@@ -252,5 +256,6 @@ export default function CsmTab({ data, reload }) {
           </div>
         </div>
       `}
+    <${ConfirmUI} />
   `;
 }

@@ -5,16 +5,19 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { ExpandableHelp, useToast, Toast } from './shared.js';
 import { deleteHook } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function HooksTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const hooks = data.hooks || {};
   const hookNames = Object.keys(hooks);
 
-  async function doClear(name) {
-    if (!confirm(t('dashboard.clearHookConfirm') + ' "' + name + '"?')) return;
-    try { await deleteHook(name); reload(); }
-    catch (e) { showErr(e.message); }
+  function doClear(name) {
+    confirm(t('dashboard.clearHookConfirm') + ' "' + name + '"?', async () => {
+      try { await deleteHook(name); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   // Hook descriptions for inline help
@@ -61,5 +64,6 @@ export default function HooksTab({ data, reload }) {
         </table>
       </div>
     </div>
+    <${ConfirmUI} />
   `;
 }

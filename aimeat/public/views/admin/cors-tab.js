@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Empty, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { clearGhiiCors, clearAgentCors, setGhiiCors, setAgentCors } from '/js/services/admin.js';
 
 const COMMON_ORIGINS = [
@@ -105,21 +106,24 @@ export default function CorsTab({ data, reload }) {
   const [editGhii, setEditGhii] = useState(null);
   const [editAgent, setEditAgent] = useState(null);
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
 
   async function doClearGhii(ghii) {
-    if (!confirm(t('dashboard.corsClearConfirm'))) return;
-    try {
-      await clearGhiiCors(ghii);
-      reload();
-    } catch (e) { showErr(e.message); }
+    confirm(t('dashboard.corsClearConfirm'), async () => {
+      try {
+        await clearGhiiCors(ghii);
+        reload();
+      } catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   async function doClearAgent(gaii) {
-    if (!confirm(t('dashboard.corsClearConfirm'))) return;
-    try {
-      await clearAgentCors(gaii);
-      reload();
-    } catch (e) { showErr(e.message); }
+    confirm(t('dashboard.corsClearConfirm'), async () => {
+      try {
+        await clearAgentCors(gaii);
+        reload();
+      } catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   async function doSaveGhii(ghii, origins) {
@@ -231,5 +235,6 @@ export default function CorsTab({ data, reload }) {
         nameKey="name"
         onSave=${(gaii, origins) => doSaveAgent(gaii, origins)} />
     </div>
+    <${ConfirmUI} />
   `;
 }

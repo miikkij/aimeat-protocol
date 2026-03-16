@@ -5,10 +5,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, deleteApp, patchApp } from '/js/services/apps.js';
 import { getNodeUrl } from '/js/services/auth.js';
 
 export default function AppsTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const [myApps, setMyApps] = useState(null);
   const [allApps, setAllApps] = useState(null);
@@ -46,10 +48,11 @@ export default function AppsTab({ session, showToast, onStats }) {
   }
 
   async function handleDelete(filename) {
-    if (!confirm(t('profile.apps.confirmDelete') || 'Delete this app?')) return;
-    const resp = await deleteApp(filename);
-    if (resp.ok !== false) { showToast(t('profile.apps.deleted') || 'App deleted'); loadData(); }
-    else showToast(resp?.error?.message || t('profile.apps.deleteFailed') || 'Delete failed', true);
+    confirm(t('profile.apps.confirmDelete') || 'Delete this app?', async () => {
+      const resp = await deleteApp(filename);
+      if (resp.ok !== false) { showToast(t('profile.apps.deleted') || 'App deleted'); loadData(); }
+      else showToast(resp?.error?.message || t('profile.apps.deleteFailed') || 'Delete failed', true);
+    }, { danger: true });
   }
 
   function startEdit(app) {
@@ -165,7 +168,8 @@ export default function AppsTab({ session, showToast, onStats }) {
               </div>`;
           })}
         </div>`
-    }`;
+    }
+    <${ConfirmUI} />`;
 }
 
 function AppUploadForm({ onUpload, onCancel }) {

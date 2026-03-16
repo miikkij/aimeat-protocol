@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, StatsGrid, Empty, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import {
   deleteChatInstance,
   getBoards, getBoardPosts, createBoard, postToBoard,
@@ -90,6 +91,7 @@ export default function ChatInstancesTab({ data, reload }) {
   const [openChats, setOpenChats] = useState(new Set());
   const nameRef = useRef(null);
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
 
   async function loadChannels() {
     try {
@@ -119,9 +121,10 @@ export default function ChatInstancesTab({ data, reload }) {
   }
 
   async function doDeleteInstance(id) {
-    if (!confirm(t('dashboard.chatDeleteConfirm').replace('{id}', id))) return;
-    try { await deleteChatInstance(id); reload(); }
-    catch (e) { showErr(e.message); }
+    confirm(t('dashboard.chatDeleteConfirm').replace('{id}', id), async () => {
+      try { await deleteChatInstance(id); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   return html`
@@ -199,5 +202,6 @@ export default function ChatInstancesTab({ data, reload }) {
         </tbody>
       </table></div></div>`
     }
+    <${ConfirmUI} />
   `;
 }

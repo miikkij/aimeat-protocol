@@ -5,10 +5,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
 
 export default function SecurityTab({ session, showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [securityData, setSecurityData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [corsEditGhii, setCorsEditGhii] = useState(null);
@@ -56,18 +58,19 @@ export default function SecurityTab({ session, showToast }) {
   }
 
   async function handleRevokeAll() {
-    if (!confirm(t('profile.security.revokeConfirm') || 'Are you sure you want to revoke all active sessions? You will be logged out.')) return;
-    setRevoking(true);
-    try {
-      const data = await securityService.revokeAllSessions();
-      if (data.ok !== false) {
-        showToast((t('profile.security.sessionsRevoked') || 'All sessions revoked') + ` (${data.data?.revoked ?? 0})`);
-        setTimeout(() => { localStorage.removeItem('aimeat_session'); location.reload(); }, 1500);
-      } else {
-        showToast(data.error?.message || 'Failed to revoke sessions', true);
-      }
-    } catch(e) { showToast(e.message || 'Error', true); }
-    setRevoking(false);
+    confirm(t('profile.security.revokeConfirm') || 'Are you sure you want to revoke all active sessions? You will be logged out.', async () => {
+      setRevoking(true);
+      try {
+        const data = await securityService.revokeAllSessions();
+        if (data.ok !== false) {
+          showToast((t('profile.security.sessionsRevoked') || 'All sessions revoked') + ` (${data.data?.revoked ?? 0})`);
+          setTimeout(() => { localStorage.removeItem('aimeat_session'); location.reload(); }, 1500);
+        } else {
+          showToast(data.error?.message || 'Failed to revoke sessions', true);
+        }
+      } catch(e) { showToast(e.message || 'Error', true); }
+      setRevoking(false);
+    }, { danger: true });
   }
 
   if (loading || !securityData) return html`<${Spinner} text=${t('profile.security.loading')} />`;
@@ -166,5 +169,6 @@ export default function SecurityTab({ session, showToast }) {
         ${revoking ? (t('profile.security.revoking') || 'Revoking...') : (t('profile.security.revokeAll') || 'Revoke All Sessions')}
       </button>
     </div>
+    <${ConfirmUI} />
   `;
 }

@@ -35,7 +35,7 @@ import {
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
-import { ConfirmDialog } from '/components/Modal.js';
+import { useConfirm } from '/components/Modal.js';
 
 /* ── Agent Listener Status ───────────────────────────── */
 
@@ -390,7 +390,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const [selectedId, setSelectedId] = useState(null);
   const [agents, setAgents] = useState([]);
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { confirm, ConfirmUI } = useConfirm();
 
   // Phase 5: Lifecycle state
   const [liveStatuses, setLiveStatuses] = useState({});
@@ -591,35 +591,27 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     };
   });
 
-  async function handleDeleteConfirmed() {
-    setShowDeleteConfirm(false);
-    try {
-      await deleteProject(projectId, session);
-      showToast?.(t('profile.generator.projectDeleted'));
-      onBack();
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
+  function handleDeleteProject() {
+    confirm(t('profile.generator.confirmDelete'), async () => {
+      try {
+        await deleteProject(projectId, session);
+        showToast?.(t('profile.generator.projectDeleted'));
+        onBack();
+      } catch (e) {
+        showToast?.(e.message, true);
+      }
+    }, { title: t('profile.generator.deleteProject'), confirmLabel: t('profile.generator.deleteProject'), cancelLabel: t('profile.generator.back'), danger: true });
   }
 
   if (!project) return html`<div class="pf-gen-loading">${t('profile.loading')}</div>`;
 
   return html`
     <div class="pf-gen-dashboard">
-      <${ConfirmDialog}
-        open=${showDeleteConfirm}
-        onClose=${() => setShowDeleteConfirm(false)}
-        onConfirm=${handleDeleteConfirmed}
-        title=${t('profile.generator.deleteProject')}
-        message=${t('profile.generator.confirmDelete')}
-        confirmLabel=${t('profile.generator.deleteProject')}
-        cancelLabel=${t('profile.generator.back')}
-        danger=${true}
-      />
+      <${ConfirmUI} />
       <div class="pf-gen-dash-header">
         <button class="btn btn-ghost btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
         <h3>${project.name}</h3>
-        <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${() => setShowDeleteConfirm(true)}>
+        <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDeleteProject}>
           ${t('profile.generator.deleteProject')}
         </button>
       </div>

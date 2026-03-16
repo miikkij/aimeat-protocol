@@ -4,14 +4,16 @@
  * @structure
  *   - Modal: generic overlay dialog (Escape / backdrop close)
  *   - ConfirmDialog: confirmation dialog with message + confirm/cancel buttons
+ *   - useConfirm: hook wrapping ConfirmDialog state — returns { confirm, ConfirmUI }
  * @usage
- *   import { Modal, ConfirmDialog } from '/components/Modal.js';
+ *   import { Modal, ConfirmDialog, useConfirm } from '/components/Modal.js';
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial Modal component
  *   v1.1.0 — 2026-03-14 — Add ConfirmDialog with danger variant
+ *   v1.2.0 — 2026-03-16 — Add useConfirm hook for easy confirm() replacement
  */
 import { h } from 'preact';
-import { useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 
@@ -61,4 +63,41 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, confir
         </button>
       </div>
     <//>`;
+}
+
+/**
+ * useConfirm — hook that wraps ConfirmDialog state management.
+ * Returns { confirm, ConfirmUI } where:
+ *   - confirm(message, onConfirm, opts?) opens the dialog
+ *   - ConfirmUI is a component to render in your JSX (renders the dialog)
+ * @example
+ *   const { confirm, ConfirmUI } = useConfirm();
+ *   // Replace: if (!confirm('Delete?')) return; doDelete();
+ *   // With:   confirm('Delete?', () => doDelete(), { danger: true });
+ *   // Render: <${ConfirmUI} />
+ */
+export function useConfirm() {
+  const [state, setState] = useState(null);
+
+  const confirm = useCallback((message, onConfirm, opts = {}) => {
+    setState({ message, onConfirm, ...opts });
+  }, []);
+
+  const close = useCallback(() => setState(null), []);
+
+  function ConfirmUI() {
+    if (!state) return null;
+    return html`<${ConfirmDialog}
+      open=${true}
+      onClose=${close}
+      onConfirm=${() => { close(); state.onConfirm(); }}
+      message=${state.message}
+      title=${state.title}
+      confirmLabel=${state.confirmLabel}
+      cancelLabel=${state.cancelLabel}
+      danger=${state.danger}
+    />`;
+  }
+
+  return { confirm, ConfirmUI };
 }

@@ -5,9 +5,11 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [myOrganisms, setMyOrganisms] = useState(null);
   const [publicOrganisms, setPublicOrganisms] = useState([]);
   const [expanded, setExpanded] = useState(null);
@@ -104,26 +106,28 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   }, [showToast, loadData]);
 
   const handleLeave = useCallback(async (id, name) => {
-    if (!confirm(t('organisms.confirmLeave')?.replace('{name}', name) || `Leave "${name}"?`)) return;
-    try {
-      await orgService.leaveOrganism(id);
-      showToast(t('organisms.left') || 'Left organism');
-      loadData();
-    } catch {
-      showToast(t('organisms.leaveError') || 'Failed to leave');
-    }
+    confirm(t('organisms.confirmLeave')?.replace('{name}', name) || `Leave "${name}"?`, async () => {
+      try {
+        await orgService.leaveOrganism(id);
+        showToast(t('organisms.left') || 'Left organism');
+        loadData();
+      } catch {
+        showToast(t('organisms.leaveError') || 'Failed to leave');
+      }
+    }, { danger: true });
   }, [showToast, loadData]);
 
   const handleDelete = useCallback(async (id, name) => {
-    if (!confirm(t('organisms.confirmDelete')?.replace('{name}', name) || `Delete "${name}"? This cannot be undone.`)) return;
-    try {
-      await orgService.deleteOrganism(id);
-      showToast(t('organisms.deleted') || 'Organism deleted');
-      setExpanded(null);
-      loadData();
-    } catch {
-      showToast(t('organisms.deleteError') || 'Failed to delete');
-    }
+    confirm(t('organisms.confirmDelete')?.replace('{name}', name) || `Delete "${name}"? This cannot be undone.`, async () => {
+      try {
+        await orgService.deleteOrganism(id);
+        showToast(t('organisms.deleted') || 'Organism deleted');
+        setExpanded(null);
+        loadData();
+      } catch {
+        showToast(t('organisms.deleteError') || 'Failed to delete');
+      }
+    }, { danger: true });
   }, [showToast, loadData]);
 
   const toggleExpand = useCallback((id) => {
@@ -381,5 +385,6 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       <div class="section-title" style="font-size:.9rem;margin-top:1rem">${t('organisms.discover') || 'Discover'}</div>
       ${publicOrganisms.map(org => renderOrgCard(org, false))}
     `}
+    <${ConfirmUI} />
   `;
 }

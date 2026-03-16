@@ -5,10 +5,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, EconRow, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { setMaintenance, getBackup, doRestore as apiRestore } from '/js/services/admin.js';
 
 export default function MaintenanceTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const m = data.maintenance || { enabled: false, message: '', enabledAt: null, enabledBy: null };
   const [msg, setMsg] = useState(m.message || '');
   const [backupResult, setBackupResult] = useState(null);
@@ -39,17 +41,18 @@ export default function MaintenanceTab({ data, reload }) {
     input.accept = '.json';
     input.onchange = async () => {
       if (!input.files?.[0]) return;
-      if (!confirm(t('dashboard.restoreConfirm'))) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const parsed = JSON.parse(reader.result);
-          await apiRestore(parsed);
-          setBackupResult({ ok: true, msg: t('dashboard.dataRestored') });
-          reload();
-        } catch (e) { setBackupResult({ ok: false, msg: e.message }); }
-      };
-      reader.readAsText(input.files[0]);
+      confirm(t('dashboard.restoreConfirm'), async () => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+            await apiRestore(parsed);
+            setBackupResult({ ok: true, msg: t('dashboard.dataRestored') });
+            reload();
+          } catch (e) { setBackupResult({ ok: false, msg: e.message }); }
+        };
+        reader.readAsText(input.files[0]);
+      }, { danger: true });
     };
     input.click();
   }
@@ -90,5 +93,6 @@ export default function MaintenanceTab({ data, reload }) {
       ${backupResult && html`<div class="adm-mt-sm adm-text-base" style="color:${backupResult.ok ? '#22c55e' : '#ef4444'}">${escHtml(backupResult.msg)}</div>`}
       <p class="adm-text-dim adm-text-xs adm-mt-sm">${t('dashboard.backupExplain')}</p>
     </div>
+    <${ConfirmUI} />
   `;
 }

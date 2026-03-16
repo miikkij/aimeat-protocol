@@ -5,9 +5,11 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { listChatInstances, deleteChatInstance } from '/js/services/agents.js';
 
 export default function McpTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [connections, setConnections] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -35,16 +37,17 @@ export default function McpTab({ session, showToast, onStats }) {
   }, []);
 
   const handleDelete = useCallback(async (ci) => {
-    if (!confirm(t('profile.mcp.confirmDelete') || `Remove MCP connection "${ci.app_name || ci.id}"?`)) return;
-    setDeleting(ci.id);
-    try {
-      await deleteChatInstance(ci.id);
-      showToast(t('profile.mcp.deleted') || 'MCP connection removed');
-      setExpanded(null);
-      loadData();
-    } catch {
-      showToast(t('profile.mcp.deleteError') || 'Failed to remove MCP connection', true);
-    } finally { setDeleting(null); }
+    confirm(t('profile.mcp.confirmDelete') || `Remove MCP connection "${ci.app_name || ci.id}"?`, async () => {
+      setDeleting(ci.id);
+      try {
+        await deleteChatInstance(ci.id);
+        showToast(t('profile.mcp.deleted') || 'MCP connection removed');
+        setExpanded(null);
+        loadData();
+      } catch {
+        showToast(t('profile.mcp.deleteError') || 'Failed to remove MCP connection', true);
+      } finally { setDeleting(null); }
+    }, { danger: true });
   }, [showToast, loadData]);
 
   const platformLabel = (p) => {
@@ -124,5 +127,6 @@ export default function McpTab({ session, showToast, onStats }) {
           `;
         })}
       `
-    }`;
+    }
+    <${ConfirmUI} />`;
 }

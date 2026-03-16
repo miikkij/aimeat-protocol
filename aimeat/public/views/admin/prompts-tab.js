@@ -9,6 +9,7 @@ import {
   getSystemPrompts, getSystemPrompt, updateSystemPrompt,
   resetSystemPrompt, resetAllSystemPrompts, getPromptVersions, restorePromptVersion,
 } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 const GROUP_NAMES = {
   tiers: 'promptsGroupTiers',
@@ -25,6 +26,7 @@ export default function PromptsTab({ data, reload }) {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { confirm, ConfirmUI } = useConfirm();
 
   // Group prompts
   const groups = {};
@@ -83,51 +85,54 @@ export default function PromptsTab({ data, reload }) {
     setSaving(false);
   }
 
-  async function handleReset() {
-    if (!confirm(t('dashboard.promptsResetConfirm'))) return;
-    setSaving(true);
-    try {
-      const res = await resetSystemPrompt(editId);
-      setEditData({ ...res.data.prompt, changeNote: '' });
-      const vRes = await getPromptVersions(editId);
-      setVersions(vRes.data.versions || []);
-      const listRes = await getSystemPrompts();
-      setPrompts(listRes.data.prompts || []);
-      window.showToast?.(t('dashboard.promptsResetDone'));
-    } catch (e) {
-      window.showToast?.(e.message, true);
-    }
-    setSaving(false);
+  function handleReset() {
+    confirm(t('dashboard.promptsResetConfirm'), async () => {
+      setSaving(true);
+      try {
+        const res = await resetSystemPrompt(editId);
+        setEditData({ ...res.data.prompt, changeNote: '' });
+        const vRes = await getPromptVersions(editId);
+        setVersions(vRes.data.versions || []);
+        const listRes = await getSystemPrompts();
+        setPrompts(listRes.data.prompts || []);
+        window.showToast?.(t('dashboard.promptsResetDone'));
+      } catch (e) {
+        window.showToast?.(e.message, true);
+      }
+      setSaving(false);
+    }, { danger: true });
   }
 
-  async function handleResetAll() {
-    if (!confirm(t('dashboard.promptsResetAllConfirm'))) return;
-    setSaving(true);
-    try {
-      const res = await resetAllSystemPrompts();
-      setPrompts(res.data.prompts || []);
-      window.showToast?.(t('dashboard.promptsResetAllDone'));
-    } catch (e) {
-      window.showToast?.(e.message, true);
-    }
-    setSaving(false);
+  function handleResetAll() {
+    confirm(t('dashboard.promptsResetAllConfirm'), async () => {
+      setSaving(true);
+      try {
+        const res = await resetAllSystemPrompts();
+        setPrompts(res.data.prompts || []);
+        window.showToast?.(t('dashboard.promptsResetAllDone'));
+      } catch (e) {
+        window.showToast?.(e.message, true);
+      }
+      setSaving(false);
+    }, { danger: true });
   }
 
-  async function handleRestore(version) {
-    if (!confirm(t('dashboard.promptsRestoreConfirm'))) return;
-    setSaving(true);
-    try {
-      const res = await restorePromptVersion(editId, version);
-      setEditData({ ...res.data.prompt, changeNote: '' });
-      const vRes = await getPromptVersions(editId);
-      setVersions(vRes.data.versions || []);
-      const listRes = await getSystemPrompts();
-      setPrompts(listRes.data.prompts || []);
-      window.showToast?.(t('dashboard.promptsRestored'));
-    } catch (e) {
-      window.showToast?.(e.message, true);
-    }
-    setSaving(false);
+  function handleRestore(version) {
+    confirm(t('dashboard.promptsRestoreConfirm'), async () => {
+      setSaving(true);
+      try {
+        const res = await restorePromptVersion(editId, version);
+        setEditData({ ...res.data.prompt, changeNote: '' });
+        const vRes = await getPromptVersions(editId);
+        setVersions(vRes.data.versions || []);
+        const listRes = await getSystemPrompts();
+        setPrompts(listRes.data.prompts || []);
+        window.showToast?.(t('dashboard.promptsRestored'));
+      } catch (e) {
+        window.showToast?.(e.message, true);
+      }
+      setSaving(false);
+    });
   }
 
   // Edit view
@@ -204,6 +209,7 @@ export default function PromptsTab({ data, reload }) {
             `)
           }
         </details>
+        <${ConfirmUI} />
       </div>
     `;
   }
@@ -254,5 +260,6 @@ export default function PromptsTab({ data, reload }) {
         </details>
       `)
     }
+    <${ConfirmUI} />
   `;
 }

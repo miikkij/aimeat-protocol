@@ -9,6 +9,7 @@ import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
   getSiteMemoryKeys, getSitePrompt, addMemory, deleteMemory, triggerLbSync,
 } from '/js/services/admin.js';
+import { useConfirm } from '/components/Modal.js';
 
 export default function PortalTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
@@ -18,6 +19,7 @@ export default function PortalTab({ data, reload }) {
   const changes = (p.changelog?.entries) || [];
   const isLb = meta.lb_mode?.enabled;
 
+  const { confirm, ConfirmUI } = useConfirm();
   const [template, setTemplate] = useState(tmpl.template || '');
   const [memKeys, setMemKeys] = useState(null);
   const [newKey, setNewKey] = useState('');
@@ -44,10 +46,11 @@ export default function PortalTab({ data, reload }) {
     a.download = 'portal-template.html'; a.click();
   }
 
-  async function resetTemplate() {
-    if (!confirm(t('dashboard.portalResetDefault') + '?')) return;
-    try { await deleteSiteTemplate(); reload(); }
-    catch (e) { showErr(e.message); }
+  function resetTemplate() {
+    confirm(t('dashboard.portalResetDefault') + '?', async () => {
+      try { await deleteSiteTemplate(); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   async function doClearCache() {
@@ -60,10 +63,11 @@ export default function PortalTab({ data, reload }) {
     catch (e) { showErr(e.message); }
   }
 
-  async function delMem(key) {
-    if (!confirm(t('dashboard.portalDeleteKeyConfirm').replace('{key}', key))) return;
-    try { await deleteMemory(key); loadMemKeys(); }
-    catch (e) { showErr(e.message); }
+  function delMem(key) {
+    confirm(t('dashboard.portalDeleteKeyConfirm').replace('{key}', key), async () => {
+      try { await deleteMemory(key); loadMemKeys(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: true });
   }
 
   async function copyPrompt() {
@@ -202,5 +206,6 @@ export default function PortalTab({ data, reload }) {
         </table>`
       }
     </div>
+    <${ConfirmUI} />
   `;
 }

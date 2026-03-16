@@ -5,9 +5,11 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import * as boardsService from '/js/services/boards.js';
 
 export default function BoardsTab({ session, showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [myBoards, setMyBoards] = useState(null);
   const [allBoards, setAllBoards] = useState(null);
   const [boardView, setBoardView] = useState(null);
@@ -82,21 +84,23 @@ export default function BoardsTab({ session, showToast }) {
   }
 
   async function handleDeleteBoard(boardId) {
-    if (!confirm(t('profile.boards.confirmDeleteBoard') || 'Delete this board and all its posts?')) return;
-    try {
-      await boardsService.deleteBoard(boardId);
-      showToast(t('profile.boards.boardDeleted') || 'Board deleted');
-      loadMyData();
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
+    confirm(t('profile.boards.confirmDeleteBoard') || 'Delete this board and all its posts?', async () => {
+      try {
+        await boardsService.deleteBoard(boardId);
+        showToast(t('profile.boards.boardDeleted') || 'Board deleted');
+        loadMyData();
+      } catch (e) { showToast(e.message || t('profile.error'), true); }
+    }, { danger: true });
   }
 
   async function handleDeletePost(boardId, postId) {
-    if (!confirm(t('profile.boards.confirmDelete') || 'Delete this post?')) return;
-    try {
-      await boardsService.deletePost(boardId, postId);
-      showToast(t('profile.boards.postDeleted') || 'Post deleted');
-      viewPosts(boardId, boardView?.name);
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
+    confirm(t('profile.boards.confirmDelete') || 'Delete this post?', async () => {
+      try {
+        await boardsService.deletePost(boardId, postId);
+        showToast(t('profile.boards.postDeleted') || 'Post deleted');
+        viewPosts(boardId, boardView?.name);
+      } catch (e) { showToast(e.message || t('profile.error'), true); }
+    }, { danger: true });
   }
 
   function isMyPost(post) {
@@ -130,7 +134,8 @@ export default function BoardsTab({ session, showToast }) {
             </div>
           </div>
         `)
-      }`;
+      }
+      <${ConfirmUI} />`;
   }
 
   return html`
@@ -172,6 +177,7 @@ export default function BoardsTab({ session, showToast }) {
         `)
       }
     `}
+    <${ConfirmUI} />
   `;
 }
 

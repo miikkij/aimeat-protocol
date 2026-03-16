@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
 
@@ -141,6 +142,7 @@ function ServiceDetail({ svc }) {
 }
 
 export default function ServicesTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [myServices, setMyServices] = useState(null);
   const [catalogue, setCatalogue] = useState(null);
   const [svcSubTab, setSvcSubTab] = useState('mine');
@@ -175,11 +177,12 @@ export default function ServicesTab({ session, showToast, onStats }) {
   }
 
   async function unpublishService(id) {
-    if (!confirm(t('profile.services.unpublishConfirm'))) return;
-    const resp = await unpublish(id);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    showToast(t('profile.services.unpublished'));
-    loadMyData();
+    confirm(t('profile.services.unpublishConfirm'), async () => {
+      const resp = await unpublish(id);
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+      showToast(t('profile.services.unpublished'));
+      loadMyData();
+    }, { danger: true });
   }
 
   function toggleMineExpand(id) {
@@ -236,6 +239,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
       <button class="sub-tab ${svcSubTab === 'catalogue' ? 'active' : ''}" onClick=${() => { setSvcSubTab('catalogue'); if (!catalogue) loadCatalogueData(catFilter); }}>${t('profile.services.catalogue')}</button>
     </div>
     ${svcSubTab === 'mine' ? renderMyServices() : renderCatalogue()}
+    <${ConfirmUI} />
   `;
 }
 

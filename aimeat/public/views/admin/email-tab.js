@@ -4,6 +4,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { EconRow, Empty, ExpandableHelp } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates, saveConfig } from '/js/services/admin.js';
 
 const TEMPLATE_IDS = ['notification', 'verification', 'magic_link', 'match_suggestion'];
@@ -69,6 +70,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
   const [editText, setEditText] = useState(tpl.text || '');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const { confirm, ConfirmUI } = useConfirm();
 
   // Sync when tpl data or locale changes
   useEffect(() => {
@@ -90,18 +92,19 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
   }
 
   async function doReset() {
-    if (!confirm(t('dashboard.emailTplResetConfirm'))) return;
-    setSaving(true);
-    setMsg(null);
-    try {
-      await onReset(tpl.id, locale);
-      setEditHtml(tpl.defaultHtml || '');
-      setEditText(tpl.defaultText || '');
-      setMsg({ ok: true, text: t('dashboard.emailTplResetDone') });
-    } catch (e) {
-      setMsg({ ok: false, text: e.message });
-    }
-    setSaving(false);
+    confirm(t('dashboard.emailTplResetConfirm'), async () => {
+      setSaving(true);
+      setMsg(null);
+      try {
+        await onReset(tpl.id, locale);
+        setEditHtml(tpl.defaultHtml || '');
+        setEditText(tpl.defaultText || '');
+        setMsg({ ok: true, text: t('dashboard.emailTplResetDone') });
+      } catch (e) {
+        setMsg({ ok: false, text: e.message });
+      }
+      setSaving(false);
+    }, { danger: true });
   }
 
   async function copyAiPrompt() {
@@ -191,6 +194,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
         `}
         ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
+      <${ConfirmUI} />
     </div>
   `;
 }
@@ -209,6 +213,7 @@ export default function EmailTab({ data, reload, locale }) {
   const [seeded, setSeeded] = useState(false);
   const [seedMsg, setSeedMsg] = useState(null);
   const [cfgSaving, setCfgSaving] = useState(false);
+  const { confirm, ConfirmUI } = useConfirm();
 
   // Group send state
   const [grpGroup, setGrpGroup] = useState('operators');
@@ -309,15 +314,16 @@ export default function EmailTab({ data, reload, locale }) {
   }
 
   async function doResetAll() {
-    if (!confirm(t('dashboard.emailTplResetAllConfirm'))) return;
-    setSeedMsg(null);
-    try {
-      const r = await resetAllEmailTemplates();
-      setSeedMsg({ ok: true, text: t('dashboard.emailTplResetAllDone').replace('{count}', r.data.count) });
-      await loadTemplates(tplLocale);
-    } catch (e) {
-      setSeedMsg({ ok: false, text: e.message });
-    }
+    confirm(t('dashboard.emailTplResetAllConfirm'), async () => {
+      setSeedMsg(null);
+      try {
+        const r = await resetAllEmailTemplates();
+        setSeedMsg({ ok: true, text: t('dashboard.emailTplResetAllDone').replace('{count}', r.data.count) });
+        await loadTemplates(tplLocale);
+      } catch (e) {
+        setSeedMsg({ ok: false, text: e.message });
+      }
+    }, { danger: true });
   }
 
   return html`
@@ -449,5 +455,6 @@ export default function EmailTab({ data, reload, locale }) {
         </div>
       `)}
     </div>
+    <${ConfirmUI} />
   `;
 }

@@ -4,19 +4,22 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { approveGenesisPeer, suspendGenesisPeer, removeGenesisPeer } from '/js/services/admin.js';
 
 export default function GenesisTab({ data, reload }) {
   const [toast, showErr, showOk, clearToast] = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const gen = data.genesis;
   if (!gen) return html`<${Empty} text=${t('dashboard.genesisNotAvailable')} />`;
 
   const peers = gen.peers || [];
 
-  async function doAction(fn, id, confirmKey) {
-    if (!confirm(t(confirmKey || 'dashboard.confirmAction'))) return;
-    try { await fn(id); reload(); }
-    catch (e) { showErr(e.message); }
+  async function doAction(fn, id, confirmKey, danger) {
+    confirm(t(confirmKey || 'dashboard.confirmAction'), async () => {
+      try { await fn(id); reload(); }
+      catch (e) { showErr(e.message); }
+    }, { danger: !!danger });
   }
 
   return html`
@@ -54,13 +57,14 @@ export default function GenesisTab({ data, reload }) {
                 <button class="adm-btn-sm" onClick=${() => doAction(approveGenesisPeer, p.id, 'dashboard.approveConfirm')}>${t('dashboard.approve')}</button>
               `}
               ${p.status !== 'suspended' && html`
-                <button class="adm-btn-sm" onClick=${() => doAction(suspendGenesisPeer, p.id, 'dashboard.suspendConfirm')}>${t('dashboard.suspend')}</button>
+                <button class="adm-btn-sm" onClick=${() => doAction(suspendGenesisPeer, p.id, 'dashboard.suspendConfirm', true)}>${t('dashboard.suspend')}</button>
               `}
-              <button class="adm-btn-sm" onClick=${() => doAction(removeGenesisPeer, p.id, 'dashboard.removeConfirm')}>${t('dashboard.remove')}</button>
+              <button class="adm-btn-sm" onClick=${() => doAction(removeGenesisPeer, p.id, 'dashboard.removeConfirm', true)}>${t('dashboard.remove')}</button>
             </td>
           </tr>`)}
         </tbody>
       </table></div></div>`
     }
+    <${ConfirmUI} />
   `;
 }

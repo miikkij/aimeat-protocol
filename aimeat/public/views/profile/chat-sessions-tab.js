@@ -5,10 +5,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { useConfirm } from '/components/Modal.js';
 import { listAgents, deleteAgent } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
 
 export default function ChatSessionsTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [chatSessions, setChatSessions] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -38,17 +40,18 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
 
   const handleDelete = useCallback(async (s) => {
     const name = s.display_name || s.name || 'session';
-    if (!confirm(t('profile.chatSessions.confirmDelete')
-        || `Remove chat session "${name}"? The session agent will be deleted.`)) return;
-    setDeleting(s.name);
-    try {
-      await deleteAgent(s.name);
-      showToast(t('profile.chatSessions.deleted') || 'Session removed');
-      setExpanded(null);
-      loadData();
-    } catch {
-      showToast(t('profile.chatSessions.deleteError') || 'Failed to remove session');
-    } finally { setDeleting(null); }
+    confirm(t('profile.chatSessions.confirmDelete')
+        || `Remove chat session "${name}"? The session agent will be deleted.`, async () => {
+      setDeleting(s.name);
+      try {
+        await deleteAgent(s.name);
+        showToast(t('profile.chatSessions.deleted') || 'Session removed');
+        setExpanded(null);
+        loadData();
+      } catch {
+        showToast(t('profile.chatSessions.deleteError') || 'Failed to remove session');
+      } finally { setDeleting(null); }
+    }, { danger: true });
   }, [showToast, loadData]);
 
   const toggleExpand = useCallback((name) => {
@@ -168,5 +171,6 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
           `;
         })}
       `
-    }`;
+    }
+    <${ConfirmUI} />`;
 }
