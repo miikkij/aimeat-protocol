@@ -563,8 +563,13 @@ export function validateBlueprint(result) {
             if (!s.action) errors.push(`Component "${c.id}": schedule missing "action" field`);
             if (!s.cron) errors.push(`Component "${c.id}": schedule missing "cron" field`);
             else if (s.cron !== '@activate') {
+              // Auto-fix: strip markdown backslash escaping (\* → *)
+              let cron = String(s.cron).trim().replace(/\\\*/g, '*');
+              if (cron !== String(s.cron).trim()) {
+                warnings.push(`Component "${c.id}": stripped backslash escaping from cron`);
+                s.cron = cron;
+              }
               // Auto-fix: "/15" → "*/15" (AI commonly drops leading asterisk)
-              let cron = String(s.cron).trim();
               if (/^\/\d/.test(cron)) {
                 const fixed = '*' + cron;
                 warnings.push(`Component "${c.id}": auto-corrected cron "${cron}" → "${fixed}"`);
