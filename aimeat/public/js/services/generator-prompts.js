@@ -1072,6 +1072,13 @@ IMPORTANT:
 - Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`my-domain-lib\\\` → \\\`AIMEAT.myDomainLib.init()\\\`)
 - Use the cortex methods for ALL data access — never call extensions or memory directly
 - The cortex handles authentication, error handling, and data transformation
+
+### UI CORTEX RULES (if aimeat-ui-* libraries are loaded):
+- NEVER use native alert(), confirm(), or prompt() — use AIMEAT.ui.dialogs.Confirm(), AIMEAT.ui.dialogs.toast(), AIMEAT.ui.dialogs.Modal() instead
+- If aimeat-ui-layout is available, use its layout components (MainDetail, DashboardGrid, Split, etc.) for page structure
+- If aimeat-ui-forms is available, use its form components (Input, Select, Toggle, FormGroup) instead of raw HTML <input>/<select> elements
+- If aimeat-ui-viewers is available, use Grid/List/DataTable/Carousel for data display instead of custom HTML/CSS
+- If aimeat-ui-nav is available, use Tabs/BurgerMenu/Sidebar for navigation instead of custom nav HTML
 `;
     }
 
