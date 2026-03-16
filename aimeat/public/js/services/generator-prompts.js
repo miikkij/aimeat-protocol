@@ -718,10 +718,26 @@ Extension code runs in an ISOLATED V8 sandbox. The following are NOT available:
 - No \`setTimeout\`, \`setInterval\`, \`setImmediate\`
 - No \`console.log\` — use \`ctx.log.info/warn/error()\`
 - No DOM APIs (document, window, etc.)
+- No \`ctx.notify()\`, \`ctx.email()\`, \`ctx.sms()\`, \`ctx.push()\` — these DO NOT EXIST
+- No \`ctx.http\`, \`ctx.request\`, \`ctx.axios\` — use \`ctx.fetch()\` for ALL HTTP requests
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  The ctx object has ONLY these properties:                              ║
+║  ctx.memory (get/set/search/delete/getPublic)                          ║
+║  ctx.fetch(url, opts)                                                   ║
+║  ctx.wallet (consume/deposit/balance)                                   ║
+║  ctx.consent (check/request)                                            ║
+║  ctx.trust (getScore)                                                   ║
+║  ctx.caller (gaii/owner/roles)                                          ║
+║  ctx.config (extension config object)                                   ║
+║  ctx.log (info/warn/error)                                              ║
+║  ctx.instance (id/config — only for instance-scoped actions)            ║
+║  NOTHING ELSE. Do NOT invent methods that are not listed here.          ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
 What IS available:
 - Standard JS built-ins: JSON, Math, Date, String, Array, Object, Map, Set, RegExp, Promise, etc.
-- \`ctx\` API object (memory, fetch, wallet, consent, trust, caller, config, log)
+- \`ctx\` API object (ONLY the properties listed above)
 - \`export default async function(ctx, input) { ... }\` — the action entry point
 
 ## ctx.memory API — CRITICAL details
