@@ -516,17 +516,20 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     // Defense-in-depth: verify ownership before deletion
-    const existing = await storage.getMemory(gaii, key);
+    // Operators can delete any key by passing ?owner=... query parameter
+    const ownerOverride = req.query.owner as string | undefined;
+    const effectiveOwner = (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : gaii;
+    const existing = await storage.getMemory(effectiveOwner, key);
     if (!existing) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
     }
-    if (existing.ownerGaii !== req.auth!.sub) {
+    if (existing.ownerGaii !== effectiveOwner && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own memory records'));
       return;
     }
 
-    const deleted = await storage.deleteMemory(gaii, key);
+    const deleted = await storage.deleteMemory(effectiveOwner, key);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
