@@ -1145,7 +1145,7 @@ AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add 
   style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
   img-src 'self' data: https: blob:;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://*.tile.openstreetmap.org https://cdn.jsdelivr.net;
+  connect-src 'self' https://*.tile.openstreetmap.org https://cdn.jsdelivr.net https://unpkg.com;
 ">
 \\\`\\\`\\\`
 Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
