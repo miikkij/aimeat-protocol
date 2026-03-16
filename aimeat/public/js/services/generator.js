@@ -414,7 +414,7 @@ async function upsertManifest(endpoint, body, owner) {
   }
 }
 
-export async function registerComponent(type, result, session) {
+export async function registerComponent(type, result, session, serviceSlug = '') {
   const owner = session?.owner;
   switch (type) {
     case 'csm': {
@@ -449,26 +449,38 @@ export async function registerComponent(type, result, session) {
     case 'memory': {
       const entries = typeof result === 'string' ? JSON.parse(result) : result;
       const results = [];
-      for (const [key, value] of Object.entries(entries)) {
+      for (const [rawKey, value] of Object.entries(entries)) {
+        // Service-prefix memory keys to avoid collisions across services
+        // Skip __meta and __index keys (they already contain the namespace)
+        const key = (serviceSlug && !rawKey.startsWith(serviceSlug + '.'))
+          ? `${serviceSlug}.${rawKey}`
+          : rawKey;
         results.push(await apiPost('/v1/memory', { key, value, visibility: 'public' }));
       }
-      return { data: { registered: results.length, keys: results.map((_, i) => Object.keys(entries)[i]) } };
+      return { data: { registered: results.length, keys: results.map((_, i) => {
+        const rawKey = Object.keys(entries)[i];
+        return (serviceSlug && !rawKey.startsWith(serviceSlug + '.'))
+          ? `${serviceSlug}.${rawKey}`
+          : rawKey;
+      }) } };
     }
     case 'translation': {
       const translations = typeof result === 'string' ? JSON.parse(result) : result;
-      // Store each locale's translations in memory as i18n.{locale} keys
+      // Store each locale's translations with service-prefix to avoid collisions
       const locales = [];
       for (const [locale, strings] of Object.entries(translations)) {
         if (locale && typeof strings === 'object') {
+          const key = serviceSlug ? `${serviceSlug}.i18n.${locale}` : `i18n.${locale}`;
           await apiPost('/v1/memory', {
-            key: `i18n.${locale}`,
+            key,
             value: strings,
             visibility: 'public',
           });
           locales.push(locale);
         }
       }
-      return { ok: true, data: { locales, name: `i18n-${locales.join('-')}` } };
+      const prefix = serviceSlug ? `${serviceSlug}.` : '';
+      return { ok: true, data: { locales, name: `${prefix}i18n-${locales.join('-')}` } };
     }
     case 'cortex': {
       // Cortex result contains YAML manifest + optional JS lib code (pre-extracted by validator)

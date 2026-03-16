@@ -922,6 +922,37 @@ Schedule entry:
 
 IMPORTANT: @activate actions MUST be idempotent — they will run multiple times (every restart). Always check existing data before overwriting.
 
+### CRITICAL: Copy Shared Data to Extension Namespace
+
+The init/@activate action MUST copy shared service data (translations, settings, lookup tables)
+from the OWNER's memory to the extension's OWN memory. This makes the data accessible to ALL users
+of the service, not just the owner who installed it.
+
+Pattern — add this to the BEGINNING of your init action:
+\`\`\`javascript
+// Copy shared data from owner namespace to extension namespace (accessible to all users)
+const SHARED_KEYS = ['i18n.fi', 'i18n.en', 'settings.config', 'municipalities.lookup'];
+// Adjust SHARED_KEYS based on what this service's memory/translation components produced
+for (const key of SHARED_KEYS) {
+  const existing = await ctx.memory.get(key);
+  if (!existing) {
+    // Try service-prefixed key first, then plain key
+    const extName = ctx.config?.name || '';
+    const prefixed = extName ? extName + '.' + key : key;
+    const ownerData = await ctx.memory.getPublic(ctx.caller.owner, prefixed)
+                   || await ctx.memory.getPublic(ctx.caller.owner, key);
+    if (ownerData) {
+      await ctx.memory.set(key, ownerData);
+      ctx.log.info('Copied shared data to extension namespace', { key });
+    }
+  }
+}
+\`\`\`
+
+Why: Memory/translation components store data in the OWNER's namespace. Other users cannot read it.
+By copying to \`ext:{name}\` namespace (via \`ctx.memory.set\`), it becomes public and accessible to
+everyone via \`getPublic('ext:{name}', key)\`.
+
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
 - \`actions\` array MUST NOT be empty — each action needs: id, method, path, script
@@ -1088,15 +1119,15 @@ The first argument is the extension's memory owner: \\\`"ext:" + extensionName\\
 Use this for ALL data produced by extensions (collected data, computed stats, caches, etc.).
 \\\`getPublic()\\\` returns the value directly (auto-unwraps), or null if not found.
 
-### Reading TRANSLATIONS (stored in owner memory, NOT a /v1/i18n route):
-Translations are stored in memory at \\\`i18n.{locale}\\\` keys. Read them with \\\`AIMEAT.data.get()\\\`:
+### Reading TRANSLATIONS (stored in extension namespace, accessible to all users):
+Translations are copied to the extension namespace during init. Read them via \\\`getPublic\\\`:
 \\\`\\\`\\\`javascript
-// Read translation strings for a locale:
-const enStrings = await AIMEAT.data.get('i18n.en');  // { "app.title": "My App", ... }
-const fiStrings = await AIMEAT.data.get('i18n.fi');  // { "app.title": "Sovellus", ... }
+// Read translations from extension namespace (works for ALL users):
+const fiStrings = await AIMEAT.data.getPublic('ext:my-extension', 'i18n.fi');
+const enStrings = await AIMEAT.data.getPublic('ext:my-extension', 'i18n.en');
 \\\`\\\`\\\`
-There is NO /v1/i18n/ route. NEVER fetch from /v1/i18n/. Use AIMEAT.data.get('i18n.{locale}').
-If a cortex library has a getI18n(locale) method, use that instead.
+Do NOT use AIMEAT.data.get('i18n.fi') — that reads from the CURRENT USER's namespace and fails for other users.
+If a cortex library has a getI18n(locale) method, use that instead (recommended).
 
 ### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
 
@@ -1485,17 +1516,31 @@ const value = json.ok ? json.data.value : null;
 
 ## IMPORTANT: How Translations Work
 
-Translation components store i18n strings in the OWNER's memory at \\\`i18n.{locale}\\\` keys.
-To read translations, use AIMEAT.data.get() (NOT getPublic — translations are in the owner's namespace):
+Translations are stored in the EXTENSION's memory namespace (copied there during init).
+Read them via readExtMemory — this works for ALL users, not just the service owner:
 \\\`\\\`\\\`javascript
-// Read translation for a locale — returns flat { "app.title": "...", "app.nav.home": "..." } object
-const enStrings = await AIMEAT.data.get('i18n.en');
-const fiStrings = await AIMEAT.data.get('i18n.fi');
+// Read translation via extension namespace (accessible to everyone):
+const fiStrings = await readExtMemory(EXT.collector, 'i18n.fi');
+const enStrings = await readExtMemory(EXT.collector, 'i18n.en');
 \\\`\\\`\\\`
 
-There is NO /v1/i18n/ route. Translations are stored in memory, NOT served from a dedicated API.
-Your cortex's getI18n() method should read from AIMEAT.data.get('i18n.' + locale).
-The translation keys use dot-namespaced paths like "app.title", "app.nav.home", "domain.type.example".
+Do NOT use AIMEAT.data.get('i18n.fi') — that reads from the CURRENT USER's namespace
+and will fail for users who didn't install the service.
+
+## IMPORTANT: How Settings Work
+
+Default settings are in the extension namespace (copied during init).
+User-specific settings are in each user's OWN namespace:
+\\\`\\\`\\\`javascript
+// Read defaults from extension namespace:
+const defaults = await readExtMemory(EXT.collector, 'settings.config') || {};
+
+// Read user's personal overrides (may be null for new users):
+const userSettings = await readOwnerMemory('settings.config');
+
+// Merge: user overrides win
+const settings = { ...defaults, ...(userSettings || {}) };
+\\\`\\\`\\\`
 
 ## Extension Action Calls (authenticated)
 

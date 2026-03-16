@@ -947,6 +947,13 @@ function ComponentDetail({ component, project, components, agents, projectId, in
   async function handleRegister() {
     setRegistering(true);
     try {
+      // Derive service slug from extension name or CSM for service-prefixed keys
+      const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
+      const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
+      const serviceSlug = extComp?.registeredAs
+        || csmComp?.registeredAs?.split('/')?.pop()
+        || '';
+
       let resp;
       if (component.type === 'cortex') {
         const vr = validateComponent('cortex', component.result || result, project.blueprint);
@@ -955,9 +962,9 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           setRegistering(false);
           return;
         }
-        resp = await registerComponent('cortex', vr.extracted, session);
+        resp = await registerComponent('cortex', vr.extracted, session, serviceSlug);
       } else {
-        resp = await registerComponent(component.type, validationResult?.extracted || result, session);
+        resp = await registerComponent(component.type, validationResult?.extracted || result, session, serviceSlug);
       }
       // Extract registered name from response — each type returns a different shape
       const d = resp?.data || {};
