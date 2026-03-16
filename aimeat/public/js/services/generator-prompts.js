@@ -1099,8 +1099,15 @@ There is NO /v1/i18n/ route. NEVER fetch from /v1/i18n/. Use AIMEAT.data.get('i1
 If a cortex library has a getI18n(locale) method, use that instead.
 
 ### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  CRITICAL: session.fetch() returns ALREADY-PARSED JSON, not Response.  ║
+║  Do NOT call resp.json() — it will crash with "not a function".        ║
+║  Access resp.ok, resp.data, resp.error directly.                       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 \\\`\\\`\\\`javascript
-// Helper for extension calls (copy this):
+// Helper for extension calls (copy this EXACTLY):
 async function extCall(extName, actionId, body = {}, instanceId = null) {
   const session = AIMEAT.auth.getSession();
   if (!session) throw new Error('Not logged in');
@@ -1108,6 +1115,7 @@ async function extCall(extName, actionId, body = {}, instanceId = null) {
     ? '/v1/ext/' + extName + '/' + instanceId + '/' + actionId
     : '/v1/ext/' + extName + '/' + actionId;
   const resp = await session.fetch(path, { method: 'POST', body: JSON.stringify(body) });
+  // resp is ALREADY parsed JSON — never call resp.json()
   if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
   return resp.data;  // unwrapped payload
 }
@@ -1577,14 +1585,18 @@ spec:
     return json.ok ? json.data.value : null;
   }
 
+  // ╔══════════════════════════════════════════════════════════════════════════╗
+  // ║  CRITICAL: session.fetch() returns ALREADY-PARSED JSON (not Response). ║
+  // ║  Do NOT call resp.json() — it will crash. Use resp.data directly.      ║
+  // ╚══════════════════════════════════════════════════════════════════════════╝
   async function callExt(extName, actionId, body) {
     const session = AIMEAT.auth && AIMEAT.auth.getSession();
-    if (!session) throw new Error('Not logged in');
+    if (!session) return null;
     const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, {
       method: 'POST', body: JSON.stringify(body || {}),
     });
-    if (!resp.ok) throw new Error((resp.error && resp.error.message) || 'Extension call failed');
-    return resp.data;
+    if (!resp || !resp.ok) return null;
+    return resp.data;  // ALREADY parsed — never call resp.json()
   }
 
   // ── Public API ──
