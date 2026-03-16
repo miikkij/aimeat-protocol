@@ -497,7 +497,7 @@ export interface EmailVerificationRecord {
   ownerName: string;
   emailHash: string;
   code: string;           // SHA-256 hash of 6-digit code
-  purpose: 'registration' | 'login' | 'change';
+  purpose: 'registration' | 'login' | 'change' | 'password_reset' | 'account_recovery' | 'email_verification';
   status: 'pending' | 'verified' | 'expired';
   attempts: number;
   expiresAt: string;

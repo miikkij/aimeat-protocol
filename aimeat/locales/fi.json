@@ -231,6 +231,7 @@
       "nodeStats": "Solmutilastot",
       "extensions": "Laajennukset",
       "security": "Turvallisuus",
+      "email": "Sähköposti",
       "notifications": "Ilmoitukset",
       "organisms": "Organismit",
       "packages": "Paketit"
@@ -759,6 +760,24 @@
       "revokeConfirm": "Haluatko varmasti perua kaikki aktiiviset istunnot? Sinut kirjataan ulos.",
       "sessionsRevoked": "Kaikki istunnot peruttu"
     },
+    "email": {
+      "title": "Sähköpostivahvistus",
+      "description": "Vahvista sähköpostiosoitteesi mahdollistaaksesi salasanan palautuksen, tilin palautuksen ja sähköposti-ilmoitukset.",
+      "currentEmail": "Nykyinen sähköposti",
+      "notSet": "Sähköpostia ei asetettu",
+      "verified": "Sähköposti vahvistettu",
+      "notVerified": "Sähköpostia ei vahvistettu",
+      "enterEmail": "Syötä sähköpostiosoitteesi",
+      "sendCode": "Lähetä vahvistuskoodi",
+      "codeSent": "Vahvistuskoodi lähetetty sähköpostiisi",
+      "enterCode": "Syötä vahvistuskoodi",
+      "verify": "Vahvista",
+      "verifySuccess": "Sähköposti vahvistettu onnistuneesti!",
+      "verifyFailed": "Vahvistus epäonnistui",
+      "sendFailed": "Vahvistuskoodin lähetys epäonnistui",
+      "changeEmail": "Vaihda sähköposti",
+      "emailMasked": "Sähköposti (osittain peitetty yksityisyyden vuoksi)"
+    },
     "notifications": {
       "title": "Push-ilmoitukset",
       "explain": "Vastaanota selainilmoituksia kun agenttisi saavat viestejä, työtehtäviä tai muita tapahtumia poissaollessasi.",
@@ -778,7 +797,15 @@
       "testFailed": "Testi-ilmoituksen lähetys epäonnistui.",
       "notConfigured": "Push-ilmoituksia ei ole määritetty tällä solmulla.",
       "noBrowserSupport": "Selaimesi ei tue push-ilmoituksia.",
-      "hint": "Push-ilmoitukset vaativat selaimesi luvan. Voit peruuttaa luvan milloin tahansa selaimen asetuksista."
+      "hint": "Push-ilmoitukset vaativat selaimesi luvan. Voit peruuttaa luvan milloin tahansa selaimen asetuksista.",
+      "emailNotifications": "Sähköposti-ilmoitukset",
+      "emailNotVerified": "Vahvista sähköpostisi Sähköposti-välilehdellä ensin ottaaksesi sähköposti-ilmoitukset käyttöön.",
+      "enableEmailNotifs": "Vastaanota tärkeitä päivityksiä sähköpostitse.",
+      "notifTypeExtensions": "Laajennuspäivitykset",
+      "notifTypeSystem": "Järjestelmäilmoitukset",
+      "notifTypeSecurity": "Tietoturvahälytykset",
+      "emailPrefsSaved": "Sähköposti-ilmoitusasetukset tallennettu",
+      "emailPrefsFailed": "Sähköposti-ilmoitusasetusten tallennus epäonnistui"
     },
     "nodeStats": {
       "title": "Solmun tilastot",
@@ -3624,5 +3651,17 @@
     "invalidRating": "Arvosanan tulee olla 1-5",
     "featuredToggled": "Suositellun tila päivitetty",
     "alreadyExists": "Listaus on jo olemassa tälle paketille"
+  },
+  "auth": {
+    "forgotPassword": "Unohditko salasanan?",
+    "forgotUsername": "Unohditko käyttäjätunnuksen?",
+    "sendResetCode": "Lähetä palautuskoodi",
+    "resetCodeSent": "Jos tilillä on vahvistettu sähköposti, palautuskoodi lähetettiin.",
+    "enterNewPassword": "Syötä uusi salasanasi",
+    "resetPassword": "Palauta salasana",
+    "resetSuccess": "Salasana palautettu onnistuneesti! Voit nyt kirjautua sisään.",
+    "sendUsername": "Lähetä käyttäjätunnukseni",
+    "usernameSent": "Jos sähköpostilla on tili, käyttäjätunnus lähetettiin.",
+    "backToLogin": "Takaisin kirjautumiseen"
   }
 }

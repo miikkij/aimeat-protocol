@@ -33,6 +33,7 @@ import AccessTab from './profile/access-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import SecurityTab from './profile/security-tab.js';
+import EmailTab from './profile/email-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
@@ -59,6 +60,7 @@ const TABS = [
   { id: 'dataWallet',   key: 'profile.tabs.dataWallet',    component: DataWalletTab },
   { id: 'nodeStats',    key: 'profile.tabs.nodeStats',     component: NodeStatsTab },
   { id: 'security',     key: 'profile.tabs.security',      component: SecurityTab },
+  { id: 'email',         key: 'profile.tabs.email',          component: EmailTab },
   { id: 'notifications', key: 'profile.tabs.notifications', component: NotificationsTab },
   { id: 'generator', key: 'profile.generator.tabLabel', component: GeneratorTab },
   { id: 'packages', key: 'profile.tabs.packages', component: PackagesTab },

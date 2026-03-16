@@ -805,6 +805,51 @@ function showLoginModal(opts, renderBtn) {
     + '<button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
     + '</div>'
     + '<p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '<div style="margin-top:14px;display:flex;gap:16px">'
+    + '<a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
+    + '<a href="#" id="aimeat-forgot-user" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
+    + '</div>'
+    + '</div>'
+    // Forgot password sub-view (hidden by default)
+    + '<div id="aimeat-forgot-pw-view" style="padding:24px 32px;display:none">'
+    + '<div id="aimeat-fpw-step1">'
+    + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.resetPasswordTitle || 'Reset Password') + '</h3>'
+    + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.resetPasswordDesc || 'Enter your username to receive a reset code by email.') + '</p>'
+    + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.usernameLabel || 'Username') + '</label>'
+    + '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '"></div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i.sendResetCode || 'Send Reset Code') + '</button>'
+    + '<button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
+    + '</div>'
+    + '<p id="aimeat-fpw-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
+    + '<p id="aimeat-fpw-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '</div>'
+    + '<div id="aimeat-fpw-step2" style="display:none">'
+    + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.enterNewPasswordTitle || 'Enter New Password') + '</h3>'
+    + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.resetCodeSent || 'A reset code was sent to your email. Enter it below with your new password.') + '</p>'
+    + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.codeLabel || 'Reset Code') + '</label>'
+    + '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6"></div>'
+    + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.newPasswordLabel || 'New Password') + '</label>'
+    + '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || 'New password (min 8 chars)') + '"></div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i.resetPassword || 'Reset Password') + '</button>'
+    + '<button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
+    + '</div>'
+    + '<p id="aimeat-fpw-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
+    + '<p id="aimeat-fpw-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
+    + '</div>'
+    + '</div>'
+    // Forgot username sub-view (hidden by default)
+    + '<div id="aimeat-forgot-user-view" style="padding:24px 32px;display:none">'
+    + '<h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i.recoverUsernameTitle || 'Recover Username') + '</h3>'
+    + '<p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i.recoverUsernameDesc || 'Enter the email address associated with your account.') + '</p>'
+    + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.emailLabel || 'Email') + '</label>'
+    + '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || 'Send My Username') + '</button>'
+    + '<button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
+    + '</div>'
+    + '<p id="aimeat-fu-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p>'
     + '</div>'
     // Features footer
     + '<div style="padding:20px 32px 28px;background:#F9FAFB;border-top:1px solid #E5E7EB">'
@@ -818,6 +863,90 @@ function showLoginModal(opts, renderBtn) {
   document.body.appendChild(modal);
 
   document.getElementById('aimeat-cancel-btn').addEventListener('click', () => modal.remove());
+
+  // Helper to toggle between views
+  function showView(view) {
+    document.getElementById('aimeat-modal-body').style.display = view === 'login' ? '' : 'none';
+    document.getElementById('aimeat-forgot-pw-view').style.display = view === 'forgot-pw' ? '' : 'none';
+    document.getElementById('aimeat-forgot-user-view').style.display = view === 'forgot-user' ? '' : 'none';
+  }
+
+  // Forgot password link
+  document.getElementById('aimeat-forgot-pw').addEventListener('click', function(e) {
+    e.preventDefault();
+    showView('forgot-pw');
+    document.getElementById('aimeat-fpw-step1').style.display = '';
+    document.getElementById('aimeat-fpw-step2').style.display = 'none';
+  });
+
+  // Forgot username link
+  document.getElementById('aimeat-forgot-user').addEventListener('click', function(e) {
+    e.preventDefault();
+    showView('forgot-user');
+  });
+
+  // Back to login buttons
+  ['aimeat-fpw-back', 'aimeat-fpw-back2', 'aimeat-fu-back'].forEach(function(id) {
+    document.getElementById(id).addEventListener('click', function() { showView('login'); });
+  });
+
+  // Send password reset code
+  document.getElementById('aimeat-fpw-send').addEventListener('click', async function() {
+    var username = document.getElementById('aimeat-fpw-username').value.trim().toLowerCase();
+    var msgEl = document.getElementById('aimeat-fpw-msg');
+    var errEl = document.getElementById('aimeat-fpw-err');
+    msgEl.style.display = 'none';
+    errEl.style.display = 'none';
+    if (!username) { errEl.textContent = i.errUserShort || 'Username is required'; errEl.style.display = 'block'; return; }
+    try {
+      await api('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: username }) });
+      msgEl.textContent = i.resetCodeSent || 'If your account has a verified email, a reset code was sent.';
+      msgEl.style.display = 'block';
+      document.getElementById('aimeat-fpw-step1').style.display = 'none';
+      document.getElementById('aimeat-fpw-step2').style.display = '';
+      // Pre-fill the username for the reset step
+      window.__aimeatResetUser = username;
+    } catch(e) {
+      errEl.textContent = e.message; errEl.style.display = 'block';
+    }
+  });
+
+  // Reset password with code
+  document.getElementById('aimeat-fpw-reset').addEventListener('click', async function() {
+    var code = document.getElementById('aimeat-fpw-code').value.trim();
+    var newPass = document.getElementById('aimeat-fpw-newpass').value;
+    var msgEl = document.getElementById('aimeat-fpw-msg2');
+    var errEl = document.getElementById('aimeat-fpw-err2');
+    msgEl.style.display = 'none';
+    errEl.style.display = 'none';
+    if (!code) { errEl.textContent = 'Code is required'; errEl.style.display = 'block'; return; }
+    if (!newPass || newPass.length < 8) { errEl.textContent = i.errPassWeak || 'Password must be at least 8 characters'; errEl.style.display = 'block'; return; }
+    try {
+      await api('/v1/ghii/password/reset', { method: 'POST', body: JSON.stringify({
+        username: window.__aimeatResetUser || '',
+        code: code,
+        newPassword: newPass
+      }) });
+      msgEl.textContent = i.resetSuccess || 'Password reset successful! You can now sign in.';
+      msgEl.style.display = 'block';
+      setTimeout(function() { showView('login'); }, 2000);
+    } catch(e) {
+      errEl.textContent = e.message; errEl.style.display = 'block';
+    }
+  });
+
+  // Send username recovery
+  document.getElementById('aimeat-fu-send').addEventListener('click', async function() {
+    var email = document.getElementById('aimeat-fu-email').value.trim();
+    var msgEl = document.getElementById('aimeat-fu-msg');
+    msgEl.style.display = 'none';
+    if (!email) return;
+    try {
+      await api('/v1/ghii/account/recover', { method: 'POST', body: JSON.stringify({ email: email }) });
+    } catch(_) { /* always show success */ }
+    msgEl.textContent = i.usernameSent || 'If an account with that email exists, your username was sent.';
+    msgEl.style.display = 'block';
+  });
 
   document.getElementById('aimeat-go-btn').addEventListener('click', async () => {
     const username = document.getElementById('aimeat-username').value.trim().toLowerCase();

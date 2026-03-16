@@ -95,6 +95,10 @@
  *     (trends: rising/falling/steady, field names: English camelCase, source values: keep as-is),
  *     add memory key naming conventions (settings.config, i18n.{locale}, domain namespaces),
  *     fix static data injection to use getPublic instead of get
+ *   v8.2.0 — 2026-03-16 — Cortex prompt: change output format from two separate
+ *     code blocks (yaml + javascript) to single untagged block with // lib/ separator.
+ *     Prevents LLMs from splitting output across messages. Add explicit const LIB_NAME
+ *     requirement. Matches extension prompt's proven single-block pattern.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -1574,15 +1578,13 @@ async function callExt(extName, actionId, body) {
 }
 \\\`\\\`\\\`
 
-## Output Format
+## Output format — SINGLE block, copy-paste friendly
 
-Return TWO code blocks:
+Return EVERYTHING in ONE code block (no language tag). The YAML manifest first, then a separator comment \`// lib/{metadata.name}.js\`, then the JavaScript library code. The user will copy-paste the entire response at once.
 
-1. A \\\`\\\`\\\`yaml block with the Cortex manifest
-2. A \\\`\\\`\\\`javascript block with the library code
+CRITICAL: Do NOT use separate code blocks. Do NOT put YAML in a \\\`\\\`\\\`yaml block and JS in a \\\`\\\`\\\`javascript block. Put EVERYTHING in ONE \\\`\\\`\\\` block — YAML first, then JS after the separator comment.
 
-### YAML Manifest Structure:
-\\\`\\\`\\\`yaml
+\\\`\\\`\\\`
 apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
@@ -1619,10 +1621,7 @@ spec:
         AIMEAT.myLib.init() — Check data readiness, returns { ready, hasData }
         AIMEAT.myLib.getData({hours, type}) — Filtered domain data
         AIMEAT.myLib.getStats(date) — Aggregated statistics
-\\\`\\\`\\\`
-
-### JavaScript Library Pattern:
-\\\`\\\`\\\`javascript
+// lib/my-domain-lib.js
 (function (AIMEAT) {
   'use strict';
 
@@ -1683,11 +1682,15 @@ spec:
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\`
 
+CRITICAL: Do NOT use separate code blocks. Put YAML manifest and JavaScript library in ONE block.
+The JavaScript section MUST start with a comment line: // lib/{metadata.name}.js
+
 ## Rules
 
 ### CRITICAL: Name Consistency
 The YAML \`metadata.name\` and the JS \`LIB_NAME\` MUST follow this convention:
 - YAML \`metadata.name\`: kebab-case (e.g., \`my-domain-lib\`)
+- JS \`LIB_NAME\`: MUST be declared with \`const\` (not var or let): \`const LIB_NAME = 'myDomainLib';\`
 - JS \`LIB_NAME\`: camelCase version of the SAME name (e.g., \`myDomainLib\`)
 - \`AIMEAT.register(LIB_NAME, exports)\` uses the camelCase name
 - Apps load via: \`/v1/cortex/{metadata.name}/libs/{metadata.name}.js\`

@@ -41,6 +41,9 @@
  *     field on cortex components in blueprint validation (not stripped as extra fields)
  *   v4.4.0 — 2026-03-15 — Cortex validator cross-checks YAML metadata.name against
  *     JS LIB_NAME (kebab→camelCase), verifies IIFE pattern and AIMEAT.register usage
+ *   v4.5.0 — 2026-03-16 — Cortex validator supports single-block format (YAML + JS
+ *     separated by // lib/ comment) in addition to legacy separate blocks. Accept
+ *     var/let/const for LIB_NAME declaration.
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -375,9 +378,42 @@ const validators = {
 
   cortex(result, blueprint) {
     const errors = [];
-    const yamlBlock = extractCodeBlock(result, 'yaml');
+
+    // ── Extract YAML and JS — supports two formats ──
+    // Format 1 (preferred): Single untagged code block with YAML first, then // lib/*.js separator
+    // Format 2 (legacy): Separate ```yaml and ```javascript blocks
+    let yamlBlock = null;
+    const jsBlocks = [];
+
+    // Try Format 1: single block with // lib/ separator
+    const untaggedMatch = result.match(/```\s*\n([\s\S]*?)```/);
+    if (untaggedMatch) {
+      const content = untaggedMatch[1];
+      const libSeparator = content.match(/^\/\/\s*lib\/\S+\.js\s*$/m);
+      if (libSeparator) {
+        const sepIndex = content.indexOf(libSeparator[0]);
+        yamlBlock = content.slice(0, sepIndex).trim();
+        jsBlocks.push(content.slice(sepIndex).trim());
+      }
+    }
+
+    // Try Format 2: separate ```yaml and ```javascript blocks
     if (!yamlBlock) {
-      errors.push('No YAML code block found — cortex must include a manifest');
+      yamlBlock = extractCodeBlock(result, 'yaml');
+      if (yamlBlock) {
+        const jsRegex = /```(?:javascript|js)\s*\n([\s\S]*?)```/gi;
+        let match;
+        const afterYaml = result.indexOf('```yaml') > -1
+          ? result.slice(result.indexOf('```', result.indexOf('```yaml') + 7) + 3)
+          : result;
+        while ((match = jsRegex.exec(afterYaml)) !== null) {
+          jsBlocks.push(match[1].trim());
+        }
+      }
+    }
+
+    if (!yamlBlock) {
+      errors.push('No YAML manifest found — cortex must include a manifest (either in a single code block with // lib/ separator, or in a ```yaml block)');
       return { valid: false, errors, extracted: null };
     }
 
@@ -395,17 +431,6 @@ const validators = {
       errors.push('spec.components array is required');
     }
 
-    // Extract JS library code blocks after the YAML
-    const jsBlocks = [];
-    const jsRegex = /```(?:javascript|js)\s*\n([\s\S]*?)```/gi;
-    let match;
-    const afterYaml = result.indexOf('```yaml') > -1
-      ? result.slice(result.indexOf('```', result.indexOf('```yaml') + 7) + 3)
-      : result;
-    while ((match = jsRegex.exec(afterYaml)) !== null) {
-      jsBlocks.push(match[1].trim());
-    }
-
     const libComponents = (parsed.spec?.components || []).filter(c => c.type === 'lib');
     if (libComponents.length > 0 && jsBlocks.length === 0) {
       errors.push(`Manifest declares ${libComponents.length} lib component(s) but no JavaScript code blocks found`);
@@ -418,7 +443,7 @@ const validators = {
       const jsCode = jsBlocks.join('\n');
 
       // Check LIB_NAME matches expected camelCase
-      const libNameMatch = jsCode.match(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
+      const libNameMatch = jsCode.match(/(?:const|let|var)\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
       if (libNameMatch) {
         const actualLibName = libNameMatch[1];
         if (actualLibName !== expectedCamel) {

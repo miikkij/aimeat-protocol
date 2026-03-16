@@ -231,6 +231,7 @@
       "nodeStats": "Node Stats",
       "extensions": "Extensions",
       "security": "Security",
+      "email": "Email",
       "notifications": "Notifications",
       "organisms": "Organisms",
       "packages": "Packages"
@@ -759,6 +760,24 @@
       "revokeConfirm": "Are you sure you want to revoke all active sessions? You will be logged out.",
       "sessionsRevoked": "All sessions revoked"
     },
+    "email": {
+      "title": "Email Verification",
+      "description": "Verify your email address to enable password reset, account recovery, and email notifications.",
+      "currentEmail": "Current email",
+      "notSet": "No email set",
+      "verified": "Email verified",
+      "notVerified": "Email not verified",
+      "enterEmail": "Enter your email address",
+      "sendCode": "Send Verification Code",
+      "codeSent": "Verification code sent to your email",
+      "enterCode": "Enter verification code",
+      "verify": "Verify",
+      "verifySuccess": "Email verified successfully!",
+      "verifyFailed": "Verification failed",
+      "sendFailed": "Failed to send verification code",
+      "changeEmail": "Change Email",
+      "emailMasked": "Email (partially masked for privacy)"
+    },
     "notifications": {
       "title": "Push Notifications",
       "explain": "Receive browser push notifications when your agents get messages, work assignments, or other events while you're away.",
@@ -778,7 +797,15 @@
       "testFailed": "Failed to send test notification.",
       "notConfigured": "Push notifications are not configured on this node.",
       "noBrowserSupport": "Your browser does not support push notifications.",
-      "hint": "Push notifications require your browser's permission. You can revoke this permission at any time in your browser settings."
+      "hint": "Push notifications require your browser's permission. You can revoke this permission at any time in your browser settings.",
+      "emailNotifications": "Email Notifications",
+      "emailNotVerified": "Verify your email in the Email tab first to enable email notifications.",
+      "enableEmailNotifs": "Receive important updates by email.",
+      "notifTypeExtensions": "Extension updates",
+      "notifTypeSystem": "System notifications",
+      "notifTypeSecurity": "Security alerts",
+      "emailPrefsSaved": "Email notification preferences saved",
+      "emailPrefsFailed": "Failed to save email notification preferences"
     },
     "nodeStats": {
       "title": "Node Statistics",
@@ -3624,5 +3651,17 @@
     "invalidRating": "Rating must be between 1 and 5",
     "featuredToggled": "Featured status updated",
     "alreadyExists": "Listing already exists for this package"
+  },
+  "auth": {
+    "forgotPassword": "Forgot password?",
+    "forgotUsername": "Forgot username?",
+    "sendResetCode": "Send Reset Code",
+    "resetCodeSent": "If your account has a verified email, a reset code was sent.",
+    "enterNewPassword": "Enter your new password",
+    "resetPassword": "Reset Password",
+    "resetSuccess": "Password reset successful! You can now sign in.",
+    "sendUsername": "Send My Username",
+    "usernameSent": "If an account with that email exists, your username was sent.",
+    "backToLogin": "Back to Login"
   }
 }
