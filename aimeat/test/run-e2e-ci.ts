@@ -24,6 +24,7 @@ const ALL_SUITES = [
     'test/e2e-board-ttl.ts',
     'test/e2e-concurrency.ts',
     'test/e2e-disputes.ts',
+    'test/e2e-email.ts',
     'test/e2e-extensions.ts',
     'test/e2e-federation.ts',
     'test/e2e-generator.ts',
