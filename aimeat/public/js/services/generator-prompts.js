@@ -149,6 +149,12 @@ AIMEAT Data Standards (MUST follow in ALL components):
   Currency/amounts: integers (no floats) — morsels are whole numbers.
 `.trim();
 
+/* ── Instruction Disclaimer (prepended to every prompt) ── */
+
+const INSTRUCTION_DISCLAIMER = `IMPORTANT: These are detailed instructions that you MUST read carefully and follow exactly. Every rule, constraint, format requirement, and example below exists for a reason. Do NOT skip sections, do NOT invent your own conventions, and do NOT deviate from the specified output format. If a rule says "MUST" or "NEVER", treat it as absolute.
+
+`;
+
 /* ── Blueprint Prompt ────────────────────────────────── */
 
 export function buildBlueprintPrompt(description, interviewSpec = null, availableCortexLibs = null) {
@@ -192,7 +198,7 @@ The generated cortex should load the used library via <script> and call its API 
     ? `\n## LANGUAGE\n\nThe user's language is "${specLocale}". Write all human-readable labels and descriptions in that language.\nJSON keys and technical identifiers stay in English.\n`
     : '';
 
-  return `${AIMEAT_CONTEXT}
+  return `${INSTRUCTION_DISCLAIMER}${AIMEAT_CONTEXT}
 
 The user wants to create this service:
 ---
@@ -373,7 +379,7 @@ export function buildInterviewPrompt(description, locale = 'en') {
     ? `\n## LANGUAGE\n\nCONDUCT THIS ENTIRE INTERVIEW IN ${langName.toUpperCase()}.\nAll your questions, summaries, options, and explanations must be in ${langName}.\nThe final JSON specification field values (descriptions, titles, notes) should also be in ${langName}.\nJSON keys and technical identifiers (field names, type values) stay in English.\nInclude "locale": "${locale}" in the output JSON root so downstream prompts continue in the same language.\n`
     : '';
 
-  return `You are a requirements analyst for the AIMEAT service generator.
+  return `${INSTRUCTION_DISCLAIMER}You are a requirements analyst for the AIMEAT service generator.
 The user wants to build a service. Your job is to interview them to produce a clear, structured specification.
 ${langInstruction}
 ## User's Initial Description
@@ -1802,16 +1808,16 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
 
   // App and cortex templates receive completedComponents for cross-referencing
   if (type === 'app' || type === 'cortex') {
-    return template(label, context, completedComponents);
+    return INSTRUCTION_DISCLAIMER + template(label, context, completedComponents);
   }
 
-  return template(label, context);
+  return INSTRUCTION_DISCLAIMER + template(label, context);
 }
 
 /* ── Fix Prompts ─────────────────────────────────────── */
 
 export function buildBlueprintFixPrompt(description, errors, interviewSpec = null) {
-  return `Your previous blueprint response was not valid. DO NOT try to fix the old response — generate a fresh one.
+  return `${INSTRUCTION_DISCLAIMER}Your previous blueprint response was not valid. DO NOT try to fix the old response — generate a fresh one.
 
 ERRORS from previous attempt:
 ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
@@ -1851,7 +1857,7 @@ APP CONSTRAINTS (browser HTML):
 
   const typeConstraint = typeRules[componentType] || '';
 
-  return `The following result had validation errors. Fix ONLY the errors listed below.
+  return `${INSTRUCTION_DISCLAIMER}The following result had validation errors. Fix ONLY the errors listed below.
 
 CRITICAL: Your output MUST use proper JavaScript/YAML syntax. NEVER output HTML entities:
 - Use => NOT =&gt;
@@ -1885,7 +1891,7 @@ export function buildImpactPrompt(changeRequest, blueprint) {
     return `- ${c.id} (${c.type}: ${c.label})\n  produces: ${produces}\n  consumes: ${consumes}`;
   }).join('\n');
 
-  return `You are analyzing the impact of a change to an AIMEAT service.
+  return `${INSTRUCTION_DISCLAIMER}You are analyzing the impact of a change to an AIMEAT service.
 
 ## Service Blueprint
 
@@ -1972,7 +1978,7 @@ Make sure your code correctly handles the new data format described above.
 `;
   }
 
-  return `${AIMEAT_CONTEXT}
+  return `${INSTRUCTION_DISCLAIMER}${AIMEAT_CONTEXT}
 
 You are modifying an existing AIMEAT ${typeLabel}: **${label}**
 ${typeConstraints[type] || ''}
