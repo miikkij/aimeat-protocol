@@ -76,6 +76,7 @@ export const closeRoom       = (id)     => apiDelete(`/v1/realtime/rooms/${encod
 export const getGhiiUsers    = ()       => apiGet('/v1/admin/ghii');
 export const updateGhiiLevel = (ghii, level) => apiPut(`/v1/admin/ghii/${encodeURIComponent(ghii)}`, { verificationLevel: level });
 export const deleteGhii      = (ghii)   => apiDelete(`/v1/admin/ghii/${encodeURIComponent(ghii)}`);
+export const removeGhiiEmail = (ghii)   => apiDelete(`/v1/admin/ghii/${encodeURIComponent(ghii)}/email`);
 export const clearGhiiCors   = (ghii)   => apiPut(`/v1/admin/ghii/${encodeURIComponent(ghii)}/cors`, { allowed_origins: null });
 
 // ── Email ──

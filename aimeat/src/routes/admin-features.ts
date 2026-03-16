@@ -46,18 +46,27 @@ export function adminFeaturesRouter(
     router.get('/v1/admin/ghii', ...auth, handle(async (_req, res) => {
         const users = await storage.listGHIIs();
         res.json(success(config.nodeId, {
-            ghii_users: users.map(u => ({
-                ghii: u.ghii,
-                username: u.username,
-                display_name: u.displayName,
-                verification_level: u.verificationLevel,
-                totp_enabled: u.totpEnabled,
-                email_hash: u.emailHash ?? null,
-                owner_name: u.ownerName,
-                allowed_origins: u.allowedOrigins ?? null,
-                created_at: u.createdAt,
-                updated_at: u.updatedAt,
-            })),
+            ghii_users: users.map(u => {
+                let maskedEmail: string | null = null;
+                if (u.notificationEmail) {
+                    const [local, domain] = u.notificationEmail.split('@');
+                    maskedEmail = (local?.[0] ?? '') + '***@' + (domain ?? '');
+                }
+                return {
+                    ghii: u.ghii,
+                    username: u.username,
+                    display_name: u.displayName,
+                    verification_level: u.verificationLevel,
+                    totp_enabled: u.totpEnabled,
+                    email_hash: u.emailHash ?? null,
+                    email_verified: !!u.emailVerifiedAt,
+                    masked_email: maskedEmail,
+                    owner_name: u.ownerName,
+                    allowed_origins: u.allowedOrigins ?? null,
+                    created_at: u.createdAt,
+                    updated_at: u.updatedAt,
+                };
+            }),
             total: users.length,
         }));
     }));
@@ -78,6 +87,22 @@ export function adminFeaturesRouter(
         }
 
         res.json(success(config.nodeId, { ghii_user: updated }));
+        emitChange('features');
+    }));
+
+    router.delete('/v1/admin/ghii/:ghii/email', ...auth, handle(async (req, res) => {
+        const ghii = param(req.params.ghii);
+        const updated = await storage.updateGHII(ghii, {
+            emailHash: null as unknown as string,
+            emailVerifiedAt: null as unknown as string,
+            notificationEmail: null as unknown as string,
+            verificationLevel: 0,
+        });
+        if (!updated) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
+            return;
+        }
+        res.json(success(config.nodeId, { deleted: true, ghii }));
         emitChange('features');
     }));
 
