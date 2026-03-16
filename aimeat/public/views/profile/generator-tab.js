@@ -18,6 +18,8 @@
  *   v2.0.1 — 2026-03-15 — Fix session not passed to ComponentDetail (broke registration)
  *   v3.0.0 — 2026-03-15 — Add lifecycle management (activate/deactivate/launch/remove),
  *     edit service UI (impact analysis + targeted edit prompts), diagnostics panel
+ *   v3.1.0 — 2026-03-17 — Editable project name, re-register button, button tooltips,
+ *     detail panel background matching, improved spacing and button visibility
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -31,7 +33,7 @@ import {
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
   getListeners, buildAgentSetupPrompt, createGeneratorAgent,
   saveInterviewSpec, getInterviewSpec,
-  getComponentStatuses, activateAll, deactivateAll, removeComponents, getAppLaunchUrl,
+  getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
@@ -409,6 +411,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   // Phase 7: Diagnostics state
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
+  // Editable project name
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
   // Interview spec (loaded for locale threading to component prompts)
   const [interviewSpec, setInterviewSpec] = useState(null);
 
@@ -485,6 +491,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       await refreshStatuses();
     } catch (e) { showToast?.(e.message, true); }
     setLifecycleLoading(null);
+  }
+
+  async function handleNameSave() {
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== project.name) {
+      await updateProject(projectId, { name: trimmed });
+      await loadData();
+      showToast?.('Name updated');
+    }
+    setEditingName(false);
   }
 
   function handleLaunchApp() {
@@ -609,8 +625,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     <div class="pf-gen-dashboard">
       <${ConfirmUI} />
       <div class="pf-gen-dash-header">
-        <button class="btn btn-ghost btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
-        <h3>${project.name}</h3>
+        <button class="btn btn-outline btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
+        ${editingName
+          ? html`<input class="pf-gen-name-input" value=${nameDraft}
+              onInput=${e => setNameDraft(e.target.value)}
+              onBlur=${handleNameSave}
+              onKeyDown=${e => { if (e.key === 'Enter') handleNameSave(); if (e.key === 'Escape') setEditingName(false); }}
+              ref=${el => el && setTimeout(() => el.focus(), 0)}
+            />`
+          : html`<h3 class="pf-gen-name-editable" onClick=${() => { setNameDraft(project.name); setEditingName(true); }}
+              title=${t('profile.generator.clickToEditName') || 'Click to edit name'}>${project.name}</h3>`
+        }
         <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDeleteProject}>
           ${t('profile.generator.deleteProject')}
         </button>
@@ -625,7 +650,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <span>${activeCount} active</span>
           </div>
           <div class="pf-gen-lifecycle-actions">
-            <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#000"
+            <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#052e16"
               onClick=${handleActivateAll}
               disabled=${lifecycleLoading !== null || registeredCount === 0}>
               ${lifecycleLoading === 'activate' ? '...' : 'Activate All'}
@@ -649,7 +674,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <button class="btn btn-sm btn-ghost" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
               ${showDiagnostics ? 'Hide Diagnostics' : 'Diagnostics'}
             </button>
-            <button class="btn btn-sm btn-ghost" style="color:var(--error,#ef4444)"
+            <button class="btn btn-sm btn-outline pf-gen-remove-toggle"
               onClick=${() => { setShowRemovePanel(!showRemovePanel); setRemoveSelection({}); }}>
               ${showRemovePanel ? 'Cancel' : 'Remove...'}
             </button>
@@ -832,6 +857,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                 agents=${agents}
                 projectId=${projectId}
                 interviewSpec=${interviewSpec}
+                liveStatuses=${liveStatuses}
                 onUpdate=${loadData}
                 onAdvance=${advanceToNext}
                 showToast=${showToast}
@@ -896,7 +922,7 @@ function StepArrow({ direction = 'right' } = {}) {
   </svg>`;
 }
 
-function ComponentDetail({ component, project, components, agents, projectId, interviewSpec, onUpdate, onAdvance, showToast, session }) {
+function ComponentDetail({ component, project, components, agents, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session }) {
   const [mode, setMode] = useState('chat');
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
@@ -1004,6 +1030,41 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     setRegistering(false);
   }
 
+  async function handleReregister() {
+    setRegistering(true);
+    try {
+      const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
+      const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
+      const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
+
+      // Re-validate current result before re-registering
+      const vr = validateComponent(component.type, component.result || result, project.blueprint);
+      if (!vr.valid) {
+        showToast?.((t('profile.generator.validationFailed') || 'Validation failed') + ': ' + vr.errors.join(', '), true);
+        setRegistering(false);
+        return;
+      }
+
+      const resp = await reregisterComponent(projectId, component, vr, session, serviceSlug, liveStatuses);
+      const d = resp?.data || {};
+      const regName = d.csm?.name || d.integration?.name || d.extension?.name
+        || d.filename || d.name || d.id
+        || (d.locales ? `i18n-${d.locales.join('-')}` : null)
+        || (d.keys?.length ? `memory:${d.keys[d.keys.length - 1]}` : null)
+        || component.registeredAs;
+      const updated = { ...component, status: 'done', registeredAs: regName,
+        history: [...(component.history || []), { action: 're-registered', at: new Date().toISOString(), by: 'user', registeredAs: regName }],
+      };
+      await saveComponent(projectId, updated);
+      showToast?.(`Re-registered: ${regName}`);
+      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+      await onUpdate();
+    } catch (e) {
+      showToast?.(`Re-register failed: ${e.message}`, true);
+    }
+    setRegistering(false);
+  }
+
   async function handleRegeneratePrompt() {
     const fresh = buildComponentPrompt(
       component.type, component.label,
@@ -1056,11 +1117,13 @@ function ComponentDetail({ component, project, components, agents, projectId, in
 
       <!-- Mode toggle -->
       <div class="pf-gen-mode-toggle">
-        <button class=${`btn btn-sm ${mode === 'chat' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('chat')}>
+        <button class=${`btn btn-sm ${mode === 'chat' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('chat')}
+          title=${t('profile.generator.modeChatHint') || 'Copy the prompt to an AI chat, paste the result back here'}>
           ${t('profile.generator.modeChat')}
         </button>
         ${agents.length > 0 && html`
-          <button class=${`btn btn-sm ${mode === 'agent' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('agent')}>
+          <button class=${`btn btn-sm ${mode === 'agent' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('agent')}
+            title=${t('profile.generator.modeAgentHint') || 'Send the prompt to a connected AI agent automatically'}>
             ${t('profile.generator.modeAgent')}
           </button>
         `}
@@ -1073,7 +1136,8 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           <pre class="pf-gen-prompt-box">${prompt}</pre>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             ${workflowStep === 'copy' && html`<${StepArrow} />`}
-            <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}>
+            <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}
+              title=${t('profile.generator.copyPromptHint') || 'Copy this prompt to your clipboard — paste it into an AI chat to generate the component'}>
               ${t('profile.generator.copyPrompt')}
             </button>
             <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint') || 'Regenerate prompt with latest templates'}>
@@ -1101,13 +1165,21 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           />
           <div class="pf-gen-actions" style="align-items:center">
             ${workflowStep === 'validate' && html`<${StepArrow} />`}
-            <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}>
+            <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
+              title=${t('profile.generator.validateHint') || 'Check the AI output for correct format and required fields'}>
               ${t('profile.generator.validate')}
             </button>
             ${validationResult?.valid && html`
               ${workflowStep === 'register' && html`<${StepArrow} />`}
-              <button class="btn btn-sm" style="background:var(--success);color:#000" onClick=${handleRegister} disabled=${registering}>
+              <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#052e16" onClick=${handleRegister} disabled=${registering}
+                title=${t('profile.generator.registerHint') || 'Install this component on your AIMEAT node — makes it live'}>
                 ${registering ? '...' : t('profile.generator.register')}
+              </button>
+            `}
+            ${component.registeredAs && result.trim() && html`
+              <button class="btn btn-sm btn-outline" onClick=${handleReregister} disabled=${registering}
+                title=${t('profile.generator.reregisterHint') || 'Deactivate, remove, and re-register this component with the current result'}>
+                ${registering ? '...' : (t('profile.generator.reregister') || 'Re-register')}
               </button>
             `}
           </div>

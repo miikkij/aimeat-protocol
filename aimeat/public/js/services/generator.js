@@ -12,7 +12,7 @@
  *   - Interview Spec (saveInterviewSpec, getInterviewSpec)
  *   - Cleanup (cleanupOldEntries)
  *   - Registration (registerComponent) — includes cortex case with auto-activate
- *   - Lifecycle (getComponentStatuses, activateAll, deactivateAll, removeComponents, getAppLaunchUrl)
+ *   - Lifecycle (getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl)
  * @usage import { listProjects, buildAgentSetupPrompt } from '/js/services/generator.js';
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial generator service
@@ -34,6 +34,7 @@
  *     components (extensions, cortex, apps, csm, msm) + extension memory +
  *     translation i18n keys before removing generator state
  *   v4.3.0 — 2026-03-15 — Memory visibility changed to 'public' for cross-component access
+ *   v4.4.0 — 2026-03-17 — Add reregisterComponent (deactivate → remove → register → re-activate)
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -687,6 +688,59 @@ export async function removeComponents(projectId, componentIds, includeMemory, s
   }
 
   return { removed, errors };
+}
+
+/**
+ * Re-register a component: deactivate → remove → register → re-activate if it was active.
+ * Useful when updating a component that is already installed on the node.
+ * @param {string} projectId
+ * @param {object} component - the component object
+ * @param {object} validationResult - validated extraction result
+ * @param {object} session - user session
+ * @param {string} serviceSlug - service slug for namespacing
+ * @param {object} liveStatuses - current live statuses map (keyed by component id)
+ * Returns the registration response (same shape as registerComponent).
+ */
+export async function reregisterComponent(projectId, component, validationResult, session, serviceSlug, liveStatuses) {
+  const name = component.registeredAs;
+  if (!name) throw new Error('Component is not registered');
+
+  // Check if it was active before removal
+  const wasActive = liveStatuses?.[component.id]?.active === true;
+
+  // Step 1: Deactivate (best effort)
+  if (component.type === 'extension') {
+    try { await apiPost(`/v1/extensions/${encodeURIComponent(name)}/deactivate`); } catch { /* ok */ }
+  } else if (component.type === 'cortex') {
+    try { await apiPost(`/v1/cortex/${encodeURIComponent(name)}/deactivate`); } catch { /* ok */ }
+  }
+
+  // Step 2: Remove
+  if (component.type === 'extension') {
+    await apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
+  } else if (component.type === 'cortex') {
+    await apiDelete(`/v1/cortex/${encodeURIComponent(name)}`);
+  } else if (component.type === 'app') {
+    const owner = session?.owner || '';
+    await apiDelete(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`);
+  } else if (component.type === 'csm') {
+    await apiDelete(`/v1/csm/${encodeURIComponent(name)}`);
+  } else if (component.type === 'msm') {
+    await apiDelete(`/v1/msm/${encodeURIComponent(name)}`);
+  }
+
+  // Step 3: Register new version
+  const extracted = validationResult?.extracted || component.result;
+  const resp = await registerComponent(component.type, extracted, session, serviceSlug);
+
+  // Step 4: Re-activate if it was active (extensions/cortex that don't auto-activate)
+  if (wasActive && component.type === 'extension') {
+    const newName = resp?.data?.extension?.name || resp?.data?.name || name;
+    try { await apiPost(`/v1/extensions/${encodeURIComponent(newName)}/activate`); } catch { /* best effort */ }
+  }
+  // Note: cortex auto-activates in registerComponent, so no need to re-activate
+
+  return resp;
 }
 
 /**
