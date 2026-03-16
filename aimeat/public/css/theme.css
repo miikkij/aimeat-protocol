@@ -677,7 +677,7 @@ a { color: inherit; text-decoration: none; }
 .modal-close:hover { opacity: 1; }
 .modal-confirm-message { color: var(--text-dim); margin: 0 0 1.25rem; line-height: 1.5; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 0.5rem; }
-.btn-danger-solid { background: var(--danger,#ef4444); color: #fff; border: none; }
+.btn-danger-solid { padding: 8px 20px; background: var(--danger,#ef4444); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 0.84rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
 .btn-danger-solid:hover { background: #dc2626; }
 
 /* ── Card extensions ── */
