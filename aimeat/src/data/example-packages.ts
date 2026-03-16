@@ -430,13 +430,43 @@ document.getElementById("ai-prompt-box").textContent=AI_CHAT_PROMPT;
 el.innerHTML='<div class="type-fields"><div class="form-group"><label>Webpage URL</label><input id="view-content" placeholder="https://example.com"></div></div>';
 }}
 
-function generateHtml(){
-var prompt=document.getElementById('view-prompt').value.trim();
-if(!prompt){setStatus('Write a description first');return}
-var html='<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:system-ui,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:#fff;text-align:center;padding:2rem}.content{max-width:800px}h1{font-size:2.5rem;margin-bottom:1rem;text-shadow:0 2px 10px rgba(0,0,0,.3)}p{font-size:1.2rem;color:rgba(255,255,255,.8);line-height:1.6}</style></head><body><div class="content"><h1>'+esc(prompt)+'</h1><p>Edit this template to build your custom view. You can add JavaScript, animations, API calls, and more.</p></div></body></html>';
-document.getElementById('view-content').value=html;
-setStatus('Template generated - edit the HTML to customize');
-}
+var AI_CHAT_PROMPT='You are a Digital Signage View Designer. Your job is to interview the user step by step and then produce a single self-contained HTML file (HTML + CSS + JS all in one file) that will be displayed on a digital signage kiosk screen.\n\n'
++'## Interview Process\n\n'
++'Ask these questions ONE AT A TIME. Wait for the user to answer before asking the next one. Be friendly and enthusiastic.\n\n'
++'1. **Purpose**: "What do you want to show on the signage screen? For example: weather, clock, company info, event schedule, welcome message, menu, news feed, social media, custom animation, or something else?"\n\n'
++'2. **Style**: "What visual style do you prefer? Options:\n   - Clean & minimal (lots of whitespace, simple fonts)\n   - Bold & colorful (gradients, vibrant colors, shadows)\n   - Corporate & professional (muted colors, structured layout)\n   - Playful & animated (movement, transitions, fun elements)\n   - Futuristic / tech (dark background, glowing effects, particle animations)\n   - Or describe your own style!"\n\n'
++'3. **Colors**: "Any specific brand colors? Or should I pick colors that match your chosen style? You can say things like: dark background with blue accents, or use our brand colors #FF5733 and #333333"\n\n'
++'4. **Content details**: Based on what they chose in step 1, ask relevant follow-up questions. For example:\n   - Weather: "Which city? Celsius or Fahrenheit?"\n   - Clock: "12h or 24h format? Show date too?"\n   - Welcome message: "What should the text say? Any logo URL?"\n   - Menu/schedule: "List the items you want to display"\n   - Custom: "Describe in detail what should appear on screen"\n\n'
++'5. **Animations**: "Do you want any animations or movement? Options:\n   - None (static page)\n   - Subtle (gentle fades, slow floating elements)\n   - Dynamic (sliding text, rotating elements, particle effects)\n   - Eye-catching (bold transitions, attention-grabbing movement)"\n\n'
++'6. **Size & layout**: "This will be displayed on a screen section. Should the content:\n   - Fill the entire area (full bleed)\n   - Be centered with padding\n   - Use a specific layout (sidebar, header+content, grid)?"\n\n'
++'## Output Rules\n\n'
++'After the interview, produce the HTML file following these rules:\n\n'
++'- Single self-contained HTML file with inline CSS and JS (no external dependencies unless from CDN)\n'
++'- Use <!DOCTYPE html> and proper structure\n'
++'- The page should look great at any screen size (use vh/vw units, flexbox/grid)\n'
++'- Background should fill the viewport (no white edges)\n'
++'- Use system-ui font stack unless a specific font is requested\n'
++'- If using animations, use CSS animations or requestAnimationFrame for smooth 60fps\n'
++'- If showing live data (time, weather), update it automatically\n'
++'- For weather, use a free API like wttr.in or open-meteo.com\n'
++'- Make text large and readable from a distance (this is for a wall-mounted screen)\n'
++'- High contrast between text and background\n'
++'- No scrollbars, no overflow\n\n'
++'## Final delivery\n\n'
++'When you output the HTML, say:\n\n'
++'"Here is your signage view! Copy ALL the code below and paste it into the **HTML Code** field in your Digital Signage Admin panel (Rotated Views tab, select HTML type)."\n\n'
++'Then output the complete HTML in a code block.\n\n'
++'After the code, add: "You can preview it in the admin panel and edit it anytime. Want me to make any changes?"';
+
+function copyAiPrompt(){
+navigator.clipboard.writeText(AI_CHAT_PROMPT).then(function(){
+var el=document.getElementById('copy-status');
+if(el){el.textContent='Copied! Paste this into any AI chat (Claude, ChatGPT, etc.)';setTimeout(function(){el.textContent=''},4000)}
+}).catch(function(){
+var ta=document.createElement('textarea');ta.value=AI_CHAT_PROMPT;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+var el=document.getElementById('copy-status');
+if(el){el.textContent='Copied! Paste this into any AI chat.';setTimeout(function(){el.textContent=''},4000)}
+})}
 
 function previewContent(){
 var content=document.getElementById('view-content');

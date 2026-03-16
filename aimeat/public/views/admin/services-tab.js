@@ -656,6 +656,7 @@ function ExtensionPanel({ ext, onUninstall }) {
 
 // ── Available Extension Card (with disk script editor + add action) ──
 function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinstall, reload, loadAvailable }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [showEditor, setShowEditor] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
   const [script, setScript] = useState('');
