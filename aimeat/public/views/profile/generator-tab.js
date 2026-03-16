@@ -880,12 +880,19 @@ function getWorkflowStep(component, validationResult, result) {
   return 'copy';
 }
 
-/** Small circle-with-arrow SVG placed inline next to the current action target. */
-function StepArrow() {
-  return html`<svg class="pf-gen-step-arrow" viewBox="0 0 24 24" width="22" height="22">
+/** Small circle-with-arrow SVG placed inline next to the current action target.
+ * @param {Object} props
+ * @param {'right'|'down'} [props.direction='right'] — arrow direction
+ */
+function StepArrow({ direction = 'right' } = {}) {
+  const chevron = direction === 'down'
+    ? 'M8 10l4 4 4-4'   // ↓ pointing down
+    : 'M10 8l4 4-4 4';  // → pointing right
+  const cls = `pf-gen-step-arrow${direction === 'down' ? ' pf-gen-step-arrow--down' : ''}`;
+  return html`<svg class=${cls} viewBox="0 0 24 24" width="22" height="22">
     <circle cx="12" cy="12" r="10" fill="var(--accent,#E8564A)" opacity="0.15"/>
     <circle cx="12" cy="12" r="10" fill="none" stroke="var(--accent,#E8564A)" stroke-width="1.5"/>
-    <path d="M8 10l4 4 4-4" fill="none" stroke="var(--accent,#E8564A)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d=${chevron} fill="none" stroke="var(--accent,#E8564A)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 }
 
@@ -1077,7 +1084,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         <div class="pf-gen-section">
           <div style="display:flex;align-items:center;gap:6px">
             <label style="margin:0">${t('profile.generator.result')}</label>
-            ${workflowStep === 'paste' && html`<${StepArrow} />`}
+            ${workflowStep === 'paste' && html`<${StepArrow} direction="down" />`}
           </div>
           ${component.type === 'extension' && html`
             <p class="pf-gen-hint">${t('profile.generator.extensionPasteHint')}</p>

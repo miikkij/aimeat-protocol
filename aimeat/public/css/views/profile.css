@@ -680,11 +680,18 @@
 /* Step Arrow — inline pointer next to the current action */
 .pf-gen-step-arrow {
   flex-shrink: 0;
-  animation: pf-gen-nudge 1.2s ease-in-out infinite;
+  animation: pf-gen-nudge-right 1.2s ease-in-out infinite;
 }
-@keyframes pf-gen-nudge {
+.pf-gen-step-arrow--down {
+  animation: pf-gen-nudge-down 1.2s ease-in-out infinite;
+}
+@keyframes pf-gen-nudge-right {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(3px); }
+}
+@keyframes pf-gen-nudge-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
 }
 
 /* Diagnostics Panel (Phase 7) */
