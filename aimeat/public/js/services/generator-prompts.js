@@ -99,6 +99,14 @@
  *     code blocks (yaml + javascript) to single untagged block with // lib/ separator.
  *     Prevents LLMs from splitting output across messages. Add explicit const LIB_NAME
  *     requirement. Matches extension prompt's proven single-block pattern.
+ *   v9.0.0 — 2026-03-16 — Interview: add URL validation protocol — AI tests every URL,
+ *     escalates to user if inaccessible, then decides together (skip/demo/defer).
+ *     dataSources spec gains verifiedBy, fallback, demoData fields.
+ *     Cortex prompt: revert to two separate code blocks (yaml + javascript) — single
+ *     block caused persistent parsing failures during cortex registration.
+ *     Cortex prompt: add critical rule that ext: namespace is read-only from client-side.
+ *     Client CANNOT PUT to /v1/memory/ext:name/key — must use callExt() for shared writes
+ *     or writeOwnerMemory() for personal data. Add data storage decision table.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -427,15 +435,47 @@ The user describes WHAT they want and WHY. The generator decides HOW.
 
    b) DATA SOURCES — Where does the data come from? (2-3 questions)
       - What external feeds/APIs/URLs does it use?
-      - If the user mentions a URL: try to fetch it and describe what you see
-        - If you CANNOT access it, say so honestly — NEVER pretend you accessed something
-      - For EVERY external source: capture at least ONE real sample entry in the spec
-        - If you can fetch it, include one raw entry verbatim (one RSS <item>, one JSON object, etc.)
-        - If you CANNOT fetch it, ask the user to paste one real sample entry
-        - NEVER generate parsing code based on assumed format — you need real evidence
-      - Note any non-obvious characteristics: encoding declaration, nested structures,
-        timestamps with ambiguous formats, mixed-language content
       - Is any data user-generated or computed from other data?
+
+      URL VALIDATION PROTOCOL (MANDATORY for every external data source):
+      For EVERY URL the user mentions, follow this escalation path:
+
+      Step 1: YOU test it
+        - Try to fetch the URL and describe what you see
+        - If it works: capture one raw entry verbatim (RSS <item>, JSON object, etc.)
+        - Note encoding, content type, response structure, any auth requirements
+
+      Step 2: If YOU cannot access it, help the USER test it
+        - Say honestly: "I can't access this URL. Can you test it?"
+        - Give the user a concrete test command they can run:
+          curl -s "https://example.com/api/endpoint" | head -50
+          Or: "Open this URL in your browser and paste what you see"
+        - Ask the user to paste the response (or a representative sample)
+        - When they paste it, analyze the format and confirm you understand the structure
+
+      Step 3: If NEITHER can access it, decide TOGETHER what to do
+        - Present these options clearly:
+          A) SKIP this data source — remove use cases and features that depend on it
+          B) USE DEMO DATA — generate realistic mock data that gets loaded as static
+             data on first install. The app works immediately but shows example data.
+             Mark the data source as "demo" in the spec so extensions skip the fetch.
+          C) DEFER — keep the data source in the spec but mark it "unverified".
+             The extension will try to fetch it, but the app must handle gracefully
+             when no data is available (empty states, "data source unavailable" message)
+        - Let the user choose. If they pick B, help them define what realistic demo
+          data looks like (5-10 sample entries with realistic field values).
+        - If they pick A, immediately review use cases and remove any that fully
+          depend on the removed source. Confirm removals with the user.
+
+      HARD RULE: Never generate extension code that calls an unverified external URL.
+      Every URL in the final spec must have "verified": true (tested by AI or user)
+      or "verified": false with a "fallback" strategy ("demo", "defer", or "skip").
+
+      For VERIFIED sources:
+        - Capture at least ONE real sample entry in the spec
+        - Note non-obvious characteristics: encoding declaration, nested structures,
+          timestamps with ambiguous formats, mixed-language content
+        - NEVER generate parsing code based on assumed format — you need real evidence
 
       STATIC / USER-PROVIDED DATA (type: "user-input"):
       - If the user provides a complete dataset (coordinate lists, lookup tables, category mappings, etc.),
@@ -523,7 +563,10 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
       "sampleFields": ["field1", "field2"],
       "notes": "Any observations from fetching/analyzing the source",
-      "verified": true
+      "verified": true,
+      "verifiedBy": "ai|user",
+      "fallback": "Only if verified=false: 'demo' (use generated mock data), 'defer' (try at runtime, handle failure), or 'skip' (remove this source). Omit if verified=true.",
+      "demoData": "Only if fallback='demo': array of 5-10 realistic sample entries that will be loaded as static data on install. Omit otherwise."
     }
   ],
   "dataModel": {
@@ -1531,7 +1574,22 @@ However, it MUST NOT contain backend/server logic (no scheduling, no data collec
 
 ## IMPORTANT: How Extension Memory Works
 
-Extensions store data in their OWN namespace. To read extension data from client-side:
+Extensions store data in their OWN namespace (\`ext:{name}\`).
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  CRITICAL: Extension namespace is READ-ONLY from client-side.          ║
+║                                                                        ║
+║  ✅ Client CAN READ:   getPublic('ext:my-collector', 'some.key')       ║
+║  ❌ Client CANNOT WRITE: PUT /v1/memory/ext:name/key → 404             ║
+║                                                                        ║
+║  To WRITE extension data, call an extension ACTION via callExt()       ║
+║  which runs server-side and uses ctx.memory.set().                     ║
+║                                                                        ║
+║  For USER data (watches, settings, preferences), use writeOwnerMemory  ║
+║  which writes to the CURRENT USER's namespace via PUT /v1/memory/:key  ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+To READ extension data from client-side:
 \\\`\\\`\\\`javascript
 // If AIMEAT.data is loaded (preferred):
 const value = await AIMEAT.data.getPublic('ext:my-collector', 'items.by-date.__index');
@@ -1541,6 +1599,21 @@ const url = NODE_URL + '/v1/memory/' + encodeURIComponent('ext:my-collector') + 
 const resp = await fetch(url);
 const json = await resp.json();
 const value = json.ok ? json.data.value : null;
+\\\`\\\`\\\`
+
+To WRITE data that belongs to the extension (shared across all users):
+\\\`\\\`\\\`javascript
+// WRONG — will 404:
+await session.fetch('/v1/memory/ext:my-collector/' + key, { method: 'PUT', ... });
+
+// CORRECT — call an extension action that does ctx.memory.set() server-side:
+await callExt('my-collector', 'updateWatches', { watches: updatedList });
+\\\`\\\`\\\`
+
+To WRITE data that belongs to the current user (personal preferences):
+\\\`\\\`\\\`javascript
+// CORRECT — writes to user's own namespace:
+await writeOwnerMemory('settings.config', { locale: 'fi', notifications: true });
 \\\`\\\`\\\`
 
 ## IMPORTANT: How Translations Work
@@ -1573,6 +1646,10 @@ const settings = { ...defaults, ...(userSettings || {}) };
 
 ## Extension Action Calls (authenticated)
 
+Use callExt() for TWO purposes:
+1. **On-demand user actions** (search, refresh, manual trigger)
+2. **Writing shared data** — extension actions run server-side and CAN write to ext: namespace
+
 \\\`\\\`\\\`javascript
 async function callExt(extName, actionId, body) {
   const session = AIMEAT.auth && AIMEAT.auth.getSession();
@@ -1585,13 +1662,24 @@ async function callExt(extName, actionId, body) {
 }
 \\\`\\\`\\\`
 
-## Output format — SINGLE block, copy-paste friendly
+### Where to store different types of data
 
-Return EVERYTHING in ONE code block (no language tag). The YAML manifest first, then a separator comment \`// lib/{metadata.name}.js\`, then the JavaScript library code. The user will copy-paste the entire response at once.
+| Data type | Where to store | How to write |
+|-----------|---------------|-------------|
+| Shared/service data (feeds, stats, reference) | ext:{name} namespace | Extension scheduler via ctx.memory.set() |
+| Shared user-generated data (watches, alerts) | ext:{name} namespace | Extension action via callExt() → ctx.memory.set() |
+| Personal user preferences (settings, locale) | User's own namespace | writeOwnerMemory() via PUT /v1/memory/:key |
 
-CRITICAL: Do NOT use separate code blocks. Do NOT put YAML in a \\\`\\\`\\\`yaml block and JS in a \\\`\\\`\\\`javascript block. Put EVERYTHING in ONE \\\`\\\`\\\` block — YAML first, then JS after the separator comment.
+## Output format — TWO separate code blocks
 
-\\\`\\\`\\\`
+Return the YAML manifest and JavaScript library as TWO separate, properly tagged code blocks.
+The installer expects to receive them separately — the YAML defines the manifest, the JS is the library file.
+
+CRITICAL: Use \\\`\\\`\\\`yaml for the manifest and \\\`\\\`\\\`javascript for the library code.
+Do NOT combine them into a single block. Do NOT use an untagged block.
+
+First block — YAML manifest:
+\\\`\\\`\\\`yaml
 apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
@@ -1628,7 +1716,10 @@ spec:
         AIMEAT.myLib.init() — Check data readiness, returns { ready, hasData }
         AIMEAT.myLib.getData({hours, type}) — Filtered domain data
         AIMEAT.myLib.getStats(date) — Aggregated statistics
-// lib/my-domain-lib.js
+\\\`\\\`\\\`
+
+Second block — JavaScript library:
+\\\`\\\`\\\`javascript
 (function (AIMEAT) {
   'use strict';
 
@@ -1689,8 +1780,8 @@ spec:
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\`
 
-CRITICAL: Do NOT use separate code blocks. Put YAML manifest and JavaScript library in ONE block.
-The JavaScript section MUST start with a comment line: // lib/{metadata.name}.js
+CRITICAL: Use TWO separate code blocks — \\\`\\\`\\\`yaml for the manifest and \\\`\\\`\\\`javascript for the library.
+The JavaScript filename MUST match the \`filename\` field in the YAML lib component.
 
 ## Rules
 
