@@ -1,0 +1,90 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-ui-forms
+  namespace: aimeat
+  description: "Form components — inputs, selects, checkboxes, radios, toggles, textareas, and declarative form groups with built-in validation."
+  author: AIMEAT
+  tags: [ui, forms, input, select, checkbox, radio, toggle, textarea, validation, components]
+  labels:
+    domain: ui
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: ui-forms-assistant
+      content: |
+        You are helping build an app that has the aimeat-ui-forms cortex installed.
+        Use AIMEAT.ui.forms for all form elements — never create raw <input>/<select>/<textarea> manually.
+
+        Available components (all under AIMEAT.ui.forms):
+
+        Input({ target?, label, type?, placeholder?, required?, name? })
+          Text input with floating label animation. type: 'text'|'email'|'password'|'number'|'search'.
+          Label floats up on focus or when filled. Coral border on error, green on valid.
+          Returns { el, destroy(), getValue(), setValue(v), setError(msg), clearError() }.
+          Example: var email = AIMEAT.ui.forms.Input({ label: 'Email', type: 'email', required: true });
+
+        Select({ target?, label, options, multiple?, name? })
+          Custom dropdown with div-based options. options: [{ value, label }].
+          Search/filter appears when > 8 options. Multi-select shows removable chips.
+          Hidden native <select> maintained for form compatibility.
+          Returns { el, destroy(), getValue(), setValue(v) }.
+
+        Checkbox({ target?, label, checked?, onChange?, name? })
+          Custom checkbox with animated SVG checkmark (stroke-dashoffset animation).
+          Supports indeterminate state. Hidden native <input type="checkbox"> for accessibility.
+          Returns { el, destroy(), getValue(), setValue(v) }.
+
+        Radio({ target?, label, options, value?, onChange?, name? })
+          Radio button group. options: [{ value, label }]. Vertical layout.
+          Inner dot fill animation on select. Proper radiogroup ARIA role.
+          Returns { el, destroy(), getValue(), setValue(v) }.
+
+        Toggle({ target?, label, checked?, onChange?, name? })
+          Slide toggle switch. 44px wide track, 20px thumb. Gray → coral on toggle.
+          Returns { el, destroy(), getValue(), setValue(v) }.
+
+        Textarea({ target?, label, rows?, autoGrow?, name? })
+          Textarea with floating label. autoGrow: true auto-expands height to fit content.
+          Returns { el, destroy(), getValue(), setValue(v) }.
+
+        FormGroup({ target?, fields, onSubmit, validate?, submitLabel? })
+          Declarative form builder. fields: array of field configs:
+            { name, type: 'text'|'email'|'password'|'number'|'search'|'select'|'checkbox'|'radio'|'toggle'|'textarea',
+              label, required?, options?, placeholder?, min?, max?, minLength?, maxLength?, pattern?, validator? }
+          Built-in validators: required, min/max, minLength/maxLength, email regex, url regex, pattern (custom regex).
+          Custom validate(data) callback returns { fieldName: 'error msg' } or null.
+          Submit button with loading spinner for async onSubmit (return a Promise).
+          Returns { el, destroy(), getData(), setErrors(errors) }.
+          Example:
+            var form = AIMEAT.ui.forms.FormGroup({
+              fields: [
+                { name: 'email', type: 'email', label: 'Email', required: true },
+                { name: 'password', type: 'password', label: 'Password', required: true, minLength: 8 },
+                { name: 'role', type: 'select', label: 'Role', options: [{value:'admin',label:'Admin'},{value:'user',label:'User'}] },
+                { name: 'terms', type: 'checkbox', label: 'I agree to terms', required: true }
+              ],
+              submitLabel: 'Sign Up',
+              onSubmit: function(data) { return fetch('/api/signup', { method: 'POST', body: JSON.stringify(data) }); }
+            });
+
+        Load via: <script src="{{node_url}}/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-ui-forms
+      filename: aimeat-ui-forms.js
+      exports: [Input, Select, Checkbox, Radio, Toggle, Textarea, FormGroup]
+      api_surface: |
+        AIMEAT.ui.forms.Input({target?, label, type?, placeholder?, required?, name?}) → {el, destroy(), getValue(), setValue(v), setError(msg), clearError()}
+        AIMEAT.ui.forms.Select({target?, label, options, multiple?, name?}) → {el, destroy(), getValue(), setValue(v)}
+        AIMEAT.ui.forms.Checkbox({target?, label, checked?, onChange?, name?}) → {el, destroy(), getValue(), setValue(v)}
+        AIMEAT.ui.forms.Radio({target?, label, options, value?, onChange?, name?}) → {el, destroy(), getValue(), setValue(v)}
+        AIMEAT.ui.forms.Toggle({target?, label, checked?, onChange?, name?}) → {el, destroy(), getValue(), setValue(v)}
+        AIMEAT.ui.forms.Textarea({target?, label, rows?, autoGrow?, name?}) → {el, destroy(), getValue(), setValue(v)}
+        AIMEAT.ui.forms.FormGroup({target?, fields, onSubmit, validate?, submitLabel?}) → {el, destroy(), getData(), setErrors(errors)}

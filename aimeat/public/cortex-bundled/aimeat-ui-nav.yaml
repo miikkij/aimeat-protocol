@@ -1,0 +1,73 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-ui-nav
+  namespace: aimeat
+  description: "Navigation components: tabs, breadcrumbs, sidebar, bottom nav, and burger menu for AIMEAT apps."
+  author: AIMEAT
+  tags: [ui, navigation, tabs, breadcrumbs, sidebar, bottom-nav, burger-menu, components]
+  labels:
+    domain: ui
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: ui-nav-assistant
+      content: |
+        You are helping build an app that has the aimeat-ui-nav cortex installed.
+        Use AIMEAT.ui.nav for all navigation UI — never build custom nav from scratch.
+
+        Available components (all under AIMEAT.ui.nav):
+
+        Tabs({ target, tabs, active?, onChange? })
+          Horizontal tab bar with scroll overflow. tabs: [{ id, label, icon? }].
+          Active tab has coral underline. Uses role="tablist" and role="tab".
+          Returns { el, destroy() }.
+          Example: AIMEAT.ui.nav.Tabs({ target: '#app', tabs: [{id:'a', label:'Tab A'}], onChange: function(id){} });
+
+        Breadcrumbs({ target, items, separator? })
+          Horizontal breadcrumb trail. items: [{ label, href?, onClick? }].
+          Last item is bold with no link. Separator defaults to " / ".
+          Semantic <nav aria-label="Breadcrumb"> with aria-current on last item.
+          Returns { el, destroy() }.
+
+        Sidebar({ target, items, collapsed?, onToggle? })
+          Vertical nav list. items: [{ label, icon?, href?, onClick?, active?, children? }].
+          children creates collapsible groups with rotating arrow indicator.
+          collapsed: true shows icon-only mode with tooltip on hover.
+          Returns { el, destroy(), collapse(bool), openOverlay(), closeOverlay() }.
+          Call openOverlay() for mobile slide-in with backdrop.
+
+        BottomNav({ target, items, active? })
+          Fixed bottom bar for mobile. Hidden at container width > 768px.
+          items: [{ label, icon?, onClick?, active?, badge? }] — max 5.
+          Badge renders as absolute-positioned coral pill with white text.
+          Returns { el, destroy() }.
+
+        BurgerMenu({ target, items, logo?, side? })
+          Hamburger icon button (3 lines → X animation). Click opens slide-in panel.
+          side: 'left' (default) or 'right'. logo: string or DOM element.
+          items: [{ label, icon?, href?, onClick?, active?, children? }].
+          children creates expandable submenus. Close on backdrop click or Escape.
+          Returns { el, destroy() }.
+
+        All components use CSS custom properties: --bg-card, --text, --border, --accent (#E8564A), --radius, --shadow-*.
+        All CSS classes use aui-* prefix. Container queries for responsiveness.
+
+        Load via: <script src="{{node_url}}/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-ui-nav
+      filename: aimeat-ui-nav.js
+      exports: [Tabs, Breadcrumbs, Sidebar, BottomNav, BurgerMenu]
+      api_surface: |
+        AIMEAT.ui.nav.Tabs({target, tabs, active?, onChange?}) → {el, destroy()}
+        AIMEAT.ui.nav.Breadcrumbs({target, items, separator?}) → {el, destroy()}
+        AIMEAT.ui.nav.Sidebar({target, items, collapsed?, onToggle?}) → {el, destroy(), collapse(bool), openOverlay(), closeOverlay()}
+        AIMEAT.ui.nav.BottomNav({target, items, active?}) → {el, destroy()}
+        AIMEAT.ui.nav.BurgerMenu({target, items, logo?, side?}) → {el, destroy()}

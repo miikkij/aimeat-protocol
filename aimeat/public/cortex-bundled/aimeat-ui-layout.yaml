@@ -1,0 +1,87 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-ui-layout
+  namespace: aimeat
+  description: "Responsive layout components with container queries for AIMEAT apps. 8 layouts + Header + Footer."
+  author: AIMEAT
+  tags: [ui, layout, responsive, grid, flexbox, header, footer, components]
+  labels:
+    domain: ui
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: ui-layout-assistant
+      content: |
+        You are helping build an app that has the aimeat-ui-layout cortex installed.
+        Use these layout components instead of writing custom CSS layouts.
+
+        Available components (all under AIMEAT.ui.layout):
+
+        MainDetail({ target, list, detail })
+          Master-detail layout. List sidebar (300px) + detail panel. Content can be DOM element or HTML string.
+          On small screens: list hides, back button appears in detail. Click list item to show detail.
+          Returns { el, destroy(), listPane, detailPane }.
+
+        Portrait({ target, content, maxWidth? })
+          Centered single column. maxWidth default 640px (pass number or CSS string).
+          Ideal for articles, profiles, forms. Returns { el, destroy() }.
+
+        Landscape({ target, content })
+          Full-width layout with overflow-x: auto. For dashboards, wide tables.
+          Returns { el, destroy() }.
+
+        Fibonacci({ target, primary, secondary })
+          Golden ratio split (61.8% / 38.2%). Stacks vertically on small screens.
+          Returns { el, destroy() }.
+
+        HolyGrail({ target, header, left, main, right, footer })
+          Classic 3-column layout with header and footer. CSS Grid.
+          On small screens: sidebars hide, hamburger toggle shows left sidebar.
+          Returns { el, destroy() }.
+
+        Split({ target, left, right, ratio? })
+          Two panels side by side. ratio: "50/50" (default), "60/40", "70/30", etc.
+          Stacks vertically on small screens. Returns { el, destroy() }.
+
+        Stacked({ target, sections })
+          Vertical sections with gap. sections: array of DOM elements or HTML strings.
+          Already mobile-friendly. Returns { el, destroy() }.
+
+        DashboardGrid({ target, widgets, cols? })
+          Auto-fit responsive grid. widgets: array of DOM elements or HTML strings.
+          cols: explicit column count (default: auto-fit minmax 200px).
+          Returns { el, destroy() }.
+
+        Header({ target, title, logo?, actions? })
+          Sticky top bar. logo: image URL. actions: array of DOM elements or string labels.
+          Shadow appears on scroll. Returns { el, destroy() }.
+
+        Footer({ target, content, links? })
+          Bottom bar. content: text or DOM element. links: [{ label, href?, onClick? }].
+          Returns { el, destroy() }.
+
+        All layouts use container queries — they respond to their container size, not the viewport.
+        CSS classes use aui-* prefix. Load via: <script src="{{node_url}}/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-ui-layout
+      filename: aimeat-ui-layout.js
+      exports: [MainDetail, Portrait, Landscape, Fibonacci, HolyGrail, Split, Stacked, DashboardGrid, Header, Footer]
+      api_surface: |
+        AIMEAT.ui.layout.MainDetail({target, list, detail}) → {el, destroy(), listPane, detailPane}
+        AIMEAT.ui.layout.Portrait({target, content, maxWidth?}) → {el, destroy()}
+        AIMEAT.ui.layout.Landscape({target, content}) → {el, destroy()}
+        AIMEAT.ui.layout.Fibonacci({target, primary, secondary}) → {el, destroy()}
+        AIMEAT.ui.layout.HolyGrail({target, header, left, main, right, footer}) → {el, destroy()}
+        AIMEAT.ui.layout.Split({target, left, right, ratio?}) → {el, destroy()}
+        AIMEAT.ui.layout.Stacked({target, sections}) → {el, destroy()}
+        AIMEAT.ui.layout.DashboardGrid({target, widgets, cols?}) → {el, destroy()}
+        AIMEAT.ui.layout.Header({target, title, logo?, actions?}) → {el, destroy()}
+        AIMEAT.ui.layout.Footer({target, content, links?}) → {el, destroy()}

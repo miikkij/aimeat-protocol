@@ -1,0 +1,73 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-ui-viewers
+  namespace: aimeat
+  description: "Content display components: carousels, grids, lists, galleries, data tables, and timelines for AIMEAT apps."
+  author: AIMEAT
+  tags: [ui, viewers, carousel, grid, list, gallery, table, timeline, components]
+  labels:
+    domain: ui
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: ui-viewers-assistant
+      content: |
+        You are helping build an app that has the aimeat-ui-viewers cortex installed.
+        Use these viewer components to display content in structured, interactive ways.
+
+        Shared item schema (used by Carousel, Grid, List):
+        { title, subtitle?, image?, badge?: { text, type: 'success'|'warn'|'danger'|'info' }, actions?: [{ label, onClick }], onClick? }
+
+        Available components (all under AIMEAT.ui.viewers):
+
+        Carousel({ target, items, autoPlay?, interval?, loop? })
+          Sliding carousel with arrows, dots, and touch swipe.
+          autoPlay: start auto-advancing (default false). interval: ms (default 4000).
+          Returns { el, destroy(), goTo(index) }.
+
+        Grid({ target, items, minColWidth?, gap?, renderItem? })
+          Responsive card grid. minColWidth default 200px. gap default '1rem'.
+          renderItem(item): optional custom renderer returning DOM element.
+          Returns { el, destroy() }.
+
+        List({ target, items, onItemClick? })
+          Vertical list with avatar, title, subtitle, badge, action buttons.
+          onItemClick(item): called when any row is clicked.
+          Returns { el, destroy() }.
+
+        Gallery({ target, images, cols? })
+          Image grid with lightbox. images: array of URLs or { src, alt? } objects.
+          cols: grid columns (default 4). Click opens fullscreen. Arrow keys navigate.
+          Returns { el, destroy() }.
+
+        DataTable({ target, columns, rows, sortable?, filterable?, pageSize? })
+          Sortable, filterable data table with pagination.
+          columns: [{ key, label, type?: 'string'|'number'|'date' }]
+          rows: array of objects matching column keys.
+          Returns { el, destroy(), refresh(newRows?) }.
+
+        Timeline({ target, events })
+          Vertical timeline with colored dots and content cards.
+          events: [{ title, time?, content?, type?: 'default'|'success'|'warn'|'error'|'info' }]
+          Returns { el, destroy() }.
+
+        Load via: <script src="{{node_url}}/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-ui-viewers
+      filename: aimeat-ui-viewers.js
+      exports: [Carousel, Grid, List, Gallery, DataTable, Timeline]
+      api_surface: |
+        AIMEAT.ui.viewers.Carousel({target, items, autoPlay?, interval?, loop?}) → {el, destroy(), goTo(idx)}
+        AIMEAT.ui.viewers.Grid({target, items, minColWidth?, gap?, renderItem?}) → {el, destroy()}
+        AIMEAT.ui.viewers.List({target, items, onItemClick?}) → {el, destroy()}
+        AIMEAT.ui.viewers.Gallery({target, images, cols?}) → {el, destroy()}
+        AIMEAT.ui.viewers.DataTable({target, columns, rows, sortable?, filterable?, pageSize?}) → {el, destroy(), refresh(newRows?)}
+        AIMEAT.ui.viewers.Timeline({target, events}) → {el, destroy()}
