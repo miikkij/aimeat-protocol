@@ -10,6 +10,7 @@ import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm-seed.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
+import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
@@ -78,6 +79,11 @@ export async function initializeServices(
   seedSystemPrompts(storage)
     .then(() => {})
     .catch(err => logger.error('Failed to seed system prompts', { error: String(err) }));
+
+  // Auto-install bundled cortex extensions (aimeat-ui-*, aimeat-canvas, aimeat-charts)
+  seedBundledCortexes(storage, `system@${config.nodeId}`)
+    .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
+    .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);
