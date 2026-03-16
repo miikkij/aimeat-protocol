@@ -1,0 +1,66 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-ui-dialogs
+  namespace: aimeat
+  description: "Modal dialogs, toasts, alerts, context menus, and dropdowns for AIMEAT apps. Replaces native browser alert/confirm."
+  author: AIMEAT
+  tags: [ui, dialogs, modal, toast, alert, context-menu, dropdown, components]
+  labels:
+    domain: ui
+  visibility: public
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: ui-dialogs-assistant
+      content: |
+        You are helping build an app that has the aimeat-ui-dialogs cortex installed.
+        NEVER use native alert(), confirm(), or prompt() — always use AIMEAT.ui.dialogs instead.
+
+        Available components (all under AIMEAT.ui.dialogs):
+
+        Modal({ title?, content, onClose, width? })
+          Generic overlay dialog. width: 'sm'|'md'|'lg' (default: 'md').
+          content: DOM element or HTML string.
+          Returns { el, destroy() }. Close on Escape, backdrop click, or close button.
+
+        Confirm({ message, title?, confirmLabel?, cancelLabel?, danger? })
+          Confirmation dialog. Returns Promise<boolean>.
+          Example: var ok = await AIMEAT.ui.dialogs.Confirm({ message: 'Delete?', danger: true });
+
+        toast(message, type?, duration?)
+          Auto-dismissing notification. type: 'success'|'error'|'info'|'warn'. Default: 'success'.
+          Stacks up to 3, queues rest. No return value.
+
+        Alert({ message, type, dismissible?, target? })
+          Persistent notification banner. type: 'success'|'error'|'warn'|'info'.
+          target: CSS selector to prepend to. Returns { el, destroy() }.
+
+        ContextMenu({ target, items })
+          Right-click / long-press menu. target: CSS selector or DOM element.
+          items: [{ label, icon?, onClick, danger? }, { type: 'separator' }]
+          Returns { el, destroy() }.
+
+        Dropdown({ trigger, items, align? })
+          Click menu. trigger: CSS selector or DOM element. align: 'left'|'right'.
+          items: [{ label, onClick }, { label, children: [{label, onClick}] }]
+          Returns { el, destroy() }.
+
+        Load via: <script src="{{node_url}}/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js"></script>
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-ui-dialogs
+      filename: aimeat-ui-dialogs.js
+      exports: [Modal, Confirm, toast, Alert, ContextMenu, Dropdown]
+      api_surface: |
+        AIMEAT.ui.dialogs.Modal({title?, content, onClose, width?}) → {el, destroy()}
+        AIMEAT.ui.dialogs.Confirm({message, title?, confirmLabel?, cancelLabel?, danger?}) → Promise<boolean>
+        AIMEAT.ui.dialogs.toast(message, type?, duration?) — fire-and-forget notification
+        AIMEAT.ui.dialogs.Alert({message, type, dismissible?, target?}) → {el, destroy()}
+        AIMEAT.ui.dialogs.ContextMenu({target, items}) → {el, destroy()}
+        AIMEAT.ui.dialogs.Dropdown({trigger, items, align?}) → {el, destroy()}
