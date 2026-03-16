@@ -1697,9 +1697,16 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       }
     }
     if (Object.keys(relevant).length > 0) {
+      // Strip pipeline metadata (source, producedBy, consumedBy) — these are NOT part of the data shape
+      // and AI copies them into the actual values if they're present
+      const cleaned = {};
+      for (const [key, schema] of Object.entries(relevant)) {
+        const { source, producedBy, consumedBy, ...dataSchema } = schema;
+        cleaned[key] = dataSchema;
+      }
       context += '\n## Domain Data Model (EXACT schemas — follow these precisely)\n';
       context += 'These are the memory key schemas for this component. Use these exact key names and data shapes.\n\n';
-      context += '```json\n' + JSON.stringify(relevant, null, 2) + '\n```\n\n';
+      context += '```json\n' + JSON.stringify(cleaned, null, 2) + '\n```\n\n';
     }
   }
 
