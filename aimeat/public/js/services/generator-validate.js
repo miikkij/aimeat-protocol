@@ -443,7 +443,8 @@ const validators = {
       }
 
       // Check exports object includes all required methods from blueprint
-      const exportsMatch = jsCode.match(/(?:const|let|var)\s+exports\s*=\s*\{([^}]+)\}/);
+      // Accept "exports", "exportsObj", etc. — also handle multiline object literals
+      const exportsMatch = jsCode.match(/(?:const|let|var)\s+\w*[Ee]xport\w*\s*=\s*\{([\s\S]*?)\}/);
       if (exportsMatch) {
         const exportedMethods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
 
@@ -462,7 +463,7 @@ const validators = {
           }
         }
       } else {
-        errors.push('No exports object found — cortex must have: const exports = { init, method1, method2, ... };');
+        errors.push('No exports object found — cortex must have: const exports = { method1, method2, ... };');
       }
     }
 

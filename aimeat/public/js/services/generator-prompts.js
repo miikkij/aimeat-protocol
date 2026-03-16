@@ -978,7 +978,7 @@ Check your ENTIRE output before responding. If you see &gt; &lt; &amp; &quot; &#
       const extractedMethods = [];
       for (const lib of cortexLibs) {
         const camelName = lib.name.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
-        const exportsMatch = lib.result?.match?.(/(?:const|let|var)\s+exports\s*=\s*\{([^}]+)\}/);
+        const exportsMatch = lib.result?.match?.(/(?:const|let|var)\s+\w*[Ee]xport\w*\s*=\s*\{([\s\S]*?)\}/);
         if (exportsMatch) {
           const methods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
           for (const m of methods) {
