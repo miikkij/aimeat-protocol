@@ -534,14 +534,17 @@ export function adminRouter(
             const results: { name: string; packageGroupId: string; templateId: string }[] = [];
 
             for (const def of examples) {
-                // Check if already seeded
                 const groupId = `${def.name}::${operator}`;
-                const { packages: existingPkgs } = await storage.listPackages({ author: operator, search: def.name, limit: 1, offset: 0 });
-                const existing = existingPkgs.find(p => p.packageGroupId === groupId);
-                if (existing) {
-                    results.push({ name: def.name, packageGroupId: existing.packageGroupId, templateId: '(already exists)' });
-                    continue;
+
+                // Archive existing package versions and delete listing for this group (reseed)
+                const { packages: existingPkgs } = await storage.listPackages({ author: operator, search: def.name, limit: 100, offset: 0 });
+                for (const oldPkg of existingPkgs.filter(p => p.packageGroupId === groupId)) {
+                    await storage.archivePackage(oldPkg.id);
                 }
+                try {
+                    const oldListing = await storage.getListingByPackage(groupId);
+                    if (oldListing) await storage.deleteTemplateListing(oldListing.id);
+                } catch { /* no listing to delete */ }
 
                 const { pkg, listing } = buildRecords(def, operator, operatorGhii);
                 await storage.createPackage(pkg);

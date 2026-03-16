@@ -82,15 +82,16 @@ export default function PackagesAdminTab({ data, reload, session }) {
     <div>
       <${StatsGrid} items=${stats} />
 
-      ${packages.length === 0 && templates.length === 0 && html`
-        <div class="adm-card" style="margin-bottom:16px;text-align:center;padding:24px">
-          <p style="margin-bottom:12px">${t('dashboard.pkgNoPackages') || 'No packages yet. Seed example packages to get started.'}</p>
-          <button class="adm-btn adm-btn-active" onClick=${handleSeed} disabled=${seeding}>
-            ${seeding ? (t('dashboard.loading') || 'Loading...') : (t('dashboard.pkgSeedExamples') || 'Seed Example Packages')}
-          </button>
-          ${seedMsg && html`<p style="margin-top:8px;font-size:0.85rem;color:var(--green,#34d399)">${seedMsg}</p>`}
-        </div>
-      `}
+      <div class="adm-card" style="margin-bottom:16px;text-align:center;padding:24px">
+        ${packages.length === 0 && templates.length === 0
+          ? html`<p style="margin-bottom:12px">${t('dashboard.pkgNoPackages') || 'No packages yet. Seed example packages to get started.'}</p>`
+          : html`<p style="margin-bottom:12px">${t('dashboard.pkgReseedHint') || 'Re-seed to update example packages to latest version.'}</p>`
+        }
+        <button class="adm-btn adm-btn-active" onClick=${handleSeed} disabled=${seeding}>
+          ${seeding ? (t('dashboard.loading') || 'Loading...') : (t('dashboard.pkgSeedExamples') || 'Seed Example Packages')}
+        </button>
+        ${seedMsg && html`<p style="margin-top:8px;font-size:0.85rem;color:var(--green,#34d399)">${seedMsg}</p>`}
+      </div>
 
       <div class="adm-subtabs" style="display:flex;gap:8px;margin:16px 0">
         <button class=${'adm-btn' + (subtab === 'packages' ? ' adm-btn-active' : '')} onClick=${() => setSubtab('packages')}>

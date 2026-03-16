@@ -2597,6 +2597,7 @@
     "pkgNoTemplates": "Ei mallilistauksia vielä",
     "pkgNoInstances": "Ei instansseja vielä",
     "pkgSeedExamples": "Luo esimerkkipaketit",
+    "pkgReseedHint": "Päivitä esimerkkipaketit uusimpaan versioon.",
     "pkgAuthor": "Tekijä",
     "pkgVersion": "Versio",
     "pkgCategory": "Kategoria",

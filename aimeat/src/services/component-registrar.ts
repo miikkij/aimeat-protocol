@@ -14,6 +14,9 @@
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation
+ *   v1.1.0 — 2026-03-16 — fix memory component key management: use manifest key
+ *     instead of prefix-based lookup for delete/fetch; store keys as-is without
+ *     registeredAs prefix
  */
 
 import { createHash } from 'node:crypto';
@@ -225,13 +228,18 @@ export async function registerComponent(
 
       case 'memory': {
         // Content: JSON { entries: [{ key, value, visibility?, tags? }] } or simple object
+        // When entries have explicit keys, use them as-is (no prefix).
+        // Fallback: store entire content under registeredAs key.
         let parsed: { entries?: Array<{ key: string; value: unknown; visibility?: string; tags?: string[] }> };
         try { parsed = JSON.parse(content); }
         catch { parsed = { entries: [{ key: registeredAs, value: content }] }; }
 
         const entries = parsed.entries ?? [{ key: registeredAs, value: parsed }];
+        const storedKeys: string[] = [];
         for (const entry of entries) {
-          const memKey = entry.key.startsWith(registeredAs) ? entry.key : `${registeredAs}.${entry.key}`;
+          // Use entry key as-is — the package author controls the final memory key names
+          const memKey = entry.key;
+          storedKeys.push(memKey);
           await storage.setMemory({
             key: memKey,
             ownerGaii,
@@ -244,6 +252,18 @@ export async function registerComponent(
             updatedAt: now,
           });
         }
+        // Store a manifest key so delete/fetch can find these entries later
+        await storage.setMemory({
+          key: `_pkg:${registeredAs}`,
+          ownerGaii,
+          value: storedKeys,
+          visibility: 'private',
+          tags: ['package-manifest'],
+          ttlHours: null,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
         break;
       }
 
@@ -299,10 +319,15 @@ export async function deleteComponent(
       case 'msm':
         return await storage.deleteMsm(registeredAs);
       case 'memory': {
-        const memories = await storage.listMemory(ownerGaii, { prefix: registeredAs });
-        for (const mem of memories) {
-          await storage.deleteMemory(ownerGaii, mem.key);
+        // Read the manifest key to find which memory keys belong to this component
+        const manifest = await storage.getMemory(ownerGaii, `_pkg:${registeredAs}`);
+        if (manifest && Array.isArray(manifest.value)) {
+          for (const key of manifest.value as string[]) {
+            await storage.deleteMemory(ownerGaii, key);
+          }
         }
+        // Delete the manifest key itself
+        await storage.deleteMemory(ownerGaii, `_pkg:${registeredAs}`);
         return true;
       }
       case 'translation':
@@ -356,10 +381,18 @@ export async function fetchComponentContent(
         return JSON.stringify(msm.definition);
       }
       case 'memory': {
-        const memories = await storage.listMemory(ownerGaii, { prefix: registeredAs });
-        if (memories.length === 0) return null;
-        const sorted = [...memories].sort((a, b) => a.key.localeCompare(b.key));
-        return JSON.stringify(sorted.map(m => ({ key: m.key, value: m.value })));
+        // Read the manifest key to find which memory keys belong to this component
+        const manifest = await storage.getMemory(ownerGaii, `_pkg:${registeredAs}`);
+        if (!manifest || !Array.isArray(manifest.value)) return null;
+        const keys = manifest.value as string[];
+        const entries: Array<{ key: string; value: unknown }> = [];
+        for (const key of keys) {
+          const mem = await storage.getMemory(ownerGaii, key);
+          if (mem) entries.push({ key: mem.key, value: mem.value });
+        }
+        if (entries.length === 0) return null;
+        const sorted = entries.sort((a, b) => a.key.localeCompare(b.key));
+        return JSON.stringify(sorted);
       }
       case 'translation': {
         const mem = await storage.getMemory(ownerGaii, `i18n.${registeredAs}`);

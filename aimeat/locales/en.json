@@ -2597,6 +2597,7 @@
     "pkgNoTemplates": "No template listings yet",
     "pkgNoInstances": "No instances yet",
     "pkgSeedExamples": "Seed Example Packages",
+    "pkgReseedHint": "Re-seed to update example packages to latest version.",
     "pkgAuthor": "Author",
     "pkgVersion": "Version",
     "pkgCategory": "Category",
