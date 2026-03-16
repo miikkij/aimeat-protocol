@@ -259,7 +259,7 @@ NOTE: The example above uses GENERIC placeholder names (lookup.data, items.by-da
 
 Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
-- IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1). Use SHORT type prefixes: csm, msm, ext, app, memory, translation, cortex. Do NOT use full type names like "extension-1" — use "ext-1".
+- IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1). ID prefixes can be short (ext-1) but the "type" field MUST be the full name: "extension" (not "ext").
 - Each component object has these fields: "id", "type", "label", "produces", "consumes"
 - Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
 - Valid cron values: standard 5-field cron syntax OR the special value "@activate"
