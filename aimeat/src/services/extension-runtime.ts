@@ -279,19 +279,39 @@ export async function executeExtensionAction(
                     body: opts.body,
                     signal: AbortSignal.timeout(Math.min(limits.timeoutMs, 30_000)),
                 });
-                // Decode response body respecting charset from Content-Type header
-                // (e.g., ISO-8859-1 for RSS feeds) — defaults to UTF-8 if not specified
+                // Always read raw bytes first so we can detect charset from multiple sources
+                const buf = await resp.arrayBuffer();
                 const ct = resp.headers.get('content-type') || '';
-                const charsetMatch = /charset=([^\s;]+)/i.exec(ct);
-                const charset = charsetMatch ? charsetMatch[1].toLowerCase() : 'utf-8';
-                let text: string;
-                if (charset !== 'utf-8' && charset !== 'utf8') {
-                    const buf = await resp.arrayBuffer();
-                    const decoder = new TextDecoder(charset);
-                    text = decoder.decode(buf);
-                } else {
-                    text = await resp.text();
+                const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
+                let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
+
+                // If Content-Type didn't specify charset, peek at XML/HTML prolog
+                if (!charset) {
+                    const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
+                    const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
+                    const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
+                    charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
                 }
+
+                // Guard against mislabeled encoding: if declared non-UTF-8 but bytes
+                // are valid UTF-8 multibyte (e.g. Cloudflare transcoding), trust bytes
+                if (charset && charset !== 'utf-8' && charset !== 'utf8') {
+                    const bytes = new Uint8Array(buf);
+                    let hasMultibyte = false;
+                    for (let i = 0; i < bytes.length - 1; i++) {
+                        if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
+                            hasMultibyte = true; break;
+                        }
+                        if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
+                            (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
+                            hasMultibyte = true; break;
+                        }
+                    }
+                    if (hasMultibyte) charset = 'utf-8';
+                }
+
+                const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
+                const text = decoder.decode(buf);
                 const headers: Record<string, string> = {};
                 resp.headers.forEach((v, k) => { headers[k] = v; });
                 return { status: resp.status, ok: resp.ok, text, headers };

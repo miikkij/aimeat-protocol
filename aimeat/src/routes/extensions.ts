@@ -875,6 +875,23 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
           }
 
+          // Guard against mislabeled encoding: if declared non-UTF-8 but bytes are valid
+          // UTF-8 multibyte (e.g. Cloudflare transcoding), trust the bytes over the label
+          if (charset && charset !== 'utf-8' && charset !== 'utf8') {
+            const bytes = new Uint8Array(buf);
+            let hasMultibyte = false;
+            for (let i = 0; i < bytes.length - 1; i++) {
+              if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
+                hasMultibyte = true; break;
+              }
+              if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
+                  (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
+                hasMultibyte = true; break;
+              }
+            }
+            if (hasMultibyte) charset = 'utf-8';
+          }
+
           const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
           const text = decoder.decode(buf);
           const headers: Record<string, string> = {};
@@ -1053,6 +1070,23 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
             const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
             charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
+          }
+
+          // Guard against mislabeled encoding: if declared non-UTF-8 but bytes are valid
+          // UTF-8 multibyte (e.g. Cloudflare transcoding), trust the bytes over the label
+          if (charset && charset !== 'utf-8' && charset !== 'utf8') {
+            const bytes = new Uint8Array(buf);
+            let hasMultibyte = false;
+            for (let i = 0; i < bytes.length - 1; i++) {
+              if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
+                hasMultibyte = true; break;
+              }
+              if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
+                  (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
+                hasMultibyte = true; break;
+              }
+            }
+            if (hasMultibyte) charset = 'utf-8';
           }
 
           const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
