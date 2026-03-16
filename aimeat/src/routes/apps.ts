@@ -213,7 +213,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         const mode = req.query.mode as string | undefined;
         if (mode === 'inline') {
-            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* data:; worker-src blob:; object-src 'none'; frame-ancestors 'self'");
+            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-ancestors 'self'");
         } else {
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         }
