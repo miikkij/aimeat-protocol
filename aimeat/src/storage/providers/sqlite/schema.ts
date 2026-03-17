@@ -27,6 +27,7 @@ export function initializeSchema(db: Database.Database): void {
       publicKey      TEXT NOT NULL,
       trustScore     REAL NOT NULL DEFAULT 50,
       morselBalance  REAL NOT NULL DEFAULT 0,
+      dailySpendLimit REAL DEFAULT NULL,
       createdAt      TEXT NOT NULL,
       lastSeen       TEXT NOT NULL,
       semantic       TEXT,
@@ -1080,4 +1081,7 @@ export function initializeSchema(db: Database.Database): void {
   // MCP session tracking — agent and OAuth client binding
   safeAddColumn('chat_instances', 'agentGaii', 'TEXT');
   safeAddColumn('chat_instances', 'mcpClientId', 'TEXT');
+
+  // Single-balance migration — per-agent daily spend limit
+  safeAddColumn('agents', 'dailySpendLimit', 'REAL DEFAULT NULL');
 }

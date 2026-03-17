@@ -29,7 +29,8 @@ model Agent {
   capabilities  String[]
   publicKey     String
   trustScore    Int      @default(50)
-  morselBalance Int      @default(0)
+  morselBalance  Int      @default(0)
+  dailySpendLimit Int?
   allowedOrigins String[]
   defaultScopes  String[]
   createdAt     DateTime @default(now())

@@ -26,7 +26,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
-import { Spinner, VisibilityPill } from './shared.js';
+import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 
@@ -324,6 +324,8 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
   /* ── Cycle visibility: private → owner → public → private ── */
   const cycleVis = ['private', 'owner', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
 
   /* ── Scroll to entry by key (matches full or short key) ── */
   const scrollToEntry = useCallback((entryKey) => {
@@ -412,9 +414,11 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     return html`
       <div class="kpkg-detail-entry" key=${i} data-entry-key=${entryKey}>
         <div class="kpkg-detail-entry-header">
-          <${VisibilityPill} visibility=${vis}
+          <button class="kpkg-vis-pill"
             onClick=${(e) => { e.stopPropagation(); handleEntryVisibility(pkg, entry, nextVis); }}
-          />
+            title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
+            style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
+          >${t('knowledge.visibility.' + vis)} ▾</button>
           <strong>${escHtml(label)}</strong>
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>

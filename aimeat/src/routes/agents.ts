@@ -177,7 +177,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
           privateKey: creds.privateKey,
           publicKey: creds.publicKey,
           scopes: request.scopes,
-          morselBalance: config.welcomeBonus,
+          morselBalance: 0,
           note: 'Use the token directly: Authorization: Bearer <token>. The privateKey is provided for advanced use (Ed25519 signing) but is not required.',
         });
         return;
@@ -318,21 +318,10 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         defaultScopes: finalScopes,
         publicKey: keyPair.publicKey,
         trustScore: 50,
-        morselBalance: config.welcomeBonus,
+        morselBalance: 0,
         createdAt: now,
         lastSeen: now,
       });
-
-      // Record welcome bonus
-      if (config.welcomeBonus > 0) {
-        await storage.addTransaction({
-          id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-          gaii,
-          type: 'welcome_bonus',
-          amount: config.welcomeBonus,
-          timestamp: now,
-        });
-      }
 
       // Post-registration hook
       fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
@@ -435,21 +424,10 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       defaultScopes: requestedScopes,
       publicKey: keyPair.publicKey,
       trustScore: 50,
-      morselBalance: config.welcomeBonus,
+      morselBalance: 0,
       createdAt: now,
       lastSeen: now,
     });
-
-    // Record welcome bonus transaction
-    if (config.welcomeBonus > 0) {
-      await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-        gaii,
-        type: 'welcome_bonus',
-        amount: config.welcomeBonus,
-        timestamp: now,
-      });
-    }
 
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
@@ -566,21 +544,10 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       defaultScopes: requestedScopes,
       publicKey: keyPair.publicKey,
       trustScore: 50,
-      morselBalance: config.welcomeBonus,
+      morselBalance: 0,
       createdAt: now,
       lastSeen: now,
     });
-
-    // Record welcome bonus transaction
-    if (config.welcomeBonus > 0) {
-      await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-        gaii,
-        type: 'welcome_bonus',
-        amount: config.welcomeBonus,
-        timestamp: now,
-      });
-    }
 
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
@@ -852,7 +819,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       capabilities: agentData.capabilities ?? [],
       publicKey: keyPair.publicKey,
       trustScore: importedTrust,
-      morselBalance: config.welcomeBonus, // fresh balance on new node
+      morselBalance: 0, // agents use GHII owner balance
       createdAt: now,
       lastSeen: now,
     });

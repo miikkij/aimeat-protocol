@@ -294,11 +294,35 @@ export class MongoStorage implements Storage {
         return rows.map((r: any) => this.toAgentRecord(r));
     }
 
+    /**
+     * Resolve any identity (GAII, GHII, bare owner) to the owner's GHII identifier.
+     * All balance operations go through GHII — agents don't have their own balance.
+     */
+    private async resolveGhii(identity: string): Promise<string | null> {
+        // GHII format: owner@node (no #)
+        if (!identity.includes('#') && identity.includes('@')) return identity;
+        // GAII format: agent#owner@node → extract owner → lookup GHII
+        let ownerName: string;
+        if (identity.includes('#')) {
+            const hashIdx = identity.indexOf('#');
+            const atIdx = identity.lastIndexOf('@');
+            if (atIdx > hashIdx) {
+                ownerName = identity.slice(hashIdx + 1, atIdx);
+            } else return null;
+        } else {
+            ownerName = identity; // bare owner name
+        }
+        const ghiiRecord = await this.prisma.ghii.findFirst({ where: { username: ownerName }, select: { ghii: true } });
+        return ghiiRecord?.ghii ?? null;
+    }
+
     async debitBalance(gaii: string, amount: number): Promise<boolean> {
         this.ensureReady();
+        const ghii = await this.resolveGhii(gaii);
+        if (!ghii) return false;
         try {
-            await this.prisma.agent.update({
-                where: { gaii, morselBalance: { gte: amount } },
+            await this.prisma.ghii.update({
+                where: { ghii, morselBalance: { gte: amount } },
                 data: { morselBalance: { decrement: amount } },
             });
             return true;
@@ -307,9 +331,11 @@ export class MongoStorage implements Storage {
 
     async creditBalance(gaii: string, amount: number): Promise<boolean> {
         this.ensureReady();
+        const ghii = await this.resolveGhii(gaii);
+        if (!ghii) return false;
         try {
-            await this.prisma.agent.update({
-                where: { gaii },
+            await this.prisma.ghii.update({
+                where: { ghii },
                 data: { morselBalance: { increment: amount } },
             });
             return true;
@@ -318,12 +344,15 @@ export class MongoStorage implements Storage {
 
     async creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number> {
         this.ensureReady();
-        const agent = await this.prisma.agent.findUnique({ where: { gaii }, select: { morselBalance: true } });
-        if (!agent || agent.morselBalance >= cap) return 0;
-        const actualCredit = Math.min(amount, cap - agent.morselBalance);
+        const ghii = await this.resolveGhii(gaii);
+        if (!ghii) return 0;
+        const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
+        const balance = record?.morselBalance ?? 0;
+        if (balance >= cap) return 0;
+        const actualCredit = Math.min(amount, cap - balance);
         if (actualCredit <= 0) return 0;
-        await this.prisma.agent.update({
-            where: { gaii },
+        await this.prisma.ghii.update({
+            where: { ghii },
             data: { morselBalance: { increment: actualCredit } },
         });
         return actualCredit;
@@ -331,12 +360,16 @@ export class MongoStorage implements Storage {
 
     async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
         this.ensureReady();
+        const fromGhii = await this.resolveGhii(fromGaii);
+        const toGhii = await this.resolveGhii(toGaii);
+        if (!fromGhii || !toGhii) return false;
+        if (fromGhii === toGhii) return true; // Same owner — no-op
         try {
             await this.prisma.$transaction(async (tx: any) => {
-                const from = await tx.agent.findUnique({ where: { gaii: fromGaii }, select: { morselBalance: true } });
-                if (!from || from.morselBalance < amount) throw new Error('INSUFFICIENT');
-                await tx.agent.update({ where: { gaii: fromGaii }, data: { morselBalance: { decrement: amount } } });
-                await tx.agent.update({ where: { gaii: toGaii }, data: { morselBalance: { increment: amount } } });
+                const from = await tx.ghii.findUnique({ where: { ghii: fromGhii }, select: { morselBalance: true } });
+                if (!from || (from.morselBalance ?? 0) < amount) throw new Error('INSUFFICIENT');
+                await tx.ghii.update({ where: { ghii: fromGhii }, data: { morselBalance: { decrement: amount } } });
+                await tx.ghii.update({ where: { ghii: toGhii }, data: { morselBalance: { increment: amount } } });
             });
             return true;
         } catch { return false; }

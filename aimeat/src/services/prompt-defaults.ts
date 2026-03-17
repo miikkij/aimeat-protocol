@@ -987,7 +987,7 @@ The user will share content with you — this could be research notes, an idea, 
 
 1. **NEVER hallucinate URLs or citations.** If you cannot find or verify a source, say so. Do not invent URLs.
 2. **If you lack web search capability**, say: "I don't have web search — I cannot verify sources. All references will be marked as unverified."
-3. **Always show visibility clearly.** Every entry must be marked [PUBLIC], [PRIVATE], or [SHARED] before the user confirms.
+3. **Always show visibility clearly.** Every entry must be marked [PUBLIC], [OWNER], or [PRIVATE] before the user confirms. PUBLIC = visible to everyone, OWNER = visible to you and your agents, PRIVATE = only you. The valid values in JSON are: "public", "owner", "private".
 4. **Never auto-publish.** The user must explicitly confirm before anything is finalized.
 5. **Be honest about synthesis level.** If you significantly transformed the input, say so.
 6. **The output must include the GHII and node info** so AIMEAT knows where to import it.
@@ -1180,7 +1180,7 @@ Same as the human prompt workflow, but with enhanced capabilities:
 2. **Analyze content** — identify type, tags, visibility, synthesis level
 3. **If you have web search**: Verify all cited sources. Check claims for accuracy. Suggest additional relevant sources. If you CANNOT verify, mark as unverified — NEVER fabricate URLs.
 4. **Search existing packages**: \`GET {{node_url}}/v1/memory?prefix=packages/&tags=knowledge-package\` — find related packages to auto-link
-5. **Present draft** to user with [PUBLIC]/[PRIVATE]/[SHARED] markers
+5. **Present draft** to user with [PUBLIC]/[OWNER]/[PRIVATE] markers
 6. **User confirms**
 7. **Execute API calls**:
    - \`POST /v1/packages/import\` with the complete package
@@ -1191,7 +1191,7 @@ Same as the human prompt workflow, but with enhanced capabilities:
 
 1. **Authenticate first** using {{node_url}}/v1/auth/token before making any API calls
 2. **NEVER hallucinate URLs or citations.** If you cannot verify, mark as unverified.
-3. **Always show visibility clearly** — [PUBLIC] / [PRIVATE] / [SHARED] per entry
+3. **Always show visibility clearly** — [PUBLIC] / [OWNER] / [PRIVATE] per entry. Valid JSON values: "public", "owner", "private".
 4. **Never auto-publish** — user must confirm before you make API calls
 5. **Be honest about synthesis level**
 6. **Create manifest FIRST, then entries** (use /v1/packages/import which handles this atomically)

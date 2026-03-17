@@ -56,6 +56,36 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       createdAt: new Date().toISOString(),
     });
 
+    // Auto-create GHII record for single-balance economy (welcome bonus on GHII)
+    const ghii = `${name}@${config.nodeId}`;
+    const existingGhii = await storage.getGHIIByOwner(name);
+    if (!existingGhii) {
+      const now = new Date().toISOString();
+      await storage.createGHII({
+        ghii,
+        username: name,
+        nodeId: config.nodeId,
+        displayName: display_name ?? name,
+        ownerName: name,
+        bio: '',
+        avatar: '',
+        locale: 'en',
+        verificationLevel: 0,
+        totpEnabled: false,
+        morselBalance: config.welcomeBonus,
+        createdAt: now,
+        updatedAt: now,
+      });
+      // Record welcome bonus transaction
+      await storage.addTransaction({
+        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        gaii: ghii,
+        type: 'welcome_bonus',
+        amount: config.welcomeBonus,
+        timestamp: now,
+      });
+    }
+
     // Extension hook: post_owner_registration (fire-and-forget)
     fireHook(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles });
 
@@ -280,6 +310,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       // Escrow holds
       const escrowHolds = await storage.listEscrowHolds(agent.gaii);
 
+      const agentGhii = await storage.getGHIIByOwner(agent.owner);
       agentData.push({
         gaii: agent.gaii,
         display_name: agent.displayName,
@@ -287,7 +318,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
         capabilities: agent.capabilities,
         default_scopes: agent.defaultScopes,
         trust,
-        morsel_balance: agent.morselBalance,
+        morsel_balance: agentGhii?.morselBalance ?? 0,
         created_at: agent.createdAt,
         last_seen: agent.lastSeen,
         memories: memories.map(m => ({

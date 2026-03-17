@@ -173,31 +173,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // Public board posting costs morsels — system boards are free (§15, Appendix B)
     if (board.visibility === 'public') {
       const cost = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
-      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-
-      let debited = false;
-      let currentBalance = 0;
-
-      if (isOwnerSession) {
-        // Owner sessions: debit from GHII morsel balance
-        const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner as string);
-        currentBalance = ghiiRecord?.morselBalance ?? 0;
-        if (currentBalance >= cost && ghiiRecord) {
-          await storage.updateGHII(ghiiRecord.ghii, { morselBalance: currentBalance - cost });
-          debited = true;
-        }
-      } else {
-        // Agent sessions: debit from agent morsel balance
-        debited = await storage.debitBalance(gaii, cost);
-        if (!debited) {
-          const agent = await storage.getAgent(gaii);
-          currentBalance = agent?.morselBalance ?? 0;
-        }
-      }
-
+      const debited = await storage.debitBalance(gaii, cost);
       if (!debited) {
         res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
-          `Posting costs ${cost} morsels, you have ${currentBalance}`));
+          `Posting costs ${cost} morsels`));
         return;
       }
       await storage.addTransaction({

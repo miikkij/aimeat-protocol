@@ -294,45 +294,75 @@ export class SqliteStorage implements Storage {
     return rows.map(r => this.deserializeAgent(r));
   }
 
+  /**
+   * Resolve any identity (GAII, GHII, bare owner) to the owner's GHII identifier.
+   * All balance operations go through GHII — agents don't have their own balance.
+   */
+  private resolveGhii(identity: string): string | null {
+    // GHII format: owner@node (no #)
+    if (!identity.includes('#') && identity.includes('@')) return identity;
+    // GAII format: agent#owner@node → extract owner → lookup GHII
+    if (identity.includes('#')) {
+      const hashIdx = identity.indexOf('#');
+      const atIdx = identity.lastIndexOf('@');
+      if (atIdx > hashIdx) {
+        const owner = identity.slice(hashIdx + 1, atIdx);
+        const row = this.db.prepare('SELECT ghii FROM ghiis WHERE username = ?').get(owner) as { ghii: string } | undefined;
+        return row?.ghii ?? null;
+      }
+    }
+    // Bare owner name → lookup GHII
+    const row = this.db.prepare('SELECT ghii FROM ghiis WHERE username = ?').get(identity) as { ghii: string } | undefined;
+    return row?.ghii ?? null;
+  }
+
   async debitBalance(gaii: string, amount: number): Promise<boolean> {
+    const ghii = this.resolveGhii(gaii);
+    if (!ghii) return false;
     const result = this.db.prepare(
-      `UPDATE agents SET morselBalance = morselBalance - ? WHERE gaii = ? AND morselBalance >= ?`
-    ).run(amount, gaii, amount);
+      `UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) - ? WHERE ghii = ? AND COALESCE(morselBalance, 0) >= ?`
+    ).run(amount, ghii, amount);
     return result.changes > 0;
   }
 
   async creditBalance(gaii: string, amount: number): Promise<boolean> {
+    const ghii = this.resolveGhii(gaii);
+    if (!ghii) return false;
     const result = this.db.prepare(
-      `UPDATE agents SET morselBalance = morselBalance + ? WHERE gaii = ?`
-    ).run(amount, gaii);
+      `UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) + ? WHERE ghii = ?`
+    ).run(amount, ghii);
     return result.changes > 0;
   }
 
   async creditBalanceCapped(gaii: string, amount: number, cap: number): Promise<number> {
-    // SQLite transaction ensures atomicity — no interleaving between read and write
+    const ghii = this.resolveGhii(gaii);
+    if (!ghii) return 0;
     const txn = this.db.transaction(() => {
-      const row = this.db.prepare('SELECT morselBalance FROM agents WHERE gaii = ?').get(gaii) as Record<string, unknown> | undefined;
+      const row = this.db.prepare('SELECT morselBalance FROM ghiis WHERE ghii = ?').get(ghii) as { morselBalance: number | null } | undefined;
       if (!row) return 0;
-      const oldBalance = row.morselBalance as number;
+      const oldBalance = row.morselBalance ?? 0;
       if (oldBalance >= cap) return 0;
       const actualCredit = Math.min(amount, cap - oldBalance);
       if (actualCredit <= 0) return 0;
-      this.db.prepare('UPDATE agents SET morselBalance = morselBalance + ? WHERE gaii = ?').run(actualCredit, gaii);
+      this.db.prepare('UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) + ? WHERE ghii = ?').run(actualCredit, ghii);
       return actualCredit;
     });
     return txn();
   }
 
   async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
+    const fromGhii = this.resolveGhii(fromGaii);
+    const toGhii = this.resolveGhii(toGaii);
+    if (!fromGhii || !toGhii) return false;
+    if (fromGhii === toGhii) return true; // Same owner — no-op
     const txn = this.db.transaction(() => {
       const debit = this.db.prepare(
-        `UPDATE agents SET morselBalance = morselBalance - ? WHERE gaii = ? AND morselBalance >= ?`
-      ).run(amount, fromGaii, amount);
+        `UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) - ? WHERE ghii = ? AND COALESCE(morselBalance, 0) >= ?`
+      ).run(amount, fromGhii, amount);
       if (debit.changes === 0) return false;
-
       this.db.prepare(
-        `UPDATE agents SET morselBalance = morselBalance + ? WHERE gaii = ?`
-      ).run(amount, toGaii);
+        `UPDATE ghiis SET morselBalance = COALESCE(morselBalance, 0) + ? WHERE ghii = ?`
+      ).run(amount, toGhii);
       return true;
     });
     return txn();

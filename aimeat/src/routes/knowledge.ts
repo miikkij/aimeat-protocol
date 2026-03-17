@@ -63,6 +63,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       for (const entry of pkg.entries) {
         if (!entry.title) entry.title = entry.key || 'Untitled';
         if (!entry.visibility) entry.visibility = 'private';
+        // Normalize 'shared' → 'owner' (memory layer doesn't have shared; prompt may produce it)
+        if (entry.visibility === 'shared') entry.visibility = 'owner';
       }
     }
 

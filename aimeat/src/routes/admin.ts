@@ -164,12 +164,16 @@ export function adminRouter(
             createdAt: new Date().toISOString(),
         });
 
-        // Create GHII profile if password provided (human-friendly login)
+        // Always create GHII profile (required for single-balance economy)
         let hasPassword = false;
-        if (password && typeof password === 'string' && password.length >= 4) {
-            const passwordHash = await hashPassword(password);
-            const ghii = `${name}@${config.nodeId}`;
-            const now = new Date().toISOString();
+        const ghii = `${name}@${config.nodeId}`;
+        const now = new Date().toISOString();
+        const existingGhii = await storage.getGHIIByOwner(name);
+        if (!existingGhii) {
+            const passwordHash = (password && typeof password === 'string' && password.length >= 4)
+                ? await hashPassword(password)
+                : undefined;
+            if (passwordHash) hasPassword = true;
             try {
                 await storage.createGHII({
                     username: name,
@@ -180,11 +184,21 @@ export function adminRouter(
                     verificationLevel: 0,
                     ownerName: name,
                     totpEnabled: false,
+                    morselBalance: config.welcomeBonus,
                     createdAt: now,
                     updatedAt: now,
                 });
-                hasPassword = true;
+                // Record welcome bonus transaction
+                await storage.addTransaction({
+                    id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                    gaii: ghii,
+                    type: 'welcome_bonus',
+                    amount: config.welcomeBonus,
+                    timestamp: now,
+                });
             } catch { /* GHII record may already exist */ }
+        } else {
+            hasPassword = !!existingGhii.passwordHash;
         }
 
         res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey, has_password: hasPassword });

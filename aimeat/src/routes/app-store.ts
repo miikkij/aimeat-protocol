@@ -78,37 +78,24 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Check buyer balance
-        const buyer = await storage.getAgent(buyerGaii);
-        if (!buyer) {
-            res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', 'Buyer agent not found'));
-            return;
-        }
-
         // Transaction fee
         const feePercent = config.marketplaceTransactionFeePercent ?? 5;
         const transactionFee = Math.ceil(price * feePercent / 100);
         const totalCost = price;
 
-        if (buyer.morselBalance < totalCost) {
+        // Debit buyer (atomic — resolves GAII to GHII internally)
+        const debited = await storage.debitBalance(buyerGaii, totalCost);
+        if (!debited) {
+            const buyerGhii = await storage.getGHIIByOwner(buyerOwner);
+            const balance = buyerGhii?.morselBalance ?? 0;
             res.status(402).json(error(config.nodeId, 'INSUFFICIENT_BALANCE',
-                `Insufficient morsels. Need ${totalCost}, have ${buyer.morselBalance}`));
+                `Insufficient morsels. Need ${totalCost}, have ${balance}`));
             return;
         }
 
-        // Debit buyer
-        await storage.updateAgent(buyerGaii, {
-            morselBalance: buyer.morselBalance - totalCost,
-        });
-
-        // Credit seller (price minus transaction fee)
+        // Credit seller (price minus transaction fee — resolves GAII to GHII internally)
         const sellerEarnings = price - transactionFee;
-        const seller = await storage.getAgent(app.ownerGaii);
-        if (seller) {
-            await storage.updateAgent(app.ownerGaii, {
-                morselBalance: seller.morselBalance + sellerEarnings,
-            });
-        }
+        await storage.creditBalance(app.ownerGaii, sellerEarnings);
 
         const now = new Date().toISOString();
         const txId = `mktx_${Date.now()}_${randomBytes(6).toString('hex')}`;
@@ -196,7 +183,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             price_morsels: purchase.priceMorsels,
             transaction_fee_morsels: purchase.transactionFeeMorsels,
             purchased_at: purchase.purchasedAt,
-            buyer_balance: buyer.morselBalance - totalCost,
+            buyer_balance: (await storage.getGHIIByOwner(buyerOwner))?.morselBalance ?? 0,
             note: `Purchased "${purchase.appName}" (${licenseType} license). The full app content is included in this receipt.`,
         }, [
             { description: 'View purchase details', method: 'GET', url: `/v1/app-store/purchases/${txId}` },

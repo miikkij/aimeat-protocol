@@ -8,6 +8,7 @@
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, MicroMemoryRecord } from '../storage/interface.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 // ── Size calculators ──
 
@@ -78,7 +79,7 @@ export async function checkMemoryQuota(
         return { allowed: true, currentBytes, quotaBytes, overageBytes: 0, overageMorsels: 0 };
     }
 
-    // Over quota — check if agent can pay overage morsels
+    // Over quota — check if owner can pay overage morsels from GHII balance
     const overageBytes = projectedBytes - quotaBytes;
     const overageMb = Math.ceil(overageBytes / (1024 * 1024));
     const overageMorsels = overageMb * config.memoryOverageMorselsPerMbMonth;
@@ -87,12 +88,14 @@ export async function checkMemoryQuota(
         return { allowed: true, currentBytes, quotaBytes, overageBytes, overageMorsels: 0 };
     }
 
-    const agent = await storage.getAgent(gaii);
-    if (!agent || agent.morselBalance < overageMorsels) {
+    const { owner } = parseGaiiLoose(gaii);
+    const ghiiRecord = owner ? await storage.getGHIIByOwner(owner) : null;
+    const balance = ghiiRecord?.morselBalance ?? 0;
+    if (!ghiiRecord || balance < overageMorsels) {
         return {
             allowed: false, currentBytes, quotaBytes, overageBytes, overageMorsels,
             reason: `Memory quota exceeded (${(projectedBytes / (1024 * 1024)).toFixed(2)}MB / ${config.memoryQuotaMb}MB). ` +
-                `Overage costs ${overageMorsels} morsels but balance is ${agent?.morselBalance ?? 0}.`,
+                `Overage costs ${overageMorsels} morsels but balance is ${balance}.`,
         };
     }
 
@@ -120,12 +123,14 @@ export async function checkStorageQuota(
     const overageGb = Math.ceil(overageBytes / (1024 * 1024 * 1024)) || 1; // minimum 1 GB billing unit
     const overageMorsels = overageGb * config.storageOverageMorselsPerGbMonth;
 
-    const agent = await storage.getAgent(gaii);
-    if (!agent || agent.morselBalance < overageMorsels) {
+    const { owner } = parseGaiiLoose(gaii);
+    const ghiiRecord = owner ? await storage.getGHIIByOwner(owner) : null;
+    const balance = ghiiRecord?.morselBalance ?? 0;
+    if (!ghiiRecord || balance < overageMorsels) {
         return {
             allowed: false, currentBytes, quotaBytes, overageBytes, overageMorsels,
             reason: `Storage quota exceeded (${(projectedBytes / (1024 * 1024)).toFixed(2)}MB / ${config.storageQuotaMb}MB). ` +
-                `Overage costs ${overageMorsels} morsels but balance is ${agent?.morselBalance ?? 0}.`,
+                `Overage costs ${overageMorsels} morsels but balance is ${balance}.`,
         };
     }
 

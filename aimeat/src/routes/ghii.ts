@@ -608,7 +608,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 capabilities: [],
                 publicKey: agentKeyPair.publicKey,
                 trustScore: 50,
-                morselBalance: config.welcomeBonus,
+                morselBalance: 0,
                 createdAt: now,
                 lastSeen: now,
             });
@@ -756,7 +756,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 capabilities: [],
                 publicKey: agentKeyPair.publicKey,
                 trustScore: 50,
-                morselBalance: config.welcomeBonus,
+                morselBalance: 0,
                 createdAt: now,
                 lastSeen: now,
             });

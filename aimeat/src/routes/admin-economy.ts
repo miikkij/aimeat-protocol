@@ -55,11 +55,12 @@ export function adminEconomyRouter(
             timestamp: new Date().toISOString(),
         });
 
-        const updatedAgent = await storage.getAgent(gaii);
+        const mintedAgent = await storage.getAgent(gaii);
+        const mintedGhii = mintedAgent ? await storage.getGHIIByOwner(mintedAgent.owner) : null;
         res.json(success(config.nodeId, {
             gaii,
             minted: amount,
-            new_balance: updatedAgent?.morselBalance ?? 0,
+            new_balance: mintedGhii?.morselBalance ?? 0,
             daily_minted: mintedToday + amount,
             daily_cap: config.maxOperatorMintPerDay,
         }));

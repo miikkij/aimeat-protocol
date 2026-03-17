@@ -129,7 +129,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             async (uri) => {
                 const agent = await storage.getAgent(agentGaii);
                 if (!agent) return { contents: [{ uri: uri.toString(), text: '{}' }] };
-                return { contents: [{ uri: uri.toString(), text: JSON.stringify({ balance: agent.morselBalance }), mimeType: 'application/json' }] };
+                const ghii = await storage.getGHIIByOwner(agent.owner);
+                const balance = ghii?.morselBalance ?? 0;
+                return { contents: [{ uri: uri.toString(), text: JSON.stringify({ balance }), mimeType: 'application/json' }] };
             },
         );
 
@@ -302,9 +304,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
                 const held = await holdEscrow(storage, agentGaii, provider_gaii, trackingCode, cost.total);
                 if (!held) {
-                    const requester = await storage.getAgent(agentGaii);
+                    const requesterAgent = await storage.getAgent(agentGaii);
+                    const requesterGhii = requesterAgent ? await storage.getGHIIByOwner(requesterAgent.owner) : null;
+                    const requesterBalance = requesterGhii?.morselBalance ?? 0;
                     return {
-                        content: [{ type: 'text' as const, text: `Insufficient morsels. Need ${cost.total}, have ${requester?.morselBalance ?? 0}` }],
+                        content: [{ type: 'text' as const, text: `Insufficient morsels. Need ${cost.total}, have ${requesterBalance}` }],
                         isError: true,
                     };
                 }
@@ -401,15 +405,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             async () => {
                 const agent = await storage.getAgent(agentGaii);
                 if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+                const ghii = await storage.getGHIIByOwner(agent.owner);
+                const balance = ghii?.morselBalance ?? 0;
                 const { calculateEscrow } = await import('../services/morsel.js');
                 const inEscrow = await calculateEscrow(storage, agentGaii);
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
-                            balance: agent.morselBalance,
+                            balance,
                             in_escrow: inEscrow,
-                            available: agent.morselBalance - inEscrow,
+                            available: balance - inEscrow,
                         }, null, 2),
                     }],
                 };
@@ -539,8 +545,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 let totalMorsels = 0;
                 let activeAgents = 0;
                 const now = Date.now();
+                const seenOwners = new Set<string>();
                 for (const a of agents) {
-                    totalMorsels += a.morselBalance;
+                    if (!seenOwners.has(a.owner)) {
+                        seenOwners.add(a.owner);
+                        const ghii = await storage.getGHIIByOwner(a.owner);
+                        totalMorsels += ghii?.morselBalance ?? 0;
+                    }
                     if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) activeAgents++;
                 }
                 return {
@@ -565,9 +576,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             async ({ limit }) => {
                 if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
                 const agents = await storage.listAgents();
-                const result = (limit ? agents.slice(0, limit) : agents).map(a => ({
+                const subset = limit ? agents.slice(0, limit) : agents;
+                const ownerBalances = new Map<string, number>();
+                for (const a of subset) {
+                    if (!ownerBalances.has(a.owner)) {
+                        const ghii = await storage.getGHIIByOwner(a.owner);
+                        ownerBalances.set(a.owner, ghii?.morselBalance ?? 0);
+                    }
+                }
+                const result = subset.map(a => ({
                     gaii: a.gaii, owner: a.owner, display_name: a.displayName,
-                    trust_score: a.trustScore, morsel_balance: a.morselBalance,
+                    trust_score: a.trustScore, morsel_balance: ownerBalances.get(a.owner) ?? 0,
                     last_seen: a.lastSeen, created_at: a.createdAt,
                 }));
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
@@ -624,8 +643,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                     timestamp: new Date().toISOString(),
                 });
                 emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
-                const updatedAgent = await storage.getAgent(gaii);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: updatedAgent?.morselBalance ?? 0 }, null, 2) }] };
+                const mintedAgentRecord = await storage.getAgent(gaii);
+                const mintedGhii = mintedAgentRecord ? await storage.getGHIIByOwner(mintedAgentRecord.owner) : null;
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: mintedGhii?.morselBalance ?? 0 }, null, 2) }] };
             },
         );
 

@@ -924,8 +924,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             return { success: true };
           },
           getBalance: async () => {
-            const agent = await storage.getAgent(callerGaii);
-            return agent?.morselBalance ?? 0;
+            const parsed = (await import('../utils/gaii.js')).parseGAII(callerGaii);
+            if (!parsed) return 0;
+            const ghii = await storage.getGHIIByOwner(parsed.owner);
+            return ghii?.morselBalance ?? 0;
           },
         },
         consent: {
@@ -1146,8 +1148,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
           // SECURITY: Extensions can only read the calling agent's own balance
           getBalance: async () => {
-            const agent = await storage.getAgent(callerGaii);
-            return agent?.morselBalance ?? 0;
+            const parsed = (await import('../utils/gaii.js')).parseGAII(callerGaii);
+            if (!parsed) return 0;
+            const ghii = await storage.getGHIIByOwner(parsed.owner);
+            return ghii?.morselBalance ?? 0;
           },
           // hold, release, transfer REMOVED — extensions cannot move other agents' funds
         },

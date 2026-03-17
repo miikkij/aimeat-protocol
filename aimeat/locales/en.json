@@ -1136,6 +1136,7 @@
     "visibility": {
       "public": "Public",
       "private": "Private",
+      "owner": "Shared",
       "protected": "Protected"
     },
     "knowledge": {

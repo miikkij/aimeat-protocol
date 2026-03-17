@@ -28,6 +28,7 @@ export interface AgentRecord {
   semantic?: SemanticAnnotation;  // Phase 0.7b
   defaultScopes?: string[];      // REQ-006 — scopes assigned at registration
   allowedOrigins?: string[];     // CORS — per-agent origin restrictions (Phase 3)
+  dailySpendLimit?: number | null;  // Per-agent daily spend cap (null = no limit)
 }
 
 export interface MemoryRecord {
