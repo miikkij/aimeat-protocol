@@ -142,7 +142,7 @@ export default function NotificationsTab({ session, showToast }) {
     }
   }
 
-  if (loading) return html`<${Spinner} />`;
+  if (loading) return html`<div><${Spinner} /></div>`;
 
   async function handleSaveEmailPrefs(newPrefs) {
     setSavingEmail(true);
@@ -207,64 +207,61 @@ export default function NotificationsTab({ session, showToast }) {
     `;
   }
 
-  if (!vapidKey) {
+  function renderPushButtons() {
+    if (subscribed) {
+      return html`
+        <div class="flex-row">
+          <button class="btn btn-sm" onClick=${handleTestPush}>
+            ${t('profile.notifications.testBtn')}
+          </button>
+          <button class="btn btn-sm btn-outline" onClick=${handleUnsubscribe}
+            disabled=${subStatus === 'unsubscribing'}>
+            ${subStatus === 'unsubscribing'
+              ? t('profile.notifications.unsubscribing')
+              : t('profile.notifications.unsubscribeBtn')}
+          </button>
+        </div>`;
+    }
     return html`
-      <div class="pf-card">
-        <h3>${t('profile.notifications.title')}</h3>
-        <p class="text-caption">${t('profile.notifications.notConfigured')}</p>
-
-        <h3 class="mt-section">${t('profile.notifications.emailNotifications')}</h3>
-        ${renderEmailNotifications()}
-      </div>
-    `;
+      <button class="btn btn-primary" onClick=${handleSubscribe}
+        disabled=${subStatus === 'subscribing'}>
+        ${subStatus === 'subscribing'
+          ? t('profile.notifications.subscribing')
+          : t('profile.notifications.subscribeBtn')}
+      </button>`;
   }
 
-  return html`
-    <div class="pf-card">
-      <h3>${t('profile.notifications.title')}</h3>
-      <p class="text-caption mb-1">${t('profile.notifications.explain')}</p>
+  if (!vapidKey) {
+    return html`<div>
+      <div class="section-title">${t('profile.notifications.title')}</div>
+      <div class="section-desc">${t('profile.notifications.explain')}</div>
 
-      <${GlassCard}>
-        <div class="flex-between">
-          <div class="pf-notif-text">
-            <div class="pf-notif-heading">
-              ${t('profile.notifications.browserPush')}
-            </div>
-            <div class="text-caption">
-              ${subscribed
-                ? t('profile.notifications.statusActive')
-                : t('profile.notifications.statusInactive')}
-            </div>
-          </div>
+      <p class="text-caption">${t('profile.notifications.notConfigured')}</p>
 
-          ${subscribed ? html`
-            <div class="flex-row">
-            <button class="btn btn-sm" onClick=${handleTestPush}>
-              ${t('profile.notifications.testBtn')}
-            </button>
-            <button class="btn btn-sm btn-outline" onClick=${handleUnsubscribe}
-              disabled=${subStatus === 'unsubscribing'}>
-              ${subStatus === 'unsubscribing'
-                ? t('profile.notifications.unsubscribing')
-                : t('profile.notifications.unsubscribeBtn')}
-            </button>
-          </div>
-        ` : html`
-          <button class="btn btn-primary" onClick=${handleSubscribe}
-            disabled=${subStatus === 'subscribing'}>
-            ${subStatus === 'subscribing'
-              ? t('profile.notifications.subscribing')
-              : t('profile.notifications.subscribeBtn')}
-          </button>
-        `}
-      </${GlassCard}>
-
-      <p class="text-meta mt-xs">
-        ${t('profile.notifications.hint')}
-      </p>
-
-      <h3 class="mt-section">${t('profile.notifications.emailNotifications')}</h3>
+      <div class="section-title mt-section">${t('profile.notifications.emailNotifications')}</div>
       ${renderEmailNotifications()}
-    </div>
-  `;
+    </div>`;
+  }
+
+  return html`<div>
+    <div class="section-title">${t('profile.notifications.title')}</div>
+    <div class="section-desc">${t('profile.notifications.explain')}</div>
+
+    <${GlassCard}>
+      <div class="flex-between">
+        <div class="pf-notif-text">
+          <div class="pf-notif-heading">${t('profile.notifications.browserPush')}</div>
+          <div class="text-caption">${subscribed
+            ? t('profile.notifications.statusActive')
+            : t('profile.notifications.statusInactive')}</div>
+        </div>
+        ${renderPushButtons()}
+      </div>
+    </${GlassCard}>
+
+    <p class="text-meta mt-xs">${t('profile.notifications.hint')}</p>
+
+    <div class="section-title mt-section">${t('profile.notifications.emailNotifications')}</div>
+    ${renderEmailNotifications()}
+  </div>`;
 }

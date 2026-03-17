@@ -350,10 +350,20 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     emitChange('work');
   });
 
-  // GET /v1/work/inbox — pending work items for provider (agent auth)
+  // GET /v1/work/inbox — pending work items for provider (agent or owner auth)
   router.get('/v1/work/inbox', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
-    const items = await storage.listWorkByProvider(gaii);
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
+    if (isOwnerSession) {
+      // Owner sees work across all their agents
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      items = [];
+      for (const agent of agents) {
+        items.push(...await storage.listWorkByProvider(agent.gaii));
+      }
+    } else {
+      items = await storage.listWorkByProvider(req.auth!.sub);
+    }
     const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
 
     res.json(success(config.nodeId, {
@@ -370,10 +380,19 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     }));
   });
 
-  // GET /v1/work/sent — work items sent by requester (agent auth)
+  // GET /v1/work/sent — work items sent by requester (agent or owner auth)
   router.get('/v1/work/sent', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
-    const items = await storage.listWorkByRequester(gaii);
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
+    if (isOwnerSession) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      items = [];
+      for (const agent of agents) {
+        items.push(...await storage.listWorkByRequester(agent.gaii));
+      }
+    } else {
+      items = await storage.listWorkByRequester(req.auth!.sub);
+    }
 
     res.json(success(config.nodeId, {
       items: items.map(w => ({

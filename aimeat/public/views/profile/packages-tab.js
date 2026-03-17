@@ -205,8 +205,8 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                       </button>
                       <button onClick=${() => handleOpenInGenerator(pkg.packageGroupId, pkg.author)}>
                         ${pkg.author === session?.owner
-                          ? (t('profile.packages.editInGenerator') || 'Edit in Generator')
-                          : (t('profile.packages.openInGenerator') || 'Open in Generator')}
+                          ? (t('packages.editInGenerator') || 'Edit in Generator')
+                          : (t('packages.openInGenerator') || 'Open in Generator')}
                       </button>
                     </div>
                   </div>
@@ -243,8 +243,8 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                       </button>
                       <button onClick=${() => handleOpenInGenerator(tpl.packageGroupId, tpl.packageAuthor)}>
                         ${tpl.packageAuthor === session?.owner
-                          ? (t('profile.packages.editInGenerator') || 'Edit in Generator')
-                          : (t('profile.packages.openInGenerator') || 'Open in Generator')}
+                          ? (t('packages.editInGenerator') || 'Edit in Generator')
+                          : (t('packages.openInGenerator') || 'Open in Generator')}
                       </button>
                     </div>
                   </div>

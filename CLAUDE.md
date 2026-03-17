@@ -153,6 +153,24 @@ This is the **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an 
 - **Package manager:** pnpm
 - **Port:** 40050
 
+## Identity Model — GHII vs GAII
+
+Three identity layers, two authentication paths:
+
+| Layer | Format | Purpose |
+|-------|--------|---------|
+| **Owner** | `alice` | Account layer — manages agents, has roles (`owner`, `operator`) |
+| **GHII** | `alice@node-id` | Human profile — display name, bio, avatar, password, TOTP |
+| **GAII** | `agent#owner@node-id` | Agent identity — scoped permissions, morsel balance, trust score |
+
+**Authentication rule:**
+- **Human users** log in via GHII (password/TOTP) → get an **owner JWT** (`sub: username`, `roles: ['owner']`). Owner JWTs bypass all scope checks.
+- **AI agents** connect via **device auth** (RFC 8628) → owner approves → agent gets **agent JWT** (`sub: gaii`, `roles: ['agent']`). Agent JWTs have scopes enforced.
+
+**Agents are never created implicitly.** Registration/login creates only the owner + GHII profile. Agents connect later through device auth, where the owner explicitly approves each agent and selects its scopes.
+
+Key files: `src/routes/ghii.ts` (human auth), `src/routes/agents.ts` (device auth), `src/auth/middleware.ts` (scope enforcement), `src/routes/libs.ts` (browser auth library)
+
 ## Key Commands
 
 ```bash
@@ -204,13 +222,18 @@ res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 ### Auth Middleware
 
 ```typescript
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 
-// Agent-only endpoint
-router.post('/v1/endpoint', requireAuth(), requireRole('agent'), async (req, res) => {
-  const gaii = req.auth!.sub;       // Agent GAII
+// Owner-only endpoint (human users — scopes bypassed)
+router.get('/v1/endpoint', requireAuth(), requireRole('owner'), async (req, res) => {
+  const owner = req.auth!.sub;      // Owner name (e.g., "alice")
+  const roles = req.auth!.roles;    // ['owner'] or ['owner', 'operator']
+});
+
+// Agent endpoint with scope enforcement
+router.post('/v1/endpoint', requireAuth(), requireRole('agent'), requireScope('memory:write'), async (req, res) => {
+  const gaii = req.auth!.sub;       // Agent GAII (e.g., "claude#alice@node")
   const owner = req.auth!.owner;    // Owner name
-  const roles = req.auth!.roles;    // ['owner'] or ['agent'] or ['owner', 'operator']
 });
 ```
 

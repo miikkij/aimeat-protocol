@@ -175,10 +175,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // GET /v1/memory — list memory keys (agent auth required)
   // Optional ?agent=GAII — owner can view any of their own agents' memory
   // Optional ?owner_scope=true — list owner-visible keys across all owner's agents
+  // Owner sessions automatically use owner_scope (see all agents' memory)
   router.get('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
-    const ownerScope = req.query.owner_scope === 'true';
+    // Owner sessions (human user) automatically see all their agents' memory
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const ownerScope = isOwnerSession || req.query.owner_scope === 'true';
 
     // Allow owner to view another of their agents' memory
     if (agentParam && agentParam !== gaii) {
@@ -254,7 +257,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
+  // Owner sessions search across all their agents' memory
   router.get('/v1/memory/search', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
     if (agentParam && agentParam !== gaii) {
@@ -275,7 +280,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const visibility = req.query.visibility as string | undefined;
     const maxFlagsParam = req.query.max_flags as string | undefined;
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
-    const results = await storage.searchMemory(gaii, q, { visibility, maxFlags });
+
+    let results: MemoryRecord[];
+    if (isOwnerSession && !agentParam) {
+      // Owner session: search across all agents
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      results = [];
+      for (const agent of agents) {
+        results.push(...await storage.searchMemory(agent.gaii, q, { visibility, maxFlags }));
+      }
+    } else {
+      results = await storage.searchMemory(gaii, q, { visibility, maxFlags });
+    }
 
     res.json(success(config.nodeId, {
       results: results.map(r => ({
@@ -384,10 +400,19 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     emitChange('memory');
   });
 
-  // GET /v1/memory/files — list files
+  // GET /v1/memory/files — list files (owner sees all agents' files)
   router.get('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
-    const files = await storage.listStorageFiles(gaii);
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
+    if (isOwnerSession) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      files = [];
+      for (const agent of agents) {
+        files.push(...await storage.listStorageFiles(agent.gaii));
+      }
+    } else {
+      files = await storage.listStorageFiles(req.auth!.sub);
+    }
 
     res.json(success(config.nodeId, {
       files: files.map(f => ({

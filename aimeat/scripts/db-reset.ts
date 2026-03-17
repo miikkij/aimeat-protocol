@@ -77,11 +77,42 @@ async function resetSqlite() {
 
 // ─── MongoDB reset ───────────────────────────────────────────
 
+// All Prisma model names — each becomes a MongoDB collection.
+// Keep in sync with prisma/schema.prisma when adding new models.
 const AIMEAT_COLLECTIONS = [
-  'Owner', 'Agent', 'Memory', 'Action', 'Work',
-  'Transaction', 'Board', 'BoardPost', 'Otk',
-  'Dispute', 'DisputeAudit', 'MicroMemory', 'StorageFile',
-  'PeeringRequest', 'NodeKey', 'SystemSetting',
+  // Core identity & auth
+  'Owner', 'Agent', 'Ghii', 'Session', 'RevokedToken', 'Otk',
+  'DeviceAuth', 'OAuthClient', 'OAuthRefreshToken', 'OAuthApproval',
+  // Data storage
+  'Memory', 'MicroMemory', 'StorageFile', 'SchemaLock',
+  // Economy
+  'Transaction', 'EscrowHold',
+  // Work & actions
+  'Action', 'Work', 'Dispute', 'DisputeAudit',
+  // Social
+  'Board', 'BoardPost', 'BoardSubscription',
+  'Organism', 'OrganismMembership', 'OrganismReputation', 'JoinRequest',
+  // Consent & moderation
+  'Consent', 'ConsentAudit', 'Flag', 'Appeal',
+  // Federation & nodes
+  'PeeringRequest', 'NodeKey', 'GenesisPeer',
+  'PersonalNode', 'MailboxItem', 'PersonalPushSubscription',
+  // Services & marketplace
+  'Csm', 'Msm', 'Listing', 'Purchase', 'Match',
+  'App', 'AppDownload', 'AppPurchase',
+  // Extensions & cortex
+  'Extension', 'ExtensionInstance', 'CortexExtension', 'CortexLibFile',
+  // Knowledge & packages
+  'KnowledgeLink', 'KnowledgeReview',
+  'Package', 'PackageInstance', 'TemplateListing', 'TemplateReview', 'TemplateDiscussion',
+  // Notifications & push
+  'PushSubscription', 'NotificationTemplate', 'NotificationPreference',
+  // Chat & realtime
+  'ChatInstance', 'RealtimeRoom',
+  // System
+  'SystemSetting', 'SystemPrompt', 'SystemPromptVersion',
+  'SiteChangeLog', 'EmailVerification', 'TrustedIssuer',
+  'ScheduledJob', 'ExecutionLog',
 ];
 
 async function resetMongodb() {

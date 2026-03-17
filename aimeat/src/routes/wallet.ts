@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
@@ -19,7 +19,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     let balance = 0;
     let identity = '';
     let inEscrow = 0;
-    let transactions: Array<{ type: string; amount: number }> = [];
+    let transactions: WalletTransaction[] = [];
 
     if (isAgent) {
       const gaii = req.auth!.sub;
@@ -31,14 +31,25 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       balance = agent.morselBalance;
       identity = gaii;
       inEscrow = await calculateEscrow(storage, gaii);
-      transactions = await storage.getTransactions(gaii, 100_000) as Array<{ type: string; amount: number }>;
+      transactions = await storage.getTransactions(gaii, 100_000);
     } else if (isOwner) {
-      // Owner accessing their own wallet — try GHII record first, fall back to owner identity
+      // Owner accessing wallet — aggregate balance and transactions across all their agents
       const ownerName = req.auth!.owner as string;
+      const agents = await storage.getAgentsByOwner(ownerName);
+      identity = ownerName;
+      for (const agent of agents) {
+        balance += agent.morselBalance;
+        inEscrow += await calculateEscrow(storage, agent.gaii);
+        const agentTx = await storage.getTransactions(agent.gaii, 100_000);
+        transactions.push(...agentTx);
+      }
+      // Also check GHII-level balance and transactions
       const ghiiRecord = await storage.getGHIIByOwner(ownerName);
-      balance = ghiiRecord?.morselBalance ?? 0;
-      identity = ghiiRecord?.ghii ?? req.auth!.sub;
-      transactions = await storage.getTransactions(identity, 100_000) as Array<{ type: string; amount: number }>;
+      if (ghiiRecord) {
+        if (ghiiRecord.morselBalance) balance += ghiiRecord.morselBalance;
+        const ghiiTx = await storage.getTransactions(ghiiRecord.ghii, 100_000);
+        transactions.push(...ghiiTx);
+      }
     } else {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Requires agent or owner role'));
       return;
@@ -79,12 +90,24 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
 
   // GET /v1/wallet/transactions — transaction history (spec path)
   router.get('/v1/wallet/transactions', requireAuth(), requireScope('wallet:read'), async (req, res) => {
-    const identity = req.auth!.sub;
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     const typeFilter = req.query.type as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
 
-    let transactions = await storage.getTransactions(identity, 100_000);
+    // Owner sessions aggregate transactions across all their agents
+    let transactions: WalletTransaction[];
+    if (isOwnerSession) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      transactions = [];
+      for (const agent of agents) {
+        const agentTx = await storage.getTransactions(agent.gaii, 100_000);
+        transactions.push(...agentTx);
+      }
+      transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } else {
+      transactions = await storage.getTransactions(req.auth!.sub, 100_000);
+    }
     if (typeFilter) {
       transactions = transactions.filter(tx => tx.type === typeFilter);
     }
@@ -114,9 +137,20 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     res.setHeader('Sunset', '2026-09-01');
     res.setHeader('Link', '</v1/wallet/transactions>; rel="successor-version"');
 
-    const gaii = req.auth!.sub;
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     const limit = Math.min(parseInt(req.query.limit as string ?? '50', 10), 200);
-    const transactions = await storage.getTransactions(gaii, limit);
+    let transactions: WalletTransaction[];
+    if (isOwnerSession) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      transactions = [];
+      for (const agent of agents) {
+        transactions.push(...await storage.getTransactions(agent.gaii, limit));
+      }
+      transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      transactions = transactions.slice(0, limit);
+    } else {
+      transactions = await storage.getTransactions(req.auth!.sub, limit);
+    }
 
     res.json(success(config.nodeId, {
       '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },

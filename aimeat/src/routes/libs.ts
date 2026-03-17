@@ -395,19 +395,31 @@ function createSession(data) {
 
     // Re-authenticate using CryptoKey from IndexedDB
     async refresh() {
-      if (!session.gaii) throw new Error('Cannot refresh — no agent credentials');
       // Load CryptoKey from IndexedDB (or use in-memory ref)
       let key = session._cryptoKey;
-      if (!key) {
-        key = await loadKey('agent_key');
+      let body;
+
+      if (session.gaii) {
+        // Agent session refresh (for future agent-mode sessions)
+        if (!key) key = await loadKey('agent_key');
+        if (!key) throw new Error('Cannot refresh — no signing key found in IndexedDB');
+        const timestamp = new Date().toISOString();
+        const message = session.gaii + timestamp;
+        const signature = await sign(key, message);
+        body = { gaii: session.gaii, timestamp, signature };
+      } else {
+        // Owner session refresh (human user)
+        if (!key) key = await loadKey('owner_key');
+        if (!key) throw new Error('Cannot refresh — no signing key found in IndexedDB');
+        const timestamp = new Date().toISOString();
+        const message = session.owner + NODE_ID + timestamp;
+        const signature = await sign(key, message);
+        body = { owner: session.owner, timestamp, signature };
       }
-      if (!key) throw new Error('Cannot refresh — no signing key found in IndexedDB');
-      const timestamp = new Date().toISOString();
-      const message = session.gaii + timestamp;
-      const signature = await sign(key, message);
+
       const data = await api('/v1/auth/token', {
         method: 'POST',
-        body: JSON.stringify({ gaii: session.gaii, timestamp, signature }),
+        body: JSON.stringify(body),
       });
       session.jwt = data.data.token;
       // SECURITY: Only save metadata to localStorage (no private keys)
@@ -443,8 +455,6 @@ const auth = {
    * @returns {Promise<object>} Session object with .fetch(), .refresh(), .jwt, .ghii
    */
   async register(username, displayName, opts = {}) {
-    const keyPair = await generateKeyPair();
-
     // Register GHII (creates owner + human profile)
     const regData = await api('/v1/ghii', {
       method: 'POST',
@@ -464,7 +474,7 @@ const auth = {
     const serverPrivateKey = regData.data.private_key;
     const serverPublicKey = regData.data.public_key;
 
-    // Get an owner JWT first (required to register agents)
+    // Get an owner JWT (human users authenticate as owners, not agents)
     const ownerTimestamp = new Date().toISOString();
     const ownerMessage = ownerName + NODE_ID + ownerTimestamp;
     const ownerSig = await sign(serverPrivateKey, ownerMessage);
@@ -472,48 +482,22 @@ const auth = {
       method: 'POST',
       body: JSON.stringify({ owner: ownerName, timestamp: ownerTimestamp, signature: ownerSig }),
     });
-    const ownerJwt = ownerTokenData.data.token;
 
-    // Register a default agent (using owner JWT)
-    const agentData = await authApi('/v1/agents', ownerJwt, {
-      method: 'POST',
-      body: JSON.stringify({
-        name: 'app',
-        owner: ownerName,
-        display_name: displayName + '\\'s App Agent',
-        description: 'Default agent for AIMEAT apps',
-      }),
-    });
-
-    const agentGaii = agentData.data.agent.gaii;
-    const agentPrivateKey = agentData.data.private_key;
-
-    // Authenticate as agent to get agent JWT
-    const timestamp = new Date().toISOString();
-    const message = agentGaii + timestamp;
-    const signature = await sign(agentPrivateKey, message);
-
-    const tokenData = await api('/v1/auth/token', {
-      method: 'POST',
-      body: JSON.stringify({ gaii: agentGaii, timestamp, signature }),
-    });
-
-    // SECURITY: Import private keys as non-extractable CryptoKeys in IndexedDB
-    const agentCryptoKey = await importEd25519Key(agentPrivateKey);
-    await storeKey('agent_key', agentCryptoKey);
+    // SECURITY: Import owner private key as non-extractable CryptoKey in IndexedDB
     const ownerCryptoKey = await importEd25519Key(serverPrivateKey);
     await storeKey('owner_key', ownerCryptoKey);
 
+    // Owner session — agents are connected later via device auth
     const session = createSession({
-      ghii, owner: ownerName, gaii: agentGaii,
-      jwt: tokenData.data.token,
-      _cryptoKey: agentCryptoKey, publicKey: agentData.data.public_key,
+      ghii, owner: ownerName, gaii: null,
+      jwt: ownerTokenData.data.token,
+      _cryptoKey: ownerCryptoKey, publicKey: serverPublicKey,
     });
 
     // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
-      owner: ownerName, gaii: agentGaii, ghii,
-      jwt: session.jwt, publicKey: agentData.data.public_key,
+      owner: ownerName, gaii: null, ghii,
+      jwt: session.jwt, publicKey: serverPublicKey,
     });
 
     currentSession = session;
@@ -535,8 +519,14 @@ const auth = {
     // SECURITY: Run one-time migration from localStorage to IndexedDB
     await migrateKeysToIndexedDB();
 
-    // Load CryptoKey from IndexedDB
-    const cryptoKey = await loadKey('agent_key');
+    // Migrate old agent sessions to owner sessions:
+    // If stored session has gaii (old agent-based login), convert to owner session
+    if (stored.gaii) {
+      stored.gaii = null;
+    }
+
+    // Load CryptoKey from IndexedDB — owner key for owner sessions, agent key for agent sessions
+    const cryptoKey = stored.gaii ? await loadKey('agent_key') : await loadKey('owner_key');
     const session = createSession({ ...stored, _cryptoKey: cryptoKey });
 
     if (isExpired(session.jwt)) {
@@ -570,27 +560,24 @@ const auth = {
 
     const d = data.data;
 
-    // SECURITY: Import private keys as non-extractable CryptoKeys in IndexedDB
-    const agentCryptoKey = await importEd25519Key(d.agent_private_key);
-    await storeKey('agent_key', agentCryptoKey);
-    if (d.owner_private_key) {
-      const ownerCryptoKey = await importEd25519Key(d.owner_private_key);
-      await storeKey('owner_key', ownerCryptoKey);
-    }
+    // SECURITY: Import owner private key as non-extractable CryptoKey in IndexedDB
+    const ownerCryptoKey = await importEd25519Key(d.owner_private_key);
+    await storeKey('owner_key', ownerCryptoKey);
 
+    // Owner session — human users authenticate as owners, not agents
     const session = createSession({
       ghii: d.ghii.ghii,
       owner: d.owner.name,
-      gaii: d.agent.gaii,
+      gaii: null,
       jwt: d.token,
-      _cryptoKey: agentCryptoKey,
-      publicKey: '',
+      _cryptoKey: ownerCryptoKey,
+      publicKey: d.owner_public_key || '',
     });
 
     // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
-      owner: d.owner.name, gaii: d.agent.gaii, ghii: d.ghii.ghii,
-      jwt: d.token, publicKey: '',
+      owner: d.owner.name, gaii: null, ghii: d.ghii.ghii,
+      jwt: d.token, publicKey: d.owner_public_key || '',
     });
 
     currentSession = session;

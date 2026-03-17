@@ -102,7 +102,7 @@ export default function EmailTab({ session, showToast }) {
 
   const isVerified = step === 'verified' || (ghiiData?.verification_level >= 1);
 
-  return html`
+  return html`<div>
     <div class="section-title">${t('profile.email.title')}</div>
     <div class="section-desc">${t('profile.email.description')}</div>
 
@@ -151,5 +151,5 @@ export default function EmailTab({ session, showToast }) {
         <//>
       `}
     </div>
-  `;
+  </div>`;
 }

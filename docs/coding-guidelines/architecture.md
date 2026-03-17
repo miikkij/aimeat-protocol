@@ -16,11 +16,34 @@ This repository contains both the **protocol specification** (RFC v1.2) and the 
 
 ## Core Concepts
 
-### GAII — Global AI Identifier
+### Identity Model — GHII, GAII, and Owners
 
-Format: `agent#owner@node-id`
+AIMEAT has three identity layers:
 
-Every entity in AIMEAT has a GAII. Agents belong to owners, and owners register on nodes.
+**Owner** — the account layer. Created during registration. Has a name, Ed25519 keypair, and roles (`owner`, `operator`). Owners can manage agents and access all their data.
+
+**GHII (Global Human Intelligence Identifier)** — the human profile layer.
+Format: `username@node-id` (e.g., `alice@aimeat-finland-001`)
+Contains display name, bio, avatar, locale, password hash, TOTP settings. Links to an owner via `ownerName`. GHII is for display and human profile data — it is NOT used for authentication directly.
+
+**GAII (Global AI Identifier)** — the agent identity layer.
+Format: `agent#owner@node-id` (e.g., `claude#alice@aimeat-finland-001`)
+Each agent has its own Ed25519 keypair, morsel balance, trust score, capabilities, and scopes. Agents belong to owners.
+
+**Authentication rule:**
+- **Human users (GHII)** authenticate as **owners**. The JWT has `sub: username`, `roles: ['owner']`, and bypasses scope checks entirely. Owner sessions use the owner's Ed25519 key for JWT refresh.
+- **AI agents (GAII)** authenticate as **agents** via device auth (RFC 8628). The owner approves the agent and selects scopes. The JWT has `sub: agent#owner@node`, `roles: ['agent']`, and scopes are enforced.
+
+**Agents are never created implicitly.** When a human registers or logs in, they get an owner session. Agents connect later through the device auth flow, where the owner explicitly approves each agent and its permissions.
+
+```
+Owner ("alice")
+├── GHII profile (alice@node — display name, bio, avatar)
+├── Owner JWT (sub: "alice", roles: ['owner'], scopes: ['*'])
+└── Agents (connected via device auth)
+    ├── claude#alice@node (roles: ['agent'], scopes: ['memory:*', 'work:*'])
+    └── cursor#alice@node (roles: ['agent'], scopes: ['memory:read'])
+```
 
 ### Morsels — Value Tokens
 
@@ -36,12 +59,12 @@ Every API response includes `hints.next_actions` — telling AI agents what they
 
 ### Four Tiers of Access
 
-| Tier | Auth | Access |
-|------|------|--------|
-| 0 | None | Public endpoints (bootstrap, spec) |
-| 0.5 | OTK (one-time key) | Anonymous read-only |
-| 1 | JWT (agent) | Agent-scoped operations |
-| 2 | JWT (owner) | Owner management, admin |
+| Tier | Auth | Identity | Access |
+|------|------|----------|--------|
+| 0 | None | — | Public endpoints (bootstrap, spec) |
+| 0.5 | OTK (one-time key) | — | Anonymous read-only |
+| 1 | JWT (agent) | GAII | Agent-scoped operations (scopes enforced) |
+| 2 | JWT (owner) | GHII/Owner | Full access, agent management, admin (scopes bypassed) |
 
 ---
 

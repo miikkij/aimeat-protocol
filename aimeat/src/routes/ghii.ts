@@ -127,7 +127,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             createdAt: new Date().toISOString(),
         });
 
-        // Create GHII profile
+        // Create GHII profile with welcome bonus
         const now = new Date().toISOString();
         const ghiiRecord = await storage.createGHII({
             username,
@@ -141,9 +141,21 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verificationLevel: 0,
             ownerName: owner.name,
             totpEnabled: false,
+            morselBalance: config.welcomeBonus,
             createdAt: now,
             updatedAt: now,
         });
+
+        // Record welcome bonus transaction
+        if (config.welcomeBonus > 0) {
+            await storage.addTransaction({
+                id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                gaii: ghii,
+                type: 'welcome_bonus',
+                amount: config.welcomeBonus,
+                timestamp: now,
+            });
+        }
 
         // SECURITY: Prevent caching of response containing private key
         res.set('Cache-Control', 'no-store');
@@ -316,39 +328,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         const ownerKeyPair = await generateKeyPair();
         await storage.updateOwner(username, { publicKey: ownerKeyPair.publicKey });
 
-        // Find or create a default agent
-        const agents = await storage.getAgentsByOwner(username);
-        let agent = agents.find(a => a.name === 'app');
-        let agentPrivKey: string;
-
-        if (agent) {
-            // Re-key existing agent
-            const agentKeyPair = await generateKeyPair();
-            await storage.updateAgent(agent.gaii, { publicKey: agentKeyPair.publicKey });
-            agentPrivKey = agentKeyPair.privateKey;
-        } else {
-            // Create new default agent
-            const agentKeyPair = await generateKeyPair();
-            const gaii = buildGAII('app', username, config.nodeId);
-            agent = await storage.createAgent({
-                name: 'app',
-                owner: username,
-                gaii,
-                displayName: `${ghiiRecord.displayName}'s App Agent`,
-                description: 'Default agent for AIMEAT apps',
-                capabilities: [],
-                publicKey: agentKeyPair.publicKey,
-                trustScore: 50,
-                morselBalance: config.welcomeBonus,
-                createdAt: new Date().toISOString(),
-                lastSeen: new Date().toISOString(),
-            });
-            agentPrivKey = agentKeyPair.privateKey;
-        }
-
-        // Issue agent JWT
+        // Issue OWNER JWT (human users authenticate as owners, not agents)
         const ownerRecord = await storage.getOwner(username);
-        const roles = ['agent'];
+        const roles: string[] = [];
         if (ownerRecord?.roles.includes('owner')) roles.push('owner');
         if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
@@ -363,7 +345,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         }
 
         const token = await issueJWT({
-            sub: agent.gaii,
+            sub: username,
             owner: username,
             node: config.nodeId,
             roles,
@@ -379,11 +361,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 display_name: ghiiRecord.displayName,
             },
             owner: { name: username },
-            agent: { gaii: agent.gaii },
             token,
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
             owner_private_key: ownerKeyPair.privateKey,
-            agent_private_key: agentPrivKey,
             owner_public_key: ownerKeyPair.publicKey,
         }, [
             { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
@@ -447,7 +427,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             createdAt: new Date().toISOString(),
         });
 
-        // Create GHII profile with verificationLevel: 0
+        // Create GHII profile with verificationLevel: 0 and welcome bonus
         const now = new Date().toISOString();
         const ghii = `${username}@${config.nodeId}`;
         const ghiiRecord = await storage.createGHII({
@@ -462,10 +442,22 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             emailHash,
             magicLinkEnabled: !!emailHash,
             notificationEmail: (typeof email === 'string' && email.length > 0) ? email.toLowerCase().trim() : undefined,
+            morselBalance: config.welcomeBonus,
             loginCount: 0,
             createdAt: now,
             updatedAt: now,
         });
+
+        // Record welcome bonus transaction
+        if (config.welcomeBonus > 0) {
+            await storage.addTransaction({
+                id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                gaii: ghii,
+                type: 'welcome_bonus',
+                amount: config.welcomeBonus,
+                timestamp: now,
+            });
+        }
 
         // Store interest profile in memory if interests provided
         if (Array.isArray(interests) && interests.length > 0) {
