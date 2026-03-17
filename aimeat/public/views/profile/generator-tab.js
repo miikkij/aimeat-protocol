@@ -283,7 +283,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
     return html`
       <div class="pf-gen-new-project">
-        <button class="btn btn-outline btn-sm" onClick=${() => setPhase('describe')}>
+        <button class="btn-outline" onClick=${() => setPhase('describe')}>
           ${t('profile.generator.back')}
         </button>
         <div class="section-title section-title-spaced">${t('profile.generator.interviewTitle')}</div>
@@ -293,7 +293,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
         <div class="pf-gen-section">
           <label>${t('profile.generator.interviewPrompt')}</label>
-          <button class="btn btn-sm btn-outline" onClick=${handleCopyInterviewPrompt}>
+          <button class="btn-primary" onClick=${handleCopyInterviewPrompt}>
             ${t('profile.generator.copyPrompt')}
           </button>
         </div>
@@ -317,10 +317,10 @@ function NewProjectView({ onBack, onCreated, showToast }) {
         `}
 
         <div class="pf-gen-actions">
-          <button class="btn btn-primary" onClick=${handleSubmitSpec} disabled=${!interviewSpec.trim()}>
+          <button class="btn-primary" onClick=${handleSubmitSpec} disabled=${!interviewSpec.trim()}>
             ${t('profile.generator.importSpec')}
           </button>
-          <button class="btn btn-ghost" onClick=${handleSkipInterview}>
+          <button class="btn-outline" onClick=${handleSkipInterview}>
             ${t('profile.generator.skipInterview')}
           </button>
         </div>
@@ -334,12 +334,12 @@ function NewProjectView({ onBack, onCreated, showToast }) {
       : null;
     return html`
       <div class="pf-gen-new-project">
-        <button class="btn btn-outline btn-sm" onClick=${() => setPhase('describe')}>${t('profile.generator.back')}</button>
+        <button class="btn-outline" onClick=${() => setPhase('describe')}>${t('profile.generator.back')}</button>
         <div class="section-title section-title-spaced">${t('profile.generator.blueprintTitle')}</div>
         <div class="section-desc">${t('profile.generator.blueprintDesc')}</div>
         <div class="pf-gen-section">
           <label>${t('profile.generator.prompt')}</label>
-          <button class="btn btn-sm btn-outline" onClick=${handleCopyBlueprintPrompt}>
+          <button class="btn-primary" onClick=${handleCopyBlueprintPrompt}>
             ${t('profile.generator.copyPrompt')}
           </button>
         </div>
@@ -358,14 +358,14 @@ function NewProjectView({ onBack, onCreated, showToast }) {
             <label>${t('profile.generator.errors')}</label>
             <ul>${blueprintErrors.map(e => html`<li>${e}</li>`)}</ul>
             ${fixPrompt && html`
-              <button class="btn btn-sm btn-outline" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
+              <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
                 ${t('profile.generator.copyFixPrompt')}
               </button>
             `}
           </div>
         `}
         <div class="pf-gen-actions">
-          <button class="btn btn-primary" onClick=${handleSubmitBlueprint} disabled=${!blueprintResult.trim()}>
+          <button class="btn-primary" onClick=${handleSubmitBlueprint} disabled=${!blueprintResult.trim()}>
             ${t('profile.generator.importBlueprint')}
           </button>
         </div>
@@ -375,7 +375,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
   return html`
     <div class="pf-gen-new-project">
-      <button class="btn btn-outline btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
+      <button class="btn-outline" onClick=${onBack}>${t('profile.generator.back')}</button>
       <div class="section-title section-title-spaced">${t('profile.generator.newProjectTitle')}</div>
       <div class="section-desc">${t('profile.generator.newProjectDesc')}</div>
       <textarea
@@ -386,7 +386,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
         onInput=${e => setDescription(e.target.value)}
       />
       <div class="pf-gen-actions">
-        <button class="btn btn-primary" onClick=${handleAnalyze} disabled=${!description.trim()}>
+        <button class="btn-primary" onClick=${handleAnalyze} disabled=${!description.trim()}>
           ${t('profile.generator.analyze')}
         </button>
       </div>
@@ -689,7 +689,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     <div class="pf-gen-dashboard">
       <${ConfirmUI} />
       <div class="pf-gen-dash-header">
-        <button class="btn btn-outline btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
+        <button class="btn-outline" onClick=${onBack}>${t('profile.generator.back')}</button>
         ${editingName
           ? html`<input class="pf-gen-name-input" value=${nameDraft}
               onInput=${e => setNameDraft(e.target.value)}
@@ -1359,7 +1359,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           ${fixPrompt && html`
             <div class="flex-row">
               ${workflowStep === 'fix' && html`<${StepArrow} />`}
-              <button class="btn btn-sm btn-outline" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
+              <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
                 ${t('profile.generator.copyFixPrompt')}
               </button>
             </div>
