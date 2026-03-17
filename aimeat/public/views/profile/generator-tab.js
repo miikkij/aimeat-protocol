@@ -23,6 +23,7 @@
  *   v4.0.0 — 2026-03-17 — Add packaging bridge: "Package as Template" / "Update Package"
  *     buttons, packaging dialog with category/tags/visibility, change detection diff,
  *     fork attribution display, package link display in project header
+ *   v4.1.0 — 2026-03-17 — Style unification: replace all inline styles with CSS classes, remove sidebar dots
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -704,12 +705,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         </button>
       </div>
       ${project.forkedFrom && html`
-        <p class="pf-gen-forked-from" style="margin:0 0 8px;font-size:0.85em;color:var(--text-muted,#888)">
+        <p class="pf-gen-forked-from text-caption mb-half">
           ${t('profile.generator.forkedFrom').replace('{name}', project.forkedFrom.packageGroupId).replace('{author}', project.forkedFrom.author)}
         </p>
       `}
       ${project.packageGroupId && html`
-        <p class="pf-gen-package-link" style="margin:0 0 8px;font-size:0.85em;color:var(--text-muted,#888)">
+        <p class="pf-gen-package-link text-caption mb-half">
           Package: ${project.packageGroupId}${project.lastPackagedVersion ? ' — ' + project.lastPackagedVersion : ''}
         </p>
       `}
@@ -723,7 +724,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <span>${activeCount} ${t('profile.generator.activeLabel')}</span>
           </div>
           <div class="pf-gen-lifecycle-actions">
-            <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#fff"
+            <button class="btn btn-sm btn-success"
               onClick=${handleActivateAll}
               disabled=${lifecycleLoading !== null || registeredCount === 0}>
               ${lifecycleLoading === 'activate' ? '...' : t('profile.generator.activateAll')}
@@ -752,7 +753,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               ${showRemovePanel ? t('profile.generator.cancelRemove') : t('profile.generator.removeEllipsis')}
             </button>
             ${doneCount > 0 && html`
-              <button class="btn btn-sm" style="background:var(--primary,#3b82f6);color:#fff"
+              <button class="btn btn-sm btn-info"
                 onClick=${handleOpenPackageDialog}
                 disabled=${packageLoading}>
                 ${project.packageGroupId
@@ -771,7 +772,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             ? t('profile.generator.updatePackage')
             : t('profile.generator.packageProject')}</h4>
           ${project.forkedFrom && html`
-            <p style="font-size:0.85em;color:var(--text-muted,#888);margin:0 0 8px">
+            <p class="text-caption mb-half">
               ${t('profile.generator.forkedFrom').replace('{name}', project.forkedFrom.packageGroupId).replace('{author}', project.forkedFrom.author)}
             </p>
           `}
@@ -801,22 +802,22 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <div class="pf-gen-changes-summary">
               <strong>${t('profile.generator.changesSummary')}</strong>
               ${packageChanges ? html`
-                <ul style="margin:4px 0;padding-left:18px">
+                <ul class="pf-gen-changes-list">
                   ${packageChanges.filter(c => c.action === 'added').map(c => html`
-                    <li style="color:var(--success,#22c55e)">${t('profile.generator.changeAdded')}: ${c.label}</li>
+                    <li class="pf-gen-change-added">${t('profile.generator.changeAdded')}: ${c.label}</li>
                   `)}
                   ${packageChanges.filter(c => c.action === 'modified').map(c => html`
-                    <li style="color:var(--warning,#f59e0b)">${t('profile.generator.changeModified')}: ${c.label}</li>
+                    <li class="pf-gen-change-modified">${t('profile.generator.changeModified')}: ${c.label}</li>
                   `)}
                   ${packageChanges.filter(c => c.action === 'removed').map(c => html`
-                    <li style="color:var(--error,#ef4444)">${t('profile.generator.changeRemoved')}: ${c.label}</li>
+                    <li class="pf-gen-change-removed">${t('profile.generator.changeRemoved')}: ${c.label}</li>
                   `)}
                   ${packageChanges.filter(c => c.action === 'unchanged').map(c => html`
-                    <li style="color:var(--text-muted,#888)">${t('profile.generator.changeUnchanged')}: ${c.label}</li>
+                    <li class="pf-gen-change-unchanged">${t('profile.generator.changeUnchanged')}: ${c.label}</li>
                   `)}
                 </ul>
-              ` : html`<span style="color:var(--text-muted,#888)">...</span>`}
-              <label class="pf-gen-pkg-label" style="margin-top:8px">${t('profile.generator.changelogNote')}
+              ` : html`<span class="text-caption">...</span>`}
+              <label class="pf-gen-pkg-label">${t('profile.generator.changelogNote')}
                 <input type="text" value=${changelogNote}
                   onChange=${e => setChangelogNote(e.target.value)}
                   placeholder=${t('profile.generator.changelogPlaceholder')} />
@@ -824,7 +825,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             </div>
           `}
 
-          <div style="display:flex;gap:8px;margin-top:12px">
+          <div class="flex-actions">
             <button class="btn btn-sm btn-outline" onClick=${() => setShowPackageDialog(false)}>
               ${t('profile.generator.cancelRemove')}
             </button>
@@ -840,7 +841,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       <!-- Phase 5: Remove Panel -->
       ${showRemovePanel && html`
         <div class="pf-gen-remove-panel">
-          <p style="margin:0 0 8px;font-weight:600">${t('profile.generator.removeSelectLabel')}</p>
+          <p class="pf-gen-remove-heading">${t('profile.generator.removeSelectLabel')}</p>
           <div class="pf-gen-remove-list">
             ${components.filter(c => c.registeredAs).map(c => html`
               <label class="pf-gen-remove-item">
@@ -854,12 +855,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               </label>
             `)}
           </div>
-          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-            <label style="display:flex;align-items:center;gap:4px;font-size:0.85em">
+          <div class="flex-row">
+            <label class="pf-gen-checkbox-label">
               <input type="checkbox" checked=${removeMemory} onChange=${e => setRemoveMemory(e.target.checked)} />
               ${t('profile.generator.deleteExtensionMemory')}
             </label>
-            <button class="btn btn-sm" style="background:var(--error,#ef4444);color:#fff"
+            <button class="btn btn-sm btn-danger-solid"
               onClick=${handleRemoveConfirmed}
               disabled=${lifecycleLoading === 'remove' || Object.values(removeSelection).filter(Boolean).length === 0}>
               ${lifecycleLoading === 'remove' ? t('profile.generator.removingLabel') : t('profile.generator.removeSelected').replace('{count}', Object.values(removeSelection).filter(Boolean).length)}
@@ -878,7 +879,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             value=${changeRequest}
             onInput=${e => setChangeRequest(e.target.value)}
           />
-          <div class="pf-gen-actions" style="margin-top:8px">
+          <div class="pf-gen-actions">
             <button class="btn btn-primary btn-sm" onClick=${handleCopyImpactPrompt} disabled=${!changeRequest.trim()}>
               ${t('profile.generator.copyImpactPrompt')}
             </button>
@@ -900,11 +901,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               <ul>${impactErrors.map(e => html`<li>${e}</li>`)}</ul>
             </div>
           `}
-          <div class="pf-gen-actions" style="margin-top:8px">
+          <div class="pf-gen-actions">
             <button class="btn btn-primary btn-sm" onClick=${handleParseImpact} disabled=${!impactResult.trim()}>
               ${t('profile.generator.analyzeImpact')}
             </button>
-            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('request')}>Back</button>
+            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('request')}>${t('profile.generator.back')}</button>
           </div>
         </div>
       `}
@@ -925,7 +926,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                   </div>
                   <div class="pf-gen-impact-reason">${a.reason}</div>
                   ${(a.impact === 'root' || a.impact === 'update') && comp && html`
-                    <button class="btn btn-sm btn-outline" style="margin-top:4px"
+                    <button class="btn btn-sm btn-outline mt-xs"
                       onClick=${() => handleCopyEditPrompt(comp, a.suggestedChange)}>
                       ${t('profile.generator.copyEditPrompt')}
                     </button>
@@ -934,7 +935,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               `;
             })}
           </div>
-          <div class="pf-gen-actions" style="margin-top:8px">
+          <div class="pf-gen-actions">
             <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
             <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
           </div>
@@ -991,11 +992,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                     onClick=${() => setSelectedId(cid)}
                   >
                     <span class="pf-gen-comp-name">${comp.label}</span>
-                    ${live && html`
-                      <span class="pf-gen-live-dot ${live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing'}"
-                        title=${live.status}></span>
-                    `}
-                    <span class="pf-gen-type-badge type-${comp.type}">${comp.type.toUpperCase()}</span>
+                    <span class="pf-gen-type-badge type-${comp.type} ${live ? (live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing') : ''}"
+                      title=${live?.status || ''}>${comp.type.toUpperCase()}</span>
                   </div>
                 `;
               })}
@@ -1289,7 +1287,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         <div class="pf-gen-section">
           <label>${t('profile.generator.prompt')}</label>
           <pre class="pf-gen-prompt-box">${prompt}</pre>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <div class="flex-row-wrap">
             ${workflowStep === 'copy' && html`<${StepArrow} />`}
             <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}
               title=${t('profile.generator.copyPromptHint')}>
@@ -1301,8 +1299,8 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           </div>
         </div>
         <div class="pf-gen-section">
-          <div style="display:flex;align-items:center;gap:6px">
-            <label style="margin:0">${t('profile.generator.result')}</label>
+          <div class="flex-row">
+            <label>${t('profile.generator.result')}</label>
             ${workflowStep === 'paste' && html`<${StepArrow} direction="down" />`}
           </div>
           ${component.type === 'extension' && html`
@@ -1318,7 +1316,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
             value=${result}
             onInput=${e => setResult(e.target.value)}
           />
-          <div class="pf-gen-actions" style="align-items:center">
+          <div class="pf-gen-actions">
             ${workflowStep === 'validate' && html`<${StepArrow} />`}
             <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
               title=${t('profile.generator.validateHint')}>
@@ -1326,7 +1324,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
             </button>
             ${validationResult?.valid && html`
               ${workflowStep === 'register' && html`<${StepArrow} />`}
-              <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#fff" onClick=${handleRegister} disabled=${registering}
+              <button class="btn btn-sm btn-success" onClick=${handleRegister} disabled=${registering}
                 title=${t('profile.generator.registerHint')}>
                 ${registering ? '...' : t('profile.generator.register')}
               </button>
@@ -1359,7 +1357,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
             ${validationResult.errors.map(e => html`<li>${e}</li>`)}
           </ul>
           ${fixPrompt && html`
-            <div style="display:flex;align-items:center;gap:6px">
+            <div class="flex-row">
               ${workflowStep === 'fix' && html`<${StepArrow} />`}
               <button class="btn btn-sm btn-outline" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
                 ${t('profile.generator.copyFixPrompt')}
