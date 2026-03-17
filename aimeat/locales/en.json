@@ -243,6 +243,7 @@
       "connectDesc": "If you have OpenClaw or any other AI automation agent, give it this prompt to register an agent under your account:",
       "copyPrompt": "Copy Prompt",
       "copied": "Copied!",
+      "copyGaii": "Copy GAII",
       "noAgent": "Don’t have an automation agent yet?",
       "seeHow": "See how to get one",
       "empty": "No agents registered yet.",
@@ -488,7 +489,12 @@
       "selectRating": "Please select a rating",
       "provider": "Provider",
       "from": "From",
-      "cost": "Cost"
+      "cost": "Cost",
+      "deliver": "Deliver",
+      "delivering": "Delivering...",
+      "accepted": "Work accepted",
+      "declined": "Work declined",
+      "delivered": "Work delivered"
     },
     "services": {
       "title": "Services",
@@ -516,7 +522,13 @@
       "catalogueError": "Could not load catalogue.",
       "allCategories": "All Categories",
       "free": "Free",
-      "price": "Price"
+      "price": "Price",
+      "provider": "Provider",
+      "estTime": "Est. time",
+      "unitPerCall": "Per call",
+      "unitPerMinute": "Per minute",
+      "unitPerToken": "Per token",
+      "unitPerTask": "Per task"
     },
     "boards": {
       "title": "Boards",
@@ -1074,6 +1086,19 @@
         "errors": "Errors",
         "done": "Done"
       }
+    },
+    "visibility": {
+      "public": "Public",
+      "private": "Private",
+      "protected": "Protected"
+    },
+    "knowledge": {
+      "parseError": "Could not parse the pasted content as JSON",
+      "notKnowledgePackage": "This doesn't look like an AIMEAT knowledge package",
+      "copyFailed": "Failed to copy prompt",
+      "cloned": "Package cloned successfully!",
+      "cloneFailed": "Clone failed",
+      "referencesPackageLevel": "References (package-level)"
     }
   },
   "dev": {

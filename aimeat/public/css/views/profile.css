@@ -739,3 +739,120 @@
   .pf-gen-lifecycle-toolbar { flex-direction: column; gap: 8px; }
   .pf-gen-lifecycle-actions { justify-content: center; }
 }
+
+/* ══ Shared Profile Utilities (2026-03-17) ══════════════ */
+
+/* ── Layout Utilities ── */
+.pf .flex-row         { display: flex; gap: .5rem; align-items: center; }
+.pf .flex-row-wrap    { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.pf .flex-between     { display: flex; justify-content: space-between; align-items: center; }
+.pf .flex-col         { display: flex; flex-direction: column; gap: .5rem; }
+.pf .flex-actions     { display: flex; gap: 8px; margin-top: 12px; }
+.pf .scroll-x         { overflow-x: auto; }
+
+/* ── Text Utilities ── */
+.pf .text-meta        { font-size: .8rem; color: var(--text-dim, #6B7280); }
+.pf .text-meta-sm     { font-size: .75rem; color: var(--text-dim, #6B7280); }
+.pf .text-caption     { font-size: .85rem; color: var(--text-dim, #6B7280); }
+.pf .text-code        { font-family: var(--font-mono, monospace); font-size: .8rem; }
+.pf .text-accent      { color: var(--accent, #E8564A); }
+.pf .text-readable    { line-height: 1.6; }
+
+/* ── Spacing Utilities ── */
+.pf .mt-section       { margin-top: 1.5rem; }
+.pf .mt-xs            { margin-top: 4px; }
+.pf .mb-1             { margin-bottom: 1rem; }
+.pf .mb-half          { margin-bottom: .5rem; }
+.pf .p-1              { padding: 1rem; }
+
+/* ── Section header with top spacing ── */
+.pf .section-title.section-title-spaced { margin-top: 1.5rem; }
+
+/* ── Card sub-heading (replaces inline h3 accent styles) ── */
+.pf .card-h3 {
+  color: var(--accent, #E8564A);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: .5rem;
+}
+
+/* ── Input size modifier ── */
+.input-field.input-sm { padding: .4rem .6rem; font-size: .85rem; }
+
+/* ── Recipient/Type Badge Labels ── */
+.pf .badge-label {
+  display: inline-block;
+  font-size: .7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.pf .badge-wildcard    { background: var(--danger, #ef4444); }
+.pf .badge-ghii        { background: #8b5cf6; }
+.pf .badge-organism    { background: var(--success, #22c55e); }
+.pf .badge-domain      { background: #f97316; }
+.pf .badge-node        { background: #6b7280; }
+.pf .badge-gaii        { background: #3b82f6; }
+
+/* ── Visibility Pill (shared: memory-tab, knowledge-tab) ── */
+.pf .vis-pill {
+  border: none; cursor: pointer; padding: 2px 8px;
+  border-radius: 9999px; font-size: .7rem; font-weight: 600;
+  transition: opacity 0.15s;
+}
+.pf .vis-pill:hover { opacity: 0.8; }
+.pf .vis-public    { background: rgba(74, 222, 128, .15); color: #4ade80; }
+.pf .vis-private   { background: rgba(192, 132, 252, .15); color: #c084fc; }
+.pf .vis-protected { background: rgba(96, 165, 250, .15); color: #60a5fa; }
+
+/* ── Toggle Switch (shared: notifications-tab, email-tab) ── */
+.pf-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.pf-toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pf-toggle-slider {
+  position: relative; display: inline-block; width: 44px; height: 24px;
+  background: #D1D5DB; border-radius: 12px; transition: background 0.2s;
+}
+.pf-toggle-slider::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.pf-toggle-input:checked + .pf-toggle-slider { background: var(--success, #22c55e); }
+.pf-toggle-input:checked + .pf-toggle-slider::after { transform: translateX(20px); }
+.pf-toggle-label { font-size: .85rem; color: var(--text, #1A1A2E); }
+
+/* ── Glass Card (shared: email-tab, notifications-tab) ── */
+.pf-glass-card {
+  padding: 16px; border-radius: 8px;
+  background: var(--surface, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  margin-bottom: 1rem;
+}
+
+/* ── Generator: live status on type badge (replaces dots) ── */
+.pf-gen-type-badge.live-active    { border-right: 3px solid var(--success, #22c55e); padding-right: 6px; }
+.pf-gen-type-badge.live-installed { border-right: 3px solid var(--warn, #f59e0b); padding-right: 6px; }
+.pf-gen-type-badge.live-missing   { border-right: 3px solid var(--danger, #ef4444); padding-right: 6px; }
+
+/* ── Generator: package changes diff colors ── */
+.pf-gen-change-added     { color: var(--success, #22c55e); }
+.pf-gen-change-modified  { color: var(--warn, #f59e0b); }
+.pf-gen-change-removed   { color: var(--danger, #ef4444); }
+.pf-gen-change-unchanged { color: var(--text-muted, #9CA3AF); }
+.pf-gen-changes-list     { margin: 4px 0; padding-left: 18px; }
+
+/* ── Generator: remove panel helpers ── */
+.pf-gen-remove-heading   { margin: 0 0 8px; font-weight: 600; }
+.pf-gen-checkbox-label   { display: flex; align-items: center; gap: 4px; font-size: .85em; }
+
+/* ── Input for verification codes (email-tab) ── */
+.pf .input-verification-code {
+  font-size: 1.5rem; letter-spacing: 6px; text-align: center;
+  padding: .75rem 1rem;
+}
+
+/* ── Data wallet tab-specific ── */
+.pf .dw-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .75rem; }
+.pf .dw-expiring { background: rgba(245, 158, 11, .08); }

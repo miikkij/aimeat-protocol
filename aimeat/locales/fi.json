@@ -243,6 +243,7 @@
       "connectDesc": "Jos sinulla on OpenClaw tai muu AI-automaatioagentti, anna sille tämä kehote rekisteröidäksesi agentin tilillesi:",
       "copyPrompt": "Kopioi kehote",
       "copied": "Kopioitu!",
+      "copyGaii": "Kopioi GAII",
       "noAgent": "Eikö sinulla vielä ole automaatioagenttia?",
       "seeHow": "Katso miten saat sellaisen",
       "empty": "Ei rekisteröityjä agentteja.",
@@ -488,7 +489,12 @@
       "selectRating": "Valitse arvio",
       "provider": "Tuottaja",
       "from": "Lähettäjä",
-      "cost": "Hinta"
+      "cost": "Hinta",
+      "deliver": "Toimita",
+      "delivering": "Toimitetaan...",
+      "accepted": "Työ hyväksytty",
+      "declined": "Työ hylätty",
+      "delivered": "Työ toimitettu"
     },
     "services": {
       "title": "Palvelut",
@@ -516,7 +522,13 @@
       "catalogueError": "Hakemiston lataus epäonnistui.",
       "allCategories": "Kaikki kategoriat",
       "free": "Ilmainen",
-      "price": "Hinta"
+      "price": "Hinta",
+      "provider": "Tarjoaja",
+      "estTime": "Arvioitu aika",
+      "unitPerCall": "Per kutsu",
+      "unitPerMinute": "Per minuutti",
+      "unitPerToken": "Per tokeni",
+      "unitPerTask": "Per tehtävä"
     },
     "boards": {
       "title": "Taulut",
@@ -1074,6 +1086,19 @@
         "errors": "Virheitä",
         "done": "Valmis"
       }
+    },
+    "visibility": {
+      "public": "Julkinen",
+      "private": "Yksityinen",
+      "protected": "Suojattu"
+    },
+    "knowledge": {
+      "parseError": "Liitettyä sisältöä ei voitu jäsentää JSON-muodossa",
+      "notKnowledgePackage": "Tämä ei näytä AIMEAT-tietopaketilta",
+      "copyFailed": "Kehotteen kopiointi epäonnistui",
+      "cloned": "Paketti kloonattu onnistuneesti!",
+      "cloneFailed": "Kloonaus epäonnistui",
+      "referencesPackageLevel": "Viitteet (pakettitaso)"
     }
   },
   "dev": {
