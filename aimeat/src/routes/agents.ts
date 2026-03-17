@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname_agents = dirname(fileURLToPath(import.meta.url));
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
@@ -627,8 +630,8 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/agents/verify — device authorization consent page (must be BEFORE :gaii catch-all)
   router.get('/v1/agents/verify', (_req, res) => {
     const candidates = [
-      join(__dirname, '..', '..', 'public', 'agent-consent.html'),      // dev: src/routes/../../public
-      join(__dirname, '..', '..', '..', 'public', 'agent-consent.html'), // dist: dist/src/routes/../../../public
+      join(__dirname_agents, '..', '..', 'public', 'agent-consent.html'),      // dev: src/routes/../../public
+      join(__dirname_agents, '..', '..', '..', 'public', 'agent-consent.html'), // dist: dist/src/routes/../../../public
     ];
     const htmlPath = candidates.find(p => existsSync(p));
     if (htmlPath) {
