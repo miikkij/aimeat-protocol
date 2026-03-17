@@ -168,7 +168,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                     <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.gaii || s.name); showToast('GAII copied'); }}>
                       Copy GAII
                     </button>
-                    <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}
+                    <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}
                       disabled=${deleting === s.name}>
                       ${deleting === s.name ? '...' : t('profile.chatSessions.remove')}
                     </button>

@@ -305,12 +305,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 </button>
               ` : null}
               ${isMine && !isCreator ? html`
-                <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleLeave(org.id, org.name); }}>
+                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleLeave(org.id, org.name); }}>
                   ${t('organisms.leave') || 'Leave'}
                 </button>
               ` : null}
               ${isCreator ? html`
-                <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleDelete(org.id, org.name); }}>
+                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(org.id, org.name); }}>
                   ${t('organisms.delete') || 'Delete'}
                 </button>
               ` : null}

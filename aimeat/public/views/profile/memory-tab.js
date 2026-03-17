@@ -202,7 +202,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <div class="search-bar">
           <input type="text" ref=${searchRef} class="input-field" placeholder=${t('profile.memory.search')} onKeyDown=${e => e.key === 'Enter' && handleSearch(e.target.value)} />
           <button class="btn-sm" onClick=${() => handleSearch(searchRef.current?.value)}>${t('profile.memory.searchBtn')}</button>
-          <button class="btn-sm btn-outline" onClick=${() => { if (searchRef.current) searchRef.current.value = ''; loadMemories(); }}>${t('profile.memory.clearBtn')}</button>
+          <button class="btn-outline btn-sm" onClick=${() => { if (searchRef.current) searchRef.current.value = ''; loadMemories(); }}>${t('profile.memory.clearBtn')}</button>
         </div>
         <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
       </div>
@@ -229,7 +229,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
               <div class="mem-detail">
                 <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
                 <div class="mb-half">
-                  <button class="btn-sm btn-outline pf-btn-xs" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
+                  <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
                     ${t('tags.editTags') || 'Edit tags'}
                   </button>
                 </div>
@@ -243,7 +243,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                   <div class="key-rules-box">
                     <div class="flex-between mb-half">
                       <strong class="text-caption">\u{1F6E1}\uFE0F ${t('permissions.sharingRules')}</strong>
-                      <button class="btn-sm btn-outline" onClick=${() => setKeyRulesPopover(null)}>\u2715</button>
+                      <button class="btn-outline btn-sm" onClick=${() => setKeyRulesPopover(null)}>\u2715</button>
                     </div>
                     <div class="text-meta-sm mb-half">Visibility: ${keyRulesPopover.visibility}</div>
                     ${keyRulesPopover.rules.length === 0
@@ -300,7 +300,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     return html`
       <div class="action-bar">
         <button class="btn-primary" onClick=${() => setShowFileForm(!showFileForm)}>${t('profile.files.uploadBtn')}</button>
-        ${filtered.length > 0 && html`<button class="btn-sm btn-outline" onClick=${copyFileUrls} title="Copy file URLs">\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})</button>`}
+        ${filtered.length > 0 && html`<button class="btn-outline btn-sm" onClick=${copyFileUrls} title="Copy file URLs">\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})</button>`}
         <span class="text-meta-sm">${t('profile.files.sizeLimit')}</span>
       </div>
       <${TagCloud} tags=${[...allTags]} selected=${fileTagFilter} onToggle=${toggleTag} onClear=${() => setFileTagFilter(new Set())} />
@@ -320,7 +320,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                       ? html`<${TagEditor} tags=${f.tags || []} onSave=${(tags) => handleUpdateFileTags(f.key || f.name, tags)} />`
                       : html`
                         ${f.tags?.length > 0 && html`<div class="file-tags">${f.tags.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}</div>`}
-                        <button class="btn-sm btn-outline pf-btn-xs mt-xs" onClick=${() => setEditingFileTags(f.key || f.name)}>
+                        <button class="btn-outline btn-sm mt-xs" onClick=${() => setEditingFileTags(f.key || f.name)}>
                           ${t('tags.editTags') || 'Edit tags'}
                         </button>
                       `}
@@ -474,7 +474,7 @@ function FileUploadForm({ onUpload, onCancel }) {
                 onInput=${e => updateKey(idx, e.target.value)}
                 onClick=${e => e.stopPropagation()} />
               <span class="text-meta pf-nowrap pf-shrink-0">${Math.round(item.file.size / 1024)} KB</span>
-              <button class="btn-sm btn-outline pf-shrink-0" onClick=${() => removeFile(idx)}>\u2715</button>
+              <button class="btn-outline btn-sm pf-shrink-0" onClick=${() => removeFile(idx)}>\u2715</button>
             </div>
           `)}
         </div>

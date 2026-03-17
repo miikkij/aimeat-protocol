@@ -124,7 +124,7 @@ export default function McpTab({ session, showToast, onStats }) {
                     </div>
                   </div>
                   <div class="card-actions flex-actions">
-                    <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleDelete(ci); }}
+                    <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(ci); }}
                       disabled=${deleting === ci.id}>
                       ${deleting === ci.id ? '...' : t('profile.mcp.remove')}
                     </button>

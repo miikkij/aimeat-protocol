@@ -130,10 +130,10 @@ export default function WorkTab({ session, showToast, onStats }) {
 
           ${type === 'inbox' && isPending && html`
             <div class="card-actions flex-row">
-              <button class="btn-sm btn-primary" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
+              <button class="btn-primary btn-sm" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
                 ${isLoading ? '...' : t('profile.work.accepted')}
               </button>
-              <button class="btn-sm btn-outline" disabled=${isLoading} onClick=${() => handleReject(tc)}>
+              <button class="btn-outline btn-sm" disabled=${isLoading} onClick=${() => handleReject(tc)}>
                 ${isLoading ? '...' : t('profile.work.declined')}
               </button>
             </div>
@@ -141,7 +141,7 @@ export default function WorkTab({ session, showToast, onStats }) {
 
           ${type === 'inbox' && isActive && html`
             <div class="card-actions flex-row">
-              <button class="btn-sm btn-primary" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
+              <button class="btn-primary btn-sm" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
                 ${t('profile.work.deliver')}
               </button>
             </div>

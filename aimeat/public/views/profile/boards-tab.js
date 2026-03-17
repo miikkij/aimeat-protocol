@@ -131,7 +131,7 @@ export default function BoardsTab({ session, showToast }) {
             <div class="post-meta">
               <span>${escHtml(p.author_gaii || p.author || '-')}</span>
               <span>${p.created_at ? timeAgo(p.created_at) : ''}</span>
-              ${isMyPost(p) ? html`<button class="btn-sm btn-danger pf-btn-xs pf-ml-auto" onClick=${(e) => { e.stopPropagation(); handleDeletePost(boardView.id, p.id || p.post_id); }}>${t('profile.boards.deletePost') || 'Delete'}</button>` : null}
+              ${isMyPost(p) ? html`<button class="btn-danger-solid btn-sm pf-ml-auto" onClick=${(e) => { e.stopPropagation(); handleDeletePost(boardView.id, p.id || p.post_id); }}>${t('profile.boards.deletePost') || 'Delete'}</button>` : null}
             </div>
             <div class="post-reactions">
               ${['\u{1F44D}','\u2764\uFE0F','\u{1F525}','\u{1F4A1}','\u{1F602}'].map(emoji => html`
@@ -162,7 +162,7 @@ export default function BoardsTab({ session, showToast }) {
               <div class="card-title">${escHtml(b.name)}</div>
               <div class="flex-row">
                 <span class="badge ${b.visibility === 'public' ? 'badge-success' : 'badge-muted'}">${b.visibility || 'private'}</span>
-                <button class="btn-sm btn-danger pf-btn-xs" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard') || 'Delete'}</button>
+                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard') || 'Delete'}</button>
               </div>
             </div>
             <div class="card-subtitle">${escHtml(b.description || '')}</div>

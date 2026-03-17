@@ -131,7 +131,7 @@ export default function AppsTab({ session, showToast, onStats }) {
           </div>
           <div class="flex-row-wrap mb-half">
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
-            <button class="btn-sm btn-danger" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
+            <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
           ${editingApp === a.filename ? html`
             <div class="pf-edit-panel">
@@ -139,7 +139,7 @@ export default function AppsTab({ session, showToast, onStats }) {
               <div class="flex-row">
                 <input class="input-field pf-flex-fill" placeholder=${t('profile.apps.accessCodePlaceholder') || 'Leave empty to remove protection'} value=${editCode} onInput=${e => setEditCode(e.target.value)} />
                 <button class="btn-primary btn-sm" onClick=${() => handleSaveAccessCode(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
-                <button class="btn-sm btn-outline" onClick=${cancelEdit}>${t('profile.cancel') || 'Cancel'}</button>
+                <button class="btn-outline btn-sm" onClick=${cancelEdit}>${t('profile.cancel') || 'Cancel'}</button>
               </div>
               ${editCode.trim() === '' ? html`<div class="text-meta-sm mt-xs">${t('profile.apps.removeProtectionHint') || 'Save empty to remove access code protection'}</div>` : ''}
             </div>
