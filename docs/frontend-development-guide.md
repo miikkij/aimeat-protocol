@@ -405,14 +405,37 @@ html`<div class="create-form">
 <p style="font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem">
 
 // ❌ Inline button colors — should use .btn-success
-<button class="btn btn-sm" style="background:var(--success,#22c55e);color:#fff">
+<button style="background:var(--success,#22c55e);color:#fff">
+
+// ❌ "btn" prefix class — design guide classes are self-contained
+<button class="btn btn-primary">     // ❌ WRONG
+<button class="btn-primary">          // ✅ CORRECT
 
 // ❌ Hardcoded color — should use var(--accent)
 <h3 style="color:#E8564A">
 
 // ❌ Hardcoded English — should use t()
 <button>Back</button>
+
+// ❌ Dark-theme rgba values in CSS — use CSS variables
+background: rgba(255,255,255,0.06);  // ❌ WRONG
+background: var(--card, #FFFFFF);     // ✅ CORRECT
+border: 1px solid rgba(255,255,255,0.1);  // ❌ WRONG
+border: 1px solid var(--border, #E5E7EB); // ✅ CORRECT
 ```
+
+### Banned Patterns (grep-checkable)
+
+These patterns MUST NOT appear in any `public/` JS or CSS file:
+
+| Pattern | Why | Fix |
+|---------|-----|-----|
+| `class="btn btn-` | "btn" base class doesn't exist | Use `class="btn-primary"` etc. directly |
+| `class="revoke-btn"` | Non-standard class | Use `class="btn-danger-solid btn-sm"` |
+| `style="` in `.js` files | Inline styles banned | Move to CSS file |
+| `rgba(255,255,255` in CSS | Dark-theme only | Use `var(--card)`, `var(--border)`, `var(--bg-dim)` |
+| Raw `<h3>` for section titles | Inconsistent styling | Use `<div class="section-title">` |
+| Hardcoded colors in JS | Theme-unaware | Use CSS variables via classes |
 
 ---
 
