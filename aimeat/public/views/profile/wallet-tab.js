@@ -162,7 +162,7 @@ export default function WalletTab({ session, showToast, onStats }) {
 
     <!-- Copy balance button -->
     <div class="mb-1">
-      <button class="wallet-balance-copy" onClick=${handleCopyBalance}>
+      <button class="btn-outline btn-sm" onClick=${handleCopyBalance}>
         ${balanceCopied ? t('profile.wallet.copied') : t('profile.wallet.copyBalance')}
       </button>
     </div>
@@ -200,7 +200,7 @@ export default function WalletTab({ session, showToast, onStats }) {
               onInput=${e => setReqReason(e.target.value)}
               placeholder=${t('profile.wallet.requestReasonPlaceholder')} />
           </div>
-          <button type="submit" class="wr-submit" disabled=${reqLoading}>
+          <button type="submit" class="btn-primary btn-sm" disabled=${reqLoading}>
             ${reqLoading ? t('profile.wallet.requesting') : t('profile.wallet.requestBtn')}
           </button>
         </div>
@@ -259,7 +259,7 @@ export default function WalletTab({ session, showToast, onStats }) {
                       <span class="tx-detail-value work-grid-span">${t('profile.wallet.noDetails')}</span>
                     `}
                     <div class="work-grid-span">
-                      <button class="tx-copy-btn" onClick=${(e) => handleCopyTx(tx, e)}>
+                      <button class="btn-outline btn-sm" onClick=${(e) => handleCopyTx(tx, e)}>
                         ${isCopied ? t('profile.wallet.copied') : t('profile.wallet.copyTx')}
                       </button>
                     </div>

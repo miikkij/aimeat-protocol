@@ -433,10 +433,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       <!-- ACTION BAR -->
       <div class="kpkg-action-bar">
         <div class="kpkg-action-buttons">
-          <button class="kpkg-btn kpkg-btn-primary" onClick=${() => copyPrompt('human')}>
+          <button class="btn-primary" onClick=${() => copyPrompt('human')}>
             ${t('knowledge.actionBar.copyHumanPrompt')}
           </button>
-          <button class="kpkg-btn kpkg-btn-secondary" onClick=${() => copyPrompt('agent')}>
+          <button class="btn-outline" onClick=${() => copyPrompt('agent')}>
             ${t('knowledge.actionBar.copyAgentPrompt')}
           </button>
         </div>
@@ -540,7 +540,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                 .replace('{consents}', importPreview.organismShare ? '1' : '0')}
             </div>
             <button
-              class="kpkg-btn kpkg-btn-primary"
+              class="btn-primary"
               onClick=${confirmImport}
               disabled=${importing}
             >
@@ -582,10 +582,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
               <!-- Action buttons -->
               <div class="kpkg-card-actions">
-                <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${(e) => { e.stopPropagation(); handleExport(pkg); }}>
+                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); handleExport(pkg); }}>
                   ${t('knowledge.myKnowledge.export')}
                 </button>
-                <button class="kpkg-btn kpkg-btn-danger kpkg-btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(pkg); }}
+                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(pkg); }}
                   disabled=${deleting === pkg.key}>
                   ${deleting === pkg.key ? '...' : t('profile.delete')}
                 </button>
@@ -709,7 +709,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               ${(pkg.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}
             </div>
             <div class="kpkg-card-actions">
-              <button class="kpkg-btn kpkg-btn-secondary kpkg-btn-sm" onClick=${() => handleClone(pkg.package_id)}>
+              <button class="btn-outline btn-sm" onClick=${() => handleClone(pkg.package_id)}>
                 ${t('knowledge.discover.cloneToMine')}
               </button>
             </div>
