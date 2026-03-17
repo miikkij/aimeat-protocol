@@ -504,12 +504,14 @@ export function adminRouter(
     // Accepts either: JWT (operator role) OR admin password via x-admin-password header
     router.post('/v1/admin/seed-examples', async (req, res) => {
         // Auth: JWT operator OR admin password
-        let operator = 'system';
-        let operatorGhii = 'system';
+        // System-seeded packages always use 'system' as author so they don't
+        // appear in users' "my packages" lists.  Templates still show them.
+        const operator = 'system';
+        const operatorGhii = 'system';
 
+        // Auth: JWT operator OR admin password
         if (req.auth?.sub && req.auth.roles?.includes('operator')) {
-            operator = req.auth.sub;
-            operatorGhii = req.auth.owner ?? operator;
+            // OK — operator JWT
         } else {
             // Check admin password
             const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
@@ -517,13 +519,6 @@ export function adminRouter(
             if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
                 res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Requires operator JWT or admin password'));
                 return;
-            }
-            // Find the first operator owner to attribute packages to
-            const allOwners = await storage.listOwners();
-            const opOwner = allOwners.find((o: any) => o.roles?.includes('operator'));
-            if (opOwner) {
-                operator = opOwner.name;
-                operatorGhii = opOwner.name;
             }
         }
 
