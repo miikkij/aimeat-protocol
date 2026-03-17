@@ -116,7 +116,7 @@ export default function EmailTab({ session, showToast }) {
           <div class="email-status-text">
             ${t('profile.email.verified')}
           </div>
-          <button class="btn btn-sm btn-outline email-change-btn" onClick=${handleChangeEmail}>
+          <button class="btn-outline btn-sm email-change-btn" onClick=${handleChangeEmail}>
             ${t('profile.email.changeEmail')}
           </button>
         <//>
@@ -128,7 +128,7 @@ export default function EmailTab({ session, showToast }) {
             <input class="pf-input input-verification-code" type="text" maxlength="6" placeholder="123456"
               value=${code} onInput=${e => setCode(e.target.value)} />
           </div>
-          <button class="btn btn-primary" onClick=${handleVerifyCode} disabled=${verifying}>
+          <button class="btn-primary" onClick=${handleVerifyCode} disabled=${verifying}>
             ${verifying ? '...' : t('profile.email.verify')}
           </button>
         <//>
@@ -145,7 +145,7 @@ export default function EmailTab({ session, showToast }) {
             <input class="pf-input" type="email" placeholder="you@example.com"
               value=${email} onInput=${e => setEmail(e.target.value)} />
           </div>
-          <button class="btn btn-primary" onClick=${handleSendCode} disabled=${sending}>
+          <button class="btn-primary" onClick=${handleSendCode} disabled=${sending}>
             ${sending ? '...' : t('profile.email.sendCode')}
           </button>
         <//>

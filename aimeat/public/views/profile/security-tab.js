@@ -113,11 +113,11 @@ export default function SecurityTab({ session, showToast }) {
           onInput=${e => setCorsEditGhii(e.target.value)}></textarea>
         <div class="flex-row">
           <button class="btn-primary" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
-          <button class="revoke-btn" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
+          <button class="btn-danger-solid btn-sm" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
           <button class="btn-outline" onClick=${() => setCorsEditGhii(null)}>\u2715</button>
         </div>
       ` : html`
-        <button class="btn-primary" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
+        <button class="btn-outline" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
       `}
     </div>
 
@@ -151,10 +151,10 @@ export default function SecurityTab({ session, showToast }) {
                 <td>${isEditing
                   ? html`<div class="flex-row">
                       <button class="btn-primary pf-btn-xs" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
-                      <button class="revoke-btn pf-btn-xs" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
+                      <button class="btn-danger-solid btn-sm pf-btn-xs" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
                       <button class="btn-outline pf-btn-xs" onClick=${() => setCorsEditAgent(null)}>\u2715</button>
                     </div>`
-                  : html`<button class="revoke-btn" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`
+                  : html`<button class="btn-outline" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`
                 }</td>
               </tr>`;
             })}
@@ -190,7 +190,7 @@ export default function SecurityTab({ session, showToast }) {
               <td class="text-meta">${new Date(s.issued_at).toLocaleString()}</td>
               <td class="text-meta">${new Date(s.expires_at).toLocaleString()}</td>
               <td>${s.current ? null : html`
-                <button class="revoke-btn pf-btn-xs" disabled=${revokingId === s.session_id}
+                <button class="btn-danger-solid btn-sm pf-btn-xs" disabled=${revokingId === s.session_id}
                   onClick=${async () => {
                     setRevokingId(s.session_id);
                     try {
@@ -210,7 +210,7 @@ export default function SecurityTab({ session, showToast }) {
 
     <div class="card mt-1">
       <p class="text-caption mb-half">${t('profile.security.sessionsDesc') || 'Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.'}</p>
-      <button class="sec-revoke-btn" onClick=${handleRevokeAll} disabled=${revoking}>
+      <button class="btn-danger-solid" onClick=${handleRevokeAll} disabled=${revoking}>
         ${revoking ? (t('profile.security.revoking') || 'Revoking...') : (t('profile.security.revokeAll') || 'Revoke All Sessions')}
       </button>
     </div>

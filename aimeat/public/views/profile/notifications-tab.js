@@ -211,10 +211,10 @@ export default function NotificationsTab({ session, showToast }) {
     if (subscribed) {
       return html`
         <div class="flex-row">
-          <button class="btn btn-sm" onClick=${handleTestPush}>
+          <button class="btn-outline btn-sm" onClick=${handleTestPush}>
             ${t('profile.notifications.testBtn')}
           </button>
-          <button class="btn btn-sm btn-outline" onClick=${handleUnsubscribe}
+          <button class="btn-outline btn-sm" onClick=${handleUnsubscribe}
             disabled=${subStatus === 'unsubscribing'}>
             ${subStatus === 'unsubscribing'
               ? t('profile.notifications.unsubscribing')
@@ -223,7 +223,7 @@ export default function NotificationsTab({ session, showToast }) {
         </div>`;
     }
     return html`
-      <button class="btn btn-primary" onClick=${handleSubscribe}
+      <button class="btn-primary" onClick=${handleSubscribe}
         disabled=${subStatus === 'subscribing'}>
         ${subStatus === 'subscribing'
           ? t('profile.notifications.subscribing')

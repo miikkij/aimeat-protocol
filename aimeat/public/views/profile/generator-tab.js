@@ -104,7 +104,7 @@ function AgentListenerBar({ showToast, session }) {
         ${lastSync && html`<span class="pf-gen-listener-sync">${t('profile.generator.lastSync')}: ${lastSync}</span>`}
       </div>
       <div class="pf-gen-listener-actions">
-        <button class="btn btn-ghost btn-xs" onClick=${() => setShowPrompt(!showPrompt)}>
+        <button class="btn-ghost btn-xs" onClick=${() => setShowPrompt(!showPrompt)}>
           ${showPrompt ? t('profile.generator.hideSetup') : t('profile.generator.agentSetup')}
         </button>
       </div>
@@ -112,7 +112,7 @@ function AgentListenerBar({ showToast, session }) {
     ${showPrompt && html`
       <div class="pf-gen-agent-prompt-panel">
         <p class="pf-gen-subtitle">${t('profile.generator.agentSetupDesc')}</p>
-        <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt} disabled=${creating}>
+        <button class="btn-outline btn-sm" onClick=${handleCopyPrompt} disabled=${creating}>
           ${creating ? t('profile.generator.creatingAgent') : t('profile.generator.copyAgentPrompt')}
         </button>
       </div>
@@ -160,7 +160,7 @@ function ProjectListView({ onSelect, onCreate, showToast, session }) {
             <input type="checkbox" checked=${showArchived} onChange=${e => { setShowArchived(e.target.checked); setPage(0); }} />
             ${t('profile.generator.showArchived')}
           </label>
-          <button class="btn btn-primary" onClick=${onCreate}>+ ${t('profile.generator.newProject')}</button>
+          <button class="btn-primary" onClick=${onCreate}>+ ${t('profile.generator.newProject')}</button>
         </div>
       </div>
       ${filtered.length === 0 && html`
@@ -173,16 +173,16 @@ function ProjectListView({ onSelect, onCreate, showToast, session }) {
             <span class="pf-gen-project-status">${p.status}</span>
             <span class="pf-gen-project-date">${p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : '—'}</span>
             ${p.status !== 'archived' && html`
-              <button class="btn btn-ghost btn-xs" onClick=${e => handleArchive(e, p)}>${t('profile.generator.archive')}</button>
+              <button class="btn-ghost btn-xs" onClick=${e => handleArchive(e, p)}>${t('profile.generator.archive')}</button>
             `}
           </div>
         </div>
       `)}
       ${totalPages > 1 && html`
         <div class="pf-gen-pagination">
-          <button class="btn btn-ghost btn-sm" disabled=${page === 0} onClick=${() => setPage(page - 1)}>←</button>
+          <button class="btn-ghost btn-sm" disabled=${page === 0} onClick=${() => setPage(page - 1)}>←</button>
           <span>${page + 1} / ${totalPages}</span>
-          <button class="btn btn-ghost btn-sm" disabled=${page >= totalPages - 1} onClick=${() => setPage(page + 1)}>→</button>
+          <button class="btn-ghost btn-sm" disabled=${page >= totalPages - 1} onClick=${() => setPage(page + 1)}>→</button>
         </div>
       `}
     </div>
@@ -700,7 +700,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
           : html`<h3 class="pf-gen-name-editable" onClick=${() => { setNameDraft(project.name); setEditingName(true); }}
               title=${t('profile.generator.clickToEditName')}>${project.name}</h3>`
         }
-        <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDeleteProject}>
+        <button class="btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDeleteProject}>
           ${t('profile.generator.deleteProject')}
         </button>
       </div>
@@ -724,36 +724,36 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <span>${activeCount} ${t('profile.generator.activeLabel')}</span>
           </div>
           <div class="pf-gen-lifecycle-actions">
-            <button class="btn btn-sm btn-success"
+            <button class="btn-success btn-sm"
               onClick=${handleActivateAll}
               disabled=${lifecycleLoading !== null || registeredCount === 0}>
               ${lifecycleLoading === 'activate' ? '...' : t('profile.generator.activateAll')}
             </button>
-            <button class="btn btn-sm btn-outline"
+            <button class="btn-outline btn-sm"
               onClick=${handleDeactivateAll}
               disabled=${lifecycleLoading !== null || activeCount === 0}>
               ${lifecycleLoading === 'deactivate' ? '...' : t('profile.generator.deactivateAll')}
             </button>
             ${hasApp && html`
-              <button class="btn btn-sm btn-primary" onClick=${handleLaunchApp}>
+              <button class="btn-primary btn-sm" onClick=${handleLaunchApp}>
                 ${t('profile.generator.launchApp')}
               </button>
             `}
-            <button class="btn btn-sm btn-outline" onClick=${() => refreshStatuses()} title=${t('profile.generator.refreshTitle')}>
+            <button class="btn-outline btn-sm" onClick=${() => refreshStatuses()} title=${t('profile.generator.refreshTitle')}>
               ${t('profile.generator.refresh')}
             </button>
-            <button class="btn btn-sm btn-ghost" onClick=${() => setEditMode(editMode ? null : 'request')}>
+            <button class="btn-ghost btn-sm" onClick=${() => setEditMode(editMode ? null : 'request')}>
               ${editMode ? t('profile.generator.cancelEdit') : t('profile.generator.editService')}
             </button>
-            <button class="btn btn-sm btn-ghost" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
               ${showDiagnostics ? t('profile.generator.hideDiagnostics') : t('profile.generator.diagnostics')}
             </button>
-            <button class="btn btn-sm btn-outline pf-gen-remove-toggle"
+            <button class="btn-outline btn-sm pf-gen-remove-toggle"
               onClick=${() => { setShowRemovePanel(!showRemovePanel); setRemoveSelection({}); }}>
               ${showRemovePanel ? t('profile.generator.cancelRemove') : t('profile.generator.removeEllipsis')}
             </button>
             ${doneCount > 0 && html`
-              <button class="btn btn-sm btn-info"
+              <button class="btn-info btn-sm"
                 onClick=${handleOpenPackageDialog}
                 disabled=${packageLoading}>
                 ${project.packageGroupId
@@ -826,10 +826,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
           `}
 
           <div class="flex-actions">
-            <button class="btn btn-sm btn-outline" onClick=${() => setShowPackageDialog(false)}>
+            <button class="btn-outline btn-sm" onClick=${() => setShowPackageDialog(false)}>
               ${t('profile.generator.cancelRemove')}
             </button>
-            <button class="btn btn-sm btn-primary" onClick=${handlePackageProject} disabled=${packageLoading}>
+            <button class="btn-primary btn-sm" onClick=${handlePackageProject} disabled=${packageLoading}>
               ${packageLoading ? '...' : (project.packageGroupId
                 ? t('profile.generator.updatePackage')
                 : t('profile.generator.packageProject'))}
@@ -860,7 +860,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               <input type="checkbox" checked=${removeMemory} onChange=${e => setRemoveMemory(e.target.checked)} />
               ${t('profile.generator.deleteExtensionMemory')}
             </label>
-            <button class="btn btn-sm btn-danger-solid"
+            <button class="btn-danger-solid btn-sm"
               onClick=${handleRemoveConfirmed}
               disabled=${lifecycleLoading === 'remove' || Object.values(removeSelection).filter(Boolean).length === 0}>
               ${lifecycleLoading === 'remove' ? t('profile.generator.removingLabel') : t('profile.generator.removeSelected').replace('{count}', Object.values(removeSelection).filter(Boolean).length)}
@@ -880,7 +880,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             onInput=${e => setChangeRequest(e.target.value)}
           />
           <div class="pf-gen-actions">
-            <button class="btn btn-primary btn-sm" onClick=${handleCopyImpactPrompt} disabled=${!changeRequest.trim()}>
+            <button class="btn-primary btn-sm" onClick=${handleCopyImpactPrompt} disabled=${!changeRequest.trim()}>
               ${t('profile.generator.copyImpactPrompt')}
             </button>
           </div>
@@ -902,10 +902,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             </div>
           `}
           <div class="pf-gen-actions">
-            <button class="btn btn-primary btn-sm" onClick=${handleParseImpact} disabled=${!impactResult.trim()}>
+            <button class="btn-primary btn-sm" onClick=${handleParseImpact} disabled=${!impactResult.trim()}>
               ${t('profile.generator.analyzeImpact')}
             </button>
-            <button class="btn btn-outline btn-sm" onClick=${() => setEditMode('request')}>${t('profile.generator.back')}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setEditMode('request')}>${t('profile.generator.back')}</button>
           </div>
         </div>
       `}
@@ -926,7 +926,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                   </div>
                   <div class="pf-gen-impact-reason">${a.reason}</div>
                   ${(a.impact === 'root' || a.impact === 'update') && comp && html`
-                    <button class="btn btn-sm btn-outline mt-xs"
+                    <button class="btn-outline btn-sm mt-xs"
                       onClick=${() => handleCopyEditPrompt(comp, a.suggestedChange)}>
                       ${t('profile.generator.copyEditPrompt')}
                     </button>
@@ -936,8 +936,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             })}
           </div>
           <div class="pf-gen-actions">
-            <button class="btn btn-outline btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
-            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
           </div>
         </div>
       `}
@@ -1289,11 +1289,11 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           <pre class="pf-gen-prompt-box">${prompt}</pre>
           <div class="flex-row-wrap">
             ${workflowStep === 'copy' && html`<${StepArrow} />`}
-            <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}
+            <button class="btn-outline btn-sm" onClick=${handleCopyPrompt}
               title=${t('profile.generator.copyPromptHint')}>
               ${t('profile.generator.copyPrompt')}
             </button>
-            <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint')}>
+            <button class="btn-ghost btn-sm" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint')}>
               ${'↻ ' + (t('profile.generator.regeneratePrompt'))}
             </button>
           </div>
@@ -1318,19 +1318,19 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           />
           <div class="pf-gen-actions">
             ${workflowStep === 'validate' && html`<${StepArrow} />`}
-            <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
+            <button class="btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
               title=${t('profile.generator.validateHint')}>
               ${t('profile.generator.validate')}
             </button>
             ${validationResult?.valid && html`
               ${workflowStep === 'register' && html`<${StepArrow} />`}
-              <button class="btn btn-sm btn-success" onClick=${handleRegister} disabled=${registering}
+              <button class="btn-success btn-sm" onClick=${handleRegister} disabled=${registering}
                 title=${t('profile.generator.registerHint')}>
                 ${registering ? '...' : t('profile.generator.register')}
               </button>
             `}
             ${component.registeredAs && result.trim() && html`
-              <button class="btn btn-sm btn-outline" onClick=${handleReregister} disabled=${registering}
+              <button class="btn-outline btn-sm" onClick=${handleReregister} disabled=${registering}
                 title=${t('profile.generator.reregisterHint')}>
                 ${registering ? '...' : (t('profile.generator.reregister'))}
               </button>
@@ -1340,7 +1340,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       ` : html`
         <!-- Agent Mode -->
         <div class="pf-gen-section">
-          <button class="btn btn-primary btn-sm" onClick=${handleSendToAgent}>
+          <button class="btn-primary btn-sm" onClick=${handleSendToAgent}>
             ${t('profile.generator.sendToAgent')} ${agents[0]?.name || ''}
           </button>
           ${component.status === 'waiting_agent' && html`

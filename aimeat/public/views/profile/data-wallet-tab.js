@@ -211,7 +211,7 @@ export default function DataWalletTab({ session, showToast }) {
           </div>
           <div class="flex-actions">
             <button type="submit" class="btn-primary">${t('permissions.grantBtn')}</button>
-            <button type="button" class="btn-sm btn-outline" onClick=${() => setShowConsentForm(false)}>${t('permissions.cancelBtn')}</button>
+            <button type="button" class="btn-outline btn-sm" onClick=${() => setShowConsentForm(false)}>${t('permissions.cancelBtn')}</button>
           </div>
         </form>
       </div>
@@ -272,7 +272,7 @@ export default function DataWalletTab({ session, showToast }) {
                   ${expSoon && html`<span class="dw-expiring-icon" title=${t('permissions.expiringWarning')}>\u26A0\uFE0F</span>`}
                   ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : t('wallet.consents.never')}
                 </td>
-                <td>${!isExpired && html`<button class="revoke-btn" onClick=${() => handleRevoke(cId)}>${t('wallet.consents.revoke')}</button>`}</td>
+                <td>${!isExpired && html`<button class="btn-danger-solid btn-sm" onClick=${() => handleRevoke(cId)}>${t('wallet.consents.revoke')}</button>`}</td>
               </tr>`;
             })}
           </tbody></table>

@@ -16,12 +16,12 @@ export default function PortfolioTab({ session, navigate }) {
       <div class="portfolio-center">
         <h3>${t('portfolio.builder.heading')}</h3>
         <p class="portfolio-subtitle">${t('portfolio.builder.subtitle')}</p>
-        <button class="btn btn-primary" onClick=${() => navigate('/v1/portfolio')}>
+        <button class="btn-primary" onClick=${() => navigate('/v1/portfolio')}>
           ${t('portfolio.builder.heading')}
         </button>
         <br/><br/>
         ${session && html`
-          <a href="/v1/portfolio/${encodeURIComponent(session.owner)}" class="btn btn-ghost" target="_blank">
+          <a href="/v1/portfolio/${encodeURIComponent(session.owner)}" class="btn-ghost" target="_blank">
             ${t('portfolio.builder.viewPublic')}
           </a>
         `}
