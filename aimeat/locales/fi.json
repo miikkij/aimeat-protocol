@@ -770,7 +770,14 @@
       "revokeAll": "Peru kaikki istunnot",
       "revoking": "Perutaan...",
       "revokeConfirm": "Haluatko varmasti perua kaikki aktiiviset istunnot? Sinut kirjataan ulos.",
-      "sessionsRevoked": "Kaikki istunnot peruttu"
+      "sessionsRevoked": "Kaikki istunnot peruttu",
+      "sessionIdentity": "Identiteetti",
+      "sessionIssuedAt": "Myönnetty",
+      "sessionExpiresAt": "Vanhenee",
+      "currentSession": "nykyinen",
+      "revoke": "Peru",
+      "sessionRevoked": "Istunto peruttu",
+      "noSessions": "Ei aktiivisia istuntoja"
     },
     "email": {
       "title": "Sähköpostivahvistus",

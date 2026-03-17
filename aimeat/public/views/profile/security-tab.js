@@ -113,8 +113,8 @@ export default function SecurityTab({ session, showToast }) {
           onInput=${e => setCorsEditGhii(e.target.value)}></textarea>
         <div class="flex-row">
           <button class="btn-primary" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
-          <button class="btn-danger-solid btn-sm" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
-          <button class="btn-outline" onClick=${() => setCorsEditGhii(null)}>\u2715</button>
+          <button class="btn-danger-solid" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
+          <button class="btn-ghost" onClick=${() => setCorsEditGhii(null)}>${t('profile.cancel')}</button>
         </div>
       ` : html`
         <button class="btn-outline" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
@@ -150,9 +150,9 @@ export default function SecurityTab({ session, showToast }) {
                 }</td>
                 <td>${isEditing
                   ? html`<div class="flex-row">
-                      <button class="btn-primary pf-btn-xs" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
-                      <button class="btn-danger-solid btn-sm pf-btn-xs" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
-                      <button class="btn-outline pf-btn-xs" onClick=${() => setCorsEditAgent(null)}>\u2715</button>
+                      <button class="btn-primary btn-sm" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
+                      <button class="btn-danger-solid btn-sm" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
+                      <button class="btn-ghost btn-sm" onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}</button>
                     </div>`
                   : html`<button class="btn-outline" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`
                 }</td>
@@ -170,37 +170,37 @@ export default function SecurityTab({ session, showToast }) {
       </div>
     </div>
 
-    <h3 class="card-h3 mt-section">${t('profile.security.sessions') || 'Session Management'}</h3>
-    <p class="text-caption mb-1">${t('profile.security.sessionsHint') || 'Manage your active sessions. Revoking a session logs it out immediately.'}</p>
+    <h3 class="card-h3 mt-section">${t('profile.security.sessions')}</h3>
+    <p class="text-caption mb-1">${t('profile.security.sessionsHint')}</p>
 
     ${sessions.length === 0
-      ? html`<div class="empty">${t('profile.security.noSessions') || 'No active sessions'}</div>`
+      ? html`<div class="empty">${t('profile.security.noSessions')}</div>`
       : html`<div class="card scroll-x">
           <table class="consent-table"><thead><tr>
-            <th>${t('profile.security.sessionIdentity') || 'Identity'}</th>
-            <th>${t('profile.security.sessionIssuedAt') || 'Issued'}</th>
-            <th>${t('profile.security.sessionExpiresAt') || 'Expires'}</th>
+            <th>${t('profile.security.sessionIdentity')}</th>
+            <th>${t('profile.security.sessionIssuedAt')}</th>
+            <th>${t('profile.security.sessionExpiresAt')}</th>
             <th></th>
           </tr></thead><tbody>
             ${sessions.map(s => html`<tr>
               <td>
                 <span class="text-code">${escHtml(s.gaii || session.owner)}</span>
-                ${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession') || 'current'}</span>` : null}
+                ${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession')}</span>` : null}
               </td>
               <td class="text-meta">${new Date(s.issued_at).toLocaleString()}</td>
               <td class="text-meta">${new Date(s.expires_at).toLocaleString()}</td>
               <td>${s.current ? null : html`
-                <button class="btn-danger-solid btn-sm pf-btn-xs" disabled=${revokingId === s.session_id}
+                <button class="btn-danger-solid btn-sm" disabled=${revokingId === s.session_id}
                   onClick=${async () => {
                     setRevokingId(s.session_id);
                     try {
                       await securityService.revokeSession(s.session_id);
-                      showToast(t('profile.security.sessionRevoked') || 'Session revoked');
+                      showToast(t('profile.security.sessionRevoked'));
                       setSessions(prev => prev.filter(x => x.session_id !== s.session_id));
                     } catch(e) { showToast(e.message || 'Error', true); }
                     setRevokingId(null);
                   }}>
-                  ${revokingId === s.session_id ? '...' : (t('profile.security.revoke') || 'Revoke')}
+                  ${revokingId === s.session_id ? '...' : t('profile.security.revoke')}
                 </button>
               `}</td>
             </tr>`)}
@@ -209,9 +209,9 @@ export default function SecurityTab({ session, showToast }) {
     }
 
     <div class="card mt-1">
-      <p class="text-caption mb-half">${t('profile.security.sessionsDesc') || 'Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.'}</p>
+      <p class="text-caption mb-half">${t('profile.security.sessionsDesc')}</p>
       <button class="btn-danger-solid" onClick=${handleRevokeAll} disabled=${revoking}>
-        ${revoking ? (t('profile.security.revoking') || 'Revoking...') : (t('profile.security.revokeAll') || 'Revoke All Sessions')}
+        ${revoking ? t('profile.security.revoking') : t('profile.security.revokeAll')}
       </button>
     </div>
     <${ConfirmUI} />

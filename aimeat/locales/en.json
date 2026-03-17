@@ -770,7 +770,14 @@
       "revokeAll": "Revoke All Sessions",
       "revoking": "Revoking...",
       "revokeConfirm": "Are you sure you want to revoke all active sessions? You will be logged out.",
-      "sessionsRevoked": "All sessions revoked"
+      "sessionsRevoked": "All sessions revoked",
+      "sessionIdentity": "Identity",
+      "sessionIssuedAt": "Issued",
+      "sessionExpiresAt": "Expires",
+      "currentSession": "current",
+      "revoke": "Revoke",
+      "sessionRevoked": "Session revoked",
+      "noSessions": "No active sessions"
     },
     "email": {
       "title": "Email Verification",
