@@ -98,6 +98,24 @@ pnpm lint
 
 Lint rules enforce code quality, style consistency, and prevent common errors. See `docs/coding-guidelines/code-style.md`.
 
+### Rule 7: Frontend Styling Must Follow the Frontend Development Guide
+
+All frontend work (HTML, CSS, JS views/components) **must** follow `docs/frontend-development-guide.md`. Before writing or modifying any frontend code, review the relevant sections. Key mandatory rules:
+
+1. **No inline `style=""` attributes** for layout, colors, spacing, or typography — use CSS classes instead.
+2. **No inline CSS constants** in JS files — all CSS goes in external `.css` files.
+3. **Use CSS variables** from `theme.css` for all colors, spacing, and typography — never hardcode values like `#E8564A` or `#6B7280` directly in JS.
+4. **Prefix all view CSS classes** to avoid collisions (e.g., `pf-` for profile, `gn-` for portal, `adm-` for admin).
+5. **Use the canonical section header pattern** in profile tabs: `.section-title` + `.section-desc` — not raw `<h3>` or `<p>` with inline styles.
+6. **Use existing button classes** (`.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`) — never set button colors via inline styles.
+7. **Use existing component library** (`/components/`) and shared components (`views/profile/shared.js`, `views/admin/shared.js`) — don't reinvent.
+8. **All user-visible text** must use `t()` i18n function — no hardcoded strings in any language.
+
+**Campsite rule:** If you encounter inline styles while working on a file, move them to the appropriate CSS file.
+
+Full guide: `docs/frontend-development-guide.md`
+Style analysis: `docs/design/style-analysis.md`
+
 ---
 
 ## Coding Guidelines Reference
