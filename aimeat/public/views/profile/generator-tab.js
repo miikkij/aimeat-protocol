@@ -223,7 +223,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     } catch { /* proceed without catalog */ }
     const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
     navigator.clipboard.writeText(prompt).catch(() => {});
-    showToast?.('Blueprint prompt copied!');
+    showToast?.(t('profile.generator.blueprintPromptCopied'));
   }
 
   async function handleSubmitBlueprint() {
@@ -467,9 +467,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     try {
       const result = await activateAll(projectId);
       if (result.errors.length > 0) {
-        showToast?.(`Activated ${result.activated.length}, ${result.errors.length} errors`, true);
+        showToast?.(t('profile.generator.activatedWithErrors').replace('{count}', result.activated.length).replace('{errors}', result.errors.length), true);
       } else {
-        showToast?.(`Activated ${result.activated.length} components`);
+        showToast?.(t('profile.generator.activatedCount').replace('{count}', result.activated.length));
       }
       await refreshStatuses();
     } catch (e) { showToast?.(e.message, true); }
@@ -481,9 +481,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     try {
       const result = await deactivateAll(projectId);
       if (result.errors.length > 0) {
-        showToast?.(`Deactivated ${result.deactivated.length}, ${result.errors.length} errors`, true);
+        showToast?.(t('profile.generator.deactivatedWithErrors').replace('{count}', result.deactivated.length).replace('{errors}', result.errors.length), true);
       } else {
-        showToast?.(`Deactivated ${result.deactivated.length} components`);
+        showToast?.(t('profile.generator.deactivatedCount').replace('{count}', result.deactivated.length));
       }
       await refreshStatuses();
     } catch (e) { showToast?.(e.message, true); }
@@ -497,9 +497,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     try {
       const result = await removeComponents(projectId, ids, removeMemory, session);
       if (result.errors.length > 0) {
-        showToast?.(`Removed ${result.removed.length}, ${result.errors.length} errors`, true);
+        showToast?.(t('profile.generator.removedWithErrors').replace('{count}', result.removed.length).replace('{errors}', result.errors.length), true);
       } else {
-        showToast?.(`Removed ${result.removed.length} components`);
+        showToast?.(t('profile.generator.removedCount').replace('{count}', result.removed.length));
       }
       setShowRemovePanel(false);
       setRemoveSelection({});
@@ -514,7 +514,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     if (trimmed && trimmed !== project.name) {
       await updateProject(projectId, { name: trimmed });
       await loadData();
-      showToast?.('Name updated');
+      showToast?.(t('profile.generator.nameUpdated'));
     }
     setEditingName(false);
   }
@@ -522,7 +522,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   function handleLaunchApp() {
     const url = getAppLaunchUrl(components, session);
     if (url) window.open(url, '_blank');
-    else showToast?.('No registered app found');
+    else showToast?.(t('profile.generator.noRegisteredApp'));
   }
 
   // Packaging handlers
@@ -575,7 +575,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   function handleCopyImpactPrompt() {
     const prompt = buildImpactPrompt(changeRequest, project?.blueprint);
     navigator.clipboard.writeText(prompt).catch(() => {});
-    showToast?.('Impact analysis prompt copied!');
+    showToast?.(t('profile.generator.impactPromptCopied'));
     setEditMode('impact');
   }
 
@@ -609,7 +609,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       upstream || null,
     );
     navigator.clipboard.writeText(prompt).catch(() => {});
-    showToast?.(`Edit prompt for ${comp.label} copied!`);
+    showToast?.(t('profile.generator.editPromptCopied').replace('{name}', comp.label));
   }
 
   const selected = components.find(c => c.id === selectedId);
@@ -641,7 +641,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       }
     }
     // All done — select nothing, show completion state
-    showToast?.('All components registered!');
+    showToast?.(t('profile.generator.allComponentsRegistered'));
   }
 
   // Auto-select first incomplete component if nothing is selected
@@ -718,38 +718,38 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       ${registeredCount > 0 && html`
         <div class="pf-gen-lifecycle-toolbar">
           <div class="pf-gen-lifecycle-status">
-            <span>${registeredCount} registered</span>
+            <span>${registeredCount} ${t('profile.generator.registeredLabel')}</span>
             <span class="pf-gen-lifecycle-sep">/</span>
-            <span>${activeCount} active</span>
+            <span>${activeCount} ${t('profile.generator.activeLabel')}</span>
           </div>
           <div class="pf-gen-lifecycle-actions">
-            <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#052e16"
+            <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#fff"
               onClick=${handleActivateAll}
               disabled=${lifecycleLoading !== null || registeredCount === 0}>
-              ${lifecycleLoading === 'activate' ? '...' : 'Activate All'}
+              ${lifecycleLoading === 'activate' ? '...' : t('profile.generator.activateAll')}
             </button>
             <button class="btn btn-sm btn-outline"
               onClick=${handleDeactivateAll}
               disabled=${lifecycleLoading !== null || activeCount === 0}>
-              ${lifecycleLoading === 'deactivate' ? '...' : 'Deactivate All'}
+              ${lifecycleLoading === 'deactivate' ? '...' : t('profile.generator.deactivateAll')}
             </button>
             ${hasApp && html`
               <button class="btn btn-sm btn-primary" onClick=${handleLaunchApp}>
-                Launch App
+                ${t('profile.generator.launchApp')}
               </button>
             `}
-            <button class="btn btn-sm btn-outline" onClick=${() => refreshStatuses()} title="Refresh live statuses">
-              Refresh
+            <button class="btn btn-sm btn-outline" onClick=${() => refreshStatuses()} title=${t('profile.generator.refreshTitle')}>
+              ${t('profile.generator.refresh')}
             </button>
             <button class="btn btn-sm btn-ghost" onClick=${() => setEditMode(editMode ? null : 'request')}>
-              ${editMode ? 'Cancel Edit' : 'Edit Service'}
+              ${editMode ? t('profile.generator.cancelEdit') : t('profile.generator.editService')}
             </button>
             <button class="btn btn-sm btn-ghost" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
-              ${showDiagnostics ? 'Hide Diagnostics' : 'Diagnostics'}
+              ${showDiagnostics ? t('profile.generator.hideDiagnostics') : t('profile.generator.diagnostics')}
             </button>
             <button class="btn btn-sm btn-outline pf-gen-remove-toggle"
               onClick=${() => { setShowRemovePanel(!showRemovePanel); setRemoveSelection({}); }}>
-              ${showRemovePanel ? 'Cancel' : 'Remove...'}
+              ${showRemovePanel ? t('profile.generator.cancelRemove') : t('profile.generator.removeEllipsis')}
             </button>
             ${doneCount > 0 && html`
               <button class="btn btn-sm" style="background:var(--primary,#3b82f6);color:#fff"
@@ -816,17 +816,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                   `)}
                 </ul>
               ` : html`<span style="color:var(--text-muted,#888)">...</span>`}
-              <label class="pf-gen-pkg-label" style="margin-top:8px">Changelog note
+              <label class="pf-gen-pkg-label" style="margin-top:8px">${t('profile.generator.changelogNote')}
                 <input type="text" value=${changelogNote}
                   onChange=${e => setChangelogNote(e.target.value)}
-                  placeholder="What changed..." />
+                  placeholder=${t('profile.generator.changelogPlaceholder')} />
               </label>
             </div>
           `}
 
           <div style="display:flex;gap:8px;margin-top:12px">
             <button class="btn btn-sm btn-outline" onClick=${() => setShowPackageDialog(false)}>
-              Cancel
+              ${t('profile.generator.cancelRemove')}
             </button>
             <button class="btn btn-sm btn-primary" onClick=${handlePackageProject} disabled=${packageLoading}>
               ${packageLoading ? '...' : (project.packageGroupId
@@ -840,7 +840,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       <!-- Phase 5: Remove Panel -->
       ${showRemovePanel && html`
         <div class="pf-gen-remove-panel">
-          <p style="margin:0 0 8px;font-weight:600">Select components to remove from the node:</p>
+          <p style="margin:0 0 8px;font-weight:600">${t('profile.generator.removeSelectLabel')}</p>
           <div class="pf-gen-remove-list">
             ${components.filter(c => c.registeredAs).map(c => html`
               <label class="pf-gen-remove-item">
@@ -857,12 +857,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
           <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
             <label style="display:flex;align-items:center;gap:4px;font-size:0.85em">
               <input type="checkbox" checked=${removeMemory} onChange=${e => setRemoveMemory(e.target.checked)} />
-              Also delete extension memory data
+              ${t('profile.generator.deleteExtensionMemory')}
             </label>
             <button class="btn btn-sm" style="background:var(--error,#ef4444);color:#fff"
               onClick=${handleRemoveConfirmed}
               disabled=${lifecycleLoading === 'remove' || Object.values(removeSelection).filter(Boolean).length === 0}>
-              ${lifecycleLoading === 'remove' ? 'Removing...' : `Remove ${Object.values(removeSelection).filter(Boolean).length} selected`}
+              ${lifecycleLoading === 'remove' ? t('profile.generator.removingLabel') : t('profile.generator.removeSelected').replace('{count}', Object.values(removeSelection).filter(Boolean).length)}
             </button>
           </div>
         </div>
@@ -1173,7 +1173,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       }
       const registered = addHistory(component, 'registered', { registeredAs: regName });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName });
-      showToast?.(`Component registered: ${regName}`);
+      showToast?.(t('profile.generator.componentRegistered').replace('{name}', regName));
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       await onUpdate();
       // Auto-advance to next component after successful registration
@@ -1211,11 +1211,11 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         history: [...(component.history || []), { action: 're-registered', at: new Date().toISOString(), by: 'user', registeredAs: regName }],
       };
       await saveComponent(projectId, updated);
-      showToast?.(`Re-registered: ${regName}`);
+      showToast?.(t('profile.generator.reregistered').replace('{name}', regName));
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       await onUpdate();
     } catch (e) {
-      showToast?.(`Re-register failed: ${e.message}`, true);
+      showToast?.(t('profile.generator.reregisterFailed').replace('{error}', e.message), true);
     }
     setRegistering(false);
   }
@@ -1244,7 +1244,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       await navigator.clipboard.writeText(fresh);
       const updated = addHistory(component, 'prompt_copied');
       await saveComponent(projectId, { ...updated, status: 'waiting_user', prompt: fresh });
-      showToast?.('Prompt copied!');
+      showToast?.(t('profile.generator.promptCopied'));
       onUpdate();
     } catch { /* clipboard fallback */ }
   }
@@ -1326,7 +1326,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
             </button>
             ${validationResult?.valid && html`
               ${workflowStep === 'register' && html`<${StepArrow} />`}
-              <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#052e16" onClick=${handleRegister} disabled=${registering}
+              <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#fff" onClick=${handleRegister} disabled=${registering}
                 title=${t('profile.generator.registerHint') || 'Install this component on your AIMEAT node — makes it live'}>
                 ${registering ? '...' : t('profile.generator.register')}
               </button>
