@@ -1,3 +1,10 @@
+/**
+ * @file agents-tab.js
+ * @description Profile tab for managing AI agents — device auth flow, agent prompt,
+ *   platform instructions, scope management modal, and agent detail cards.
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: replace all inline styles with CSS utility classes
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -298,25 +305,25 @@ export default function AgentsTab({ session, showToast, onStats }) {
     <div class="section-title">${t('profile.agents.title')}</div>
     <div class="section-desc">${t('profile.agents.desc')}</div>
 
-    <div class="agent-cta" style="margin-bottom:1.5rem">
+    <div class="agent-cta mb-1">
       <h3>${t('profile.agents.deviceAuth.title')}</h3>
       <p>${t('profile.agents.deviceAuth.desc')}</p>
 
       ${!deviceAuthResult ? html`
-        <div style="display:flex;gap:.75rem;align-items:flex-end;margin-top:1rem">
-          <div style="flex:1">
-            <label style="display:block;font-size:.85rem;margin-bottom:.35rem;color:var(--muted)">${t('profile.agents.deviceAuth.agentNameLabel')}</label>
-            <input type="text" class="input" placeholder=${t('profile.agents.deviceAuth.agentNamePlaceholder')}
+        <div class="flex-row mt-1 pf-device-auth-row">
+          <div class="pf-device-auth-field">
+            <label class="text-caption mb-half">${t('profile.agents.deviceAuth.agentNameLabel')}</label>
+            <input type="text" class="input-field" placeholder=${t('profile.agents.deviceAuth.agentNamePlaceholder')}
               value=${deviceAgentName} onInput=${e => setDeviceAgentName(e.target.value)}
-              style="width:100%" maxlength="64" />
+              maxlength="64" />
           </div>
           <button class="btn-primary" onClick=${handleCreateDeviceAuth} disabled=${deviceAuthLoading}>
             ${deviceAuthLoading ? '...' : t('profile.agents.deviceAuth.createLink')}
           </button>
         </div>
       ` : html`
-        <div class="card" style="margin-top:1rem;padding:1.25rem">
-          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+        <div class="card mt-1 p-1">
+          <div class="flex-row mb-1">
             ${deviceAuthStatus === 'pending' ? html`
               <span class="badge badge-info">${t('profile.agents.deviceAuth.statusPending')}</span>
             ` : deviceAuthStatus === 'approved' ? html`
@@ -328,16 +335,16 @@ export default function AgentsTab({ session, showToast, onStats }) {
             `}
           </div>
 
-          <div style="margin-bottom:1rem">
-            <div style="font-size:.85rem;color:var(--muted);margin-bottom:.35rem">${t('profile.agents.deviceAuth.userCode')}</div>
-            <div style="font-size:2rem;font-weight:700;font-family:monospace;letter-spacing:.15em">${deviceAuthResult.user_code}</div>
+          <div class="mb-1">
+            <div class="text-caption mb-half">${t('profile.agents.deviceAuth.userCode')}</div>
+            <div class="pf-device-code">${deviceAuthResult.user_code}</div>
           </div>
 
-          <div style="margin-bottom:1rem">
-            <div style="font-size:.85rem;color:var(--muted);margin-bottom:.35rem">${t('profile.agents.deviceAuth.verifyUrl')}</div>
-            <div style="display:flex;align-items:center;gap:.5rem">
-              <code style="font-size:.85rem;word-break:break-all">${deviceAuthResult.verification_uri_complete}</code>
-              <button class="btn-outline" style="white-space:nowrap" onClick=${() => {
+          <div class="mb-1">
+            <div class="text-caption mb-half">${t('profile.agents.deviceAuth.verifyUrl')}</div>
+            <div class="flex-row">
+              <code class="text-caption pf-code-break">${deviceAuthResult.verification_uri_complete}</code>
+              <button class="btn-outline pf-nowrap" onClick=${() => {
                 copyToClipboard(deviceAuthResult.verification_uri_complete).then(() => {
                   setDeviceUrlCopied(true);
                   setTimeout(() => setDeviceUrlCopied(false), 2000);
@@ -347,13 +354,13 @@ export default function AgentsTab({ session, showToast, onStats }) {
           </div>
 
           ${deviceAuthStatus === 'pending' && html`
-            <div style="font-size:.85rem;color:var(--muted)">
+            <div class="text-caption">
               ${t('profile.agents.deviceAuth.expiresIn')}: ${Math.floor(deviceAuthCountdown / 60)}:${String(deviceAuthCountdown % 60).padStart(2, '0')}
             </div>
           `}
 
           ${deviceAuthStatus !== 'pending' && html`
-            <button class="btn-outline" style="margin-top:.75rem" onClick=${() => {
+            <button class="btn-outline mt-xs" onClick=${() => {
               setDeviceAuthResult(null);
               setDeviceAuthStatus(null);
               setDeviceAuthCountdown(0);
@@ -374,11 +381,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
         });
       }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
 
-      <div style="margin-top:1.25rem;border-top:1px solid var(--border);padding-top:1.25rem">
-        <p style="margin-bottom:.75rem">${t('profile.agents.noAgent')}</p>
+      <div class="pf-agent-divider">
+        <p class="mb-half">${t('profile.agents.noAgent')}</p>
         <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
           <span>${t('profile.agents.seeHow')}</span>
-          <span style="transition:transform .2s;${platExpand ? 'transform:rotate(180deg)' : ''}">\u25BC</span>
+          <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
         </button>
         ${platExpand && html`
           <div class="platform-instructions expanded">
@@ -401,14 +408,14 @@ export default function AgentsTab({ session, showToast, onStats }) {
         return html`
         <div class="card agent-card ${isExpanded ? 'agent-card-expanded' : ''}">
           <div class="agent-card-header-clickable" onClick=${() => toggleAgent(a.name)}>
-            <div class="card-header" style="margin-bottom:0">
-              <div style="display:flex;align-items:center;gap:.5rem">
-                <span class="agent-expand-icon" style="transition:transform .2s;${isExpanded ? 'transform:rotate(90deg)' : ''}">\u25B6</span>
+            <div class="card-header mb-0">
+              <div class="flex-row">
+                <span class="agent-expand-icon ${isExpanded ? 'pf-rotate-90' : ''}">\u25B6</span>
                 <div class="card-title">${escHtml(a.display_name || a.name)}</div>
               </div>
               <span class="badge badge-info">${escHtml(a.name)}</span>
             </div>
-            <div class="card-subtitle" style="margin-top:.35rem">
+            <div class="card-subtitle mt-xs">
               ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502
               ${t('profile.agents.balance')}: ${a.balance ?? '-'} \u2502
               ${t('profile.agents.lastSeen')}: ${a.last_seen ? timeAgo(a.last_seen) : '-'}
@@ -419,11 +426,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
             <div class="agent-details">
               <div class="agent-detail-row">
                 <span class="agent-detail-label">GAII</span>
-                <span class="agent-detail-value" style="display:flex;align-items:center;gap:.5rem">
-                  <span style="font-family:monospace;word-break:break-all">${escHtml(a.gaii || '-')}</span>
+                <span class="agent-detail-value flex-row">
+                  <span class="text-code pf-code-break">${escHtml(a.gaii || '-')}</span>
                   ${a.gaii && html`
                     <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyGaii(a.gaii); }}>
-                      ${gaiiCopied === a.gaii ? '\u2713 Copied' : 'Copy GAII'}
+                      ${gaiiCopied === a.gaii ? '\u2713 ' + t('profile.agents.copied') : t('profile.agents.copyGaii')}
                     </button>
                   `}
                 </span>
@@ -440,7 +447,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                 <span class="agent-detail-label">${t('profile.agents.roles') || 'Roles'}</span>
                 <span class="agent-detail-value">
                   ${(a.roles && a.roles.length > 0)
-                    ? a.roles.map(r => html`<span class="badge badge-muted" style="margin-right:.3rem">${escHtml(r)}</span>`)
+                    ? a.roles.map(r => html`<span class="badge badge-muted pf-badge-gap">${escHtml(r)}</span>`)
                     : html`<span class="badge badge-muted">agent</span>`
                   }
                 </span>
@@ -469,7 +476,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
               ${a.public_key ? html`
                 <div class="agent-detail-row">
                   <span class="agent-detail-label">${t('profile.agents.publicKey') || 'Public Key'}</span>
-                  <span class="agent-detail-value" style="display:flex;align-items:center;gap:.5rem">
+                  <span class="agent-detail-value flex-row">
                     <code class="agent-pubkey">${escHtml(truncateKey(a.public_key))}</code>
                     <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyKey(a.public_key); }}>
                       ${keyCopied === a.public_key ? '\u2713 Copied' : 'Copy'}
@@ -490,7 +497,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           `}
 
           ${!isExpanded && a.capabilities?.length > 0 && html`
-            <div class="caps" style="margin-top:.5rem">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
+            <div class="caps mb-half">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
           `}
 
           ${(() => {
@@ -605,11 +612,11 @@ function ScopesModal({ agent, session, onSave, onCancel }) {
         <div class="scope-agent-info">${escHtml(agent.gaii || '')}</div>
 
         ${isReadOnly ? html`
-          <p style="color:var(--muted);margin-bottom:1rem;font-size:.85rem">${t('profile.agents.scopeUi.readOnlyView')}</p>
+          <p class="text-caption mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>
           <div class="scope-readonly-list">
             ${scopes.map(s => html`<span class="scope-tag">${escHtml(s)}</span>`)}
           </div>
-          <div class="form-actions" style="margin-top:1.5rem">
+          <div class="form-actions mt-section">
             <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
           </div>
         ` : html`
@@ -624,7 +631,7 @@ function ScopesModal({ agent, session, onSave, onCancel }) {
 
           <button class="scope-advanced-toggle" onClick=${() => setAdvanced(!advanced)}>
             <span>${t('profile.agents.scopeUi.advanced')}</span>
-            <span style="transition:transform .2s;${advanced ? 'transform:rotate(180deg)' : ''}">\u25BC</span>
+            <span class="pf-chevron ${advanced ? 'pf-chevron-open' : ''}">\u25BC</span>
           </button>
 
           ${advanced && html`
@@ -661,7 +668,7 @@ function ScopesModal({ agent, session, onSave, onCancel }) {
             </div>
           `}
 
-          <div class="form-actions" style="margin-top:1.25rem">
+          <div class="form-actions mt-1">
             <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
               ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
             </button>

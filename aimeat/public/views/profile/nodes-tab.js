@@ -1,3 +1,11 @@
+/**
+ * @file nodes-tab.js
+ * @description Profile tab for managing personal node registrations, visibility,
+ *   agent assignments, tunnel URLs, and mailbox status.
+ * @version-history
+ *   v1.0.0 — 2026-03-16 — Initial nodes tab
+ *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -67,7 +75,7 @@ export default function NodesTab({ session, showToast, onStats }) {
   return html`
     <div class="section-title">${t('profile.nodes.title')}</div>
     <div class="section-desc">${t('profile.nodes.desc')}</div>
-    <button class="btn-primary" style="margin-bottom:1rem" onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}</button>
+    <button class="btn-primary mb-1" onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}</button>
     ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
     ${!nodes ? html`<${Spinner} text=${t('profile.nodes.loading')} />`
       : nodes.length === 0 ? html`<div class="empty">${t('profile.nodes.empty')}</div>`
@@ -107,16 +115,16 @@ export default function NodesTab({ session, showToast, onStats }) {
                 <div class="pn-details open">
                   <div class="pn-detail-row">
                     <span class="pn-detail-label">${t('profile.nodes.tunnelUrl')}</span>
-                    <span class="pn-detail-value" style="display:flex;align-items:center;gap:.5rem">
-                      <code style="font-size:.75rem">${tunnelUrl}</code>
-                      <button onClick=${() => { copyToClipboard(tunnelUrl).then(() => showToast(t('profile.nodes.copied'))); }} style="padding:2px 8px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--love4);cursor:pointer;font-size:.7rem">${t('profile.nodes.copyUrl')}</button>
+                    <span class="pn-detail-value flex-row">
+                      <code class="text-meta-sm">${tunnelUrl}</code>
+                      <button class="pn-copy-btn" onClick=${() => { copyToClipboard(tunnelUrl).then(() => showToast(t('profile.nodes.copied'))); }}>${t('profile.nodes.copyUrl')}</button>
                     </span>
                   </div>
-                  <div style="padding:.5rem 0">
+                  <div class="pn-padding-half">
                     <span class="pn-detail-label">${t('profile.nodes.agentList')}</span>
                     ${node.agent_gaiis?.length > 0
                       ? html`<div class="pn-agent-list">${node.agent_gaiis.map(g => html`<div class="pn-agent-item">${escHtml(g)}</div>`)}</div>`
-                      : html`<div style="font-size:.8rem;color:var(--muted);margin-top:.3rem">${t('profile.nodes.noAgents')}</div>`}
+                      : html`<div class="pn-no-agents">${t('profile.nodes.noAgents')}</div>`}
                   </div>
                   <div class="pn-detail-row">
                     <span class="pn-detail-label">${t('profile.nodes.mailbox')}</span>
@@ -133,12 +141,12 @@ export default function NodesTab({ session, showToast, onStats }) {
                       <button class="pn-vis-btn ${isPublic ? 'active' : ''}" onClick=${() => handleSetVis(node.node_id, 'public')}>${t('profile.nodes.public')}</button>
                     </div>
                   </div>
-                  <div style="margin-top:.75rem">
-                    <button class="expand-btn" style="font-size:.8rem;padding:6px 12px" onClick=${() => {
+                  <div class="flex-actions">
+                    <button class="expand-btn btn-sm" onClick=${() => {
                       const s = new Set(expandedSetups);
                       s.has(idx) ? s.delete(idx) : s.add(idx);
                       setExpandedSetups(s);
-                    }}>${t('profile.nodes.setupTitle')} <span style="transition:transform .2s;${setupOpen ? 'transform:rotate(180deg)' : ''}">\u25BC</span></button>
+                    }}>${t('profile.nodes.setupTitle')} <span class="pn-setup-arrow ${setupOpen ? 'open' : ''}">\u25BC</span></button>
                     ${setupOpen && html`
                       <div class="pn-setup open">
                         <ol>
@@ -147,7 +155,7 @@ export default function NodesTab({ session, showToast, onStats }) {
                           <li>${t('profile.nodes.setupStep3')}</li>
                           <li>${t('profile.nodes.setupStep4')}</li>
                         </ol>
-                        <a href="/docs/personal-node-setup-guide.md" target="_blank" style="color:var(--love1);font-size:.8rem">${t('profile.nodes.setupDocs')} \u2192</a>
+                        <a href="/docs/personal-node-setup-guide.md" target="_blank" class="pn-setup-link">${t('profile.nodes.setupDocs')} \u2192</a>
                       </div>
                     `}
                   </div>
@@ -169,11 +177,11 @@ function NodeForm({ onRegister, onCancel }) {
       <div class="section-title">${t('profile.nodes.addTitle')}</div>
       <div class="form-row"><label>${t('profile.nodes.nodeIdLabel')}</label><input class="input-field" placeholder=${t('profile.nodes.nodeIdPlaceholder')} value=${nodeId} onInput=${e => setNodeId(e.target.value)} /></div>
       <div class="form-row"><label>${t('profile.nodes.visLabel')}</label>
-        <div style="display:flex;gap:1rem">
-          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+        <div class="radio-row">
+          <label class="radio-label">
             <input type="radio" name="nodeVis" value="private" checked=${vis === 'private'} onChange=${() => setVis('private')} /> ${t('profile.nodes.private')}
           </label>
-          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+          <label class="radio-label">
             <input type="radio" name="nodeVis" value="public" checked=${vis === 'public'} onChange=${() => setVis('public')} /> ${t('profile.nodes.public')}
           </label>
         </div>

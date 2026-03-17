@@ -1,3 +1,9 @@
+/**
+ * @file services-tab.js
+ * @description Profile tab for publishing/managing services and browsing the catalogue.
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; i18n for unit options and detail labels
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
@@ -43,15 +49,15 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
   const priceUnit = svc.unit || svc.pricing?.per_unit?.unit || '';
 
   return html`
-    <div class="card ${expanded ? 'svc-card-expanded' : ''}" style="cursor:pointer" onClick=${onToggle}>
+    <div class="card card-clickable ${expanded ? 'svc-card-expanded' : ''}" onClick=${onToggle}>
       <div class="card-header">
-        <div style="display:flex;align-items:center;gap:8px">
+        <div class="flex-row">
           <span class="svc-expand-icon">${expanded ? '\u25BC' : '\u25B6'}</span>
           <div class="card-title">${escHtml(displayName)}</div>
         </div>
         <div>
           ${category && html`<span class="badge badge-info">${escHtml(category)}</span>`}
-          <span class="badge badge-success" style="margin-left:.25rem">${priceMorsels ? priceMorsels + ' \u2764\uFE0F' : t('profile.services.free')}</span>
+          <span class="badge badge-success pf-badge-gap">${priceMorsels ? priceMorsels + ' \u2764\uFE0F' : t('profile.services.free')}</span>
         </div>
       </div>
       <div class="card-subtitle">${escHtml(svc.description || '')}${svc.owner ? html` \u2502 ${escHtml(svc.owner)}` : ''}</div>
@@ -107,7 +113,7 @@ function ServiceDetail({ svc }) {
         </div>`}
       ${providerGaii && html`
         <div class="svc-detail-row">
-          <span class="svc-detail-label">Provider</span>
+          <span class="svc-detail-label">${t('profile.services.provider')}</span>
           <span class="svc-detail-value mono">${escHtml(providerGaii)}</span>
         </div>`}
       <div class="svc-detail-row">
@@ -121,7 +127,7 @@ function ServiceDetail({ svc }) {
         </div>`}
       ${estimatedTime && html`
         <div class="svc-detail-row">
-          <span class="svc-detail-label">Est. time</span>
+          <span class="svc-detail-label">${t('profile.services.estTime')}</span>
           <span class="svc-detail-value">${estimatedTime}s</span>
         </div>`}
       ${tags.length > 0 && html`
@@ -196,7 +202,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
   const renderMyServices = () => {
     if (!myServices) return html`<${Spinner} text=${t('profile.services.loading')} />`;
     return html`
-      <button class="btn-primary" style="margin-bottom:1rem" onClick=${() => setShowPubForm(!showPubForm)}>${t('profile.services.publishBtn')}</button>
+      <button class="btn-primary mb-1" onClick=${() => setShowPubForm(!showPubForm)}>${t('profile.services.publishBtn')}</button>
       ${showPubForm && html`<${PublishForm} onPublish=${publishService} onCancel=${() => setShowPubForm(false)} />`}
       ${myServices.length === 0
         ? html`<div class="empty">${t('profile.services.empty')}</div>`
@@ -214,7 +220,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
 
   const renderCatalogue = () => html`
     <div class="action-bar">
-      <select class="input-field" style="max-width:200px" value=${catFilter} onChange=${e => { setCatFilter(e.target.value); loadCatalogueData(e.target.value); }}>
+      <select class="input-field pf-select-narrow" value=${catFilter} onChange=${e => { setCatFilter(e.target.value); loadCatalogueData(e.target.value); }}>
         <option value="">${t('profile.services.allCategories')}</option>
         ${SERVICE_CATEGORIES.map(c => html`<option value=${c}>${c}</option>`)}
       </select>
@@ -262,8 +268,8 @@ function PublishForm({ onPublish, onCancel }) {
       <div class="form-row"><label>${t('profile.services.priceLabel')}</label><input type="number" class="input-field" value=${price} min="0" onInput=${e => setPrice(e.target.value)} /></div>
       <div class="form-row"><label>${t('profile.services.unitLabel')}</label>
         <select class="input-field" value=${unit} onChange=${e => setUnit(e.target.value)}>
-          <option value="call">Per call</option><option value="minute">Per minute</option>
-          <option value="token">Per token</option><option value="task">Per task</option>
+          <option value="call">${t('profile.services.unitPerCall')}</option><option value="minute">${t('profile.services.unitPerMinute')}</option>
+          <option value="token">${t('profile.services.unitPerToken')}</option><option value="task">${t('profile.services.unitPerTask')}</option>
         </select>
       </div>
       <div class="form-row"><label>${t('profile.services.webhookLabel')}</label><input class="input-field" placeholder=${t('profile.services.webhookPlaceholder')} value=${webhook} onInput=${e => setWebhook(e.target.value)} /></div>

@@ -1,9 +1,15 @@
+/**
+ * @file notifications-tab.js
+ * @description Profile tab for push notification and email notification preferences.
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; use ToggleSwitch and GlassCard from shared.js
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from './shared.js';
+import { Spinner, ToggleSwitch, GlassCard } from './shared.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 
 export default function NotificationsTab({ session, showToast }) {
@@ -158,56 +164,46 @@ export default function NotificationsTab({ session, showToast }) {
   function renderEmailNotifications() {
     if (!emailVerified) {
       return html`
-        <div style="padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB);opacity:.7">
-          <div style="font-weight:600;margin-bottom:4px">${t('profile.notifications.emailNotifications')}</div>
-          <p style="font-size:.85rem;color:var(--text-dim)">${t('profile.notifications.emailNotVerified')}</p>
-        </div>
+        <${GlassCard}>
+          <div class="pf-notif-disabled">
+            <div class="pf-notif-heading">${t('profile.notifications.emailNotifications')}</div>
+            <p class="text-caption">${t('profile.notifications.emailNotVerified')}</p>
+          </div>
+        </${GlassCard}>
       `;
     }
 
     return html`
-      <div style="padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB)">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-          <div style="flex:1">
-            <div style="font-weight:600;margin-bottom:4px">${t('profile.notifications.emailNotifications')}</div>
-            <div style="font-size:.85rem;color:var(--text-dim)">${t('profile.notifications.enableEmailNotifs')}</div>
+      <${GlassCard}>
+        <div class="flex-between mb-1">
+          <div class="pf-notif-text">
+            <div class="pf-notif-heading">${t('profile.notifications.emailNotifications')}</div>
+            <div class="text-caption">${t('profile.notifications.enableEmailNotifs')}</div>
           </div>
-          <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
-            <input type="checkbox" checked=${emailPrefs.enabled}
-              onChange=${e => handleSaveEmailPrefs({ ...emailPrefs, enabled: e.target.checked })}
-              style="opacity:0;width:0;height:0" />
-            <span style=${{
-              position: 'absolute', inset: 0, borderRadius: '12px', transition: '.2s',
-              background: emailPrefs.enabled ? '#22C55E' : '#D1D5DB',
-            }}></span>
-            <span style=${{
-              position: 'absolute', top: '2px', left: emailPrefs.enabled ? '22px' : '2px',
-              width: '20px', height: '20px', borderRadius: '50%', background: '#fff',
-              transition: '.2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-            }}></span>
-          </label>
+          <${ToggleSwitch} checked=${emailPrefs.enabled}
+            onChange=${e => handleSaveEmailPrefs({ ...emailPrefs, enabled: e.target.checked })} />
         </div>
 
         ${emailPrefs.enabled ? html`
-          <div style="padding-left:8px;border-left:2px solid var(--glass-border,#E5E7EB)">
-            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:.9rem;cursor:pointer">
+          <div class="pf-notif-options">
+            <label class="pf-notif-option">
               <input type="checkbox" checked=${emailPrefs.extensions}
                 onChange=${e => handleSaveEmailPrefs({ ...emailPrefs, extensions: e.target.checked })} />
               ${t('profile.notifications.notifTypeExtensions')}
             </label>
-            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:.9rem;cursor:pointer">
+            <label class="pf-notif-option">
               <input type="checkbox" checked=${emailPrefs.system}
                 onChange=${e => handleSaveEmailPrefs({ ...emailPrefs, system: e.target.checked })} />
               ${t('profile.notifications.notifTypeSystem')}
             </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer">
+            <label class="pf-notif-option">
               <input type="checkbox" checked=${emailPrefs.security}
                 onChange=${e => handleSaveEmailPrefs({ ...emailPrefs, security: e.target.checked })} />
               ${t('profile.notifications.notifTypeSecurity')}
             </label>
           </div>
         ` : null}
-      </div>
+      </${GlassCard}>
     `;
   }
 
@@ -215,9 +211,9 @@ export default function NotificationsTab({ session, showToast }) {
     return html`
       <div class="pf-card">
         <h3>${t('profile.notifications.title')}</h3>
-        <p style="color:var(--text-dim)">${t('profile.notifications.notConfigured')}</p>
+        <p class="text-caption">${t('profile.notifications.notConfigured')}</p>
 
-        <h3 style="margin-top:24px">${t('profile.notifications.emailNotifications')}</h3>
+        <h3 class="mt-section">${t('profile.notifications.emailNotifications')}</h3>
         ${renderEmailNotifications()}
       </div>
     `;
@@ -226,22 +222,23 @@ export default function NotificationsTab({ session, showToast }) {
   return html`
     <div class="pf-card">
       <h3>${t('profile.notifications.title')}</h3>
-      <p style="color:var(--text-dim);font-size:.9rem;margin-bottom:16px">${t('profile.notifications.explain')}</p>
+      <p class="text-caption mb-1">${t('profile.notifications.explain')}</p>
 
-      <div style="display:flex;align-items:center;gap:12px;padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB)">
-        <div style="flex:1">
-          <div style="font-weight:600;margin-bottom:4px">
-            ${t('profile.notifications.browserPush')}
+      <${GlassCard}>
+        <div class="flex-between">
+          <div class="pf-notif-text">
+            <div class="pf-notif-heading">
+              ${t('profile.notifications.browserPush')}
+            </div>
+            <div class="text-caption">
+              ${subscribed
+                ? t('profile.notifications.statusActive')
+                : t('profile.notifications.statusInactive')}
+            </div>
           </div>
-          <div style="font-size:.85rem;color:var(--text-dim)">
-            ${subscribed
-              ? t('profile.notifications.statusActive')
-              : t('profile.notifications.statusInactive')}
-          </div>
-        </div>
 
-        ${subscribed ? html`
-          <div style="display:flex;gap:8px">
+          ${subscribed ? html`
+            <div class="flex-row">
             <button class="btn btn-sm" onClick=${handleTestPush}>
               ${t('profile.notifications.testBtn')}
             </button>
@@ -260,13 +257,13 @@ export default function NotificationsTab({ session, showToast }) {
               : t('profile.notifications.subscribeBtn')}
           </button>
         `}
-      </div>
+      </${GlassCard}>
 
-      <p style="font-size:.8rem;color:var(--text-dim);margin-top:12px">
+      <p class="text-meta mt-xs">
         ${t('profile.notifications.hint')}
       </p>
 
-      <h3 style="margin-top:24px">${t('profile.notifications.emailNotifications')}</h3>
+      <h3 class="mt-section">${t('profile.notifications.emailNotifications')}</h3>
       ${renderEmailNotifications()}
     </div>
   `;

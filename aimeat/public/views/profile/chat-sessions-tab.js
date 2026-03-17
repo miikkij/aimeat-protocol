@@ -1,3 +1,12 @@
+/**
+ * @file chat-sessions-tab.js
+ * @description Profile tab for managing AI chat sessions connected via agents.
+ *   Shows active sessions, allows creating new ones via prompt copy, and
+ *   removing existing sessions.
+ * @version-history
+ *   v1.0.0 — 2026-03-16 — Initial chat sessions tab
+ *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; fix fallback strings
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -40,16 +49,15 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
 
   const handleDelete = useCallback(async (s) => {
     const name = s.display_name || s.name || 'session';
-    confirm(t('profile.chatSessions.confirmDelete')
-        || `Remove chat session "${name}"? The session agent will be deleted.`, async () => {
+    confirm(t('profile.chatSessions.confirmDelete'), async () => {
       setDeleting(s.name);
       try {
         await deleteAgent(s.name);
-        showToast(t('profile.chatSessions.deleted') || 'Session removed');
+        showToast(t('profile.chatSessions.deleted'));
         setExpanded(null);
         loadData();
       } catch {
-        showToast(t('profile.chatSessions.deleteError') || 'Failed to remove session');
+        showToast(t('profile.chatSessions.deleteError'));
       } finally { setDeleting(null); }
     }, { danger: true });
   }, [showToast, loadData]);
@@ -68,12 +76,12 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
       const text = resp?.data?.prompt;
       if (text) {
         await navigator.clipboard.writeText(text);
-        showToast(t('profile.chatSessions.promptCopied') || 'Prompt copied to clipboard');
+        showToast(t('profile.chatSessions.promptCopied'));
       } else {
-        showToast(t('profile.chatSessions.promptError') || 'Could not load prompt template');
+        showToast(t('profile.chatSessions.promptError'));
       }
     } catch {
-      showToast(t('profile.chatSessions.promptError') || 'Could not load prompt template');
+      showToast(t('profile.chatSessions.promptError'));
     } finally { setCopying(null); }
   }, [showToast]);
 
@@ -82,26 +90,26 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     <div class="section-title">${t('profile.chatSessions.title')}</div>
     <div class="section-desc">${t('profile.chatSessions.desc')}</div>
 
-    <div class="card" style="margin-bottom:1rem">
+    <div class="card mb-1">
       <div class="card-header">
-        <div class="card-title">${t('profile.chatSessions.createTitle') || 'Create a Chat Session'}</div>
+        <div class="card-title">${t('profile.chatSessions.createTitle')}</div>
       </div>
-      <div style="padding:.75rem 1rem .5rem">
-        <p style="margin:0 0 .5rem;font-size:.85rem;color:var(--muted,#6B7280)">
-          ${t('profile.chatSessions.createDesc') || 'Copy a prompt below and paste it into your AI chat (Claude, ChatGPT, Grok, etc.) to create a new chat session connected to your AIMEAT node.'}
+      <div class="cs-create-body">
+        <p class="cs-create-desc">
+          ${t('profile.chatSessions.createDesc')}
         </p>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <div class="flex-row-wrap mb-half">
           <button class="btn-sm btn-copy" onClick=${() => copyPrompt('quick')}
             disabled=${copying === 'quick'}>
-            ${copying === 'quick' ? '...' : (t('profile.chatSessions.copyQuickPrompt') || 'Copy Quick Prompt')}
+            ${copying === 'quick' ? '...' : t('profile.chatSessions.copyQuickPrompt')}
           </button>
           <button class="btn-sm btn-copy" onClick=${() => copyPrompt('detailed')}
             disabled=${copying === 'detailed'}>
-            ${copying === 'detailed' ? '...' : (t('profile.chatSessions.copyDetailedPrompt') || 'Copy Detailed Prompt')}
+            ${copying === 'detailed' ? '...' : t('profile.chatSessions.copyDetailedPrompt')}
           </button>
         </div>
-        <p style="margin:0;font-size:.75rem;color:var(--muted,#6B7280);font-style:italic">
-          ${t('profile.chatSessions.createHint') || 'Quick Prompt works with AIs that can browse the web. Detailed Prompt includes full connection instructions for any AI.'}
+        <p class="cs-create-hint">
+          ${t('profile.chatSessions.createHint')}
         </p>
       </div>
     </div>
@@ -109,14 +117,14 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     ${chatSessions.length === 0
       ? html`<div class="empty">${t('profile.chatSessions.empty')}</div>`
       : html`
-        <div class="section-title" style="font-size:.9rem;margin-top:1rem">${t('profile.chatSessions.activeSessions') || 'Active Sessions'}</div>
+        <div class="section-title cs-section-sub">${t('profile.chatSessions.activeSessions')}</div>
         ${chatSessions.map(s => {
           const isExpanded = expanded === s.name;
           return html`
             <div class="card ${isExpanded ? 'card-expanded' : ''}" key=${s.name}>
               <div class="card-header card-clickable" onClick=${() => toggleExpand(s.name)}>
                 <span class="expand-icon">${isExpanded ? '\u25BC' : '\u25B6'}</span>
-                <div class="card-title">${escHtml(s.display_name || s.name || t('profile.chatSessions.anonymous'))}</div>
+                <div class="card-title">${escHtml(s.display_name || s.name || '-')}</div>
                 <span class="badge badge-info">${escHtml(s.name || '')}</span>
               </div>
               <div class="card-subtitle">${t('profile.chatSessions.lastSeen')}: ${s.last_seen ? timeAgo(s.last_seen) : '-'}</div>
@@ -130,39 +138,39 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                     </div>
                     ${s.description ? html`
                       <div class="detail-item">
-                        <span class="detail-label">${t('profile.chatSessions.description') || 'Description'}</span>
+                        <span class="detail-label">${t('profile.chatSessions.description')}</span>
                         <span class="detail-value">${escHtml(s.description)}</span>
                       </div>
                     ` : null}
                     <div class="detail-item">
-                      <span class="detail-label">${t('profile.chatSessions.trust') || 'Trust'}</span>
+                      <span class="detail-label">${t('profile.chatSessions.trust')}</span>
                       <span class="detail-value">${s.trust_score ?? '-'}</span>
                     </div>
                     <div class="detail-item">
-                      <span class="detail-label">${t('profile.chatSessions.balance') || 'Balance'}</span>
+                      <span class="detail-label">${t('profile.chatSessions.balance')}</span>
                       <span class="detail-value">${s.morsel_balance ?? '-'} morsels</span>
                     </div>
                     ${s.roles ? html`
                       <div class="detail-item">
-                        <span class="detail-label">${t('profile.chatSessions.roles') || 'Roles'}</span>
+                        <span class="detail-label">${t('profile.chatSessions.roles')}</span>
                         <span class="detail-value">${(s.roles || []).join(', ')}</span>
                       </div>
                     ` : null}
                     ${s.created_at ? html`
                       <div class="detail-item">
-                        <span class="detail-label">${t('profile.chatSessions.created') || 'Created'}</span>
+                        <span class="detail-label">${t('profile.chatSessions.created')}</span>
                         <span class="detail-value">${new Date(s.created_at).toLocaleString()}</span>
                       </div>
                     ` : null}
                   </div>
 
-                  <div class="card-actions" style="margin-top:.75rem">
+                  <div class="card-actions flex-actions">
                     <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.gaii || s.name); showToast('GAII copied'); }}>
                       Copy GAII
                     </button>
                     <button class="btn-sm btn-danger" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}
                       disabled=${deleting === s.name}>
-                      ${deleting === s.name ? '...' : (t('profile.chatSessions.remove') || 'Remove Session')}
+                      ${deleting === s.name ? '...' : t('profile.chatSessions.remove')}
                     </button>
                   </div>
                 </div>

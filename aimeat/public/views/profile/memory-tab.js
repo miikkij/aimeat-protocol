@@ -1,10 +1,17 @@
+/**
+ * @file memory-tab.js
+ * @description Profile tab for memory entries and file management — CRUD, search,
+ *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Spinner, recipientBadge } from './shared.js';
+import { Spinner, recipientBadge, VisibilityPill } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import { listAgents } from '/js/services/agents.js';
 import { getKeyPermissions } from '/js/services/consent.js';
@@ -221,31 +228,31 @@ export default function MemoryTab({ session, showToast, onStats }) {
             ${expandedMem === m.key && html`
               <div class="mem-detail">
                 <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
-                <div style="margin-top:.5rem">
-                  <button class="btn-sm btn-outline" style="font-size:.7rem" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
+                <div class="mb-half">
+                  <button class="btn-sm btn-outline pf-btn-xs" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
                     ${t('tags.editTags') || 'Edit tags'}
                   </button>
                 </div>
                 ${editingMemTags === m.key && html`
-                  <div style="margin-top:.5rem">
+                  <div class="mb-half">
                     <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />
                   </div>
                 `}
-                ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div style="margin-top:.5rem;font-size:.75rem;color:var(--muted)">${m.tags.join(', ')}</div>`}
+                ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div class="text-meta-sm mb-half">${m.tags.join(', ')}</div>`}
                 ${keyRulesPopover && keyRulesPopover.key === m.key && html`
                   <div class="key-rules-box">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-                      <strong style="font-size:.85rem">\u{1F6E1}\uFE0F ${t('permissions.sharingRules')}</strong>
+                    <div class="flex-between mb-half">
+                      <strong class="text-caption">\u{1F6E1}\uFE0F ${t('permissions.sharingRules')}</strong>
                       <button class="btn-sm btn-outline" onClick=${() => setKeyRulesPopover(null)}>\u2715</button>
                     </div>
-                    <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem">Visibility: ${keyRulesPopover.visibility}</div>
+                    <div class="text-meta-sm mb-half">Visibility: ${keyRulesPopover.visibility}</div>
                     ${keyRulesPopover.rules.length === 0
-                      ? html`<div style="font-size:.8rem;color:var(--muted);font-style:italic">${t('permissions.noRules')}</div>`
+                      ? html`<div class="text-meta pf-italic">${t('permissions.noRules')}</div>`
                       : keyRulesPopover.rules.map(r => html`
-                        <div style="display:flex;gap:.5rem;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+                        <div class="pf-rule-row">
                           ${recipientBadge(r.recipient)}
-                          <span style="font-family:monospace;font-size:.75rem">${escHtml(r.data_pattern)}</span>
-                          <span style="font-size:.75rem;color:var(--muted);margin-left:auto">${escHtml(r.scope || '-')}</span>
+                          <span class="text-code text-meta-sm">${escHtml(r.data_pattern)}</span>
+                          <span class="text-meta-sm pf-ml-auto">${escHtml(r.scope || '-')}</span>
                         </div>`)
                     }
                   </div>
@@ -294,7 +301,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
       <div class="action-bar">
         <button class="btn-primary" onClick=${() => setShowFileForm(!showFileForm)}>${t('profile.files.uploadBtn')}</button>
         ${filtered.length > 0 && html`<button class="btn-sm btn-outline" onClick=${copyFileUrls} title="Copy file URLs">\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})</button>`}
-        <span style="font-size:.75rem;color:var(--muted)">${t('profile.files.sizeLimit')}</span>
+        <span class="text-meta-sm">${t('profile.files.sizeLimit')}</span>
       </div>
       <${TagCloud} tags=${[...allTags]} selected=${fileTagFilter} onToggle=${toggleTag} onClear=${() => setFileTagFilter(new Set())} />
       ${showFileForm && html`<${FileUploadForm} onUpload=${handleUploadFiles} onCancel=${() => setShowFileForm(false)} />`}
@@ -313,13 +320,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
                       ? html`<${TagEditor} tags=${f.tags || []} onSave=${(tags) => handleUpdateFileTags(f.key || f.name, tags)} />`
                       : html`
                         ${f.tags?.length > 0 && html`<div class="file-tags">${f.tags.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}</div>`}
-                        <button class="btn-sm btn-outline" style="font-size:.65rem;margin-top:.25rem;padding:1px 6px" onClick=${() => setEditingFileTags(f.key || f.name)}>
+                        <button class="btn-sm btn-outline pf-btn-xs mt-xs" onClick=${() => setEditingFileTags(f.key || f.name)}>
                           ${t('tags.editTags') || 'Edit tags'}
                         </button>
                       `}
                   </div>
                   <div class="file-actions">
-                    <a class="btn-sm" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}" target="_blank" style="text-decoration:none">${t('profile.files.download')}</a>
+                    <a class="btn-sm pf-no-underline" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}" target="_blank">${t('profile.files.download')}</a>
                     <button class="btn-danger" onClick=${() => handleDeleteFile(f.key || f.name)}>${t('profile.files.delete')}</button>
                   </div>
                 </div>`;
@@ -333,9 +340,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     <div class="section-desc">${t('profile.memory.desc')}</div>
 
     ${agents.length > 1 && html`
-      <div class="agent-selector" style="margin-bottom:.75rem">
-        <label style="font-size:.8rem;color:var(--muted);margin-right:.5rem">${t('profile.memory.agent') || 'Agent'}:</label>
-        <select class="input-field" style="display:inline-block;width:auto;min-width:12rem"
+      <div class="agent-selector mb-half">
+        <label class="text-meta pf-mr-half">${t('profile.memory.agent') || 'Agent'}:</label>
+        <select class="input-field pf-select-inline"
           value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); }}>
           <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
           ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${escHtml(a.name || a.gaii)}${a.display_name ? ` — ${escHtml(a.display_name)}` : ''}</option>`)}
@@ -449,12 +456,12 @@ function FileUploadForm({ onUpload, onCancel }) {
           onDragOver=${(e) => { e.preventDefault(); setDragover(true); }}
           onDragLeave=${() => setDragover(false)}
           onDrop=${handleDrop}>
-          <input type="file" multiple ref=${fileRef} style="display:none"
+          <input type="file" multiple ref=${fileRef} class="pf-hidden"
             onChange=${e => { addFiles(Array.from(e.target.files || [])); e.target.value = ''; }} />
           <div class="file-dropzone-empty">
-            <span style="font-size:2rem;opacity:.5">\u{2B06}\uFE0F</span>
+            <span class="pf-upload-icon">\u{2B06}\uFE0F</span>
             <span>${t('profile.files.dropHere')}</span>
-            <span style="color:var(--muted);font-size:.8rem">${t('profile.files.orClick')}</span>
+            <span class="text-meta">${t('profile.files.orClick')}</span>
           </div>
         </div>
       </div>
@@ -462,12 +469,12 @@ function FileUploadForm({ onUpload, onCancel }) {
         <div class="file-upload-list">
           ${fileItems.map((item, idx) => html`
             <div class="file-upload-item" key=${item.file.name + item.file.size}>
-              <span style="font-size:1.2rem;flex-shrink:0">${fileIcon(item.file.type)}</span>
-              <input class="input-field" style="flex:1;min-width:0" value=${item.key}
+              <span class="pf-file-icon">${fileIcon(item.file.type)}</span>
+              <input class="input-field pf-flex-fill" value=${item.key}
                 onInput=${e => updateKey(idx, e.target.value)}
                 onClick=${e => e.stopPropagation()} />
-              <span style="color:var(--muted);font-size:.8rem;flex-shrink:0;white-space:nowrap">${Math.round(item.file.size / 1024)} KB</span>
-              <button class="btn-sm btn-outline" style="flex-shrink:0;padding:4px 8px" onClick=${() => removeFile(idx)}>\u2715</button>
+              <span class="text-meta pf-nowrap pf-shrink-0">${Math.round(item.file.size / 1024)} KB</span>
+              <button class="btn-sm btn-outline pf-shrink-0" onClick=${() => removeFile(idx)}>\u2715</button>
             </div>
           `)}
         </div>
@@ -480,14 +487,14 @@ function FileUploadForm({ onUpload, onCancel }) {
         </select>
       </div>
       <div class="form-row"><label>${t('profile.files.tagsLabel') || 'Tags'}</label>
-        <div style="display:flex;gap:.5rem;align-items:center">
-          <input class="input-field" style="flex:1" placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
+        <div class="flex-row">
+          <input class="input-field pf-flex-fill" placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
             value=${tagInput} onInput=${e => setTagInput(e.target.value)}
             onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
           <button type="button" class="btn-sm" onClick=${addTag}>+</button>
         </div>
         ${fileTags.length > 0 && html`
-          <div class="file-tag-cloud" style="margin-top:.5rem">
+          <div class="file-tag-cloud mb-half">
             ${fileTags.map(tag => html`
               <span class="file-tag-btn active" key=${tag} onClick=${() => removeTag(tag)}>
                 ${tag} \u2715
@@ -517,8 +524,8 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
         <h3>${t('profile.memory.editTitle')}: ${escHtml(memKey)}</h3>
-        <div class="form-row" style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
-          <label style="margin:0">${t('profile.memory.visLabel')}</label>
+        <div class="form-row flex-row mb-half">
+          <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
           <button class="kpkg-vis-pill"
             onClick=${() => setVis(nextVis)}
             title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
@@ -526,7 +533,7 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
           >${t('knowledge.visibility.' + vis)} ▾</button>
         </div>
         <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
-        <div class="form-actions" style="margin-top:1rem">
+        <div class="form-actions mt-1">
           <button class="btn-primary" onClick=${() => onSave(value, vis, initialVersion)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>

@@ -1,3 +1,9 @@
+/**
+ * @file apps-tab.js
+ * @description Profile tab for HTML app management — upload, gallery, access code editing.
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, text-caption, etc.)
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -83,59 +89,59 @@ export default function AppsTab({ session, showToast, onStats }) {
     <div class="section-desc">${t('profile.apps.desc')}</div>
 
     <!-- App launcher -->
-    <div class="card" style="margin-bottom:1rem">
-      <h3 style="color:var(--accent,#E8564A);font-size:1rem;margin-bottom:.5rem">\u{1F680} ${t('profile.apps.launcherTitle')}</h3>
-      <p style="font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem">${t('profile.apps.launcherDesc')}</p>
-      <a href="/app-catalog.html" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block">${t('profile.apps.launcherOpen')}</a>
+    <div class="card mb-1">
+      <h3 class="card-h3">\u{1F680} ${t('profile.apps.launcherTitle')}</h3>
+      <p class="text-caption mb-half">${t('profile.apps.launcherDesc')}</p>
+      <a href="/app-catalog.html" target="_blank" class="btn-primary pf-no-underline pf-inline-block">${t('profile.apps.launcherOpen')}</a>
     </div>
 
     <!-- Create guide -->
-    <div class="card" style="margin-bottom:1rem">
-      <h3 style="color:var(--accent,#E8564A);font-size:1rem;margin-bottom:.5rem">\u2728 ${t('profile.apps.createGuide')}</h3>
-      <p style="font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem">${t('profile.apps.createGuideDesc')}</p>
-      <a href="/v1/aimeat-os" target="_blank" class="btn-primary" style="text-decoration:none;display:inline-block;margin-bottom:.5rem">${t('profile.apps.downloadGuide')}</a>
-      <p style="font-size:.8rem;color:var(--text-dim,#6B7280)">${t('profile.apps.guideDesc')}</p>
+    <div class="card mb-1">
+      <h3 class="card-h3">\u2728 ${t('profile.apps.createGuide')}</h3>
+      <p class="text-caption mb-half">${t('profile.apps.createGuideDesc')}</p>
+      <a href="/v1/aimeat-os" target="_blank" class="btn-primary pf-no-underline pf-inline-block mb-half">${t('profile.apps.downloadGuide')}</a>
+      <p class="text-meta">${t('profile.apps.guideDesc')}</p>
     </div>
 
     <!-- Upload -->
-    <button class="btn-primary" style="margin-bottom:1rem" onClick=${() => setShowAppUpload(!showAppUpload)}>${t('profile.apps.uploadBtn')}</button>
+    <button class="btn-primary mb-1" onClick=${() => setShowAppUpload(!showAppUpload)}>${t('profile.apps.uploadBtn')}</button>
     ${showAppUpload && html`<${AppUploadForm} onUpload=${handleUpload} onCancel=${() => setShowAppUpload(false)} />`}
 
     <!-- My Apps -->
-    <div class="section-title" style="margin-top:1.5rem">${t('profile.apps.mine')}</div>
+    <div class="section-title section-title-spaced">${t('profile.apps.mine')}</div>
     ${!myApps ? html`<${Spinner} text=${t('profile.apps.loading')} />`
       : myApps.length === 0 ? html`<div class="empty">${t('profile.apps.empty')}</div>`
       : myApps.map(a => html`
         <div class="card">
           <div class="card-header">
             <div class="card-title">${escHtml(a.manifest?.name || a.filename || a.name)}</div>
-            <div style="display:flex;gap:.5rem;align-items:center">
+            <div class="flex-row">
               ${a.manifest?.version ? html`<span class="badge">${'v' + escHtml(a.manifest.version)}</span>` : ''}
               ${a.version_number > 1 ? html`<span class="badge badge-dim">${'#' + a.version_number}</span>` : ''}
               <span class="badge badge-info">${escHtml(a.mime_type || a.content_type || 'html')}</span>
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
             </div>
           </div>
-          ${a.manifest?.description ? html`<div style="font-size:.8rem;color:var(--text-dim,#6B7280);margin-bottom:.35rem">${escHtml(a.manifest.description)}</div>` : ''}
+          ${a.manifest?.description ? html`<div class="text-meta mb-half">${escHtml(a.manifest.description)}</div>` : ''}
           <div class="card-subtitle">
             <a href="${NODE_URL}/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}" target="_blank">${t('profile.apps.download')}</a>
             ${a.size ? ' \u2022 ' + Math.round(a.size / 1024) + ' KB' : ''}
             ${a.created_at ? ' \u2022 ' + timeAgo(a.created_at) : ''}
             ${a.downloads ? ' \u2022 ' + a.downloads + ' \u{2B07}' : ''}
           </div>
-          <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+          <div class="flex-row-wrap mb-half">
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
             <button class="btn-sm btn-danger" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
           ${editingApp === a.filename ? html`
-            <div style="margin-top:.75rem;padding:.75rem;background:var(--bg2,#f5f5f5);border-radius:8px">
-              <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:.25rem">${t('profile.apps.accessCodeLabel') || 'Access Code'}</label>
-              <div style="display:flex;gap:.5rem;align-items:center">
-                <input class="input-field" style="flex:1" placeholder=${t('profile.apps.accessCodePlaceholder') || 'Leave empty to remove protection'} value=${editCode} onInput=${e => setEditCode(e.target.value)} />
+            <div class="pf-edit-panel">
+              <label class="text-meta mb-half">${t('profile.apps.accessCodeLabel') || 'Access Code'}</label>
+              <div class="flex-row">
+                <input class="input-field pf-flex-fill" placeholder=${t('profile.apps.accessCodePlaceholder') || 'Leave empty to remove protection'} value=${editCode} onInput=${e => setEditCode(e.target.value)} />
                 <button class="btn-primary btn-sm" onClick=${() => handleSaveAccessCode(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
                 <button class="btn-sm btn-outline" onClick=${cancelEdit}>${t('profile.cancel') || 'Cancel'}</button>
               </div>
-              ${editCode.trim() === '' ? html`<div style="font-size:.75rem;color:var(--muted);margin-top:.25rem">${t('profile.apps.removeProtectionHint') || 'Save empty to remove access code protection'}</div>` : ''}
+              ${editCode.trim() === '' ? html`<div class="text-meta-sm mt-xs">${t('profile.apps.removeProtectionHint') || 'Save empty to remove access code protection'}</div>` : ''}
             </div>
           ` : ''}
         </div>
@@ -143,7 +149,7 @@ export default function AppsTab({ session, showToast, onStats }) {
     }
 
     <!-- Gallery -->
-    <div class="section-title" style="margin-top:1.5rem">${t('profile.apps.gallery')}</div>
+    <div class="section-title section-title-spaced">${t('profile.apps.gallery')}</div>
     ${!allApps ? html`<${Spinner} text=${t('profile.apps.galleryLoading')} />`
       : allApps.length === 0 ? html`<div class="empty">${t('profile.apps.galleryEmpty')}</div>`
       : html`<div class="app-grid">
@@ -156,14 +162,14 @@ export default function AppsTab({ session, showToast, onStats }) {
                 </div>
                 <div class="app-info">
                   <div class="app-name">${escHtml(a.manifest?.name || a.filename)}</div>
-                  ${a.manifest?.description ? html`<div style="font-size:.75rem;color:var(--text-dim,#6B7280);margin:.15rem 0">${escHtml(a.manifest.description)}</div>` : ''}
+                  ${a.manifest?.description ? html`<div class="text-meta-sm">${escHtml(a.manifest.description)}</div>` : ''}
                   <div class="app-meta">
                     ${escHtml(a.owner)} \u2022 ${Math.round((a.size || 0) / 1024)} KB
                     ${a.manifest?.version ? ' \u2022 v' + escHtml(a.manifest.version) : ''}
                     ${a.created_at ? ' \u2022 ' + timeAgo(a.created_at) : ''}
                     ${a.protected ? ' \u2022 \u{1F512} ' + t('profile.apps.protected') : ''}
                   </div>
-                  <div style="margin-top:.5rem"><a href="${NODE_URL + (a.download_url || '/v1/apps/' + encodeURIComponent(a.owner) + '/' + encodeURIComponent(a.filename))}" class="btn-sm" style="text-decoration:none;display:inline-block">${t('profile.apps.download')}</a></div>
+                  <div class="mb-half"><a href="${NODE_URL + (a.download_url || '/v1/apps/' + encodeURIComponent(a.owner) + '/' + encodeURIComponent(a.filename))}" class="btn-sm pf-no-underline pf-inline-block">${t('profile.apps.download')}</a></div>
                 </div>
               </div>`;
           })}

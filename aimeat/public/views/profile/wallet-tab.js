@@ -1,3 +1,11 @@
+/**
+ * @file wallet-tab.js
+ * @description Profile tab for morsel wallet: balance overview, lifetime stats,
+ *   morsel request form, and transaction history with expandable details.
+ * @version-history
+ *   v1.0.0 — 2026-03-16 — Initial wallet tab
+ *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -153,7 +161,7 @@ export default function WalletTab({ session, showToast, onStats }) {
     </div>
 
     <!-- Copy balance button -->
-    <div style="margin-bottom:1rem">
+    <div class="mb-1">
       <button class="wallet-balance-copy" onClick=${handleCopyBalance}>
         ${balanceCopied ? t('profile.wallet.copied') : t('profile.wallet.copyBalance')}
       </button>
@@ -161,10 +169,10 @@ export default function WalletTab({ session, showToast, onStats }) {
 
     <!-- Lifetime stats -->
     ${(lifetime.earned != null || lifetime.spent != null) && html`
-      <div class="section-title" style="margin-top:.5rem">${t('profile.wallet.lifetime')}</div>
+      <div class="section-title">${t('profile.wallet.lifetime')}</div>
       <div class="wallet-lifetime">
-        <div class="wl-stat"><div class="wl-val" style="color:var(--success,#22c55e)">${lifetime.earned ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeEarned')}</div></div>
-        <div class="wl-stat"><div class="wl-val" style="color:var(--danger,#ef4444)">${lifetime.spent ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeSpent')}</div></div>
+        <div class="wl-stat"><div class="wl-val wl-val-success">${lifetime.earned ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeEarned')}</div></div>
+        <div class="wl-stat"><div class="wl-val wl-val-danger">${lifetime.spent ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeSpent')}</div></div>
         <div class="wl-stat"><div class="wl-val">${lifetime.received_allowance ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeAllowance')}</div></div>
         <div class="wl-stat"><div class="wl-val">${lifetime.welcome_bonus ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeWelcome')}</div></div>
       </div>
@@ -182,10 +190,10 @@ export default function WalletTab({ session, showToast, onStats }) {
               value=${reqAmount}
               onInput=${e => setReqAmount(e.target.value)}
               placeholder=${t('profile.wallet.requestAmountHint')}
-              style="width:120px"
+              class="wallet-input-w"
               required />
           </div>
-          <div class="wr-field" style="flex:1;min-width:150px">
+          <div class="wr-field wallet-reason-field">
             <label>${t('profile.wallet.requestReason')}</label>
             <input type="text"
               value=${reqReason}
@@ -200,7 +208,7 @@ export default function WalletTab({ session, showToast, onStats }) {
     </div>
 
     <!-- Transaction history -->
-    <div class="section-title" style="margin-top:1.5rem">${t('profile.wallet.recentTx')}</div>
+    <div class="section-title section-title-spaced">${t('profile.wallet.recentTx')}</div>
     ${(!walletTx || walletTx.length === 0)
       ? html`<div class="empty">${t('profile.wallet.empty')}</div>`
       : html`<div class="card"><div class="tx-list">
@@ -215,14 +223,14 @@ export default function WalletTab({ session, showToast, onStats }) {
                   <div>
                     <span class="tx-type">${typeLabel}</span>
                     ${' '}
-                    <span style="font-size:.8rem">${escHtml(tx.description || tx.memo || '')}</span>
+                    <span class="work-desc-text">${escHtml(tx.description || tx.memo || '')}</span>
                   </div>
-                  <div style="text-align:right;display:flex;align-items:center;gap:.5rem">
+                  <div class="work-tx-right">
                     <div>
                       <div class="tx-amount ${isCredit ? 'credit' : 'debit'}">${isCredit ? '+' : ''}${tx.amount}</div>
                       <div class="tx-date">${tx.timestamp ? timeAgo(tx.timestamp) : (tx.created_at ? timeAgo(tx.created_at) : '')}</div>
                     </div>
-                    <span style="font-size:.7rem;opacity:.5">${isExpanded ? '\u25B2' : '\u25BC'}</span>
+                    <span class="expand-arrow">${isExpanded ? '\u25B2' : '\u25BC'}</span>
                   </div>
                 </div>
                 ${isExpanded && html`
@@ -248,9 +256,9 @@ export default function WalletTab({ session, showToast, onStats }) {
                       <span class="tx-detail-value">${new Date(tx.timestamp).toLocaleString()}</span>
                     `}
                     ${!tx.counterparty_gaii && !tx.tracking_code && !tx.timestamp && html`
-                      <span class="tx-detail-value" style="grid-column:1/-1">${t('profile.wallet.noDetails')}</span>
+                      <span class="tx-detail-value work-grid-span">${t('profile.wallet.noDetails')}</span>
                     `}
-                    <div style="grid-column:1/-1">
+                    <div class="work-grid-span">
                       <button class="tx-copy-btn" onClick=${(e) => handleCopyTx(tx, e)}>
                         ${isCopied ? t('profile.wallet.copied') : t('profile.wallet.copyTx')}
                       </button>

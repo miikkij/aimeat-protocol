@@ -1,3 +1,9 @@
+/**
+ * @file security-tab.js
+ * @description Profile tab for CORS origin management (GHII + per-agent) and session revocation.
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, flex-between, etc.)
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
@@ -84,36 +90,36 @@ export default function SecurityTab({ session, showToast }) {
     <div class="section-title">\u{1F512} ${t('profile.security.title')}</div>
     <div class="section-desc">${t('profile.security.desc')}</div>
 
-    <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.ghiiTitle')}</h3>
-    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${t('profile.security.ghiiDesc')}</p>
+    <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
+    <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-        <span style="font-weight:600">${t('profile.security.allowedOrigins')}</span>
+      <div class="flex-between mb-half">
+        <span class="pf-bold">${t('profile.security.allowedOrigins')}</span>
         <span class="badge ${isInherited ? 'badge-muted' : 'badge-success'}">${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}</span>
       </div>
-      <div style="font-size:.85rem;color:var(--muted);margin-bottom:.5rem">
+      <div class="text-caption mb-half">
         ${t('profile.security.effective')}: ${effectiveOrigins.includes('*') ? t('profile.security.wildcard') : effectiveOrigins.join(', ') || '-'}
       </div>
       ${corsEditGhii !== null ? html`
-        <textarea style="width:100%;min-height:60px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;font-family:monospace;font-size:.85rem;margin-bottom:.5rem"
+        <textarea class="input-field text-code mb-half"
           placeholder=${t('profile.security.originsPlaceholder')}
           value=${corsEditGhii}
           onInput=${e => setCorsEditGhii(e.target.value)}></textarea>
-        <div style="display:flex;gap:.5rem">
+        <div class="flex-row">
           <button class="btn-primary" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
           <button class="revoke-btn" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
-          <button style="background:none;border:1px solid var(--border);color:var(--muted);padding:4px 12px;border-radius:4px;cursor:pointer" onClick=${() => setCorsEditGhii(null)}>\u2715</button>
+          <button class="btn-outline" onClick=${() => setCorsEditGhii(null)}>\u2715</button>
         </div>
       ` : html`
         <button class="btn-primary" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
       `}
     </div>
 
-    <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.agentsTitle')}</h3>
-    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${t('profile.security.agentsDesc')}</p>
+    <h3 class="card-h3 mt-section">${t('profile.security.agentsTitle')}</h3>
+    <p class="text-caption mb-1">${t('profile.security.agentsDesc')}</p>
     ${agentsCors.length === 0
       ? html`<div class="empty">${t('profile.security.noAgents')}</div>`
-      : html`<div class="card" style="overflow-x:auto">
+      : html`<div class="card scroll-x">
           <table class="consent-table"><thead><tr>
             <th>${t('profile.security.agent')}</th>
             <th>${t('profile.security.origins')}</th>
@@ -125,9 +131,9 @@ export default function SecurityTab({ session, showToast }) {
               const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
               const isEditing = corsEditAgent && corsEditAgent.name === agentName;
               return html`<tr>
-                <td><span style="font-family:monospace;font-size:.8rem;color:var(--love3)">${escHtml(agentName)}</span></td>
-                <td style="font-size:.8rem">${isEditing
-                  ? html`<textarea style="width:200px;min-height:40px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-family:monospace;font-size:.8rem"
+                <td><span class="text-code text-accent">${escHtml(agentName)}</span></td>
+                <td class="text-meta">${isEditing
+                  ? html`<textarea class="input-field text-code pf-textarea-sm"
                       value=${corsEditAgent.value}
                       onInput=${e => setCorsEditAgent({name: agentName, value: e.target.value})}></textarea>`
                   : html`${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}`
@@ -137,10 +143,10 @@ export default function SecurityTab({ session, showToast }) {
                   : html`<span class="badge badge-muted">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`
                 }</td>
                 <td>${isEditing
-                  ? html`<div style="display:flex;gap:.25rem">
-                      <button class="btn-primary" style="font-size:.75rem;padding:2px 8px" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
-                      <button class="revoke-btn" style="font-size:.75rem" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
-                      <button style="background:none;border:1px solid var(--border);color:var(--muted);padding:2px 8px;border-radius:4px;cursor:pointer;font-size:.75rem" onClick=${() => setCorsEditAgent(null)}>\u2715</button>
+                  ? html`<div class="flex-row">
+                      <button class="btn-primary pf-btn-xs" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
+                      <button class="revoke-btn pf-btn-xs" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
+                      <button class="btn-outline pf-btn-xs" onClick=${() => setCorsEditAgent(null)}>\u2715</button>
                     </div>`
                   : html`<button class="revoke-btn" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`
                 }</td>
@@ -150,21 +156,21 @@ export default function SecurityTab({ session, showToast }) {
         </div>`
     }
 
-    <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.inheritanceTitle')}</h3>
+    <h3 class="card-h3 mt-section">${t('profile.security.inheritanceTitle')}</h3>
     <div class="card">
-      <p style="font-size:.85rem;color:var(--muted)">${t('profile.security.inheritanceDesc')}</p>
-      <div style="margin-top:.75rem;font-size:.8rem;font-family:monospace;color:var(--love3)">
+      <p class="text-caption">${t('profile.security.inheritanceDesc')}</p>
+      <div class="text-code text-meta text-accent mt-xs">
         Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
       </div>
     </div>
 
-    <h3 style="color:var(--love1);margin:1.5rem 0 .75rem">${t('profile.security.sessions') || 'Session Management'}</h3>
-    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">${t('profile.security.sessionsHint') || 'Revoke all active sessions. You will need to re-authenticate on all devices.'}</p>
+    <h3 class="card-h3 mt-section">${t('profile.security.sessions') || 'Session Management'}</h3>
+    <p class="text-caption mb-1">${t('profile.security.sessionsHint') || 'Revoke all active sessions. You will need to re-authenticate on all devices.'}</p>
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:600">${t('profile.security.sessionsLabel') || 'Active Sessions'}</span>
+      <div class="flex-between">
+        <span class="pf-bold">${t('profile.security.sessionsLabel') || 'Active Sessions'}</span>
       </div>
-      <p style="font-size:.85rem;color:var(--muted);margin:.5rem 0">${t('profile.security.sessionsDesc') || 'Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.'}</p>
+      <p class="text-caption mb-half">${t('profile.security.sessionsDesc') || 'Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.'}</p>
       <button class="sec-revoke-btn" onClick=${handleRevokeAll} disabled=${revoking}>
         ${revoking ? (t('profile.security.revoking') || 'Revoking...') : (t('profile.security.revokeAll') || 'Revoke All Sessions')}
       </button>

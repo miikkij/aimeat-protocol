@@ -1,3 +1,12 @@
+/**
+ * @file work-tab.js
+ * @description Profile tab for managing incoming and outgoing work requests.
+ *   Displays inbox (received) and sent work items with accept/decline/deliver actions
+ *   and a rating modal for completed deliveries.
+ * @version-history
+ *   v1.0.0 — 2026-03-16 — Initial work tab
+ *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; i18n for action labels
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -44,11 +53,11 @@ export default function WorkTab({ session, showToast, onStats }) {
     setActionLoading(tc);
     try {
       const resp = await acceptWork(tc);
-      if (resp.ok === false) { showToast(resp.error?.message || 'Failed to accept work', true); return; }
-      showToast('Work accepted');
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.accepted'), true); return; }
+      showToast(t('profile.work.accepted'));
       loadData();
     } catch (e) {
-      showToast(e.message || 'Failed to accept work', true);
+      showToast(e.message || t('profile.work.accepted'), true);
     } finally {
       setActionLoading(null);
     }
@@ -58,11 +67,11 @@ export default function WorkTab({ session, showToast, onStats }) {
     setActionLoading(tc);
     try {
       const resp = await rejectWork(tc);
-      if (resp.ok === false) { showToast(resp.error?.message || 'Failed to decline work', true); return; }
-      showToast('Work declined');
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.declined'), true); return; }
+      showToast(t('profile.work.declined'));
       loadData();
     } catch (e) {
-      showToast(e.message || 'Failed to decline work', true);
+      showToast(e.message || t('profile.work.declined'), true);
     } finally {
       setActionLoading(null);
     }
@@ -72,12 +81,12 @@ export default function WorkTab({ session, showToast, onStats }) {
     setActionLoading(tc);
     try {
       const resp = await deliverWork(tc, result);
-      if (resp.ok === false) { showToast(resp.error?.message || 'Failed to deliver work', true); return; }
-      showToast('Work delivered');
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.work.delivered'), true); return; }
+      showToast(t('profile.work.delivered'));
       setDeliverModal(null);
       loadData();
     } catch (e) {
-      showToast(e.message || 'Failed to deliver work', true);
+      showToast(e.message || t('profile.work.delivered'), true);
     } finally {
       setActionLoading(null);
     }
@@ -120,26 +129,26 @@ export default function WorkTab({ session, showToast, onStats }) {
           </div>
 
           ${type === 'inbox' && isPending && html`
-            <div class="card-actions" style="margin-top:.5rem;display:flex;gap:.5rem">
+            <div class="card-actions flex-row">
               <button class="btn-sm btn-primary" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
-                ${isLoading ? '...' : 'Accept'}
+                ${isLoading ? '...' : t('profile.work.accepted')}
               </button>
               <button class="btn-sm btn-outline" disabled=${isLoading} onClick=${() => handleReject(tc)}>
-                ${isLoading ? '...' : 'Decline'}
+                ${isLoading ? '...' : t('profile.work.declined')}
               </button>
             </div>
           `}
 
           ${type === 'inbox' && isActive && html`
-            <div class="card-actions" style="margin-top:.5rem;display:flex;gap:.5rem">
+            <div class="card-actions flex-row">
               <button class="btn-sm btn-primary" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
-                Deliver
+                ${t('profile.work.deliver')}
               </button>
             </div>
           `}
 
           ${type === 'sent' && w.status === 'delivered' && html`
-            <button class="btn-sm" style="margin-top:.5rem" onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
+            <button class="btn-sm mt-xs" onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
           `}
         </div>
       `;
@@ -173,8 +182,8 @@ function RateModal({ desc, onSubmit, onCancel }) {
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
         <h3>${t('profile.work.rateTitle')}</h3>
-        <p style="color:var(--muted);margin-bottom:1rem">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
-        <div class="star-rating" style="margin-bottom:1rem">
+        <p class="text-meta mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
+        <div class="star-rating mb-1">
           ${[1,2,3,4,5].map(i => html`
             <span class="star ${i <= rating ? 'active' : ''}" onClick=${() => setRating(i)}>\u2605</span>
           `)}
@@ -193,18 +202,18 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
   return html`
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
-        <h3>Deliver Work</h3>
-        <p style="color:var(--muted);margin-bottom:1rem">Delivering: ${escHtml(desc || '')}</p>
+        <h3>${t('profile.work.deliver')}</h3>
+        <p class="text-meta mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
         <div class="form-row">
-          <label>Result / notes (optional)</label>
+          <label>${t('profile.work.commentLabel')}</label>
           <textarea class="input-field" rows="4" placeholder="Describe the completed work or attach results..."
             value=${result} onInput=${e => setResult(e.target.value)}></textarea>
         </div>
         <div class="form-actions">
           <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
-            ${loading ? 'Delivering...' : 'Deliver'}
+            ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
           </button>
-          <button class="btn-outline" disabled=${loading} onClick=${onCancel}>Cancel</button>
+          <button class="btn-outline" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
       </div>
     </div>`;

@@ -5,13 +5,14 @@
  *   view verification status, and change their email.
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial email verification tab
+ *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; use GlassCard/ToggleSwitch
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from './shared.js';
+import { Spinner, GlassCard } from './shared.js';
 import { apiGet, apiPost } from '/js/api.js';
 
 export default function EmailTab({ session, showToast }) {
@@ -102,53 +103,52 @@ export default function EmailTab({ session, showToast }) {
   const isVerified = step === 'verified' || (ghiiData?.verification_level >= 1);
 
   return html`
-    <div class="pf-card">
-      <h3>${t('profile.email.title')}</h3>
-      <p style="color:var(--text-dim);font-size:.9rem;margin-bottom:16px">${t('profile.email.description')}</p>
+    <div class="section-title">${t('profile.email.title')}</div>
+    <div class="section-desc">${t('profile.email.description')}</div>
 
+    <div class="pf-card">
       ${isVerified && !changing ? html`
-        <div style="padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB)">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-            <span style="color:#22C55E;font-size:20px">\u2713</span>
-            <span style="font-weight:600;color:#22C55E">${t('profile.email.verified')}</span>
+        <${GlassCard}>
+          <div class="email-icon-row">
+            <span class="email-verified-icon">\u2713</span>
+            <span class="email-verified-text">${t('profile.email.verified')}</span>
           </div>
-          <div style="font-size:.9rem;color:var(--text-dim)">
+          <div class="email-status-text">
             ${t('profile.email.verified')}
           </div>
-          <button class="btn btn-sm btn-outline" style="margin-top:12px" onClick=${handleChangeEmail}>
+          <button class="btn btn-sm btn-outline email-change-btn" onClick=${handleChangeEmail}>
             ${t('profile.email.changeEmail')}
           </button>
-        </div>
+        <//>
       ` : step === 'codeSent' ? html`
-        <div style="padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB)">
-          <p style="font-size:.9rem;color:#22C55E;margin-bottom:12px">${t('profile.email.codeSent')}</p>
-          <div style="margin-bottom:14px">
-            <label style="display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)">${t('profile.email.enterCode')}</label>
-            <input class="pf-input" type="text" maxlength="6" placeholder="123456"
-              value=${code} onInput=${e => setCode(e.target.value)}
-              style="font-size:1.5rem;letter-spacing:6px;text-align:center;max-width:200px" />
+        <${GlassCard}>
+          <p class="email-sent-text">${t('profile.email.codeSent')}</p>
+          <div class="email-form-group">
+            <label class="email-form-label">${t('profile.email.enterCode')}</label>
+            <input class="pf-input input-verification-code" type="text" maxlength="6" placeholder="123456"
+              value=${code} onInput=${e => setCode(e.target.value)} />
           </div>
           <button class="btn btn-primary" onClick=${handleVerifyCode} disabled=${verifying}>
             ${verifying ? '...' : t('profile.email.verify')}
           </button>
-        </div>
+        <//>
       ` : html`
-        <div style="padding:16px;border-radius:8px;background:var(--glass-bg,#FFFFFF);border:1px solid var(--glass-border,#E5E7EB)">
+        <${GlassCard}>
           ${!isVerified ? html`
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-              <span style="color:var(--text-dim);font-size:16px">\u2709</span>
-              <span style="font-size:.9rem;color:var(--text-dim)">${t('profile.email.notVerified')}</span>
+            <div class="email-icon-row">
+              <span class="email-unverified-icon">\u2709</span>
+              <span class="email-unverified-text">${t('profile.email.notVerified')}</span>
             </div>
           ` : null}
-          <div style="margin-bottom:14px">
-            <label style="display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim)">${t('profile.email.enterEmail')}</label>
+          <div class="email-form-group">
+            <label class="email-form-label">${t('profile.email.enterEmail')}</label>
             <input class="pf-input" type="email" placeholder="you@example.com"
               value=${email} onInput=${e => setEmail(e.target.value)} />
           </div>
           <button class="btn btn-primary" onClick=${handleSendCode} disabled=${sending}>
             ${sending ? '...' : t('profile.email.sendCode')}
           </button>
-        </div>
+        <//>
       `}
     </div>
   `;

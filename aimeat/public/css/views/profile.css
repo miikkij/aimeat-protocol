@@ -660,11 +660,6 @@
 .pf-gen-lifecycle-sep { color: var(--border); }
 .pf-gen-lifecycle-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* Live status dots in sidebar */
-.pf-gen-live-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.pf-gen-live-dot.live-active { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }
-.pf-gen-live-dot.live-installed { background: #fbbf24; }
-.pf-gen-live-dot.live-missing { background: #d1d5db; }
 
 /* Remove Panel (Phase 5) */
 .pf-gen-remove-panel {
@@ -942,3 +937,137 @@
 .pf .pf-sharing-box  { margin-bottom: .75rem; padding: .5rem .75rem; border: 1px solid rgba(232,86,74,.15); border-radius: 8px; background: rgba(232,86,74,.04); }
 .pf .pf-sharing-heading { margin: 0 0 .5rem; font-size: .8rem; }
 .pf .vis-owner       { background: rgba(107, 114, 128, .15); color: #6b7280; }
+
+/* ══ Refactored inline styles (2026-03-17) ══════════════ */
+
+/* ── Node Stats tab ── */
+.pf .stat-grid       { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+.pf .stat-grid-sm    { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+.pf .stat-card       { text-align: center; padding: 1rem; }
+.pf .stat-value      { font-size: 1.5rem; font-weight: 700; }
+.pf .stat-label      { font-size: .75rem; color: var(--muted); margin-top: .25rem; }
+.pf .stat-two-col    { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+.pf .stat-section-h3 { color: var(--love1); margin: 1.5rem 0 .75rem; font-size: 1rem; }
+.pf .stat-panel-h4   { color: var(--love1); margin: 0 0 .75rem; font-size: .9rem; }
+.pf .stat-row        { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.pf .stat-row-label  { font-weight: 600; font-size: .85rem; }
+.pf .stat-row-value  { color: var(--muted); font-size: .85rem; }
+.pf .stat-footer     { color: var(--muted); font-size: .8rem; margin-top: 1rem; }
+
+/* ── Nodes tab ── */
+.pf .radio-row       { display: flex; gap: 1rem; }
+.pf .radio-label     { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
+.pf .pn-copy-btn     { padding: 2px 8px; background: var(--card2); border: 1px solid var(--border); border-radius: 4px; color: var(--love4); cursor: pointer; font-size: .7rem; }
+.pf .pn-setup-arrow  { transition: transform .2s; display: inline-block; }
+.pf .pn-setup-arrow.open { transform: rotate(180deg); }
+.pf .pn-setup-link   { color: var(--love1); font-size: .8rem; }
+.pf .pn-padding-half { padding: .5rem 0; }
+.pf .pn-no-agents    { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
+
+/* ── Email tab ── */
+.pf .email-desc      { color: var(--text-dim); font-size: .9rem; margin-bottom: 16px; }
+.pf .email-icon-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pf .email-verified-icon { color: var(--success, #22C55E); font-size: 20px; }
+.pf .email-verified-text { font-weight: 600; color: var(--success, #22C55E); }
+.pf .email-status-text   { font-size: .9rem; color: var(--text-dim); }
+.pf .email-sent-text     { font-size: .9rem; color: var(--success, #22C55E); margin-bottom: 12px; }
+.pf .email-form-label    { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); }
+.pf .email-form-group    { margin-bottom: 14px; }
+.pf .email-unverified-icon { color: var(--text-dim); font-size: 16px; }
+.pf .email-unverified-text { font-size: .9rem; color: var(--text-dim); }
+.pf .email-change-btn    { margin-top: 12px; }
+
+/* ── Access tab ── */
+.pf .access-mono     { font-family: monospace; font-size: .75rem; word-break: break-all; color: var(--muted); }
+.pf .access-key-blur { filter: blur(4px); transition: filter .2s; }
+.pf .access-key-blur.revealed { filter: none; }
+.pf .access-card-warn { border-color: var(--warn); cursor: pointer; }
+.pf .access-warn-text { font-size: .75rem; color: var(--warn); margin-top: .5rem; }
+.pf .access-mcp-url  { font-family: monospace; font-size: .85rem; color: var(--love3); }
+.pf .access-mcp-desc { font-size: .75rem; color: var(--muted); margin-top: .3rem; }
+
+/* ── Wallet tab ── */
+.pf .wl-val-success  { color: var(--success, #22c55e); }
+.pf .wl-val-danger   { color: var(--danger, #ef4444); }
+.pf .wallet-input-w  { width: 120px; }
+.pf .wallet-reason-field { flex: 1; min-width: 150px; }
+
+/* ── Chat sessions tab ── */
+.pf .cs-create-body  { padding: .75rem 1rem .5rem; }
+.pf .cs-create-desc  { margin: 0 0 .5rem; font-size: .85rem; color: var(--muted, #6B7280); }
+.pf .cs-create-hint  { margin: 0; font-size: .75rem; color: var(--muted, #6B7280); font-style: italic; }
+.pf .cs-section-sub  { font-size: .9rem; margin-top: 1rem; }
+
+/* ── MCP tab ── */
+.pf .mcp-hint-box    { margin-bottom: 1rem; padding: .5rem .75rem; background: rgba(130,100,255,.06); border: 1px solid rgba(130,100,255,.15); border-radius: .25rem; font-size: .82rem; }
+.pf .mcp-hint-link   { color: var(--accent, #E8564A); text-decoration: underline; }
+.pf .mcp-empty-body  { padding: .75rem 1rem; font-size: .85rem; color: var(--muted, #6B7280); }
+.pf .mcp-empty-sub   { margin: 0; font-size: .8rem; }
+.pf .mcp-id-small    { font-size: .7rem; word-break: break-all; }
+.pf .mcp-badge-sm    { font-size: .7rem; }
+.pf .mcp-badge-xs    { font-size: .65rem; }
+
+/* ── Federation tab ── */
+.pf .fed-status-text { font-size: .8rem; }
+.pf .fed-status-text.online  { color: var(--success); }
+.pf .fed-status-text.offline { color: var(--danger); }
+
+/* ── Portfolio tab ── */
+.pf .portfolio-center { text-align: center; padding: 2rem; }
+.pf .portfolio-subtitle { color: var(--text-dim); margin-bottom: 1.5rem; }
+
+/* ── Shared: text color accent on expand icon ── */
+.pf .expand-arrow    { font-size: .7rem; opacity: .5; }
+
+/* ── Work tab ── */
+.pf .work-desc-text  { font-size: .8rem; }
+.pf .work-tx-right   { text-align: right; display: flex; align-items: center; gap: .5rem; }
+.pf .work-grid-span  { grid-column: 1 / -1; }
+
+/* ── Utility classes added during inline-style refactor (2026-03-17) ── */
+.pf .mb-0             { margin-bottom: 0; }
+.pf .mt-1             { margin-top: 1rem; }
+.pf .pf-bold          { font-weight: 600; }
+.pf .pf-italic        { font-style: italic; }
+.pf .pf-nowrap        { white-space: nowrap; }
+.pf .pf-shrink-0      { flex-shrink: 0; }
+.pf .pf-flex-fill     { flex: 1; min-width: 0; }
+.pf .pf-ml-auto       { margin-left: auto; }
+.pf .pf-mr-half       { margin-right: .5rem; }
+.pf .pf-hidden         { display: none; }
+.pf .pf-no-underline  { text-decoration: none; }
+.pf .pf-inline-block  { display: inline-block; }
+.pf .pf-badge-gap     { margin-right: .3rem; }
+.pf .pf-code-break    { word-break: break-all; }
+.pf .pf-label-inline  { margin: 0; }
+.pf .pf-select-inline { display: inline-block; width: auto; min-width: 12rem; }
+.pf .pf-select-narrow { max-width: 200px; }
+.pf .pf-upload-icon   { font-size: 2rem; opacity: .5; }
+.pf .pf-file-icon     { font-size: 1.2rem; flex-shrink: 0; }
+.pf .pf-rotate-90     { transform: rotate(90deg); }
+.pf .pf-btn-xs        { font-size: .75rem; padding: 2px 8px; }
+.pf .pf-textarea-sm   { width: 200px; min-height: 40px; }
+
+/* Chevron animation (expand/collapse) */
+.pf .pf-chevron       { transition: transform .2s; display: inline-block; }
+.pf .pf-chevron-open  { transform: rotate(180deg); }
+
+/* Agent tab: device auth layout */
+.pf .pf-device-auth-row   { align-items: flex-end; gap: .75rem; }
+.pf .pf-device-auth-field { flex: 1; }
+.pf .pf-device-code       { font-size: 2rem; font-weight: 700; font-family: monospace; letter-spacing: .15em; }
+.pf .pf-agent-divider     { margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
+
+/* Memory tab: sharing rules row */
+.pf .pf-rule-row { display: flex; gap: .5rem; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
+
+/* Notifications tab helpers */
+.pf .pf-notif-heading  { font-weight: 600; margin-bottom: 4px; }
+.pf .pf-notif-text     { flex: 1; }
+.pf .pf-notif-disabled { opacity: .7; }
+.pf .pf-notif-options  { padding-left: 8px; border-left: 2px solid var(--glass-border, #E5E7EB); }
+.pf .pf-notif-option   { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .9rem; cursor: pointer; }
+.pf .pf-notif-option:last-child { margin-bottom: 0; }
+
+/* Apps tab: inline edit panel */
+.pf .pf-edit-panel { margin-top: .75rem; padding: .75rem; background: var(--bg2, #f5f5f5); border-radius: 8px; }

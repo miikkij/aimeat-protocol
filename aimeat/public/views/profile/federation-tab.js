@@ -1,3 +1,10 @@
+/**
+ * @file federation-tab.js
+ * @description Profile tab showing federated peer nodes and their online/offline status.
+ * @version-history
+ *   v1.0.0 — 2026-03-16 — Initial federation tab
+ *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
+ */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -35,7 +42,7 @@ export default function FederationTab({ session, showToast }) {
     <div class="section-desc">${t('profile.federation.desc')}</div>
     ${!federation ? html`<${Spinner} text=${t('profile.federation.loading')} />`
       : federation.length === 0 ? html`<div class="empty">${t('profile.federation.empty')}</div>`
-      : html`<div class="section-title" style="margin-top:0">${t('profile.federation.peers')}</div>
+      : html`<div class="section-title">${t('profile.federation.peers')}</div>
           ${federation.map(p => {
             const alive = p.status === 'active' || p.alive;
             return html`
@@ -47,7 +54,7 @@ export default function FederationTab({ session, showToast }) {
                   </div>
                   <div class="peer-status">
                     <span class="peer-dot ${alive ? 'alive' : 'dead'}"></span>
-                    <span style="font-size:.8rem;color:${alive ? 'var(--success)' : 'var(--danger)'}">${alive ? t('profile.federation.online') : t('profile.federation.offline')}</span>
+                    <span class="fed-status-text ${alive ? 'online' : 'offline'}">${alive ? t('profile.federation.online') : t('profile.federation.offline')}</span>
                   </div>
                 </div>
               </div>`;
