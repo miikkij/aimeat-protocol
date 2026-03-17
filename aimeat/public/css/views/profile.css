@@ -311,7 +311,7 @@
 .pf .ext-card-actions button.danger{border-color:rgba(239,68,68,0.3);color:#f87171}
 .pf .ext-card-actions button.danger:hover{background:rgba(239,68,68,0.15)}
 .pf .ext-detail-section{background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:10px;padding:1rem;margin-bottom:1rem}
-.pf .ext-detail-section-title{font-weight:600;font-size:.85rem;margin-bottom:.75rem;display:flex;align-items:center;gap:8px}
+.pf .ext-detail-section-title{font-weight:700;font-size:.95rem;margin-bottom:.75rem;display:flex;align-items:center;gap:8px;color:var(--accent,#E8564A)}
 .pf .ext-detail-code{font-family:monospace;font-size:.8rem;background:var(--bg-dim,#F3F4F6);padding:10px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
 .pf .ext-copy-btn{font-size:.7rem;padding:3px 10px;border-radius:5px;border:1px solid var(--border,#E5E7EB);background:transparent;color:var(--text-dim,#6B7280);cursor:pointer;margin-left:auto}
 .pf .ext-copy-btn:hover{background:var(--bg-dim,#F3F4F6)}
@@ -876,8 +876,8 @@
 .pf .ext-meta-row-sm         { display: flex; gap: 1.5rem; font-size: .85rem; color: var(--muted); margin-bottom: 1rem; flex-wrap: wrap; }
 .pf .ext-actions-bar         { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
 .pf .ext-lib-meta            { margin-bottom: .5rem; font-size: .85rem; color: var(--muted); }
-.pf .ext-lib-label           { font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
-.pf .ext-lib-label-spaced    { font-size: .85rem; font-weight: 600; margin-top: .75rem; margin-bottom: 4px; }
+.pf .ext-lib-label           { font-size: .85rem; font-weight: 600; margin-bottom: 4px; color: var(--accent, #E8564A); }
+.pf .ext-lib-label-spaced    { font-size: .85rem; font-weight: 600; margin-top: .75rem; margin-bottom: 4px; color: var(--accent, #E8564A); }
 .pf .ext-schema-item         { font-size: .85rem; color: var(--muted); margin-bottom: .25rem; }
 .pf .ext-ontology-text       { font-size: .85rem; color: var(--muted); }
 .pf .ext-installed-heading   { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; margin-top: 1.5rem; color: var(--muted); }

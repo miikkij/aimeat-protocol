@@ -387,7 +387,7 @@ export default function ExtensionsTab({ session, showToast }) {
         const content = p._content || p.content || '';
         return html`
           <div class="ext-detail-section">
-            <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(content); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyPrompt')}</button></div>
+            <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <button class="btn-primary btn-sm" onClick=${() => { copyToClipboard(content); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyPrompt')}</button></div>
             <div class="ext-detail-code">${content.substring(0, 500)}${content.length > 500 ? '...' : ''}</div>
           </div>`;
       })}
@@ -399,10 +399,10 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${lib.filename}</div>
             <div class="ext-lib-meta">${t('profile.extensions.detail.exports')}: ${(lib.exports || []).join(', ')}</div>
-            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
+            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <button class="btn-primary btn-sm" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
             <div class="ext-detail-code">${scriptTag}</div>
             ${lib.api_surface ? html`<div>
-              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
+              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <button class="btn-primary btn-sm" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
               <div class="ext-detail-code">${lib.api_surface}</div>
             </div>` : null}
           </div>`;
@@ -427,7 +427,7 @@ export default function ExtensionsTab({ session, showToast }) {
         <button class="btn-outline" onClick=${() => handleToggleVisibility(ext.name, vis)}>
           ${vis === 'public' ? t('profile.extensions.unpublish') : t('profile.extensions.publish')}
         </button>
-        <button class="btn-outline btn-danger-outline" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
+        <button class="btn-danger-solid" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
       </div>
       <${ConfirmUI} />
     </div>`;
@@ -465,7 +465,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 <span class="ext-action-name">${a.id}</span>
                 <span class="ext-action-meta">${a.method || 'POST'}</span>
                 <span class="ext-action-desc">${a.description || ''}</span>
-                ${isActive ? html`<button class="btn-sm" onClick=${() => {
+                ${isActive ? html`<button class="btn-outline btn-sm" onClick=${() => {
                   if (testAction?.actionId === a.id) { setTestAction(null); setTestResult(null); }
                   else { setTestAction({ actionId: a.id }); setTestResult(null); setTestInput('{}'); }
                 }}>${testAction?.actionId === a.id ? t('profile.v8ext.test.close') : t('profile.v8ext.test.btn')}</button>` : null}
@@ -505,8 +505,8 @@ export default function ExtensionsTab({ session, showToast }) {
                 <span class="ext-instance-name">${inst.id}</span>
                 <span class="ext-status-dot ${inst.status}"></span>
                 <span class="ext-instance-status">${inst.status}</span>
-                <button class="btn-sm" onClick=${() => { copyToClipboard(inst.id); showToast(t('profile.v8ext.instanceIdCopied')); }}>${t('profile.v8ext.copyId')}</button>
-                <button class="btn-sm btn-danger" onClick=${() => handleDeleteInstance(ext.name, inst.id)}>${t('profile.v8ext.deleteInstance')}</button>
+                <button class="btn-outline btn-sm" onClick=${() => { copyToClipboard(inst.id); showToast(t('profile.v8ext.instanceIdCopied')); }}>${t('profile.v8ext.copyId')}</button>
+                <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteInstance(ext.name, inst.id)}>${t('profile.v8ext.deleteInstance')}</button>
               </div>`)}
           ${isActive ? html`
             <div class="ext-instance-create">
@@ -519,14 +519,14 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-endpoint-box">
             POST ${NODE_URL}/v1/ext/${ext.name}/{actionId}
           </div>
-          <button class="btn-sm ext-btn-copy-spaced" onClick=${() => { copyToClipboard(NODE_URL + '/v1/ext/' + ext.name + '/'); showToast(t('profile.v8ext.copied')); }}>${t('profile.v8ext.copyEndpoint')}</button>
+          <button class="btn-primary btn-sm ext-btn-copy-spaced" onClick=${() => { copyToClipboard(NODE_URL + '/v1/ext/' + ext.name + '/'); showToast(t('profile.v8ext.copied')); }}>${t('profile.v8ext.copyEndpoint')}</button>
         </div>`}
 
       <div class="ext-actions-bar">
         ${isActive
           ? html`<button class="btn-outline" onClick=${() => handleV8Deactivate(ext.name)}>${t('profile.v8ext.deactivate')}</button>`
           : html`<button class="btn-primary" onClick=${() => handleV8Activate(ext.name)}>${t('profile.v8ext.activate')}</button>`}
-        <button class="btn-outline btn-danger-outline" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
+        <button class="btn-danger-solid" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
       </div>
       <${ConfirmUI} />
     </div>`;
