@@ -342,17 +342,17 @@
 /* ── Packages Tab (pkg-*) ── */
 .pf .pkg-tab{display:flex;flex-direction:column;gap:1.5rem}
 .pf .pkg-nav{display:flex;gap:.5rem;flex-wrap:wrap}
-.pf .pkg-nav button{font-size:.85rem;padding:6px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:var(--text-dim,#6B7280);cursor:pointer;transition:all .15s;font-weight:500}
-.pf .pkg-nav button:hover{background:rgba(255,255,255,0.08)}
+.pf .pkg-nav button{font-size:.85rem;padding:6px 16px;border-radius:8px;border:1px solid var(--border,#E5E7EB);background:transparent;color:var(--text-dim,#6B7280);cursor:pointer;transition:all .15s;font-weight:500}
+.pf .pkg-nav button:hover{background:var(--bg-dim,#F3F4F6)}
 .pf .pkg-nav button.active{background:var(--accent,#E8564A);color:#fff;border-color:var(--accent,#E8564A)}
 .pf .pkg-section{margin-top:.25rem}
-.pf .pkg-section h3{font-size:1rem;font-weight:600;margin:0 0 1rem;color:var(--accent,#E8564A)}
+.pf .pkg-section h3{font-size:1.15rem;font-weight:700;margin:0 0 1rem;color:var(--accent,#E8564A)}
 .pf .pkg-filters{display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
-.pf .pkg-filters input,.pf .pkg-filters select{padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:var(--text,#e0e0e0);font-size:.85rem;flex:1;min-width:140px}
+.pf .pkg-filters input,.pf .pkg-filters select{padding:6px 12px;border-radius:8px;border:1px solid var(--border,#E5E7EB);background:var(--card,#FFFFFF);color:var(--text,#1F2937);font-size:.85rem;flex:1;min-width:140px}
 .pf .pkg-filters select{flex:0 0 auto;min-width:160px}
 .pf .pkg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
-.pf .pkg-card{background:var(--card-bg,#fff);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
-.pf .pkg-card:hover{border-color:var(--accent,#E8564A);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
+.pf .pkg-card{background:var(--card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.pf .pkg-card:hover{border-color:var(--accent,#E8564A);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.12)}
 .pf .pkg-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem}
 .pf .pkg-card-name{font-weight:600;font-size:.95rem}
 .pf .pkg-card-version{font-size:.75rem;color:var(--text-dim,#6B7280);background:var(--bg-dim,#F3F4F6);padding:2px 8px;border-radius:6px}

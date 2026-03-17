@@ -154,7 +154,7 @@ function ProjectListView({ onSelect, onCreate, showToast, session }) {
     <div class="pf-gen-project-list">
       <${AgentListenerBar} showToast=${showToast} session=${session} />
       <div class="pf-gen-header">
-        <h3>${t('profile.generator.title')}</h3>
+        <div class="section-title">${t('profile.generator.title')}</div>
         <div class="pf-gen-header-actions">
           <label class="pf-gen-archive-toggle">
             <input type="checkbox" checked=${showArchived} onChange=${e => { setShowArchived(e.target.checked); setPage(0); }} />
@@ -283,13 +283,13 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
     return html`
       <div class="pf-gen-new-project">
-        <button class="btn btn-ghost" onClick=${() => setPhase('describe')}>
+        <button class="btn btn-outline btn-sm" onClick=${() => setPhase('describe')}>
           ${t('profile.generator.back')}
         </button>
-        <h3>${t('profile.generator.interviewTitle')}</h3>
-        <p class="pf-gen-subtitle">
+        <div class="section-title section-title-spaced">${t('profile.generator.interviewTitle')}</div>
+        <div class="section-desc">
           ${t('profile.generator.interviewDesc')}
-        </p>
+        </div>
 
         <div class="pf-gen-section">
           <label>${t('profile.generator.interviewPrompt')}</label>
@@ -334,9 +334,9 @@ function NewProjectView({ onBack, onCreated, showToast }) {
       : null;
     return html`
       <div class="pf-gen-new-project">
-        <button class="btn btn-ghost" onClick=${() => setPhase('describe')}>${t('profile.generator.back')}</button>
-        <h3>${t('profile.generator.blueprintTitle')}</h3>
-        <p class="pf-gen-subtitle">${t('profile.generator.blueprintDesc')}</p>
+        <button class="btn btn-outline btn-sm" onClick=${() => setPhase('describe')}>${t('profile.generator.back')}</button>
+        <div class="section-title section-title-spaced">${t('profile.generator.blueprintTitle')}</div>
+        <div class="section-desc">${t('profile.generator.blueprintDesc')}</div>
         <div class="pf-gen-section">
           <label>${t('profile.generator.prompt')}</label>
           <button class="btn btn-sm btn-outline" onClick=${handleCopyBlueprintPrompt}>
@@ -375,9 +375,9 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
   return html`
     <div class="pf-gen-new-project">
-      <button class="btn btn-ghost" onClick=${onBack}>${t('profile.generator.back')}</button>
-      <h3>${t('profile.generator.newProjectTitle')}</h3>
-      <p class="pf-gen-subtitle">${t('profile.generator.newProjectDesc')}</p>
+      <button class="btn btn-outline btn-sm" onClick=${onBack}>${t('profile.generator.back')}</button>
+      <div class="section-title section-title-spaced">${t('profile.generator.newProjectTitle')}</div>
+      <div class="section-desc">${t('profile.generator.newProjectDesc')}</div>
       <textarea
         class="pf-gen-description"
         rows="8"
@@ -905,7 +905,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <button class="btn btn-primary btn-sm" onClick=${handleParseImpact} disabled=${!impactResult.trim()}>
               ${t('profile.generator.analyzeImpact')}
             </button>
-            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('request')}>${t('profile.generator.back')}</button>
+            <button class="btn btn-outline btn-sm" onClick=${() => setEditMode('request')}>${t('profile.generator.back')}</button>
           </div>
         </div>
       `}
@@ -936,7 +936,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             })}
           </div>
           <div class="pf-gen-actions">
-            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
+            <button class="btn btn-outline btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
             <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
           </div>
         </div>
