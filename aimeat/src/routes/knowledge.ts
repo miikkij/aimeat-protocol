@@ -7,6 +7,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { ManifestSchema } from '../schemas/knowledge-package.js';
 import { createRequire } from 'node:module';
 
@@ -24,10 +25,11 @@ const validateManifest = ajv.compile(ManifestSchema);
 
 export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   /* ── POST /v1/packages/import — Import a knowledge package from AI Chat output ── */
   router.post('/v1/packages/import', requireAuth(), async (req, res) => {
-    const ownerGaii = req.auth!.sub as string;
+    const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const { package: pkg, overrides } = req.body;
 
@@ -220,7 +222,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── POST /v1/packages/:id/link — Create a link from this package to another memory ── */
   router.post('/v1/packages/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = req.auth!.sub as string;
+    const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const packageId = req.params.id as string;
     const { target, relation, description } = req.body;
@@ -308,7 +310,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── GET /v1/packages/:id/broken-links — Find broken links ── */
   router.get('/v1/packages/:id/broken-links', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = req.auth!.sub as string;
+    const ownerGaii = resolve(req);
     const broken = await storage.findBrokenLinks(ownerGaii);
 
     res.json(success(config.nodeId, { broken_links: broken, count: broken.length }));
@@ -328,7 +330,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       owner_name: ghii,
       node_url: nodeUrl,
       node_id: config.nodeId,
-      gaii: req.auth!.sub as string,
+      gaii: resolve(req),
     });
 
     res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
@@ -337,7 +339,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
   /* ── GET /v1/templates/knowledge-packager-agent — Get agent prompt template ── */
   router.get('/v1/templates/knowledge-packager-agent', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
-    const gaii = req.auth!.sub as string;
+    const gaii = resolve(req);
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
 
     const record = await storage.getSystemPrompt('knowledge-packager-agent');
@@ -379,7 +381,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── PATCH /v1/packages/:id/sharing — Update package sharing settings ── */
   router.patch('/v1/packages/:id/sharing', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = req.auth!.sub as string;
+    const ownerGaii = resolve(req);
     const packageId = req.params.id as string;
     const { catalog_listed, allow_clone } = req.body ?? {};
 
@@ -425,7 +427,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── PATCH /v1/packages/:id/entries/:entryKey/visibility — Change entry visibility ── */
   router.patch('/v1/packages/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = req.auth!.sub as string;
+    const ownerGaii = resolve(req);
     const packageId = req.params.id as string;
     const entryKey = req.params.entryKey as string;
     const { visibility } = req.body ?? {};
@@ -494,7 +496,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── POST /v1/packages/:id/clone — Clone public entries to your own namespace ── */
   router.post('/v1/packages/:id/clone', requireAuth(), async (req, res) => {
-    const requesterGaii = req.auth!.sub as string;
+    const requesterGaii = resolve(req);
     const requesterGhii = req.auth!.owner as string;
     const sourcePackageId = req.params.id as string;
     const { target_prefix, entries: requestedEntries } = req.body;
@@ -686,7 +688,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── POST /v1/packages/:id/contribute — Contribute a package to an organism ── */
   router.post('/v1/packages/:id/contribute', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = req.auth!.sub as string;
+    const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const packageId = req.params.id as string;
     const { organism_id } = req.body;
@@ -878,7 +880,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     // Also collect system packages stored under operator GAII
-    const operatorGaii = req.auth!.sub as string;
+    const operatorGaii = resolve(req);
     const operatorManifests = await storage.listMemory(operatorGaii, {
       prefix: 'packages/',
       tags: ['knowledge-package'],
@@ -936,7 +938,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── POST /v1/admin/knowledge/import — Operator creates system knowledge ── */
   router.post('/v1/admin/knowledge/import', requireAuth(), requireRole('operator'), async (req, res) => {
-    const operatorGaii = req.auth!.sub as string;
+    const operatorGaii = resolve(req);
     const ownerName = req.auth!.owner as string;
     const { name, content_type, tags, maturity, visibility, catalog_listed, entries } = req.body;
 
@@ -1053,7 +1055,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Also try operator's own GAII for system packages
     if (!found) {
-      const operatorGaii = req.auth!.sub as string;
+      const operatorGaii = resolve(req);
       const mem = await storage.getMemory(operatorGaii, manifestKey);
       if (mem) {
         const allEntries = await storage.listMemory(operatorGaii, { prefix: `packages/${packageId}/` });
@@ -1075,7 +1077,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── POST /v1/admin/knowledge/:id/review — Operator reviews a package ── */
   router.post('/v1/admin/knowledge/:id/review', requireAuth(), requireRole('operator'), async (req, res) => {
-    const operatorGaii = req.auth!.sub as string;
+    const operatorGaii = resolve(req);
     const packageId = req.params.id as string;
     const { reason, custom_text, action: reviewAction } = req.body;
 

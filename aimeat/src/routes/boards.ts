@@ -11,9 +11,11 @@ import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   /** Notify board subscribers of a new post (fire-and-forget). */
   function notifySubscribers(boardId: string, post: { id: string; authorGaii: string; title: string; category?: string; tags: string[] }): void {
@@ -67,7 +69,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       name,
       description,
       visibility,
-      ownerGaii: req.auth!.sub,
+      ownerGaii: resolve(req),
       allowedGaiis: allowed_gaiis ?? [],
       createdAt: new Date().toISOString(),
     });
@@ -113,7 +115,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/boards/subscriptions — list agent's own subscriptions
   // Must be registered before :boardId routes to avoid matching "subscriptions" as a boardId
   router.get('/v1/boards/subscriptions', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const subs = await storage.listSubscriptionsByAgent(gaii);
     const enriched = await Promise.all(subs.map(async s => {
       const board = await storage.getBoard(s.boardId);
@@ -143,7 +145,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
 
     // Extension hook: pre_board_post
     const hookResult = await executeHooks(config, storage, 'pre_board_post', { board_id: boardId, author_gaii: gaii });
@@ -171,11 +173,31 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // Public board posting costs morsels — system boards are free (§15, Appendix B)
     if (board.visibility === 'public') {
       const cost = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
-      const debited = await storage.debitBalance(gaii, cost);
+      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+
+      let debited = false;
+      let currentBalance = 0;
+
+      if (isOwnerSession) {
+        // Owner sessions: debit from GHII morsel balance
+        const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner as string);
+        currentBalance = ghiiRecord?.morselBalance ?? 0;
+        if (currentBalance >= cost && ghiiRecord) {
+          await storage.updateGHII(ghiiRecord.ghii, { morselBalance: currentBalance - cost });
+          debited = true;
+        }
+      } else {
+        // Agent sessions: debit from agent morsel balance
+        debited = await storage.debitBalance(gaii, cost);
+        if (!debited) {
+          const agent = await storage.getAgent(gaii);
+          currentBalance = agent?.morselBalance ?? 0;
+        }
+      }
+
       if (!debited) {
-        const agent = await storage.getAgent(gaii);
         res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
-          `Posting costs ${cost} morsels, you have ${agent?.morselBalance ?? 0}`));
+          `Posting costs ${cost} morsels, you have ${currentBalance}`));
         return;
       }
       await storage.addTransaction({
@@ -396,7 +418,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // DELETE /v1/boards/:boardId — delete own board
   router.delete('/v1/boards/:boardId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const boardId = req.params.boardId as string;
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
 
     const board = await storage.getBoard(boardId);
     if (!board) {
@@ -418,7 +440,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   router.delete('/v1/boards/:boardId/posts/:postId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
     const boardId = req.params.boardId as string;
     const postId = req.params.postId as string;
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
 
     const post = await storage.getPost(boardId, postId);
     if (!post) {
@@ -444,7 +466,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const postId = req.params.postId as string;
     const { reaction } = req.body ?? {};
 
-    const ok = await storage.addReaction(boardId, postId, reaction, req.auth!.sub);
+    const ok = await storage.addReaction(boardId, postId, reaction, resolve(req));
     if (!ok) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Post not found'));
       return;
@@ -470,7 +492,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const reply = await storage.createPost({
       id: replyId,
       boardId,
-      authorGaii: req.auth!.sub,
+      authorGaii: resolve(req),
       title: `Re: ${parent.title}`,
       body,
       tags: [],
@@ -501,7 +523,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
 
     // Check access for non-public boards (system boards are publicly accessible)
     if (board.visibility !== 'public' && board.visibility !== 'system') {
@@ -544,7 +566,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // DELETE /v1/boards/:boardId/subscribe — unsubscribe from a board
   router.delete('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), requireScope('social:read'), async (req, res) => {
     const boardId = req.params.boardId as string;
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
 
     const deleted = await storage.deleteBoardSubscription(boardId, gaii);
     if (!deleted) {
@@ -565,7 +587,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (board.ownerGaii !== req.auth!.sub && !req.auth!.roles.includes('operator')) {
+    if (board.ownerGaii !== resolve(req) && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can list subscribers'));
       return;
     }

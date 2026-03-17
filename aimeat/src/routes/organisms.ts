@@ -5,6 +5,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -34,7 +35,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       name: `${name.trim()} — Discussion`,
       description: `Discussion board for ${name.trim()}`,
       visibility: vis === 'public' ? 'public' : 'shared',
-      ownerGaii: req.auth!.sub as string,
+      ownerGaii: resolveIdentity(req.auth!, config.nodeId),
       allowedGaiis: [],
       createdAt: now,
     });

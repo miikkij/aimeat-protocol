@@ -6,13 +6,15 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { checkConsentForRead } from '../services/consent.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function permissionsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
+    const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
     // GET /v1/permissions/summary — overview of all rules for authenticated agent's data
     router.get('/v1/permissions/summary', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const ownerGaii = req.auth!.sub;
+        const ownerGaii = resolve(req);
         const consents = await storage.listConsents(ownerGaii, { status: 'active' });
 
         const byType = { wildcard: 0, gaii: 0, ghii: 0, organism: 0, domain: 0, node: 0 };
@@ -48,7 +50,7 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
             return;
         }
 
-        const ownerGaii = req.auth!.sub;
+        const ownerGaii = resolve(req);
         const memory = await storage.getMemory(ownerGaii, key);
         const visibility = memory?.visibility ?? 'private';
 
@@ -67,7 +69,7 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
     // GET /v1/permissions/memory/:key — list all rules affecting a specific key
     router.get('/v1/permissions/memory/:key', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const key = req.params.key as string;
-        const ownerGaii = req.auth!.sub;
+        const ownerGaii = resolve(req);
 
         const memory = await storage.getMemory(ownerGaii, key);
         const consents = await storage.listConsents(ownerGaii, { status: 'active' });

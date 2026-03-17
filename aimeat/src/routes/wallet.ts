@@ -95,11 +95,17 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
 
-    // Owner sessions aggregate transactions across all their agents
+    // Owner sessions aggregate transactions across GHII + all their agents
     let transactions: WalletTransaction[];
     if (isOwnerSession) {
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      const ownerName = req.auth!.owner as string;
+      const agents = await storage.getAgentsByOwner(ownerName);
       transactions = [];
+      // Include GHII-level transactions
+      const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+      if (ghiiRecord) {
+        transactions.push(...await storage.getTransactions(ghiiRecord.ghii, 100_000));
+      }
       for (const agent of agents) {
         const agentTx = await storage.getTransactions(agent.gaii, 100_000);
         transactions.push(...agentTx);
@@ -141,8 +147,13 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     const limit = Math.min(parseInt(req.query.limit as string ?? '50', 10), 200);
     let transactions: WalletTransaction[];
     if (isOwnerSession) {
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      const ownerName = req.auth!.owner as string;
+      const agents = await storage.getAgentsByOwner(ownerName);
       transactions = [];
+      const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+      if (ghiiRecord) {
+        transactions.push(...await storage.getTransactions(ghiiRecord.ghii, limit));
+      }
       for (const agent of agents) {
         transactions.push(...await storage.getTransactions(agent.gaii, limit));
       }

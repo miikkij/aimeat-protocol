@@ -55,6 +55,19 @@ export function isValidGAII(gaii: string): boolean {
 }
 
 /**
+ * Resolve the effective storage identity from a request's auth context.
+ * - Owner sessions (GHII): JWT sub is bare username → returns `owner@nodeId` (GHII format)
+ * - Agent sessions (GAII): JWT sub is already full GAII → returns it as-is
+ *
+ * This MUST be used everywhere data is stored/retrieved by identity (memory, files,
+ * consent, knowledge, etc.) to ensure owner sessions use GHII and agents use GAII.
+ */
+export function resolveIdentity(auth: { sub: string; owner: string; roles: string[] }, nodeId: string): string {
+  const isOwnerSession = auth.roles.includes('owner') && !auth.roles.includes('agent');
+  return isOwnerSession ? `${auth.owner}@${nodeId}` : auth.sub;
+}
+
+/**
  * Lenient GAII parser — extracts owner and node without strict validation.
  * Handles both `agent#owner@node` and `owner@node` formats.
  * Returns empty strings for missing parts instead of null.

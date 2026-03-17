@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -27,13 +28,14 @@ function extractKey(params: Record<string, string | string[]>): string {
 
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
+    const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
     // Max chunked file size (configurable, default 5 GB)
     const MAX_CHUNKED_FILE_SIZE = config.storageMaxChunkedFileSizeGb * 1024 * 1024 * 1024;
 
     // POST /v1/storage — upload file (agent auth)
     router.post('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolve(req);
 
         // Accept raw body or JSON with base64 data
         const contentType = req.headers['content-type'] ?? '';
@@ -117,7 +119,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
     // GET /v1/storage — list storage items (agent auth)
     router.get('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolve(req);
         const files = await storage.listStorageFiles(gaii);
 
         res.json(success(config.nodeId, {
@@ -140,7 +142,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
     // POST /v1/storage/upload/init — initiate chunked upload
     router.post('/v1/storage/upload/init', requireAuth(), requireRole('agent'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolve(req);
         const { key, mime_type, visibility, chunk_size, total_chunks } = req.body ?? {};
 
         // Anonymous namespace enforcement
@@ -200,7 +202,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
             return;
         }
-        if (upload.ownerGaii !== req.auth!.sub) {
+        if (upload.ownerGaii !== resolve(req)) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not your upload'));
             return;
         }
@@ -245,7 +247,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
             return;
         }
-        if (upload.ownerGaii !== req.auth!.sub) {
+        if (upload.ownerGaii !== resolve(req)) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not your upload'));
             return;
         }
@@ -329,7 +331,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Upload not found or expired'));
             return;
         }
-        if (upload.ownerGaii !== req.auth!.sub) {
+        if (upload.ownerGaii !== resolve(req)) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not your upload'));
             return;
         }
@@ -406,7 +408,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // HEAD /v1/storage/{*key} — file metadata (agent auth)
     // Must be registered before GET to prevent Express auto-HEAD via GET handler
     router.head('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolve(req);
         const key = extractKey(req.params);
         const file = await storage.getStorageFile(gaii, key);
         if (!file) {
@@ -415,12 +417,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         // Cross-agent access: if the file is not owned by the requester, enforce consent
-        if (file.ownerGaii !== req.auth!.sub) {
+        if (file.ownerGaii !== resolve(req)) {
             if (file.visibility === 'public') {
                 // Public files are always accessible
             } else if (config.consentEnabled) {
                 const consentResult = await checkConsentForRead(
-                    storage, `storage:${key}`, file.ownerGaii, req.auth!.sub, file.visibility,
+                    storage, `storage:${key}`, file.ownerGaii, resolve(req), file.visibility,
                 );
                 if (!consentResult.allowed) {
                     res.status(403).end();
@@ -441,7 +443,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
     // GET /v1/storage/{*key} — download file (agent auth)
     router.get('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolve(req);
         const key = extractKey(req.params);
         const file = await storage.getStorageFile(gaii, key);
         if (!file) {
@@ -450,15 +452,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         // Cross-agent access: if the file is not owned by the requester, enforce consent
-        if (file.ownerGaii !== req.auth!.sub) {
+        if (file.ownerGaii !== resolve(req)) {
             if (file.visibility === 'public') {
                 // Public files are always accessible
             } else if (config.consentEnabled) {
                 const consentResult = await checkConsentForRead(
-                    storage, `storage:${key}`, file.ownerGaii, req.auth!.sub, file.visibility,
+                    storage, `storage:${key}`, file.ownerGaii, resolve(req), file.visibility,
                 );
                 await auditDataAccess(storage, consentResult.consentId ?? null,
-                    file.ownerGaii, req.auth!.sub, `storage:${key}`, 'read', consentResult.allowed);
+                    file.ownerGaii, resolve(req), `storage:${key}`, 'read', consentResult.allowed);
                 if (!consentResult.allowed) {
                     res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this file'));
                     return;
@@ -493,7 +495,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
     // DELETE /v1/storage/{*key} — delete file (agent auth)
     router.delete('/v1/storage/{*key}', requireAuth(), requireRole('agent'), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolve(req);
         const key = extractKey(req.params);
 
         // Anonymous namespace enforcement
@@ -508,7 +510,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
             return;
         }
-        if (existing.ownerGaii !== req.auth!.sub) {
+        if (existing.ownerGaii !== resolve(req)) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own files'));
             return;
         }

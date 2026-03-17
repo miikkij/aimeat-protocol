@@ -6,13 +6,15 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
+    const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
     // POST /v1/consent — Create a new consent grant
     router.post('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const ownerGaii = req.auth!.sub;
+        const ownerGaii = resolve(req);
         const {
             data_pattern,
             recipient,
@@ -94,7 +96,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
 
     // GET /v1/consent — List own consents
     router.get('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const ownerGaii = req.auth!.sub;
+        const ownerGaii = resolve(req);
         const opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {};
 
         if (req.query.status) {
@@ -125,7 +127,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
 
     // GET /v1/consent/audit — Audit report (MUST be before /:id)
     router.get('/v1/consent/audit', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const ownerGaii = req.auth!.sub;
+        const ownerGaii = resolve(req);
         const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
         const opts: { days?: number; accessorGaii?: string; consentId?: string } = { days };
 
@@ -163,7 +165,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             return;
         }
 
-        if (consent.ownerGaii !== req.auth!.sub && !req.auth!.roles.includes('operator')) {
+        if (consent.ownerGaii !== resolve(req) && !req.auth!.roles.includes('operator')) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this consent record'));
             return;
         }
@@ -195,7 +197,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             return;
         }
 
-        if (consent.ownerGaii !== req.auth!.sub) {
+        if (consent.ownerGaii !== resolve(req)) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the consent owner can revoke'));
             return;
         }

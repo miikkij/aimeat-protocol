@@ -9,6 +9,7 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { enqueueMemoryReplication } from '../services/memory-replication.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." */
 function isAnonymousGaii(gaii: string): boolean {
@@ -34,6 +35,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // Phase 2.3 — Workspace access middleware for organism.* namespace keys
   const workspaceAccess = workspaceAccessMiddleware(config, storage);
 
+  /** Resolve effective identity for memory operations — owner sessions use GHII, agents use GAII */
+  const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
     const { key, value, visibility, tags, ttl_hours } = req.body ?? {};
@@ -55,10 +59,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     const now = new Date().toISOString();
     // Owner sessions use GHII identity (owner@nodeId) for memory storage
-    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    const gaii = isOwnerSession
-      ? `${req.auth!.owner}@${config.nodeId}`
-      : req.auth!.sub;
+    const gaii = resolve(req);
 
     // Anonymous namespace enforcement: anonymous agents can only write to anonymous.* keys
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
@@ -82,7 +83,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const existing = await storage.getMemory(gaii, key);
 
     // Defense-in-depth: verify ownership on overwrite even though getMemory is scoped by GAII
-    if (existing && existing.ownerGaii !== req.auth!.sub) {
+    if (existing && existing.ownerGaii !== gaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
       return;
     }
@@ -294,9 +295,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     let results: MemoryRecord[];
     if (isOwnerSession && !agentParam) {
-      // Owner session: search across all agents
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      // Owner session: search across GHII + all agents
+      const callerOwner = req.auth!.owner as string;
+      const ownerGhii = `${callerOwner}@${config.nodeId}`;
+      const agents = await storage.getAgentsByOwner(callerOwner);
       results = [];
+      results.push(...await storage.searchMemory(ownerGhii, q, { visibility, maxFlags }));
       for (const agent of agents) {
         results.push(...await storage.searchMemory(agent.gaii, q, { visibility, maxFlags }));
       }
@@ -325,7 +329,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // POST /v1/memory/files — upload file (base64 JSON body)
   router.post('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const { key, content, mime_type, visibility, tags } = req.body ?? {};
 
     if (!key || !content) {
@@ -380,7 +384,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // PATCH /v1/memory/files/:key — update file tags
   router.patch('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = req.params.key as string;
     const { tags } = req.body ?? {};
 
@@ -411,13 +415,17 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     emitChange('memory');
   });
 
-  // GET /v1/memory/files — list files (owner sees all agents' files)
+  // GET /v1/memory/files — list files (owner sees all agents' files + GHII files)
   router.get('/v1/memory/files', requireAuth(), requireRole('agent'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
     if (isOwnerSession) {
-      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      const callerOwner = req.auth!.owner as string;
+      const ownerGhii = `${callerOwner}@${config.nodeId}`;
+      const agents = await storage.getAgentsByOwner(callerOwner);
       files = [];
+      // Include GHII's own files first
+      files.push(...await storage.listStorageFiles(ownerGhii));
       for (const agent of agents) {
         files.push(...await storage.listStorageFiles(agent.gaii));
       }
@@ -440,7 +448,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory/files/:key — download file
   router.get('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = req.params.key as string;
     const file = await storage.getStorageFile(gaii, key);
 
@@ -456,7 +464,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // DELETE /v1/memory/files/:key — delete file
   router.delete('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = req.params.key as string;
 
     const existing = await storage.getStorageFile(gaii, key);
@@ -480,7 +488,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory/:key — read a memory entry
   router.get('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:read'), workspaceAccess, async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
     let record = await storage.getMemory(gaii, key);
@@ -542,7 +550,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // DELETE /v1/memory/:key — delete a memory entry
   router.delete('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:delete'), workspaceAccess, async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
     // Anonymous namespace enforcement
@@ -586,7 +594,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // PUT /v1/memory/:key — update memory with optimistic locking
   router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:write'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
     const { value, visibility, tags, ttl_hours, version } = req.body ?? {};
 
@@ -603,7 +611,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     // Defense-in-depth: verify ownership even though getMemory is scoped by GAII
-    if (existing.ownerGaii !== req.auth!.sub) {
+    if (existing.ownerGaii !== gaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
       return;
     }
@@ -709,7 +717,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory/cors/:key — Get memory key CORS allowed origins
   router.get('/v1/memory/cors/:key', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
     const record = await storage.getMemory(gaii, key);
@@ -747,7 +755,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // PUT /v1/memory/cors/:key — Set memory key CORS allowed origins
   router.put('/v1/memory/cors/:key', requireAuth(), requireRole('agent'), requireScope('memory:write'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
     const record = await storage.getMemory(gaii, key);
@@ -757,7 +765,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     // Defense-in-depth: verify ownership even though getMemory is scoped by GAII
-    if (record.ownerGaii !== req.auth!.sub) {
+    if (record.ownerGaii !== gaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
       return;
     }

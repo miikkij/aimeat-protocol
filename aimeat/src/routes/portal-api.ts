@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /**
  * Portal API — JSON endpoints extracted from the former SSR portal.
@@ -18,7 +19,7 @@ export function portalApiRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const gaii = req.auth!.sub;
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
     const rawKey = req.body?.boardKey;
     const boardKey = (typeof rawKey === 'string' && /^board\.[a-z][a-z0-9._-]{0,60}$/.test(rawKey))
       ? rawKey
