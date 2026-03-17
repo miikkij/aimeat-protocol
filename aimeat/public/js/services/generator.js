@@ -148,12 +148,22 @@ export async function deleteProject(projectId, session) {
   }
 
   // Phase 2: Clean translation memory keys — only delete this project's locale keys
+  // registeredAs format: "halytyskartta.i18n-fi" or "i18n-fi" (legacy)
   const translationComps = components.filter(c => c.type === 'translation' && c.registeredAs);
+  const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
+  const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
+  const slug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
   for (const comp of translationComps) {
-    // registeredAs is the locale name (e.g. "fi", "en")
-    const locale = comp.registeredAs;
-    if (locale) {
-      try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
+    const name = comp.registeredAs;
+    if (name) {
+      // Try service-prefixed key first, then legacy format
+      const locale = name.replace(/^.*i18n-/, '');
+      const prefixedKey = slug ? `${slug}.i18n.${locale}` : `i18n.${locale}`;
+      try { await apiDelete(`/v1/memory/${encodeURIComponent(prefixedKey)}`); } catch { /* best effort */ }
+      // Also try legacy unprefixed key
+      if (slug) {
+        try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
+      }
     }
   }
 
@@ -668,10 +678,18 @@ export async function removeComponents(projectId, componentIds, includeMemory, s
       } else if (comp.type === 'msm') {
         await apiDelete(`/v1/msm/${encodeURIComponent(name)}`);
       } else if (comp.type === 'translation') {
-        // Translation keys are stored as i18n.{locale} — extract locale from name (e.g., "i18n-fi" → "fi")
-        const locale = name.replace(/^i18n-/, '');
+        // Translation keys stored as {service}.i18n.{locale} or legacy i18n.{locale}
+        const locale = name.replace(/^.*i18n-/, '');
         if (locale) {
-          try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
+          // Find service slug from sibling extension/csm
+          const extSibling = comps.find(c => c.type === 'extension' && c.registeredAs);
+          const csmSibling = comps.find(c => c.type === 'csm' && c.registeredAs);
+          const svcSlug = extSibling?.registeredAs || csmSibling?.registeredAs?.split('/')?.pop() || '';
+          const memKey = svcSlug ? `${svcSlug}.i18n.${locale}` : `i18n.${locale}`;
+          try { await apiDelete(`/v1/memory/${encodeURIComponent(memKey)}`); } catch { /* best effort */ }
+          if (svcSlug) {
+            try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
+          }
         }
       }
       removed.push(name);
