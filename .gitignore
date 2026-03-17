@@ -29,12 +29,33 @@ logs/**
 !**/src/**/*.spec.js
 !**/src/static/**/*.js
 
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/playwright/.auth/
+# Playwright (match in any subdirectory)
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/playwright/.cache/
+**/playwright/.auth/
+
+# Playwright MCP logs
+.playwright-mcp/
+
+# Superpowers brainstorm artifacts
+.superpowers/
+
+# SQLite test databases
+*.db
+*.db-shm
+*.db-wal
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
 
 # OpenMemory - IDE/Assistant specific rules
 .github\instructions\openmemory.instructions.md
