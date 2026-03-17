@@ -99,11 +99,11 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
           ${t('profile.chatSessions.createDesc')}
         </p>
         <div class="flex-row-wrap mb-half">
-          <button class="btn-sm btn-copy" onClick=${() => copyPrompt('quick')}
+          <button class="btn-primary" onClick=${() => copyPrompt('quick')}
             disabled=${copying === 'quick'}>
             ${copying === 'quick' ? '...' : t('profile.chatSessions.copyQuickPrompt')}
           </button>
-          <button class="btn-sm btn-copy" onClick=${() => copyPrompt('detailed')}
+          <button class="btn-outline" onClick=${() => copyPrompt('detailed')}
             disabled=${copying === 'detailed'}>
             ${copying === 'detailed' ? '...' : t('profile.chatSessions.copyDetailedPrompt')}
           </button>
@@ -165,7 +165,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                   </div>
 
                   <div class="card-actions flex-actions">
-                    <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.gaii || s.name); showToast('GAII copied'); }}>
+                    <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.gaii || s.name); showToast('GAII copied'); }}>
                       Copy GAII
                     </button>
                     <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}

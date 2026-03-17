@@ -224,10 +224,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           </select>
         </div>
         <div class="flex-row-wrap">
-          <button class="btn-sm btn-copy" onClick=${() => handleUpdate(org.id)} disabled=${saving}>
+          <button class="btn-primary btn-sm" onClick=${() => handleUpdate(org.id)} disabled=${saving}>
             ${saving ? '...' : (t('organisms.save') || 'Save')}
           </button>
-          <button class="btn-sm" onClick=${cancelEdit}>
+          <button class="btn-ghost btn-sm" onClick=${cancelEdit}>
             ${t('organisms.cancel') || 'Cancel'}
           </button>
         </div>
@@ -300,7 +300,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
             <div class="card-actions">
               ${canEdit ? html`
-                <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); startEdit(org); }}>
+                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEdit(org); }}>
                   ${t('organisms.edit') || 'Edit'}
                 </button>
               ` : null}
@@ -315,7 +315,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 </button>
               ` : null}
               ${!isMember ? html`
-                <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); handleJoin(org.id); }}>
+                <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); handleJoin(org.id); }}>
                   ${t('organisms.join') || 'Join'}
                 </button>
               ` : null}
@@ -337,7 +337,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <!-- Create button / form -->
     <div class="mb-1">
       ${!showCreate ? html`
-        <button class="btn-sm btn-copy" onClick=${() => setShowCreate(true)}>
+        <button class="btn-primary" onClick=${() => setShowCreate(true)}>
           ${t('organisms.createNew') || 'Create Organism'}
         </button>
       ` : html`
@@ -373,10 +373,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               </select>
             </div>
             <div class="form-actions">
-              <button class="btn-sm btn-copy" onClick=${handleCreate} disabled=${creating}>
+              <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating}>
                 ${creating ? '...' : (t('organisms.create') || 'Create')}
               </button>
-              <button class="btn-sm" onClick=${() => setShowCreate(false)}>
+              <button class="btn-ghost btn-sm" onClick=${() => setShowCreate(false)}>
                 ${t('organisms.cancel') || 'Cancel'}
               </button>
             </div>
