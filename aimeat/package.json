@@ -64,6 +64,7 @@
     "test:e2e:memory": "node --env-file=.env.test.memory --import tsx test/run-e2e-ci.ts",
     "test:e2e:sqlite": "node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts",
     "test:e2e:mongodb": "node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts",
+    "test:playwright:mongodb": "node --env-file=.env.test.mongodb --import tsx test/run-playwright-ci.ts",
     "test:e2e:all-backends": "node --env-file=.env.test.memory --import tsx test/run-e2e-ci.ts --all && node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --all && node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:ci": "node --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:ci:filter": "node --import tsx test/run-e2e-ci.ts",
