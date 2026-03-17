@@ -32,6 +32,17 @@ export async function setAgentCors(agentName, origins) {
   });
 }
 
+/** List active sessions for the authenticated owner. */
+export async function listSessions() {
+  const data = await apiGet('/v1/auth/sessions');
+  return data?.data?.sessions || [];
+}
+
+/** Revoke a specific session by ID. */
+export async function revokeSession(sessionId) {
+  return api('/v1/auth/sessions/' + encodeURIComponent(sessionId), { method: 'DELETE' });
+}
+
 /** Revoke all active JWT sessions for the authenticated owner. */
 export async function revokeAllSessions() {
   return api('/v1/auth/sessions', { method: 'DELETE' });

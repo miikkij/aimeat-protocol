@@ -22,6 +22,8 @@ export default function SecurityTab({ session, showToast }) {
   const [corsEditGhii, setCorsEditGhii] = useState(null);
   const [corsEditAgent, setCorsEditAgent] = useState(null);
   const [revoking, setRevoking] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [revokingId, setRevokingId] = useState(null);
 
   useEffect(() => {
     if (session) loadData();
@@ -30,9 +32,13 @@ export default function SecurityTab({ session, showToast }) {
   async function loadData() {
     setLoading(true);
     try {
-      const agents = await listAgents(session.owner);
+      const [agents, sessionsList] = await Promise.all([
+        listAgents(session.owner),
+        securityService.listSessions(),
+      ]);
       const result = await securityService.loadAll(agents);
       setSecurityData(result);
+      setSessions(sessionsList);
     } catch { setSecurityData({ ghii: {}, agents: [] }); }
     setLoading(false);
   }
@@ -165,11 +171,44 @@ export default function SecurityTab({ session, showToast }) {
     </div>
 
     <h3 class="card-h3 mt-section">${t('profile.security.sessions') || 'Session Management'}</h3>
-    <p class="text-caption mb-1">${t('profile.security.sessionsHint') || 'Revoke all active sessions. You will need to re-authenticate on all devices.'}</p>
-    <div class="card">
-      <div class="flex-between">
-        <span class="pf-bold">${t('profile.security.sessionsLabel') || 'Active Sessions'}</span>
-      </div>
+    <p class="text-caption mb-1">${t('profile.security.sessionsHint') || 'Manage your active sessions. Revoking a session logs it out immediately.'}</p>
+
+    ${sessions.length === 0
+      ? html`<div class="empty">${t('profile.security.noSessions') || 'No active sessions'}</div>`
+      : html`<div class="card scroll-x">
+          <table class="consent-table"><thead><tr>
+            <th>${t('profile.security.sessionIdentity') || 'Identity'}</th>
+            <th>${t('profile.security.sessionIssuedAt') || 'Issued'}</th>
+            <th>${t('profile.security.sessionExpiresAt') || 'Expires'}</th>
+            <th></th>
+          </tr></thead><tbody>
+            ${sessions.map(s => html`<tr>
+              <td>
+                <span class="text-code">${escHtml(s.gaii || session.owner)}</span>
+                ${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession') || 'current'}</span>` : null}
+              </td>
+              <td class="text-meta">${new Date(s.issued_at).toLocaleString()}</td>
+              <td class="text-meta">${new Date(s.expires_at).toLocaleString()}</td>
+              <td>${s.current ? null : html`
+                <button class="revoke-btn pf-btn-xs" disabled=${revokingId === s.session_id}
+                  onClick=${async () => {
+                    setRevokingId(s.session_id);
+                    try {
+                      await securityService.revokeSession(s.session_id);
+                      showToast(t('profile.security.sessionRevoked') || 'Session revoked');
+                      setSessions(prev => prev.filter(x => x.session_id !== s.session_id));
+                    } catch(e) { showToast(e.message || 'Error', true); }
+                    setRevokingId(null);
+                  }}>
+                  ${revokingId === s.session_id ? '...' : (t('profile.security.revoke') || 'Revoke')}
+                </button>
+              `}</td>
+            </tr>`)}
+          </tbody></table>
+        </div>`
+    }
+
+    <div class="card mt-1">
       <p class="text-caption mb-half">${t('profile.security.sessionsDesc') || 'Revoking all sessions will invalidate every active JWT token. You and all your agents will be logged out immediately.'}</p>
       <button class="sec-revoke-btn" onClick=${handleRevokeAll} disabled=${revoking}>
         ${revoking ? (t('profile.security.revoking') || 'Revoking...') : (t('profile.security.revokeAll') || 'Revoke All Sessions')}

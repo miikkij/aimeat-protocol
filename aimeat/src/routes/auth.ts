@@ -396,6 +396,38 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
+  // GET /v1/auth/sessions — list active sessions for the authenticated owner
+  router.get('/v1/auth/sessions', requireAuth(), async (req, res) => {
+    const owner = req.auth!.owner;
+    const sessions = await storage.listActiveSessions(owner);
+    const currentSessionId = req.auth!.sessionId;
+
+    res.json(success(config.nodeId, {
+      sessions: sessions.map(s => ({
+        session_id: s.sessionId,
+        gaii: s.gaii,
+        issued_at: s.issuedAt,
+        expires_at: s.expiresAt,
+        current: s.sessionId === currentSessionId,
+      })),
+      total: sessions.length,
+    }));
+  });
+
+  // DELETE /v1/auth/sessions/:id — revoke a specific session
+  router.delete('/v1/auth/sessions/:id', requireAuth(), async (req, res) => {
+    const sessionId = req.params.id as string;
+    // Verify the session belongs to this owner by checking active sessions
+    const sessions = await storage.listActiveSessions(req.auth!.owner);
+    const target = sessions.find(s => s.sessionId === sessionId);
+    if (!target) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Session not found or already revoked'));
+      return;
+    }
+    await storage.revokeSession(sessionId);
+    res.json(success(config.nodeId, { revoked: true, session_id: sessionId }));
+  });
+
   // DELETE /v1/auth/sessions — revoke all sessions for the authenticated owner (P3-7)
   router.delete('/v1/auth/sessions', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;

@@ -3659,6 +3659,12 @@ export class SqliteStorage implements Storage {
     ).run(session.sessionId, session.gaii, session.owner, session.issuedAt, session.expiresAt);
   }
 
+  async listActiveSessions(owner: string): Promise<import('../../../storage/repositories/session.repository.js').SessionRecord[]> {
+    return this.db.prepare(
+      'SELECT sessionId, gaii, owner, issuedAt, expiresAt, revoked FROM sessions WHERE owner = ? AND revoked = 0 ORDER BY issuedAt DESC'
+    ).all(owner) as import('../../../storage/repositories/session.repository.js').SessionRecord[];
+  }
+
   async revokeSession(sessionId: string): Promise<boolean> {
     const result = this.db.prepare('UPDATE sessions SET revoked = 1 WHERE sessionId = ? AND revoked = 0').run(sessionId);
     return result.changes > 0;

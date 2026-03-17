@@ -3057,6 +3057,22 @@ export class MongoStorage implements Storage {
         });
     }
 
+    async listActiveSessions(owner: string): Promise<import('../../../storage/repositories/session.repository.js').SessionRecord[]> {
+        this.ensureReady();
+        const sessions = await this.prisma.session.findMany({
+            where: { owner, revoked: false },
+            orderBy: { issuedAt: 'desc' },
+        });
+        return sessions.map((s: { sessionId: string; gaii: string; owner: string; issuedAt: Date | string; expiresAt: Date | string; revoked: boolean }) => ({
+            sessionId: s.sessionId,
+            gaii: s.gaii,
+            owner: s.owner,
+            issuedAt: s.issuedAt instanceof Date ? s.issuedAt.toISOString() : String(s.issuedAt),
+            expiresAt: s.expiresAt instanceof Date ? s.expiresAt.toISOString() : String(s.expiresAt),
+            revoked: s.revoked,
+        }));
+    }
+
     async revokeSession(sessionId: string): Promise<boolean> {
         this.ensureReady();
         const session = await this.prisma.session.findUnique({ where: { sessionId } });

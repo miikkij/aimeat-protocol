@@ -89,6 +89,12 @@ export function createSession(db: Database.Database, session: { sessionId: strin
   ).run(session.sessionId, session.gaii, session.owner, session.issuedAt, session.expiresAt);
 }
 
+export function listActiveSessions(db: Database.Database, owner: string): Array<{ sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string; revoked: boolean }> {
+  return db.prepare(
+    'SELECT sessionId, gaii, owner, issuedAt, expiresAt, revoked FROM sessions WHERE owner = ? AND revoked = 0 ORDER BY issuedAt DESC'
+  ).all(owner) as Array<{ sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string; revoked: boolean }>;
+}
+
 export function revokeSession(db: Database.Database, sessionId: string): boolean {
   const result = db.prepare('UPDATE sessions SET revoked = 1 WHERE sessionId = ? AND revoked = 0').run(sessionId);
   return result.changes > 0;

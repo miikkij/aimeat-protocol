@@ -41,7 +41,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     try {
       const [instRes, pkgRes, tplRes] = await Promise.all([
         pkgService.listInstances({ status: 'active' }),
-        pkgService.listPackages({ status: 'published', visibility: 'public' }),
+        pkgService.listPackages({ status: 'published', author: session?.owner }),
         pkgService.listTemplates({ sort: 'newest' }),
       ]);
       if (instRes.ok) setInstances(instRes.data?.instances ?? []);
