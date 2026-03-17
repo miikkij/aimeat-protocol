@@ -58,45 +58,41 @@ function permLabel(perm) {
 function buildAgentPrompt(sess) {
   const ghii = sess.ghii || (sess.owner + '@unknown');
   const url = getNodeUrl();
-  return `I want you to register a new automation agent on my AIMEAT node.
+  return `Register a new agent on my AIMEAT node using Device Authorization (OAuth-style flow).
 
-IMPORTANT: I already have an account. Do NOT create a new owner. Use my existing identity.
+IMPORTANT: I already have an account. Do NOT create a new owner.
 
-My GHII: ${ghii}
-My owner name (for API calls): ${sess.owner}
+My owner name: ${sess.owner}
 Node URL: ${url}
 
-Preferred method (Device Authorization):
-1. POST ${url}/v1/agents/device-authorize
-   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
-2. Show the verification_uri_complete URL to the user to open in their browser
-3. Poll POST ${url}/v1/agents/device-token
-   Body: { "device_code": "...", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
-   Every {interval} seconds until you get a 200 response
-4. On success, store the returned privateKey securely
-5. Authenticate: POST ${url}/v1/auth/token with Ed25519 signature
+Step 1 — Start device authorization:
+  POST ${url}/v1/agents/device-authorize
+  Body: { "agent_name": "choose-a-name", "owner": "${sess.owner}" }
 
-Alternative method (Direct API registration):
-1. Authenticate as my owner:
-   POST ${url}/v1/auth/token
-   Sign (ownerName + nodeId + timestamp) with Ed25519 owner private key.
+  Response includes: device_code, user_code, verification_uri_complete, interval
 
-2. Register a new agent:
-   POST ${url}/v1/agents
-   Header: Authorization: Bearer <owner_jwt>
-   Body: {"name": "<choose-a-name>", "owner": "${sess.owner}", "display_name": "<Your Agent Name>", "description": "<What this agent does>"}
-   SAVE the private_key from the response!
+Step 2 — Show the verification_uri_complete URL to me so I can open it in my browser and approve.
 
-3. Authenticate as the new agent:
-   Sign (gaii + timestamp) with the agent's Ed25519 private key
-   POST ${url}/v1/auth/token with {"gaii": "<agent-gaii>", "timestamp": "<iso>", "signature": "<sig>"}
+Step 3 — Poll for the token:
+  POST ${url}/v1/agents/device-token
+  Body: { "device_code": "<from step 1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
+  Poll every {interval} seconds. You will get "authorization_pending" until I approve.
 
-4. You're connected! Use the JWT to access:
-   GET ${url}/v1/catalogue \u2014 Browse services
-   POST ${url}/v1/memory \u2014 Store/retrieve memories
-   GET ${url}/v1/wallet \u2014 Check balance
-   Full API spec: ${url}/v1/spec
-   Operating instructions: ${url}/v1/prompts/tier1`;
+Step 4 — On success (HTTP 200), the response contains:
+  - token: a long-lived JWT (valid ~90 days)
+  - gaii: your agent identity
+
+  Store the token. Use it for ALL API calls:
+  Authorization: Bearer <token>
+
+That's it! You're connected. Available APIs:
+  GET ${url}/v1/catalogue — Browse services
+  POST ${url}/v1/memory — Store/retrieve data
+  GET ${url}/v1/wallet — Check balance
+  Full API spec: ${url}/v1/spec
+  Operating instructions: ${url}/v1/prompts/tier1
+
+If the agent name already exists, the approval will issue a new token for the existing agent.`;
 }
 
 /* ── Platform instructions ── */

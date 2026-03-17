@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
@@ -10,7 +12,7 @@ import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { AgentRegistrationSchema, validateBody } from '../models/schemas.js';
-import { verifyJWT } from '../auth/jwt.js';
+import { verifyJWT, issueJWT, generateSessionId } from '../auth/jwt.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -167,10 +169,13 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
           gaii: creds.gaii,
           name: request.agentName,
           owner: request.ownerName,
+          token: creds.token,
+          expires_at: creds.expires_at,
           privateKey: creds.privateKey,
           publicKey: creds.publicKey,
           scopes: request.scopes,
           morselBalance: config.welcomeBonus,
+          note: 'Use the token directly: Authorization: Bearer <token>. The privateKey is provided for advanced use (Ed25519 signing) but is not required.',
         });
         return;
       }
@@ -282,48 +287,67 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Check for duplicate agent name
+    // Check if agent already exists — if so, issue new JWT for existing agent
     const gaii = buildGAII(request.agentName, request.ownerName, config.nodeId);
     const existing = await storage.getAgent(gaii);
-    if (existing) {
-      res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${request.agentName}" already exists under your account`));
-      return;
-    }
-
-    // Generate keypair and create agent
-    const keyPair = await generateKeyPair();
+    let keyPair: { privateKey: string; publicKey: string };
     const now = new Date().toISOString();
 
-    await storage.createAgent({
-      name: request.agentName,
-      owner: request.ownerName,
-      gaii,
-      displayName: request.displayName ?? request.agentName,
-      description: request.description,
-      capabilities: [],
-      defaultScopes: finalScopes,
-      publicKey: keyPair.publicKey,
-      trustScore: 50,
-      morselBalance: config.welcomeBonus,
-      createdAt: now,
-      lastSeen: now,
-    });
-
-    // Record welcome bonus
-    if (config.welcomeBonus > 0) {
-      await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-        gaii,
-        type: 'welcome_bonus',
-        amount: config.welcomeBonus,
-        timestamp: now,
+    if (existing) {
+      // Existing agent: generate new keypair (rotate keys) and issue JWT
+      keyPair = await generateKeyPair();
+      await storage.updateAgent(gaii, {
+        publicKey: keyPair.publicKey,
+        defaultScopes: finalScopes,
+        lastSeen: now,
       });
+    } else {
+      // New agent: create from scratch
+      keyPair = await generateKeyPair();
+
+      await storage.createAgent({
+        name: request.agentName,
+        owner: request.ownerName,
+        gaii,
+        displayName: request.displayName ?? request.agentName,
+        description: request.description,
+        capabilities: [],
+        defaultScopes: finalScopes,
+        publicKey: keyPair.publicKey,
+        trustScore: 50,
+        morselBalance: config.welcomeBonus,
+        createdAt: now,
+        lastSeen: now,
+      });
+
+      // Record welcome bonus
+      if (config.welcomeBonus > 0) {
+        await storage.addTransaction({
+          id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          gaii,
+          type: 'welcome_bonus',
+          amount: config.welcomeBonus,
+          timestamp: now,
+        });
+      }
+
+      // Post-registration hook
+      fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
     }
 
-    // Post-registration hook
-    fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
+    // Issue long-lived JWT for the agent
+    const sessionId = generateSessionId();
+    const agentJwt = await issueJWT({
+      sub: gaii,
+      owner: request.ownerName,
+      node: config.nodeId,
+      roles: ['agent'],
+      scopes: finalScopes,
+    }, config.agentJwtTtlSeconds, sessionId);
 
-    // Store credentials for agent to poll
+    const expiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
+
+    // Store credentials + JWT for agent to poll
     await storage.updateDeviceAuth(request.deviceCode, {
       status: 'approved',
       scopes: finalScopes,
@@ -332,6 +356,8 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         gaii,
         privateKey: keyPair.privateKey,
         publicKey: keyPair.publicKey,
+        token: agentJwt,
+        expires_at: expiresAt,
       },
     });
 
@@ -339,6 +365,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       status: 'approved',
       gaii,
       agent_name: request.agentName,
+      existing_agent: !!existing,
     }));
     emitChange('agents');
   });
@@ -424,6 +451,18 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
 
+    // Issue long-lived JWT for the agent
+    const connectSessionId = generateSessionId();
+    const connectJwt = await issueJWT({
+      sub: gaii,
+      owner: owner,
+      node: config.nodeId,
+      roles: ['agent'],
+      scopes: requestedScopes,
+    }, config.agentJwtTtlSeconds, connectSessionId);
+
+    const connectExpiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
+
     res.set('Cache-Control', 'no-store');
     res.set('Pragma', 'no-cache');
     res.status(201).json(success(config.nodeId, {
@@ -436,9 +475,11 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         morsel_balance: agent.morselBalance,
         created_at: agent.createdAt,
       },
+      token: connectJwt,
+      expires_at: connectExpiresAt,
       private_key: keyPair.privateKey,
       public_key: keyPair.publicKey,
-      note: 'Agent registered successfully. Store the private key securely — it cannot be retrieved again. Use it to authenticate via POST /v1/auth/token.',
+      note: 'Use the token directly: Authorization: Bearer <token>. The private_key is for advanced use (Ed25519 signing) but is not required.',
     }, [
       {
         description: 'Authenticate as this agent to get a JWT',
@@ -581,6 +622,26 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       },
     ]));
     emitChange('agents');
+  });
+
+  // GET /v1/agents/verify — device authorization consent page (must be BEFORE :gaii catch-all)
+  router.get('/v1/agents/verify', (_req, res) => {
+    const candidates = [
+      join(__dirname, '..', '..', 'public', 'agent-consent.html'),      // dev: src/routes/../../public
+      join(__dirname, '..', '..', '..', 'public', 'agent-consent.html'), // dist: dist/src/routes/../../../public
+    ];
+    const htmlPath = candidates.find(p => existsSync(p));
+    if (htmlPath) {
+      let html = readFileSync(htmlPath, 'utf-8');
+      const nonce = res.locals.cspNonce as string || '';
+      if (nonce) {
+        html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+        html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+      }
+      res.type('text/html').send(html);
+    } else {
+      res.status(404).type('text/plain').send('Agent consent page not found');
+    }
   });
 
   // GET /v1/agents/:gaii — public agent profile (no auth)

@@ -63,6 +63,7 @@ export interface AimeatConfig {
   devMode: boolean;
   anonymousMode: boolean;
   jwtTtlSeconds: number;
+  agentJwtTtlSeconds: number;
   welcomeBonus: number;
   dailyAllowance: number;
   dailyAllowanceCap: number;
@@ -400,6 +401,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     devMode: process.env.AIMEAT_DEV_MODE === 'true',
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
     jwtTtlSeconds: parseInt(process.env.AIMEAT_JWT_TTL ?? '3600', 10),
+    agentJwtTtlSeconds: parseInt(process.env.AIMEAT_AGENT_JWT_TTL ?? '7776000', 10), // 90 days
     welcomeBonus: parseInt(process.env.AIMEAT_WELCOME_BONUS ?? '100', 10),
     dailyAllowance: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE ?? '50', 10),
     dailyAllowanceCap: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE_CAP ?? '500', 10),

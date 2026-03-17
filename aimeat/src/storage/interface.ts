@@ -170,6 +170,8 @@ export interface DeviceAuthorizationRecord {
     gaii: string;
     privateKey: string;
     publicKey: string;
+    token?: string;
+    expires_at?: string;
   };
 }
 
