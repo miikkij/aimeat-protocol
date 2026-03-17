@@ -211,7 +211,7 @@ export default function NotificationsTab({ session, showToast }) {
     if (subscribed) {
       return html`
         <div class="flex-row">
-          <button class="btn-outline btn-sm" onClick=${handleTestPush}>
+          <button class="btn-primary btn-sm" onClick=${handleTestPush}>
             ${t('profile.notifications.testBtn')}
           </button>
           <button class="btn-outline btn-sm" onClick=${handleUnsubscribe}
