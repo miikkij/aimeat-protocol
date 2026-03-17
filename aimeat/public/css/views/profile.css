@@ -187,15 +187,8 @@
 .pf .file-upload-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:rgba(255,255,255,.03);border:1px solid var(--border,rgba(232,86,74,.15));border-radius:8px}
 .pf .btn-primary{background:linear-gradient(135deg,var(--accent,#E8564A),var(--accent-dark,#D4493F));color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s}
 .pf .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,86,74,.3)}
-.pf .btn-sm{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;background:var(--accent-dark,#D4493F);color:#fff;border:none;transition:all .2s}
-.pf .btn-sm:hover{background:var(--accent,#E8564A)}
-.pf .btn-outline{padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;background:transparent;color:var(--text-dim,#6B7280);border:1px solid var(--border,#E5E7EB);transition:all .2s}
-.pf .btn-outline:hover{color:var(--text,#1A1A2E);border-color:var(--accent,#E8564A)}
-.pf .btn-danger{background:var(--danger,#ef4444);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:.8rem;font-weight:600}
-.pf .btn-danger:hover{opacity:.8}
-.pf .btn-danger:disabled{opacity:.4;cursor:not-allowed}
-.pf .btn-copy{background:rgba(108,92,231,.15);color:#a29bfe;border:1px solid rgba(108,92,231,.3)}
-.pf .btn-copy:hover{background:rgba(108,92,231,.3)}
+/* Button overrides removed — use theme.css btn-primary/btn-outline/btn-ghost/btn-danger-solid classes.
+   See docs/frontend-development-guide.md "Banned Patterns" for the rationale. */
 .pf .card-expanded{border-color:var(--accent,#E8564A)}
 .pf .card-clickable{cursor:pointer;user-select:none}
 .pf .card-clickable:hover{opacity:.9}
