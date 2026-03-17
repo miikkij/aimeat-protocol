@@ -35,6 +35,7 @@ import PushTab         from './admin/push-tab.js';
 import DirectoryTab    from './admin/directory-tab.js';
 import MatchingTab     from './admin/matching-tab.js';
 import ServicesTab     from './admin/services-tab.js';
+import CortexTab       from './admin/cortex-tab.js';
 import CsmTab          from './admin/csm-tab.js';
 import MsmTab          from './admin/msm-tab.js';
 import FederationTab   from './admin/federation-tab.js';
@@ -82,6 +83,7 @@ const NAV_GROUPS = [
     { id: 'directory',   icon: '\u{1F4D6}', key: 'dashboard.directory',      component: DirectoryTab },
     { id: 'matching',    icon: '\u{1F91D}', key: 'dashboard.matching',       component: MatchingTab },
     { id: 'services',    icon: '\u{1F9E9}', key: 'dashboard.services',       component: ServicesTab },
+    { id: 'cortex',      icon: '\u{1F4E6}', key: 'dashboard.cortexTab',      component: CortexTab },
     { id: 'csm',         icon: '\u{1F4E6}', key: 'dashboard.csmManagement',  component: CsmTab },
     { id: 'knowledge',   icon: '\u{1F9E0}', key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
     { id: 'packages',    icon: '\u{1F9F0}', key: 'dashboard.packagesTab',      component: PackagesAdminTab },

@@ -360,6 +360,7 @@ export default function ExtensionsTab({ session, showToast }) {
     const comps = ext.components || [];
     const isActive = ext.status === 'active';
     const vis = ext.visibility || 'private';
+    const isOwn = ext.installed_by === (session?.owner || '');
 
     return html`<div>
       <button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button>
@@ -420,7 +421,7 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-ontology-text">${Object.entries(ont.concepts || {}).map(([k, c]) => k + ' (' + (c.label?.en || k) + ')').join(', ')}</div>
         </div>`)}
 
-      <div class="ext-actions-bar">
+      ${isOwn ? html`<div class="ext-actions-bar">
         ${isActive
           ? html`<button class="btn-outline" onClick=${() => deactivateExt(ext.name)}>${t('profile.extensions.deactivate')}</button>`
           : html`<button class="btn-primary" onClick=${() => activateExt(ext.name)}>${t('profile.extensions.activate')}</button>`}
@@ -428,7 +429,7 @@ export default function ExtensionsTab({ session, showToast }) {
           ${vis === 'public' ? t('profile.extensions.unpublish') : t('profile.extensions.publish')}
         </button>
         <button class="btn-danger-solid" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
-      </div>
+      </div>` : html`<div class="ext-meta-row"><span>${t('profile.extensions.managedByAdmin')}</span></div>`}
       <${ConfirmUI} />
     </div>`;
   }
@@ -533,8 +534,14 @@ export default function ExtensionsTab({ session, showToast }) {
   }
 
   // ── Grid view ──
-  const hasExtensions = extensions && extensions.length > 0;
-  const installedNames = (extensions || []).map(e => e.name);
+  const currentOwner = session?.owner || '';
+  const allExts = extensions || [];
+  const nodeExts = allExts.filter(e => e.installed_by !== currentOwner);
+  const myExts = allExts.filter(e => e.installed_by === currentOwner);
+  const hasNodeExts = nodeExts.length > 0;
+  const hasMyExts = myExts.length > 0;
+  const hasExtensions = allExts.length > 0;
+  const installedNames = allExts.map(e => e.name);
   const unbundled = BUNDLED.filter(b => !installedNames.includes(b.id));
   const hasV8 = v8Exts && v8Exts.length > 0;
 
@@ -580,11 +587,36 @@ export default function ExtensionsTab({ session, showToast }) {
       </div>
     </div>
 
-    ${!extensions ? html`<${Spinner} text=${t('profile.extensions.loading')} />`
-      : hasExtensions ? html`<div>
-        <div class="ext-installed-heading">${t('profile.extensions.installed')} (${extensions.length})</div>
+    ${!extensions ? html`<${Spinner} text=${t('profile.extensions.loading')} />` : null}
+
+    ${hasNodeExts ? html`<div>
+        <div class="ext-installed-heading">${t('profile.extensions.nodeExtensions')} (${nodeExts.length})</div>
         <div class="ext-grid">
-          ${extensions.map(ext => {
+          ${nodeExts.map(ext => {
+            const types = ext.component_types || [];
+            return html`
+              <div class="ext-card" onClick=${() => loadDetail(ext.name)}>
+                <div class="ext-card-header">
+                  <span class="ext-card-name">${ext.name}</span>
+                  <span class="ext-card-version">v${ext.version || '?'}</span>
+                  <span class="ext-visibility-badge public">${'\u{1F310}'}</span>
+                </div>
+                <div class="ext-card-desc">${ext.description || ''}</div>
+                <div class="ext-card-tags">
+                  ${types.map(ct => html`<span class="ext-comp-tag ${COMP_TAG_CLASSES[ct] || ''}">${t('profile.extensions.components.' + ct) || ct}</span>`)}
+                </div>
+                <div class="ext-card-footer">
+                  <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
+                </div>
+              </div>`;
+          })}
+        </div>
+      </div>` : null}
+
+    ${hasMyExts ? html`<div>
+        <div class="ext-installed-heading">${t('profile.extensions.myExtensions')} (${myExts.length})</div>
+        <div class="ext-grid">
+          ${myExts.map(ext => {
             const types = ext.component_types || [];
             const isActive = ext.status === 'active';
             const vis = ext.visibility || 'private';
