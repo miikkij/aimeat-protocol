@@ -1321,6 +1321,14 @@ export class SqliteStorage implements Storage {
     return this.getStorageFile(ownerGaii, key);
   }
 
+  async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility']): Promise<StorageFileRecord | null> {
+    const result = this.db.prepare(
+      'UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?'
+    ).run(visibility, ownerGaii, key);
+    if (result.changes === 0) return null;
+    return this.getStorageFile(ownerGaii, key);
+  }
+
   // ══════════════════════════════════════════════════════════
   // ── Peering Requests ──
   // ══════════════════════════════════════════════════════════

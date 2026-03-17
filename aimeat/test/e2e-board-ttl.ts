@@ -512,9 +512,14 @@ await test('22. Post to public board → morsels deducted', async () => {
 });
 
 await test('23. Post with insufficient morsels → 402', async () => {
-    // Agent-B has 100 morsels. Drain with 4 × 10000-char posts (cost 25 each = 100 total)
+    // Single-balance economy: both agents share the owner's GHII balance.
+    // Query actual balance and drain it with expensive posts (cost 25 each).
+    const { body: w } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${agent2Token}` } });
+    const remaining = w.data?.balance ?? 0;
     const drainBody = 'x'.repeat(10000);
-    for (let i = 0; i < 4; i++) {
+    const costPerPost = 5 + Math.ceil((drainBody.length / 1000) * 2); // 25
+    const drainCount = Math.floor(remaining / costPerPost);
+    for (let i = 0; i < drainCount; i++) {
         const { status } = await json(`/v1/boards/${publicBoardId}/posts`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${agent2Token}` },
@@ -522,11 +527,11 @@ await test('23. Post with insufficient morsels → 402', async () => {
         });
         assert(status === 201, `drain post ${i + 1} failed: ${status}`);
     }
-    // Now balance = 0, any post should fail
+    // Now balance < 25 morsels. Post another expensive one that costs 25 — should fail.
     const { status, body } = await json(`/v1/boards/${publicBoardId}/posts`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${agent2Token}` },
-        body: JSON.stringify({ title: 'Expensive Post', body: 'One more post' }),
+        body: JSON.stringify({ title: 'Expensive Post', body: drainBody }),
     });
     assert(status === 402, `expected 402, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'INSUFFICIENT_MORSELS', `code: ${body.error?.code}`);

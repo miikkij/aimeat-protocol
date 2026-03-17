@@ -63,6 +63,14 @@ export function updateFileTagsByKey(db: Database.Database, ownerGaii: string, ke
   return getStorageFile(db, ownerGaii, key);
 }
 
+export function updateFileVisibility(db: Database.Database, ownerGaii: string, key: string, visibility: StorageFileRecord['visibility']): StorageFileRecord | null {
+  const result = db.prepare(
+    'UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?'
+  ).run(visibility, ownerGaii, key);
+  if (result.changes === 0) return null;
+  return getStorageFile(db, ownerGaii, key);
+}
+
 // ── Chunked Uploads (in-memory) ──
 
 export function createChunkedUpload(chunkedUploads: Map<string, ChunkedUploadRecord>, record: ChunkedUploadRecord): ChunkedUploadRecord {

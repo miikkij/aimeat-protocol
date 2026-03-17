@@ -213,10 +213,11 @@
 .pf .file-card{display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);transition:all .2s}
 .pf .file-card:hover{border-color:var(--accent,#E8564A)}
 .pf .file-icon{font-size:1.5rem;min-width:2rem;text-align:center}
+.pf .file-thumb{width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid var(--border,#E5E7EB)}
 .pf .file-info{flex:1;min-width:0}
 .pf .file-name{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pf .file-meta{font-size:.75rem;color:var(--text-dim,#6B7280)}
-.pf .file-actions{display:flex;gap:.25rem;flex-shrink:0}
+.pf .file-meta{font-size:.75rem;color:var(--text-dim,#6B7280);display:flex;align-items:center;gap:.5rem}
+.pf .file-actions{display:flex;gap:.5rem;flex-shrink:0;align-items:center}
 .pf .file-tags{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.25rem}
 .pf .file-tag{font-size:.65rem;padding:1px 6px;border-radius:8px;background:rgba(232,86,74,.15);color:var(--accent,#E8564A);border:1px solid rgba(232,86,74,.25)}
 .pf .file-tag-cloud{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem 0}

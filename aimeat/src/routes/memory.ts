@@ -382,6 +382,31 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     emitChange('memory');
   });
 
+  // PATCH /v1/memory/files/:key/visibility — update file visibility
+  // Registered BEFORE generic :key PATCH to avoid Express matching "key/visibility" as a single param
+  router.patch('/v1/memory/files/:key/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+    const gaii = resolve(req);
+    const key = req.params.key as string;
+    const { visibility } = req.body ?? {};
+
+    if (!visibility || !['private', 'owner', 'public'].includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "owner", or "public"'));
+      return;
+    }
+
+    const updated = await storage.updateFileVisibility(gaii, key, visibility);
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      key: updated.key,
+      visibility: updated.visibility,
+    }));
+    emitChange('memory');
+  });
+
   // PATCH /v1/memory/files/:key — update file tags
   router.patch('/v1/memory/files/:key', requireAuth(), requireRole('agent'), async (req, res) => {
     const gaii = resolve(req);

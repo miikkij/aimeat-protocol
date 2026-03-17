@@ -162,9 +162,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
 
   async function handleUpdateVisibility(key, newVis, version) {
+    // Optimistic update — change locally first, then persist
+    setMemories(prev => prev.map(m => m.key === key ? { ...m, visibility: newVis, version: (m.version || 1) + 1 } : m));
     const resp = await memoryService.updateMemoryVisibility(key, newVis, version);
-    if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-    loadMemories();
+    if (resp.ok === false) {
+      showToast(resp.error?.message || t('profile.error'), true);
+      loadMemories(); // Revert on error
+    }
   }
 
   async function handleUpdateMemoryTags(key, tags, version) {
@@ -177,6 +181,16 @@ export default function MemoryTab({ session, showToast, onStats }) {
     const resp = await memoryService.updateFileTags(key, tags);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     loadFiles();
+  }
+
+  async function handleUpdateFileVisibility(key, newVis) {
+    // Optimistic update
+    setFiles(prev => prev?.map(f => (f.key || f.name) === key ? { ...f, visibility: newVis } : f));
+    const resp = await memoryService.updateFileVisibility(key, newVis);
+    if (resp.ok === false) {
+      showToast(resp.error?.message || t('profile.error'), true);
+      loadFiles(); // Revert on error
+    }
   }
 
   const renderEntries = () => {
@@ -314,25 +328,38 @@ export default function MemoryTab({ session, showToast, onStats }) {
         ? html`<div class="empty">${files.length > 0 ? (t('profile.files.noMatch') || 'No files match selected tags') : t('profile.files.empty')}</div>`
         : html`<div class="file-grid">
             ${filtered.map(f => {
-              const icon = f.mime_type?.startsWith('image') ? '\u{1F5BC}\uFE0F' : f.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}';
+              const fKey = f.key || f.name;
+              const isImage = f.mime_type?.startsWith('image');
+              const vis = f.visibility || 'private';
+              const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
               return html`
                 <div class="file-card">
-                  <div class="file-icon">${icon}</div>
+                  ${isImage
+                    ? html`<img class="file-thumb" src="${NODE_URL}/v1/memory/files/${encodeURIComponent(fKey)}" alt=${escHtml(fKey)} loading="lazy" />`
+                    : html`<div class="file-icon">${f.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}'}</div>`
+                  }
                   <div class="file-info">
-                    <div class="file-name">${escHtml(f.key || f.name)}</div>
-                    <div class="file-meta">${f.size ? Math.round(f.size / 1024) + ' KB' : ''} \u2502 ${f.visibility || 'private'}</div>
-                    ${editingFileTags === (f.key || f.name)
-                      ? html`<${TagEditor} tags=${f.tags || []} onSave=${(tags) => handleUpdateFileTags(f.key || f.name, tags)} />`
+                    <div class="file-name">${escHtml(fKey)}</div>
+                    <div class="file-meta">
+                      ${f.size ? Math.round(f.size / 1024) + ' KB' : ''}
+                      <button class="kpkg-vis-pill"
+                        onClick=${(e) => { e.stopPropagation(); handleUpdateFileVisibility(fKey, nextVis); }}
+                        title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
+                        style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
+                      >${t('knowledge.visibility.' + vis)} ▾</button>
+                    </div>
+                    ${editingFileTags === fKey
+                      ? html`<${TagEditor} tags=${f.tags || []} onSave=${(tags) => handleUpdateFileTags(fKey, tags)} />`
                       : html`
                         ${f.tags?.length > 0 && html`<div class="file-tags">${f.tags.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}</div>`}
-                        <button class="btn-outline btn-sm mt-xs" onClick=${() => setEditingFileTags(f.key || f.name)}>
+                        <button class="btn-outline btn-sm mt-xs" onClick=${() => setEditingFileTags(fKey)}>
                           ${t('tags.editTags') || 'Edit tags'}
                         </button>
                       `}
                   </div>
                   <div class="file-actions">
-                    <a class="btn-sm pf-no-underline" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}" target="_blank">${t('profile.files.download')}</a>
-                    <button class="btn-danger" onClick=${() => handleDeleteFile(f.key || f.name)}>${t('profile.files.delete')}</button>
+                    <a class="btn-outline btn-sm pf-no-underline" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(fKey)}" target="_blank">${t('profile.files.download')}</a>
+                    <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteFile(fKey)}>${t('profile.files.delete')}</button>
                   </div>
                 </div>`;
             })}

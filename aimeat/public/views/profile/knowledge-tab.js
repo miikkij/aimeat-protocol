@@ -278,16 +278,23 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     const manifest = pkg.value;
     const packageId = manifest?.id || pkg.key.split('/')[1] || pkg.key;
     const entryKey = entry.key;
+    // Optimistic update — change locally first
+    setPackages(prev => prev.map(p => {
+      if (p.key !== pkg.key) return p;
+      const updatedEntries = (p.value?.entries || []).map(e =>
+        e.key === entryKey ? { ...e, visibility: newVis } : e
+      );
+      return { ...p, value: { ...p.value, entries: updatedEntries } };
+    }));
     try {
       const result = await knowledgeService.updateEntryVisibility(packageId, entryKey, newVis);
-      if (result?.data?.visibility) {
-        showToast(t('knowledge.myKnowledge.saved') || 'Saved');
-        loadPackages();
-      } else {
+      if (!result?.data?.visibility) {
         showToast(result?.error?.message || (t('knowledge.myKnowledge.saveError') || 'Failed'));
+        loadPackages(); // Revert on error
       }
     } catch {
       showToast(t('knowledge.myKnowledge.saveError') || 'Failed');
+      loadPackages(); // Revert on error
     }
   }, [showToast, loadPackages]);
 

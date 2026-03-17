@@ -98,6 +98,14 @@ export async function uploadFile(key, base64Content, mimeType, visibility, tags)
   });
 }
 
+/** Update visibility on a file. */
+export async function updateFileVisibility(key, visibility) {
+  return api(`/v1/memory/files/${encodeURIComponent(key)}/visibility`, {
+    method: 'PATCH',
+    body: JSON.stringify({ visibility }),
+  });
+}
+
 /** Delete a file. */
 export async function deleteFile(key) {
   return apiDelete(`/v1/memory/files/${encodeURIComponent(key)}`);

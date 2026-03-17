@@ -1228,6 +1228,16 @@ export class MongoStorage implements Storage {
         return this.getStorageFile(ownerGaii, key);
     }
 
+    async updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility']): Promise<StorageFileRecord | null> {
+        this.ensureReady();
+        const updated = await this.prisma.storageFile.updateMany({
+            where: { ownerGaii, key },
+            data: { visibility },
+        });
+        if (updated.count === 0) return null;
+        return this.getStorageFile(ownerGaii, key);
+    }
+
     // ── Peering Requests ────────────────────────────────────────
 
     async createPeeringRequest(req: PeeringRequestRecord): Promise<PeeringRequestRecord> {
