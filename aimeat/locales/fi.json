@@ -3873,5 +3873,20 @@
     "sendUsername": "Lähetä käyttäjätunnukseni",
     "usernameSent": "Jos sähköpostilla on tili, käyttäjätunnus lähetettiin.",
     "backToLogin": "Takaisin kirjautumiseen"
+  },
+  "aimeatOs": {
+    "title": "Rakenna oma sovellus",
+    "subtitle": "Käytä mitä tahansa chat-tekoälyä suunnitellaksesi ja rakentaaksesi itsenäisen HTML-sovelluksen joka yhdistää AIMEAT-solmuusi. Lataa alla oleva opas ja anna se tekoälylle kontekstiksi.",
+    "step1Title": "1. Lataa opas",
+    "step1Desc": "Hanki AIMEAT-OS.md-tiedosto — se sisältää kaiken mitä tekoäly tarvitsee sovelluksesi rakentamiseen.",
+    "step2Title": "2. Anna se tekoälychatille",
+    "step2Desc": "Avaa Claude, ChatGPT tai mikä tahansa tekoälychat. Lataa opas ja kuvaile mitä haluat rakentaa.",
+    "step3Title": "3. Lataa sovelluksesi",
+    "step3Desc": "Kun tekoäly tuottaa valmiin HTML-tiedoston, palaa takaisin ja lisää se sovelluksiisi.",
+    "downloadBtn": "Lataa AIMEAT-OS.md",
+    "downloadHint": "Kattava opas tekoälyavustajille — sisältää täyden API-kuvauksen, esimerkkikehotteita ja kaiken tarvittavan AIMEAT-sovellusten rakentamiseen.",
+    "addAppBtn": "Lisää uusi sovellus",
+    "generatorHint": "Rakennatko jotain monimutkaisempaa taustapalveluilla ja dataputkilla?",
+    "generatorLink": "Kokeile Generaattoria"
   }
 }

@@ -3873,5 +3873,20 @@
     "sendUsername": "Send My Username",
     "usernameSent": "If an account with that email exists, your username was sent.",
     "backToLogin": "Back to Login"
+  },
+  "aimeatOs": {
+    "title": "Build Your Own App",
+    "subtitle": "Use any AI chat to design and build a standalone HTML application that connects to your AIMEAT node. Download the guide below and give it to the AI as context.",
+    "step1Title": "1. Download the guide",
+    "step1Desc": "Get the AIMEAT-OS.md file — it contains everything an AI needs to build your app.",
+    "step2Title": "2. Give it to an AI chat",
+    "step2Desc": "Open Claude, ChatGPT, or any AI chat. Upload the guide and describe what you want to build.",
+    "step3Title": "3. Upload your app",
+    "step3Desc": "When the AI produces a finished HTML file, come back and add it to your apps.",
+    "downloadBtn": "Download AIMEAT-OS.md",
+    "downloadHint": "Comprehensive guide for AI assistants — includes full API reference, example prompts, and everything needed to build AIMEAT apps.",
+    "addAppBtn": "Add new app",
+    "generatorHint": "Building something more complex with background services and data pipelines?",
+    "generatorLink": "Try the Generator"
   }
 }
