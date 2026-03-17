@@ -54,7 +54,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const vis = visibility ?? 'private';
 
     const now = new Date().toISOString();
-    const gaii = req.auth!.sub;
+    // Owner sessions use GHII identity (owner@nodeId) for memory storage
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const gaii = isOwnerSession
+      ? `${req.auth!.owner}@${config.nodeId}`
+      : req.auth!.sub;
 
     // Anonymous namespace enforcement: anonymous agents can only write to anonymous.* keys
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
@@ -203,11 +207,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     let records: MemoryRecord[];
     if (ownerScope) {
-      // Collect keys from all owner's agents (any visibility)
+      // Collect keys from owner's GHII + all agents (any visibility)
       const callerOwner = req.auth!.owner;
+      const ownerGhii = `${callerOwner}@${config.nodeId}`;
       const agents = await storage.getAgentsByOwner(callerOwner);
       const seen = new Set<string>();
       records = [];
+      // Include GHII's own memory entries first
+      const ghiiRecords = await storage.listMemory(ownerGhii, { prefix, visibility, tags, maxFlags });
+      for (const r of ghiiRecords) {
+        seen.add(r.key);
+        records.push(r);
+      }
       for (const agent of agents) {
         const agentRecords = await storage.listMemory(agent.gaii, { prefix, visibility, tags, maxFlags });
         for (const r of agentRecords) {
