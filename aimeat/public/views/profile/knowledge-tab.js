@@ -1,3 +1,24 @@
+/**
+ * @file knowledge-tab.js
+ * @description Knowledge packages tab for the profile view. Manages importing,
+ *   exporting, cloning, and sharing knowledge packages. Displays owned packages,
+ *   organism-shared packages, and discoverable packages from the catalog.
+ * @structure
+ *   - KnowledgeTab (default export) — main tab component
+ *   - renderEntry — renders a single knowledge entry with visibility pill
+ *   - renderEntryRefs — renders per-entry reference links
+ *   - renderRelatedEntries — renders related-entry chip buttons
+ *   - formatEntryValue — formats structured entry data for display
+ * @usage
+ *   import KnowledgeTab from './knowledge-tab.js';
+ *   html`<${KnowledgeTab} session=${session} showToast=${showToast} onStats=${onStats} />`
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Refactor: remove all inline style="" attributes, use CSS
+ *     classes (pf-ref-row, pf-ref-icon, pf-external-icon, pf-ref-title, pf-badge-xs,
+ *     pf-sharing-box, pf-sharing-heading, kpkg-detail-loading). Replace inline
+ *     visibility pill with shared VisibilityPill component. Replace hardcoded English
+ *     strings with i18n t() calls.
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -5,7 +26,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
-import { Spinner } from './shared.js';
+import { Spinner, VisibilityPill } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 
@@ -111,7 +132,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         showToast('Prompt template not available yet');
       }
     } catch (err) {
-      showToast('Failed to copy prompt');
+      showToast(t('profile.knowledge.copyFailed'));
     }
   }, [showToast]);
 
@@ -131,7 +152,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       const parsed = JSON.parse(jsonStr.trim());
 
       if (!parsed.aimeat_knowledge_package && !parsed.package) {
-        setImportError('This doesn\'t look like an AIMEAT knowledge package. Make sure you paste the complete JSON output.');
+        setImportError(t('profile.knowledge.notKnowledgePackage'));
         return;
       }
 
@@ -149,7 +170,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         organismShare: '',
       });
     } catch (e) {
-      setImportError('Could not parse the pasted content as JSON. Make sure you copy the complete output from your AI chat.');
+      setImportError(t('profile.knowledge.parseError'));
     }
   }, [ghii]);
 
@@ -221,12 +242,12 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     try {
       const result = await knowledgeService.clonePackage(packageId, 'cloned');
       if (result?.data?.cloned_package_id) {
-        showToast('Package cloned successfully!');
+        showToast(t('profile.knowledge.cloned'));
         loadPackages();
       } else {
-        showToast('Clone failed');
+        showToast(t('profile.knowledge.cloneFailed'));
       }
-    } catch { showToast('Clone failed'); }
+    } catch { showToast(t('profile.knowledge.cloneFailed')); }
   }, [showToast, loadPackages]);
 
   /* ── Update sharing settings ── */
@@ -303,8 +324,6 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
   /* ── Cycle visibility: private → owner → public → private ── */
   const cycleVis = ['private', 'owner', 'public'];
-  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
 
   /* ── Scroll to entry by key (matches full or short key) ── */
   const scrollToEntry = useCallback((entryKey) => {
@@ -325,15 +344,15 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     return html`
       <div class="kpkg-entry-refs">
         ${refs.map((ref, i) => html`
-          <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.4rem;padding:.15rem 0">
-            <span style="font-size:.75rem">${ref.verified ? '\u2713' : '?'}</span>
+          <div key=${i} class="kpkg-ref pf-ref-row ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
+            <span class="pf-ref-icon">${ref.verified ? '\u2713' : '?'}</span>
             ${ref.url ? html`
               <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link">
                 ${escHtml(ref.title || ref.url)}
-                <span style="font-size:.65rem;opacity:.6"> \u2197</span>
+                <span class="pf-external-icon"> \u2197</span>
               </a>
-            ` : html`<span style="font-size:.8rem">${escHtml(ref.title || 'Untitled')}</span>`}
-            ${ref.type ? html`<span class="kpkg-badge" style="font-size:.6rem">${escHtml(ref.type)}</span>` : null}
+            ` : html`<span class="pf-ref-title">${escHtml(ref.title || 'Untitled')}</span>`}
+            ${ref.type ? html`<span class="kpkg-badge pf-badge-xs">${escHtml(ref.type)}</span>` : null}
           </div>
         `)}
       </div>
@@ -393,15 +412,13 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     return html`
       <div class="kpkg-detail-entry" key=${i} data-entry-key=${entryKey}>
         <div class="kpkg-detail-entry-header">
-          <button class="kpkg-vis-pill"
+          <${VisibilityPill} visibility=${vis}
             onClick=${(e) => { e.stopPropagation(); handleEntryVisibility(pkg, entry, nextVis); }}
-            title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
-            style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
-          >${t('knowledge.visibility.' + vis)} ▾</button>
+          />
           <strong>${escHtml(label)}</strong>
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>
-        ${loadingEntries === pkg.key && !rawData ? html`<p class="kpkg-detail-loading" style="color:var(--muted,#888);font-size:.8rem;font-style:italic;margin:.25rem 0">Loading...</p>` : null}
+        ${loadingEntries === pkg.key && !rawData ? html`<p class="kpkg-detail-loading">Loading...</p>` : null}
         ${val && html`<pre class="kpkg-detail-value">${val}</pre>`}
         ${renderEntryRefs(entry.references)}
         ${renderRelatedEntries(entry.related_entries, allEntries)}
@@ -498,7 +515,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               const pkgRefs = importPreview.pkg.references || [];
               if (pkgRefs.length > 0 && !hasPerEntryRefs) return html`
                 <div class="kpkg-preview-refs">
-                  <strong>References (package-level):</strong>
+                  <strong>${t('profile.knowledge.referencesPackageLevel')}</strong>
                   ${pkgRefs.map((ref, i) => html`
                     <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
                       ${ref.verified ? '\u2713' : '?'} ${escHtml(ref.title)}
@@ -582,9 +599,9 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                   ` : null}
 
                   <!-- Sharing settings -->
-                  <div class="kpkg-sharing-settings" style="margin-bottom:.75rem;padding:.5rem .75rem;border:1px solid rgba(232,86,74,.15);border-radius:8px;background:rgba(232,86,74,.04)">
-                    <h4 style="margin:0 0 .5rem;font-size:.8rem">${t('knowledge.myKnowledge.shareSettings')}</h4>
-                    <label class="kpkg-toggle" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;font-size:.8rem;cursor:pointer">
+                  <div class="kpkg-sharing-settings pf-sharing-box">
+                    <h4 class="pf-sharing-heading">${t('knowledge.myKnowledge.shareSettings')}</h4>
+                    <label class="kpkg-toggle mb-half">
                       <input type="checkbox"
                         checked=${manifest.sharing?.catalog_listed}
                         disabled=${savingSharing === pkg.key}
@@ -592,7 +609,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                       />
                       ${t('knowledge.myKnowledge.catalogListed')}
                     </label>
-                    <label class="kpkg-toggle" style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;cursor:pointer">
+                    <label class="kpkg-toggle">
                       <input type="checkbox"
                         checked=${manifest.sharing?.allow_clone}
                         disabled=${savingSharing === pkg.key}
@@ -616,15 +633,15 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                       <div class="kpkg-detail-refs">
                         <h4>${t('knowledge.myKnowledge.references') || 'References'} (${t('knowledge.myKnowledge.packageLevel') || 'package-level'})</h4>
                         ${pkgRefs.map((ref, i) => html`
-                          <div key=${i} class="kpkg-ref ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}" style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0">
-                            <span>${ref.verified ? '\u2705' : '\u2753'}</span>
+                          <div key=${i} class="kpkg-ref pf-ref-row ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
+                            <span class="pf-ref-icon">${ref.verified ? '\u2705' : '\u2753'}</span>
                             ${ref.url ? html`
-                              <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link" style="color:var(--love1,#E8564A);text-decoration:none">
+                              <a href=${ref.url} target="_blank" rel="noopener" class="kpkg-ref-link">
                                 ${escHtml(ref.title || ref.url)}
-                                <span style="font-size:.7rem;opacity:.6"> \u2197</span>
+                                <span class="pf-external-icon"> \u2197</span>
                               </a>
                             ` : html`<span>${escHtml(ref.title || 'Untitled')}</span>`}
-                            ${ref.type ? html`<span class="kpkg-badge" style="font-size:.6rem">${escHtml(ref.type)}</span>` : null}
+                            ${ref.type ? html`<span class="kpkg-badge pf-badge-xs">${escHtml(ref.type)}</span>` : null}
                           </div>
                         `)}
                       </div>

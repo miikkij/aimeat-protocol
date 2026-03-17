@@ -855,4 +855,90 @@
 
 /* ── Data wallet tab-specific ── */
 .pf .dw-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .75rem; }
-.pf .dw-expiring { background: rgba(245, 158, 11, .08); }
+.pf .dw-expiring      { background: rgba(245, 158, 11, .08); }
+.pf .dw-summary-card  { margin-bottom: 1.5rem; padding: 1rem; }
+.pf .dw-stat           { text-align: center; }
+.pf .dw-stat-value     { font-size: 1.4rem; font-weight: 700; color: var(--love1, #E8564A); }
+.pf .dw-type-tag       { font-size: .75rem; padding: 3px 8px; border-radius: 4px; background: var(--bg-secondary); border: 1px solid var(--border); }
+.pf .dw-form-grid      { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.pf .dw-label          { font-size: .8rem; font-weight: 600; display: block; margin-bottom: 4px; }
+.pf .dw-filter-input   { flex: 1; max-width: 300px; }
+.pf .dw-checkbox-col   { width: 30px; }
+.pf .dw-code-accent    { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--love3); }
+.pf .dw-recipient-cell { display: flex; gap: 4px; align-items: center; }
+.pf .dw-expiring-icon  { color: #f59e0b; font-size: .7rem; margin-right: 4px; }
+.pf .dw-consent-card   { margin-bottom: 1rem; padding: 1rem; border-color: var(--love1); }
+.pf .dw-section-title  { margin: 1rem 0 .75rem; }
+.pf .dw-section-heading { color: var(--love1, #E8564A); margin: 1.5rem 0 .75rem; }
+.pf .w-full            { width: 100%; }
+
+/* ── Extension tab: refactored inline styles ── */
+.pf .ext-detail-wrap        { margin: 1.5rem 0; }
+.pf .ext-title               { font-size: 1.3rem; font-weight: 700; margin-bottom: .5rem; }
+.pf .ext-title-version       { font-size: .8rem; font-weight: 400; color: var(--muted); }
+.pf .ext-description         { font-size: .95rem; color: var(--muted); line-height: 1.6; margin-bottom: 1rem; }
+.pf .ext-meta-row            { display: flex; gap: 1.5rem; font-size: .85rem; color: var(--muted); margin-bottom: 1.5rem; flex-wrap: wrap; }
+.pf .ext-meta-row-sm         { display: flex; gap: 1.5rem; font-size: .85rem; color: var(--muted); margin-bottom: 1rem; flex-wrap: wrap; }
+.pf .ext-actions-bar         { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+.pf .ext-lib-meta            { margin-bottom: .5rem; font-size: .85rem; color: var(--muted); }
+.pf .ext-lib-label           { font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+.pf .ext-lib-label-spaced    { font-size: .85rem; font-weight: 600; margin-top: .75rem; margin-bottom: 4px; }
+.pf .ext-schema-item         { font-size: .85rem; color: var(--muted); margin-bottom: .25rem; }
+.pf .ext-ontology-text       { font-size: .85rem; color: var(--muted); }
+.pf .ext-installed-heading   { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; margin-top: 1.5rem; color: var(--muted); }
+.pf .ext-section-heading     { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; color: var(--muted); }
+.pf .ext-action-row          { border-bottom: 1px solid var(--border, #E5E7EB); padding: .5rem 0; }
+.pf .ext-action-header       { display: flex; align-items: center; gap: .75rem; }
+.pf .ext-action-name         { font-weight: 600; font-size: .9rem; }
+.pf .ext-action-meta         { font-size: .8rem; color: var(--muted); }
+.pf .ext-action-desc         { font-size: .8rem; color: var(--muted); flex: 1; }
+.pf .ext-test-panel          { margin-top: .75rem; padding: .75rem; background: var(--surface, #F9FAFB); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; }
+.pf .ext-test-label          { font-size: .8rem; font-weight: 600; margin-bottom: .5rem; }
+.pf .ext-test-textarea       { width: 100%; min-height: 80px; font-family: monospace; font-size: 13px; border: 1px solid var(--border, #E5E7EB); border-radius: 6px; padding: .5rem; resize: vertical; }
+.pf .ext-test-actions        { display: flex; gap: .5rem; margin-top: .5rem; align-items: center; }
+.pf .ext-test-elapsed        { font-size: .75rem; color: var(--muted); }
+.pf .ext-test-result         { margin-top: .75rem; }
+.pf .ext-test-result-label   { font-size: .8rem; font-weight: 600; margin-bottom: .25rem; }
+.pf .ext-test-result-label.success { color: var(--success, #22c55e); }
+.pf .ext-test-result-label.error   { color: var(--error, #ef4444); }
+.pf .ext-test-output         { font-size: .8rem; font-family: monospace; background: var(--bg, #fff); border: 1px solid var(--border, #E5E7EB); border-radius: 6px; padding: .75rem; overflow-x: auto; max-height: 300px; white-space: pre-wrap; word-break: break-word; }
+.pf .ext-instance-row        { display: flex; align-items: center; gap: .75rem; padding: .75rem; margin-bottom: .5rem; background: var(--surface, #F9FAFB); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; }
+.pf .ext-instance-name       { font-weight: 600; font-size: .9rem; flex: 1; }
+.pf .ext-instance-status     { font-size: .8rem; color: var(--muted); }
+.pf .ext-instance-create     { display: flex; gap: .5rem; margin-top: .75rem; align-items: center; }
+.pf .ext-instance-input      { flex: 1; max-width: 300px; }
+.pf .ext-hint                { font-size: .8rem; color: var(--muted); margin-top: .5rem; }
+.pf .ext-no-instances        { font-size: .85rem; color: var(--muted); padding: .5rem 0; }
+.pf .ext-endpoint-box        { font-size: .85rem; padding: .75rem; background: var(--surface, #F9FAFB); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; font-family: monospace; word-break: break-all; }
+.pf .ext-v8-section          { margin-bottom: 2rem; }
+.pf .ext-grid-spaced         { margin-top: 1rem; }
+.pf .ext-modal-section       { margin-top: 1rem; }
+.pf .ext-radio-row           { display: flex; gap: 1rem; margin: .5rem 0; }
+.pf .ext-modal-textarea      { width: 100%; font-family: monospace; font-size: 13px; }
+.pf .ext-lib-entry           { margin-bottom: .75rem; padding: .75rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; }
+.pf .ext-lib-entry-input     { width: 100%; margin-bottom: .5rem; }
+.pf .ext-lib-entry-code      { width: 100%; font-family: monospace; font-size: 13px; }
+.pf .ext-modal-footer        { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+.pf .ext-bundled-btn         { font-size: .85rem; padding: .5rem 1rem; }
+.pf .ext-btn-copy-spaced     { margin-top: .5rem; }
+.pf .btn-danger-outline      { border-color: rgba(239, 68, 68, .3); color: #f87171; }
+.pf .ext-comp-tag-schema     { color: #60a5fa; }
+.pf .ext-comp-tag-prompt     { color: #a78bfa; }
+.pf .ext-comp-tag-action     { color: #f59e0b; }
+.pf .ext-comp-tag-board      { color: #34d399; }
+.pf .ext-comp-tag-ontology   { color: #f472b6; }
+.pf .ext-comp-tag-seed       { color: #6ee7b7; }
+.pf .ext-comp-tag-lib        { color: #38bdf8; }
+.pf .ext-modal-narrow        { max-width: 600px; }
+.pf .ext-add-lib-btn         { font-size: .85rem; }
+.pf .ext-detail-section.mt-section { margin-top: 1.5rem; }
+
+/* ── Knowledge tab references ── */
+.pf .pf-ref-row      { display: flex; align-items: center; gap: .4rem; padding: .15rem 0; }
+.pf .pf-ref-icon     { font-size: .75rem; }
+.pf .pf-external-icon { font-size: .65rem; opacity: .6; }
+.pf .pf-ref-title    { font-size: .8rem; }
+.pf .pf-badge-xs     { font-size: .6rem; }
+.pf .pf-sharing-box  { margin-bottom: .75rem; padding: .5rem .75rem; border: 1px solid rgba(232,86,74,.15); border-radius: 8px; background: rgba(232,86,74,.04); }
+.pf .pf-sharing-heading { margin: 0 0 .5rem; font-size: .8rem; }
+.pf .vis-owner       { background: rgba(107, 114, 128, .15); color: #6b7280; }

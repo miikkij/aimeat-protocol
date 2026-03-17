@@ -1,3 +1,18 @@
+/**
+ * @file organisms-tab.js
+ * @description Profile tab for managing organisms (groups, communities, teams).
+ *   Allows creating, editing, joining, leaving, and deleting organisms.
+ *   Displays user's organisms and a public discovery section.
+ * @structure
+ *   - OrganismsTab — main exported component
+ *   - renderEditForm — inline edit form for an organism
+ *   - renderOrgCard — card component for a single organism
+ * @usage
+ *   import OrganismsTab from '/views/profile/organisms-tab.js';
+ *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Remove all inline style attributes; use CSS utility classes
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -180,42 +195,39 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     } finally { setSaving(false); }
   }, [editForm, showToast, loadData]);
 
-  const inputStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem';
-  const selectStyle = 'padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem';
-
   const renderEditForm = (org) => html`
     <div class="card-detail" onClick=${(e) => e.stopPropagation()}>
-      <div style="display:flex;flex-direction:column;gap:.5rem;padding:.25rem 0">
+      <div class="flex-col">
         <input type="text" value=${editForm.name} onInput=${(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
-          placeholder=${t('organisms.namePlaceholder') || 'Name'} style=${inputStyle} />
+          placeholder=${t('organisms.namePlaceholder') || 'Name'} class="input-field input-sm" />
         <textarea value=${editForm.description} onInput=${(e) => setEditForm(f => ({ ...f, description: e.target.value }))} rows="2"
-          placeholder=${t('organisms.descPlaceholder') || 'Description'} style=${inputStyle + ';resize:vertical'} />
+          placeholder=${t('organisms.descPlaceholder') || 'Description'} class="input-field input-sm" />
         <input type="text" value=${editForm.interests} onInput=${(e) => setEditForm(f => ({ ...f, interests: e.target.value }))}
-          placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} style=${inputStyle} />
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <select value=${editForm.type} onChange=${(e) => setEditForm(f => ({ ...f, type: e.target.value }))} style=${selectStyle}>
+          placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} class="input-field input-sm" />
+        <div class="flex-row-wrap">
+          <select value=${editForm.type} onChange=${(e) => setEditForm(f => ({ ...f, type: e.target.value }))} class="input-field input-sm">
             <option value="community">${t('organisms.types.community') || 'Community'}</option>
             <option value="team">${t('organisms.types.team') || 'Team'}</option>
             <option value="club">${t('organisms.types.club') || 'Club'}</option>
             <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
             <option value="project">${t('organisms.types.project') || 'Project'}</option>
           </select>
-          <select value=${editForm.join_policy} onChange=${(e) => setEditForm(f => ({ ...f, join_policy: e.target.value }))} style=${selectStyle}>
+          <select value=${editForm.join_policy} onChange=${(e) => setEditForm(f => ({ ...f, join_policy: e.target.value }))} class="input-field input-sm">
             <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
             <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
             <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
           </select>
-          <select value=${editForm.visibility} onChange=${(e) => setEditForm(f => ({ ...f, visibility: e.target.value }))} style=${selectStyle}>
+          <select value=${editForm.visibility} onChange=${(e) => setEditForm(f => ({ ...f, visibility: e.target.value }))} class="input-field input-sm">
             <option value="public">${t('organisms.visPublic') || 'Public'}</option>
             <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
             <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
           </select>
         </div>
-        <div style="display:flex;gap:.5rem">
+        <div class="flex-row-wrap">
           <button class="btn-sm btn-copy" onClick=${() => handleUpdate(org.id)} disabled=${saving}>
             ${saving ? '...' : (t('organisms.save') || 'Save')}
           </button>
-          <button class="btn-sm" onClick=${cancelEdit} style="opacity:.7">
+          <button class="btn-sm" onClick=${cancelEdit}>
             ${t('organisms.cancel') || 'Cancel'}
           </button>
         </div>
@@ -252,8 +264,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         </div>
 
         ${(org.interests || []).length > 0 && html`
-          <div style="display:flex;flex-wrap:wrap;gap:.25rem;padding:0 1rem .25rem">
-            ${org.interests.map(tag => html`<span class="badge" style="font-size:.65rem;padding:1px 6px;border-radius:8px;background:rgba(232,86,74,.06);color:var(--love1,#E8564A)" key=${tag}>${escHtml(tag)}</span>`)}
+          <div class="flex-row-wrap" >
+            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}
           </div>
         `}
 
@@ -286,7 +298,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               ` : null}
             </div>
 
-            <div class="card-actions" style="margin-top:.75rem">
+            <div class="card-actions">
               ${canEdit ? html`
                 <button class="btn-sm btn-copy" onClick=${(e) => { e.stopPropagation(); startEdit(org); }}>
                   ${t('organisms.edit') || 'Edit'}
@@ -323,24 +335,24 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <div class="section-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
 
     <!-- Create button / form -->
-    <div style="margin-bottom:1rem">
+    <div class="mb-1">
       ${!showCreate ? html`
         <button class="btn-sm btn-copy" onClick=${() => setShowCreate(true)}>
           ${t('organisms.createNew') || 'Create Organism'}
         </button>
       ` : html`
-        <div class="card" style="padding:.75rem 1rem">
-          <h4 style="margin:0 0 .5rem">${t('organisms.createTitle') || 'Create New Organism'}</h4>
-          <div style="display:flex;flex-direction:column;gap:.5rem">
+        <div class="create-form">
+          <h4 class="card-h3 mb-half">${t('organisms.createTitle') || 'Create New Organism'}</h4>
+          <div class="flex-col">
             <input type="text" placeholder=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${(e) => setFormName(e.target.value)}
-              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem" />
+              class="input-field input-sm" />
             <textarea placeholder=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${(e) => setFormDesc(e.target.value)} rows="2"
-              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem;resize:vertical" />
+              class="input-field input-sm" />
             <input type="text" placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${(e) => setFormInterests(e.target.value)}
-              style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:transparent;color:var(--text,#1a1a2e);font-size:.85rem" />
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              class="input-field input-sm" />
+            <div class="flex-row-wrap">
               <select value=${formType} onChange=${(e) => setFormType(e.target.value)}
-                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem">
+                class="input-field input-sm">
                 <option value="community">${t('organisms.types.community') || 'Community'}</option>
                 <option value="team">${t('organisms.types.team') || 'Team'}</option>
                 <option value="club">${t('organisms.types.club') || 'Club'}</option>
@@ -348,23 +360,23 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 <option value="project">${t('organisms.types.project') || 'Project'}</option>
               </select>
               <select value=${formPolicy} onChange=${(e) => setFormPolicy(e.target.value)}
-                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem">
+                class="input-field input-sm">
                 <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
                 <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
                 <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
               </select>
               <select value=${formVisibility} onChange=${(e) => setFormVisibility(e.target.value)}
-                style="padding:.4rem .6rem;border-radius:6px;border:1px solid var(--border,rgba(232,86,74,.15));background:var(--bg2,#F5F5F3);color:var(--text,#1a1a2e);font-size:.8rem">
+                class="input-field input-sm">
                 <option value="public">${t('organisms.visPublic') || 'Public'}</option>
                 <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
                 <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
               </select>
             </div>
-            <div style="display:flex;gap:.5rem">
+            <div class="form-actions">
               <button class="btn-sm btn-copy" onClick=${handleCreate} disabled=${creating}>
                 ${creating ? '...' : (t('organisms.create') || 'Create')}
               </button>
-              <button class="btn-sm" onClick=${() => setShowCreate(false)} style="opacity:.7">
+              <button class="btn-sm" onClick=${() => setShowCreate(false)}>
                 ${t('organisms.cancel') || 'Cancel'}
               </button>
             </div>
@@ -374,7 +386,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     </div>
 
     <!-- My Organisms -->
-    <div class="section-title" style="font-size:.9rem">${t('organisms.myOrganisms') || 'My Organisms'}</div>
+    <div class="section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
     ${myOrganisms.length === 0
       ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
       : myOrganisms.map(org => renderOrgCard(org, true))
@@ -382,7 +394,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
     <!-- Discover -->
     ${publicOrganisms.length > 0 && html`
-      <div class="section-title" style="font-size:.9rem;margin-top:1rem">${t('organisms.discover') || 'Discover'}</div>
+      <div class="section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
       ${publicOrganisms.map(org => renderOrgCard(org, false))}
     `}
     <${ConfirmUI} />

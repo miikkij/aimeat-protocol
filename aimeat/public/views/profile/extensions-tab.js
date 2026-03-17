@@ -1,3 +1,20 @@
+/**
+ * @file extensions-tab.js
+ * @description Profile tab for managing Cortex (YAML manifest) and V8 (sandboxed JS)
+ *   extensions. Lists installed extensions, shows detail views with component
+ *   breakdowns, action testing, instance management, and install/uninstall flows.
+ * @structure
+ *   - buildCortexPrompt()  — generates AI scaffolding prompt for extension creation
+ *   - ExtensionsTab()      — main tab component (default export)
+ *     - Cortex detail view — manifest components, prompts, libs, schemas, ontologies
+ *     - V8 detail view     — actions, test runner, instances, endpoint info
+ *     - Grid view          — cards for installed + bundled extensions
+ *     - Install modal      — upload/paste manifest + libs
+ * @usage Loaded as a lazy tab in profile.js via dynamic import.
+ * @version-history
+ *   v1.0.0 — 2026-03-10 — Initial implementation with Cortex + V8 extension management
+ *   v1.1.0 — 2026-03-17 — Refactor: replace all inline style="" attributes with CSS classes
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
@@ -11,7 +28,7 @@ import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
 
 const COMP_ICONS = {schema:'\u{1F4D0}',prompt:'\u{1F4AC}',action:'\u26A1','board-template':'\u{1F4CC}',ontology:'\u{1F9EC}','seed-data':'\u{1F331}',lib:'\u{1F4E6}'};
-const COMP_COLORS = {schema:'#60a5fa',prompt:'#a78bfa',action:'#f59e0b','board-template':'#34d399',ontology:'#f472b6','seed-data':'#6ee7b7',lib:'#38bdf8'};
+const COMP_TAG_CLASSES = {schema:'ext-comp-tag-schema',prompt:'ext-comp-tag-prompt',action:'ext-comp-tag-action','board-template':'ext-comp-tag-board',ontology:'ext-comp-tag-ontology','seed-data':'ext-comp-tag-seed',lib:'ext-comp-tag-lib'};
 
 const BUNDLED = [
   { id: 'aimeat-charts', icon: '\u{1F4CA}', nameKey: 'profile.extensions.bundled.charts.name', descKey: 'profile.extensions.bundled.charts.desc' },
@@ -346,14 +363,14 @@ export default function ExtensionsTab({ session, showToast }) {
 
     return html`<div>
       <button class="btn-outline" onClick=${() => setExtDetailName(null)}>${t('profile.extensions.detail.back')}</button>
-      <div style="margin:1.5rem 0">
-        <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">
+      <div class="ext-detail-wrap">
+        <div class="ext-title">
           ${ext.name}
-          <span style="font-size:.8rem;font-weight:400;color:var(--muted)">v${ext.version || '?'}</span>
+          <span class="ext-title-version">v${ext.version || '?'}</span>
           <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'} ${t('profile.extensions.visibility.' + vis)}</span>
         </div>
-        <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${ext.description || ''}</div>
-        <div style="display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);margin-bottom:1.5rem;flex-wrap:wrap">
+        <div class="ext-description">${ext.description || ''}</div>
+        <div class="ext-meta-row">
           <span>${t('profile.extensions.detail.author')}: ${ext.author || '?'}</span>
           ${ext.license ? html`<span>${t('profile.extensions.detail.license')}: ${ext.license}</span>` : null}
           <span><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
@@ -381,11 +398,11 @@ export default function ExtensionsTab({ session, showToast }) {
         return html`
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${lib.filename}</div>
-            <div style="margin-bottom:.5rem;font-size:.85rem;color:var(--muted)">${t('profile.extensions.detail.exports')}: ${(lib.exports || []).join(', ')}</div>
-            <div style="font-size:.85rem;font-weight:600;margin-bottom:4px">${t('profile.extensions.detail.scriptTag')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
+            <div class="ext-lib-meta">${t('profile.extensions.detail.exports')}: ${(lib.exports || []).join(', ')}</div>
+            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
             <div class="ext-detail-code">${scriptTag}</div>
             ${lib.api_surface ? html`<div>
-              <div style="font-size:.85rem;font-weight:600;margin-top:.75rem;margin-bottom:4px">${t('profile.extensions.detail.apiSurface')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
+              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <button class="ext-copy-btn" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
               <div class="ext-detail-code">${lib.api_surface}</div>
             </div>` : null}
           </div>`;
@@ -394,23 +411,23 @@ export default function ExtensionsTab({ session, showToast }) {
       ${comps.filter(c => c.type === 'schema').length > 0 ? html`
         <div class="ext-detail-section">
           <div class="ext-detail-section-title">${'\u{1F4D0}'} Schemas</div>
-          ${comps.filter(c => c.type === 'schema').map(s => html`<div style="font-size:.85rem;color:var(--muted);margin-bottom:.25rem">${s.key_pattern} (${s.apply_to || ''})</div>`)}
+          ${comps.filter(c => c.type === 'schema').map(s => html`<div class="ext-schema-item">${s.key_pattern} (${s.apply_to || ''})</div>`)}
         </div>` : null}
 
       ${(ext._ontologies || []).map(ont => html`
         <div class="ext-detail-section">
           <div class="ext-detail-section-title">${'\u{1F9EC}'} Ontology: ${ont.name}</div>
-          <div style="font-size:.85rem;color:var(--muted)">${Object.entries(ont.concepts || {}).map(([k, c]) => k + ' (' + (c.label?.en || k) + ')').join(', ')}</div>
+          <div class="ext-ontology-text">${Object.entries(ont.concepts || {}).map(([k, c]) => k + ' (' + (c.label?.en || k) + ')').join(', ')}</div>
         </div>`)}
 
-      <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap">
+      <div class="ext-actions-bar">
         ${isActive
           ? html`<button class="btn-outline" onClick=${() => deactivateExt(ext.name)}>${t('profile.extensions.deactivate')}</button>`
           : html`<button class="btn-primary" onClick=${() => activateExt(ext.name)}>${t('profile.extensions.activate')}</button>`}
         <button class="btn-outline" onClick=${() => handleToggleVisibility(ext.name, vis)}>
           ${vis === 'public' ? t('profile.extensions.unpublish') : t('profile.extensions.publish')}
         </button>
-        <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
+        <button class="btn-outline btn-danger-outline" onClick=${() => uninstallExt(ext.name)}>${t('profile.extensions.uninstall')}</button>
       </div>
       <${ConfirmUI} />
     </div>`;
@@ -426,13 +443,13 @@ export default function ExtensionsTab({ session, showToast }) {
 
     return html`<div>
       <button class="btn-outline" onClick=${() => setV8Detail(null)}>${t('profile.v8ext.back')}</button>
-      <div style="margin:1.5rem 0">
-        <div style="font-size:1.3rem;font-weight:700;margin-bottom:.5rem">
+      <div class="ext-detail-wrap">
+        <div class="ext-title">
           ${ext.name}
-          <span style="font-size:.8rem;font-weight:400;color:var(--muted)">v${ext.version || '?'}</span>
+          <span class="ext-title-version">v${ext.version || '?'}</span>
         </div>
-        <div style="font-size:.95rem;color:var(--muted);line-height:1.6;margin-bottom:1rem">${ext.description || ''}</div>
-        <div style="display:flex;gap:1.5rem;font-size:.85rem;color:var(--muted);margin-bottom:1rem;flex-wrap:wrap">
+        <div class="ext-description">${ext.description || ''}</div>
+        <div class="ext-meta-row-sm">
           <span>${t('profile.v8ext.author')}: ${ext.author || '?'}</span>
           <span><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
           <span>${t('profile.v8ext.actions')}: ${actions.length}</span>
@@ -443,34 +460,34 @@ export default function ExtensionsTab({ session, showToast }) {
         <div class="ext-detail-section">
           <div class="ext-detail-section-title">${t('profile.v8ext.actionsTitle')}</div>
           ${actions.map(a => html`
-            <div style="border-bottom:1px solid var(--border,#E5E7EB);padding:.5rem 0">
-              <div style="display:flex;align-items:center;gap:.75rem">
-                <span style="font-weight:600;font-size:.9rem">${a.id}</span>
-                <span style="font-size:.8rem;color:var(--muted)">${a.method || 'POST'}</span>
-                <span style="font-size:.8rem;color:var(--muted);flex:1">${a.description || ''}</span>
+            <div class="ext-action-row">
+              <div class="ext-action-header">
+                <span class="ext-action-name">${a.id}</span>
+                <span class="ext-action-meta">${a.method || 'POST'}</span>
+                <span class="ext-action-desc">${a.description || ''}</span>
                 ${isActive ? html`<button class="btn-sm" onClick=${() => {
                   if (testAction?.actionId === a.id) { setTestAction(null); setTestResult(null); }
                   else { setTestAction({ actionId: a.id }); setTestResult(null); setTestInput('{}'); }
                 }}>${testAction?.actionId === a.id ? t('profile.v8ext.test.close') : t('profile.v8ext.test.btn')}</button>` : null}
               </div>
               ${testAction?.actionId === a.id ? html`
-                <div style="margin-top:.75rem;padding:.75rem;background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px">
-                  <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem">${t('profile.v8ext.test.inputLabel')}</div>
-                  <textarea style="width:100%;min-height:80px;font-family:monospace;font-size:13px;border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:.5rem;resize:vertical"
+                <div class="ext-test-panel">
+                  <div class="ext-test-label">${t('profile.v8ext.test.inputLabel')}</div>
+                  <textarea class="ext-test-textarea"
                     value=${testInput} onInput=${e => setTestInput(e.target.value)}
                     placeholder='{ "key": "value" }'></textarea>
-                  <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center">
+                  <div class="ext-test-actions">
                     <button class="btn-primary btn-sm" disabled=${testRunning} onClick=${() => handleTestAction(ext.name, a.id)}>
                       ${testRunning ? html`<${Spinner} />` : t('profile.v8ext.test.run')}
                     </button>
-                    ${testResult?.elapsed ? html`<span style="font-size:.75rem;color:var(--muted)">${testResult.elapsed}ms</span>` : null}
+                    ${testResult?.elapsed ? html`<span class="ext-test-elapsed">${testResult.elapsed}ms</span>` : null}
                   </div>
                   ${testResult ? html`
-                    <div style="margin-top:.75rem">
-                      <div style="font-size:.8rem;font-weight:600;margin-bottom:.25rem;color:${testResult.ok ? 'var(--success,#22c55e)' : 'var(--error,#ef4444)'}">
+                    <div class="ext-test-result">
+                      <div class="ext-test-result-label ${testResult.ok ? 'success' : 'error'}">
                         ${testResult.ok ? t('profile.v8ext.test.success') : t('profile.v8ext.test.error')}
                       </div>
-                      <pre style="font-size:.8rem;font-family:monospace;background:var(--bg,#fff);border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:.75rem;overflow-x:auto;max-height:300px;white-space:pre-wrap;word-break:break-word">${
+                      <pre class="ext-test-output">${
                         testResult.ok ? JSON.stringify(testResult.data, null, 2) : testResult.error
                       }</pre>
                     </div>` : null}
@@ -479,37 +496,37 @@ export default function ExtensionsTab({ session, showToast }) {
         </div>` : null}
 
       ${supportsInstances ? html`
-        <div class="ext-detail-section" style="margin-top:1.5rem">
+        <div class="ext-detail-section mt-section">
           <div class="ext-detail-section-title">${t('profile.v8ext.instancesTitle')}</div>
           ${!v8Instances ? html`<${Spinner} />` : v8Instances.length === 0
-            ? html`<div style="font-size:.85rem;color:var(--muted);padding:.5rem 0">${t('profile.v8ext.noInstances')}</div>`
+            ? html`<div class="ext-no-instances">${t('profile.v8ext.noInstances')}</div>`
             : v8Instances.map(inst => html`
-              <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;margin-bottom:.5rem;background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px">
-                <span style="font-weight:600;font-size:.9rem;flex:1">${inst.id}</span>
+              <div class="ext-instance-row">
+                <span class="ext-instance-name">${inst.id}</span>
                 <span class="ext-status-dot ${inst.status}"></span>
-                <span style="font-size:.8rem;color:var(--muted)">${inst.status}</span>
+                <span class="ext-instance-status">${inst.status}</span>
                 <button class="btn-sm" onClick=${() => { copyToClipboard(inst.id); showToast(t('profile.v8ext.instanceIdCopied')); }}>${t('profile.v8ext.copyId')}</button>
                 <button class="btn-sm btn-danger" onClick=${() => handleDeleteInstance(ext.name, inst.id)}>${t('profile.v8ext.deleteInstance')}</button>
               </div>`)}
           ${isActive ? html`
-            <div style="display:flex;gap:.5rem;margin-top:.75rem;align-items:center">
-              <input class="input-field" style="flex:1;max-width:300px" placeholder=${t('profile.v8ext.instanceIdPlaceholder')} value=${newInstanceId} onInput=${e => setNewInstanceId(e.target.value)} />
+            <div class="ext-instance-create">
+              <input class="input-field ext-instance-input" placeholder=${t('profile.v8ext.instanceIdPlaceholder')} value=${newInstanceId} onInput=${e => setNewInstanceId(e.target.value)} />
               <button class="btn-primary btn-sm" onClick=${() => handleCreateInstance(ext.name)}>${t('profile.v8ext.createInstance')}</button>
-            </div>` : html`<div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">${t('profile.v8ext.activateFirst')}</div>`}
+            </div>` : html`<div class="ext-hint">${t('profile.v8ext.activateFirst')}</div>`}
         </div>` : html`
-        <div class="ext-detail-section" style="margin-top:1.5rem">
+        <div class="ext-detail-section mt-section">
           <div class="ext-detail-section-title">${t('profile.v8ext.apiEndpoint')}</div>
-          <div style="font-size:.85rem;padding:.75rem;background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px;font-family:monospace;word-break:break-all">
+          <div class="ext-endpoint-box">
             POST ${NODE_URL}/v1/ext/${ext.name}/{actionId}
           </div>
-          <button class="btn-sm" style="margin-top:.5rem" onClick=${() => { copyToClipboard(NODE_URL + '/v1/ext/' + ext.name + '/'); showToast(t('profile.v8ext.copied')); }}>${t('profile.v8ext.copyEndpoint')}</button>
+          <button class="btn-sm ext-btn-copy-spaced" onClick=${() => { copyToClipboard(NODE_URL + '/v1/ext/' + ext.name + '/'); showToast(t('profile.v8ext.copied')); }}>${t('profile.v8ext.copyEndpoint')}</button>
         </div>`}
 
-      <div style="display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap">
+      <div class="ext-actions-bar">
         ${isActive
           ? html`<button class="btn-outline" onClick=${() => handleV8Deactivate(ext.name)}>${t('profile.v8ext.deactivate')}</button>`
           : html`<button class="btn-primary" onClick=${() => handleV8Activate(ext.name)}>${t('profile.v8ext.activate')}</button>`}
-        <button class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:#f87171" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
+        <button class="btn-outline btn-danger-outline" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
       </div>
       <${ConfirmUI} />
     </div>`;
@@ -523,10 +540,10 @@ export default function ExtensionsTab({ session, showToast }) {
 
   return html`<div>
     ${hasV8 ? html`
-      <div style="margin-bottom:2rem">
+      <div class="ext-v8-section">
         <div class="section-title">${t('profile.v8ext.title')}</div>
         <div class="section-desc">${t('profile.v8ext.desc')}</div>
-        <div class="ext-grid" style="margin-top:1rem">
+        <div class="ext-grid ext-grid-spaced">
           ${v8Exts.map(ext => {
             const isActive = ext.status === 'active';
             return html`
@@ -537,7 +554,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 </div>
                 <div class="ext-card-desc">${ext.description || ''}</div>
                 <div class="ext-card-tags">
-                  ${(ext.actions || []).map(a => html`<span class="ext-comp-tag" style="color:#f59e0b">${a.id}</span>`)}
+                  ${(ext.actions || []).map(a => html`<span class="ext-comp-tag ext-comp-tag-action">${a.id}</span>`)}
                 </div>
                 <div class="ext-card-footer">
                   <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
@@ -565,7 +582,7 @@ export default function ExtensionsTab({ session, showToast }) {
 
     ${!extensions ? html`<${Spinner} text=${t('profile.extensions.loading')} />`
       : hasExtensions ? html`<div>
-        <div style="font-size:.95rem;font-weight:600;margin-bottom:.75rem;margin-top:1.5rem;color:var(--muted)">${t('profile.extensions.installed')} (${extensions.length})</div>
+        <div class="ext-installed-heading">${t('profile.extensions.installed')} (${extensions.length})</div>
         <div class="ext-grid">
           ${extensions.map(ext => {
             const types = ext.component_types || [];
@@ -580,7 +597,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 </div>
                 <div class="ext-card-desc">${ext.description || ''}</div>
                 <div class="ext-card-tags">
-                  ${types.map(ct => html`<span class="ext-comp-tag" style="color:${COMP_COLORS[ct] || 'var(--muted)'}">${t('profile.extensions.components.' + ct) || ct}</span>`)}
+                  ${types.map(ct => html`<span class="ext-comp-tag ${COMP_TAG_CLASSES[ct] || ''}">${t('profile.extensions.components.' + ct) || ct}</span>`)}
                 </div>
                 <div class="ext-card-footer">
                   <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
@@ -599,15 +616,15 @@ export default function ExtensionsTab({ session, showToast }) {
     ${!hasExtensions && unbundled.length === 0 ? html`<div class="empty">${t('profile.extensions.empty')}</div>` : null}
 
     ${extensions && unbundled.length > 0 ? html`
-      <div style="margin-top:${hasExtensions ? '2rem' : '0'}">
-        <div style="font-size:.95rem;font-weight:600;margin-bottom:.75rem;color:var(--muted)">${t('profile.extensions.readyExtensions')}</div>
+      <div class="${hasExtensions ? 'ext-v8-section' : ''}">
+        <div class="ext-section-heading">${t('profile.extensions.readyExtensions')}</div>
         <div class="ext-bundled-grid">
           ${unbundled.map(b => html`
             <div class="ext-bundled-card">
               <div class="ext-bundled-icon">${b.icon}</div>
               <div class="ext-bundled-name">${t(b.nameKey)}</div>
               <div class="ext-bundled-desc">${t(b.descKey)}</div>
-              <button class="btn-primary" style="font-size:.85rem;padding:.5rem 1rem"
+              <button class="btn-primary ext-bundled-btn"
                 disabled=${bundledInstalling === b.id}
                 onClick=${() => handleInstallBundled(b.id)}>
                 ${bundledInstalling === b.id ? html`<${Spinner} />` : t('profile.extensions.addThis')}
@@ -618,23 +635,23 @@ export default function ExtensionsTab({ session, showToast }) {
 
     ${showInstall ? html`
       <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowInstall(false); }}>
-        <div class="modal" style="max-width:600px">
+        <div class="modal ext-modal-narrow">
           <h3>${t('profile.extensions.installModal.title')}</h3>
           <form onSubmit=${handleInstall}>
-            <div style="margin-top:1rem">
+            <div class="ext-modal-section">
               <label>${t('profile.extensions.installModal.manifestLabel')}</label>
-              <div style="display:flex;gap:1rem;margin:.5rem 0">
+              <div class="ext-radio-row">
                 <label><input type="radio" name="ext-mmode" checked=${manifestMode==='upload'} onChange=${() => setManifestMode('upload')} /> ${t('profile.extensions.installModal.uploadFile')}</label>
                 <label><input type="radio" name="ext-mmode" checked=${manifestMode==='paste'} onChange=${() => setManifestMode('paste')} /> ${t('profile.extensions.installModal.pasteYaml')}</label>
               </div>
               ${manifestMode === 'upload'
                 ? html`<input type="file" id="ext-manifest-file" accept=".yaml,.yml" />`
-                : html`<textarea id="ext-manifest-text" rows="10" style="width:100%;font-family:monospace;font-size:13px" placeholder="apiVersion: cortex.aimeat.org/v1\nkind: Extension\n..."></textarea>`}
+                : html`<textarea id="ext-manifest-text" rows="10" class="ext-modal-textarea" placeholder="apiVersion: cortex.aimeat.org/v1\nkind: Extension\n..."></textarea>`}
             </div>
 
-            <div style="margin-top:1rem">
+            <div class="ext-modal-section">
               <label>${t('profile.extensions.installModal.libsLabel')}</label>
-              <div style="display:flex;gap:1rem;margin:.5rem 0">
+              <div class="ext-radio-row">
                 <label><input type="radio" name="ext-lmode" checked=${libMode==='upload'} onChange=${() => setLibMode('upload')} /> ${t('profile.extensions.installModal.uploadFiles')}</label>
                 <label><input type="radio" name="ext-lmode" checked=${libMode==='paste'} onChange=${() => setLibMode('paste')} /> ${t('profile.extensions.installModal.pasteCode')}</label>
               </div>
@@ -642,15 +659,15 @@ export default function ExtensionsTab({ session, showToast }) {
                 ? html`<input type="file" id="ext-lib-files" accept=".js" multiple />`
                 : html`<div>
                     ${libEntries.map((entry, i) => html`
-                      <div style="margin-bottom:.75rem;padding:.75rem;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px">
-                        <input type="text" placeholder=${t('profile.extensions.installModal.filenamePlaceholder')} value=${entry.filename} onInput=${(e) => { const arr = [...libEntries]; arr[i] = {...arr[i], filename: e.target.value}; setLibEntries(arr); }} style="width:100%;margin-bottom:.5rem" />
-                        <textarea rows="6" placeholder="(function(AIMEAT) { ... })(...)" value=${entry.code} onInput=${(e) => { const arr = [...libEntries]; arr[i] = {...arr[i], code: e.target.value}; setLibEntries(arr); }} style="width:100%;font-family:monospace;font-size:13px"></textarea>
+                      <div class="ext-lib-entry">
+                        <input type="text" placeholder=${t('profile.extensions.installModal.filenamePlaceholder')} value=${entry.filename} onInput=${(e) => { const arr = [...libEntries]; arr[i] = {...arr[i], filename: e.target.value}; setLibEntries(arr); }} class="ext-lib-entry-input" />
+                        <textarea rows="6" placeholder="(function(AIMEAT) { ... })(...)" value=${entry.code} onInput=${(e) => { const arr = [...libEntries]; arr[i] = {...arr[i], code: e.target.value}; setLibEntries(arr); }} class="ext-lib-entry-code"></textarea>
                       </div>`)}
-                    <button type="button" class="btn-outline" style="font-size:.85rem" onClick=${() => setLibEntries([...libEntries, {filename:'', code:''}])}>${t('profile.extensions.installModal.addLib')}</button>
+                    <button type="button" class="btn-outline ext-add-lib-btn" onClick=${() => setLibEntries([...libEntries, {filename:'', code:''}])}>${t('profile.extensions.installModal.addLib')}</button>
                   </div>`}
             </div>
 
-            <div style="display:flex;justify-content:flex-end;gap:1rem;margin-top:1.5rem">
+            <div class="ext-modal-footer">
               <button type="button" class="btn-outline" onClick=${() => setShowInstall(false)}>${t('profile.extensions.installModal.cancel')}</button>
               <button type="submit" class="btn-primary">${t('profile.extensions.installModal.installBtn')}</button>
             </div>
