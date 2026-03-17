@@ -350,19 +350,47 @@
       // Mount Preact app
       render(html`<${App} />`, document.getElementById('app'));
 
-      // Mount auth button after Preact renders
-      requestAnimationFrame(() => {
+      // Build i18n object for auth widget from modal.* translations
+      function authI18n() {
+        const keys = [
+          'descNew', 'descReturning', 'usernameLabel', 'usernamePlaceholder',
+          'passwordLabel', 'passwordPlaceholder', 'displayNameLabel', 'displayNameHint',
+          'displayNamePlaceholder', 'signInBtn', 'cancelBtn', 'working',
+          'errUserShort', 'errPassShort', 'errWrongPass', 'loggedIn', 'logoutBtn',
+          'forgotPassword', 'forgotUsername', 'resetPasswordTitle', 'resetPasswordDesc',
+          'sendResetCode', 'backToLogin', 'resetCodeSent', 'enterNewPasswordTitle',
+          'codeLabel', 'newPasswordLabel', 'newPasswordPlaceholder', 'errPassWeak',
+          'resetPassword', 'resetSuccess', 'recoverUsernameTitle', 'recoverUsernameDesc',
+          'emailLabel', 'sendUsername', 'usernameSent',
+          'whyTitle', 'whyGhii', 'whyPrivacy', 'whyAgents', 'whyMorsels',
+        ];
+        const obj = {};
+        for (const k of keys) {
+          const v = t('modal.' + k);
+          if (v !== 'modal.' + k) obj[k] = v;
+        }
+        return obj;
+      }
+
+      function mountAuth() {
         try {
           if (document.getElementById('headerAuth') && window.AIMEAT?.auth?.mountLoginButton) {
             window.AIMEAT.auth.mountLoginButton('#headerAuth', {
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
+              i18n: authI18n(),
             });
           }
         } catch (err) {
           console.error('Auth mount failed:', err);
         }
-      });
+      }
+
+      // Mount auth button after Preact renders
+      requestAnimationFrame(() => mountAuth());
+
+      // Re-mount auth button when locale changes
+      window.addEventListener('lang-change', () => requestAnimationFrame(() => mountAuth()));
     }
 
     boot().catch(err => {

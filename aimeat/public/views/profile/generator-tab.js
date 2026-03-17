@@ -256,7 +256,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     function handleCopyInterviewPrompt() {
       const prompt = buildInterviewPrompt(description, getLocale());
       navigator.clipboard.writeText(prompt).catch(() => {});
-      showToast?.(t('profile.generator.interviewPromptCopied') || 'Interview prompt copied!');
+      showToast?.(t('profile.generator.interviewPromptCopied'));
     }
 
     async function handleSubmitSpec() {
@@ -272,7 +272,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
         interviewDone: true,
         enhancedDescription: vr.parsed.description,
       });
-      showToast?.(t('profile.generator.specImported') || 'Specification imported!');
+      showToast?.(t('profile.generator.specImported'));
       setPhase('blueprint');
     }
 
@@ -285,24 +285,24 @@ function NewProjectView({ onBack, onCreated, showToast }) {
         <button class="btn btn-ghost" onClick=${() => setPhase('describe')}>
           ${t('profile.generator.back')}
         </button>
-        <h3>${t('profile.generator.interviewTitle') || 'Requirements Interview'}</h3>
+        <h3>${t('profile.generator.interviewTitle')}</h3>
         <p class="pf-gen-subtitle">
-          ${t('profile.generator.interviewDesc') || 'Copy the interview prompt to AI Chat. The AI will interview you about your requirements. When done, paste the JSON specification back here.'}
+          ${t('profile.generator.interviewDesc')}
         </p>
 
         <div class="pf-gen-section">
-          <label>${t('profile.generator.interviewPrompt') || 'Step 1: Copy Interview Prompt to AI Chat'}</label>
+          <label>${t('profile.generator.interviewPrompt')}</label>
           <button class="btn btn-sm btn-outline" onClick=${handleCopyInterviewPrompt}>
             ${t('profile.generator.copyPrompt')}
           </button>
         </div>
 
         <div class="pf-gen-section">
-          <label>${t('profile.generator.interviewResult') || 'Step 2: Paste the JSON Specification'}</label>
+          <label>${t('profile.generator.interviewResult')}</label>
           <textarea
             class="pf-gen-result-area"
             rows="14"
-            placeholder=${t('profile.generator.interviewPlaceholder') || 'Paste the complete AI response here...'}
+            placeholder=${t('profile.generator.interviewPlaceholder')}
             value=${interviewSpec}
             onInput=${e => setInterviewSpec(e.target.value)}
           />
@@ -317,10 +317,10 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
         <div class="pf-gen-actions">
           <button class="btn btn-primary" onClick=${handleSubmitSpec} disabled=${!interviewSpec.trim()}>
-            ${t('profile.generator.importSpec') || 'Import Specification'}
+            ${t('profile.generator.importSpec')}
           </button>
           <button class="btn btn-ghost" onClick=${handleSkipInterview}>
-            ${t('profile.generator.skipInterview') || 'Skip (use description only)'}
+            ${t('profile.generator.skipInterview')}
           </button>
         </div>
       </div>
@@ -586,14 +586,14 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       if (jsonMatch) text = jsonMatch[1].trim();
       const parsed = JSON.parse(text);
       if (!parsed.analysis || !Array.isArray(parsed.analysis)) {
-        setImpactErrors(['Response must contain an "analysis" array']);
+        setImpactErrors([t('profile.generator.impactArrayRequired')]);
         return;
       }
       setImpactParsed(parsed);
       setImpactErrors([]);
       setEditMode('editing');
     } catch (e) {
-      setImpactErrors([`Invalid JSON: ${e.message}`]);
+      setImpactErrors([t('profile.generator.invalidJson').replace('{error}', e.message)]);
     }
   }
 
@@ -697,7 +697,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
               ref=${el => el && setTimeout(() => el.focus(), 0)}
             />`
           : html`<h3 class="pf-gen-name-editable" onClick=${() => { setNameDraft(project.name); setEditingName(true); }}
-              title=${t('profile.generator.clickToEditName') || 'Click to edit name'}>${project.name}</h3>`
+              title=${t('profile.generator.clickToEditName')}>${project.name}</h3>`
         }
         <button class="btn btn-ghost btn-sm pf-gen-delete-btn" onClick=${handleDeleteProject}>
           ${t('profile.generator.deleteProject')}
@@ -871,16 +871,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       <!-- Phase 6: Edit Service Panel -->
       ${editMode === 'request' && html`
         <div class="pf-gen-edit-panel">
-          <h4>Edit Service</h4>
-          <p class="pf-gen-subtitle">Describe the problem or change you want to make:</p>
+          <h4>${t('profile.generator.editService')}</h4>
+          <p class="pf-gen-subtitle">${t('profile.generator.editServiceDesc')}</p>
           <textarea class="pf-gen-result-area" rows="4"
-            placeholder="e.g., Municipality and Type fields show numbers instead of names. The RSS title format is HH:MM:SS Municipality Type: Severity"
+            placeholder="${t('profile.generator.editPlaceholder')}"
             value=${changeRequest}
             onInput=${e => setChangeRequest(e.target.value)}
           />
           <div class="pf-gen-actions" style="margin-top:8px">
             <button class="btn btn-primary btn-sm" onClick=${handleCopyImpactPrompt} disabled=${!changeRequest.trim()}>
-              Copy Impact Analysis Prompt
+              ${t('profile.generator.copyImpactPrompt')}
             </button>
           </div>
         </div>
@@ -888,8 +888,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
       ${editMode === 'impact' && html`
         <div class="pf-gen-edit-panel">
-          <h4>Impact Analysis</h4>
-          <p class="pf-gen-subtitle">Paste the AI's impact analysis response:</p>
+          <h4>${t('profile.generator.impactAnalysis')}</h4>
+          <p class="pf-gen-subtitle">${t('profile.generator.impactPasteDesc')}</p>
           <textarea class="pf-gen-result-area" rows="8"
             placeholder="Paste the JSON response from AI Chat..."
             value=${impactResult}
@@ -902,7 +902,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
           `}
           <div class="pf-gen-actions" style="margin-top:8px">
             <button class="btn btn-primary btn-sm" onClick=${handleParseImpact} disabled=${!impactResult.trim()}>
-              Analyze Impact
+              ${t('profile.generator.analyzeImpact')}
             </button>
             <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('request')}>Back</button>
           </div>
@@ -911,7 +911,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
       ${editMode === 'editing' && impactParsed && html`
         <div class="pf-gen-edit-panel">
-          <h4>Impact Results</h4>
+          <h4>${t('profile.generator.impactResults')}</h4>
           ${impactParsed.summary && html`<p class="pf-gen-subtitle">${impactParsed.summary}</p>`}
           <div class="pf-gen-impact-list">
             ${impactParsed.analysis.map(a => {
@@ -927,7 +927,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                   ${(a.impact === 'root' || a.impact === 'update') && comp && html`
                     <button class="btn btn-sm btn-outline" style="margin-top:4px"
                       onClick=${() => handleCopyEditPrompt(comp, a.suggestedChange)}>
-                      Copy Edit Prompt
+                      ${t('profile.generator.copyEditPrompt')}
                     </button>
                   `}
                 </div>
@@ -935,8 +935,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             })}
           </div>
           <div class="pf-gen-actions" style="margin-top:8px">
-            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('impact')}>Back to Impact</button>
-            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode(null)}>Done</button>
+            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
+            <button class="btn btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
           </div>
         </div>
       `}
@@ -944,15 +944,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       <!-- Phase 7: Diagnostics Panel -->
       ${showDiagnostics && html`
         <div class="pf-gen-diagnostics-panel">
-          <h4>Diagnostics</h4>
+          <h4>${t('profile.generator.diagnostics')}</h4>
           <table class="pf-gen-diag-table">
             <thead>
               <tr>
-                <th>Component</th>
-                <th>Type</th>
-                <th>Gen Status</th>
-                <th>Live Status</th>
-                <th>Last Action</th>
+                <th>${t('profile.generator.diagComponent')}</th>
+                <th>${t('profile.generator.diagType')}</th>
+                <th>${t('profile.generator.diagGenStatus')}</th>
+                <th>${t('profile.generator.diagLiveStatus')}</th>
+                <th>${t('profile.generator.diagLastAction')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1146,7 +1146,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       if (component.type === 'cortex') {
         const vr = validateComponent('cortex', component.result || result, project.blueprint);
         if (!vr.valid) {
-          showToast?.((t('profile.generator.validationFailed') || 'Validation failed') + ': ' + vr.errors.join(', '), true);
+          showToast?.((t('profile.generator.validationFailed')) + ': ' + vr.errors.join(', '), true);
           setRegistering(false);
           return;
         }
@@ -1167,7 +1167,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         || null;
       if (!regName) {
         // Registration succeeded but we couldn't extract the name — warn user
-        showToast?.((t('profile.generator.registrationNameMissing') || 'Registered but name could not be determined — re-register recommended'), true);
+        showToast?.(t('profile.generator.registrationNameMissing'), true);
         setRegistering(false);
         return;
       }
@@ -1195,7 +1195,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       // Re-validate current result before re-registering
       const vr = validateComponent(component.type, component.result || result, project.blueprint);
       if (!vr.valid) {
-        showToast?.((t('profile.generator.validationFailed') || 'Validation failed') + ': ' + vr.errors.join(', '), true);
+        showToast?.((t('profile.generator.validationFailed')) + ': ' + vr.errors.join(', '), true);
         setRegistering(false);
         return;
       }
@@ -1229,7 +1229,7 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     );
     const updated = addHistory(component, 'prompt_regenerated');
     await saveComponent(projectId, { ...updated, status: 'prompt_ready', prompt: fresh });
-    showToast?.(t('profile.generator.promptRegenerated') || 'Prompt updated!');
+    showToast?.(t('profile.generator.promptRegenerated'));
     onUpdate();
   }
 
@@ -1273,12 +1273,12 @@ function ComponentDetail({ component, project, components, agents, projectId, in
       <!-- Mode toggle -->
       <div class="pf-gen-mode-toggle">
         <button class=${`btn btn-sm ${mode === 'chat' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('chat')}
-          title=${t('profile.generator.modeChatHint') || 'Copy the prompt to an AI chat, paste the result back here'}>
+          title=${t('profile.generator.modeChatHint')}>
           ${t('profile.generator.modeChat')}
         </button>
         ${agents.length > 0 && html`
           <button class=${`btn btn-sm ${mode === 'agent' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('agent')}
-            title=${t('profile.generator.modeAgentHint') || 'Send the prompt to a connected AI agent automatically'}>
+            title=${t('profile.generator.modeAgentHint')}>
             ${t('profile.generator.modeAgent')}
           </button>
         `}
@@ -1292,11 +1292,11 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             ${workflowStep === 'copy' && html`<${StepArrow} />`}
             <button class="btn btn-sm btn-outline" onClick=${handleCopyPrompt}
-              title=${t('profile.generator.copyPromptHint') || 'Copy this prompt to your clipboard — paste it into an AI chat to generate the component'}>
+              title=${t('profile.generator.copyPromptHint')}>
               ${t('profile.generator.copyPrompt')}
             </button>
-            <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint') || 'Regenerate prompt with latest templates'}>
-              ${'↻ ' + (t('profile.generator.regeneratePrompt') || 'Refresh prompt')}
+            <button class="btn btn-sm btn-ghost" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint')}>
+              ${'↻ ' + (t('profile.generator.regeneratePrompt'))}
             </button>
           </div>
         </div>
@@ -1321,20 +1321,20 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           <div class="pf-gen-actions" style="align-items:center">
             ${workflowStep === 'validate' && html`<${StepArrow} />`}
             <button class="btn btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
-              title=${t('profile.generator.validateHint') || 'Check the AI output for correct format and required fields'}>
+              title=${t('profile.generator.validateHint')}>
               ${t('profile.generator.validate')}
             </button>
             ${validationResult?.valid && html`
               ${workflowStep === 'register' && html`<${StepArrow} />`}
               <button class="btn btn-sm" style="background:var(--success,#22c55e);color:#fff" onClick=${handleRegister} disabled=${registering}
-                title=${t('profile.generator.registerHint') || 'Install this component on your AIMEAT node — makes it live'}>
+                title=${t('profile.generator.registerHint')}>
                 ${registering ? '...' : t('profile.generator.register')}
               </button>
             `}
             ${component.registeredAs && result.trim() && html`
               <button class="btn btn-sm btn-outline" onClick=${handleReregister} disabled=${registering}
-                title=${t('profile.generator.reregisterHint') || 'Deactivate, remove, and re-register this component with the current result'}>
-                ${registering ? '...' : (t('profile.generator.reregister') || 'Re-register')}
+                title=${t('profile.generator.reregisterHint')}>
+                ${registering ? '...' : (t('profile.generator.reregister'))}
               </button>
             `}
           </div>
