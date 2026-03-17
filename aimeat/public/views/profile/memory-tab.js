@@ -45,9 +45,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     if (session) { loadMemories(); }
   }, [selectedAgent]);
 
-  // Live update listener
-  const liveRef = useRef(loadMemories);
-  liveRef.current = loadMemories;
+  // Live update listener — refresh both memories and files
+  const liveRef = useRef(() => { loadMemories(); loadFiles(); });
+  liveRef.current = () => { loadMemories(); loadFiles(); };
   useEffect(() => {
     const handler = () => liveRef.current();
     window.addEventListener('aimeat-live-update', handler);
@@ -79,9 +79,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
   }
 
   async function handleCreateMemory(key, value, visibility, tags) {
-    const resp = await memoryService.createMemory(key, value, visibility, tags);
-    if (resp.ok !== false) { showToast(t('profile.memory.saved')); setShowMemForm(false); loadMemories(); }
-    else showToast(t('profile.memory.saveFailed'), true);
+    try {
+      await memoryService.createMemory(key, value, visibility, tags);
+      showToast(t('profile.memory.saved'));
+      setShowMemForm(false);
+      await loadMemories();
+    } catch (e) {
+      showToast(e.message || t('profile.memory.saveFailed'), true);
+    }
   }
 
   async function handleDeleteMemory(key) {
@@ -117,8 +122,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     for (const item of fileItems) {
       try {
         const base64 = await readFileAsBase64(item.file);
-        const resp = await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility, tags);
-        if (resp.ok !== false) ok++; else fail++;
+        await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility, tags);
+        ok++;
       } catch { fail++; }
     }
     if (ok > 0) showToast(ok === 1 ? t('profile.files.uploaded') : `${ok} ${t('profile.files.filesUploaded')}`);
