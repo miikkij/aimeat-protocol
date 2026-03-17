@@ -12,6 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-16 — restyle to match extensions-tab pattern (grid cards, consistent CSS)
+ *   v1.2.0 — 2026-03-17 — add "Open in Generator" / "Edit in Generator" buttons for
+ *     importing packages into generator projects (fork vs edit detection)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -22,6 +24,7 @@ import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
+import { importPackageToGenerator } from '/js/services/generator-packaging.js';
 
 export default function PackagesTab({ session, showToast, navigate, locale }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -91,6 +94,22 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
       }
     } else {
       showToast(res.error || 'Check failed', true);
+    }
+  };
+
+  const handleOpenInGenerator = async (groupId, author) => {
+    const currentUser = session?.owner || '';
+    const isOwn = author === currentUser;
+    if (!isOwn) {
+      const ok = window.confirm(t('profile.generator.forkConfirm') || 'This will create your own copy of this package for editing. Continue?');
+      if (!ok) return;
+    }
+    try {
+      const newProjectId = await importPackageToGenerator(groupId, null, currentUser);
+      showToast(t('profile.packages.importSuccess') || 'Package imported as generator project');
+      navigate('generator');
+    } catch (e) {
+      showToast(e.message, true);
     }
   };
 
@@ -184,6 +203,11 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                       <button class="primary" onClick=${() => handleInstall(pkg.packageGroupId)}>
                         ${t('packages.install') || 'Install'}
                       </button>
+                      <button onClick=${() => handleOpenInGenerator(pkg.packageGroupId, pkg.author)}>
+                        ${pkg.author === session?.owner
+                          ? (t('profile.packages.editInGenerator') || 'Edit in Generator')
+                          : (t('profile.packages.openInGenerator') || 'Open in Generator')}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -216,6 +240,11 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                     <div class="pkg-card-actions">
                       <button class="primary" onClick=${() => handleInstall(tpl.packageGroupId)}>
                         ${t('packages.install') || 'Install'}
+                      </button>
+                      <button onClick=${() => handleOpenInGenerator(tpl.packageGroupId, tpl.packageAuthor)}>
+                        ${tpl.packageAuthor === session?.owner
+                          ? (t('profile.packages.editInGenerator') || 'Edit in Generator')
+                          : (t('profile.packages.openInGenerator') || 'Open in Generator')}
                       </button>
                     </div>
                   </div>

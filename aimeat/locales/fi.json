@@ -1041,13 +1041,29 @@
       "diagLastAction": "Viimeisin toiminto",
       "serviceDefinition": "PALVELUMÄÄRITTELY",
       "seedDataTranslations": "ALKUTIEDOT JA KÄÄNNÖKSET",
+      "packageProject": "Paketoi malliksi",
+      "updatePackage": "Päivitä paketti",
+      "packageSuccess": "Paketti luotu onnistuneesti",
+      "packageUpdateSuccess": "Paketti päivitetty versioon {version}",
+      "packageCategory": "Kategoria",
+      "packageTags": "Tunnisteet (pilkulla erotettu)",
+      "packageVisibility": "Näkyvyys",
+      "noComponentsToPackage": "Ei valmiita komponentteja paketoitavaksi",
+      "changesSummary": "Muutokset edellisestä versiosta",
+      "changeAdded": "Lisätty",
+      "changeModified": "Muokattu",
+      "changeRemoved": "Poistettu",
+      "changeUnchanged": "Muuttumaton",
+      "forkedFrom": "Haarautettu paketista {name}, tekijä {author}",
+      "forkConfirm": "Tämä luo oman kopiosi tästä paketista muokattavaksi. Jatketaanko?",
+      "clickToEditName": "Napsauta muokataksesi nimeä",
       "status": {
         "not_started": "Ei aloitettu",
         "prompt_ready": "Prompt valmis",
         "waiting_user": "Odottaa sinua",
         "waiting_agent": "Odottaa agenttia",
         "validating": "Validoidaan",
-        "errors": "Virheit\u00e4",
+        "errors": "Virheitä",
         "done": "Valmis"
       }
     }
@@ -3697,7 +3713,13 @@
     "noTemplates": "Ei malleja saatavilla.",
     "labelPrompt": "Instanssin nimi (valinnainen):",
     "confirmRemove": "Poistetaanko instanssi?",
-    "installs": "asennusta"
+    "installs": "asennusta",
+    "noPackages": "Ei paketteja saatavilla.",
+    "openInGenerator": "Avaa generaattorissa",
+    "editInGenerator": "Muokkaa generaattorissa",
+    "importingPackage": "Tuodaan pakettia generaattoriin...",
+    "importSuccess": "Paketti tuotu generaattoriprojektiksi",
+    "forkedFrom": "Perustuu pakettiin {name}"
   },
   "templates": {
     "created": "Mallipohja luotu",

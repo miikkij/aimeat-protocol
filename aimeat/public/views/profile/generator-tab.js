@@ -20,6 +20,9 @@
  *     edit service UI (impact analysis + targeted edit prompts), diagnostics panel
  *   v3.1.0 — 2026-03-17 — Editable project name, re-register button, button tooltips,
  *     detail panel background matching, improved spacing and button visibility
+ *   v4.0.0 — 2026-03-17 — Add packaging bridge: "Package as Template" / "Update Package"
+ *     buttons, packaging dialog with category/tags/visibility, change detection diff,
+ *     fork attribution display, package link display in project header
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -38,6 +41,10 @@ import {
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
 import { useConfirm } from '/components/Modal.js';
+import {
+  packageProject, updatePackageVersion, detectChanges,
+  importPackageToGenerator, publishToGallery,
+} from '/js/services/generator-packaging.js';
 
 /* ── Agent Listener Status ───────────────────────────── */
 
@@ -411,6 +418,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   // Phase 7: Diagnostics state
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
+  // Packaging state
+  const [showPackageDialog, setShowPackageDialog] = useState(false);
+  const [packageLoading, setPackageLoading] = useState(false);
+  const [packageChanges, setPackageChanges] = useState(null);
+  const [packageCategory, setPackageCategory] = useState('utility');
+  const [packageTags, setPackageTags] = useState('');
+  const [packageVisibility, setPackageVisibility] = useState('private');
+  const [changelogNote, setChangelogNote] = useState('');
+
   // Editable project name
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -509,6 +525,52 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     else showToast?.('No registered app found');
   }
 
+  // Packaging handlers
+  async function handleOpenPackageDialog() {
+    setShowPackageDialog(true);
+    setPackageChanges(null);
+    setChangelogNote('');
+    // If project is linked to a package, detect changes
+    if (project.packageGroupId) {
+      try {
+        const pkgResp = await getPackage(project.packageGroupId);
+        const pkg = pkgResp?.data || pkgResp;
+        const packageable = components.filter(c => c.status === 'done' && c.result);
+        const changes = await detectChanges(packageable, pkg?.components);
+        setPackageChanges(changes);
+      } catch { /* first time — no changes to detect */ }
+    }
+  }
+
+  async function handlePackageProject() {
+    setPackageLoading(true);
+    try {
+      const tags = packageTags.split(',').map(t => t.trim()).filter(Boolean);
+      if (project.packageGroupId) {
+        // Update existing package
+        const { result, changes } = await updatePackageVersion(projectId, {
+          category: packageCategory,
+          tags,
+          changelogNote,
+        });
+        showToast?.(t('profile.generator.packageUpdateSuccess').replace('{version}', result?.data?.version || ''));
+      } else {
+        // Create new package
+        await packageProject(projectId, {
+          category: packageCategory,
+          tags,
+          visibility: packageVisibility,
+        });
+        showToast?.(t('profile.generator.packageSuccess'));
+      }
+      setShowPackageDialog(false);
+      await loadData();
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setPackageLoading(false);
+  }
+
   // Phase 6: Edit service handlers
   function handleCopyImpactPrompt() {
     const prompt = buildImpactPrompt(changeRequest, project?.blueprint);
@@ -563,6 +625,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const registeredCount = components.filter(c => c.registeredAs).length;
   const activeCount = Object.values(liveStatuses).filter(s => s.active).length;
   const hasApp = components.some(c => c.type === 'app' && c.registeredAs);
+  const doneCount = components.filter(c => c.status === 'done' && c.result).length;
 
   // Compute phase-ordered component list for auto-advance
   const phaseOrder = phases.flatMap(p => p.componentIds || []);
@@ -640,6 +703,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
           ${t('profile.generator.deleteProject')}
         </button>
       </div>
+      ${project.forkedFrom && html`
+        <p class="pf-gen-forked-from" style="margin:0 0 8px;font-size:0.85em;color:var(--text-muted,#888)">
+          ${t('profile.generator.forkedFrom').replace('{name}', project.forkedFrom.packageGroupId).replace('{author}', project.forkedFrom.author)}
+        </p>
+      `}
+      ${project.packageGroupId && html`
+        <p class="pf-gen-package-link" style="margin:0 0 8px;font-size:0.85em;color:var(--text-muted,#888)">
+          Package: ${project.packageGroupId}${project.lastPackagedVersion ? ' — ' + project.lastPackagedVersion : ''}
+        </p>
+      `}
 
       <!-- Phase 5: Lifecycle Toolbar -->
       ${registeredCount > 0 && html`
@@ -677,6 +750,88 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
             <button class="btn btn-sm btn-outline pf-gen-remove-toggle"
               onClick=${() => { setShowRemovePanel(!showRemovePanel); setRemoveSelection({}); }}>
               ${showRemovePanel ? 'Cancel' : 'Remove...'}
+            </button>
+            ${doneCount > 0 && html`
+              <button class="btn btn-sm" style="background:var(--primary,#3b82f6);color:#fff"
+                onClick=${handleOpenPackageDialog}
+                disabled=${packageLoading}>
+                ${project.packageGroupId
+                  ? t('profile.generator.updatePackage')
+                  : t('profile.generator.packageProject')}
+              </button>
+            `}
+          </div>
+        </div>
+      `}
+
+      <!-- Package Dialog -->
+      ${showPackageDialog && html`
+        <div class="pf-gen-package-dialog">
+          <h4>${project.packageGroupId
+            ? t('profile.generator.updatePackage')
+            : t('profile.generator.packageProject')}</h4>
+          ${project.forkedFrom && html`
+            <p style="font-size:0.85em;color:var(--text-muted,#888);margin:0 0 8px">
+              ${t('profile.generator.forkedFrom').replace('{name}', project.forkedFrom.packageGroupId).replace('{author}', project.forkedFrom.author)}
+            </p>
+          `}
+
+          ${!project.packageGroupId && html`
+            <label class="pf-gen-pkg-label">${t('profile.generator.packageVisibility')}
+              <select value=${packageVisibility} onChange=${e => setPackageVisibility(e.target.value)}>
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+              </select>
+            </label>
+          `}
+
+          <label class="pf-gen-pkg-label">${t('profile.generator.packageCategory')}
+            <input type="text" value=${packageCategory}
+              onChange=${e => setPackageCategory(e.target.value)}
+              placeholder="utility" />
+          </label>
+
+          <label class="pf-gen-pkg-label">${t('profile.generator.packageTags')}
+            <input type="text" value=${packageTags}
+              onChange=${e => setPackageTags(e.target.value)}
+              placeholder="alerts, maps, finland" />
+          </label>
+
+          ${project.packageGroupId && html`
+            <div class="pf-gen-changes-summary">
+              <strong>${t('profile.generator.changesSummary')}</strong>
+              ${packageChanges ? html`
+                <ul style="margin:4px 0;padding-left:18px">
+                  ${packageChanges.filter(c => c.action === 'added').map(c => html`
+                    <li style="color:var(--success,#22c55e)">${t('profile.generator.changeAdded')}: ${c.label}</li>
+                  `)}
+                  ${packageChanges.filter(c => c.action === 'modified').map(c => html`
+                    <li style="color:var(--warning,#f59e0b)">${t('profile.generator.changeModified')}: ${c.label}</li>
+                  `)}
+                  ${packageChanges.filter(c => c.action === 'removed').map(c => html`
+                    <li style="color:var(--error,#ef4444)">${t('profile.generator.changeRemoved')}: ${c.label}</li>
+                  `)}
+                  ${packageChanges.filter(c => c.action === 'unchanged').map(c => html`
+                    <li style="color:var(--text-muted,#888)">${t('profile.generator.changeUnchanged')}: ${c.label}</li>
+                  `)}
+                </ul>
+              ` : html`<span style="color:var(--text-muted,#888)">...</span>`}
+              <label class="pf-gen-pkg-label" style="margin-top:8px">Changelog note
+                <input type="text" value=${changelogNote}
+                  onChange=${e => setChangelogNote(e.target.value)}
+                  placeholder="What changed..." />
+              </label>
+            </div>
+          `}
+
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn btn-sm btn-outline" onClick=${() => setShowPackageDialog(false)}>
+              Cancel
+            </button>
+            <button class="btn btn-sm btn-primary" onClick=${handlePackageProject} disabled=${packageLoading}>
+              ${packageLoading ? '...' : (project.packageGroupId
+                ? t('profile.generator.updatePackage')
+                : t('profile.generator.packageProject'))}
             </button>
           </div>
         </div>
