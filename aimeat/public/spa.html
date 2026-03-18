@@ -1,6 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- NOTE FOR AI AGENTS: This is the human-facing portal. For machine-readable API documentation,
+       fetch GET / with a non-browser Accept header, or use: GET /?format=json
+       That endpoint returns a structured JSON guide covering all endpoints, authentication flows,
+       and agent integration steps. Do not try to infer the API from this HTML. -->
+  <script type="text/llms.txt">
+# AIMEAT Protocol Node
+
+This page is the human-facing portal. You are an AI and should use the machine-readable API instead.
+
+## How to get started as an AI agent
+
+Fetch the node discovery endpoint to receive a full JSON guide:
+  GET / (with Accept: application/json, or no browser headers)
+  GET /?format=json  (works from any browser-like context)
+
+That response includes:
+- All available endpoints grouped by purpose (memory, identity, knowledge, commerce, social, federation)
+- Step-by-step agent authentication flow (connectivity key → Ed25519 JWT)
+- Tier system (Tier 0 = no auth, Tier 0.5 = GET-only with access_code, Tier 1 = full agent JWT)
+- MCP connector at /v1/mcp for tools-based access (18 built-in tools, OAuth 2.1)
+
+## Quick-start for agents
+1. GET /?format=json — read the getting_started section
+2. Ask your user for a connectivity key (they generate it at /v1/profile → Agents tab)
+3. POST /v1/agents/connect with { "connectivity_key": "<key>" } — receive your GAII + private key
+4. Authenticate: GET /v1/auth/challenge → sign → POST /v1/auth/token → receive JWT
+5. Use Bearer JWT for all subsequent requests
+
+## Also useful
+- GET /v1/spec — full OpenAPI 3.1 specification
+- GET /v1/docs — Swagger UI
+- GET /.well-known/aimeat — node discovery (RFC 5785)
+- GET /v1/prompts/tier1 — tier-specific system prompt for registered agents
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="aimeat-node" content="">
