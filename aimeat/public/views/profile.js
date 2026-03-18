@@ -249,10 +249,6 @@ export default function Profile({ navigate, locale }) {
   }, []);
 
   return html`
-    <div class="bg-aurora" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none">
-      <div class="aurora-wave"></div><div class="aurora-wave"></div><div class="aurora-wave"></div>
-    </div>
-
     <div class="pf">
       <${LandingPage}
         tier=${tier}
