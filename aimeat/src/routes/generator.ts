@@ -3,17 +3,18 @@
 // Agents submit generated content here; the route validates it, then writes to
 // generator.* memory keys using the same structure the frontend reads.
 // @structure
-//   POST /v1/generator/projects                                    — create a new generator project
-//   GET  /v1/generator/projects                                    — list all projects for the caller
-//   GET  /v1/generator/:projectId                                  — get full project state (project, interviewSpec, components, session)
-//   POST /v1/generator/:projectId/interview                        — save/update interview spec for a project
-//   POST /v1/generator/:projectId/session/claim                    — agent claims an execution session
-//   POST /v1/generator/:projectId/session/heartbeat                — agent keeps session alive / updates progress
-//   DELETE /v1/generator/:projectId/session                        — release session (user stop or agent done)
-//   POST /v1/generator/:projectId/steps/blueprint                  — validate + store blueprint
-//   POST /v1/generator/:projectId/components/:componentId/submit   — validate + store component content
-//   POST /v1/generator/:projectId/log                              — write log entry to memory
-//   POST /v1/generator/:projectId/complete                         — mark project active, release session
+//   POST /v1/generator/projects                                           — create a new generator project
+//   GET  /v1/generator/projects                                           — list all projects for the caller
+//   GET  /v1/generator/:projectId                                         — get full project state (project, interviewSpec, components, session)
+//   POST /v1/generator/:projectId/interview                               — save/update interview spec for a project
+//   POST /v1/generator/:projectId/session/claim                           — agent claims an execution session
+//   POST /v1/generator/:projectId/session/heartbeat                       — agent keeps session alive / updates progress
+//   DELETE /v1/generator/:projectId/session                               — release session (user stop or agent done)
+//   POST /v1/generator/:projectId/steps/blueprint                         — validate + store blueprint
+//   POST /v1/generator/:projectId/components/:componentId/submit          — validate + store component content
+//   POST /v1/generator/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
+//   POST /v1/generator/:projectId/log                                     — write log entry to memory
+//   POST /v1/generator/:projectId/complete                                — mark project active, release session
 // @usage
 //   Consumed by AI agents via device auth (generator:read / generator:write / generator:execute scopes)
 //   and by the browser UI (owner JWT satisfies agent role check).
@@ -22,6 +23,7 @@
 //   v1.1.0 — 2026-03-18 — Add project management and interview endpoints (Task 3)
 //   v1.2.0 — 2026-03-18 — Add session claim, heartbeat, and release endpoints (Task 4)
 //   v1.3.0 — 2026-03-18 — Add blueprint, component submit, log, and complete endpoints (Task 5)
+//   v1.4.0 — 2026-03-18 — Add component registration endpoint (Task 6)
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -31,6 +33,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { validateInterviewSpec, validateBlueprint, validateComponent } from '../services/generator-validate.js';
 import type { ComponentType } from '../services/generator-validate.js';
+import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 
 export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -395,6 +398,65 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         warnings: validation.warnings ?? [],
         extracted: validation.extracted,
       }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/components/:componentId/register — register a validated component into the AIMEAT catalogue
+  router.post('/v1/generator/:projectId/components/:componentId/register',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:execute'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+
+      const componentRec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
+      if (!componentRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Component not found — submit content first'));
+        return;
+      }
+
+      const component = componentRec.value as { type: ComponentType; content: string; status: string };
+      if (component.status !== 'ready') {
+        res.status(400).json(error(config.nodeId, 'NOT_READY', 'Component must be in "ready" status before registration'));
+        return;
+      }
+
+      const agentRecord = await storage.getAgent(gaii);
+      if (!agentRecord) {
+        res.status(403).json(error(config.nodeId, 'AUTH_ERROR', 'Agent record not found'));
+        return;
+      }
+      const ownerGhii = `${agentRecord.owner}@${config.nodeId}`;
+
+      try {
+        switch (component.type) {
+          case 'csm': await registerCsm(component.content, ownerGhii, storage); break;
+          case 'msm': await registerMsm(component.content, ownerGhii, storage); break;
+          case 'extension': await registerExtension(component.content, ownerGhii, storage); break;
+          case 'app': await registerApp(component.content, ownerGhii, storage); break;
+          case 'memory':
+          case 'translation':
+          case 'cortex':
+            // No catalogue registration needed — stored in generator memory keys only
+            break;
+          default:
+            res.status(400).json(error(config.nodeId, 'UNSUPPORTED_TYPE', `Registration not supported for type: ${component.type as string}`));
+            return;
+        }
+
+        const now = new Date().toISOString();
+        await storage.setMemory({
+          ...componentRec,
+          value: { ...component, status: 'registered', registeredAt: now },
+          updatedAt: now,
+        });
+        res.json(success(config.nodeId, { registered: true, componentId }));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        res.status(500).json(error(config.nodeId, 'REGISTRATION_ERROR', msg));
+      }
     }
   );
 

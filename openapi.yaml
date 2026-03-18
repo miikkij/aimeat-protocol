@@ -13763,6 +13763,43 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/generator/{projectId}/components/{componentId}/register:
+    post:
+      tags: [Generator]
+      summary: Register a validated component into the AIMEAT catalogue
+      operationId: generatorRegisterComponent
+      description: >
+        Register a previously submitted and validated component (status `ready`) into the AIMEAT
+        catalogue. Resolves the agent's owner GHII and calls storage registration methods directly,
+        bypassing owner-only HTTP routes. After successful registration the component status is
+        updated to `registered`. Types `memory`, `translation`, and `cortex` are stored in generator
+        memory keys only and require no catalogue registration — this endpoint is a no-op for them.
+        Requires `generator:execute` scope.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: componentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Component registered successfully
+        '400':
+          description: Component not ready or unsupported type
+        '403':
+          description: Agent record not found
+        '404':
+          description: Component not found
+        '500':
+          description: Registration error
+
   /v1/generator/{projectId}/log:
     post:
       operationId: writeGeneratorLog
