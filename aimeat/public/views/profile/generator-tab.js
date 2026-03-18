@@ -408,14 +408,14 @@ function AgentProgressBanner({ session, components, projectId, onStop }) {
 
   if (!session) return null;
 
-  return html`<div class="gen-agent-banner ${isStale ? 'stale' : ''}">
-    <div class="gen-agent-banner-info">
+  return html`<div class="pf-gen-agent-banner ${isStale ? 'stale' : ''}">
+    <div class="pf-gen-agent-banner-info">
       <strong>${isStale
         ? t('profile.generator.agentBanner.disconnected')
         : t('profile.generator.agentBanner.working').replace('{agentName}', session.agentName)
       }</strong>
       ${!isStale && session.totalSteps > 0 && html`
-        <span class="gen-agent-banner-phase">
+        <span class="pf-gen-agent-banner-phase">
           ${t('profile.generator.agentBanner.phase')
             .replace('{phase}', session.phase)
             .replace('{step}', session.stepNumber)
@@ -423,13 +423,13 @@ function AgentProgressBanner({ session, components, projectId, onStop }) {
         </span>
       `}
     </div>
-    <div class="gen-step-indicators">
+    <div class="pf-gen-step-indicators">
       ${components.map(c => html`
-        <span class="gen-step-dot ${c.status === 'registered' ? 'done' : c.id === session.componentId ? 'active' : 'pending'}"
+        <span class="pf-gen-step-dot ${c.status === 'registered' ? 'done' : c.id === session.componentId ? 'active' : 'pending'}"
               title=${c.id}></span>
       `)}
     </div>
-    <button class="btn-ghost gen-stop-btn" onClick=${handleStop}>
+    <button class="btn-ghost pf-gen-stop-btn" onClick=${handleStop}>
       ${isStale
         ? t('profile.generator.agentBanner.continueManually')
         : t('profile.generator.agentBanner.stopButton')
@@ -441,27 +441,33 @@ function AgentProgressBanner({ session, components, projectId, onStop }) {
 function AgentSelector({ projectId, listeners, onAgentStart, onManual }) {
   const [selected, setSelected] = useState(listeners[0]?.gaii ?? null);
 
+  useEffect(() => {
+    if (listeners.length > 0 && !listeners.find(a => a.gaii === selected)) {
+      setSelected(listeners[0].gaii);
+    }
+  }, [listeners]);
+
   if (listeners.length === 0) {
-    return html`<div class="gen-agent-selector">
-      <p class="gen-agent-selector-empty">${t('profile.generator.agentSelector.noAgents')}</p>
+    return html`<div class="pf-gen-agent-selector">
+      <p class="pf-gen-agent-selector-empty">${t('profile.generator.agentSelector.noAgents')}</p>
       <button class="btn-ghost" onClick=${onManual}>${t('profile.generator.agentSelector.manualButton')}</button>
     </div>`;
   }
 
-  return html`<div class="gen-agent-selector">
-    <p class="gen-agent-selector-subtitle">${t('profile.generator.agentSelector.subtitle')}</p>
-    <div class="gen-agent-list">
+  return html`<div class="pf-gen-agent-selector">
+    <p class="pf-gen-agent-selector-subtitle">${t('profile.generator.agentSelector.subtitle')}</p>
+    <div class="pf-gen-agent-list">
       ${listeners.map(agent => html`
-        <label class="gen-agent-option ${selected === agent.gaii ? 'selected' : ''}">
+        <label class="pf-gen-agent-option ${selected === agent.gaii ? 'selected' : ''}">
           <input type="radio" name="agent" value=${agent.gaii}
             checked=${selected === agent.gaii}
             onChange=${() => setSelected(agent.gaii)} />
-          <span class="gen-agent-name">${agent.name ?? agent.gaii}</span>
-          <span class="gen-agent-gaii">${agent.gaii}</span>
+          <span class="pf-gen-agent-name">${agent.name ?? agent.gaii}</span>
+          <span class="pf-gen-agent-gaii">${agent.gaii}</span>
         </label>
       `)}
     </div>
-    <div class="gen-agent-actions">
+    <div class="pf-gen-agent-actions">
       <button class="btn-primary" disabled=${!selected}
         onClick=${() => selected && onAgentStart(selected)}>
         ${t('profile.generator.agentSelector.startButton')}
