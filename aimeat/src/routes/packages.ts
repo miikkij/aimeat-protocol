@@ -282,10 +282,17 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Check for duplicate package name by this author
+    const packageGroupId = `${name}::${owner}`;
+    const existingGroup = await storage.listVersions(packageGroupId, 1, 0);
+    if (existingGroup.total > 0) {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${name}" already exists for this author. Use POST /v1/bundles/${encodeURIComponent(packageGroupId)}/versions to publish a new version.`));
+      return;
+    }
+
     const now = new Date().toISOString();
     const id = randomUUID();
     const version = generateVersion();
-    const packageGroupId = `${name}::${owner}`;
     const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
 
     const processedComponents: PackageComponent[] = components.map((c: any) => ({

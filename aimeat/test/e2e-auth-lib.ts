@@ -253,7 +253,7 @@ console.log('\nPhase 7 — Password Login');
 
 const pwUsername = `pwtest${Date.now()}`;
 const pwPassword = 'TestPass123';
-let pwAgentJwt = '';
+let pwOwnerJwt = '';
 
 await test('POST /v1/ghii — register with password', async () => {
     const data = await api('/v1/ghii', {
@@ -273,13 +273,13 @@ await test('POST /v1/ghii/login — login with correct password', async () => {
     assert(data.ok === true, `Login failed: ${data.error?.message}`);
     assert(typeof data.data.token === 'string', 'should return JWT');
     assert(typeof data.data.owner_private_key === 'string', 'should return owner private key');
-    assert(typeof data.data.agent_private_key === 'string', 'should return agent private key');
-    assert(data.data.agent.gaii.startsWith('app#'), `expected gaii starting with app#, got: ${data.data.agent.gaii}`);
-    pwAgentJwt = data.data.token;
+    assert(typeof data.data.owner_public_key === 'string', 'should return owner public key');
+    assert(data.data.ghii.username === pwUsername, `username mismatch: ${data.data.ghii.username}`);
+    pwOwnerJwt = data.data.token;
 });
 
-await test('Authenticated ops with password-login JWT', async () => {
-    const data = await authApi('/v1/memory', pwAgentJwt, {
+await test('Authenticated ops with password-login JWT (owner JWT)', async () => {
+    const data = await authApi('/v1/memory', pwOwnerJwt, {
         method: 'POST',
         body: JSON.stringify({ key: 'pw-test', value: { from: 'password login' }, visibility: 'private' }),
     });
@@ -315,7 +315,7 @@ await test('POST /v1/ghii/login — no-password account rejected', async () => {
 });
 
 await test('POST /v1/ghii/login — re-login regenerates keys and still works', async () => {
-    // Login a second time — keys should be regenerated
+    // Login a second time — owner keys should be regenerated
     const data = await api('/v1/ghii/login', {
         method: 'POST',
         body: JSON.stringify({ username: pwUsername, password: pwPassword }),
@@ -323,8 +323,9 @@ await test('POST /v1/ghii/login — re-login regenerates keys and still works', 
     assert(data.ok === true, `Second login failed: ${data.error?.message}`);
     const newJwt = data.data.token;
     assert(typeof newJwt === 'string' && newJwt.length > 0, 'should get a JWT');
+    assert(typeof data.data.owner_private_key === 'string', 'should return new owner private key');
 
-    // New JWT should work for authenticated ops
+    // New owner JWT should work for authenticated ops
     const memData = await authApi('/v1/memory/pw-test', newJwt);
     assert(memData.ok === true, 'new JWT from re-login should work');
     assert(memData.data.value.from === 'password login', 'data should match');

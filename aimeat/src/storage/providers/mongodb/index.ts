@@ -4433,8 +4433,12 @@ export class MongoStorage implements Storage {
 
     async getTemplateListing(id: string): Promise<TemplateListingRecord | null> {
         this.ensureReady();
-        const row = await this.prisma.templateListing.findUnique({ where: { id } });
-        return row ? this.toTemplateListingRecord(row) : null;
+        try {
+            const row = await this.prisma.templateListing.findUnique({ where: { id } });
+            return row ? this.toTemplateListingRecord(row) : null;
+        } catch {
+            return null; // Invalid ObjectId format → not found
+        }
     }
 
     async getListingByPackage(packageGroupId: string): Promise<TemplateListingRecord | null> {
@@ -4715,8 +4719,12 @@ export class MongoStorage implements Storage {
 
     async getInstance(id: string): Promise<PackageInstanceRecord | null> {
         this.ensureReady();
-        const row = await this.prisma.packageInstance.findUnique({ where: { id } });
-        return row ? this.toPackageInstanceRecord(row) : null;
+        try {
+            const row = await this.prisma.packageInstance.findUnique({ where: { id } });
+            return row ? this.toPackageInstanceRecord(row) : null;
+        } catch {
+            return null; // Invalid ObjectId format → not found
+        }
     }
 
     async listInstances(filter: InstanceFilter): Promise<{ instances: PackageInstanceRecord[]; total: number }> {

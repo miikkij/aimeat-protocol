@@ -42,22 +42,22 @@ const OWNER_NAME = 'ui-test-owner-' + Date.now();
 const OWNER_PASS = 'TestPass123!';
 
 await test('Register owner', async () => {
-  const r = await json('/v1/owners', {
+  const r = await json('/v1/ghii', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: OWNER_NAME, password: OWNER_PASS }),
+    body: JSON.stringify({ username: OWNER_NAME, display_name: 'UI Test Owner', password: OWNER_PASS }),
   });
   if (r.status !== 201) throw new Error(`Expected 201, got ${r.status}: ${JSON.stringify(r.body)}`);
-  ownerGaii = r.body.data?.owner?.gaii || r.body.data?.gaii;
+  ownerGaii = r.body.data?.ghii?.ghii || r.body.data?.gaii;
 });
 
 await test('Login owner', async () => {
-  const r = await json('/v1/auth/login', {
+  const r = await json('/v1/ghii/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: OWNER_NAME, password: OWNER_PASS }),
+    body: JSON.stringify({ username: OWNER_NAME, password: OWNER_PASS }),
   });
-  if (r.status !== 200) throw new Error(`Expected 200, got ${r.status}`);
+  if (r.status !== 200) throw new Error(`Expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
   ownerToken = r.body.data?.token;
   if (!ownerToken) throw new Error('No token in response');
 });
@@ -71,9 +71,9 @@ for (const name of UI_CORTEXES) {
     const r = await json('/v1/cortex', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-      body: JSON.stringify({ manifest: yaml, libs: [{ filename: `${name}.js`, content: js }] }),
+      body: JSON.stringify({ manifest: yaml, libs: { [`${name}.js`]: js } }),
     });
-    if (r.status !== 201) throw new Error(`Expected 201, got ${r.status}: ${JSON.stringify(r.body)}`);
+    if (r.status !== 201 && r.status !== 409) throw new Error(`Expected 201 or 409, got ${r.status}: ${JSON.stringify(r.body)}`);
   });
 }
 
@@ -142,8 +142,8 @@ for (const name of UI_CORTEXES) {
   });
 }
 
-// Delete test owner
-await json(`/v1/owners/${ownerGaii}`, {
+// Delete test owner (use owner name, not GAII)
+await json(`/v1/owners/${OWNER_NAME}`, {
   method: 'DELETE',
   headers: { Authorization: `Bearer ${ownerToken}` },
 });
