@@ -2795,12 +2795,12 @@ This endpoint MUST be available without authentication and MUST return:
 {
   "node_id": "aimeat-finland-001-genesis",
   "node_type": "full",
-  "protocol_version": "2.0",
+  "protocol_version": "3.0",
   "api_version": "v1",
   "capabilities": [
     "memory", "actions", "work", "wallet", "boards",
     "federation", "micro-memory", "storage", "consent",
-    "catalogue", "flags", "csm", "msm"
+    "catalogue", "flags", "csm", "msm", "sse", "packages", "prompts"
   ],
   "federation": {
     "role": "contributor",

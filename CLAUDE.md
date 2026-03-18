@@ -443,6 +443,21 @@ Full testing guide: `docs/coding-guidelines/testing-requirements.md`
 - `docs/a-endpoints.md` — Quick endpoint reference
 - `docs/b-config.md` — Node configuration schema
 - `docs/c-platform-notes.md` — AI platform compatibility
+- `docs/AIMEAT-RFC-v3.0-full.md` — Full protocol specification v3.0
+- `docs/AIMEAT-IO-Implementation-Guide-v3.0.md` — Reference implementation guide v3.0
+
+## AI Agent Prompts — Where They Live
+
+User-facing prompt texts (the copy-pasteable instructions shown to users for connecting AI agents) live in the frontend:
+
+| Location | What it is |
+|----------|-----------|
+| `public/views/profile/agents-tab.js` → `buildAgentPrompt()` | "Connect a new agent" prompt shown in the profile Agents tab — uses connectivity key flow |
+| `public/views/profile/agents-tab.js` → `PLATFORMS` object | Platform-specific setup instructions (Windows/Mac/Linux, OpenClaw, Claude, etc.) |
+| `aimeat/src/routes/bootstrap.ts` | Machine-readable getting-started guide returned at `GET /` — used by AI agents discovering the node |
+| `aimeat/src/routes/prompts.ts` | Managed system prompts stored in DB, served at `/v1/prompts/:name` (tier1, tier2, etc.) |
+
+**Agent registration flow (current):** Connectivity key — owner generates from profile → shares key → agent calls `POST /v1/agents/connect`. NOT device authorization (that flow still exists but is not the primary path).
 
 ## Backend Architecture Rule — NO Server-Side Rendering
 

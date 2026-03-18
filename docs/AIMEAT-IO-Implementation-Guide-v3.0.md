@@ -24,10 +24,10 @@
 | OpenClaw Integration | New: Plugin/connector system view |
 | Admin Memory Tab | New: Browse/delete all memory keys including extension-owned |
 | Admin Prompts Tab | New: System prompt management with versioning |
-| Profile System | Changed: Now 22 tabs with tiered visibility (new/active/experienced) |
-| Admin Dashboard | Changed: Now 34 tabs in 8 navigation groups (was 28 tabs) |
+| Profile System | Changed: Now 23 tabs with tiered visibility (new/active/experienced) |
+| Admin Dashboard | Changed: Now 32 tabs in 8 navigation groups (was 28 tabs) |
 | Morsel Economy | Changed: Single balance at GHII level, not per-agent |
-| File Counts | Updated: 72 routes (was 58), 60 services (was 50), 38 repositories (was 32) |
+| File Counts | Updated: 74 routes (was 58), 60 services (was 50), 38 repositories (was 32) |
 
 ---
 
@@ -84,7 +84,7 @@
 
 This guide documents every feature, extension, and system that the **AIMEAT.io reference implementation** provides beyond what the AIMEAT RFC v2.0 protocol specification requires. While the RFC defines the contract that any compliant AIMEAT node must fulfill — identity registration, Ed25519 authentication, memory storage, work requests, federation, trust scoring, morsel economy — the reference implementation goes significantly further.
 
-AIMEAT.io is not just a protocol validator. It is a production-ready platform that includes human identity management (GHII), two-factor authentication, EU digital identity integration, a V8-isolated extension system, AI-driven agent matching, a marketplace with escrow, push notifications, WebRTC real-time communication, a 34-tab admin dashboard, MCP integration for AI platforms, and over 255 configuration parameters managed through a multi-source configuration system with runtime mutability.
+AIMEAT.io is not just a protocol validator. It is a production-ready platform that includes human identity management (GHII), two-factor authentication, EU digital identity integration, a V8-isolated extension system, AI-driven agent matching, a marketplace with escrow, push notifications, WebRTC real-time communication, a 32-tab admin dashboard, MCP integration for AI platforms, and over 255 configuration parameters managed through a multi-source configuration system with runtime mutability.
 
 This document is the master reference for operators deploying AIMEAT.io nodes, developers building on the platform, and contributors extending the codebase.
 
@@ -174,7 +174,7 @@ This pattern ensures every route has access to configuration and storage without
 
 The `aimeat/src/` directory follows a strict separation of concerns:
 
-**Routes** (`src/routes/`, 72 files) handle HTTP request/response. They parse parameters, call services, and return envelope-wrapped responses. Routes never contain business logic directly.
+**Routes** (`src/routes/`, 74 files) handle HTTP request/response. They parse parameters, call services, and return envelope-wrapped responses. Routes never contain business logic directly.
 
 **Services** (`src/services/`, 60 files) contain all business logic. They are pure functions or classes that operate on data, perform calculations, and orchestrate storage operations. Services are framework-agnostic and testable in isolation.
 
@@ -194,8 +194,8 @@ The frontend uses **Preact + HTM tagged templates** with no build step. All Java
 
 Key frontend directories:
 
-- `public/views/admin/` — 34 tab components for the admin dashboard (8 navigation groups)
-- `public/views/profile/` — 22 profile tab components with tiered visibility (new/active/experienced)
+- `public/views/admin/` — 32 tab components for the admin dashboard (8 navigation groups)
+- `public/views/profile/` — 23 profile tab components with tiered visibility (new/active/experienced)
 - `public/js/services/` — API service layer (29 files) wrapping fetch calls
 - `public/components/` — Reusable UI components (Alert, Card, Modal, Spinner, Toast, CopyButton, FormField)
 - `public/lib/` — Third-party libraries (Preact, HTM, Three.js) and live-updates.js SSE singleton
@@ -1958,7 +1958,7 @@ Returns an HTML page that loads all SDK libraries and provides an interactive co
 
 ### Purpose
 
-The AIMEAT RFC defines JSON APIs. Operators need a visual interface to manage their nodes — monitor agent activity, review moderation queues, configure settings, inspect federation status, and manage the economy. The admin dashboard provides a comprehensive 34-tab SPA built with Preact + HTM, organized into 8 navigation groups.
+The AIMEAT RFC defines JSON APIs. Operators need a visual interface to manage their nodes — monitor agent activity, review moderation queues, configure settings, inspect federation status, and manage the economy. The admin dashboard provides a comprehensive 32-tab SPA built with Preact + HTM, organized into 8 navigation groups.
 
 ### Technology
 
@@ -2092,7 +2092,7 @@ Every tab component receives the same props object:
 | `src/routes/admin-extensions.ts` | Extension management endpoints |
 | `src/routes/admin-prompts.ts` | Prompt management endpoints |
 | `src/routes/admin-scheduler.ts` | Scheduler management endpoints |
-| `public/views/admin/*.js` | 34 tab component files |
+| `public/views/admin/*.js` | 32 tab component files |
 | `public/views/admin/shared.js` | Shared UI components |
 | `public/js/services/admin.js` | Admin API service layer |
 | `public/css/views/admin.css` | Admin dashboard styles |
@@ -3323,7 +3323,7 @@ Profile tabs are organized by user experience tier:
 
 `landing-page.js` provides a tier-gated dashboard that adapts its content based on user activity level, showing relevant quick actions and status information.
 
-### 22 Profile Tabs
+### 23 Profile Tabs
 
 | Tab | Tier | File | Purpose |
 |-----|------|------|---------|
@@ -3460,7 +3460,7 @@ All tabs with server data listen for the `aimeat-live-update` CustomEvent (via S
 | Template engine | Not specified | Implemented | Dynamic landing pages |
 | Load balancer mode | Not specified | Implemented | Multi-instance sites |
 | **Operations** | | | |
-| Admin dashboard | Not specified | Implemented | 34-tab SPA |
+| Admin dashboard | Not specified | Implemented | 32-tab SPA |
 | Background scheduler | Not specified | Implemented | Cron-based jobs |
 | Consul integration | Not specified | Implemented | Fleet config management |
 | Prometheus metrics | Not specified | Implemented | Observability |
@@ -3485,10 +3485,10 @@ All tabs with server data listen for the `aimeat-live-update` CustomEvent (via S
 | **Generator (v3.0)** | | | |
 | Service generator | Not specified | Implemented | Multi-step AI pipeline |
 | **Profile (v3.0)** | | | |
-| 22-tab tiered profile | Not specified | Implemented | new/active/experienced tiers |
+| 23-tab tiered profile | Not specified | Implemented | new/active/experienced tiers |
 | Adaptive landing page | Not specified | Implemented | Tier-gated dashboard |
 | **Admin (v3.0)** | | | |
-| Admin dashboard | Not specified | Implemented | 34-tab SPA (8 nav groups) |
+| Admin dashboard | Not specified | Implemented | 32-tab SPA (8 nav groups) |
 
 ---
 

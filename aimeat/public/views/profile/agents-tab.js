@@ -63,43 +63,40 @@ function permLabel(perm) {
 
 /* ── Agent prompt builder ── */
 function buildAgentPrompt(sess) {
-  const ghii = sess.ghii || (sess.owner + '@unknown');
   const url = getNodeUrl();
-  return `Register a new agent on my AIMEAT node using Device Authorization (OAuth-style flow).
+  return `Register as a new agent on my AIMEAT node using the connectivity key I'll give you.
 
 IMPORTANT: I already have an account. Do NOT create a new owner.
 
 My owner name: ${sess.owner}
 Node URL: ${url}
 
-Step 1 — Start device authorization:
-  POST ${url}/v1/agents/device-authorize
-  Body: { "agent_name": "choose-a-name", "owner": "${sess.owner}" }
+Step 1 — Ask me for a connectivity key.
+  I'll generate one from my profile page (Agents tab → Generate Connectivity Key).
+  It's a single-use key — I'll paste it to you here.
 
-  Response includes: device_code, user_code, verification_uri_complete, interval
+Step 2 — Register with the key:
+  POST ${url}/v1/agents/connect
+  Body: { "connectivity_key": "<key I gave you>", "agent_name": "choose-a-name" }
 
-Step 2 — Show the verification_uri_complete URL to me so I can open it in my browser and approve.
+  Response includes: gaii, token, private_key, public_key
 
-Step 3 — Poll for the token:
-  POST ${url}/v1/agents/device-token
-  Body: { "device_code": "<from step 1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
-  Poll every {interval} seconds. You will get "authorization_pending" until I approve.
+Step 3 — Store permanently:
+  - gaii — your agent identity (e.g. "claude#${sess.owner}@node-id")
+  - private_key — store securely, you need it to re-authenticate when the token expires
+  - token — use immediately for API calls: Authorization: Bearer <token>
 
-Step 4 — On success (HTTP 200), the response contains:
-  - token: a long-lived JWT (valid ~90 days)
-  - gaii: your agent identity
-
-  Store the token. Use it for ALL API calls:
-  Authorization: Bearer <token>
+Step 4 — Token expires after 24 hours. To re-authenticate:
+  POST ${url}/v1/auth/token
+  Body: { "gaii": "<your gaii>", "timestamp": "<ISO timestamp>", "signature": "<Ed25519_sign(private_key, gaii + timestamp)>" }
+  → You receive a new JWT.
 
 That's it! You're connected. Available APIs:
-  GET ${url}/v1/catalogue — Browse services
-  POST ${url}/v1/memory — Store/retrieve data
-  GET ${url}/v1/wallet — Check balance
+  GET  ${url}/v1/catalogue — Browse services
+  POST ${url}/v1/memory   — Store/retrieve data
+  GET  ${url}/v1/wallet   — Check balance
   Full API spec: ${url}/v1/spec
-  Operating instructions: ${url}/v1/prompts/tier1
-
-If the agent name already exists, the approval will issue a new token for the existing agent.`;
+  Operating instructions: ${url}/v1/prompts/tier1`;
 }
 
 /* ── Platform instructions ── */
