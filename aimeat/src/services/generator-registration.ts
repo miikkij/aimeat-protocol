@@ -4,14 +4,15 @@
  * Extracted/adapted from src/routes/csm.ts, msm.ts, extensions.ts, apps.ts
  * to allow agents to register components using owner GHII derived from their agent record.
  * @structure
- *   registerCsm(content, ownerGhii, storage)    — parse + validate + store CSM + schema
- *   registerMsm(content, ownerGhii, storage)    — parse + validate + store MSM
- *   registerExtension(content, ownerGhii, storage) — parse YAML+JS + store ExtensionRecord
- *   registerApp(content, ownerGhii, storage)    — store HTML as AppRecord
+ *   registerCsm(content, ownerName, storage)              — parse + validate + store CSM + schema
+ *   registerMsm(content, ownerName, storage)              — parse + validate + store MSM
+ *   registerExtension(content, ownerName, ownerGhii, storage, maxExtensionsPerOwner?) — parse YAML+JS + store ExtensionRecord
+ *   registerApp(content, ownerName, callerGaii, storage)  — store HTML as AppRecord
  * @usage
  *   import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
  * @version-history
  *   v1.0.0 — 2026-03-18 — Initial extraction for generator agent support
+ *   v1.1.0 — 2026-03-18 — Accept ownerName directly (no split('@')); add callerGaii to registerApp; add extension per-owner limit check
  */
 
 import { parse as parseYaml } from 'yaml';
@@ -20,12 +21,10 @@ import { parseCsm, validateCsm, csmToJsonSchema } from './csm-parser.js';
 import { parseMsm, validateMsm } from './msm-parser.js';
 
 /**
- * Register a CSM service definition on behalf of ownerGhii.
+ * Register a CSM service definition on behalf of ownerName.
  * Content is a YAML or JSON string. Mirrors POST /v1/csm logic exactly.
  */
-export async function registerCsm(content: string, ownerGhii: string, storage: Storage): Promise<void> {
-  // ownerGhii is "alice@node-id" — extract the owner name (bare username)
-  const ownerName = ownerGhii.split('@')[0]!;
+export async function registerCsm(content: string, ownerName: string, storage: Storage): Promise<void> {
 
   let definition: ReturnType<typeof parseCsm>;
   try {
@@ -89,11 +88,10 @@ export async function registerCsm(content: string, ownerGhii: string, storage: S
 }
 
 /**
- * Register an MSM integration on behalf of ownerGhii.
+ * Register an MSM integration on behalf of ownerName.
  * Content is a YAML or JSON string. Mirrors POST /v1/msm logic exactly.
  */
-export async function registerMsm(content: string, ownerGhii: string, storage: Storage): Promise<void> {
-  const ownerName = ownerGhii.split('@')[0]!;
+export async function registerMsm(content: string, ownerName: string, storage: Storage): Promise<void> {
 
   let definition: ReturnType<typeof parseMsm>;
   try {
@@ -134,13 +132,13 @@ export async function registerMsm(content: string, ownerGhii: string, storage: S
 }
 
 /**
- * Install an extension on behalf of ownerGhii.
+ * Install an extension on behalf of ownerName.
  * Content is the YAML+JS composite string produced by the generator.
  * The YAML block contains the manifest; JS fenced blocks contain action scripts.
  * Mirrors POST /v1/extensions logic exactly.
+ * @param maxExtensionsPerOwner — optional per-owner limit; throws if exceeded
  */
-export async function registerExtension(content: string, ownerGhii: string, storage: Storage): Promise<void> {
-  const ownerName = ownerGhii.split('@')[0]!;
+export async function registerExtension(content: string, ownerName: string, ownerGhii: string, storage: Storage, maxExtensionsPerOwner?: number): Promise<void> {
 
   // Split content into manifest YAML and embedded scripts.
   // The generator stores YAML at the top, followed by ```javascript ... ``` blocks.
@@ -217,6 +215,15 @@ export async function registerExtension(content: string, ownerGhii: string, stor
     }
   }
 
+  // Enforce maxExtensionsPerOwner limit if configured
+  if (maxExtensionsPerOwner && maxExtensionsPerOwner > 0) {
+    const allExts = await storage.listExtensions();
+    const ownerExts = allExts.filter(e => e.installedBy === ownerName);
+    if (ownerExts.length >= maxExtensionsPerOwner) {
+      throw new Error(`Extension limit reached: owner ${ownerName} already has ${ownerExts.length}/${maxExtensionsPerOwner} extensions`);
+    }
+  }
+
   // Check if extension name already exists
   const name = metadata.name as string;
   const existingExt = await storage.getExtension(name);
@@ -282,13 +289,12 @@ export async function registerExtension(content: string, ownerGhii: string, stor
 }
 
 /**
- * Publish an app on behalf of ownerGhii.
+ * Publish an app on behalf of ownerName / callerGaii.
  * Content is base64-encoded HTML (or raw HTML). Mirrors POST /v1/apps logic.
  * The generator stores raw HTML; we accept both base64 and raw.
+ * @param callerGaii — storage identity used as ownerGaii (matches what apps.ts stores for agents)
  */
-export async function registerApp(content: string, ownerGhii: string, storage: Storage): Promise<void> {
-  // ownerGhii = "alice@node-id"
-  const ownerName = ownerGhii.split('@')[0]!;
+export async function registerApp(content: string, ownerName: string, callerGaii: string, storage: Storage): Promise<void> {
 
   // Detect if content is base64 — try to decode; if it looks like HTML, treat as raw
   let data: Buffer;
@@ -337,7 +343,7 @@ export async function registerApp(content: string, ownerGhii: string, storage: S
     .replace(/^-|-$/g, '') + '.html';
 
   // Auto-increment version number
-  const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
+  const existingVersion = await storage.getLatestVersionNumber(callerGaii, filename);
   const newVersion = existingVersion + 1;
 
   const now = new Date().toISOString();
@@ -353,7 +359,7 @@ export async function registerApp(content: string, ownerGhii: string, storage: S
   if (manifestData['icon']) manifest.icon = manifestData['icon'];
 
   await storage.createApp({
-    ownerGaii: ownerGhii,
+    ownerGaii: callerGaii,
     ownerName,
     filename,
     versionNumber: newVersion,

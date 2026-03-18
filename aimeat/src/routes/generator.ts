@@ -428,14 +428,15 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(403).json(error(config.nodeId, 'AUTH_ERROR', 'Agent record not found'));
         return;
       }
-      const ownerGhii = `${agentRecord.owner}@${config.nodeId}`;
+      const ownerName = agentRecord.owner;
+      const ownerGhii = `${ownerName}@${config.nodeId}`;
 
       try {
         switch (component.type) {
-          case 'csm': await registerCsm(component.content, ownerGhii, storage); break;
-          case 'msm': await registerMsm(component.content, ownerGhii, storage); break;
-          case 'extension': await registerExtension(component.content, ownerGhii, storage); break;
-          case 'app': await registerApp(component.content, ownerGhii, storage); break;
+          case 'csm': await registerCsm(component.content, ownerName, storage); break;
+          case 'msm': await registerMsm(component.content, ownerName, storage); break;
+          case 'extension': await registerExtension(component.content, ownerName, ownerGhii, storage, config.maxExtensionsPerOwner); break;
+          case 'app': await registerApp(component.content, ownerName, gaii, storage); break;
           case 'memory':
           case 'translation':
           case 'cortex':
