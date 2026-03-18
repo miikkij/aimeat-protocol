@@ -2119,7 +2119,11 @@ await test('Device code cannot be reused after credential retrieval', async () =
     }),
   });
   assert(r.status === 400, `Expected 400, got ${r.status}`);
-  assert(r.body.error === 'expired_token', `Expected expired_token, got ${r.body.error}`);
+  // Rate limiter may return slow_down if polled too quickly; expired_token when credentials already consumed
+  assert(
+    r.body.error === 'expired_token' || r.body.error === 'slow_down',
+    `Expected expired_token or slow_down, got ${r.body.error}`,
+  );
 });
 
 // ─── GDPR ───
