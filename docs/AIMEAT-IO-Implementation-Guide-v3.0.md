@@ -84,7 +84,7 @@
 
 This guide documents every feature, extension, and system that the **AIMEAT.io reference implementation** provides beyond what the AIMEAT RFC v2.0 protocol specification requires. While the RFC defines the contract that any compliant AIMEAT node must fulfill — identity registration, Ed25519 authentication, memory storage, work requests, federation, trust scoring, morsel economy — the reference implementation goes significantly further.
 
-AIMEAT.io is not just a protocol validator. It is a production-ready platform that includes human identity management (GHII), two-factor authentication, EU digital identity integration, a V8-isolated extension system, AI-driven agent matching, a marketplace with escrow, push notifications, WebRTC real-time communication, a 28-tab admin dashboard, MCP integration for AI platforms, and over 200 configuration parameters managed through a multi-source configuration system with runtime mutability.
+AIMEAT.io is not just a protocol validator. It is a production-ready platform that includes human identity management (GHII), two-factor authentication, EU digital identity integration, a V8-isolated extension system, AI-driven agent matching, a marketplace with escrow, push notifications, WebRTC real-time communication, a 34-tab admin dashboard, MCP integration for AI platforms, and over 255 configuration parameters managed through a multi-source configuration system with runtime mutability.
 
 This document is the master reference for operators deploying AIMEAT.io nodes, developers building on the platform, and contributors extending the codebase.
 
@@ -2439,7 +2439,7 @@ router.post('/v1/endpoint',
 
 ### Purpose
 
-AIMEAT.io has over 200 configuration parameters spanning identity, economy, federation, security, email, push notifications, realtime communication, extensions, and more. The configuration system provides a robust, multi-source, validated, and runtime-mutable configuration framework.
+AIMEAT.io has over 255 configuration parameters spanning identity, economy, federation, security, email, push notifications, realtime communication, extensions, and more. The configuration system provides a robust, multi-source, validated, and runtime-mutable configuration framework.
 
 ### Configuration Priority
 
@@ -2938,7 +2938,7 @@ All providers implement the `Storage` interface defined in `src/storage/interfac
 
 ### Repository Pattern
 
-Domain-specific data access is handled by 32 repositories in `src/storage/repositories/`:
+Domain-specific data access is handled by 38 repositories in `src/storage/repositories/`:
 
 | Repository | Domain |
 |-----------|--------|
@@ -3372,7 +3372,8 @@ All tabs with server data listen for the `aimeat-live-update` CustomEvent (via S
 |---------|----------|----------------|-------|
 | **Identity & Auth** | | | |
 | Ed25519 keypair registration | Required | Implemented | Core protocol |
-| Challenge-response auth | Required | Implemented | Core protocol |
+| Challenge-response auth | Required | Implemented | Legacy, still supported |
+| Device Authorization (RFC 8628) | Required | Implemented | Primary agent auth flow |
 | JWT tokens (EdDSA) | Required | Implemented | jose 6.1 library |
 | Scoped agent capabilities | Required | Implemented | REQ-006 |
 | GHII (human identity) | Not specified | Implemented | Email/password + magic link |
@@ -3459,7 +3460,7 @@ All tabs with server data listen for the `aimeat-live-update` CustomEvent (via S
 | Template engine | Not specified | Implemented | Dynamic landing pages |
 | Load balancer mode | Not specified | Implemented | Multi-instance sites |
 | **Operations** | | | |
-| Admin dashboard | Not specified | Implemented | 28-tab SPA |
+| Admin dashboard | Not specified | Implemented | 34-tab SPA |
 | Background scheduler | Not specified | Implemented | Cron-based jobs |
 | Consul integration | Not specified | Implemented | Fleet config management |
 | Prometheus metrics | Not specified | Implemented | Observability |
@@ -3468,11 +3469,26 @@ All tabs with server data listen for the `aimeat-live-update` CustomEvent (via S
 | Client JS SDK | Not specified | Implemented | 7 browser libraries |
 | **Infrastructure** | | | |
 | Multi-storage backend | Not specified | Implemented | Memory/SQLite/MongoDB |
-| Repository pattern | Not specified | Implemented | 32 repositories |
-| Configuration system | Not specified | Implemented | 200+ params, multi-source |
+| Repository pattern | Not specified | Implemented | 38 repositories |
+| Configuration system | Not specified | Implemented | 255+ params, multi-source |
 | Init wizard | Not specified | Implemented | Web + CLI |
 | i18n | Not specified | Implemented | English + Finnish |
 | PWA support | Not specified | Implemented | Service worker + offline |
+| **Packages (v3.0)** | | | |
+| Package system | Required | Implemented | 7 component types, semver |
+| Package instances | Required | Implemented | Per-owner installations |
+| **Prompts (v3.0)** | | | |
+| System prompt management | Required | Implemented | Versioned, tiered prompts |
+| Prompt variable substitution | Required | Implemented | {{variable}} syntax |
+| **SSE (v3.0)** | | | |
+| Server-Sent Events | Required | Implemented | Ticket-based SSE stream |
+| **Generator (v3.0)** | | | |
+| Service generator | Not specified | Implemented | Multi-step AI pipeline |
+| **Profile (v3.0)** | | | |
+| 22-tab tiered profile | Not specified | Implemented | new/active/experienced tiers |
+| Adaptive landing page | Not specified | Implemented | Tier-gated dashboard |
+| **Admin (v3.0)** | | | |
+| Admin dashboard | Not specified | Implemented | 34-tab SPA (8 nav groups) |
 
 ---
 
@@ -3482,26 +3498,27 @@ All tabs with server data listen for the `aimeat-live-update` CustomEvent (via S
 |-----------|---------|-----------|
 | `src/auth/` | JWT, keypair generation, auth middleware | ~4 |
 | `src/middleware/` | Response envelope, rate limiting, idempotency | ~5 |
-| `src/routes/` | Express route handlers | 58 |
-| `src/services/` | Business logic | 50 |
+| `src/routes/` | Express route handlers | 72 |
+| `src/services/` | Business logic | 60 |
 | `src/storage/` | Data layer abstraction + provider implementations | ~5 |
-| `src/storage/repositories/` | Domain-specific data access | 32 |
+| `src/storage/repositories/` | Domain-specific data access | 38 |
 | `src/cli/` | CLI tools (init wizard, config, federation, scaffold) | 5 |
 | `src/utils/` | GAII utilities, logger, env tools | 8 |
 | `locales/` | i18n translations (en.json, fi.json) | 2 |
-| `public/` | Static frontend assets | ~20 |
-| `public/views/admin/` | Admin dashboard tab components | 29 |
-| `public/js/services/` | Frontend API service layer | 16 |
+| `public/` | Static frontend assets | ~25 |
+| `public/views/admin/` | Admin dashboard tab components | 34 |
+| `public/views/profile/` | Profile tab components | 22 |
+| `public/js/services/` | Frontend API service layer | 29 |
 | `public/css/` | Stylesheets | ~5 |
-| `public/css/views/` | View-specific stylesheets | ~3 |
+| `public/css/views/` | View-specific stylesheets | 12 |
 | `public/components/` | Reusable UI components | 9 |
-| `public/lib/` | Third-party libraries (Preact, HTM, Three.js) | 4 |
+| `public/lib/` | Third-party libraries (Preact, HTM, Three.js, live-updates.js) | 6 |
 | `public/cortex-bundled/` | Bundled Cortex extensions | 4 |
 | `test/` | E2E test suite | ~3 |
-| `docs/` | RFC and documentation | ~20 |
+| `docs/` | RFC and documentation | ~25 |
 
-**Total TypeScript source**: ~158 files in `src/`
-**Total frontend**: ~65 files in `public/`
+**Total TypeScript source**: ~190 files in `src/`
+**Total frontend**: ~100 files in `public/`
 
 ---
 
@@ -3623,5 +3640,5 @@ AIMEAT_DEV_MODE=true
 
 ---
 
-*AIMEAT.io Implementation Guide v2.0 — March 2026*
+*AIMEAT.io Implementation Guide v3.0 — March 2026*
 *Jouni Miikki, Overscale Solutions Oy*
