@@ -25,11 +25,16 @@ export type ComponentType =
   | 'csm' | 'msm' | 'extension' | 'app'
   | 'memory' | 'translation' | 'cortex';
 
+export interface CortexExtracted {
+  manifest: string;
+  libs: Array<{ filename: string; code: string }>;
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings?: string[];
-  extracted: unknown;
+  extracted: string | CortexExtracted | null;
 }
 
 export interface BlueprintValidationResult {
@@ -82,7 +87,7 @@ function sanitizeJson(text: string): string {
   // Strip markdown backslash escaping: \[ \] \{ \} \( \) \* \_ \` \| \~ \#
   s = s.replace(/\\([[\]{}()*_`|~#])/g, '$1');
   s = s.replace(/,\s*([}\]])/g, '$1');
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   return s;
 }
 
@@ -98,7 +103,7 @@ function preCleanYaml(text: string): string {
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
   return s;
 }
 
@@ -127,28 +132,26 @@ function tryParseYaml(text: string): ParseResult {
   const preCleaned = preCleanYaml(text);
 
   // Attempt 1: strict parse
-  let e1: Error | null = null;
   try {
     const parsed = parseYaml(preCleaned) as Record<string, unknown>;
     // Re-serialize through the real yaml library → guaranteed clean output
     const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
     return { errors, parsed, cleaned };
-  } catch (err) {
-    e1 = err instanceof Error ? err : new Error(String(err));
-  }
-
-  // Attempt 2: try stripping markdown bullets `* ` → `- ` and retry
-  let fixed = preCleaned;
-  fixed = fixed.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
-  fixed = fixed.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
-  try {
-    const parsed = parseYaml(fixed) as Record<string, unknown>;
-    const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
-    return { errors, parsed, cleaned };
-  } catch (_e2) {
-    // Both attempts failed — report the original error
-    errors.push(`YAML parse error: ${e1.message}`);
-    return { errors, parsed: null, cleaned: preCleaned };
+  } catch (e1) {
+    // Attempt 2: try stripping markdown bullets `* ` → `- ` and retry
+    const firstError = e1 instanceof Error ? e1 : new Error(String(e1));
+    let fixed = preCleaned;
+    fixed = fixed.replace(/^(\s*)\*\s{2,}/gm, '$1- ');
+    fixed = fixed.replace(/^(\s*)\*\s+(?=\S)/gm, '$1- ');
+    try {
+      const parsed = parseYaml(fixed) as Record<string, unknown>;
+      const cleaned = stringifyYaml(parsed, { lineWidth: 0 });
+      return { errors, parsed, cleaned };
+    } catch {
+      // Both attempts failed — report the original error
+      errors.push(`YAML parse error: ${firstError.message}`);
+      return { errors, parsed: null, cleaned: preCleaned };
+    }
   }
 }
 
@@ -213,7 +216,7 @@ export function validateAntiPatterns(type: string, code: string): AntiPatternRes
         .replace(/\/(?:[^/\\]|\\.)+\/[gimsuy]*/g, '//'); // remove regex literals
       if (!/&gt;|&lt;|&amp;[a-z]|&quot;/.test(stripped)) return false;
       // Flag lines with entities in code context
-      return /[=(){}\[\];]/.test(line);
+      return /[=(){}[\];]/.test(line);
     });
     if (entityLines.length > 0) {
       errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the V8 sandbox.`);
@@ -390,6 +393,7 @@ function validateMemorySchema(result: string): ValidationResult {
 
 function validateTranslation(result: string): ValidationResult {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const json = sanitizeJson(extractCodeBlock(result, 'json'));
   try {
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -408,19 +412,15 @@ function validateTranslation(result: string): ValidationResult {
       }
     }
     // Anti-pattern scan (warnings only, don't block validation)
-    validateAntiPatterns('translation', json);
+    const ap = validateAntiPatterns('translation', json);
+    warnings.push(...ap.warnings);
 
-    return { valid: errors.length === 0, errors, extracted: json };
+    return { valid: errors.length === 0, errors, warnings, extracted: json };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(`Invalid JSON: ${msg}`);
     return { valid: false, errors, extracted: json };
   }
-}
-
-interface CortexExtracted {
-  manifest: string;
-  libs: Array<{ filename: string; code: string }>;
 }
 
 function validateCortex(result: string, blueprint?: Record<string, unknown> | null): ValidationResult {
