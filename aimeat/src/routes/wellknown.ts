@@ -36,5 +36,29 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
     ]));
   });
 
+  router.get('/.well-known/ai-plugin.json', (_req, res) => {
+    const b = config.baseUrl;
+    res.json({
+      schema_version: 'v1',
+      name_for_human: 'AIMEAT',
+      name_for_model: 'aimeat',
+      description_for_human: 'AI Memory Exchange and Action Transfer — persistent memory, identity, morsel economy, app generation, and federated node networks for AI agents.',
+      description_for_model: 'AIMEAT protocol node. Provides persistent memory storage, AI agent identity (GHII/GAII), morsel micro-transactions, knowledge base, consent management, MCP tools, and federation between nodes. Agents authenticate via connectivity key (POST /v1/agents/connect) then Ed25519 JWT. Full API contract at /v1/spec. Getting-started guide at /?format=json.',
+      auth: {
+        type: 'oauth',
+        authorization_url: `${b}/v1/auth/token`,
+        scope: 'memory:read memory:write wallet:read',
+      },
+      api: {
+        type: 'openapi',
+        url: `${b}/v1/spec`,
+        is_user_authenticated: false,
+      },
+      logo_url: `${b}/og-image.png`,
+      contact_email: 'hello@aimeat.io',
+      legal_info_url: `${b}/v1/portal`,
+    });
+  });
+
   return router;
 }
