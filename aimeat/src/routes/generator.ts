@@ -408,8 +408,8 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const projectId = req.params['projectId'] as string;
       const { taskId, level, message, meta } = req.body ?? {};
 
-      if (!taskId || !level || !message) {
-        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'taskId, level, and message are required'));
+      if (!taskId || typeof taskId !== 'string' || !level || typeof level !== 'string' || !message || typeof message !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'taskId, level, and message must be strings'));
         return;
       }
       if (!['info', 'warn', 'error'].includes(level as string)) {
@@ -418,6 +418,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       const now = new Date().toISOString();
+      // Log entries are keyed by taskId — last-write-wins for a given task step (intentional)
       await storage.setMemory({
         key: `generator.${projectId}.logs.${taskId as string}`,
         ownerGaii: gaii,
