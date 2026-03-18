@@ -2057,39 +2057,73 @@ await test('Cleanup — delete second owner', async () => {
     assert(body.ok === true, `delete owner2: ${JSON.stringify(body.error)}`);
 });
 
-// ── Phase 8: Connectivity Key ──────────────────────────────────────
-console.log('\n── Phase 8: Connectivity Key ──');
+// ── Phase 8: Device Authorization Flow ────────────────────────────
+console.log('\n── Phase 8: Device Authorization Flow ──');
 
-let connectivityKey: string;
+let deviceAuthCode: string;
+let deviceAuthUserCode: string;
 
-await test('Owner generates connectivity key', async () => {
-  const r = await json('/v1/auth/connectivity-key', {
+await test('Agent starts device authorization', async () => {
+  const r = await json('/v1/agents/device-authorize', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ agent_name: 'connected-bot', description: 'Test agent via connectivity key' }),
+    body: JSON.stringify({ agent_name: 'device-auth-bot', owner: ownerName }),
   });
-  assert(r.status === 201, `Expected 201, got ${r.status}: ${JSON.stringify(r.body)}`);
-  assert(r.body.data.connectivity_key, 'Missing connectivity_key');
-  connectivityKey = r.body.data.connectivity_key;
+  assert(r.status === 200, `Expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(r.body.data.device_code, 'Missing device_code');
+  assert(r.body.data.user_code, 'Missing user_code');
+  assert(r.body.data.verification_uri_complete, 'Missing verification_uri_complete');
+  assert(r.body.data.interval > 0, 'Missing interval');
+  deviceAuthCode = r.body.data.device_code;
+  deviceAuthUserCode = r.body.data.user_code;
 });
 
-await test('Agent registers via connectivity key', async () => {
-  const r = await json('/v1/agents/connect', {
+await test('Owner approves device authorization', async () => {
+  const r = await json('/v1/agents/verify', {
     method: 'POST',
-    body: JSON.stringify({ connectivity_key: connectivityKey }),
+    body: JSON.stringify({
+      user_code: deviceAuthUserCode,
+      action: 'approve',
+      owner_token: ownerToken,
+    }),
   });
-  assert(r.status === 201, `Expected 201, got ${r.status}: ${JSON.stringify(r.body)}`);
-  assert(r.body.data.agent.gaii.includes('connected-bot'), 'GAII should contain agent name');
-  assert(r.body.data.private_key, 'Missing private_key');
-  assert(r.body.data.public_key, 'Missing public_key');
+  assert(r.status === 200, `Expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(r.body.data.status === 'approved', `Expected approved, got ${r.body.data.status}`);
+  assert(r.body.data.gaii, 'Missing gaii');
 });
 
-await test('Connectivity key cannot be reused', async () => {
-  const r = await json('/v1/agents/connect', {
+let deviceAuthAgentToken: string;
+let deviceAuthGaii: string;
+
+await test('Agent polls and receives credentials', async () => {
+  const r = await json('/v1/agents/device-token', {
     method: 'POST',
-    body: JSON.stringify({ connectivity_key: connectivityKey }),
+    body: JSON.stringify({
+      device_code: deviceAuthCode,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    }),
   });
-  assert(r.status === 404 || r.status === 409, `Expected 404 or 409, got ${r.status}`);
+  assert(r.status === 200, `Expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(r.body.gaii, 'Missing gaii');
+  assert(r.body.token, 'Missing token');
+  assert(r.body.privateKey, 'Missing privateKey');
+  deviceAuthAgentToken = r.body.token;
+  deviceAuthGaii = r.body.gaii;
+});
+
+await test('Device code cannot be reused after credential retrieval', async () => {
+  const r = await json('/v1/agents/device-token', {
+    method: 'POST',
+    body: JSON.stringify({
+      device_code: deviceAuthCode,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    }),
+  });
+  assert(r.status === 400, `Expected 400, got ${r.status}`);
+  // Rate limiter may return slow_down if polled too quickly; expired_token when credentials already consumed
+  assert(
+    r.body.error === 'expired_token' || r.body.error === 'slow_down',
+    `Expected expired_token or slow_down, got ${r.body.error}`,
+  );
 });
 
 // ─── GDPR ───

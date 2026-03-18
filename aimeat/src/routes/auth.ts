@@ -515,60 +515,6 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // POST /v1/auth/connectivity-key — generate a connectivity key for AI agent registration
-  // Owner generates this from their profile page. The key is dormant (no expiry until first use).
-  // An AI agent uses it via POST /v1/agents/connect to register under this owner's identity.
-  router.post('/v1/auth/connectivity-key', requireAuth(), requireRole('owner'), async (req, res) => {
-    const { agent_name, description } = req.body ?? {};
-    const owner = req.auth!.owner;
-
-    // Validate optional agent name
-    if (agent_name) {
-      const nameError = validateAgentName(agent_name);
-      if (nameError) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
-        return;
-      }
-
-      // Check for duplicate agent name
-      const gaii = buildGAII(agent_name, owner, config.nodeId);
-      const existing = await storage.getAgent(gaii);
-      if (existing) {
-        res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${agent_name}" already exists under your identity`));
-        return;
-      }
-    }
-
-    const key = generateOtk();
-    const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
-
-    await storage.createOtk({
-      key,
-      ownerGaii: req.auth!.sub,
-      action: 'register_agent',
-      params: {
-        owner,
-        agent_name: agent_name ?? null,
-        description: description ?? null,
-      },
-      expiresAt: farFuture,
-      initial: true,
-      used: false,
-      usedAt: null,
-      sessionId: null,
-      createdAt: new Date().toISOString(),
-    });
-
-    res.set('Cache-Control', 'no-store');
-    res.set('Pragma', 'no-cache');
-    res.status(201).json(success(config.nodeId, {
-      connectivity_key: key,
-      owner,
-      agent_name: agent_name ?? null,
-      note: 'Share this key with an AI agent. It uses POST /v1/agents/connect with { "connectivity_key": "<this key>" } to register under your identity. The key is single-use and has no expiry until redeemed.',
-    }));
-  });
-
   // GET /v1/otk/:key — execute a one-time key action (no auth required — Tier 0.5)
   router.get('/v1/otk/:key', async (req, res) => {
     const key = req.params.key as string;

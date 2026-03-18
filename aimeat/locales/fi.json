@@ -310,6 +310,15 @@
         "statusExpired": "Pyyntö vanhentunut",
         "copyUrl": "Kopioi linkki",
         "copyPrompt": "Kopioi kehote"
+      },
+      "approval": {
+        "credentials_ready_title": "Agentti hyväksytty",
+        "credentials_ready_desc": "Kopioi alla olevat tunnistetiedot ja liitä ne agentillesi.",
+        "copy_credentials": "Kopioi tunnistetiedot",
+        "copied": "Kopioitu!",
+        "credentials_warning": "Säilytä yksityinen avain turvallisesti — sitä ei voi hakea uudelleen.",
+        "polling_note": "Jos agenttisi pollaa automaattisesti, se saa nämä tunnistetiedot muutaman sekunnin kuluessa.",
+        "token_expiry_note": "Token vanhenee 24 tunnin kuluttua. Agenttisi käyttää yksityistä avainta uuden tokenin hankkimiseen automaattisesti."
       }
     },
     "scopes": {

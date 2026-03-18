@@ -4,6 +4,7 @@
  *   platform instructions, scope management modal, and agent detail cards.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace all inline styles with CSS utility classes
+ *   v1.1.0 — 2026-03-18 — Rewrite agent prompt to use device-auth flow; remove connectivity key UI
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -64,34 +65,44 @@ function permLabel(perm) {
 /* ── Agent prompt builder ── */
 function buildAgentPrompt(sess) {
   const url = getNodeUrl();
-  return `Register as a new agent on my AIMEAT node using the connectivity key I'll give you.
+  return `Connect to my AIMEAT node as an AI agent.
 
 IMPORTANT: I already have an account. Do NOT create a new owner.
 
 My owner name: ${sess.owner}
 Node URL: ${url}
 
-Step 1 — Ask me for a connectivity key.
-  I'll generate one from my profile page (Agents tab → Generate Connectivity Key).
-  It's a single-use key — I'll paste it to you here.
+Step 1 — Request access:
+  POST ${url}/v1/agents/device-authorize
+  Body: { "agent_name": "choose-a-name", "owner": "${sess.owner}" }
+  → You receive: device_code, user_code, verification_uri_complete, interval
 
-Step 2 — Register with the key:
-  POST ${url}/v1/agents/connect
-  Body: { "connectivity_key": "<key I gave you>", "agent_name": "choose-a-name" }
+Step 2 — Tell me:
+  "Please open this URL to approve my access: <verification_uri_complete from step 1>"
 
-  Response includes: gaii, token, private_key, public_key
+Step 3 — Wait for approval. Two options:
 
-Step 3 — Store permanently:
-  - gaii — your agent identity (e.g. "claude#${sess.owner}@node-id")
-  - private_key — store securely, you need it to re-authenticate when the token expires
-  - token — use immediately for API calls: Authorization: Bearer <token>
+  Option A — If you can poll:
+    POST ${url}/v1/agents/device-token every <interval> seconds
+    Body: { "device_code": "<from step 1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
+    You will get "authorization_pending" until I approve.
+    On HTTP 200: you receive gaii, token, private_key.
 
-Step 4 — Token expires after 24 hours. To re-authenticate:
+  Option B — If you cannot poll:
+    Tell me: "I cannot poll. Please copy my credentials from the approval page and paste them here."
+    I will paste: { "gaii": "...", "private_key": "...", "token": "..." }
+
+Step 4 — Store permanently:
+  - private_key — never changes, use to get a new token when the current one expires
+  - gaii — your identity on this node
+  - token — use for all API calls: Authorization: Bearer <token>
+
+Re-authentication (token expires after 24h):
   POST ${url}/v1/auth/token
-  Body: { "gaii": "<your gaii>", "timestamp": "<ISO timestamp>", "signature": "<Ed25519_sign(private_key, gaii + timestamp)>" }
-  → You receive a new JWT.
+  Body: { "gaii": "<your gaii>", "timestamp": "<ISO now>", "signature": "<Ed25519_sign(private_key, gaii+timestamp)>" }
+  → New JWT.
 
-That's it! You're connected. Available APIs:
+Available APIs:
   GET  ${url}/v1/catalogue — Browse services
   POST ${url}/v1/memory   — Store/retrieve data
   GET  ${url}/v1/wallet   — Check balance
