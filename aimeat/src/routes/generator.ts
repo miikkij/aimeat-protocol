@@ -181,8 +181,8 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      // Verify agent exists and has generator capability
-      const agentRecord = await storage.getAgent(agentGaii as string);
+      // Verify authenticated caller has generator capability
+      const agentRecord = await storage.getAgent(gaii);
       if (!agentRecord || !agentRecord.capabilities.includes('generator')) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
         return;
