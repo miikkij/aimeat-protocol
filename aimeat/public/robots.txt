@@ -1,0 +1,52 @@
+User-agent: *
+Allow: /
+
+# ── OpenAI ──────────────────────────────────────────────────────────────────
+# OAI-SearchBot: powers ChatGPT search results (allow — we want to show up)
+User-agent: OAI-SearchBot
+Allow: /
+
+# GPTBot: training data crawler (blocked — training is a separate decision)
+User-agent: GPTBot
+Disallow: /
+
+# ── Anthropic / Claude ───────────────────────────────────────────────────────
+# Claude-SearchBot: search indexing
+User-agent: Claude-SearchBot
+Allow: /
+
+# Claude-User: user-initiated fetches (cowork, claude.ai browsing)
+User-agent: Claude-User
+Allow: /
+
+# ClaudeBot: training crawler
+User-agent: ClaudeBot
+Disallow: /
+
+# ── Perplexity ───────────────────────────────────────────────────────────────
+# PerplexityBot: search indexing (respects robots.txt)
+User-agent: PerplexityBot
+Allow: /
+
+# Perplexity-User: user-initiated fetches (typically ignores robots.txt anyway)
+User-agent: Perplexity-User
+Allow: /
+
+# ── Google ───────────────────────────────────────────────────────────────────
+# Googlebot: standard search indexing (allow)
+User-agent: Googlebot
+Allow: /
+
+# Google-Extended: Gemini training/grounding — does NOT affect Google Search
+User-agent: Google-Extended
+Disallow: /
+
+# ── Bing / Copilot ───────────────────────────────────────────────────────────
+User-agent: Bingbot
+Allow: /
+
+# ── AI agents: machine-readable docs ────────────────────────────────────────
+# See /llms.txt for structured API documentation
+# API entry point for AI agents: GET /?format=json
+
+Sitemap: https://aimeat.io/sitemap.xml
