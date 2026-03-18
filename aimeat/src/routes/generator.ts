@@ -24,6 +24,7 @@
 //   v1.2.0 — 2026-03-18 — Add session claim, heartbeat, and release endpoints (Task 4)
 //   v1.3.0 — 2026-03-18 — Add blueprint, component submit, log, and complete endpoints (Task 5)
 //   v1.4.0 — 2026-03-18 — Add component registration endpoint (Task 6)
+//   v1.5.0 — 2026-03-18 — Fix session claim: use setMemory for new sessions (setMemoryIfVersion only for CAS on existing stale sessions)
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -231,19 +232,19 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         ttlHours: null,
       };
 
-      if (storage.setMemoryIfVersion) {
-        const expectedVersion = existing ? existing.version : 0;
-        const newVersion = existing ? existing.version + 1 : 1;
+      if (existing && storage.setMemoryIfVersion) {
+        // Stale session exists — use atomic CAS to prevent two agents claiming simultaneously
         const result = await storage.setMemoryIfVersion(
-          { ...sessionRecord, version: newVersion, createdAt: existing?.createdAt ?? now, updatedAt: now },
-          expectedVersion,
+          { ...sessionRecord, version: existing.version + 1, createdAt: existing.createdAt, updatedAt: now },
+          existing.version,
         );
         if (!result) {
           res.status(409).json(error(config.nodeId, 'SESSION_BUSY', 'Session was claimed by another agent'));
           return;
         }
       } else {
-        await storage.setMemory({ ...sessionRecord, version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now });
+        // No prior session — simple write (version 1, new record)
+        await storage.setMemory({ ...sessionRecord, version: 1, createdAt: now, updatedAt: now });
       }
 
       res.json(success(config.nodeId, { claimed: true, expiresAt }));

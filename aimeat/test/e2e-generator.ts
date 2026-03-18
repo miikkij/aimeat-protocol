@@ -6,6 +6,7 @@
  *   components → archive → delete) works correctly against the backend.
  * @version-history
  *   v1.0.0 — 2026-03-14 — Initial generator E2E test suite
+ *   v1.1.0 — 2026-03-18 — Add agent-driven generator API endpoint tests
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-generator.ts
@@ -84,6 +85,9 @@ const ownerName = `genowner${Date.now()}`;
 let agentToken = '';
 let agentPrivKey = '';
 let agentGaii = '';
+let generatorAgentToken = '';
+let generatorAgentGaii = '';
+let generatorAgentPrivKey = '';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? '';
 
 console.log('\n=== Generator E2E Tests ===\n');
@@ -162,6 +166,39 @@ await test('Agent auth token', async () => {
     assert(body.ok === true, `agent token ok: ${JSON.stringify(body.error)}`);
     agentToken = body.data?.token;
     assert(typeof agentToken === 'string', 'got agent token');
+});
+
+// ─── Setup: Register generator agent ───
+console.log('\nSetup — Generator Agent');
+
+await test('Register generator agent with generator scopes', async () => {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: 'gen-api-agent',
+            owner: ownerName,
+            capabilities: ['memory', 'generator'],
+            scopes: ['memory:read', 'memory:write', 'generator:read', 'generator:write', 'generator:execute'],
+            model: 'test',
+        }),
+    });
+    assert(status === 201, `generator agent register status ${status}: ${JSON.stringify(body)}`);
+    generatorAgentGaii = body.data.agent.gaii;
+    generatorAgentPrivKey = body.data.private_key;
+});
+
+await test('Generator agent auth token', async () => {
+    const timestamp = new Date().toISOString();
+    const message = generatorAgentGaii + timestamp;
+    const signature = await signMsg(generatorAgentPrivKey, message);
+    const { body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: generatorAgentGaii, timestamp, signature }),
+    });
+    assert(body.ok === true, `generator agent token ok: ${JSON.stringify(body.error)}`);
+    generatorAgentToken = body.data?.token;
+    assert(typeof generatorAgentToken === 'string', 'got generator agent token');
 });
 
 const auth = () => ({ Authorization: `Bearer ${agentToken}` });
@@ -538,6 +575,142 @@ spec:
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
+});
+
+// ─── Generator API (agent-driven endpoints) ───
+console.log('\nGenerator API — Agent-Driven Endpoints');
+
+let generatorApiProjectId = '';
+
+await test('Agent: create generator project via POST /v1/generator/projects', async () => {
+    const { status, body } = await json('/v1/generator/projects', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ name: 'API Test Service', description: 'E2E test via generator API' }),
+    });
+    assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.projectId, 'Expected projectId in response');
+    generatorApiProjectId = body.data.projectId;
+    assert(typeof generatorApiProjectId === 'string' && generatorApiProjectId.length > 0, 'Got projectId');
+});
+
+await test('Agent: save interview spec (must be readable back with agent token)', async () => {
+    const spec = {
+        version: '1.0', projectName: 'API Test', description: 'E2E test',
+        technicalLevel: 'beginner',
+        useCases: [{ id: 'uc1', title: 'Test UC', description: 'Test', priority: 'must-have' }],
+        audience: { type: 'personal', scale: 'single', description: '' },
+        dataSources: [],
+        dataModel: { entities: [] },
+        views: [{ id: 'v1', type: 'list', title: 'Main View', description: 'Shows data' }],
+        constraints: {},
+    };
+    const { status } = await json(`/v1/generator/${generatorApiProjectId}/interview`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ interviewSpec: spec }),
+    });
+    assert(status === 200, `Interview spec save: expected 200, got ${status}`);
+
+    // Verify agent can read it back via memory API (visibility: 'owner' allows agents of same owner)
+    const { status: readStatus } = await json(`/v1/memory/generator.${generatorApiProjectId}.interview-spec`, {
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    assert(readStatus === 200, `Agent should read interview-spec (visibility: owner), got ${readStatus}`);
+});
+
+await test('Agent: blueprint submit returns validation errors for invalid YAML', async () => {
+    const { status, body } = await json(`/v1/generator/${generatorApiProjectId}/steps/blueprint`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ blueprint: 'not: valid: yaml: [' }),
+    });
+    assert(status === 200, `Blueprint validation: expected HTTP 200 (not 4xx), got ${status}`);
+    assert(body.data?.valid === false, `Expected valid:false, got: ${JSON.stringify(body.data)}`);
+    assert(Array.isArray(body.data?.errors) && body.data.errors.length > 0, 'Expected validation errors array');
+});
+
+await test('Agent: component submit validates and stores valid CSM', async () => {
+    const validCsm = `\`\`\`yaml
+service:
+  name: api-test-service
+  description: API test
+  version: "1.0"
+data_schema:
+  required:
+    name:
+      type: string
+consent_requirements:
+  data_access: required
+\`\`\``;
+
+    const { status, body } = await json(`/v1/generator/${generatorApiProjectId}/components/csm-main/submit`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ type: 'csm', content: validCsm }),
+    });
+    assert(status === 200, `Component submit: expected 200, got ${status}`);
+    assert(body.data?.valid === true, `Expected valid:true, errors: ${JSON.stringify(body.data?.errors)}`);
+
+    // Verify the component is stored in memory
+    const { status: memStatus } = await json(`/v1/memory/generator.${generatorApiProjectId}.component.csm-main`, {
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    assert(memStatus === 200, `Component should be stored in memory after valid submit, got ${memStatus}`);
+});
+
+await test('Agent: session claim, duplicate claim returns 409, heartbeat, delete, post-delete heartbeat returns 404', async () => {
+    // Claim
+    const { status: claimStatus } = await json(`/v1/generator/${generatorApiProjectId}/session/claim`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ agentGaii: generatorAgentGaii, agentName: 'TestAPIAgent' }),
+    });
+    assert(claimStatus === 200, `Session claim: expected 200, got ${claimStatus}`);
+
+    // Second claim from same agent should return 409 SESSION_BUSY
+    const { status: claimStatus2 } = await json(`/v1/generator/${generatorApiProjectId}/session/claim`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ agentGaii: generatorAgentGaii, agentName: 'TestAPIAgent' }),
+    });
+    assert(claimStatus2 === 409, `Duplicate session claim: expected 409, got ${claimStatus2}`);
+
+    // Heartbeat while session active
+    const { status: hbStatus } = await json(`/v1/generator/${generatorApiProjectId}/session/heartbeat`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ phase: 'blueprint', stepNumber: 1, totalSteps: 5 }),
+    });
+    assert(hbStatus === 200, `Heartbeat: expected 200, got ${hbStatus}`);
+
+    // Release session
+    const { status: delStatus } = await json(`/v1/generator/${generatorApiProjectId}/session`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    assert(delStatus === 200, `Session release: expected 200, got ${delStatus}`);
+
+    // Heartbeat after release should return 404 SESSION_RELEASED
+    const { status: hbAfter } = await json(`/v1/generator/${generatorApiProjectId}/session/heartbeat`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    assert(hbAfter === 404, `Post-release heartbeat: expected 404 SESSION_RELEASED, got ${hbAfter}`);
+});
+
+await test('Agent: cleanup generator API test project', async () => {
+    // Delete all generator.{id}.* keys
+    const { body: listBody } = await json(`/v1/memory?prefix=${encodeURIComponent(`generator.${generatorApiProjectId}.`)}`, {
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    const items: Array<{ key: string }> = listBody.data?.items || [];
+    for (const item of items) {
+        await json(`/v1/memory/${encodeURIComponent(item.key)}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        });
+    }
 });
 
 // ─── Generator Cleanup ───
