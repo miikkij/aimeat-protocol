@@ -114,7 +114,7 @@ tags:
     description: Package installation, instance management, migrations
   - name: Templates
     description: Template gallery, reviews, discussions
-  - name: generator
+  - name: Generator
     description: Agent-driven service generation pipeline. Endpoints allow AI agents to autonomously create and configure AIMEAT services on behalf of a user.
 
 components:

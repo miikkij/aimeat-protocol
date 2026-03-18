@@ -11,7 +11,7 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
-export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
+export function generatorRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
