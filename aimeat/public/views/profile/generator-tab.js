@@ -24,13 +24,14 @@
  *     buttons, packaging dialog with category/tags/visibility, change detection diff,
  *     fork attribution display, package link display in project header
  *   v4.1.0 — 2026-03-17 — Style unification: replace all inline styles with CSS classes, remove sidebar dots
+ *   v4.2.0 — 2026-03-18 — Add agent selector UI and progress banner for agent-driven generation
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent, enqueueTask, pollResults, pollLogs,
@@ -394,6 +395,82 @@ function NewProjectView({ onBack, onCreated, showToast }) {
   `;
 }
 
+function AgentProgressBanner({ session, components, projectId, onStop }) {
+  const isStale = session &&
+    (Date.now() - new Date(session.heartbeat).getTime()) > 5 * 60 * 1000;
+
+  async function handleStop() {
+    try {
+      await apiDelete(`/v1/generator/${projectId}/session`);
+    } catch { /* best effort */ }
+    onStop();
+  }
+
+  if (!session) return null;
+
+  return html`<div class="gen-agent-banner ${isStale ? 'stale' : ''}">
+    <div class="gen-agent-banner-info">
+      <strong>${isStale
+        ? t('profile.generator.agentBanner.disconnected')
+        : t('profile.generator.agentBanner.working').replace('{agentName}', session.agentName)
+      }</strong>
+      ${!isStale && session.totalSteps > 0 && html`
+        <span class="gen-agent-banner-phase">
+          ${t('profile.generator.agentBanner.phase')
+            .replace('{phase}', session.phase)
+            .replace('{step}', session.stepNumber)
+            .replace('{total}', session.totalSteps)}
+        </span>
+      `}
+    </div>
+    <div class="gen-step-indicators">
+      ${components.map(c => html`
+        <span class="gen-step-dot ${c.status === 'registered' ? 'done' : c.id === session.componentId ? 'active' : 'pending'}"
+              title=${c.id}></span>
+      `)}
+    </div>
+    <button class="btn-ghost gen-stop-btn" onClick=${handleStop}>
+      ${isStale
+        ? t('profile.generator.agentBanner.continueManually')
+        : t('profile.generator.agentBanner.stopButton')
+      }
+    </button>
+  </div>`;
+}
+
+function AgentSelector({ projectId, listeners, onAgentStart, onManual }) {
+  const [selected, setSelected] = useState(listeners[0]?.gaii ?? null);
+
+  if (listeners.length === 0) {
+    return html`<div class="gen-agent-selector">
+      <p class="gen-agent-selector-empty">${t('profile.generator.agentSelector.noAgents')}</p>
+      <button class="btn-ghost" onClick=${onManual}>${t('profile.generator.agentSelector.manualButton')}</button>
+    </div>`;
+  }
+
+  return html`<div class="gen-agent-selector">
+    <p class="gen-agent-selector-subtitle">${t('profile.generator.agentSelector.subtitle')}</p>
+    <div class="gen-agent-list">
+      ${listeners.map(agent => html`
+        <label class="gen-agent-option ${selected === agent.gaii ? 'selected' : ''}">
+          <input type="radio" name="agent" value=${agent.gaii}
+            checked=${selected === agent.gaii}
+            onChange=${() => setSelected(agent.gaii)} />
+          <span class="gen-agent-name">${agent.name ?? agent.gaii}</span>
+          <span class="gen-agent-gaii">${agent.gaii}</span>
+        </label>
+      `)}
+    </div>
+    <div class="gen-agent-actions">
+      <button class="btn-primary" disabled=${!selected}
+        onClick=${() => selected && onAgentStart(selected)}>
+        ${t('profile.generator.agentSelector.startButton')}
+      </button>
+      <button class="btn-ghost" onClick=${onManual}>${t('profile.generator.agentSelector.manualButton')}</button>
+    </div>
+  </div>`;
+}
+
 function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const [project, setProject] = useState(null);
   const [components, setComponents] = useState([]);
@@ -435,7 +512,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   // Interview spec (loaded for locale threading to component prompts)
   const [interviewSpec, setInterviewSpec] = useState(null);
 
+  // Agent-driven session state
+  const [generatorSession, setGeneratorSession] = useState(null);
+  const [listeners, setListeners] = useState([]);
+
   useEffect(() => { loadData(); }, [projectId]);
+
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [projectId]);
 
   async function loadData() {
     const p = await getProject(projectId);
@@ -445,6 +532,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       const spec = await getInterviewSpec(projectId);
       setInterviewSpec(spec);
     } catch { /* no interview spec — that's fine */ }
+    // Load generator session state (if any agent is executing)
+    try {
+      const sessionResp = await apiGet(`/v1/memory/generator.${projectId}.session`);
+      setGeneratorSession(sessionResp?.data?.value ?? null);
+    } catch { /* no session — that's fine */ }
+    // Load listening agents for the selector
+    try {
+      setListeners(await getListeners(projectId));
+    } catch { /* best effort */ }
     if (p?.blueprint?.components) {
       const comps = await loadAllComponents(projectId);
       setComponents(comps.length > 0 ? comps : p.blueprint.components.map(c => ({ ...c, status: 'not_started', history: [], _version: 0 })));
@@ -671,6 +767,19 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     };
   });
 
+  async function handleAgentStart(agentGaii) {
+    const agentRecord = listeners.find(a => a.gaii === agentGaii);
+    try {
+      await apiPost(`/v1/generator/${projectId}/session/claim`, {
+        agentGaii,
+        agentName: agentRecord?.name ?? agentGaii,
+      });
+      await loadData();
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+  }
+
   function handleDeleteProject() {
     confirm(t('profile.generator.confirmDelete'), async () => {
       try {
@@ -687,6 +796,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
   return html`
     <div class="pf-gen-dashboard">
+      <${AgentProgressBanner}
+        session=${generatorSession}
+        components=${components}
+        projectId=${projectId}
+        onStop=${loadData}
+      />
       <${ConfirmUI} />
       <div class="pf-gen-dash-header">
         <button class="btn-outline" onClick=${onBack}>${t('profile.generator.back')}</button>
@@ -713,6 +828,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         <p class="pf-gen-package-link text-caption mb-half">
           Package: ${project.packageGroupId}${project.lastPackagedVersion ? ' — ' + project.lastPackagedVersion : ''}
         </p>
+      `}
+
+      ${interviewSpec && !generatorSession && !project?.blueprint && html`
+        <${AgentSelector}
+          projectId=${projectId}
+          listeners=${listeners}
+          onAgentStart=${handleAgentStart}
+          onManual=${() => { /* just dismiss — user proceeds manually */ }}
+        />
       `}
 
       <!-- Phase 5: Lifecycle Toolbar -->

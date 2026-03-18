@@ -1009,6 +1009,20 @@
       "agentSetup": "Agent Setup",
       "hideSetup": "Hide Setup",
       "agentSetupDesc": "Creates a new generator agent with credentials and copies the setup prompt to your clipboard. Paste it into your AI agent to start listening.",
+      "agentSelector": {
+        "title": "Start with an agent",
+        "subtitle": "Interview complete. Let an agent execute the rest of the pipeline.",
+        "noAgents": "No agents listening. Copy the agent prompt and paste it into your AI agent.",
+        "startButton": "Start with this agent",
+        "manualButton": "Continue manually"
+      },
+      "agentBanner": {
+        "working": "{agentName} is working",
+        "phase": "Phase: {phase} ({step}/{total})",
+        "disconnected": "Agent may have disconnected",
+        "stopButton": "Stop agent",
+        "continueManually": "Stop and continue manually"
+      },
       "copyAgentPrompt": "Copy Agent Prompt",
       "agentPromptCopied": "Agent created and setup prompt copied!",
       "creatingAgent": "Creating agent...",

@@ -1009,6 +1009,20 @@
       "agentSetup": "Agentin asennus",
       "hideSetup": "Piilota asennus",
       "agentSetupDesc": "Luo uuden generaattoriagentin avaimineen ja kopioi asennuspromptin leikepöydälle. Liitä se AI-agenttiisi kuuntelun aloittamiseksi.",
+      "agentSelector": {
+        "title": "[TODO:fi] Start with an agent",
+        "subtitle": "[TODO:fi] Interview complete. Let an agent execute the rest of the pipeline.",
+        "noAgents": "[TODO:fi] No agents listening. Copy the agent prompt and paste it into your AI agent.",
+        "startButton": "[TODO:fi] Start with this agent",
+        "manualButton": "[TODO:fi] Continue manually"
+      },
+      "agentBanner": {
+        "working": "[TODO:fi] {agentName} is working",
+        "phase": "[TODO:fi] Phase: {phase} ({step}/{total})",
+        "disconnected": "[TODO:fi] Agent may have disconnected",
+        "stopButton": "[TODO:fi] Stop agent",
+        "continueManually": "[TODO:fi] Stop and continue manually"
+      },
       "copyAgentPrompt": "Kopioi agentin prompt",
       "agentPromptCopied": "Agentti luotu ja asennusprompt kopioitu!",
       "creatingAgent": "Luodaan agenttia...",
