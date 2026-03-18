@@ -19,12 +19,12 @@ export function bootstrapRouter(
     const b = config.baseUrl;
     const now = new Date().toISOString().split('T')[0];
     const urls = [
-      { loc: `${b}/`,             changefreq: 'weekly',  priority: '1.0' },
-      { loc: `${b}/v1/portal`,    changefreq: 'monthly', priority: '0.9' },
-      { loc: `${b}/v1/docs`,      changefreq: 'weekly',  priority: '0.8' },
-      { loc: `${b}/v1/spec`,      changefreq: 'weekly',  priority: '0.7' },
-      { loc: `${b}/v1/catalogue`, changefreq: 'daily',   priority: '0.7' },
-      { loc: `${b}/v1/health`,    changefreq: 'always',  priority: '0.3' },
+      { loc: `${b}/`, changefreq: 'weekly', priority: '1.0' },
+      { loc: `${b}/v1/portal`, changefreq: 'monthly', priority: '0.9' },
+      { loc: `${b}/v1/docs`, changefreq: 'weekly', priority: '0.8' },
+      { loc: `${b}/v1/spec`, changefreq: 'weekly', priority: '0.7' },
+      { loc: `${b}/v1/catalogue`, changefreq: 'daily', priority: '0.7' },
+      { loc: `${b}/v1/health`, changefreq: 'always', priority: '0.3' },
     ];
     const xml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
