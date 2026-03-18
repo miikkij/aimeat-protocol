@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -14,6 +14,9 @@ import { listMyServices } from '/js/services/catalogue.js';
 import { listInbox } from '/js/services/work.js';
 import { listApps } from '/js/services/apps.js';
 import * as nodesService from '/js/services/nodes.js';
+
+// === Landing page (adaptive dashboard) ===
+import LandingPage, { computeTier } from './profile/landing-page.js';
 
 // === Tab modules (lazy-loaded on first visit, stay mounted) ===
 import PortfolioTab from './profile/portfolio-tab.js';
@@ -40,30 +43,33 @@ import NotificationsTab from './profile/notifications-tab.js';
 import GeneratorTab from './profile/generator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
 
+// Each tab has a minTier: 'new' | 'active' | 'experienced'
+// Tabs with minTier <= current tier are visible in the tab bar.
+// Deep links (?tab=X) bypass tier filtering.
 const TABS = [
-  { id: 'portfolio',    key: 'portfolio.tabLabel',         component: PortfolioTab },
-  { id: 'agents',       key: 'profile.tabs.agents',        component: AgentsTab },
-  { id: 'chatsessions', key: 'profile.tabs.chatSessions',  component: ChatSessionsTab },
-  { id: 'mcp',          key: 'profile.tabs.mcp',            component: McpTab },
-  { id: 'wallet',       key: 'profile.tabs.wallet',        component: WalletTab },
-  { id: 'knowledge',    key: 'knowledge.tabLabel',          component: KnowledgeTab },
-  { id: 'organisms',    key: 'profile.tabs.organisms',      component: OrganismsTab },
-  { id: 'memory',       key: 'profile.tabs.memory',        component: MemoryTab },
-  { id: 'work',         key: 'profile.tabs.work',          component: WorkTab },
-  { id: 'actions',      key: 'profile.tabs.services',      component: ServicesTab },
-  { id: 'boards',       key: 'profile.tabs.boards',        component: BoardsTab },
-  { id: 'apps',         key: 'profile.tabs.apps',          component: AppsTab },
-  { id: 'extensions',   key: 'profile.tabs.extensions',    component: ExtensionsTab },
-  { id: 'federation',   key: 'profile.tabs.federation',    component: FederationTab },
-  { id: 'nodes',        key: 'profile.tabs.nodes',         component: NodesTab },
-  { id: 'access',       key: 'profile.tabs.access',        component: AccessTab },
-  { id: 'dataWallet',   key: 'profile.tabs.dataWallet',    component: DataWalletTab },
-  { id: 'nodeStats',    key: 'profile.tabs.nodeStats',     component: NodeStatsTab },
-  { id: 'security',     key: 'profile.tabs.security',      component: SecurityTab },
-  { id: 'email',         key: 'profile.tabs.email',          component: EmailTab },
-  { id: 'notifications', key: 'profile.tabs.notifications', component: NotificationsTab },
-  { id: 'generator', key: 'profile.generator.tabLabel', component: GeneratorTab },
-  { id: 'packages', key: 'profile.tabs.packages', component: PackagesTab },
+  { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
+  { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
+  { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
+  { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'active' },
+  { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
+  { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
+  { id: 'organisms',     key: 'profile.tabs.organisms',      component: OrganismsTab,      minTier: 'active' },
+  { id: 'memory',        key: 'profile.tabs.memory',         component: MemoryTab,         minTier: 'new' },
+  { id: 'work',          key: 'profile.tabs.work',           component: WorkTab,           minTier: 'active' },
+  { id: 'actions',       key: 'profile.tabs.services',       component: ServicesTab,       minTier: 'active' },
+  { id: 'boards',        key: 'profile.tabs.boards',         component: BoardsTab,         minTier: 'active' },
+  { id: 'apps',          key: 'profile.tabs.apps',           component: AppsTab,           minTier: 'active' },
+  { id: 'extensions',    key: 'profile.tabs.extensions',     component: ExtensionsTab,     minTier: 'active' },
+  { id: 'federation',    key: 'profile.tabs.federation',     component: FederationTab,     minTier: 'experienced' },
+  { id: 'nodes',         key: 'profile.tabs.nodes',          component: NodesTab,          minTier: 'experienced' },
+  { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
+  { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
+  { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },
+  { id: 'security',      key: 'profile.tabs.security',       component: SecurityTab,       minTier: 'experienced' },
+  { id: 'email',         key: 'profile.tabs.email',          component: EmailTab,          minTier: 'new' },
+  { id: 'notifications', key: 'profile.tabs.notifications',  component: NotificationsTab,  minTier: 'active' },
+  { id: 'generator',     key: 'profile.generator.tabLabel',  component: GeneratorTab,      minTier: 'active' },
+  { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
 ];
 
 export default function Profile({ navigate, locale }) {
@@ -71,10 +77,15 @@ export default function Profile({ navigate, locale }) {
   const [session, setSession] = useState(null);
   const savedTab = () => {
     const id = localStorage.getItem('aimeat-profile-tab');
-    return id && TABS.some(t => t.id === id) ? id : 'agents';
+    // Default to 'home' (landing page) instead of a specific tab
+    if (id === 'home') return 'home';
+    return id && TABS.some(t => t.id === id) ? id : 'home';
   };
   const [activeTab, setActiveTab] = useState(savedTab);
-  const [visitedTabs, setVisitedTabs] = useState(() => new Set([savedTab()]));
+  const [visitedTabs, setVisitedTabs] = useState(() => {
+    const initial = savedTab();
+    return initial === 'home' ? new Set() : new Set([initial]);
+  });
   const [stats, setStats] = useState({
     agents: '-', chatSessions: '-', balance: '-', memory: '-',
     services: '-', work: '-', apps: '-', files: '-', nodes: '-',
@@ -92,6 +103,15 @@ export default function Profile({ navigate, locale }) {
     setStats(prev => ({ ...prev, ...partial }));
   }, []);
 
+  // Compute tier from stats + session (re-computed on every stats change)
+  const tier = useMemo(() => {
+    if (!session) return 'new';
+    return computeTier(stats, session);
+  }, [stats, session]);
+
+  // visibleTabs kept for deep-link support — tab bar removed from UI
+  // but tier filtering still applies to which tabs can be navigated to via landing page
+
   // Auth listener
   useEffect(() => {
     const s = getSession();
@@ -100,14 +120,14 @@ export default function Profile({ navigate, locale }) {
       const ns = getSession();
       setSession(ns);
       if (!ns) {
-        setActiveTab('agents');
-        setVisitedTabs(new Set(['agents']));
+        setActiveTab('home');
+        setVisitedTabs(new Set());
         localStorage.removeItem('aimeat-profile-tab');
       }
     });
   }, []);
 
-  // URL tab param
+  // URL tab param (deep links bypass tier filtering)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
@@ -189,11 +209,13 @@ export default function Profile({ navigate, locale }) {
   function switchTab(tabId) {
     setActiveTab(tabId);
     localStorage.setItem('aimeat-profile-tab', tabId);
-    setVisitedTabs(prev => {
-      const next = new Set(prev);
-      next.add(tabId);
-      return next;
-    });
+    if (tabId !== 'home') {
+      setVisitedTabs(prev => {
+        const next = new Set(prev);
+        next.add(tabId);
+        return next;
+      });
+    }
   }
 
   // Not logged in
@@ -213,53 +235,37 @@ export default function Profile({ navigate, locale }) {
   // Common props passed to all tabs
   const tabProps = { session, showToast, onStats: updateStats, navigate, locale };
 
+  // Render a tab component by ID — called by LandingPage to show content inline
+  const renderTab = useCallback((tabId) => {
+    const tab = TABS.find(t => t.id === tabId);
+    if (!tab) return null;
+    return html`<${tab.component} ...${tabProps} />`;
+  }, [tabProps]);
+
+  // Get tab label by ID
+  const getTabLabel = useCallback((tabId) => {
+    const tab = TABS.find(t => t.id === tabId);
+    return tab ? t(tab.key) : tabId;
+  }, []);
+
   return html`
     <div class="bg-aurora" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none">
       <div class="aurora-wave"></div><div class="aurora-wave"></div><div class="aurora-wave"></div>
     </div>
-    <div class="pf-hero">
-      <div class="pf-hero-inner">
-        <!-- Profile header -->
-        <div class="profile-header">
-          <div class="avatar">\u{1F9D1}</div>
-          <div class="profile-info">
-            <h1>${escHtml(session.displayName || session.owner)}</h1>
-            <div class="ghii">${escHtml(session.ghii || '')}</div>
-            <div class="meta">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
-          </div>
-        </div>
 
-        <!-- Stats bar -->
-        <div class="stats-bar">
-          <div class="stat-card"><div class="num blue">${stats.agents}</div><div class="label">${t('profile.stats.agents')}</div></div>
-          <div class="stat-card"><div class="num purple">${stats.chatSessions}</div><div class="label">${t('profile.stats.chatSessions')}</div></div>
-          <div class="stat-card"><div class="num heart">${stats.balance}</div><div class="label">${t('profile.stats.morsels')}</div></div>
-          <div class="stat-card"><div class="num mint">${stats.memory}</div><div class="label">${t('profile.stats.memories')}</div></div>
-          <div class="stat-card"><div class="num">${stats.services}</div><div class="label">${t('profile.stats.services')}</div></div>
-          <div class="stat-card"><div class="num">${stats.work}</div><div class="label">${t('profile.stats.tasks')}</div></div>
-          <div class="stat-card"><div class="num">${stats.apps}</div><div class="label">${t('profile.stats.apps')}</div></div>
-          <div class="stat-card"><div class="num blue">${stats.files}</div><div class="label">${t('profile.stats.files')}</div></div>
-          <div class="stat-card"><div class="num">${stats.nodes}</div><div class="label">${t('profile.stats.nodes')}</div></div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="tabs">
-          ${TABS.map(tab => html`
-            <button class="tab ${activeTab === tab.id ? 'active' : ''}" onClick=${() => switchTab(tab.id)}>${t(tab.key)}</button>
-          `)}
-        </div>
-      </div>
-    </div>
     <div class="pf">
+      <${LandingPage}
+        tier=${tier}
+        stats=${stats}
+        session=${session}
+        navigate=${navigate}
+        showToast=${showToast}
+        locale=${locale}
+        renderTab=${renderTab}
+        getTabLabel=${getTabLabel}
+      />
+    </div>
 
-      <!-- Tab panels: mount once on first visit, show/hide with display -->
-      ${TABS.filter(tab => visitedTabs.has(tab.id)).map(tab => html`
-        <div key=${tab.id} style=${activeTab === tab.id ? '' : 'display:none'}>
-          <${tab.component} ...${tabProps} />
-        </div>
-      `)}
-
-      <!-- Toast -->
-      ${toast && html`<div class="toast ${toast.isError ? 'error' : ''}">${toast.msg}</div>`}
-    </div>`;
+    <!-- Toast -->
+    ${toast && html`<div class="pf toast-container"><div class="toast ${toast?.isError ? 'error' : ''}">${toast?.msg}</div></div>`}`;
 }
