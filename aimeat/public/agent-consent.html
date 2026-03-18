@@ -61,6 +61,19 @@
     .denied-msg h2 { color:var(--muted); margin-bottom:.5rem; }
     .expired-msg { text-align:center; padding:1.5rem 0; }
     .expired-msg h2 { color:var(--danger); margin-bottom:.5rem; }
+    .polling-guidance { margin-top:1.25rem; text-align:left; }
+    .polling-guidance-note { font-size:.85rem; color:var(--muted); margin-bottom:.75rem; line-height:1.5; }
+    .gaii-block { margin:.75rem 0; }
+    .gaii-label { font-size:.8rem; color:var(--muted); margin-bottom:.3rem; }
+    .polling-hint { margin-top:.75rem; padding:.75rem 1rem; background:rgba(130,100,255,.06);
+      border:1px solid rgba(130,100,255,.2); border-radius:.5rem; font-size:.82rem; color:var(--muted); line-height:1.5; }
+    .polling-hint code { font-family:'Courier New',monospace; color:var(--accent);
+      background:rgba(130,100,255,.12); padding:.1rem .35rem; border-radius:.25rem; }
+    .msg-muted { color:var(--muted); }
+    #loading { text-align:center; padding:2rem; color:var(--muted); }
+    #loading p { margin-top:.75rem; }
+    .error-msg-spaced { margin-top:1rem; }
+    .login-prompt { margin-bottom:1rem; font-size:.9rem; }
     .spinner { display:inline-block; width:1.5rem; height:1.5rem; border:2px solid var(--border);
       border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -68,9 +81,9 @@
 </head>
 <body>
   <div class="consent-card" id="app">
-    <div id="loading" style="text-align:center;padding:2rem;color:var(--muted)">
+    <div id="loading">
       <div class="spinner"></div>
-      <p style="margin-top:.75rem">Loading...</p>
+      <p>Loading...</p>
     </div>
   </div>
 
@@ -118,6 +131,10 @@
         errorNotFound: 'Authorization request not found or expired.',
         errorOwnerMismatch: 'This request belongs to a different user. Sign in with the correct account.',
         errorGeneric: 'Something went wrong. Please try again.',
+        pollingNote: 'Your agent is polling for credentials automatically. If it cannot poll, copy the information below and paste it to your agent chat.',
+        pollingHint: 'The agent will receive its token and private key via polling. If polling fails, ask your agent to retry',
+        pollingHintCode: 'POST /v1/agents/device-token',
+        pollingHintSuffix: 'with the device code.',
       },
       fi: {
         title: 'Agentin hyväksyminen',
@@ -154,6 +171,10 @@
         errorNotFound: 'Valtuutuspyyntöä ei löydy tai se on vanhentunut.',
         errorOwnerMismatch: 'Tämä pyyntö kuuluu toiselle käyttäjälle. Kirjaudu oikealla tilillä.',
         errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
+        pollingNote: 'Agenttisi hakee tunnistetietoja automaattisesti. Jos se ei pysty hakemaan, kopioi alla olevat tiedot ja liitä ne agentille.',
+        pollingHint: 'Agentti saa tunnuksen ja yksityisen avaimen kyselyllä. Jos kysely epäonnistuu, pyydä agenttia yrittämään uudelleen',
+        pollingHintCode: 'POST /v1/agents/device-token',
+        pollingHintSuffix: 'laitteen koodilla.',
       }
     };
     const T = strings[lang] || strings.en;
@@ -219,7 +240,7 @@
     };
 
     function renderError(msg) {
-      app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg" style="margin-top:1rem">${escHtml(msg)}</p>`;
+      app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg error-msg-spaced">${escHtml(msg)}</p>`;
     }
 
     function renderLogin() {
@@ -230,7 +251,7 @@
           <div class="user-code-value">${escHtml(code)}</div>
           <div class="user-code-hint">${escHtml(t('confirmHint'))}</div>
         </div>
-        <p style="margin-bottom:1rem;font-size:.9rem">${escHtml(t('loginRequired'))}</p>
+        <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
         <form id="loginForm">
           <label>${escHtml(t('usernameLabel'))}</label>
           <input type="text" id="username" required autocomplete="username" />
@@ -406,8 +427,17 @@
         <div class="success-msg">
           <h2>${escHtml(t('approved'))}</h2>
           <p>${escHtml(t('approvedMsg'))}</p>
-          ${data?.gaii ? `<p style="margin-top:.75rem;font-size:.85rem;color:var(--muted)">${escHtml(t('agentGaii'))}</p>
-          <span class="gaii">${escHtml(data.gaii)}</span>` : ''}
+          ${data?.gaii ? `
+          <div class="polling-guidance">
+            <p class="polling-guidance-note">${escHtml(t('pollingNote'))}</p>
+            <div class="gaii-block">
+              <div class="gaii-label">${escHtml(t('agentGaii'))}</div>
+              <span class="gaii">${escHtml(data.gaii)}</span>
+            </div>
+            <div class="polling-hint">
+              ${escHtml(t('pollingHint'))} <code>${escHtml(t('pollingHintCode'))}</code> ${escHtml(t('pollingHintSuffix'))}
+            </div>
+          </div>` : ''}
         </div>
       `;
     }
@@ -416,7 +446,7 @@
       app.innerHTML = `
         <div class="denied-msg">
           <h2>${escHtml(t('denied'))}</h2>
-          <p style="color:var(--muted)">${escHtml(t('deniedMsg'))}</p>
+          <p class="msg-muted">${escHtml(t('deniedMsg'))}</p>
         </div>
       `;
     }
@@ -425,7 +455,7 @@
       app.innerHTML = `
         <div class="expired-msg">
           <h2>${escHtml(t('expired'))}</h2>
-          <p style="color:var(--muted)">${escHtml(t('expiredMsg'))}</p>
+          <p class="msg-muted">${escHtml(t('expiredMsg'))}</p>
         </div>
       `;
     }
