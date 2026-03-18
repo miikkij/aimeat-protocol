@@ -310,6 +310,15 @@
         "statusExpired": "Request expired",
         "copyUrl": "Copy link",
         "copyPrompt": "Copy prompt"
+      },
+      "approval": {
+        "credentials_ready_title": "Agent approved",
+        "credentials_ready_desc": "Copy the credentials below and paste them to your agent.",
+        "copy_credentials": "Copy credentials",
+        "copied": "Copied!",
+        "credentials_warning": "Store the private key securely — it cannot be retrieved again.",
+        "polling_note": "If your agent is polling automatically, it will receive these credentials within a few seconds.",
+        "token_expiry_note": "The token expires in 24 hours. Your agent uses the private key to obtain a new token automatically."
       }
     },
     "scopes": {
