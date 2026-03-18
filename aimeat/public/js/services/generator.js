@@ -181,7 +181,7 @@ export async function saveInterviewSpec(projectId, spec) {
   return apiPost('/v1/memory', {
     key: `generator.${projectId}.interview-spec`,
     value: spec,
-    visibility: 'private',
+    visibility: 'owner',
   });
 }
 

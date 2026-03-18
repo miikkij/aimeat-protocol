@@ -13290,3 +13290,196 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+
+  # ── Generator ───────────────────────────────────────────────
+  /v1/generator/projects:
+    post:
+      operationId: createGeneratorProject
+      summary: Create generator project
+      description: Create a new service generator project. Requires `generator:write` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Human-readable project name
+                  example: Neighbourhood Hobby Hub
+                description:
+                  type: string
+                  description: Optional project description
+                  example: A platform for connecting locals around shared interests
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          projectId:
+                            type: string
+                            example: gen-1742300000000-abc123
+                          project:
+                            type: object
+                            properties:
+                              id: { type: string }
+                              name: { type: string }
+                              description: { type: string }
+                              status: { type: string, enum: [draft, active, archived] }
+                              blueprint: { type: object, nullable: true }
+                              createdAt: { type: string, format: date-time }
+                              updatedAt: { type: string, format: date-time }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      operationId: listGeneratorProjects
+      summary: List generator projects
+      description: List all generator projects owned by the caller. Requires `generator:read` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Project list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          projects:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                description: { type: string }
+                                status: { type: string }
+                                createdAt: { type: string, format: date-time }
+                                updatedAt: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}:
+    get:
+      operationId: getGeneratorProject
+      summary: Get generator project
+      description: Get full project state including interview spec, components, and session. Requires `generator:read` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID (e.g. gen-1742300000000-abc123)
+      responses:
+        '200':
+          description: Project state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          project:
+                            type: object
+                            nullable: true
+                          interviewSpec:
+                            type: object
+                            nullable: true
+                          components:
+                            type: array
+                            items:
+                              type: object
+                          session:
+                            type: object
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/generator/{projectId}/interview:
+    post:
+      operationId: saveGeneratorInterviewSpec
+      summary: Save interview spec
+      description: Save or replace the interview spec for a project. Writes with owner visibility so agent JWTs can read it. Requires generator:write scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interviewSpec]
+              properties:
+                interviewSpec:
+                  type: object
+                  description: Interview specification object (validated by generator-validate service)
+      responses:
+        '200':
+          description: Interview spec saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          saved: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Validation error - interview spec failed schema validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
