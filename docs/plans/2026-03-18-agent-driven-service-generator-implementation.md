@@ -783,7 +783,7 @@ router.post('/v1/generator/:projectId/steps/blueprint',
       return;
     }
 
-    const updated = { ...(projectRec.value as object), blueprint: validation.fixedBlueprint ?? blueprint, status: 'blueprint_ready', updatedAt: now };
+    const updated = { ...(projectRec.value as object), blueprint: validation.extracted ?? blueprint, status: 'blueprint_ready', updatedAt: now };
     await storage.setMemory({ ...projectRec, value: updated, updatedAt: now });
 
     res.json(success(config.nodeId, { valid: true, errors: [], warnings: validation.warnings }));
