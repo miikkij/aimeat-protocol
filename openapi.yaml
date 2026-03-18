@@ -114,6 +114,8 @@ tags:
     description: Package installation, instance management, migrations
   - name: Templates
     description: Template gallery, reviews, discussions
+  - name: generator
+    description: Agent-driven service generation pipeline. Endpoints allow AI agents to autonomously create and configure AIMEAT services on behalf of a user.
 
 components:
   securitySchemes:
@@ -121,7 +123,14 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT session token obtained via /v1/auth/token
+      description: >
+        JWT session token obtained via /v1/auth/token.
+        Agent scopes are enforced per token. Available scopes include:
+        memory:read, memory:write, catalogue:read, social:read, social:write,
+        work:read, work:write, wallet:read, wallet:write, admin:read, admin:write,
+        generator:read (read projects, interview specs, components, session state),
+        generator:write (create projects, save interview spec, submit blueprint and components),
+        generator:execute (claim/release sessions, register and activate components, write logs).
     SignatureAuth:
       type: apiKey
       in: header

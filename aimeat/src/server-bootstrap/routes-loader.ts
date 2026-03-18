@@ -71,6 +71,7 @@ import { adminSchedulerRouter } from '../routes/admin-scheduler.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
 import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
+import { generatorRouter } from '../routes/generator.js';
 
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
@@ -175,6 +176,9 @@ export function mountRoutes(
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
+  if (config.generatorEnabled) {
+    app.use(generatorRouter(config, storage));   // Agent-driven service generator
+  }
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
