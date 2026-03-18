@@ -130,7 +130,13 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const projectId = req.params['projectId'] as string;
       const { interviewSpec } = req.body ?? {};
 
-      const validation = validateInterviewSpec(interviewSpec);
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      const validation = validateInterviewSpec(JSON.stringify(interviewSpec));
       if (!validation.valid) {
         res.status(422).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid interview spec', undefined, { errors: validation.errors }));
         return;
