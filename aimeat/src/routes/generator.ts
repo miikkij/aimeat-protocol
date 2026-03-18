@@ -3,16 +3,20 @@
 // Agents submit generated content here; the route validates it, then writes to
 // generator.* memory keys using the same structure the frontend reads.
 // @structure
-//   POST /v1/generator/projects       — create a new generator project
-//   GET  /v1/generator/projects       — list all projects for the caller
-//   GET  /v1/generator/:projectId     — get full project state (project, interviewSpec, components, session)
-//   POST /v1/generator/:projectId/interview — save/update interview spec for a project
+//   POST /v1/generator/projects                        — create a new generator project
+//   GET  /v1/generator/projects                        — list all projects for the caller
+//   GET  /v1/generator/:projectId                      — get full project state (project, interviewSpec, components, session)
+//   POST /v1/generator/:projectId/interview            — save/update interview spec for a project
+//   POST /v1/generator/:projectId/session/claim        — agent claims an execution session
+//   POST /v1/generator/:projectId/session/heartbeat    — agent keeps session alive / updates progress
+//   DELETE /v1/generator/:projectId/session            — release session (user stop or agent done)
 // @usage
-//   Consumed by AI agents via device auth (generator:read / generator:write scopes)
+//   Consumed by AI agents via device auth (generator:read / generator:write / generator:execute scopes)
 //   and by the browser UI (owner JWT satisfies agent role check).
 // @version-history
 //   v1.0.0 — 2026-03-18 — Initial implementation
 //   v1.1.0 — 2026-03-18 — Add project management and interview endpoints (Task 3)
+//   v1.2.0 — 2026-03-18 — Add session claim, heartbeat, and release endpoints (Task 4)
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -25,6 +29,8 @@ import { validateInterviewSpec } from '../services/generator-validate.js';
 export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+
+  const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   // POST /v1/generator/projects — create a new generator project
   router.post('/v1/generator/projects',
@@ -156,6 +162,126 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       });
 
       res.json(success(config.nodeId, { saved: true }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/session/claim — agent claims an execution session
+  // NOTE: registered before the generic /:projectId handler to ensure correct routing
+  router.post('/v1/generator/:projectId/session/claim',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:execute'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+      const { agentGaii, agentName } = req.body ?? {};
+
+      if (!agentGaii || !agentName) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'agentGaii and agentName are required'));
+        return;
+      }
+
+      // Verify agent exists and has generator capability
+      const agentRecord = await storage.getAgent(agentGaii as string);
+      if (!agentRecord || !agentRecord.capabilities.includes('generator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
+        return;
+      }
+
+      // Check for existing fresh session
+      const existing = await storage.getMemory(gaii, `generator.${projectId}.session`);
+      if (existing) {
+        const session = existing.value as { heartbeat: string };
+        const age = Date.now() - new Date(session.heartbeat).getTime();
+        if (age < SESSION_TTL_MS) {
+          res.status(409).json(error(config.nodeId, 'SESSION_BUSY', 'Another agent holds an active session for this project'));
+          return;
+        }
+      }
+
+      const now = new Date().toISOString();
+      const sessionData = {
+        agentGaii,
+        agentName,
+        phase: 'starting',
+        componentId: null,
+        stepNumber: 0,
+        totalSteps: 0,
+        startedAt: now,
+        heartbeat: now,
+      };
+
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+      const sessionRecord = {
+        key: `generator.${projectId}.session`,
+        ownerGaii: gaii,
+        value: sessionData,
+        visibility: 'owner' as const,
+        tags: ['generator', 'session'],
+        ttlHours: null,
+      };
+
+      if (storage.setMemoryIfVersion) {
+        const expectedVersion = existing ? existing.version : 0;
+        const newVersion = existing ? existing.version + 1 : 1;
+        const result = await storage.setMemoryIfVersion(
+          { ...sessionRecord, version: newVersion, createdAt: existing?.createdAt ?? now, updatedAt: now },
+          expectedVersion,
+        );
+        if (!result) {
+          res.status(409).json(error(config.nodeId, 'SESSION_BUSY', 'Session was claimed by another agent'));
+          return;
+        }
+      } else {
+        await storage.setMemory({ ...sessionRecord, version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now });
+      }
+
+      res.json(success(config.nodeId, { claimed: true, expiresAt }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/session/heartbeat — agent keeps session alive and updates progress
+  router.post('/v1/generator/:projectId/session/heartbeat',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:execute'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+
+      const existing = await storage.getMemory(gaii, `generator.${projectId}.session`);
+      if (!existing) {
+        res.status(404).json(error(config.nodeId, 'SESSION_RELEASED', 'Session no longer exists — agent should halt'));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const updated: Record<string, unknown> = { ...(existing.value as Record<string, unknown>), heartbeat: now };
+
+      // Allow agent to update progress fields via heartbeat body
+      const { phase, componentId, stepNumber, totalSteps } = req.body ?? {};
+      if (phase !== undefined) updated['phase'] = phase;
+      if (componentId !== undefined) updated['componentId'] = componentId;
+      if (stepNumber !== undefined) updated['stepNumber'] = stepNumber;
+      if (totalSteps !== undefined) updated['totalSteps'] = totalSteps;
+
+      await storage.setMemory({ ...existing, value: updated, updatedAt: now });
+
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+      res.json(success(config.nodeId, { ok: true, expiresAt }));
+    }
+  );
+
+  // DELETE /v1/generator/:projectId/session — release session (UI stop button or agent done)
+  router.delete('/v1/generator/:projectId/session',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:execute'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+      await storage.deleteMemory(gaii, `generator.${projectId}.session`);
+      res.json(success(config.nodeId, { released: true }));
     }
   );
 

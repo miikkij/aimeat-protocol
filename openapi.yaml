@@ -13483,3 +13483,164 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/generator/{projectId}/session/claim:
+    post:
+      operationId: claimGeneratorSession
+      summary: Claim a generator execution session
+      description: |
+        Agent claims the execution session for a project. Verifies the agent has the
+        `generator` capability. Returns 409 SESSION_BUSY if another agent holds a fresh
+        session (heartbeat within last 5 minutes). Uses atomic setMemoryIfVersion when
+        available to prevent race conditions. Requires generator:execute scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentGaii, agentName]
+              properties:
+                agentGaii:
+                  type: string
+                  description: Full GAII of the agent claiming the session (e.g. "claude#alice@aimeat-node")
+                agentName:
+                  type: string
+                  description: Human-readable display name of the agent
+      responses:
+        '200':
+          description: Session successfully claimed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          claimed: { type: boolean }
+                          expiresAt: { type: string, format: date-time }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: SESSION_BUSY - another agent holds an active session for this project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/generator/{projectId}/session/heartbeat:
+    post:
+      operationId: generatorSessionHeartbeat
+      summary: Send agent heartbeat to keep session alive
+      description: |
+        Called by the agent every 60 seconds while working. Resets the session TTL (5 minutes).
+        Optionally updates progress fields (phase, componentId, stepNumber, totalSteps) so the
+        UI can show which component is being generated. Returns 404 SESSION_RELEASED if the
+        session has been deleted — the agent must halt on this response.
+        Requires generator:execute scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  description: Current generation phase (e.g. "generating", "validating", "done")
+                componentId:
+                  type: string
+                  nullable: true
+                  description: ID of the component currently being generated
+                stepNumber:
+                  type: integer
+                  description: Current step index
+                totalSteps:
+                  type: integer
+                  description: Total number of steps
+      responses:
+        '200':
+          description: Heartbeat accepted, session extended
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok: { type: boolean }
+                          expiresAt: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: SESSION_RELEASED - session no longer exists, agent should halt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/generator/{projectId}/session:
+    delete:
+      operationId: releaseGeneratorSession
+      summary: Release generator execution session
+      description: |
+        Releases the execution session for a project. Called by the UI's stop button or
+        by the agent when it has finished. The next heartbeat from a running agent will
+        receive SESSION_RELEASED and halt. Requires generator:execute scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      responses:
+        '200':
+          description: Session released
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          released: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
