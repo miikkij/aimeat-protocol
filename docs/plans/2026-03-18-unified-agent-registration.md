@@ -218,10 +218,45 @@ Target: 0 failures. Update any E2E tests that relied on the connectivity key end
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-1. **Verify page location** — The approval page (`/v1/agents/verify`) is served from where exactly? Confirm before Step 4. Check `src/routes/agents.ts` for the GET handler and `public/` for the HTML/JS.
+### 1. Verify page location — RESOLVED
 
-2. **Storage cleanup** — `storage.consumeOtk()` and related OTK methods: are they used by anything other than connectivity key? If yes, keep. If only used by connectivity key, can be removed from storage interface (both SQLite + MongoDB implementations).
+`GET /v1/agents/verify` is handled in `src/routes/agents.ts` (line ~598). It serves `public/agent-consent.html` as a static file (CSP nonce-injected). The URL is already known at device-authorize time — `verification_uri_complete` is constructed from `req.protocol + req.get('host')` in the same handler (line ~86). The agent always receives the full URL in the device-authorize response, so it can tell the user exactly where to go without any hardcoding.
 
-3. **E2E test coverage** — Do existing E2E tests exercise `POST /v1/agents/connect`? If yes, those tests need to be replaced with device-auth-flow tests.
+**Step 4 target file: `public/agent-consent.html`** (and its accompanying JS/CSS).
+
+### 2. OTK storage — RESOLVED, keep everything
+
+OTK (`storage.consumeOtk`, `storage.createOtk`) is used in **7 separate routes**, not just connectivity key:
+
+| Route | OTK purpose |
+|-------|-------------|
+| `auth.ts` `/v1/auth/session` | Tier 0.5 session OTK (after Ed25519 challenge-response) |
+| `auth.ts` pre-rotate | Buffered next_otk so agent always has a key ready |
+| `auth.ts` `/v1/auth/otk` | Generate OTK for owner Tier 0.5 actions |
+| `auth.ts` `/v1/auth/initial-otk` | Initial OTK embedded in AI prompts |
+| `admin.ts` `/v1/admin/setup/initial-otk` | Admin-generated initial OTK for setup |
+| `boards.ts` Tier 0.5 board post | Post to board without JWT, using OTK |
+| `disputes.ts` Tier 0.5 | Dispute actions via OTK |
+| `micro-memory.ts` | Lightweight memory reads/writes for Tier 0.5 |
+| `work.ts` | Work queue actions via OTK |
+
+OTK is the foundation of Tier 0.5 — the "can-do-some-things-without-full-JWT" layer. It is **not connectivity-key-specific** and must be kept in full.
+
+**Only remove:** the single `action: 'register_agent'` OTK creation in `auth.ts /v1/auth/connectivity-key` and the corresponding `consumeOtk` call in `agents.ts /v1/agents/connect`. The storage interface, the OTK table, and all other usages are unaffected.
+
+### 3. E2E test coverage — RESOLVED, tests need replacing
+
+Three tests in `test/api-full.ts` exercise the connectivity key path (lines ~2063–2092):
+
+- `"Owner generates connectivity key"` — calls `POST /v1/auth/connectivity-key`
+- `"Agent registers via connectivity key"` — calls `POST /v1/agents/connect`
+- `"Connectivity key cannot be reused"` — calls `POST /v1/agents/connect` again
+
+These three tests must be **replaced** (not just deleted) with device-auth-flow equivalent tests:
+
+- `"Agent starts device authorization"` — calls `POST /v1/agents/device-authorize`, asserts device_code + verification_uri returned
+- `"Owner approves device authorization"` — calls `POST /v1/agents/verify` with owner JWT, asserts approved
+- `"Agent polls and receives credentials"` — calls `POST /v1/agents/device-token`, asserts gaii + token + private_key returned
+- `"Device code cannot be reused after credential retrieval"` — polls again, asserts expired_token
