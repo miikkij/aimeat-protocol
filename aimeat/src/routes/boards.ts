@@ -89,7 +89,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   // GET /v1/boards — list boards (public boards no auth, private/shared need auth)
   router.get('/v1/boards', async (req, res) => {
     const boards = await storage.listBoards();
-    const gaii = req.auth?.sub;
+    const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
 
     const visible = boards.filter(b => {
       if (b.visibility === 'public' || b.visibility === 'system') return true;
@@ -110,6 +110,33 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       })),
       total: visible.length,
     }));
+  });
+
+  // PATCH /v1/boards/:boardId/visibility — update board visibility (owner only)
+  router.patch('/v1/boards/:boardId/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const gaii = resolve(req);
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+    if (board.ownerGaii !== gaii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner can change visibility'));
+      return;
+    }
+    const { visibility } = req.body ?? {};
+    if (!visibility || !['private', 'public', 'shared'].includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "public", or "shared"'));
+      return;
+    }
+    const updated = await storage.updateBoardVisibility(boardId, visibility);
+    if (!updated) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board visibility'));
+      return;
+    }
+    res.json(success(config.nodeId, { id: updated.id, visibility: updated.visibility }));
+    emitChange('boards');
   });
 
   // GET /v1/boards/subscriptions — list agent's own subscriptions
@@ -232,7 +259,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const gaii = req.auth?.sub;
+    const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
     if (board.visibility !== 'public' && board.visibility !== 'system') {
       if (!gaii) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
@@ -344,7 +371,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const gaii = req.auth?.sub;
+    const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
     if (board.visibility !== 'public' && board.visibility !== 'system') {
       if (!gaii) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));

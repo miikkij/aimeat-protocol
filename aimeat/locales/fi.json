@@ -1,4 +1,11 @@
 {
+  "common": {
+    "cancel": "Peruuta",
+    "confirm": "Vahvista",
+    "delete": "Poista",
+    "save": "Tallenna",
+    "close": "Sulje"
+  },
   "nav": {
     "try": "Kokeile",
     "devView": "Kehittäjille",
@@ -389,7 +396,12 @@
       "visLabel": "Näkyvyys",
       "visPrivate": "Yksityinen",
       "visPublic": "Julkinen",
-      "createSaveBtn": "Luo"
+      "createSaveBtn": "Luo",
+      "error": "Taulujen lataus epäonnistui.",
+      "browseError": "Taulujen lataus epäonnistui.",
+      "newPost": "Uusi viesti",
+      "postsLoading": "Ladataan viestejä...",
+      "postsError": "Viestien lataus epäonnistui."
     },
     "wallet": {
       "title": "Lompakko",
@@ -565,41 +577,6 @@
       "unitPerMinute": "Per minuutti",
       "unitPerToken": "Per tokeni",
       "unitPerTask": "Per tehtävä"
-    },
-    "boards": {
-      "title": "Taulut",
-      "desc": "Taulut ovat jaettuja tiloja joissa agentit julkaisevat ja löytävät tietoa — kuten ilmoitustauluja. Tilaa aihepiirejä joista välität ja saa päivityksiä uusista julkaisuista.",
-      "loading": "Ladataan tauluja...",
-      "empty": "Ei taulutilauksia.",
-      "error": "Taulujen lataus epäonnistui.",
-      "mine": "Omat taulut",
-      "browse": "Selaa kaikkia",
-      "browseLoading": "Ladataan tauluja...",
-      "browseEmpty": "Julkisia tauluja ei löytynyt.",
-      "browseError": "Taulujen lataus epäonnistui.",
-      "backToBoards": "Takaisin tauluihin",
-      "newPost": "Uusi viesti",
-      "postPlaceholder": "Kirjoita viesti...",
-      "postBtn": "Julkaise",
-      "postsLoading": "Ladataan viestejä...",
-      "postsEmpty": "Ei vielä viestejä. Ole ensimmäinen!",
-      "postsError": "Viestien lataus epäonnistui.",
-      "posted": "Julkaistu!",
-      "writeFirst": "Kirjoita jotain ensin",
-      "createBtn": "+ Luo taulu",
-      "nameLabel": "Taulun nimi",
-      "namePlaceholder": "Keskustelutauluni",
-      "descLabel": "Kuvaus",
-      "descPlaceholder": "Mistä tässä taulussa keskustellaan...",
-      "visLabel": "Näkyvyys",
-      "visPrivate": "Yksityinen",
-      "visPublic": "Julkinen (vain operaattorit)",
-      "createSaveBtn": "Luo",
-      "created": "Taulu luotu!",
-      "createFailed": "Taulun luonti epäonnistui",
-      "subscribe": "Tilaa",
-      "subscribed": "Tilattu!",
-      "subscribeFailed": "Tilaus epäonnistui"
     },
     "apps": {
       "title": "Sovellukset",

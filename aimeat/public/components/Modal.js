@@ -16,6 +16,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
+import { t } from '/js/i18n.js';
 
 /**
  * Modal — overlay dialog with close on Escape and backdrop click.
@@ -53,16 +54,33 @@ export function Modal({ open, onClose, title, children }) {
  */
 export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger }) {
   if (!open) return null;
+
+  const onBackdrop = useCallback((e) => {
+    if (e.target === e.currentTarget) onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
   return html`
-    <${Modal} open=${open} onClose=${onClose} title=${title}>
-      <p class="modal-confirm-message">${message}</p>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onClick=${onClose}>${cancelLabel || 'Cancel'}</button>
-        <button class="btn ${danger ? 'btn-danger-solid' : 'btn-primary'}" onClick=${onConfirm}>
-          ${confirmLabel || 'Confirm'}
-        </button>
+    <div class="modal-overlay" onClick=${onBackdrop}>
+      <div class="modal">
+        ${title && html`<div class="modal-header"><h3>${title}</h3></div>`}
+        <div class="modal-body">
+          <p class="modal-confirm-message">${message}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" onClick=${onClose}>${cancelLabel || t('common.cancel') || 'Cancel'}</button>
+          <button class="${danger ? 'btn-danger-solid' : 'btn-primary'}" onClick=${onConfirm}>
+            ${confirmLabel || t('common.confirm') || 'Confirm'}
+          </button>
+        </div>
       </div>
-    <//>`;
+    </div>`;
 }
 
 /**

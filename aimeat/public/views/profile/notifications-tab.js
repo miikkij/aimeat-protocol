@@ -25,6 +25,13 @@ export default function NotificationsTab({ session, showToast }) {
     if (session) checkSubscription();
   }, [session]);
 
+  // Re-check email verification when other tabs update data (e.g. email confirmed)
+  useEffect(() => {
+    const handler = () => { if (session) checkSubscription(); };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [session]);
+
   async function checkSubscription() {
     setLoading(true);
     try {

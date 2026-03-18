@@ -801,6 +801,14 @@ export class MongoStorage implements Storage {
         return rows.map((r: any) => this.toBoardRecord(r));
     }
 
+    async updateBoardVisibility(id: string, visibility: string): Promise<import('../../interface.js').BoardRecord | null> {
+        this.ensureReady();
+        try {
+            const row = await this.prisma.board.update({ where: { boardId: id }, data: { visibility } });
+            return this.toBoardRecord(row);
+        } catch { return null; }
+    }
+
     async deleteBoard(id: string): Promise<boolean> {
         this.ensureReady();
         try {
@@ -852,7 +860,7 @@ export class MongoStorage implements Storage {
 
     async deletePost(boardId: string, postId: string): Promise<boolean> {
         this.ensureReady();
-        const result = await this.prisma.boardPost.deleteMany({ where: { boardId, id: postId } });
+        const result = await this.prisma.boardPost.deleteMany({ where: { boardId, postId } });
         return result.count > 0;
     }
 

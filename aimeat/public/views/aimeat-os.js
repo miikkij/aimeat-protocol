@@ -1,17 +1,25 @@
 /**
- * AIMEAT-OS — View Module
- * Operating System Guide for AI App Builders.
- * Large reference/documentation page with copy-as-markdown.
+ * @file aimeat-os.js
+ * @description AIMEAT-OS landing page — guides users to build their own app
+ *   with any AI chat. Shows a 3-step flow: download guide, give to AI, upload app.
+ * @structure
+ *   - generateMarkdown(nodeUrl) — builds the .md prompt file content
+ *   - AimeatOsView — main Preact component (hero + steps + CTAs)
+ * @usage import AimeatOsView from '/views/aimeat-os.js'
+ * @version-history
+ *   v1.0.0 — 2026-03-17 — Initial reference documentation page
+ *   v2.0.0 — 2026-03-17 — Rewrite: landing page with i18n
+ *   v3.0.0 — 2026-03-18 — Full redesign: clean landing page, proper CSS, i18n
  */
 import { h } from 'preact';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { copyToClipboard } from '/js/utils.js';
+import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
 
-/* ── Data tables ─────────────────────────────────── */
+/* ── Data for markdown generator ──────────────── */
 
 const LIBRARIES = [
   ['aimeat-auth', '/v1/libs/aimeat-auth.js', '—', 'Identity, registration, login, JWT, session management'],
@@ -106,544 +114,143 @@ const EXAMPLE_PROMPTS = [
   ['Data Visualization', 'Create a data dashboard that reads structured data from AIMEAT memory keys and displays it as charts and graphs. Support bar charts, line charts, and pie charts.'],
 ];
 
-/* ── Markdown generator ──────────────────────────── */
+/* ── Markdown generator ──────────────────────── */
 
 function generateMarkdown(nodeUrl) {
-  let md = `# AIMEAT-OS — Operating System Guide for AI App Builders\n\n`;
-  md += `> **Node URL:** \`${nodeUrl}\`\n> **Protocol Version:** 1.2\n> **Generated:** ${new Date().toISOString().split('T')[0]}\n\n---\n\n`;
-  md += `## What Is This?\n\nThis document is your complete reference for building **self-contained HTML applications** that connect to the AIMEAT protocol. Give this file to any chat AI (Claude, ChatGPT, Copilot, etc.) and it will have everything it needs to build you a working AIMEAT app.\n\n`;
-  md += `AIMEAT (AI Memory Exchange and Action Transfer) is an open protocol for AI agent infrastructure. It provides identity, memory, file storage, work exchange, social boards, and an economy — all accessible through a REST API.\n\n`;
-  md += `Your app will be a **single HTML file** with embedded CSS and JavaScript. Users download it and open it in their browser. The app connects to the AIMEAT node at \`${nodeUrl}\`.\n\n---\n\n`;
-  md += `## Available Libraries\n\n| Library | URL | Depends On | What It Does |\n|---------|-----|-----------|---------------|\n`;
+  let md = `# AIMEAT App Builder\n\n`;
+  md += `You are an AIMEAT app builder. Your job is to help the user create a self-contained HTML application that connects to an AIMEAT node.\n\n`;
+  md += `## Your Process\n\n`;
+  md += `1. Ask the user what they want to build (free-form description)\n`;
+  md += `2. Ask what data/features the app needs (memory, files, boards, wallet, etc.)\n`;
+  md += `3. Ask about the look & feel (or offer sensible defaults)\n`;
+  md += `4. Build a single HTML+CSS+JS file that works\n\n`;
+  md += `Keep the interview light — 3-4 questions max. If the user already described everything clearly, skip straight to building.\n\n`;
+  md += `## Node Details\n\n`;
+  md += `- **Node URL:** \`${nodeUrl}\`\n- **Protocol Version:** 1.2\n- **Generated:** ${new Date().toISOString().split('T')[0]}\n\n---\n\n`;
+
+  md += `## Available Client Libraries\n\nLoad via \`<script>\` tags — served from the node, zero CORS issues.\n\n`;
+  md += `| Library | URL | Depends On | Purpose |\n|---------|-----|-----------|--------|\n`;
   for (const [name, url, dep, desc] of LIBRARIES) {
     md += `| **${name}** | \`${nodeUrl}${url}\` | ${dep} | ${desc} |\n`;
   }
-  md += `\n---\n\n## REST API Endpoints\n\n`;
+
+  md += `\n## Quick Start Template\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>My AIMEAT App</title>\n  <script src="${nodeUrl}/v1/libs/aimeat-auth.js"><` + `/script>\n</head>\n<body>\n  <h1>My App</h1>\n  <div id="login"></div>\n  <div id="content" style="display:none"></div>\n  <script>\n    AIMEAT.auth.mountLoginButton('#login', {\n      onLogin: function(session) {\n        document.getElementById('content').style.display = 'block';\n        startApp(session);\n      },\n      onLogout: function() {\n        document.getElementById('content').style.display = 'none';\n      }\n    });\n    async function startApp(session) {\n      var data = await session.fetch('/v1/memory');\n      console.log('My memories:', data);\n    }\n  <` + `/script>\n</body>\n</html>\n\`\`\`\n\n`;
+
+  md += `## REST API Endpoints\n\n`;
   for (const sec of API_SECTIONS) {
     md += `### ${sec.title}\n\n| Method | Path | Auth | Description |\n|--------|------|------|-------------|\n`;
     for (const [m, p, a, d] of sec.rows) md += `| ${m} | ${p} | ${a} | ${d} |\n`;
     md += '\n';
   }
-  md += `---\n\n## Limitations\n\n| Resource | Limit |\n|----------|-------|\n`;
+
+  md += `## Key Concepts\n\n`;
+  md += `- **Owner** — A registered human or organization with a master key pair\n`;
+  md += `- **Agent** — An AI identity under an owner with its own key pair and memory\n`;
+  md += `- **GAII** — Global Agent Instance Identifier: \`agent-name#owner@node-id\`\n`;
+  md += `- **Morsels** — Simple tokens that flow between agents when they help each other\n`;
+  md += `- **Visibility** — private (only you), shared (your agents), public (everyone)\n\n`;
+
+  md += `## Design Guidelines\n\n`;
+  md += `\`\`\`css\n:root {\n  --bg: #0f0a14;\n  --card: rgba(30, 20, 40, 0.85);\n  --text: #f0e6f6;\n  --muted: #c4a6d0;\n  --accent: #E8564A;\n  --border: rgba(232, 86, 74, 0.15);\n  --success: #22c55e;\n  --radius: 12px;\n}\nbody {\n  font-family: system-ui, -apple-system, sans-serif;\n  background: var(--bg);\n  color: var(--text);\n  margin: 0;\n  min-height: 100vh;\n}\n\`\`\`\n\n`;
+
+  md += `## Self-Download Pattern\n\n\`\`\`javascript\nfunction downloadSelf() {\n  var html = document.documentElement.outerHTML;\n  var blob = new Blob(['<!DOCTYPE html>' + html], { type: 'text/html' });\n  var a = document.createElement('a');\n  a.href = URL.createObjectURL(blob);\n  a.download = 'my-app.html';\n  a.click();\n}\n\`\`\`\n\n`;
+
+  md += `## Limitations\n\n| Resource | Limit |\n|----------|-------|\n`;
   for (const [r, l] of LIMITS) md += `| ${r} | ${l} |\n`;
+
+  md += `\n## Example Prompts\n\n`;
+  for (const [title, prompt] of EXAMPLE_PROMPTS) {
+    md += `### ${title}\n> "${prompt}"\n\n`;
+  }
+
+  md += `## Output Requirements\n\n`;
+  md += `Produce a SINGLE HTML file containing:\n`;
+  md += `- All CSS in a \`<style>\` tag\n`;
+  md += `- All JavaScript in \`<script>\` tags\n`;
+  md += `- The aimeat-auth library loaded via \`<script src="${nodeUrl}/v1/libs/aimeat-auth.js">\`\n`;
+  md += `- Additional libraries as needed\n`;
+  md += `- Login/logout UI via \`AIMEAT.auth.mountLoginButton()\`\n`;
+  md += `- Responsive design (mobile-first)\n`;
+  md += `- The self-download button pattern\n`;
+
   return md;
 }
 
-/* ── Subcomponents ───────────────────────────────── */
+/* ── Download helper ─────────────────────────── */
 
-function CodeBlock({ lang, children }) {
-  const preRef = useRef(null);
-  const onCopy = () => {
-    const text = preRef.current?.querySelector('code')?.textContent || '';
-    copyToClipboard(text);
-  };
-  return html`
-    <pre ref=${preRef}>
-      <code class="lang-${lang || ''}">${children}</code>
-      <button class="os-copy-btn" onClick=${onCopy}>Copy</button>
-    </pre>
-  `;
+function downloadFile(content, filename) {
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function ApiTable({ title, rows }) {
-  return html`
-    <h3>${title}</h3>
-    <table>
-      <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
-      <tbody>
-        ${rows.map(([m, p, a, d]) => html`<tr><td>${m}</td><td><code>${p}</code></td><td>${a}</td><td>${d}</td></tr>`)}
-      </tbody>
-    </table>
-  `;
-}
+/* ── Main view ───────────────────────────────── */
 
-/* ── Main view ───────────────────────────────────── */
-
-function AimeatOsView() {
+function AimeatOsView({ navigate }) {
   const nodeUrl = window.location.origin;
-  const today = new Date().toISOString().split('T')[0];
 
   useViewCSS('/css/views/aimeat-os.css');
 
   useEffect(() => {
-    document.title = 'AIMEAT-OS | Operating System Guide for AI App Builders';
+    document.title = t('aimeatOs.title') + ' | AIMEAT';
   }, []);
 
-  const onCopyMarkdown = () => {
-    copyToClipboard(generateMarkdown(nodeUrl));
+  const onDownload = () => {
+    const md = generateMarkdown(nodeUrl);
+    downloadFile(md, 'AIMEAT-OS.md');
+  };
+
+  const onAddApp = () => {
+    navigate('/v1/profile?tab=apps');
+  };
+
+  const onGenerator = (e) => {
+    e.preventDefault();
+    navigate('/v1/profile?tab=generator');
   };
 
   return html`
     <div class="os-wrap">
-      <!-- Header -->
-      <div class="os-doc-header">
-        <h1>AIMEAT-OS — Operating System Guide for AI App Builders</h1>
-        <div class="os-meta-info">
-          <span><strong>Node URL:</strong> <code>${nodeUrl}</code></span>
-          <span><strong>Protocol Version:</strong> 1.2</span>
-          <span><strong>Generated:</strong> <code>${today}</code></span>
+      <section class="os-hero">
+        <h1>${t('aimeatOs.title')}</h1>
+        <p>${t('aimeatOs.subtitle')}</p>
+      </section>
+
+      <div class="os-steps">
+        <div class="os-step">
+          <div class="os-step-num">1</div>
+          <h3>${t('aimeatOs.step1Title').replace(/^\d+\.\s*/, '')}</h3>
+          <p>${t('aimeatOs.step1Desc')}</p>
         </div>
-        <button class="os-copy-all-btn" onClick=${onCopyMarkdown}>📋 Copy as Markdown</button>
+        <div class="os-step">
+          <div class="os-step-num">2</div>
+          <h3>${t('aimeatOs.step2Title').replace(/^\d+\.\s*/, '')}</h3>
+          <p>${t('aimeatOs.step2Desc')}</p>
+        </div>
+        <div class="os-step">
+          <div class="os-step-num">3</div>
+          <h3>${t('aimeatOs.step3Title').replace(/^\d+\.\s*/, '')}</h3>
+          <p>${t('aimeatOs.step3Desc')}</p>
+        </div>
       </div>
 
-      <!-- What Is This? -->
-      <h2>What Is This?</h2>
-      <p>This document is your complete reference for building <strong>self-contained HTML applications</strong> that connect to the AIMEAT protocol. Give this file to any chat AI (Claude, ChatGPT, Copilot, etc.) and it will have everything it needs to build you a working AIMEAT app.</p>
-      <p>AIMEAT (AI Memory Exchange and Action Transfer) is an open protocol for AI agent infrastructure. It provides identity, memory, file storage, work exchange, social boards, and an economy — all accessible through a REST API.</p>
-      <p>Your app will be a <strong>single HTML file</strong> with embedded CSS and JavaScript. Users download it and open it in their browser. The app connects to the AIMEAT node at <code>${nodeUrl}</code>.</p>
-
-      <hr />
-
-      <!-- Quick Start -->
-      <h2>Quick Start — Minimal App Template</h2>
-      <${CodeBlock} lang="html">${`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My AIMEAT App</title>
-  <!-- Load the auth library from the node -->
-  <script src="${nodeUrl}/v1/libs/aimeat-auth.js"><\/script>
-</head>
-<body>
-  <h1>My App</h1>
-  <div id="login"></div>
-  <div id="content" style="display:none">
-    <!-- Your app content here -->
-  </div>
-
-  <script>
-    // Mount automatic login/logout button
-    AIMEAT.auth.mountLoginButton('#login', {
-      onLogin: function(session) {
-        document.getElementById('content').style.display = 'block';
-        startApp(session);
-      },
-      onLogout: function() {
-        document.getElementById('content').style.display = 'none';
-      }
-    });
-
-    async function startApp(session) {
-      var data = await session.fetch('/v1/memory');
-      console.log('My memories:', data);
-    }
-  <\/script>
-</body>
-</html>`}</${CodeBlock}>
-
-      <hr />
-
-      <!-- Available Libraries -->
-      <h2>Available Libraries</h2>
-      <p>Load these via <code>${'<script>'}</code> tags. They're served from the node itself — zero CORS issues.</p>
-      <table>
-        <thead><tr><th>Library</th><th>URL</th><th>Depends On</th><th>What It Does</th></tr></thead>
-        <tbody>
-          ${LIBRARIES.map(([name, url, dep, desc]) => html`
-            <tr><td><strong>${name}</strong></td><td><code>${nodeUrl}${url}</code></td><td>${dep}</td><td>${desc}</td></tr>
-          `)}
-        </tbody>
-      </table>
-      <p><strong>Include pattern:</strong></p>
-      <${CodeBlock} lang="html">${`<script src="${nodeUrl}/v1/libs/aimeat-auth.js"><\/script>
-<script src="${nodeUrl}/v1/libs/aimeat-data.js"><\/script>
-<!-- Add only the libraries you need -->`}</${CodeBlock}>
-
-      <hr />
-
-      <!-- Library API Reference -->
-      <h2>Library API Reference</h2>
-
-      <h3>AIMEAT.auth — Identity & Sessions</h3>
-      <${CodeBlock} lang="javascript">${`// Register a new account (creates owner + agent)
-var session = await AIMEAT.auth.register(username, displayName, {
-  password: 'optional'  // for password-based login
-});
-
-// Login with stored credentials
-var session = await AIMEAT.auth.login();
-
-// Login with password
-var session = await AIMEAT.auth.loginWithPassword(username, password);
-
-// Get current session (null if not logged in)
-var session = AIMEAT.auth.getSession();
-
-// Check if logged in
-if (AIMEAT.auth.hasSession) { /* ... */ }
-
-// Logout
-AIMEAT.auth.logout();
-
-// Mount login/logout UI button
-AIMEAT.auth.mountLoginButton('#selector', {
-  onLogin: function(session) { /* ... */ },
-  onLogout: function() { /* ... */ }
-});
-
-// Session object properties:
-// session.owner    — owner name (string)
-// session.gaii     — agent GAII identity (string)
-// session.ghii     — human identity (string or null)
-// session.jwt      — current JWT token
-// session.nodeUrl  — node URL
-// session.valid    — is JWT still valid? (boolean)
-
-// Session methods:
-// session.fetch(path, opts) — authenticated API call, auto-refreshes JWT
-// session.refresh() — manually refresh JWT`}</${CodeBlock}>
-
-      <h3>AIMEAT.data — Memory & Micro-Memory</h3>
-      <${CodeBlock} lang="javascript">${`// Write a memory entry
-await AIMEAT.data.set('my-key', 'my-value', {
-  visibility: 'private',  // 'private' | 'shared' | 'public'
-  tags: ['tag1', 'tag2']
-});
-
-// Read a value
-var value = await AIMEAT.data.get('my-key');
-
-// Read full entry with metadata
-var entry = await AIMEAT.data.getEntry('my-key');
-// entry = { key, value, visibility, tags, version, created_at, updated_at }
-
-// Update with optimistic locking
-await AIMEAT.data.update('my-key', 'new-value', entry.version, {
-  tags: ['updated']
-});
-
-// Delete
-await AIMEAT.data.delete('my-key');
-
-// List all keys
-var list = await AIMEAT.data.list({
-  prefix: 'project/',
-  visibility: 'public',
-  tags: 'important'
-});
-
-// Search
-var results = await AIMEAT.data.search('query text', {
-  visibility: 'private'
-});`}</${CodeBlock}>
-
-      <h3>AIMEAT.storage — File Storage</h3>
-      <${CodeBlock} lang="javascript">${`// Upload a file (from <input type="file">)
-var fileInput = document.getElementById('file-input');
-var result = await AIMEAT.storage.upload(fileInput.files[0], {
-  key: 'my-photo.jpg',
-  visibility: 'private'  // 'private' | 'owner' | 'public'
-});
-
-// Upload base64 data
-await AIMEAT.storage.upload(base64String, {
-  key: 'data.json',
-  mimeType: 'application/json'
-});
-
-// List files
-var files = await AIMEAT.storage.list();
-
-// Download as Blob
-var blob = await AIMEAT.storage.download('my-photo.jpg');
-var url = URL.createObjectURL(blob);
-
-// Get file metadata
-var meta = await AIMEAT.storage.metadata('my-photo.jpg');
-
-// Delete
-await AIMEAT.storage.delete('my-photo.jpg');
-
-// Mount drag & drop zone
-AIMEAT.storage.mountDropZone('#drop-area', {
-  onUpload: function(result) { console.log('Uploaded:', result); }
-});`}</${CodeBlock}>
-
-      <h3>AIMEAT.social — Boards & Posts</h3>
-      <${CodeBlock} lang="javascript">${`// Create a board
-var board = await AIMEAT.social.createBoard('My Board', {
-  description: 'A place to discuss things',
-  visibility: 'private'
-});
-
-// List boards
-var boards = await AIMEAT.social.listBoards();
-
-// Get posts from a board
-var posts = await AIMEAT.social.getPosts(boardId, { page: 1 });
-
-// Post to a board
-await AIMEAT.social.post(boardId, 'Hello world!', {
-  tags: ['announcement']
-});
-
-// React to a post
-await AIMEAT.social.react(boardId, postId, '👍');
-
-// Reply to a post
-await AIMEAT.social.reply(boardId, postId, 'Great point!');`}</${CodeBlock}>
-
-      <h3>AIMEAT.wallet — Economy</h3>
-      <${CodeBlock} lang="javascript">${`// Check balance
-var balance = await AIMEAT.wallet.balance();
-// balance = { balance, in_escrow, available, daily_allowance }
-
-// Transaction history
-var txs = await AIMEAT.wallet.transactions({ limit: 20 });
-
-// Mount balance badge UI
-AIMEAT.wallet.mountBadge('#balance', {
-  onClick: function() { /* show transaction history */ }
-});`}</${CodeBlock}>
-
-      <h3>AIMEAT.work — Actions & Work Exchange</h3>
-      <${CodeBlock} lang="javascript">${`// Browse the action catalogue
-var catalogue = await AIMEAT.work.catalogue({
-  search: 'translation',
-  category: 'language'
-});
-
-// Request work from a provider
-var work = await AIMEAT.work.request(actionId, providerGaii, {
-  text: 'Translate this to Finnish'
-}, { ttl_hours: 24 });
-
-// Provider: check inbox
-var inbox = await AIMEAT.work.inbox();
-
-// Provider: accept and deliver
-await AIMEAT.work.accept(trackingCode);
-await AIMEAT.work.deliver(trackingCode, {
-  translated: 'Käännä tämä suomeksi'
-});
-
-// Requester: rate delivery (1-5)
-await AIMEAT.work.rate(trackingCode, 5, { comment: 'Excellent!' });
-
-// Publish your own action/service
-await AIMEAT.work.publishAction({
-  display_name: 'Translation Service',
-  description: 'I translate text between languages',
-  category: 'language',
-  price: 5,
-  unit: 'per_request'
-});`}</${CodeBlock}>
-
-      <hr />
-
-      <!-- REST API Endpoints -->
-      <h2>REST API Endpoints (Direct)</h2>
-      <p>If you prefer direct API calls instead of the libraries, here is the full endpoint reference. All require JWT auth unless marked (public).</p>
-
-      <h3>Response Format</h3>
-      <p>Every response follows this envelope:</p>
-      <${CodeBlock} lang="json">${`{
-  "ok": true,
-  "node_id": "node-name",
-  "data": { },
-  "hints": [{ "description": "...", "method": "GET", "url": "..." }]
-}`}</${CodeBlock}>
-      <p>On error:</p>
-      <${CodeBlock} lang="json">${`{
-  "ok": false,
-  "error": { "code": "ERROR_CODE", "message": "What went wrong" }
-}`}</${CodeBlock}>
-
-      ${API_SECTIONS.map(sec => html`<${ApiTable} title=${sec.title} rows=${sec.rows} />`)}
-
-      <hr />
-
-      <!-- Key Concepts -->
-      <h2>Key Concepts</h2>
-
-      <h3>Identity Model</h3>
-      <ul>
-        <li><strong>Owner</strong> — A registered human or organization. Has a master key pair.</li>
-        <li><strong>Agent</strong> — An AI identity under an owner. Has its own key pair, wallet, memory.</li>
-        <li><strong>GAII</strong> — Global Agent Instance Identifier: <code>agent-name#owner@node-id</code></li>
-        <li><strong>GHII</strong> — Global Human Instance Identifier: human identity for the web UI</li>
-      </ul>
-
-      <h3>Morsel Economy</h3>
-      <ul>
-        <li><strong>Morsels</strong> — Not money. Simple tokens that flow between agents when they help each other.</li>
-        <li>Welcome bonus: 100 morsels on registration</li>
-        <li>Daily allowance: 50/day (cap 500)</li>
-        <li>Work requests hold morsels in escrow until delivered and rated</li>
-      </ul>
-
-      <h3>Visibility Levels</h3>
-      <ul>
-        <li><strong>private</strong> — Only the owning agent can see it</li>
-        <li><strong>shared</strong> / <strong>owner</strong> — All agents under the same owner can see it</li>
-        <li><strong>public</strong> — Anyone on the network can discover it</li>
-      </ul>
-
-      <h3>Apps</h3>
-      <ul>
-        <li>Self-contained HTML files uploaded via POST /v1/apps</li>
-        <li>Stored with key prefix <code>apps/</code> and public visibility</li>
-        <li>Downloaded at GET /v1/apps/:owner/:filename</li>
-        <li>Optional access code protection</li>
-        <li>Optional screenshot (uploaded alongside the app)</li>
-      </ul>
-
-      <hr />
-
-      <!-- Example Prompts -->
-      <h2>Example Prompts for AI</h2>
-      <p>Use these as starting points when asking an AI to build you an app:</p>
-      ${EXAMPLE_PROMPTS.map(([title, prompt]) => html`
-        <h3>${title}</h3>
-        <blockquote><p>"${prompt}"</p></blockquote>
-      `)}
-
-      <hr />
-
-      <!-- Design Guidelines -->
-      <h2>Design Guidelines</h2>
-
-      <h3>Recommended CSS Theme</h3>
-      <p>Apps look best when they match the AIMEAT aesthetic:</p>
-      <${CodeBlock} lang="css">${`:root {
-  --bg: #0f0a14;
-  --card: rgba(30, 20, 40, 0.85);
-  --text: #f0e6f6;
-  --muted: #c4a6d0;
-  --accent: #E8564A;
-  --border: rgba(232, 86, 74, 0.15);
-  --success: #22c55e;
-  --radius: 12px;
-}
-body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  margin: 0;
-  min-height: 100vh;
-}`}</${CodeBlock}>
-
-      <h3>Self-Download Pattern</h3>
-      <p>Include a download button so users can save the app:</p>
-      <${CodeBlock} lang="javascript">${`function downloadSelf() {
-  var html = document.documentElement.outerHTML;
-  var blob = new Blob(['<!DOCTYPE html>' + html], { type: 'text/html' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'my-app.html';
-  a.click();
-}`}</${CodeBlock}>
-
-      <h3>Self-Publish Pattern</h3>
-      <p>Include a "Publish to AIMEAT" button so the app can upload itself to the node's app catalog:</p>
-      <${CodeBlock} lang="javascript">${`async function publishSelf() {
-  // Capture the complete HTML
-  var html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
-  var content = btoa(unescape(encodeURIComponent(html)));
-
-  // Get auth token (user must be logged in)
-  var token = AIMEAT.auth.getToken();
-  if (!token) { alert('Please log in first'); return; }
-
-  var filename = 'my-app.html'; // Change to your app's filename
-  var res = await fetch('${nodeUrl}/v1/apps', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      filename: filename,
-      content: content,
-      mime_type: 'text/html',
-      name: 'My App',
-      description: 'Description of my app',
-      category: 'utility',
-      tags: ['tag1', 'tag2']
-    })
-  });
-  var data = await res.json();
-  if (data.status === 'ok') {
-    alert('Published! Version ' + data.data.version_number);
-  } else {
-    alert('Error: ' + (data.error_description || 'Unknown error'));
-  }
-}`}</${CodeBlock}>
-      <p>The app captures its own HTML with <code>document.documentElement.outerHTML</code>, base64-encodes it, and uploads via <code>POST /v1/apps</code>. Each publish auto-increments the version number, so previous versions are preserved.</p>
-
-      <h3>"Share This App" Prompt</h3>
-      <p>Generate a prompt that describes your app so another user can paste it into any AI and get a functionally equivalent app regenerated:</p>
-      <${CodeBlock} lang="javascript">${`function generateSharePrompt() {
-  var html = document.documentElement.outerHTML;
-  var prompt = 'Recreate this HTML app. It should do the following:\\n\\n';
-  prompt += '[DESCRIBE WHAT YOUR APP DOES HERE]\\n\\n';
-  prompt += 'The app connects to an AIMEAT node at ' + window.location.origin + '.\\n';
-  prompt += 'Use the AIMEAT client libraries (aimeat-auth, aimeat-data, etc.).\\n\\n';
-  prompt += 'Here is the source code for reference:\\n\\n';
-  prompt += html;
-  navigator.clipboard.writeText(prompt);
-  alert('Share prompt copied to clipboard!');
-}`}</${CodeBlock}>
-      <p>This enables <strong>prompt-based app distribution</strong> — instead of sharing files, share a prompt that any AI can use to regenerate the app.</p>
-
-      <h3>Sandbox Iframe Auth (postMessage)</h3>
-      <p>When your app runs inside the App Catalog's sandboxed iframe, <code>localStorage</code> is not accessible. Use <code>requestParentAuth()</code> to get a JWT from the parent window:</p>
-      <${CodeBlock} lang="javascript">${`// Detect sandbox mode and request auth from the parent
-async function init() {
-  if (AIMEAT.auth.inSandbox) {
-    // Running in sandboxed iframe — request JWT from parent
-    var session = await AIMEAT.auth.requestParentAuth();
-    if (session) {
-      console.log('Got auth from parent:', session.owner);
-      // Use session.fetch() for authenticated API calls
-      var data = await session.fetch('/v1/memory/my-key');
-    }
-  } else {
-    // Running standalone — use normal login
-    var session = await AIMEAT.auth.login();
-  }
-}
-init();`}</${CodeBlock}>
-      <p>The parent responds with the user's current JWT and node URL. The returned session has a <code>.fetch()</code> method for authenticated API calls. If no auth is available, <code>null</code> is returned.</p>
-
-      <h3>Responsive Design</h3>
-      <p>Always include the viewport meta tag and design for mobile-first:</p>
-      <${CodeBlock} lang="html">${`<meta name="viewport" content="width=device-width, initial-scale=1.0">`}</${CodeBlock}>
-
-      <hr />
-
-      <!-- Limitations -->
-      <h2>Limitations & Quotas</h2>
-      <table>
-        <thead><tr><th>Resource</th><th>Limit</th></tr></thead>
-        <tbody>
-          ${LIMITS.map(([r, l]) => html`<tr><td>${r}</td><td>${l}</td></tr>`)}
-        </tbody>
-      </table>
-
-      <hr />
-
-      <!-- Troubleshooting -->
-      <h2>Troubleshooting</h2>
-
-      <h3>CORS Errors</h3>
-      <p>Your app HTML should be served from the same AIMEAT node. Upload it via POST /v1/apps so it's served from <code>${nodeUrl}/v1/apps/...</code>.</p>
-
-      <h3>JWT Expired</h3>
-      <p>Use <code>session.fetch()</code> instead of raw <code>fetch()</code> — it auto-refreshes the JWT.</p>
-
-      <h3>"Not authenticated" Errors</h3>
-      <p>Make sure you call <code>AIMEAT.auth.login()</code> or <code>AIMEAT.auth.register()</code> before making API calls.</p>
-
-      <h3>413 File Too Large</h3>
-      <p>Single file uploads are limited to 10MB. Use chunked upload for larger files.</p>
-
-      <hr />
-
-      <!-- Footer -->
-      <div class="os-doc-footer">
-        <p>This guide was generated for the AIMEAT node at <code>${nodeUrl}</code>. The node implements AIMEAT Protocol v1.2.</p>
+      <div class="os-actions">
+        <button class="btn-primary os-download-btn" onClick=${onDownload}>
+          ${t('aimeatOs.downloadBtn')}
+        </button>
+        <p class="os-download-hint">${t('aimeatOs.downloadHint')}</p>
+        <button class="btn-outline os-add-btn" onClick=${onAddApp}>
+          ${t('aimeatOs.addAppBtn')}
+        </button>
+      </div>
+
+      <div class="os-generator-hint">
+        <span>${t('aimeatOs.generatorHint')} </span>
+        <a href="/v1/profile?tab=generator" onClick=${onGenerator}>${t('aimeatOs.generatorLink')}</a>
       </div>
     </div>
   `;

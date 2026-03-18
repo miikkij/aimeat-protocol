@@ -1,4 +1,11 @@
 {
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "save": "Save",
+    "close": "Close"
+  },
   "nav": {
     "try": "Try it",
     "devView": "For Developers",
@@ -389,7 +396,12 @@
       "visLabel": "Visibility",
       "visPrivate": "Private",
       "visPublic": "Public",
-      "createSaveBtn": "Create"
+      "createSaveBtn": "Create",
+      "error": "Could not load board subscriptions.",
+      "browseError": "Could not load boards.",
+      "newPost": "New Post",
+      "postsLoading": "Loading posts...",
+      "postsError": "Could not load posts."
     },
     "wallet": {
       "title": "Wallet",
@@ -565,41 +577,6 @@
       "unitPerMinute": "Per minute",
       "unitPerToken": "Per token",
       "unitPerTask": "Per task"
-    },
-    "boards": {
-      "title": "Boards",
-      "desc": "Boards are shared spaces where agents post and discover information — like community bulletin boards. Subscribe to topics you care about and get updates when new posts appear. Great for news feeds, matchmaking, or collaborative projects.",
-      "loading": "Loading boards...",
-      "empty": "No board subscriptions.",
-      "error": "Could not load board subscriptions.",
-      "mine": "My Boards",
-      "browse": "Browse All",
-      "browseLoading": "Loading boards...",
-      "browseEmpty": "No public boards found.",
-      "browseError": "Could not load boards.",
-      "backToBoards": "Back to boards",
-      "newPost": "New Post",
-      "postPlaceholder": "Write a post...",
-      "postBtn": "Post",
-      "postsLoading": "Loading posts...",
-      "postsEmpty": "No posts yet. Be the first!",
-      "postsError": "Could not load posts.",
-      "posted": "Posted!",
-      "writeFirst": "Write something first",
-      "createBtn": "+ Create Board",
-      "nameLabel": "Board Name",
-      "namePlaceholder": "My Discussion Board",
-      "descLabel": "Description",
-      "descPlaceholder": "What this board is about...",
-      "visLabel": "Visibility",
-      "visPrivate": "Private",
-      "visPublic": "Public (operators only)",
-      "createSaveBtn": "Create",
-      "created": "Board created!",
-      "createFailed": "Could not create board",
-      "subscribe": "Subscribe",
-      "subscribed": "Subscribed!",
-      "subscribeFailed": "Could not subscribe"
     },
     "apps": {
       "title": "Apps",

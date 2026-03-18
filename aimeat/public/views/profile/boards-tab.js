@@ -57,6 +57,19 @@ export default function BoardsTab({ session, showToast }) {
     } else showToast(t('profile.boards.createFailed'), true);
   }
 
+  const cycleVis = ['private', 'public'];
+  const visColor = { private: '#c084fc', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', public: 'rgba(0,200,100,.2)' };
+
+  async function handleUpdateBoardVisibility(boardId, newVis) {
+    setMyBoards(prev => prev?.map(b => (b.board_id || b.id) === boardId ? { ...b, visibility: newVis } : b));
+    const resp = await boardsService.updateBoardVisibility(boardId, newVis);
+    if (resp.ok === false) {
+      showToast(resp.error?.message || t('profile.error'), true);
+      loadMyData();
+    }
+  }
+
   async function handleSubscribe(boardId) {
     try {
       const resp = await boardsService.subscribe(boardId);
@@ -127,9 +140,10 @@ export default function BoardsTab({ session, showToast }) {
         ? html`<div class="empty">${t('profile.boards.postsEmpty')}</div>`
         : boardView.posts.map(p => html`
           <div class="post-card">
-            <div class="post-content">${escHtml(p.content)}</div>
+            <div class="post-content">${escHtml(p.body || p.content || '')}</div>
             <div class="post-meta">
               <span>${escHtml(p.author_gaii || p.author || '-')}</span>
+              <span class="text-meta">\u00B7</span>
               <span>${p.created_at ? timeAgo(p.created_at) : ''}</span>
               ${isMyPost(p) ? html`<button class="btn-danger-solid btn-sm pf-ml-auto" onClick=${(e) => { e.stopPropagation(); handleDeletePost(boardView.id, p.id || p.post_id); }}>${t('profile.boards.deletePost') || 'Delete'}</button>` : null}
             </div>
@@ -156,16 +170,21 @@ export default function BoardsTab({ session, showToast }) {
       ${showBrdForm && html`<${BoardForm} onCreate=${handleCreate} onCancel=${() => setShowBrdForm(false)} />`}
       ${!myBoards ? html`<${Spinner} text=${t('profile.boards.loading')} />`
         : myBoards.length === 0 ? html`<div class="empty">${t('profile.boards.empty')}</div>`
-        : myBoards.map(b => { const bid = b.board_id || b.id; return html`
+        : myBoards.map(b => { const bid = b.board_id || b.id; const vis = b.visibility || 'private'; const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length]; return html`
           <div class="card card-clickable" onClick=${() => viewPosts(bid, b.name)}>
             <div class="card-header">
               <div class="card-title">${escHtml(b.name)}</div>
               <div class="flex-row">
-                <span class="badge ${b.visibility === 'public' ? 'badge-success' : 'badge-muted'}">${b.visibility || 'private'}</span>
-                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard') || 'Delete'}</button>
+                <button class="kpkg-vis-pill"
+                  onClick=${(e) => { e.stopPropagation(); handleUpdateBoardVisibility(bid, nextVis); }}
+                  title="${t('knowledge.visibility.' + vis)} \u2192 ${t('knowledge.visibility.' + nextVis)}"
+                  style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
+                >${t('knowledge.visibility.' + vis)} \u25BE</button>
+                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard')}</button>
               </div>
             </div>
-            <div class="card-subtitle">${escHtml(b.description || '')}</div>
+            ${b.description ? html`<div class="card-subtitle">${escHtml(b.description)}</div>` : null}
+            <div class="text-meta-sm">${b.created_at ? timeAgo(b.created_at) : ''}</div>
           </div>
         `; })
       }
@@ -178,7 +197,8 @@ export default function BoardsTab({ session, showToast }) {
               <div class="card-title card-clickable" onClick=${() => viewPosts(b.id || b.board_id, b.name)}>${escHtml(b.name)}</div>
               <button class="btn-sm" onClick=${() => handleSubscribe(b.id || b.board_id)}>${t('profile.boards.subscribe')}</button>
             </div>
-            <div class="card-subtitle">${escHtml(b.description || '')}</div>
+            ${b.description ? html`<div class="card-subtitle">${escHtml(b.description)}</div>` : null}
+            <div class="text-meta-sm">${b.created_at ? timeAgo(b.created_at) : ''}</div>
           </div>
         `)
       }

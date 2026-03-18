@@ -29,6 +29,14 @@ export async function deleteBoard(boardId) {
   return apiDelete(`/v1/boards/${encodeURIComponent(boardId)}`);
 }
 
+/** Update board visibility. */
+export async function updateBoardVisibility(boardId, visibility) {
+  return api(`/v1/boards/${encodeURIComponent(boardId)}/visibility`, {
+    method: 'PATCH',
+    body: JSON.stringify({ visibility }),
+  });
+}
+
 /** Subscribe to a board. */
 export async function subscribe(boardId) {
   return apiPost(`/v1/boards/${encodeURIComponent(boardId)}/subscribe`);
@@ -58,6 +66,6 @@ export async function deletePost(boardId, postId) {
 export async function reactToPost(boardId, postId, emoji) {
   return api(`/v1/boards/${encodeURIComponent(boardId)}/posts/${encodeURIComponent(postId)}/react`, {
     method: 'POST',
-    body: JSON.stringify({ emoji }),
+    body: JSON.stringify({ reaction: emoji }),
   });
 }

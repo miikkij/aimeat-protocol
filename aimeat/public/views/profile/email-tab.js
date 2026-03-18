@@ -84,6 +84,8 @@ export default function EmailTab({ session, showToast }) {
       }
       setStep('verified');
       showToast(t('profile.email.verifySuccess'));
+      // Notify other tabs (e.g. notifications-tab) that email status changed
+      window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       loadData();
     } catch (err) {
       showToast(err.message || t('profile.email.verifyFailed'), true);

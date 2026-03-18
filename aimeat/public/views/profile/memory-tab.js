@@ -4,6 +4,7 @@
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
+ *   v1.1.0 — 2026-03-18 — Fix: use AuthImage for thumbnails and authenticated download to avoid 401
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -13,6 +14,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner, recipientBadge, VisibilityPill } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
+import AuthImage from '/js/components/auth-image.js';
 import { listAgents } from '/js/services/agents.js';
 import { getKeyPermissions } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -138,6 +140,29 @@ export default function MemoryTab({ session, showToast, onStats }) {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async function handleDownloadFile(key) {
+    try {
+      const headers = {};
+      if (window.AIMEAT?.auth?.hasSession) {
+        const session = window.AIMEAT.auth.getSession();
+        if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+      }
+      const resp = await fetch(`${NODE_URL}/v1/memory/files/${encodeURIComponent(key)}`, { headers });
+      if (!resp.ok) throw new Error(resp.status);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = key;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast(e.message || t('profile.error'), true);
+    }
   }
 
   async function handleDeleteFile(key) {
@@ -335,7 +360,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
               return html`
                 <div class="file-card">
                   ${isImage
-                    ? html`<img class="file-thumb" src="${NODE_URL}/v1/memory/files/${encodeURIComponent(fKey)}" alt=${escHtml(fKey)} loading="lazy" />`
+                    ? html`<${AuthImage} class="file-thumb" src="${NODE_URL}/v1/memory/files/${encodeURIComponent(fKey)}" alt=${escHtml(fKey)} />`
                     : html`<div class="file-icon">${f.mime_type?.includes('pdf') ? '\u{1F4C4}' : '\u{1F4CE}'}</div>`
                   }
                   <div class="file-info">
@@ -358,7 +383,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                       `}
                   </div>
                   <div class="file-actions">
-                    <a class="btn-outline btn-sm pf-no-underline" href="${NODE_URL}/v1/memory/files/${encodeURIComponent(fKey)}" target="_blank">${t('profile.files.download')}</a>
+                    <button class="btn-outline btn-sm" onClick=${() => handleDownloadFile(fKey)}>${t('profile.files.download')}</button>
                     <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteFile(fKey)}>${t('profile.files.delete')}</button>
                   </div>
                 </div>`;
