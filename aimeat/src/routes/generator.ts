@@ -3,13 +3,17 @@
 // Agents submit generated content here; the route validates it, then writes to
 // generator.* memory keys using the same structure the frontend reads.
 // @structure
-//   POST /v1/generator/projects                        — create a new generator project
-//   GET  /v1/generator/projects                        — list all projects for the caller
-//   GET  /v1/generator/:projectId                      — get full project state (project, interviewSpec, components, session)
-//   POST /v1/generator/:projectId/interview            — save/update interview spec for a project
-//   POST /v1/generator/:projectId/session/claim        — agent claims an execution session
-//   POST /v1/generator/:projectId/session/heartbeat    — agent keeps session alive / updates progress
-//   DELETE /v1/generator/:projectId/session            — release session (user stop or agent done)
+//   POST /v1/generator/projects                                    — create a new generator project
+//   GET  /v1/generator/projects                                    — list all projects for the caller
+//   GET  /v1/generator/:projectId                                  — get full project state (project, interviewSpec, components, session)
+//   POST /v1/generator/:projectId/interview                        — save/update interview spec for a project
+//   POST /v1/generator/:projectId/session/claim                    — agent claims an execution session
+//   POST /v1/generator/:projectId/session/heartbeat                — agent keeps session alive / updates progress
+//   DELETE /v1/generator/:projectId/session                        — release session (user stop or agent done)
+//   POST /v1/generator/:projectId/steps/blueprint                  — validate + store blueprint
+//   POST /v1/generator/:projectId/components/:componentId/submit   — validate + store component content
+//   POST /v1/generator/:projectId/log                              — write log entry to memory
+//   POST /v1/generator/:projectId/complete                         — mark project active, release session
 // @usage
 //   Consumed by AI agents via device auth (generator:read / generator:write / generator:execute scopes)
 //   and by the browser UI (owner JWT satisfies agent role check).
@@ -17,6 +21,7 @@
 //   v1.0.0 — 2026-03-18 — Initial implementation
 //   v1.1.0 — 2026-03-18 — Add project management and interview endpoints (Task 3)
 //   v1.2.0 — 2026-03-18 — Add session claim, heartbeat, and release endpoints (Task 4)
+//   v1.3.0 — 2026-03-18 — Add blueprint, component submit, log, and complete endpoints (Task 5)
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -24,13 +29,15 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { validateInterviewSpec } from '../services/generator-validate.js';
+import { validateInterviewSpec, validateBlueprint, validateComponent } from '../services/generator-validate.js';
+import type { ComponentType } from '../services/generator-validate.js';
 
 export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  const VALID_COMPONENT_TYPES: ComponentType[] = ['csm', 'msm', 'extension', 'app', 'memory', 'translation', 'cortex'];
 
   // POST /v1/generator/projects — create a new generator project
   router.post('/v1/generator/projects',
@@ -282,6 +289,182 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const projectId = req.params['projectId'] as string;
       await storage.deleteMemory(gaii, `generator.${projectId}.session`);
       res.json(success(config.nodeId, { released: true }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/steps/blueprint — validate + store blueprint
+  // NOTE: registered before /:projectId/components/:componentId/submit to prevent 'steps' matching as componentId
+  router.post('/v1/generator/:projectId/steps/blueprint',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:write'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+      const { blueprint } = req.body ?? {};
+
+      if (!blueprint || typeof blueprint !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'blueprint string is required'));
+        return;
+      }
+
+      const validation = validateBlueprint(blueprint);
+      if (!validation.valid) {
+        // Return validation errors to agent — do NOT write to memory
+        res.json(success(config.nodeId, { valid: false, errors: validation.errors, warnings: validation.warnings }));
+        return;
+      }
+
+      // Update the project's blueprint field in memory
+      const now = new Date().toISOString();
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      const updated = {
+        ...(projectRec.value as Record<string, unknown>),
+        blueprint: validation.extracted ?? blueprint,
+        status: 'blueprint_ready',
+        updatedAt: now,
+      };
+      await storage.setMemory({ ...projectRec, value: updated, updatedAt: now });
+
+      res.json(success(config.nodeId, { valid: true, errors: [], warnings: validation.warnings ?? [] }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/components/:componentId/submit — validate + store component content
+  router.post('/v1/generator/:projectId/components/:componentId/submit',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:write'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+      const { type, content } = req.body ?? {};
+
+      if (!type || !VALID_COMPONENT_TYPES.includes(type as ComponentType)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', `type must be one of: ${VALID_COMPONENT_TYPES.join(', ')}`));
+        return;
+      }
+      if (!content || typeof content !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'content string is required'));
+        return;
+      }
+
+      const validation = validateComponent(type as ComponentType, content);
+
+      if (!validation.valid) {
+        // Return errors for agent to correct — do NOT write to memory
+        res.json(success(config.nodeId, {
+          valid: false,
+          errors: validation.errors,
+          warnings: validation.warnings ?? [],
+          extracted: validation.extracted,
+        }));
+        return;
+      }
+
+      // Write validated component to memory
+      const now = new Date().toISOString();
+      const existingRec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
+      const newVersion = existingRec ? existingRec.version + 1 : 1;
+
+      const extractedContent = typeof validation.extracted === 'string'
+        ? validation.extracted
+        : JSON.stringify(validation.extracted);
+
+      await storage.setMemory({
+        key: `generator.${projectId}.component.${componentId}`,
+        ownerGaii: gaii,
+        value: { type, content: extractedContent, status: 'ready', submittedAt: now },
+        visibility: 'owner',
+        version: newVersion,
+        tags: ['generator', 'component', type as string],
+        ttlHours: null,
+        createdAt: existingRec?.createdAt ?? now,
+        updatedAt: now,
+      });
+
+      res.json(success(config.nodeId, {
+        valid: true,
+        errors: [],
+        warnings: validation.warnings ?? [],
+        extracted: validation.extracted,
+      }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/log — write log entry to memory
+  router.post('/v1/generator/:projectId/log',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:execute'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+      const { taskId, level, message, meta } = req.body ?? {};
+
+      if (!taskId || !level || !message) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'taskId, level, and message are required'));
+        return;
+      }
+      if (!['info', 'warn', 'error'].includes(level as string)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'level must be info, warn, or error'));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      await storage.setMemory({
+        key: `generator.${projectId}.logs.${taskId as string}`,
+        ownerGaii: gaii,
+        value: { taskId, level, message, meta: meta ?? null, timestamp: now },
+        visibility: 'owner',
+        version: 1,
+        tags: ['generator', 'log'],
+        ttlHours: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      res.json(success(config.nodeId, { ok: true }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/complete — mark project active, release session
+  router.post('/v1/generator/:projectId/complete',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:execute'),
+    async (req, res) => {
+      const gaii = resolve(req);
+      const projectId = req.params['projectId'] as string;
+
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      await storage.setMemory({
+        ...projectRec,
+        value: {
+          ...(projectRec.value as Record<string, unknown>),
+          status: 'active',
+          completedAt: now,
+          updatedAt: now,
+        },
+        updatedAt: now,
+      });
+
+      // Release session if it exists
+      await storage.deleteMemory(gaii, `generator.${projectId}.session`);
+
+      res.json(success(config.nodeId, { status: 'active' }));
     }
   );
 

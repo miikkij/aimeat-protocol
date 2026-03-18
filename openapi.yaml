@@ -13644,3 +13644,218 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}/steps/blueprint:
+    post:
+      operationId: submitGeneratorBlueprint
+      summary: Validate and store blueprint
+      description: |
+        Validates the blueprint JSON submitted by the agent. On validation failure, returns
+        `valid: false` with structured errors (HTTP 200) so the agent can correct and retry —
+        nothing is written to memory. On success, stores the blueprint in the project record
+        and sets status to `blueprint_ready`. Requires `generator:write` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blueprint]
+              properties:
+                blueprint:
+                  type: string
+                  description: Blueprint JSON string to validate and store
+      responses:
+        '200':
+          description: Validation result (valid or invalid — check `data.valid`)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid: { type: boolean }
+                          errors: { type: array, items: { type: string } }
+                          warnings: { type: array, items: { type: string } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/generator/{projectId}/components/{componentId}/submit:
+    post:
+      operationId: submitGeneratorComponent
+      summary: Validate and store component content
+      description: |
+        Validates component content submitted by the agent. On validation failure, returns
+        `valid: false` with structured errors (HTTP 200) — nothing is written to memory.
+        On success, writes the validated component to `generator.{id}.component.{componentId}`.
+        Requires `generator:write` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+        - name: componentId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Component ID (matches blueprint component id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, content]
+              properties:
+                type:
+                  type: string
+                  enum: [csm, msm, extension, app, memory, translation, cortex]
+                  description: Component type
+                content:
+                  type: string
+                  description: Component content string to validate and store
+      responses:
+        '200':
+          description: Validation result (valid or invalid — check `data.valid`)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid: { type: boolean }
+                          errors: { type: array, items: { type: string } }
+                          warnings: { type: array, items: { type: string } }
+                          extracted:
+                            description: Extracted/normalized content (string or object for cortex)
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}/log:
+    post:
+      operationId: writeGeneratorLog
+      summary: Write a generator log entry
+      description: |
+        Writes a log entry to `generator.{projectId}.logs.{taskId}` in memory.
+        Used by agents to record progress, warnings, and errors during generation.
+        Requires `generator:execute` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId, level, message]
+              properties:
+                taskId:
+                  type: string
+                  description: Unique task/step identifier for this log entry
+                level:
+                  type: string
+                  enum: [info, warn, error]
+                  description: Log level
+                message:
+                  type: string
+                  description: Log message
+                meta:
+                  description: Optional structured metadata
+                  nullable: true
+      responses:
+        '200':
+          description: Log entry written
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}/complete:
+    post:
+      operationId: completeGeneratorProject
+      summary: Mark project active and release session
+      description: |
+        Marks the project status as `active` and records `completedAt`. Also releases the
+        execution session if one exists. Called by the agent when all components have been
+        successfully submitted. Requires `generator:execute` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      responses:
+        '200':
+          description: Project marked active
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, example: active }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
