@@ -857,8 +857,8 @@
 .pf-gen-step-indicators { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .pf-gen-step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); display: inline-block; }
 .pf-gen-step-dot.done { background: var(--success); }
-.pf-gen-step-dot.active { background: var(--accent); animation: gen-pulse 1.5s infinite; }
-@keyframes gen-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.pf-gen-step-dot.active { background: var(--accent); animation: pf-gen-pulse 1.5s infinite; }
+@keyframes pf-gen-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .pf-gen-agent-selector { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
 .pf-gen-agent-selector-subtitle { color: var(--text-dim); margin-bottom: 12px; }
 .pf-gen-agent-selector-empty { color: var(--text-dim); font-style: italic; }
