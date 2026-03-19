@@ -556,7 +556,32 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
 
       // Allow agent to update progress fields via heartbeat body — with type checks
       const { phase, componentId, stepNumber, totalSteps } = req.body ?? {};
-      if (phase !== undefined && typeof phase === 'string') updated['phase'] = phase;
+
+      // Enforce phase progression — agent cannot skip steps
+      if (phase !== undefined && typeof phase === 'string') {
+        if (phase === 'generating' || phase === 'registering' || phase === 'completing') {
+          // These phases require a valid blueprint
+          const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+          const blueprint = (projectRec?.value as Record<string, unknown>)?.blueprint;
+          if (!blueprint) {
+            res.status(400).json(error(config.nodeId, 'PHASE_BLOCKED', `Cannot enter phase "${phase}" — blueprint not yet submitted`));
+            return;
+          }
+        }
+        if (phase === 'completing') {
+          // Completing requires at least one registered component
+          const componentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
+          const registeredCount = componentRecords.filter(r => {
+            const val = r.value as { status?: string };
+            return val.status === 'registered';
+          }).length;
+          if (registeredCount === 0) {
+            res.status(400).json(error(config.nodeId, 'PHASE_BLOCKED', 'Cannot enter "completing" phase — no components have been registered'));
+            return;
+          }
+        }
+        updated['phase'] = phase;
+      }
       if (componentId !== undefined && typeof componentId === 'string') updated['componentId'] = componentId;
       if (stepNumber !== undefined && typeof stepNumber === 'number') updated['stepNumber'] = stepNumber;
       if (totalSteps !== undefined && typeof totalSteps === 'number') updated['totalSteps'] = totalSteps;
@@ -652,10 +677,14 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
-      // Verify componentId exists in the blueprint
+      // Blueprint is REQUIRED before submitting components
       const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
       const blueprint = (projectRec?.value as any)?.blueprint;
-      if (blueprint?.components && !blueprint.components.some((c: any) => c.id === componentId)) {
+      if (!blueprint) {
+        res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint must be submitted before components'));
+        return;
+      }
+      if (blueprint.components && !blueprint.components.some((c: any) => c.id === componentId)) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint`));
         return;
       }

@@ -1059,7 +1059,7 @@ IMPORTANT: Do NOT call \`/session/claim\` — the owner already claimed the sess
 
 ## Heartbeat Loop
 
-Once you have claimed a session, send heartbeats every 60 seconds to keep the session alive. The session TTL is 5 minutes — if you miss heartbeats for 5 minutes, the UI shows "Agent disconnected" and the owner can reassign.
+Once you are assigned to a project, send heartbeats every 60 seconds to keep the session alive. The session TTL is 5 minutes — if you miss heartbeats for 5 minutes, the UI shows "Agent disconnected" and the owner can reassign.
 
 \`\`\`
 POST ${nodeUrl}/v1/generator/{projectId}/session/heartbeat
@@ -1215,8 +1215,8 @@ authenticate → checkin → get SSE ticket → connect SSE stream
                                                ↓
                                        on "memory" event:
                                          GET /v1/generator/projects →
-                                         find assigned session →
-                                         POST .../session/claim (409 = skip) →
+                                         GET /v1/generator/{projectId} →
+                                         if session.agentGaii === me →
                                          ┌─────────────────────────────────────┐
                                          │  start heartbeat loop (every 60s)  │
                                          │  POST .../session/heartbeat        │

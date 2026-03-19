@@ -557,16 +557,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [projectId]);
 
-  // Polling fallback for session heartbeat — refreshes every 10s when agent session is active
+  // Polling fallback — full reload every 10s when agent session is active
   useEffect(() => {
     if (!generatorSession) return;
-    const poller = setInterval(async () => {
-      try {
-        const resp = await apiGet(`/v1/memory/generator.${projectId}.session`);
-        const val = resp?.data?.value;
-        setGeneratorSession(val?.agentGaii ? val : null);
-      } catch { /* ignore */ }
-    }, 10_000);
+    const poller = setInterval(() => loadData(), 10_000);
     return () => clearInterval(poller);
   }, [projectId, !!generatorSession]);
 
@@ -767,10 +761,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const selected = components.find(c => c.id === selectedId);
   const phases = project?.blueprint?.phases || [];
 
-  // Build activity log from all component histories
-  const allLogs = components.flatMap(c =>
+  // Build activity log from component histories + agent API logs
+  const componentLogs = components.flatMap(c =>
     (c.history || []).map(h => ({ ...h, componentId: c.id, componentLabel: c.label }))
-  ).sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  );
+  const apiLogs = (agentLogs || []).map(l => ({
+    action: `[${l.level || 'info'}] ${l.message}`,
+    at: l.timestamp,
+    componentId: l.componentId || null,
+    componentLabel: l.componentId ? (components.find(c => c.id === l.componentId)?.label || l.componentId) : 'agent',
+  }));
+  const allLogs = [...componentLogs, ...apiLogs].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const filteredLogs = logFilter ? allLogs.filter(l => l.componentId === logFilter) : allLogs;
 
   // Phase 5: Compute summary for lifecycle toolbar
