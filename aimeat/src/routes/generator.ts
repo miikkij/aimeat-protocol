@@ -853,6 +853,30 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
       };
       await storage.setMemory({ ...projectRec, value: updatedProject, version: (projectRec.version ?? 1) + 1, updatedAt: now });
 
+      // Initialize component records from blueprint — same as frontend handleSubmitBlueprint().
+      // This ensures the sidebar shows components immediately when agent submits blueprint.
+      const parsed = typeof (validation.extracted ?? blueprint) === 'string'
+        ? JSON.parse(validation.extracted ?? blueprint)
+        : (validation.extracted ?? blueprint);
+      const bpComponents = (parsed as { components?: Array<{ id: string; type: string; label: string }> }).components ?? [];
+      for (const comp of bpComponents) {
+        const compKey = `generator.${projectId}.component.${comp.id}`;
+        const existing = await storage.getMemory(gaii, compKey);
+        if (!existing) {
+          await storage.setMemory({
+            key: compKey,
+            ownerGaii: gaii,
+            value: { id: comp.id, type: comp.type, label: comp.label, status: 'not_started', prompt: null, result: null, validationErrors: [], registeredAs: null, history: [] },
+            visibility: 'owner',
+            version: 1,
+            tags: ['generator', 'component', comp.type],
+            ttlHours: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+
       res.json(success(config.nodeId, { valid: true, errors: [], warnings: validation.warnings ?? [] }));
       emitChange('memory');
     }

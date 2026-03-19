@@ -597,7 +597,19 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     } catch { /* best effort */ }
     if (p?.blueprint?.components) {
       const comps = await loadAllComponents(projectId);
-      setComponents(comps.length > 0 ? comps : p.blueprint.components.map(c => ({ ...c, status: 'not_started', history: [], _version: 0 })));
+      if (comps.length > 0) {
+        setComponents(comps);
+      } else {
+        // Blueprint exists but no component records yet (e.g. agent submitted blueprint via API).
+        // Initialize component records in memory — same as handleSubmitBlueprint() does for UI flow.
+        const initialized = [];
+        for (const c of p.blueprint.components) {
+          const comp = { id: c.id, type: c.type, label: c.label, status: 'not_started', prompt: null, result: null, validationErrors: [], registeredAs: null, history: [], _version: 0 };
+          await saveComponent(projectId, comp);
+          initialized.push(comp);
+        }
+        setComponents(initialized);
+      }
     }
     setAgents(await discoverAgents());
     // Load agent-written logs from memory
