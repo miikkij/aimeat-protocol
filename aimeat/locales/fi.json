@@ -263,6 +263,9 @@
       "publicKey": "Julkinen avain",
       "capabilities": "Kyvyt",
       "description": "Kuvaus",
+      "deleteAgent": "Poista agentti",
+      "deleteConfirm": "Poista agentti",
+      "deleted": "Agentti poistettu",
       "loadingPrompt": "Ladataan kehotetta...",
       "loadingAgents": "Ladataan agentteja...",
       "scopeUi": {
@@ -651,7 +654,8 @@
       "updated": "Sovellus päivitetty",
       "updateFailed": "Päivitys epäonnistui",
       "save": "Tallenna",
-      "removeProtectionHint": "Tallenna tyhjänä poistaaksesi pääsykoodisuojauksen"
+      "removeProtectionHint": "Tallenna tyhjänä poistaaksesi pääsykoodisuojauksen",
+      "launch": "Käynnistä"
     },
     "v8ext": {
       "title": "V8-laajennukset",
@@ -1209,6 +1213,7 @@
       "expandMore": "Näytä kaikki",
       "myApps": "Omat sovellukset",
       "allApps": "Kaikki",
+      "openApp": "Avaa uudessa välilehdessä",
       "viewAll": "Näytä kaikki",
       "editProfile": "muokkaa profiilia",
       "federationBadge": "{count} solmu(a) federaatiossa",

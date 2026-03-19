@@ -263,6 +263,9 @@
       "publicKey": "Public Key",
       "capabilities": "Capabilities",
       "description": "Description",
+      "deleteAgent": "Delete agent",
+      "deleteConfirm": "Delete agent",
+      "deleted": "Agent deleted",
       "loadingPrompt": "Loading prompt...",
       "loadingAgents": "Loading agents...",
       "scopeUi": {
@@ -651,7 +654,8 @@
       "updated": "App updated",
       "updateFailed": "Update failed",
       "save": "Save",
-      "removeProtectionHint": "Save empty to remove access code protection"
+      "removeProtectionHint": "Save empty to remove access code protection",
+      "launch": "Launch"
     },
     "v8ext": {
       "title": "V8 Extensions",
@@ -1209,6 +1213,7 @@
       "expandMore": "Show all",
       "myApps": "My apps",
       "allApps": "All",
+      "openApp": "Open in new tab",
       "viewAll": "View all",
       "editProfile": "edit profile",
       "federationBadge": "{count} node(s) in federation",

@@ -15,8 +15,9 @@ import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost } from '/js/api.js';
-import { listAgents, updateAgentScopes } from '/js/services/agents.js';
+import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
+import { useConfirm } from '/components/Modal.js';
 
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
@@ -170,6 +171,7 @@ const PLATFORM_KEYS = ['windows','mac','linux','wsl2','android','aws'];
 const PLATFORM_LABELS = { windows:'profile.platforms.windows', mac:'profile.platforms.mac', linux:'profile.platforms.linux', wsl2:'profile.platforms.wsl2', android:'profile.platforms.android', aws:'profile.platforms.aws' };
 
 export default function AgentsTab({ session, showToast, onStats }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [agents, setAgents] = useState(null);
   const [promptCopied, setPromptCopied] = useState(false);
   const [platExpand, setPlatExpand] = useState(false);
@@ -283,6 +285,16 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch {
       showToast(t('profile.agents.pendingRequests.approveError'), true);
     }
+  }
+
+  function handleDeleteAgent(name) {
+    confirm(t('profile.agents.deleteConfirm') + ': ' + name + '?', async () => {
+      try {
+        await deleteAgent(name);
+        showToast(t('profile.agents.deleted'));
+        loadData();
+      } catch { showToast(t('profile.unknownError'), true); }
+    });
   }
 
   async function handleDeny(userCode) {
@@ -478,6 +490,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   </span>
                 </div>
               `}
+              <div class="agent-detail-row mt-1">
+                <button class="btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteAgent(a.name); }}>
+                  ${t('profile.agents.deleteAgent')}
+                </button>
+              </div>
             </div>
           `}
 
@@ -511,6 +528,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       session=${session}
       onSave=${handleSaveScopes}
       onCancel=${() => setScopesModal(null)} />`}
+    <${ConfirmUI} />
   `;
 }
 

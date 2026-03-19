@@ -11,6 +11,7 @@
  *   - MenuSection, MenuItem — generic menu layout components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v1.2.0 — 2026-03-19 — Expandable AppStrip chips with launch button; remove Generator primary style
  *   v1.1.0 — 2026-03-19 — Persist open tab to localStorage across page reloads
  *   v1.0.0 — 2026-03-18 — Initial adaptive landing page implementation
  */
@@ -224,6 +225,17 @@ function CortexSection({ switchTab }) {
 }
 
 function AppStrip({ apps, switchTab }) {
+  const [expandedApp, setExpandedApp] = useState(null);
+
+  const toggleApp = (filename) => {
+    setExpandedApp(prev => prev === filename ? null : filename);
+  };
+
+  const launchApp = (e, app) => {
+    e.stopPropagation();
+    window.open(`/v1/apps/${app.owner}/${app.filename}?mode=inline`, '_blank');
+  };
+
   return html`
     <div class="pf-app-strip">
       <div class="pf-app-strip-header">
@@ -234,9 +246,15 @@ function AppStrip({ apps, switchTab }) {
       </div>
       <div class="pf-app-row">
         ${apps.length > 0 ? apps.map(app => html`
-          <div class="pf-app-chip" key=${app.filename || app.name}>
+          <div class="pf-app-chip ${expandedApp === app.filename ? 'pf-app-chip-expanded' : ''}"
+               key=${app.filename || app.name}
+               onClick=${() => toggleApp(app.filename)}>
             <span class="pf-chip-icon">\u{1F4F1}</span>
             ${escHtml(app.name || app.filename || 'App')}
+            ${expandedApp === app.filename && html`
+              <button class="pf-chip-launch" onClick=${(e) => launchApp(e, app)}
+                title=${t('profile.landing.openApp')} aria-label=${t('profile.landing.openApp')}>\u{1F517}</button>
+            `}
           </div>
         `) : html`
           <div class="pf-app-chip pf-app-chip-ghost" onClick=${() => switchTab('packages')}>
@@ -444,7 +462,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
 
         <${MenuSection} title=${t('profile.landing.menuBuildShare')}>
           <div class="pf-menu-grid">
-            <${MenuItem} icon="\u{1F534}" label=${t('profile.generator.tabLabel')} primary active=${isOpen('generator')} onClick=${() => open('generator', 'build')} />
+            <${MenuItem} icon="\u{1F534}" label=${t('profile.generator.tabLabel')} active=${isOpen('generator')} onClick=${() => open('generator', 'build')} />
             <${MenuItem} icon="\u{1F50C}" label=${t('profile.tabs.extensions')} active=${isOpen('extensions')} onClick=${() => open('extensions', 'build')} />
             <${MenuItem} icon="\u{1F3A8}" label=${t('portfolio.tabLabel')} active=${isOpen('portfolio')} onClick=${() => open('portfolio', 'build')} />
             ${isExperienced && html`

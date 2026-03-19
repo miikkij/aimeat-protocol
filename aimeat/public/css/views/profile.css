@@ -1291,6 +1291,15 @@
 }
 .pf .pf-app-chip:hover { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); transform: translateY(-1px); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
 .pf .pf-chip-icon { font-size: 18px; }
+.pf .pf-app-chip-expanded { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); }
+.pf .pf-chip-launch {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px; border: none;
+  background: var(--accent, #E8564A); color: #fff; cursor: pointer;
+  font-size: 14px; margin-left: 4px; padding: 0; flex-shrink: 0;
+  transition: background .15s;
+}
+.pf .pf-chip-launch:hover { background: var(--accent-hover, #d04a3f); }
 .pf .pf-app-chip-ghost { border-style: dashed; border-color: var(--border, #e5e5e0); color: var(--text-dim, #9CA3AF); }
 .pf .pf-app-chip-ghost:hover { border-color: var(--accent, #E8564A); color: var(--accent, #E8564A); }
 

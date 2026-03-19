@@ -2,6 +2,7 @@
  * @file apps-tab.js
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.1.0 — 2026-03-19 — Add launch button to My Apps list
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, text-caption, etc.)
  */
 import { h } from 'preact';
@@ -130,6 +131,7 @@ export default function AppsTab({ session, showToast, onStats }) {
             ${a.downloads ? ' \u2022 ' + a.downloads + ' \u{2B07}' : ''}
           </div>
           <div class="flex-row-wrap mb-half">
+            <button class="btn-primary btn-sm" onClick=${() => window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank')}>${t('profile.apps.launch') || 'Launch'}</button>
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
