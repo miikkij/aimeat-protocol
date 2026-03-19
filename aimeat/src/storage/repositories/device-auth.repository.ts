@@ -6,5 +6,6 @@ export interface DeviceAuthRepository {
   getDeviceAuthByUserCode(userCode: string): Promise<DeviceAuthorizationRecord | null>;
   updateDeviceAuth(deviceCode: string, updates: Partial<DeviceAuthorizationRecord>): Promise<void>;
   countPendingDeviceAuthByOwner(ownerName: string): Promise<number>;
+  listPendingDeviceAuthByOwner(ownerName: string): Promise<DeviceAuthorizationRecord[]>;
   cleanupExpiredDeviceAuth(): Promise<number>;
 }

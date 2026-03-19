@@ -209,6 +209,13 @@ export function countPendingDeviceAuthByOwner(db: Database.Database, ownerName: 
   return row.cnt;
 }
 
+export function listPendingDeviceAuthByOwner(db: Database.Database, ownerName: string): DeviceAuthorizationRecord[] {
+  const rows = db.prepare(
+    `SELECT * FROM device_auth WHERE ownerName = ? AND status = 'pending' AND expiresAt > ? ORDER BY createdAt DESC`
+  ).all(ownerName, new Date().toISOString()) as Record<string, unknown>[];
+  return rows.map(deserializeDeviceAuth);
+}
+
 export function cleanupExpiredDeviceAuth(db: Database.Database): number {
   const result = db.prepare(
     `DELETE FROM device_auth WHERE status = 'pending' AND expiresAt <= ?`

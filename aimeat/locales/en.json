@@ -311,6 +311,22 @@
         "copyUrl": "Copy link",
         "copyPrompt": "Copy prompt"
       },
+      "pendingRequests": {
+        "title": "Pending Agent Requests",
+        "desc": "AI agents requesting access to your account will appear here. Approve or deny them directly.",
+        "waiting": "Waiting for your approval",
+        "agentName": "Agent name",
+        "code": "Verification code",
+        "expiresIn": "Expires in",
+        "scopeLevel": "Permission level",
+        "approve": "Approve",
+        "deny": "Deny",
+        "confirmApprove": "Confirm & Approve",
+        "cancel": "Cancel",
+        "approved": "Agent approved successfully!",
+        "denied": "Request denied",
+        "approveError": "Failed to approve agent"
+      },
       "approval": {
         "credentials_ready_title": "Agent approved",
         "credentials_ready_desc": "Copy the credentials below and paste them to your agent.",

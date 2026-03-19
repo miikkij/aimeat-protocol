@@ -19,8 +19,8 @@ import { verifyJWT, issueJWT, generateSessionId } from '../auth/jwt.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 
-/** Device authorization code expires after 10 minutes */
-const DEVICE_AUTH_EXPIRY_MS = 600_000;
+/** Device authorization code expires after 30 minutes */
+const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -92,7 +92,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       user_code: userCode,
       verification_uri: verificationUri,
       verification_uri_complete: verificationUriComplete,
-      expires_in: 600,
+      expires_in: 1800,
       interval: 5,
     }, [
       { description: 'Open this URL in a browser', method: 'GET', url: `/v1/agents/verify?code=${userCode}` },
@@ -478,6 +478,22 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       },
     ]));
     emitChange('agents');
+  });
+
+  // GET /v1/agents/device-authorize/pending — list pending device auth requests for the logged-in owner
+  router.get('/v1/agents/device-authorize/pending', requireAuth(), requireRole('owner'), async (req, res) => {
+    const pending = await storage.listPendingDeviceAuthByOwner(req.auth!.owner);
+    res.json(success(config.nodeId, {
+      requests: pending.map(r => ({
+        user_code: r.userCode,
+        agent_name: r.agentName,
+        display_name: r.displayName,
+        description: r.description,
+        status: r.status,
+        created_at: r.createdAt,
+        expires_in: Math.max(0, Math.ceil((new Date(r.expiresAt).getTime() - Date.now()) / 1000)),
+      })),
+    }));
   });
 
   // GET /v1/agents/verify — device authorization consent page (must be BEFORE :gaii catch-all)

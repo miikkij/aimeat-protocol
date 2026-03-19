@@ -311,6 +311,22 @@
         "copyUrl": "Kopioi linkki",
         "copyPrompt": "Kopioi kehote"
       },
+      "pendingRequests": {
+        "title": "Odottavat agenttipyynnöt",
+        "desc": "AI-agentit, jotka pyytävät pääsyä tilillesi, näkyvät täällä. Hyväksy tai hylkää ne suoraan.",
+        "waiting": "Odottaa hyväksyntääsi",
+        "agentName": "Agentin nimi",
+        "code": "Vahvistuskoodi",
+        "expiresIn": "Vanhenee",
+        "scopeLevel": "Käyttöoikeustaso",
+        "approve": "Hyväksy",
+        "deny": "Hylkää",
+        "confirmApprove": "Vahvista ja hyväksy",
+        "cancel": "Peruuta",
+        "approved": "Agentti hyväksytty!",
+        "denied": "Pyyntö hylätty",
+        "approveError": "Agentin hyväksyminen epäonnistui"
+      },
       "approval": {
         "credentials_ready_title": "Agentti hyväksytty",
         "credentials_ready_desc": "Kopioi alla olevat tunnistetiedot ja liitä ne agentillesi.",

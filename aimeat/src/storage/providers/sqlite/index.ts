@@ -4457,6 +4457,13 @@ export class SqliteStorage implements Storage {
     return row.cnt;
   }
 
+  async listPendingDeviceAuthByOwner(ownerName: string): Promise<DeviceAuthorizationRecord[]> {
+    const rows = this.db.prepare(
+      `SELECT * FROM device_auth WHERE ownerName = ? AND status = 'pending' AND expiresAt > ? ORDER BY createdAt DESC`
+    ).all(ownerName, new Date().toISOString()) as Record<string, unknown>[];
+    return rows.map(row => this.deserializeDeviceAuth(row));
+  }
+
   async cleanupExpiredDeviceAuth(): Promise<number> {
     const result = this.db.prepare(
       `DELETE FROM device_auth WHERE status = 'pending' AND expiresAt <= ?`

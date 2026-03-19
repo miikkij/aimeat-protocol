@@ -3946,6 +3946,15 @@ export class MongoStorage implements Storage {
         });
     }
 
+    async listPendingDeviceAuthByOwner(ownerName: string): Promise<DeviceAuthorizationRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.deviceAuth.findMany({
+            where: { ownerName, status: 'pending', expiresAt: { gt: new Date() } },
+            orderBy: { createdAt: 'desc' },
+        });
+        return rows.map((row: any) => this.toDeviceAuthRecord(row));
+    }
+
     async cleanupExpiredDeviceAuth(): Promise<number> {
         this.ensureReady();
         const result = await this.prisma.deviceAuth.deleteMany({

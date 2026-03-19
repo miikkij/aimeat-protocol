@@ -206,10 +206,13 @@
     }
 
     async function checkSession() {
+      // Read session from localStorage (same origin as SPA)
       try {
-        const r = await fetch('/v1/auth/session', { credentials: 'include' });
-        const d = await r.json();
-        if (d.ok && d.data?.jwt) return d.data;
+        const raw = localStorage.getItem('aimeat_session');
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s && s.jwt) return s;
+        }
       } catch {}
       return null;
     }
@@ -275,6 +278,13 @@
             document.getElementById('password').value,
             document.getElementById('totp').value.trim() || undefined,
           );
+          // Persist session so SPA and future consent pages pick it up
+          try {
+            localStorage.setItem('aimeat_session', JSON.stringify({
+              owner: session.owner, jwt: session.jwt || session.token,
+              ghii: session.ghii || null, gaii: session.gaii || null,
+            }));
+          } catch {}
           await loadAndRender();
         } catch (err) {
           errEl.textContent = err.message;

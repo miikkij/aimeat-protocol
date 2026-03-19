@@ -5,6 +5,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace all inline styles with CSS utility classes
  *   v1.1.0 — 2026-03-18 — Rewrite agent prompt to use device-auth flow; remove connectivity key UI
+ *   v1.2.0 — 2026-03-19 — Replace profile-initiated device auth with inline pending request approval
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -13,7 +14,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { apiPost } from '/js/api.js';
+import { apiGet, apiPost } from '/js/api.js';
 import { listAgents, updateAgentScopes } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 
@@ -176,55 +177,28 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [gaiiCopied, setGaiiCopied] = useState(null);
   const [keyCopied, setKeyCopied] = useState(null);
-  const [deviceAuthResult, setDeviceAuthResult] = useState(null);
-  const [deviceAuthStatus, setDeviceAuthStatus] = useState(null);
-  const [deviceAuthCountdown, setDeviceAuthCountdown] = useState(0);
-  const [deviceAgentName, setDeviceAgentName] = useState('');
-  const [deviceAuthLoading, setDeviceAuthLoading] = useState(false);
-  const [deviceUrlCopied, setDeviceUrlCopied] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [approvingCode, setApprovingCode] = useState(null);
+  const [approvePreset, setApprovePreset] = useState('standard');
 
   useEffect(() => {
     if (session) loadData();
   }, [session]);
 
-  // Device auth countdown timer
+  // Poll for pending device auth requests every 5 seconds
   useEffect(() => {
-    if (!deviceAuthResult || deviceAuthStatus !== 'pending') return;
-    const timer = setInterval(() => {
-      setDeviceAuthCountdown(prev => {
-        if (prev <= 1) {
-          setDeviceAuthStatus('expired');
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [deviceAuthResult, deviceAuthStatus]);
-
-  // Device auth status polling
-  useEffect(() => {
-    if (!deviceAuthResult || deviceAuthStatus !== 'pending') return;
-    const poller = setInterval(async () => {
+    if (!session) return;
+    let active = true;
+    async function poll() {
       try {
-        const resp = await fetch(`/v1/agents/verify/info/${deviceAuthResult.user_code}`);
-        const data = await resp.json();
-        if (data?.status === 'approved') {
-          setDeviceAuthStatus('approved');
-          clearInterval(poller);
-          loadData();
-        } else if (data?.status === 'denied') {
-          setDeviceAuthStatus('denied');
-          clearInterval(poller);
-        } else if (data?.status === 'expired') {
-          setDeviceAuthStatus('expired');
-          clearInterval(poller);
-        }
-      } catch { /* ignore poll errors */ }
-    }, 5000);
-    return () => clearInterval(poller);
-  }, [deviceAuthResult, deviceAuthStatus]);
+        const resp = await apiGet('/v1/agents/device-authorize/pending');
+        if (active && resp?.data?.requests) setPendingRequests(resp.data.requests);
+      } catch { /* ignore */ }
+    }
+    poll();
+    const poller = setInterval(poll, 5000);
+    return () => { active = false; clearInterval(poller); };
+  }, [session]);
 
   async function loadData() {
     try {
@@ -288,23 +262,37 @@ export default function AgentsTab({ session, showToast, onStats }) {
     }
   }
 
-  async function handleCreateDeviceAuth() {
-    setDeviceAuthLoading(true);
+  async function handleApprove(userCode) {
+    const scopes = SCOPE_TEMPLATES[approvePreset] || SCOPE_TEMPLATES.standard;
     try {
-      const body = { owner: session.owner };
-      if (deviceAgentName.trim()) body.agent_name = deviceAgentName.trim();
-      const resp = await apiPost('/v1/agents/device-authorize', body);
-      if (resp?.data) {
-        setDeviceAuthResult(resp.data);
-        setDeviceAuthStatus('pending');
-        setDeviceAuthCountdown(resp.data.expires_in || 600);
+      const resp = await apiPost('/v1/agents/verify', {
+        user_code: userCode,
+        action: 'approve',
+        scopes,
+        owner_token: session.jwt,
+      });
+      if (resp?.ok !== false) {
+        showToast(t('profile.agents.pendingRequests.approved'));
+        setApprovingCode(null);
+        setApprovePreset('standard');
+        loadData();
       } else {
-        showToast(resp?.error?.message || 'Failed to create device auth request', true);
+        showToast(resp?.error?.message || t('profile.agents.pendingRequests.approveError'), true);
       }
     } catch {
-      showToast('Failed to create device auth request', true);
+      showToast(t('profile.agents.pendingRequests.approveError'), true);
     }
-    setDeviceAuthLoading(false);
+  }
+
+  async function handleDeny(userCode) {
+    try {
+      await apiPost('/v1/agents/verify', {
+        user_code: userCode,
+        action: 'deny',
+        owner_token: session.jwt,
+      });
+      showToast(t('profile.agents.pendingRequests.denied'));
+    } catch { /* ignore */ }
   }
 
   if (!agents) return html`<${Spinner} text=${t('profile.agents.loadingAgents')} />`;
@@ -313,70 +301,58 @@ export default function AgentsTab({ session, showToast, onStats }) {
     <div class="section-title">${t('profile.agents.title')}</div>
     <div class="section-desc">${t('profile.agents.desc')}</div>
 
-    <div class="agent-cta mb-1">
-      <h3>${t('profile.agents.deviceAuth.title')}</h3>
-      <p>${t('profile.agents.deviceAuth.desc')}</p>
-
-      ${!deviceAuthResult ? html`
-        <div class="flex-row mt-1 pf-device-auth-row">
-          <div class="pf-device-auth-field">
-            <label class="text-caption mb-half">${t('profile.agents.deviceAuth.agentNameLabel')}</label>
-            <input type="text" class="input-field" placeholder=${t('profile.agents.deviceAuth.agentNamePlaceholder')}
-              value=${deviceAgentName} onInput=${e => setDeviceAgentName(e.target.value)}
-              maxlength="64" />
-          </div>
-          <button class="btn-primary" onClick=${handleCreateDeviceAuth} disabled=${deviceAuthLoading}>
-            ${deviceAuthLoading ? '...' : t('profile.agents.deviceAuth.createLink')}
-          </button>
-        </div>
-      ` : html`
-        <div class="card mt-1 p-1">
-          <div class="flex-row mb-1">
-            ${deviceAuthStatus === 'pending' ? html`
-              <span class="badge badge-info">${t('profile.agents.deviceAuth.statusPending')}</span>
-            ` : deviceAuthStatus === 'approved' ? html`
-              <span class="badge badge-success">${t('profile.agents.deviceAuth.statusApproved')}</span>
-            ` : deviceAuthStatus === 'denied' ? html`
-              <span class="badge badge-error">${t('profile.agents.deviceAuth.statusDenied')}</span>
+    ${pendingRequests.length > 0 && html`
+      <div class="agent-cta mb-1">
+        <h3>${t('profile.agents.pendingRequests.title')}</h3>
+        <p>${t('profile.agents.pendingRequests.desc')}</p>
+        ${pendingRequests.map(req => html`
+          <div class="card mt-1 p-1" key=${req.user_code}>
+            <div class="flex-row mb-half">
+              <span class="badge badge-info">${t('profile.agents.pendingRequests.waiting')}</span>
+              <span class="text-caption">${t('profile.agents.pendingRequests.expiresIn')}: ${Math.floor(req.expires_in / 60)}:${String(req.expires_in % 60).padStart(2, '0')}</span>
+            </div>
+            <div class="mb-half">
+              <div class="text-caption mb-half">${t('profile.agents.pendingRequests.agentName')}</div>
+              <div class="text-bold">${escHtml(req.agent_name)}${req.display_name ? ` (${escHtml(req.display_name)})` : ''}</div>
+            </div>
+            <div class="mb-half">
+              <div class="text-caption mb-half">${t('profile.agents.pendingRequests.code')}</div>
+              <div class="pf-device-code">${req.user_code}</div>
+            </div>
+            ${approvingCode === req.user_code ? html`
+              <div class="mb-half">
+                <div class="text-caption mb-half">${t('profile.agents.pendingRequests.scopeLevel')}</div>
+                <div class="flex-row pf-scope-presets">
+                  ${['readonly', 'standard', 'full'].map(p => html`
+                    <button class="${approvePreset === p ? 'btn-primary' : 'btn-outline'} pf-scope-preset-btn"
+                      onClick=${() => setApprovePreset(p)}>
+                      ${templateLabel(p)}
+                    </button>
+                  `)}
+                </div>
+              </div>
+              <div class="flex-row mt-1">
+                <button class="btn-success" onClick=${() => handleApprove(req.user_code)}>
+                  ${t('profile.agents.pendingRequests.confirmApprove')}
+                </button>
+                <button class="btn-outline" onClick=${() => setApprovingCode(null)}>
+                  ${t('profile.agents.pendingRequests.cancel')}
+                </button>
+              </div>
             ` : html`
-              <span class="badge badge-muted">${t('profile.agents.deviceAuth.statusExpired')}</span>
+              <div class="flex-row mt-1">
+                <button class="btn-success" onClick=${() => setApprovingCode(req.user_code)}>
+                  ${t('profile.agents.pendingRequests.approve')}
+                </button>
+                <button class="btn-danger" onClick=${() => handleDeny(req.user_code)}>
+                  ${t('profile.agents.pendingRequests.deny')}
+                </button>
+              </div>
             `}
           </div>
-
-          <div class="mb-1">
-            <div class="text-caption mb-half">${t('profile.agents.deviceAuth.userCode')}</div>
-            <div class="pf-device-code">${deviceAuthResult.user_code}</div>
-          </div>
-
-          <div class="mb-1">
-            <div class="text-caption mb-half">${t('profile.agents.deviceAuth.verifyUrl')}</div>
-            <div class="flex-row">
-              <code class="text-caption pf-code-break">${deviceAuthResult.verification_uri_complete}</code>
-              <button class="btn-outline pf-nowrap" onClick=${() => {
-                copyToClipboard(deviceAuthResult.verification_uri_complete).then(() => {
-                  setDeviceUrlCopied(true);
-                  setTimeout(() => setDeviceUrlCopied(false), 2000);
-                });
-              }}>${deviceUrlCopied ? '\u2713' : t('profile.agents.deviceAuth.copyUrl')}</button>
-            </div>
-          </div>
-
-          ${deviceAuthStatus === 'pending' && html`
-            <div class="text-caption">
-              ${t('profile.agents.deviceAuth.expiresIn')}: ${Math.floor(deviceAuthCountdown / 60)}:${String(deviceAuthCountdown % 60).padStart(2, '0')}
-            </div>
-          `}
-
-          ${deviceAuthStatus !== 'pending' && html`
-            <button class="btn-outline mt-xs" onClick=${() => {
-              setDeviceAuthResult(null);
-              setDeviceAuthStatus(null);
-              setDeviceAuthCountdown(0);
-            }}>${t('profile.agents.deviceAuth.createLink')}</button>
-          `}
-        </div>
-      `}
-    </div>
+        `)}
+      </div>
+    `}
 
     <div class="agent-cta">
       <h3>${t('profile.agents.connect')}</h3>
