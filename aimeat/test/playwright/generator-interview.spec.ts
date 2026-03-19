@@ -259,8 +259,9 @@ test.describe('Generator — Agent Progress Banner', () => {
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
     });
 
-    // Banner should appear
+    // Banner should appear and show the agent name
     await expect(page.locator('.pf-gen-agent-banner')).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('.pf-gen-agent-banner')).toContainText('PlaywrightTestAgent');
   });
 
   test('stop button releases session and removes banner', async ({ page }) => {
