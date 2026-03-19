@@ -25,7 +25,7 @@ export async function deleteAgent(name) {
 /** Update agent scopes. */
 export async function updateAgentScopes(name, scopes) {
   return api(`/v1/agents/${encodeURIComponent(name)}/scopes`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify({ scopes }),
   });
 }
