@@ -62,6 +62,16 @@
 
 ## What Still Doesn't Work
 
+### ~~2. Activity log still shows "Ei toimintaa vielä"~~ — FIXED
+`writeProjectLog()` calls added for all user actions: project create, interview import, blueprint import, agent start/stop, delete, activate/deactivate, name change. UI-sourced logs now appear alongside agent logs.
+
+Note: the log prefix mismatch noted as a suspected bug was NOT a bug — both backend and frontend use `generator.{id}.logs.` consistently.
+
+### ~~3. Agent doesn't react to assignment~~ — FIXED
+Added `GET /v1/generator/my-assignments` polling endpoint. Agent guide rewritten to use polling (every 10–15 seconds) instead of SSE discovery. Agents now reliably detect when they are assigned to a project.
+
+---
+
 ### 1. Agent generates content in wrong format
 The OpenClaw agent receives the 26695-char prompt from `GET /v1/generator/{projectId}/prompts/{componentId}` but still generates CSM as JSON instead of YAML, or omits required fields. The LLM doesn't follow the prompt precisely enough.
 
@@ -73,19 +83,37 @@ The OpenClaw agent receives the 26695-char prompt from `GET /v1/generator/{proje
 - C) Add a "prompt simplifier" that extracts only the essential format requirements for each component type
 - D) Test with different LLM models (Claude Opus vs Sonnet, GPT-4o, etc.)
 
-### 2. Activity log still shows "Ei toimintaa vielä"
-Agent logs are written to `generator.{id}.logs.*` memory keys. The `loadData()` function reads them via `GET /v1/memory?prefix=generator.{id}.log.&owner_scope=true`. But the key prefix might be wrong — logs are stored as `generator.{id}.logs.{logId}` (with 's') but queried as `generator.{id}.log.` (without 's').
-
-**Fix:** Check and align the prefix in `loadData()` vs the log endpoint's key format.
-
-### 3. Components don't appear in sidebar after blueprint
-When agent submits blueprint successfully, `emitChange('memory')` fires, SSE triggers `loadData()`, which reads `project.blueprint.components` and should populate the sidebar. This should work now with the 10s poller, but needs verification after deploy.
-
-### 4. Multiple agent processes
+### 2. Multiple agent processes
 Each time OpenClaw creates a new agent script, it spawns a new Node.js process. Old processes keep running. Need cleanup mechanism or the agent script should check for existing instances.
 
 ### 5. No way to reset a "completed" project
 If agent calls `/complete` (now guarded, but previously it could complete without components), the project gets `status: "active"` and can't be re-run. Need a "reset" or "re-run" button.
+
+---
+
+## What Was Fixed (2026-03-19 evening session)
+
+### Activity logging for all user actions
+`writeProjectLog()` calls added throughout `generator-tab.js` and backend routes for: project create, interview import, blueprint import, agent start/stop, delete, activate/deactivate, and name change. UI-sourced log entries now appear in the activity log alongside agent-written logs.
+
+### Agent polling endpoint (`GET /v1/generator/my-assignments`)
+New endpoint replaces SSE-based assignment discovery. Agents poll every 10–15 seconds to check whether they have been assigned to a project and what phase it is in. Much more reliable than waiting for an SSE event that may be missed.
+
+### Agent guide rewritten for polling
+`GET /v1/generator/agent-guide` updated to describe the polling-based workflow. Removed SSE instructions. Added explicit step sequence: authenticate → poll assignments → claim session → fetch prompts → generate → submit.
+
+### Backend safety guards
+- Version increment fix: project version now increments atomically on each write
+- Blueprint immutability: once a blueprint is accepted it cannot be overwritten
+- Registered component protection: submitted components cannot be deleted or overridden
+- Session identity check: heartbeat and log endpoints verify the calling agent matches the session's `agentGaii`
+
+### CSS and import fixes
+- `btn` base class removed from generator tab buttons (design system has no `.btn` base class)
+- `apiPatch` import added to `generator.js` service (was missing, caused runtime error on scope save)
+
+### E2E tests updated
+Existing generator E2E tests updated to match new behavior: polling endpoint responses, blueprint immutability rejections, component protection guards.
 
 ---
 
@@ -127,9 +155,8 @@ If agent calls `/complete` (now guarded, but previously it could complete withou
 
 ## Priority for Next Session
 
-1. **Fix activity log prefix mismatch** (`logs.` vs `log.`) — 5 min fix
-2. **Verify components appear in sidebar after blueprint** — deploy + test
-3. **Decide agent strategy: deterministic script vs better prompts** — the fundamental question
-4. **Add project reset/re-run capability**
-5. **Write Playwright tests for generator agent flow**
-6. **Clean up old generator agents** (user has many leftover agents)
+1. **Decide agent strategy: deterministic script vs better prompts** — the fundamental question
+2. **Add project reset/re-run capability**
+3. **Write Playwright tests for generator agent flow**
+4. **Clean up old generator agents** (user has many leftover agents)
+5. **Verify components appear in sidebar after blueprint** — deploy + test with real agent
