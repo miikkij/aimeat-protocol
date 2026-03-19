@@ -566,6 +566,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
   async function loadData() {
     const p = await getProject(projectId);
+    if (!p || !p.projectId) {
+      // Project deleted — stop polling, go back
+      setGeneratorSession(null);
+      onBack();
+      return;
+    }
     setProject(p);
     // Load interview spec BEFORE components — prompts need it for locale/data source threading
     try {
