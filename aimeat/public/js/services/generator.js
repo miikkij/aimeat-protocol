@@ -844,7 +844,12 @@ That document contains everything: authentication, SSE setup, the full generator
 3. Connect SSE: POST ${nodeUrl}/v1/events/ticket → GET ${nodeUrl}/v1/events?ticket={ticket}
 4. On SSE "memory" event: GET ${nodeUrl}/v1/generator/projects → for each project, GET ${nodeUrl}/v1/generator/{projectId}
 5. If response has session.agentGaii === your GAII → you are assigned. Do NOT call /session/claim (owner already did it).
-6. Start heartbeat (POST .../session/heartbeat every 60s), then execute the pipeline per the full instructions above.
+6. Start heartbeat (POST .../session/heartbeat every 60s)
+7. GET ${nodeUrl}/v1/generator/{projectId}/prompts → returns blueprint generation prompt. Use it to generate the blueprint.
+8. For each component: GET ${nodeUrl}/v1/generator/{projectId}/prompts/{componentId} → returns the EXACT generation prompt with context, examples, format. Use it to generate the component content.
+9. Submit, register, complete per the full instructions at the URL above.
+
+CRITICAL: Always fetch the prompt from the API before generating. These prompts contain exact format requirements, YAML examples, anti-patterns, and context from previously completed components. Do NOT guess the format.
 
 ## IMPORTANT: Do not create new agents
 Your agent identity (${gaii}) is already registered with the correct scopes and capabilities. Do NOT call POST /v1/agents to create another one. If you see an existing agent with the same credentials, reuse it.
@@ -1039,7 +1044,7 @@ GET ${nodeUrl}/v1/generator/projects
 Authorization: Bearer {token}
 \`\`\`
 
-Look for projects where \`session.agentGaii\` matches your GAII (\`${gaii || '{your-gaii}'}\`) and \`session.status === "active"\`.
+Look for projects where \`session.agentGaii\` matches your GAII (\`${gaii || '{your-gaii}'}\`). Ignore \`project.status\` — what matters is the session object having YOUR GAII.
 
 ### Step 4: Load the full project state
 
@@ -1048,17 +1053,9 @@ GET ${nodeUrl}/v1/generator/{projectId}
 Authorization: Bearer {token}
 \`\`\`
 
-Response includes \`project\`, \`interviewSpec\`, \`components\`, and \`session\`. The \`interviewSpec\` contains everything from the user interview — service name, description, components to generate, and detailed specs for each.
+Response includes \`project\`, \`interviewSpec\`, \`components\`, and \`session\`. The \`interviewSpec\` contains everything from the user interview.
 
-### Step 5: Claim the session
-
-\`\`\`
-POST ${nodeUrl}/v1/generator/{projectId}/session/claim
-Authorization: Bearer {token}
-\`\`\`
-
-- **200 OK** → you own the session, proceed with generation.
-- **409 SESSION_BUSY** → another agent already claimed it, do not proceed.
+IMPORTANT: Do NOT call \`/session/claim\` — the owner already claimed the session for you from the UI. If \`session.agentGaii === your GAII\`, you are assigned and should start working immediately.
 
 ## Heartbeat Loop
 
@@ -1106,7 +1103,14 @@ Include \`componentId\` when the log relates to a specific component, omit it fo
 
 ### Phase 1: Blueprint
 
-Read the \`interviewSpec\` from the project state. Generate a blueprint that defines all components to build, their types, dependencies, and generation order.
+FIRST, fetch the blueprint generation prompt from the API:
+
+\`\`\`
+GET ${nodeUrl}/v1/generator/{projectId}/prompts
+Authorization: Bearer {token}
+\`\`\`
+
+This returns a detailed prompt with exact format requirements, examples, and the interview spec context. Use that prompt to generate the blueprint. Then submit it:
 
 \`\`\`
 POST ${nodeUrl}/v1/generator/{projectId}/steps/blueprint
@@ -1124,7 +1128,14 @@ Update heartbeat: \`{ "phase": "blueprint", "stepNumber": 1, "totalSteps": 1 }\`
 
 ### Phase 2: Component Generation
 
-For each component defined in the blueprint, generate the content and submit it:
+For each component defined in the blueprint, FIRST fetch its generation prompt:
+
+\`\`\`
+GET ${nodeUrl}/v1/generator/{projectId}/prompts/{componentId}
+Authorization: Bearer {token}
+\`\`\`
+
+This returns a detailed prompt with the EXACT format (YAML, JS, HTML, JSON), required fields, anti-patterns, and context from previously completed components. Use that prompt to generate the content. Then submit it:
 
 \`\`\`
 POST ${nodeUrl}/v1/generator/{projectId}/components/{componentId}/submit
