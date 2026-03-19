@@ -161,15 +161,91 @@ Backend validates. If errors, fix the specific fields and resubmit (max 3 attemp
 
 ### 3. Generate each component
 
-For each component in the blueprint:
+For each component, generate content in the CORRECT FORMAT for its type, then submit:
 
 POST ${baseUrl}/v1/generator/{projectId}/components/{componentId}/submit
 Authorization: Bearer {token}
 Content-Type: application/json
 
-{ "type": "csm|msm|extension|app|memory|translation|cortex", "content": "<generated content>" }
+{ "type": "<type>", "content": "<string content in the format below>" }
 
 Update heartbeat after each: { "phase": "generating", "componentId": "...", "stepNumber": N, "totalSteps": M }
+
+#### Component format: CSM (Content Service Manifest) — YAML
+
+content must be a YAML string:
+\`\`\`yaml
+service:
+  name: my-service
+  description: What this service does
+  version: "1.0"
+  category: monitoring
+consent_requirements:
+  personal_data: false
+  cookies: false
+  third_party: false
+  legal_basis: legitimate_interest
+data_schema:
+  required:
+    - fieldName1
+    - fieldName2
+  properties:
+    fieldName1:
+      type: string
+      description: What this field is
+    fieldName2:
+      type: number
+      description: What this field is
+\`\`\`
+
+#### Component format: MSM (Micro Service Module) — YAML
+
+content must be a YAML string:
+\`\`\`yaml
+service:
+  name: my-service
+  version: "1.0"
+auth:
+  required: true
+  scopes:
+    - memory:read
+    - memory:write
+actions:
+  - name: getData
+    method: GET
+    path: /data
+    description: Fetches the data
+  - name: updateData
+    method: POST
+    path: /data
+    description: Updates the data
+\`\`\`
+
+#### Component format: Extension — JavaScript
+
+content must be valid JavaScript. The extension runs in a sandbox with access to AIMEAT APIs.
+IMPORTANT: Do NOT use JSON.parse on untrusted input, require(), or import. Use the AIMEAT memory API.
+
+#### Component format: App — HTML
+
+content must be a complete HTML document with a manifest comment at the top:
+\`\`\`html
+<!-- MANIFEST: {"name":"My App","version":"1.0","description":"What it does"} -->
+<!DOCTYPE html>
+<html>...</html>
+\`\`\`
+
+#### Component format: Memory — JSON
+
+content must be valid JSON representing key-value data to store.
+
+#### Component format: Translation — JSON
+
+content must be a JSON locale object: { "key": "translated text", ... }
+
+#### Component format: Cortex — YAML + JS
+
+content must be YAML metadata followed by JavaScript library code in IIFE format.
 
 ### 4. Register components
 
