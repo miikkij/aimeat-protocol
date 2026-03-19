@@ -11,6 +11,7 @@
  *   - MenuSection, MenuItem — generic menu layout components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v1.1.0 — 2026-03-19 — Persist open tab to localStorage across page reloads
  *   v1.0.0 — 2026-03-18 — Initial adaptive landing page implementation
  */
 import { h } from 'preact';
@@ -300,7 +301,16 @@ function InlineView({ tabId, label, onClose, renderTab }) {
 
 export default function LandingPage({ tier, stats, session, navigate, showToast, locale, renderTab, getTabLabel }) {
   const [apps, setApps] = useState([]);
-  const [openView, setOpenView] = useState(null); // { tabId, slot }
+  const [openView, setOpenView] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aimeat-profile-tab');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.tabId && parsed.slot) return parsed;
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
   const [expanded, setExpanded] = useState(false);
 
   const owner = session.owner;
@@ -326,10 +336,21 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
 
   /* Open a tab inline below a specific slot. Toggle if same tab clicked again. */
   const open = useCallback((tabId, slot) => {
-    setOpenView(prev => (prev?.tabId === tabId) ? null : { tabId, slot });
+    setOpenView(prev => {
+      const next = (prev?.tabId === tabId) ? null : { tabId, slot };
+      if (next) {
+        localStorage.setItem('aimeat-profile-tab', JSON.stringify(next));
+      } else {
+        localStorage.removeItem('aimeat-profile-tab');
+      }
+      return next;
+    });
   }, []);
 
-  const close = useCallback(() => setOpenView(null), []);
+  const close = useCallback(() => {
+    localStorage.removeItem('aimeat-profile-tab');
+    setOpenView(null);
+  }, []);
 
   /* Render inline view if it matches the given slot */
   const viewAt = (slot) => {
