@@ -35,6 +35,8 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { validateInterviewSpec, validateBlueprint, validateComponent } from '../services/generator-validate.js';
 import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
+// @ts-ignore — frontend ESM module, no .d.ts
+import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
 
 export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -124,7 +126,14 @@ If heartbeat returns 404 SESSION_RELEASED → stop immediately (owner clicked St
 
 ### 2. Generate and submit the blueprint
 
-Read the interviewSpec from the project state. Generate a blueprint as JSON with this EXACT structure:
+FIRST, fetch the blueprint generation prompt:
+
+GET ${baseUrl}/v1/generator/{projectId}/prompts
+Authorization: Bearer {token}
+
+Response: { "data": { "prompt": "...full blueprint generation instructions..." } }
+
+Use that prompt to generate a blueprint as JSON with this EXACT structure:
 
 {
   "components": [
@@ -161,7 +170,14 @@ Backend validates. If errors, fix the specific fields and resubmit (max 3 attemp
 
 ### 3. Generate each component
 
-For each component, generate content in the CORRECT FORMAT for its type, then submit:
+IMPORTANT: For each component, FIRST fetch the generation prompt from the API. This prompt contains the exact format, examples, anti-patterns, and context (completed components, data model) you need:
+
+GET ${baseUrl}/v1/generator/{projectId}/prompts/{componentId}
+Authorization: Bearer {token}
+
+Response: { "data": { "prompt": "...full generation instructions..." } }
+
+Use that prompt to generate the content. Then submit:
 
 POST ${baseUrl}/v1/generator/{projectId}/components/{componentId}/submit
 Authorization: Bearer {token}
@@ -784,6 +800,97 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       await storage.deleteMemory(gaii, `generator.${projectId}.session`);
 
       res.json(success(config.nodeId, { status: 'active' }));
+    }
+  );
+
+  // GET /v1/generator/:projectId/prompts/:componentId — get the generation prompt for a component
+  // Returns the SAME prompt that the UI gives to users, with full context (blueprint, completed components, interview spec).
+  router.get('/v1/generator/:projectId/prompts/:componentId',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:read'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+
+      // Load project state
+      const [projectRec, interviewRec] = await Promise.all([
+        storage.getMemory(gaii, `generator.${projectId}.project`),
+        storage.getMemory(gaii, `generator.${projectId}.interview-spec`),
+      ]);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      const project = projectRec.value as { blueprint?: { components?: Array<{ id: string; type: string; label: string }>; dataModel?: Record<string, unknown> }; description?: string };
+      const interviewSpec = interviewRec?.value ?? null;
+      const blueprint = project.blueprint;
+
+      if (!blueprint?.components) {
+        res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint not yet submitted'));
+        return;
+      }
+
+      const component = blueprint.components.find((c: { id: string }) => c.id === componentId);
+      if (!component) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint`));
+        return;
+      }
+
+      // Load completed components for context
+      const allComponentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
+      const completedComponents = allComponentRecords
+        .filter(r => {
+          const val = r.value as { status?: string };
+          return val.status === 'registered' || val.status === 'ready';
+        })
+        .map(r => r.value);
+
+      // Build the same prompt that UI shows to users
+      const prompt = buildComponentPrompt(
+        component.type,
+        component.label,
+        project.description || '',
+        blueprint,
+        completedComponents,
+        interviewSpec,
+      );
+
+      res.json(success(config.nodeId, {
+        componentId,
+        type: component.type,
+        label: component.label,
+        prompt,
+      }));
+    }
+  );
+
+  // GET /v1/generator/:projectId/prompts — get the blueprint generation prompt
+  router.get('/v1/generator/:projectId/prompts',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:read'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+
+      const [projectRec, interviewRec] = await Promise.all([
+        storage.getMemory(gaii, `generator.${projectId}.project`),
+        storage.getMemory(gaii, `generator.${projectId}.interview-spec`),
+      ]);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      const project = projectRec.value as { description?: string };
+      const interviewSpec = interviewRec?.value ?? null;
+
+      const prompt = buildBlueprintPrompt(project.description || '', interviewSpec);
+
+      res.json(success(config.nodeId, { prompt }));
     }
   );
 
