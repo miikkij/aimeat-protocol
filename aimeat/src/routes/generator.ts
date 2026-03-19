@@ -28,6 +28,7 @@
 //   v1.5.0 — 2026-03-18 — Fix session claim: use setMemory for new sessions (setMemoryIfVersion only for CAS on existing stale sessions)
 //   v1.6.0 — 2026-03-19 — Fix emitChange, session ownership, validation status codes, dead code removal, type checks
 //   v1.7.0 — 2026-03-19 — Add GET /v1/generator/my-assignments polling endpoint for agent discovery
+//   v1.8.0 — 2026-03-19 — Update agent guide to use polling instead of SSE for assignment discovery
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -61,7 +62,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
 ## Your Role
 
-You are an AIMEAT Generator Agent. You listen for session assignments via SSE, then autonomously execute the full service generation pipeline — blueprint, components, registration.
+You are an AIMEAT Generator Agent. You poll for session assignments every 10-15 seconds, then autonomously execute the full service generation pipeline — blueprint, components, registration.
 
 ## AIMEAT API Conventions
 
@@ -79,37 +80,27 @@ Memory keys use dots as separators (e.g. generator.project123.session). Allowed:
 
 Token expires after 24h. Re-authenticate when you get HTTP 401.
 
-## Discovering Session Assignments (SSE)
+## Discovering Session Assignments (Polling)
 
-### Get an SSE ticket
-POST ${baseUrl}/v1/events/ticket
+Poll this endpoint every 10-15 seconds to check if the owner has assigned you to a project:
+
+GET ${baseUrl}/v1/generator/my-assignments
 Authorization: Bearer {token}
 
-### Connect to the SSE stream
-GET ${baseUrl}/v1/events?ticket={ticket}
+Response when assigned:
+{
+  "ok": true,
+  "data": {
+    "assignments": [
+      { "projectId": "gen-xxx", "session": { "agentGaii": "your-gaii", "phase": "starting", ... } }
+    ]
+  }
+}
 
-Listen for events where domain === "memory". On each event, check for assigned sessions.
+Response when no assignment:
+{ "ok": true, "data": { "assignments": [] } }
 
-### Check for your assignment
-
-GET ${baseUrl}/v1/generator/projects
-Authorization: Bearer {token}
-
-This returns a list of projects. For each project, load its full state:
-
-GET ${baseUrl}/v1/generator/{projectId}
-Authorization: Bearer {token}
-
-Response: { project, interviewSpec, components, session }
-
-IMPORTANT: Check the SESSION object, NOT the project status. A project assigned to you has:
-  session.agentGaii === "{your GAII}"
-
-Ignore project.status — it may be "draft", "active", or anything else. What matters is:
-  1. session exists (not null)
-  2. session.agentGaii matches YOUR GAII
-
-If session.agentGaii matches you → you are assigned. Start the pipeline immediately.
+When assignments is non-empty, start the pipeline for the first assignment immediately.
 Do NOT call /session/claim — the owner already claimed the session for you from the UI.
 
 ## Generator Pipeline
@@ -300,10 +291,6 @@ Call periodically so the UI shows you as an active listener.
 - Network error: Retry with exponential backoff (1s, 2s, 4s)
 - 401: Re-authenticate and retry
 
-## SSE Reconnection
-
-If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for pending assignments.
-
 ## Complete Example Script (Node.js)
 
 This script shows EXACTLY how to implement the full pipeline. Copy and adapt it.
@@ -337,14 +324,14 @@ async function api(method, path, body) {
   return r.json();
 }
 
-// STEP 1: Find my assigned project
+// STEP 1: Poll for assignment
 async function findAssignment() {
-  const projects = (await api('GET', '/v1/generator/projects')).data?.projects || [];
-  for (const p of projects) {
-    const full = (await api('GET', '/v1/generator/' + p.projectId)).data;
-    if (full?.session?.agentGaii === GAII) return { projectId: p.projectId, ...full };
-  }
-  return null;
+  const resp = await api('GET', '/v1/generator/my-assignments');
+  const assignments = resp.data?.assignments || [];
+  if (assignments.length === 0) return null;
+  const a = assignments[0];
+  const full = (await api('GET', '/v1/generator/' + a.projectId)).data;
+  return { projectId: a.projectId, ...full };
 }
 
 // STEP 2: Generate blueprint using API prompt
@@ -407,16 +394,19 @@ async function complete(projectId) {
   console.log(resp.ok ? 'DONE!' : 'Complete failed: ' + resp.error?.message);
 }
 
-// Main
 async function main() {
   await auth();
-  await api('POST', '/v1/checkin');
-  const assignment = await findAssignment();
-  if (!assignment) { console.log('No assignment — waiting for SSE events'); return; }
-  console.log('Assigned to:', assignment.projectId);
-  if (await generateBlueprint(assignment.projectId)) {
-    await generateComponents(assignment.projectId);
-    await complete(assignment.projectId);
+  while (true) {
+    await api('POST', '/v1/checkin');
+    const assignment = await findAssignment();
+    if (assignment) {
+      console.log('Assigned to:', assignment.projectId);
+      if (await generateBlueprint(assignment.projectId)) {
+        await generateComponents(assignment.projectId);
+        await complete(assignment.projectId);
+      }
+    }
+    await new Promise(r => setTimeout(r, 10000));
   }
 }
 main();
