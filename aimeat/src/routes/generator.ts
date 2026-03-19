@@ -60,7 +60,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const projectId = `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const now = new Date().toISOString();
       const project = {
-        id: projectId,
+        projectId,
         name: name.trim(),
         description: (description ?? '').trim(),
         status: 'draft',

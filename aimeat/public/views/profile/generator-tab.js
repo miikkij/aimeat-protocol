@@ -25,6 +25,8 @@
  *     fork attribution display, package link display in project header
  *   v4.1.0 — 2026-03-17 — Style unification: replace all inline styles with CSS classes, remove sidebar dots
  *   v4.2.0 — 2026-03-18 — Add agent selector UI and progress banner for agent-driven generation
+ *   v4.2.1 — 2026-03-19 — Fix session state: check agentGaii presence, not just truthy value,
+ *     to avoid treating auto-created empty {} from memory GET as an active session
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -539,9 +541,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       setInterviewSpec(spec);
     } catch { /* no interview spec — that's fine */ }
     // Load generator session state (if any agent is executing)
+    // Only treat as active if the value has agentGaii — the memory GET auto-creates {}
+    // for missing keys, so we must distinguish a real session from an empty auto-created one.
     try {
       const sessionResp = await apiGet(`/v1/memory/generator.${projectId}.session`);
-      setGeneratorSession(sessionResp?.data?.value ?? null);
+      const val = sessionResp?.data?.value;
+      setGeneratorSession(val?.agentGaii ? val : null);
     } catch { /* no session — that's fine */ }
     // Load listening agents for the selector
     try {

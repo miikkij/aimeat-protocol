@@ -7,6 +7,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-14 — Initial interview phase UI tests
  *   v1.1.0 — 2026-03-18 — Add agent progress banner and stop button tests
+ *   v1.2.0 — 2026-03-19 — Fix: add auth to basic tests, replace networkidle with DOM waits,
+ *                          add explicit generator tab click (LandingPage does not auto-open from URL param)
  */
 import { test, expect, type Page, type Browser } from '@playwright/test';
 
@@ -35,32 +37,68 @@ async function loginUser(page: Page, username: string) {
   );
 }
 
+/**
+ * Navigate to the profile page and open the Generator tab.
+ * Does NOT use waitForLoadState('networkidle') — the SSE connection keeps the network
+ * active indefinitely, preventing networkidle from resolving.
+ *
+ * For new-tier users: clicks the onboarding tile "Generate a full service".
+ * Falls back to the expanded management menu if the tile is not visible.
+ */
+async function openGeneratorTab(page: Page) {
+  await page.goto('/v1/profile');
+  // Wait for the profile landing page to render (not networkidle — SSE stays open)
+  await page.waitForSelector('.pf-landing', { timeout: 10_000 });
+
+  // Try the onboarding tile first (visible for new-tier users)
+  const onboardTile = page.locator('.pf-onboard-card').filter({ hasText: /generate/i }).first();
+  const tileVisible = await onboardTile.isVisible({ timeout: 3_000 }).catch(() => false);
+
+  if (tileVisible) {
+    await onboardTile.click();
+  } else {
+    // Fall back to the menu item (visible for active/experienced users or expanded menu)
+    // Expand the management section if needed
+    const expandTrigger = page.locator('.pf-expand-trigger').first();
+    if (await expandTrigger.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await expandTrigger.click();
+      await page.waitForTimeout(300);
+    }
+    const genMenuItem = page.locator('.pf-menu-item').filter({ hasText: /generator|generaattori/i }).first();
+    await expect(genMenuItem).toBeVisible({ timeout: 5_000 });
+    await genMenuItem.click();
+  }
+
+  // Wait for the generator tab content to appear
+  await page.waitForSelector('.pf-gen-project-list, .pf-inline-view', { timeout: 10_000 });
+}
+
 // ── Basic interview phase tests ──────────────────────────────────────────────
 
 test.describe('Generator Interview Phase', () => {
   test('profile page loads with generator tab', async ({ page }) => {
+    await loadHarness(page);
+    await registerUser(page, `pw-gen-basic1-${TS_BANNER}`);
+
     await page.goto('/v1/profile');
-    await page.waitForLoadState('networkidle');
-    // Generator tab should be visible in the navigation
-    const genLink = page.locator('a, button').filter({ hasText: /generaattori|generator/i }).first();
-    await expect(genLink).toBeVisible({ timeout: 10_000 });
+    // Wait for profile to render (SSE keeps network open — don't use networkidle)
+    await page.waitForSelector('.pf-landing', { timeout: 10_000 });
+
+    // Generator tile should be visible in the onboarding section (new users)
+    // or in the management menu (active/experienced users)
+    const genTile = page.locator('.pf-onboard-card').filter({ hasText: /generate/i }).first();
+    await expect(genTile).toBeVisible({ timeout: 8_000 });
   });
 
   test('generator tab has new project button', async ({ page }) => {
-    await page.goto('/v1/profile');
-    await page.waitForLoadState('networkidle');
-    // Navigate to generator if it's a tab
-    const genLink = page.locator('a, button').filter({ hasText: /generaattori|generator/i }).first();
-    if (await genLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await genLink.click();
-      await page.waitForTimeout(500);
-    }
-    // Should show new project button or description area
-    const newBtn = page.locator('button').filter({ hasText: /uusi|new/i }).first();
-    const descArea = page.locator('textarea.pf-gen-description');
-    const hasNewBtn = await newBtn.isVisible({ timeout: 3_000 }).catch(() => false);
-    const hasDesc = await descArea.isVisible({ timeout: 1_000 }).catch(() => false);
-    expect(hasNewBtn || hasDesc).toBeTruthy();
+    await loadHarness(page);
+    await registerUser(page, `pw-gen-basic2-${TS_BANNER}`);
+
+    await openGeneratorTab(page);
+
+    // Should show new project button (inside .pf-gen-project-list)
+    const newBtn = page.locator('.pf-gen-project-list button').filter({ hasText: /uusi|new/i }).first();
+    await expect(newBtn).toBeVisible({ timeout: 5_000 });
   });
 });
 
@@ -119,12 +157,33 @@ test.describe('Generator — Agent Progress Banner', () => {
   /**
    * Navigate to the generator tab and open the test project.
    * Returns only after the project dashboard is rendered.
+   *
+   * Uses DOM-based waits instead of waitForLoadState('networkidle') because
+   * the SSE live-update connection stays open indefinitely, preventing networkidle.
    */
   async function openProject(page: Page) {
-    await page.goto('/v1/profile?tab=generator');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/v1/profile');
+    // Wait for the profile landing to render (not networkidle — SSE stays open)
+    await page.waitForSelector('.pf-landing', { timeout: 10_000 });
 
-    // Wait for project list to load (spinner gone)
+    // Open the generator tab — try onboarding tile first, fall back to menu item
+    const onboardTile = page.locator('.pf-onboard-card').filter({ hasText: /generate/i }).first();
+    const tileVisible = await onboardTile.isVisible({ timeout: 3_000 }).catch(() => false);
+
+    if (tileVisible) {
+      await onboardTile.click();
+    } else {
+      const expandTrigger = page.locator('.pf-expand-trigger').first();
+      if (await expandTrigger.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await expandTrigger.click();
+        await page.waitForTimeout(300);
+      }
+      const genMenuItem = page.locator('.pf-menu-item').filter({ hasText: /generator|generaattori/i }).first();
+      await expect(genMenuItem).toBeVisible({ timeout: 5_000 });
+      await genMenuItem.click();
+    }
+
+    // Wait for the project list to load inside the inline view
     await page.waitForSelector('.pf-gen-project-card', { timeout: 10_000 });
 
     // Click into the project card
