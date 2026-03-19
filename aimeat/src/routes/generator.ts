@@ -5,6 +5,7 @@
 // @structure
 //   POST /v1/generator/projects                                           — create a new generator project
 //   GET  /v1/generator/projects                                           — list all projects for the caller
+//   GET  /v1/generator/my-assignments                                     — poll for projects assigned to this agent (replaces SSE discovery)
 //   GET  /v1/generator/:projectId                                         — get full project state (project, interviewSpec, components, session)
 //   POST /v1/generator/:projectId/interview                               — save/update interview spec for a project
 //   POST /v1/generator/:projectId/session/claim                           — agent claims an execution session
@@ -26,6 +27,7 @@
 //   v1.4.0 — 2026-03-18 — Add component registration endpoint (Task 6)
 //   v1.5.0 — 2026-03-18 — Fix session claim: use setMemory for new sessions (setMemoryIfVersion only for CAS on existing stale sessions)
 //   v1.6.0 — 2026-03-19 — Fix emitChange, session ownership, validation status codes, dead code removal, type checks
+//   v1.7.0 — 2026-03-19 — Add GET /v1/generator/my-assignments polling endpoint for agent discovery
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -481,6 +483,35 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
         .map(r => r.value);
 
       res.json(success(config.nodeId, { projects }));
+    }
+  );
+
+  // GET /v1/generator/my-assignments — poll for assigned projects (replaces SSE discovery)
+  // Agents call this every 10-15 seconds to check if they've been assigned to a project.
+  router.get('/v1/generator/my-assignments',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:read'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const callerGaii = req.auth!.sub; // The calling agent's GAII
+
+      // List all generator sessions
+      const records = await storage.listMemory(gaii, { prefix: 'generator.', visibility: 'owner' });
+      const sessions = records.filter(r => r.key.endsWith('.session'));
+
+      const assignments: Array<{ projectId: string; session: unknown }> = [];
+      for (const rec of sessions) {
+        const session = rec.value as { agentGaii?: string };
+        if (session.agentGaii === callerGaii) {
+          // Extract projectId from key: generator.{projectId}.session
+          const parts = rec.key.split('.');
+          const projectId = parts.slice(1, -1).join('.');
+          assignments.push({ projectId, session: rec.value });
+        }
+      }
+
+      res.json(success(config.nodeId, { assignments }));
     }
   );
 
