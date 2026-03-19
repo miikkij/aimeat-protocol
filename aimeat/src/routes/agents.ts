@@ -586,6 +586,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       agents: agents.map(a => ({
         gaii: a.gaii,
         name: a.name,
+        owner: a.owner,
         display_name: a.displayName,
         description: a.description,
         capabilities: a.capabilities,
@@ -594,6 +595,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         morsel_balance: a.morselBalance,
         created_at: a.createdAt,
         last_seen: a.lastSeen,
+        public_key: a.publicKey,
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
