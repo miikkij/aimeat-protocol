@@ -28,6 +28,7 @@ const SCOPE_DOMAINS = [
   { key: 'tunnel',    permissions: ['connect'] },
   { key: 'agent',     permissions: ['register'] },
   { key: 'catalogue', permissions: ['read'] },
+  { key: 'generator', permissions: ['read', 'write', 'execute'] },
 ];
 
 const SCOPE_TEMPLATES = {

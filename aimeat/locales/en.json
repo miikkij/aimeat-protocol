@@ -290,6 +290,8 @@
         "domainTunnel": "Tunnel",
         "domainAgent": "Agent",
         "domainCatalogue": "Catalogue",
+        "domainGenerator": "Generator",
+        "permExecute": "Execute",
         "permRead": "Read",
         "permWrite": "Write",
         "permDelete": "Delete",

@@ -326,11 +326,14 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
-      // Verify authenticated caller has generator capability
-      const agentRecord = await storage.getAgent(gaii);
-      if (!agentRecord || !agentRecord.capabilities.includes('generator')) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
-        return;
+      // Verify caller has generator capability (skip for owner sessions — they bypass scopes)
+      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      if (!isOwnerSession) {
+        const agentRecord = await storage.getAgent(gaii);
+        if (!agentRecord || !agentRecord.capabilities.includes('generator')) {
+          res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
+          return;
+        }
       }
 
       // Check for existing fresh session

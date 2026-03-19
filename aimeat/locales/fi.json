@@ -290,6 +290,8 @@
         "domainTunnel": "Tunneli",
         "domainAgent": "Agentti",
         "domainCatalogue": "Hakemisto",
+        "domainGenerator": "Generaattori",
+        "permExecute": "Suoritus",
         "permRead": "Luku",
         "permWrite": "Kirjoitus",
         "permDelete": "Poisto",
