@@ -946,6 +946,32 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('agents');
   });
 
+  // DELETE /v1/agents/:name — delete an agent (owner only)
+  router.delete('/v1/agents/:name', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const ownerName = req.auth!.owner;
+
+    const agents = await storage.getAgentsByOwner(ownerName);
+    const agent = agents.find(a => a.name === agentName);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own agents'));
+      return;
+    }
+
+    const deleted = await storage.deleteAgent(agent.gaii);
+    if (!deleted) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to delete agent'));
+      return;
+    }
+
+    res.json(success(config.nodeId, { deleted: true, name: agentName, gaii: agent.gaii }));
+    emitChange('agents');
+  });
+
   // ── CORS per-agent management ──
 
   // GET /v1/agents/:name/cors — Get agent CORS allowed origins
