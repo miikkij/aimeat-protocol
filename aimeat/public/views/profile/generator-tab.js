@@ -546,6 +546,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   // Agent-driven session state
   const [generatorSession, setGeneratorSession] = useState(null);
   const [listeners, setListeners] = useState([]);
+  const [agentLogs, setAgentLogs] = useState([]);
 
   useEffect(() => { loadData(); }, [projectId]);
 
@@ -594,6 +595,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       setComponents(comps.length > 0 ? comps : p.blueprint.components.map(c => ({ ...c, status: 'not_started', history: [], _version: 0 })));
     }
     setAgents(await discoverAgents());
+    // Load agent-written logs from memory
+    try {
+      const logResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.log.&owner_scope=true`);
+      const logItems = logResp?.data?.items || [];
+      setAgentLogs(logItems.map(l => l.value).filter(Boolean));
+    } catch { /* no logs */ }
     cleanupOldEntries(projectId).catch(() => {});
   }
 

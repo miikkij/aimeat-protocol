@@ -35,6 +35,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { validateInterviewSpec, validateBlueprint, validateComponent } from '../services/generator-validate.js';
 import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
+import { emitChange } from '../services/event-bus.js';
 // @ts-ignore — frontend ESM module, no .d.ts
 import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
 
@@ -522,6 +523,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       }
 
       res.json(success(config.nodeId, { claimed: true, expiresAt }));
+      emitChange('memory');
     }
   );
 
@@ -784,6 +786,18 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
+      // Guard: require at least one registered component before marking complete
+      const componentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
+      const registeredCount = componentRecords.filter(r => {
+        const val = r.value as { status?: string };
+        return val.status === 'registered';
+      }).length;
+
+      if (registeredCount === 0) {
+        res.status(400).json(error(config.nodeId, 'NO_COMPONENTS', 'Cannot complete project — no components have been registered. Generate and register components first.'));
+        return;
+      }
+
       const now = new Date().toISOString();
       await storage.setMemory({
         ...projectRec,
@@ -799,7 +813,8 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       // Release session if it exists
       await storage.deleteMemory(gaii, `generator.${projectId}.session`);
 
-      res.json(success(config.nodeId, { status: 'active' }));
+      res.json(success(config.nodeId, { status: 'active', registeredComponents: registeredCount }));
+      emitChange('memory');
     }
   );
 
