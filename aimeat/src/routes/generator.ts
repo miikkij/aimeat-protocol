@@ -3,19 +3,20 @@
 // Agents submit generated content here; the route validates it, then writes to
 // generator.* memory keys using the same structure the frontend reads.
 // @structure
-//   POST /v1/generator/projects                                           — create a new generator project
-//   GET  /v1/generator/projects                                           — list all projects for the caller
-//   GET  /v1/generator/my-assignments                                     — poll for projects assigned to this agent (replaces SSE discovery)
-//   GET  /v1/generator/:projectId                                         — get full project state (project, interviewSpec, components, session)
-//   POST /v1/generator/:projectId/interview                               — save/update interview spec for a project
-//   POST /v1/generator/:projectId/session/claim                           — agent claims an execution session
-//   POST /v1/generator/:projectId/session/heartbeat                       — agent keeps session alive / updates progress
-//   DELETE /v1/generator/:projectId/session                               — release session (user stop or agent done)
-//   POST /v1/generator/:projectId/steps/blueprint                         — validate + store blueprint
-//   POST /v1/generator/:projectId/components/:componentId/submit          — validate + store component content
-//   POST /v1/generator/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
-//   POST /v1/generator/:projectId/log                                     — write log entry to memory
-//   POST /v1/generator/:projectId/complete                                — mark project active, release session
+//   POST   /v1/generator/projects                                           — create a new generator project
+//   GET    /v1/generator/projects                                           — list all projects for the caller
+//   GET    /v1/generator/my-assignments                                     — poll for projects assigned to this agent (replaces SSE discovery)
+//   GET    /v1/generator/:projectId                                         — get full project state (project, interviewSpec, components, session)
+//   DELETE /v1/generator/:projectId                                         — delete project and all associated data (cascade)
+//   POST   /v1/generator/:projectId/interview                               — save/update interview spec for a project
+//   POST   /v1/generator/:projectId/session/claim                           — agent claims an execution session
+//   POST   /v1/generator/:projectId/session/heartbeat                       — agent keeps session alive / updates progress
+//   DELETE /v1/generator/:projectId/session                                 — release session (user stop or agent done)
+//   POST   /v1/generator/:projectId/steps/blueprint                         — validate + store blueprint
+//   POST   /v1/generator/:projectId/components/:componentId/submit          — validate + store component content
+//   POST   /v1/generator/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
+//   POST   /v1/generator/:projectId/log                                     — write log entry to memory
+//   POST   /v1/generator/:projectId/complete                                — mark project active, release session
 // @usage
 //   Consumed by AI agents via device auth (generator:read / generator:write / generator:execute scopes)
 //   and by the browser UI (owner JWT satisfies agent role check).
@@ -31,6 +32,7 @@
 //   v1.8.0 — 2026-03-19 — Update agent guide to use polling instead of SSE for assignment discovery
 //   v1.9.0 — 2026-03-19 — Safety guards: version increment, blueprint immutability, registered component protection, session identity check
 //   v1.7.0 — 2026-03-19 — Add polling endpoint, safety guards, update agent guide to polling
+//   v2.0.0 — 2026-03-19 — Add DELETE /v1/generator/:projectId cascade delete; validate componentId in heartbeat against blueprint
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -541,6 +543,32 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
     }
   );
 
+  // DELETE /v1/generator/:projectId — delete project and all associated data (cascade)
+  router.delete('/v1/generator/:projectId',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:write'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      // Cascade delete all project data
+      const allRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.` });
+      for (const rec of allRecords) {
+        await storage.deleteMemory(gaii, rec.key);
+      }
+
+      res.json(success(config.nodeId, { deleted: true, keysRemoved: allRecords.length }));
+      emitChange('memory');
+    }
+  );
+
   // POST /v1/generator/:projectId/interview — save/update interview spec
   // Also fixes visibility: frontend previously wrote 'private', now writes 'owner' so agents can read it.
   router.post('/v1/generator/:projectId/interview',
@@ -709,11 +737,13 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
       // Allow agent to update progress fields via heartbeat body — with type checks
       const { phase, componentId, stepNumber, totalSteps } = req.body ?? {};
 
+      // Load project record once — needed for phase and componentId validation
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+
       // Enforce phase progression — agent cannot skip steps
       if (phase !== undefined && typeof phase === 'string') {
         if (phase === 'generating' || phase === 'registering' || phase === 'completing') {
           // These phases require a valid blueprint
-          const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
           const blueprint = (projectRec?.value as Record<string, unknown>)?.blueprint;
           if (!blueprint) {
             res.status(400).json(error(config.nodeId, 'PHASE_BLOCKED', `Cannot enter phase "${phase}" — blueprint not yet submitted`));
@@ -734,7 +764,15 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
         }
         updated['phase'] = phase;
       }
-      if (componentId !== undefined && typeof componentId === 'string') updated['componentId'] = componentId;
+      if (componentId !== undefined && typeof componentId === 'string') {
+        // Validate componentId exists in blueprint (if blueprint exists)
+        const bp = (projectRec?.value as any)?.blueprint;
+        if (bp?.components && !bp.components.some((c: any) => c.id === componentId)) {
+          res.status(400).json(error(config.nodeId, 'INVALID_COMPONENT', `Component "${componentId}" not in blueprint`));
+          return;
+        }
+        updated['componentId'] = componentId;
+      }
       if (stepNumber !== undefined && typeof stepNumber === 'number') updated['stepNumber'] = stepNumber;
       if (totalSteps !== undefined && typeof totalSteps === 'number') updated['totalSteps'] = totalSteps;
 
