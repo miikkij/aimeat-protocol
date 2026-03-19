@@ -426,7 +426,7 @@ function AgentProgressBanner({ session, components, projectId, onStop }) {
         ? t('profile.generator.agentBanner.disconnected')
         : t('profile.generator.agentBanner.working').replace('{agentName}', session.agentName)
       }</strong>
-      ${!isStale && session.totalSteps > 0 && html`
+      ${session.totalSteps > 0 && html`
         <span class="pf-gen-agent-banner-phase">
           ${t('profile.generator.agentBanner.phase')
             .replace('{phase}', session.phase)
@@ -434,6 +434,7 @@ function AgentProgressBanner({ session, components, projectId, onStop }) {
             .replace('{total}', session.totalSteps)}
         </span>
       `}
+      <span class="text-caption">${session.phase || 'starting'} | heartbeat: ${session.heartbeat ? new Date(session.heartbeat).toLocaleTimeString() : '-'}</span>
     </div>
     <div class="pf-gen-step-indicators">
       ${components.map(c => html`
