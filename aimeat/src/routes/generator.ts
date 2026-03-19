@@ -301,6 +301,126 @@ Call periodically so the UI shows you as an active listener.
 ## SSE Reconnection
 
 If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for pending assignments.
+
+## Complete Example Script (Node.js)
+
+This script shows EXACTLY how to implement the full pipeline. Copy and adapt it.
+
+\`\`\`javascript
+import * as ed from '@noble/ed25519';
+
+const GAII = '{your-gaii}';
+const PRIVATE_KEY = '{your-private-key}';
+const NODE = '${baseUrl}';
+let token = '';
+
+// Auth
+async function auth() {
+  const ts = new Date().toISOString();
+  const msg = new TextEncoder().encode(GAII + ts);
+  const key = Uint8Array.from(atob(PRIVATE_KEY), c => c.charCodeAt(0));
+  const sig = btoa(String.fromCharCode(...await ed.signAsync(msg, key)));
+  const r = await fetch(NODE + '/v1/auth/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gaii: GAII, timestamp: ts, signature: sig })
+  });
+  token = (await r.json()).data.token;
+}
+
+// API helper
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Authorization': 'Bearer ' + token } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const r = await fetch(NODE + path, opts);
+  return r.json();
+}
+
+// STEP 1: Find my assigned project
+async function findAssignment() {
+  const projects = (await api('GET', '/v1/generator/projects')).data?.projects || [];
+  for (const p of projects) {
+    const full = (await api('GET', '/v1/generator/' + p.projectId)).data;
+    if (full?.session?.agentGaii === GAII) return { projectId: p.projectId, ...full };
+  }
+  return null;
+}
+
+// STEP 2: Generate blueprint using API prompt
+async function generateBlueprint(projectId) {
+  const promptResp = await api('GET', '/v1/generator/' + projectId + '/prompts');
+  const prompt = promptResp.data.prompt;  // 13000+ chars of detailed instructions
+
+  // Send prompt to your LLM and get the blueprint JSON back
+  const blueprintJson = await callYourLLM(prompt);  // YOU implement this
+
+  // Submit to API — it validates the structure
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const resp = await api('POST', '/v1/generator/' + projectId + '/steps/blueprint',
+      { blueprint: blueprintJson });
+    if (resp.ok) { console.log('Blueprint OK'); return true; }
+    // 422 = validation error — fix and retry
+    console.log('Blueprint error:', resp.error?.message);
+    // Re-generate with error context
+    blueprintJson = await callYourLLM(prompt + '\\nERROR: ' + resp.error?.message + '\\nFix and output ONLY the corrected JSON.');
+  }
+  return false;
+}
+
+// STEP 3: Generate each component using API prompts
+async function generateComponents(projectId) {
+  const project = (await api('GET', '/v1/generator/' + projectId)).data;
+  const components = project.project.blueprint.components;
+
+  for (let i = 0; i < components.length; i++) {
+    const comp = components[i];
+    await api('POST', '/v1/generator/' + projectId + '/session/heartbeat',
+      { phase: 'generating', componentId: comp.id, stepNumber: i + 1, totalSteps: components.length });
+
+    // GET THE PROMPT FROM THE API — this is the key step
+    const promptResp = await api('GET', '/v1/generator/' + projectId + '/prompts/' + comp.id);
+    const prompt = promptResp.data.prompt;  // Contains exact format, YAML examples, anti-patterns
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const content = await callYourLLM(prompt);  // LLM generates the content
+      const resp = await api('POST', '/v1/generator/' + projectId + '/components/' + comp.id + '/submit',
+        { type: comp.type, content: content });
+      if (resp.ok && resp.data?.valid) {
+        console.log(comp.id + ' OK');
+        // Register immediately
+        await api('POST', '/v1/generator/' + projectId + '/components/' + comp.id + '/register');
+        break;
+      }
+      console.log(comp.id + ' error:', resp.error?.message);
+      // Retry with error
+      prompt += '\\nERROR: ' + resp.error?.message + '\\nFix and output ONLY the corrected content.';
+    }
+    await api('POST', '/v1/generator/' + projectId + '/log',
+      { level: 'info', message: 'Generated ' + comp.label, componentId: comp.id });
+  }
+}
+
+// STEP 4: Complete
+async function complete(projectId) {
+  const resp = await api('POST', '/v1/generator/' + projectId + '/complete');
+  console.log(resp.ok ? 'DONE!' : 'Complete failed: ' + resp.error?.message);
+}
+
+// Main
+async function main() {
+  await auth();
+  await api('POST', '/v1/checkin');
+  const assignment = await findAssignment();
+  if (!assignment) { console.log('No assignment — waiting for SSE events'); return; }
+  console.log('Assigned to:', assignment.projectId);
+  if (await generateBlueprint(assignment.projectId)) {
+    await generateComponents(assignment.projectId);
+    await complete(assignment.projectId);
+  }
+}
+main();
+\`\`\`
+
+The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentId}\` BEFORE generating content. The API returns the exact prompt with format requirements, examples, and context. Send that prompt to your LLM. Submit the LLM output to the API. If 422, append the error to the prompt and retry.
 `);
   });
 
