@@ -797,18 +797,19 @@ export async function getListeners() {
  * Returns { gaii, privateKey, publicKey, name } or throws on failure.
  */
 export async function createGeneratorAgent(ownerName) {
-  const agentName = 'generator';
-
-  // Try to rekey existing agent first (rotates keys, returns new private key)
+  // Rekey the most recently seen generator agent if one exists
   try {
     const existing = await apiGet('/v1/agents');
     const agents = existing?.data?.agents || [];
-    const gen = agents.find(a => a.name === agentName && (a.capabilities || []).includes('generator'));
-    if (gen) {
+    const generators = agents
+      .filter(a => (a.capabilities || []).includes('generator'))
+      .sort((a, b) => (b.last_seen || '').localeCompare(a.last_seen || ''));
+    if (generators.length > 0) {
+      const gen = generators[0]; // most recently active
       const rekeyResp = await apiPost(`/v1/agents/${encodeURIComponent(gen.gaii)}/rekey`);
       if (rekeyResp.ok !== false && rekeyResp.data?.private_key) {
         // Update scopes in case they're outdated
-        await api(`/v1/agents/${encodeURIComponent(agentName)}/scopes`, {
+        await api(`/v1/agents/${encodeURIComponent(gen.name)}/scopes`, {
           method: 'PATCH',
           body: JSON.stringify({ scopes: [
             'memory:read', 'memory:write', 'memory:delete', 'catalogue:read',
@@ -817,7 +818,7 @@ export async function createGeneratorAgent(ownerName) {
         });
         return {
           gaii: gen.gaii,
-          name: agentName,
+          name: gen.name,
           privateKey: rekeyResp.data.private_key,
           publicKey: rekeyResp.data.public_key,
         };
@@ -826,6 +827,7 @@ export async function createGeneratorAgent(ownerName) {
   } catch { /* fallback to create */ }
 
   // No existing generator agent — create one
+  const agentName = 'generator-' + Date.now().toString(36).slice(-6);
   const resp = await apiPost('/v1/agents', {
     name: agentName,
     owner: ownerName,
