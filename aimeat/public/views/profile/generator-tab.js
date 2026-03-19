@@ -587,8 +587,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     // Only treat as active if the value has agentGaii — the memory GET auto-creates {}
     // for missing keys, so we must distinguish a real session from an empty auto-created one.
     try {
-      const sessionResp = await apiGet(`/v1/memory/generator.${projectId}.session`);
-      const val = sessionResp?.data?.value;
+      const sessionKey = `generator.${projectId}.session`;
+      const sessionResp = await apiGet(`/v1/memory?prefix=${sessionKey}&owner_scope=true`);
+      const sessionItem = (sessionResp?.data?.items || []).find(i => i.key === sessionKey);
+      const val = sessionItem?.value;
       setGeneratorSession(val?.agentGaii ? val : null);
     } catch { /* no session — that's fine */ }
     // Load listening agents for the selector

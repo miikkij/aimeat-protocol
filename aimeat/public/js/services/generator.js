@@ -72,9 +72,11 @@ export async function listProjects() {
 }
 
 export async function getProject(projectId) {
-  const resp = await apiGet(`/v1/memory/generator.${projectId}.project`);
-  if (!resp?.data) return null;
-  const item = resp.data;
+  // Use owner_scope to find projects regardless of which agent/identity created them
+  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.project&owner_scope=true`);
+  const items = resp?.data?.items || [];
+  const item = items.find(i => i.key === `generator.${projectId}.project`);
+  if (!item) return null;
   const val = typeof item.value === 'string' ? JSON.parse(item.value) : (item.value || item);
   return { ...val, _version: item.version };
 }
@@ -215,17 +217,21 @@ export async function saveInterviewSpec(projectId, spec) {
 
 export async function getInterviewSpec(projectId) {
   try {
-    const resp = await apiGet(`/v1/memory/generator.${projectId}.interview-spec`);
-    if (!resp?.data?.value) return null;
-    return typeof resp.data.value === 'string' ? JSON.parse(resp.data.value) : resp.data.value;
+    const key = `generator.${projectId}.interview-spec`;
+    const resp = await apiGet(`/v1/memory?prefix=${key}&owner_scope=true`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    if (!item?.value) return null;
+    return typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
   } catch { return null; }
 }
 
 /* ── Component State ─────────────────────────────────── */
 
 export async function getComponent(projectId, componentId) {
-  const resp = await apiGet(`/v1/memory/generator.${projectId}.component.${componentId}`);
-  return resp?.data || null;
+  const key = `generator.${projectId}.component.${componentId}`;
+  const resp = await apiGet(`/v1/memory?prefix=${key}&owner_scope=true`);
+  const item = (resp?.data?.items || []).find(i => i.key === key);
+  return item || null;
 }
 
 export async function saveComponent(projectId, component) {
