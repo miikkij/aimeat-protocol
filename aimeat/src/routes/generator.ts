@@ -43,6 +43,10 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
   const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
   const VALID_COMPONENT_TYPES: ComponentType[] = ['csm', 'msm', 'extension', 'app', 'memory', 'translation', 'cortex'];
 
+  // Generator data is always stored under the owner's GHII (created by browser/owner session).
+  // Agents need to read/write using the owner's GHII, not their own GAII.
+  const ownerGhii = (req: Express.Request) => `${req.auth!.owner}@${config.nodeId}`;
+
   // GET /v1/generator/agent-guide — generic generator agent instructions (no auth, plain text)
   // Agents fetch this URL to learn the session-based pipeline flow.
   router.get('/v1/generator/agent-guide', (_req, res) => {
@@ -172,7 +176,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:write'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const { name, description } = req.body ?? {};
 
       if (!name || typeof name !== 'string') {
@@ -215,7 +219,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:read'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const records = await storage.listMemory(gaii, { prefix: 'generator.', visibility: 'owner' });
       const projects = records
         .filter(r => r.key.endsWith('.project'))
@@ -231,7 +235,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:read'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
 
       const [projectRec, interviewRec, sessionRec] = await Promise.all([
@@ -266,7 +270,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:write'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const { interviewSpec } = req.body ?? {};
 
@@ -306,7 +310,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:execute'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const { agentGaii, agentName } = req.body ?? {};
 
@@ -329,7 +333,8 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       // Verify caller has generator capability (skip for owner sessions — they bypass scopes)
       const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
       if (!isOwnerSession) {
-        const agentRecord = await storage.getAgent(gaii);
+        const callerGaii = resolve(req);
+        const agentRecord = await storage.getAgent(callerGaii);
         if (!agentRecord || !agentRecord.capabilities.includes('generator')) {
           res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
           return;
@@ -394,7 +399,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:execute'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
 
       const existing = await storage.getMemory(gaii, `generator.${projectId}.session`);
@@ -426,7 +431,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:execute'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       await storage.deleteMemory(gaii, `generator.${projectId}.session`);
       res.json(success(config.nodeId, { released: true }));
@@ -440,7 +445,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:write'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const { blueprint } = req.body ?? {};
 
@@ -482,7 +487,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:write'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const componentId = req.params['componentId'] as string;
       const { type, content } = req.body ?? {};
@@ -545,7 +550,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:execute'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const componentId = req.params['componentId'] as string;
 
@@ -561,20 +566,16 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
-      const agentRecord = await storage.getAgent(gaii);
-      if (!agentRecord) {
-        res.status(403).json(error(config.nodeId, 'AUTH_ERROR', 'Agent record not found'));
-        return;
-      }
-      const ownerName = agentRecord.owner;
-      const ownerGhii = `${ownerName}@${config.nodeId}`;
+      // For registration, resolve owner from auth (works for both owner and agent sessions)
+      const ownerName = req.auth!.owner;
+      const regGhii = `${ownerName}@${config.nodeId}`;
 
       try {
         switch (component.type) {
           case 'csm': await registerCsm(component.content, ownerName, storage); break;
           case 'msm': await registerMsm(component.content, ownerName, storage); break;
-          case 'extension': await registerExtension(component.content, ownerName, ownerGhii, storage, config.maxExtensionsPerOwner); break;
-          case 'app': await registerApp(component.content, ownerName, gaii, storage); break;
+          case 'extension': await registerExtension(component.content, ownerName, regGhii, storage, config.maxExtensionsPerOwner); break;
+          case 'app': await registerApp(component.content, ownerName, resolve(req), storage); break;
           case 'memory':
           case 'translation':
           case 'cortex':
@@ -605,7 +606,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:execute'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const { taskId, level, message, meta } = req.body ?? {};
 
@@ -642,7 +643,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     requireRole('agent'),
     requireScope('generator:execute'),
     async (req, res) => {
-      const gaii = resolve(req);
+      const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
 
       const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
