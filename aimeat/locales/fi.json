@@ -1058,7 +1058,13 @@
         "phase": "Vaihe: {phase} ({step}/{total})",
         "disconnected": "Agentti saattoi katkaista yhteyden",
         "stopButton": "Pysäytä agentti",
-        "continueManually": "Pysäytä ja jatka manuaalisesti"
+        "continueManually": "Pysäytä ja jatka manuaalisesti",
+        "lastHeartbeat": "viimeisin",
+        "phaseStarting": "Käynnistyy...",
+        "phaseBlueprint": "Luo pohjapiirros",
+        "phaseGenerating": "Generoi komponentteja",
+        "phaseRegistering": "Rekisteröi",
+        "phaseCompleting": "Viimeistelee"
       },
       "copyAgentPrompt": "Kopioi agentin prompt",
       "copyAgentPromptShort": "Kopioi prompt (linkillä)",

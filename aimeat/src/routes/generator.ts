@@ -124,15 +124,40 @@ If heartbeat returns 404 SESSION_RELEASED → stop immediately (owner clicked St
 
 ### 2. Generate and submit the blueprint
 
-Read the interviewSpec from the project state. Generate a blueprint listing all components to create.
+Read the interviewSpec from the project state. Generate a blueprint as JSON with this EXACT structure:
 
+{
+  "components": [
+    { "id": "csm-main", "type": "csm", "label": "Main Service Manifest", "produces": ["service-config"], "consumes": [] },
+    { "id": "msm-main", "type": "msm", "label": "Main Service Module", "produces": ["api-endpoints"], "consumes": ["service-config"] },
+    { "id": "ext-data", "type": "extension", "label": "Data Fetcher", "produces": ["raw-data"], "consumes": [], "schedules": [{ "action": "fetch", "cron": "*/15 * * * *" }] },
+    { "id": "app-dashboard", "type": "app", "label": "Dashboard App", "consumes": ["raw-data"] },
+    { "id": "mem-config", "type": "memory", "label": "Default Configuration" },
+    { "id": "tr-fi", "type": "translation", "label": "Finnish Translations" },
+    { "id": "cortex-lib", "type": "cortex", "label": "Shared Utilities", "uses": ["charts"] }
+  ],
+  "phases": [
+    { "id": "phase-1", "label": "Core Service", "componentIds": ["csm-main", "msm-main", "mem-config"] },
+    { "id": "phase-2", "label": "Data & UI", "componentIds": ["ext-data", "app-dashboard", "tr-fi"] },
+    { "id": "phase-3", "label": "Libraries", "componentIds": ["cortex-lib"] }
+  ]
+}
+
+REQUIRED fields per component: id, type, label
+OPTIONAL fields: produces (array), consumes (array), schedules (for extensions), uses (for cortex)
+Valid types: csm, msm, extension, app, memory, translation, cortex
+
+REQUIRED top-level: components (array), phases (array)
+Each phase: id, label, componentIds (array of component ids)
+
+Submit the blueprint:
 POST ${baseUrl}/v1/generator/{projectId}/steps/blueprint
 Authorization: Bearer {token}
 Content-Type: application/json
 
-{ "blueprint": "<your generated blueprint>" }
+{ "blueprint": "<JSON string of the blueprint above>" }
 
-Backend validates. If errors, fix and resubmit (max 3 attempts).
+Backend validates. If errors, fix the specific fields and resubmit (max 3 attempts).
 
 ### 3. Generate each component
 

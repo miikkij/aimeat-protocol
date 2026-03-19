@@ -1058,7 +1058,13 @@
         "phase": "Phase: {phase} ({step}/{total})",
         "disconnected": "Agent may have disconnected",
         "stopButton": "Stop agent",
-        "continueManually": "Stop and continue manually"
+        "continueManually": "Stop and continue manually",
+        "lastHeartbeat": "heartbeat",
+        "phaseStarting": "Starting...",
+        "phaseBlueprint": "Generating blueprint",
+        "phaseGenerating": "Generating components",
+        "phaseRegistering": "Registering",
+        "phaseCompleting": "Completing"
       },
       "copyAgentPrompt": "Copy Agent Prompt",
       "copyAgentPromptShort": "Copy prompt (with link)",

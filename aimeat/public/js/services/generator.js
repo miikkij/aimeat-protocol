@@ -825,18 +825,18 @@ export async function createGeneratorAgent(ownerName) {
  */
 export function buildAgentShortPrompt(nodeUrl, credentials) {
   const { gaii, name, privateKey } = credentials || {};
-  return `You are an AIMEAT Generator Agent.
+  return `You are an AIMEAT Generator Agent. Your credentials are below. An agent identity has already been created for you — do NOT create a new one.
 
-## Credentials
+## Credentials (already created — use these, do not register a new agent)
 - GAII: ${gaii}
 - Agent name: ${name}
 - Private key (Ed25519, base64): ${privateKey}
 - Node URL: ${nodeUrl}
 
 ## Full instructions
-Fetch and read: ${nodeUrl}/v1/generator/agent-guide
+Fetch and read this URL FIRST: ${nodeUrl}/v1/generator/agent-guide
 
-That document contains everything: authentication, SSE setup, the full generator pipeline (blueprint → components → registration), heartbeat, error handling.
+That document contains everything: authentication, SSE setup, the full generator pipeline (blueprint format, components, registration), heartbeat, error handling.
 
 ## Quick start
 1. Authenticate: POST ${nodeUrl}/v1/auth/token — sign (GAII + timestamp) with your private key
@@ -845,6 +845,9 @@ That document contains everything: authentication, SSE setup, the full generator
 4. On SSE "memory" event: GET ${nodeUrl}/v1/generator/projects → for each project, GET ${nodeUrl}/v1/generator/{projectId}
 5. If response has session.agentGaii === your GAII → you are assigned. Do NOT call /session/claim (owner already did it).
 6. Start heartbeat (POST .../session/heartbeat every 60s), then execute the pipeline per the full instructions above.
+
+## IMPORTANT: Do not create new agents
+Your agent identity (${gaii}) is already registered with the correct scopes and capabilities. Do NOT call POST /v1/agents to create another one. If you see an existing agent with the same credentials, reuse it.
 
 ## Persistent connection
 

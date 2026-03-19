@@ -426,21 +426,27 @@ function AgentProgressBanner({ session, components, projectId, onStop }) {
 
   if (!session) return null;
 
+  const phaseLabels = {
+    starting: t('profile.generator.agentBanner.phaseStarting'),
+    blueprint: t('profile.generator.agentBanner.phaseBlueprint'),
+    generating: t('profile.generator.agentBanner.phaseGenerating'),
+    registering: t('profile.generator.agentBanner.phaseRegistering'),
+    completing: t('profile.generator.agentBanner.phaseCompleting'),
+  };
+  const phaseLabel = phaseLabels[session?.phase] || session?.phase || '';
+
   return html`<div class="pf-gen-agent-banner ${isStale ? 'stale' : ''}">
     <div class="pf-gen-agent-banner-info">
       <strong>${isStale
         ? t('profile.generator.agentBanner.disconnected')
         : t('profile.generator.agentBanner.working').replace('{agentName}', session.agentName)
       }</strong>
+      ${' '}
+      <span class="pf-gen-agent-banner-phase">${phaseLabel}</span>
       ${session.totalSteps > 0 && html`
-        <span class="pf-gen-agent-banner-phase">
-          ${t('profile.generator.agentBanner.phase')
-            .replace('{phase}', session.phase)
-            .replace('{step}', session.stepNumber)
-            .replace('{total}', session.totalSteps)}
-        </span>
+        <span class="text-caption">(${session.stepNumber}/${session.totalSteps})</span>
       `}
-      <span class="text-caption">${session.phase || 'starting'} | heartbeat: ${session.heartbeat ? new Date(session.heartbeat).toLocaleTimeString() : '-'}</span>
+      <span class="text-caption"> | ${t('profile.generator.agentBanner.lastHeartbeat')}: ${session.heartbeat ? new Date(session.heartbeat).toLocaleTimeString() : '-'}</span>
     </div>
     <div class="pf-gen-step-indicators">
       ${components.map(c => html`
