@@ -107,11 +107,6 @@
  *     Cortex prompt: add critical rule that ext: namespace is read-only from client-side.
  *     Client CANNOT PUT to /v1/memory/ext:name/key — must use callExt() for shared writes
  *     or writeOwnerMemory() for personal data. Add data storage decision table.
- *   v9.1.0 — 2026-03-19 — Extension prompt: add consolidated "Memory Namespace Rules"
- *     block at the top of the extension template explaining the two-namespace model
- *     (owner namespace vs ext:{name} namespace) with correct and wrong examples.
- *     Expand @activate idempotency explanation with plain definition, bad/good code examples,
- *     and explicit warning about data accumulation on repeated restarts.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -752,33 +747,6 @@ Create an AIMEAT Extension for: ${label}
 
 ${context}
 
-## Memory Namespace Rules (CRITICAL — read before writing ANY memory code)
-
-There are TWO namespaces. You MUST use the right one:
-
-1. **Owner namespace** — where memory components, settings, and translations live (installed by the service owner)
-   - Extensions READ from here: \`ctx.memory.getPublic(ctx.caller.owner, 'key')\`
-   - Extensions CANNOT write here directly — only the owner's memory/translation components do
-
-2. **Extension namespace (\`ext:{your-name}\`)** — your extension's own storage
-   - Extensions WRITE here: \`ctx.memory.set('key', value)\`
-   - Other extensions/cortex/apps read from here: \`ctx.memory.getPublic('ext:{name}', 'key')\` OR via \`getPublic(ctx.caller.owner, 'key')\` after init copies data over
-
-**Rule: READ owner data with getPublic(ctx.caller.owner, ...), WRITE your own data with ctx.memory.set().**
-**Never use ctx.memory.set() to write to owner namespace keys — it writes to YOUR namespace, not the owner's.**
-
-\`\`\`javascript
-// ✅ CORRECT — read seed data / settings / translations that memory components put in owner namespace:
-const settings = await ctx.memory.getPublic(ctx.caller.owner, 'settings.config') || {};
-const lookup   = await ctx.memory.getPublic(ctx.caller.owner, 'lookup.data') || [];
-
-// ✅ CORRECT — write results to your OWN extension namespace:
-await ctx.memory.set('results.today', { items: [...], fetchedAt: new Date().toISOString() });
-
-// ❌ WRONG — ctx.memory.get() reads ext:{name} namespace, NOT the owner namespace:
-const settings = await ctx.memory.get('settings.config');  // null! that key is in owner namespace
-\`\`\`
-
 ## YAML STRING RULES (read this FIRST — violations cause parse errors)
 
 Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
@@ -1017,24 +985,7 @@ Schedule entry:
     input: {}
 \`\`\`
 
-IMPORTANT: @activate actions MUST be idempotent — meaning running them 10 times must have the same result as running them once. They will run on every server restart, so they MUST NOT accumulate or duplicate data.
-
-BAD (not idempotent — appends a duplicate entry on every restart):
-\`\`\`javascript
-const items = await ctx.memory.get('items') || [];
-items.push({ id: 'default', name: 'Default Item' });   // grows forever
-await ctx.memory.set('items', items);
-\`\`\`
-
-GOOD (idempotent — writes only when data is missing or stale):
-\`\`\`javascript
-const existing = await ctx.memory.get('config');
-if (!existing) {
-  await ctx.memory.set('config', { refreshMinutes: 15, locale: 'fi' });
-}
-\`\`\`
-
-See the timestamp-check pattern above — that is the preferred approach for data collectors.
+IMPORTANT: @activate actions MUST be idempotent — they will run multiple times (every restart). Always check existing data before overwriting.
 
 ### CRITICAL: Copy Shared Data to Extension Namespace
 
