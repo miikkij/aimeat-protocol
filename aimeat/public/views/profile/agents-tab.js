@@ -401,7 +401,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
             </div>
             <div class="card-subtitle mt-xs">
               ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502
-              ${t('profile.agents.balance')}: ${a.balance ?? '-'} \u2502
+              ${t('profile.agents.balance')}: ${a.morsel_balance ?? '-'} \u2502
               ${t('profile.agents.lastSeen')}: ${a.last_seen ? timeAgo(a.last_seen) : '-'}
             </div>
           </div>
@@ -422,13 +422,13 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
               ${a.description ? html`
                 <div class="agent-detail-row">
-                  <span class="agent-detail-label">${t('profile.agents.description') || 'Description'}</span>
+                  <span class="agent-detail-label">${t('profile.agents.description')}</span>
                   <span class="agent-detail-value">${escHtml(a.description)}</span>
                 </div>
               ` : ''}
 
               <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.roles') || 'Roles'}</span>
+                <span class="agent-detail-label">${t('profile.agents.roles')}</span>
                 <span class="agent-detail-value">
                   ${(a.roles && a.roles.length > 0)
                     ? a.roles.map(r => html`<span class="badge badge-muted pf-badge-gap">${escHtml(r)}</span>`)
@@ -444,7 +444,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
               <div class="agent-detail-row">
                 <span class="agent-detail-label">${t('profile.agents.balance')}</span>
-                <span class="agent-detail-value">${a.balance ?? '-'}</span>
+                <span class="agent-detail-value">${a.morsel_balance ?? '-'}</span>
               </div>
 
               <div class="agent-detail-row">
@@ -453,17 +453,17 @@ export default function AgentsTab({ session, showToast, onStats }) {
               </div>
 
               <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.created') || 'Created'}</span>
+                <span class="agent-detail-label">${t('profile.agents.created')}</span>
                 <span class="agent-detail-value">${a.created_at ? formatDate(a.created_at) : '-'}</span>
               </div>
 
               ${a.public_key ? html`
                 <div class="agent-detail-row">
-                  <span class="agent-detail-label">${t('profile.agents.publicKey') || 'Public Key'}</span>
+                  <span class="agent-detail-label">${t('profile.agents.publicKey')}</span>
                   <span class="agent-detail-value flex-row">
                     <code class="agent-pubkey">${escHtml(truncateKey(a.public_key))}</code>
                     <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyKey(a.public_key); }}>
-                      ${keyCopied === a.public_key ? '\u2713 Copied' : 'Copy'}
+                      ${keyCopied === a.public_key ? '\u2713 ' + t('profile.agents.copied') : t('profile.agents.copyGaii')}
                     </button>
                   </span>
                 </div>
@@ -471,7 +471,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
               ${a.capabilities?.length > 0 && html`
                 <div class="agent-detail-row">
-                  <span class="agent-detail-label">${t('profile.agents.capabilities') || 'Capabilities'}</span>
+                  <span class="agent-detail-label">${t('profile.agents.capabilities')}</span>
                   <span class="agent-detail-value">
                     <div class="caps">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
                   </span>

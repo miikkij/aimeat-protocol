@@ -258,6 +258,11 @@
       "trust": "Luottamus",
       "balance": "Saldo",
       "lastSeen": "Nähty viimeksi",
+      "roles": "Roolit",
+      "created": "Luotu",
+      "publicKey": "Julkinen avain",
+      "capabilities": "Kyvyt",
+      "description": "Kuvaus",
       "loadingPrompt": "Ladataan kehotetta...",
       "loadingAgents": "Ladataan agentteja...",
       "scopeUi": {
@@ -1035,18 +1040,18 @@
       "hideSetup": "Piilota asennus",
       "agentSetupDesc": "Luo uuden generaattoriagentin avaimineen ja kopioi asennuspromptin leikepöydälle. Liitä se AI-agenttiisi kuuntelun aloittamiseksi.",
       "agentSelector": {
-        "title": "[TODO:fi] Start with an agent",
-        "subtitle": "[TODO:fi] Interview complete. Let an agent execute the rest of the pipeline.",
-        "noAgents": "[TODO:fi] No agents listening. Copy the agent prompt and paste it into your AI agent.",
-        "startButton": "[TODO:fi] Start with this agent",
-        "manualButton": "[TODO:fi] Continue manually"
+        "title": "Käynnistä agentilla",
+        "subtitle": "Haastattelu valmis. Anna agentin generoida loput automaattisesti.",
+        "noAgents": "Ei kuuntelevia agentteja. Kopioi agenttiprompt ja liitä se AI-agenttiisi.",
+        "startButton": "Käynnistä tällä agentilla",
+        "manualButton": "Jatka manuaalisesti"
       },
       "agentBanner": {
-        "working": "[TODO:fi] {agentName} is working",
-        "phase": "[TODO:fi] Phase: {phase} ({step}/{total})",
-        "disconnected": "[TODO:fi] Agent may have disconnected",
-        "stopButton": "[TODO:fi] Stop agent",
-        "continueManually": "[TODO:fi] Stop and continue manually"
+        "working": "{agentName} työskentelee",
+        "phase": "Vaihe: {phase} ({step}/{total})",
+        "disconnected": "Agentti saattoi katkaista yhteyden",
+        "stopButton": "Pysäytä agentti",
+        "continueManually": "Pysäytä ja jatka manuaalisesti"
       },
       "copyAgentPrompt": "Kopioi agentin prompt",
       "agentPromptCopied": "Agentti luotu ja asennusprompt kopioitu!",

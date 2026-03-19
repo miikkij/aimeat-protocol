@@ -370,11 +370,14 @@ function scheduleAutoRefresh(session) {
 }
 
 function createSession(data) {
+  // Extract roles from JWT payload so UI can check owner/operator status
+  const jwtPayload = data.jwt ? parseJwt(data.jwt) : null;
   const session = {
     ghii: data.ghii || null,
     owner: data.owner,
     gaii: data.gaii || null,
     jwt: data.jwt,
+    roles: jwtPayload?.roles || data.roles || [],
     // SECURITY: Private keys are stored as non-extractable CryptoKeys in IndexedDB,
     // NOT in this session object or localStorage. Use _cryptoKey for in-memory ref only.
     _cryptoKey: data._cryptoKey || null,
@@ -422,10 +425,11 @@ function createSession(data) {
         body: JSON.stringify(body),
       });
       session.jwt = data.data.token;
+      session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
       // SECURITY: Only save metadata to localStorage (no private keys)
       save('session', {
         owner: session.owner, gaii: session.gaii, ghii: session.ghii,
-        jwt: session.jwt, publicKey: session.publicKey,
+        jwt: session.jwt, publicKey: session.publicKey, roles: session.roles,
       });
       scheduleAutoRefresh(session);
       return session;
@@ -497,7 +501,7 @@ const auth = {
     // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
       owner: ownerName, gaii: null, ghii,
-      jwt: session.jwt, publicKey: serverPublicKey,
+      jwt: session.jwt, publicKey: serverPublicKey, roles: session.roles,
     });
 
     currentSession = session;
@@ -577,7 +581,7 @@ const auth = {
     // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
       owner: d.owner.name, gaii: null, ghii: d.ghii.ghii,
-      jwt: d.token, publicKey: d.owner_public_key || '',
+      jwt: d.token, publicKey: d.owner_public_key || '', roles: session.roles,
     });
 
     currentSession = session;

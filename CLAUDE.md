@@ -32,7 +32,22 @@ When frontend work is **finished** (a view, component, or feature is done — no
 1. **Run Playwright browser tests:**
    ```bash
    cd aimeat
-   npx playwright test
+   # All Playwright tests (starts server automatically):
+   pnpm test:playwright:mongodb
+
+   # Single test file:
+   pnpm test:playwright:mongodb -- profile-agents
+
+   # Single test by name:
+   pnpm test:playwright:mongodb -- --grep "shows agent cards"
+
+   # Headed mode (see the browser):
+   pnpm test:playwright:mongodb -- --headed
+
+   # Other backends:
+   pnpm test:playwright           # memory (fastest)
+   pnpm test:playwright:sqlite
+   pnpm test:playwright:mongodb   # most realistic
    ```
 2. **Target: 0 failures.** All browser tests must pass.
 3. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
@@ -257,23 +272,34 @@ cd aimeat
 pnpm dev
 
 # Type-check (no emit)
-npx tsc --noEmit
+pnpm typecheck           # or: npx tsc --noEmit
 
-# Run API integration tests (server must be running on :40251)
-npx tsx test/api-full.ts
+# Lint
+pnpm lint
 
-# Build for production
+# ── E2E API tests (starts server automatically) ──
+pnpm test:e2e            # memory backend (fastest)
+pnpm test:e2e:sqlite     # SQLite backend
+pnpm test:e2e:mongodb    # MongoDB backend (most realistic)
+
+# ── Playwright browser tests (starts server automatically) ──
+pnpm test:playwright              # memory backend (fastest)
+pnpm test:playwright:mongodb      # MongoDB backend (most realistic)
+
+# Single test file:
+pnpm test:playwright -- profile-agents
+
+# Single test by name:
+pnpm test:playwright -- --grep "shows agent cards"
+
+# Headed mode (see the browser):
+pnpm test:playwright -- --headed
+
+# ── Build & start ──
 pnpm build
-
-# Start production
 pnpm start
-
-# Start with CLI bootstrap args
 pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
 pnpm start -- --db sqlite --db-path ./data/aimeat.db
-pnpm start -- --consul http://consul:8500
-
-# Start with config file
 pnpm start -- --config production.ini
 ```
 

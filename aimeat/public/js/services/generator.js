@@ -802,8 +802,13 @@ export async function createGeneratorAgent(ownerName) {
     name: agentName,
     owner: ownerName,
     display_name: 'Generator Agent',
-    description: 'Auto-created agent for the service generator queue',
+    description: 'Auto-created agent for the service generator pipeline',
     capabilities: ['generator'],
+    scopes: [
+      'memory:read', 'memory:write', 'memory:delete',
+      'catalogue:read',
+      'generator:read', 'generator:write', 'generator:execute',
+    ],
   });
   const data = resp?.data || resp;
   return {
@@ -935,7 +940,7 @@ def authenticate():
 
 2. Register with capability "generator" if not already done.`;
 
-  return `You are an AIMEAT Generator Agent. Your job is to listen for generator tasks via SSE (Server-Sent Events), process them, and write results back.
+  return `You are an AIMEAT Generator Agent. Your job is to listen for session assignments via SSE, then autonomously execute the full service generation pipeline — blueprint, components, registration.
 
 **Node URL:** ${nodeUrl}
 ${credentialsBlock}
@@ -962,9 +967,9 @@ Error responses have \`"ok": false\` and an \`"error": { "code": "...", "message
 - \`visibility\` controls access: \`"private"\` = only this agent, \`"owner"\` = all agents under same owner, \`"public"\` = anyone
 - \`version\` enables optimistic concurrency: set \`"version": 0\` for first write, then use the version returned by the server for updates. A 409 Conflict means another writer changed it first.
 
-## Event-Driven Task Listening (SSE)
+## Discovering Session Assignments (SSE)
 
-Instead of polling, use Server-Sent Events to react instantly when tasks are queued.
+Use Server-Sent Events to discover when you've been assigned a generation session.
 
 ### Step 1: Get an SSE ticket
 
@@ -986,118 +991,145 @@ This returns a \`text/event-stream\`. Each event is a JSON line:
 data: {"domain":"memory","timestamp":1710378900000}
 \`\`\`
 
-**Listen for events where \`domain === "memory"\`** — this means someone wrote to memory (e.g. a new task was queued).
+### Step 3: On "memory" event, check for assigned sessions
 
-### Step 3: On "memory" event, scan for pending tasks
+When you receive an event where \`domain === "memory"\`, check for projects assigned to you:
 
 \`\`\`
-GET ${nodeUrl}/v1/memory?prefix=generator.&visibility=owner
+GET ${nodeUrl}/v1/generator/projects
 Authorization: Bearer {token}
 \`\`\`
 
-Filter items where the key contains \`.queue.\` and \`value.status === "pending"\`.
+Look for projects where \`session.agentGaii\` matches your GAII (\`${gaii || '{your-gaii}'}\`) and \`session.status === "active"\`.
 
-Example response:
+### Step 4: Load the full project state
+
+\`\`\`
+GET ${nodeUrl}/v1/generator/{projectId}
+Authorization: Bearer {token}
+\`\`\`
+
+Response includes \`project\`, \`interviewSpec\`, \`components\`, and \`session\`. The \`interviewSpec\` contains everything from the user interview — service name, description, components to generate, and detailed specs for each.
+
+### Step 5: Claim the session
+
+\`\`\`
+POST ${nodeUrl}/v1/generator/{projectId}/session/claim
+Authorization: Bearer {token}
+\`\`\`
+
+- **200 OK** → you own the session, proceed with generation.
+- **409 SESSION_BUSY** → another agent already claimed it, do not proceed.
+
+## Heartbeat Loop
+
+Once you have claimed a session, send heartbeats every 60 seconds to keep the session alive. The session TTL is 5 minutes — if you miss heartbeats for 5 minutes, the UI shows "Agent disconnected" and the owner can reassign.
+
+\`\`\`
+POST ${nodeUrl}/v1/generator/{projectId}/session/heartbeat
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "phase": "blueprint",
+  "componentId": null,
+  "stepNumber": 1,
+  "totalSteps": 5
+}
+\`\`\`
+
+The \`phase\` field tracks where you are in the pipeline: \`"blueprint"\`, \`"generating"\`, \`"registering"\`, \`"completing"\`.
+The \`componentId\` field is null during blueprint phase, then the ID of the component being processed.
+\`stepNumber\` and \`totalSteps\` let the UI show a progress bar.
+
+**CRITICAL:** If heartbeat returns **404** → the owner clicked Stop. You MUST immediately cease all work and exit the pipeline. Do not write any more results.
+
+## Logging
+
+Throughout the pipeline, write log entries so the owner sees real-time progress in the UI:
+
+\`\`\`
+POST ${nodeUrl}/v1/generator/{projectId}/log
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "level": "info",
+  "message": "Generating CSM for user profiles...",
+  "componentId": "csm-profiles"
+}
+\`\`\`
+
+Levels: \`"info"\` for progress updates, \`"warn"\` for retries/non-fatal issues, \`"error"\` for failures.
+Include \`componentId\` when the log relates to a specific component, omit it for general pipeline messages.
+
+## Generation Pipeline
+
+### Phase 1: Blueprint
+
+Read the \`interviewSpec\` from the project state. Generate a blueprint that defines all components to build, their types, dependencies, and generation order.
+
+\`\`\`
+POST ${nodeUrl}/v1/generator/{projectId}/steps/blueprint
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "blueprint": "{ ... blueprint JSON as string ... }"
+}
+\`\`\`
+
+The server validates the blueprint structure. If validation fails (400 response), read the error message, fix the blueprint, and retry. **Maximum 3 retries** — if it still fails after 3 attempts, log the error and stop.
+
+Update heartbeat: \`{ "phase": "blueprint", "stepNumber": 1, "totalSteps": 1 }\`
+
+### Phase 2: Component Generation
+
+For each component defined in the blueprint, generate the content and submit it:
+
+\`\`\`
+POST ${nodeUrl}/v1/generator/{projectId}/components/{componentId}/submit
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "type": "csm",
+  "content": "{ ... component content as string ... }"
+}
+\`\`\`
+
+Valid types: \`"csm"\`, \`"msm"\`, \`"extension"\`, \`"app"\`, \`"memory"\`, \`"translation"\`, \`"cortex"\`.
+
+The server validates each component. On validation error (400), read the error details, fix the content, and resubmit. **Maximum 3 retries per component.**
+
+After each component, update heartbeat with progress:
 \`\`\`json
-{
-  "ok": true,
-  "data": {
-    "items": [
-      {
-        "key": "generator.prj-abc123.queue.task-xyz789",
-        "value": {
-          "taskId": "task-xyz789",
-          "componentId": "csm-main",
-          "type": "csm",
-          "prompt": "Generate a CSM for...",
-          "status": "pending",
-          "createdAt": "2026-03-14T01:15:00.000Z",
-          "expiresAt": "2026-03-14T01:45:00.000Z"
-        },
-        "visibility": "owner",
-        "version": 1,
-        "created_at": "...",
-        "updated_at": "..."
-      }
-    ]
-  }
-}
+{ "phase": "generating", "componentId": "csm-profiles", "stepNumber": 3, "totalSteps": 8 }
 \`\`\`
 
-### Step 4: Claim the task (optimistic locking)
+### Phase 3: Registration
 
-For each pending task at key \`K\` with version \`V\`:
+After all components are validated and stored, register each one to the node's catalogue:
 
 \`\`\`
-PUT ${nodeUrl}/v1/memory/{K}
+POST ${nodeUrl}/v1/generator/{projectId}/components/{componentId}/register
 Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "value": {
-    "taskId": "{from task}",
-    "componentId": "{from task}",
-    "type": "{from task}",
-    "prompt": "{from task}",
-    "status": "processing",
-    "claimedBy": "${gaii || '{your-gaii}'}",
-    "createdAt": "{from task}",
-    "expiresAt": "{from task}"
-  },
-  "visibility": "owner",
-  "version": {V}
-}
 \`\`\`
 
-- If you get **200 OK** → you claimed the task, proceed to Step 5.
-- If you get **409 Conflict** → another agent already claimed it, skip this task.
+Update heartbeat: \`{ "phase": "registering", "componentId": "csm-profiles", "stepNumber": 6, "totalSteps": 8 }\`
 
-### Step 5: Process the task
+### Phase 4: Completion
 
-Read \`task.prompt\` — it contains the full generation instructions.
-Execute the prompt to generate the requested output (CSM, MSM, extension, cortex, app HTML, memory entries, or translations).
-
-### Step 6: Write result
-
-Extract \`{projectId}\` and \`{taskId}\` from the task's key (format: \`generator.{projectId}.queue.{taskId}\`).
+When all components are generated and registered:
 
 \`\`\`
-PUT ${nodeUrl}/v1/memory/generator.{projectId}.results.{taskId}
+POST ${nodeUrl}/v1/generator/{projectId}/complete
 Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "value": {
-    "taskId": "{taskId}",
-    "componentId": "{componentId from task}",
-    "status": "completed",
-    "result": "{your generated output as a string}",
-    "completedAt": "{current ISO timestamp}"
-  },
-  "visibility": "owner",
-  "version": 0
-}
 \`\`\`
 
-### Step 7: Update queue entry status
+This marks the project as active and releases the session.
 
-\`\`\`
-PUT ${nodeUrl}/v1/memory/{original queue key}
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "value": {
-    "...all original task fields...",
-    "status": "completed",
-    "completedAt": "{current ISO timestamp}"
-  },
-  "visibility": "owner",
-  "version": {current version from your claim write + 1}
-}
-\`\`\`
-
-## Heartbeat (Checkin)
+## Checkin (Listener Bar)
 
 Call the checkin endpoint on startup and periodically (every 60 seconds) so the UI knows you're online:
 
@@ -1112,23 +1144,11 @@ This updates your \`last_seen\` timestamp. The UI uses this to show you as an ac
 
 ## Error Handling
 
-If task processing fails, write the result with \`"status": "failed"\` and include an \`"error"\` field:
-
-\`\`\`json
-{
-  "value": {
-    "taskId": "...",
-    "componentId": "...",
-    "status": "failed",
-    "error": "Description of what went wrong",
-    "completedAt": "..."
-  },
-  "visibility": "owner",
-  "version": 0
-}
-\`\`\`
-
-Also update the queue entry status to \`"failed"\` (same as Step 7 but with status "failed").
+- **404 on heartbeat** → owner clicked Stop. Cease all work immediately.
+- **409 SESSION_BUSY on claim** → another agent already has the session. Do not proceed.
+- **400 validation errors** → read the error message, fix your output, and retry (max 3 attempts per step).
+- **Network errors** → use exponential backoff (1s, 2s, 4s, 8s...) up to 60s max delay.
+- **Auth errors (401/403)** → re-authenticate with POST /v1/auth/token, then retry.
 
 ## SSE Reconnection
 
@@ -1136,7 +1156,7 @@ The SSE stream may disconnect. When it does:
 1. Re-authenticate if your token has expired (POST /v1/auth/token)
 2. Get a new SSE ticket (POST /v1/events/ticket)
 3. Reconnect to the SSE stream (GET /v1/events?ticket={ticket})
-4. Immediately scan for pending tasks (Step 3) in case events were missed during disconnect
+4. Immediately check for pending session assignments (Step 3) in case events were missed during disconnect
 
 ## Lifecycle Summary
 
@@ -1144,11 +1164,21 @@ The SSE stream may disconnect. When it does:
 authenticate → checkin → get SSE ticket → connect SSE stream
                                                ↓
                                        on "memory" event:
-                                         scan for pending tasks →
-                                         claim task (409 = skip) →
-                                         process prompt →
-                                         write result →
-                                         update queue status →
+                                         GET /v1/generator/projects →
+                                         find assigned session →
+                                         POST .../session/claim (409 = skip) →
+                                         ┌─────────────────────────────────────┐
+                                         │  start heartbeat loop (every 60s)  │
+                                         │  POST .../session/heartbeat        │
+                                         │  (404 = stop immediately)          │
+                                         └─────────────────────────────────────┘
+                                         POST .../steps/blueprint →
+                                         for each component:
+                                           POST .../components/{id}/submit →
+                                           POST .../components/{id}/register →
+                                           POST .../log (progress) →
+                                           heartbeat (update progress) →
+                                         POST .../complete →
                                          checkin
 \`\`\`
 `;

@@ -258,6 +258,11 @@
       "trust": "Trust",
       "balance": "Balance",
       "lastSeen": "Last seen",
+      "roles": "Roles",
+      "created": "Created",
+      "publicKey": "Public Key",
+      "capabilities": "Capabilities",
+      "description": "Description",
       "loadingPrompt": "Loading prompt...",
       "loadingAgents": "Loading agents...",
       "scopeUi": {

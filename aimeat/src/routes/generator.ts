@@ -192,6 +192,17 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
+      // Verify claimed agent exists and has generator capability
+      const claimedAgent = await storage.getAgent(agentGaii);
+      if (!claimedAgent) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent not found: ${agentGaii}`));
+        return;
+      }
+      if (!claimedAgent.capabilities.includes('generator')) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
+        return;
+      }
+
       // Verify authenticated caller has generator capability
       const agentRecord = await storage.getAgent(gaii);
       if (!agentRecord || !agentRecord.capabilities.includes('generator')) {

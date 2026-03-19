@@ -72,9 +72,12 @@ function killServer(child: ChildProcess): void {
 }
 
 // ── Run Playwright ──
+// Forwards any extra CLI args to Playwright (e.g. file filters, --grep, --headed)
 function runPlaywright(): Promise<number> {
+    const extraArgs = process.argv.slice(2).filter(a => a !== '--');
     return new Promise((resolve) => {
-        const child = spawn('npx', ['playwright', 'test'], {
+        const args = ['playwright', 'test', ...extraArgs];
+        const child = spawn('npx', args, {
             env: { ...process.env, AIMEAT_PORT: PORT, BASE_URL },
             stdio: 'inherit',
             cwd: process.cwd(),
