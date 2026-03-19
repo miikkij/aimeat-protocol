@@ -27,6 +27,7 @@
  *   v4.2.0 — 2026-03-18 — Add agent selector UI and progress banner for agent-driven generation
  *   v4.2.1 — 2026-03-19 — Fix session state: check agentGaii presence, not just truthy value,
  *     to avoid treating auto-created empty {} from memory GET as an active session
+ *   v4.3.0 — 2026-03-19 — Add activity logging for all user actions (writeProjectLog)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -41,6 +42,7 @@ import {
   getListeners, buildAgentSetupPrompt, buildAgentShortPrompt, createGeneratorAgent,
   saveInterviewSpec, getInterviewSpec,
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
+  writeProjectLog,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
@@ -214,6 +216,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     try {
       const name = description.slice(0, 60).replace(/\n/g, ' ');
       const p = await createProject(name, description);
+      await writeProjectLog(p.projectId, 'project_created', { meta: { name } });
       setProject(p);
       setPhase('interview');
     } catch (e) {
@@ -245,6 +248,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     }
     try {
       await updateProject(project.projectId, { blueprint: vr.parsed, status: 'in_progress' });
+      await writeProjectLog(project.projectId, 'blueprint_imported', { meta: { componentCount: vr.parsed.components.length } });
       // Initialize components from blueprint — skip existing ones to preserve progress
       const existing = await loadAllComponents(project.projectId);
       const existingIds = new Set(existing.map(c => c.id));
@@ -279,6 +283,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
       setInterviewErrors([]);
       setInterviewParsed(vr.parsed);
       await saveInterviewSpec(project.projectId, vr.parsed);
+      await writeProjectLog(project.projectId, 'interview_imported');
       await updateProject(project.projectId, {
         interviewDone: true,
         enhancedDescription: vr.parsed.description,
@@ -623,6 +628,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       } else {
         showToast?.(t('profile.generator.activatedCount').replace('{count}', result.activated.length));
       }
+      await writeProjectLog(projectId, 'all_activated');
       await refreshStatuses();
     } catch (e) { showToast?.(e.message, true); }
     setLifecycleLoading(null);
@@ -637,6 +643,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       } else {
         showToast?.(t('profile.generator.deactivatedCount').replace('{count}', result.deactivated.length));
       }
+      await writeProjectLog(projectId, 'all_deactivated');
       await refreshStatuses();
     } catch (e) { showToast?.(e.message, true); }
     setLifecycleLoading(null);
@@ -665,6 +672,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     const trimmed = nameDraft.trim();
     if (trimmed && trimmed !== project.name) {
       await updateProject(projectId, { name: trimmed });
+      await writeProjectLog(projectId, 'name_changed', { meta: { newName: nameDraft } });
       await loadData();
       showToast?.(t('profile.generator.nameUpdated'));
     }
@@ -772,10 +780,14 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     (c.history || []).map(h => ({ ...h, componentId: c.id, componentLabel: c.label }))
   );
   const apiLogs = (agentLogs || []).map(l => ({
-    action: `[${l.level || 'info'}] ${l.message}`,
+    action: l.source === 'ui'
+      ? (t(`profile.generator.logActions.${l.message}`) || l.message)
+      : `[${l.level || 'info'}] ${l.message}`,
     at: l.timestamp,
     componentId: l.componentId || null,
-    componentLabel: l.componentId ? (components.find(c => c.id === l.componentId)?.label || l.componentId) : 'agent',
+    componentLabel: l.componentId
+      ? (components.find(c => c.id === l.componentId)?.label || l.componentId)
+      : (l.source === 'ui' ? 'system' : 'agent'),
   }));
   const allLogs = [...componentLogs, ...apiLogs].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const filteredLogs = logFilter ? allLogs.filter(l => l.componentId === logFilter) : allLogs;
@@ -836,6 +848,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         agentGaii,
         agentName: agentRecord?.name ?? agentGaii,
       });
+      await writeProjectLog(projectId, 'agent_started', { meta: { agentGaii, agentName: agentRecord?.name } });
       await loadData();
     } catch (e) {
       showToast?.(e.message, true);
@@ -845,6 +858,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   function handleDeleteProject() {
     confirm(t('profile.generator.confirmDelete'), async () => {
       try {
+        await writeProjectLog(projectId, 'project_deleted');
         await deleteProject(projectId, session);
         showToast?.(t('profile.generator.projectDeleted'));
         onBack();
@@ -862,7 +876,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         session=${generatorSession}
         components=${components}
         projectId=${projectId}
-        onStop=${loadData}
+        onStop=${async () => { await writeProjectLog(projectId, 'agent_stopped'); await loadData(); }}
       />
       <${ConfirmUI} />
       <div class="pf-gen-dash-header">

@@ -1159,6 +1159,17 @@
       "changelogNote": "Muutoshuomautus",
       "changelogPlaceholder": "Mitä muuttui...",
       "registerHint": "Asenna tämä komponentti AIMEAT-solmuusi — tekee siitä käytössä olevan",
+      "logActions": {
+        "project_created": "Projekti luotu",
+        "interview_imported": "Haastattelumäärittely tuotu",
+        "blueprint_imported": "Pohjapiirros tuotu",
+        "agent_started": "Agentti käynnistetty",
+        "agent_stopped": "Agentti pysäytetty",
+        "project_deleted": "Projekti poistettu",
+        "all_activated": "Kaikki komponentit aktivoitu",
+        "all_deactivated": "Kaikki komponentit deaktivoitu",
+        "name_changed": "Projektin nimi muutettu"
+      },
       "status": {
         "not_started": "Ei aloitettu",
         "prompt_ready": "Prompt valmis",

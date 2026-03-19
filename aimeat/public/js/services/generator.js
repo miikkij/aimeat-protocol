@@ -35,6 +35,7 @@
  *     translation i18n keys before removing generator state
  *   v4.3.0 — 2026-03-15 — Memory visibility changed to 'public' for cross-component access
  *   v4.4.0 — 2026-03-17 — Add reregisterComponent (deactivate → remove → register → re-activate)
+ *   v4.5.0 — 2026-03-19 — Add writeProjectLog for user-action activity logging
  */
 import { apiGet, apiPost, apiPut, apiDelete, apiPatch } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -173,6 +174,33 @@ export async function deleteProject(projectId, session) {
   for (const item of items) {
     await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}`);
   }
+}
+
+/* ── Activity Logging ────────────────────────────────── */
+
+/**
+ * Write a project-level activity log entry to memory.
+ * Uses the same key pattern as agent logs: generator.{projectId}.logs.{logId}
+ */
+export async function writeProjectLog(projectId, action, details = {}) {
+  const logId = `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const key = `generator.${projectId}.logs.${logId}`;
+  try {
+    await apiPost('/v1/memory', {
+      key,
+      value: {
+        logId,
+        level: 'info',
+        message: action,
+        componentId: details.componentId || null,
+        meta: details.meta || null,
+        source: 'ui',
+        timestamp: new Date().toISOString(),
+      },
+      visibility: 'owner',
+      tags: ['generator', 'log'],
+    });
+  } catch { /* best-effort logging — don't block user flow */ }
 }
 
 /* ── Interview Spec ─────────────────────────────────── */

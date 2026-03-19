@@ -1159,6 +1159,17 @@
       "changelogNote": "Changelog note",
       "changelogPlaceholder": "What changed...",
       "registerHint": "Install this component on your AIMEAT node — makes it live",
+      "logActions": {
+        "project_created": "Project created",
+        "interview_imported": "Interview specification imported",
+        "blueprint_imported": "Blueprint imported",
+        "agent_started": "Agent started",
+        "agent_stopped": "Agent stopped",
+        "project_deleted": "Project deleted",
+        "all_activated": "All components activated",
+        "all_deactivated": "All components deactivated",
+        "name_changed": "Project renamed"
+      },
       "status": {
         "not_started": "Not started",
         "prompt_ready": "Prompt ready",
