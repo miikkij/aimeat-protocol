@@ -114,6 +114,8 @@ tags:
     description: Package installation, instance management, migrations
   - name: Templates
     description: Template gallery, reviews, discussions
+  - name: Generator
+    description: Agent-driven service generation pipeline. Endpoints allow AI agents to autonomously create and configure AIMEAT services on behalf of a user.
 
 components:
   securitySchemes:
@@ -121,7 +123,14 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT session token obtained via /v1/auth/token
+      description: >
+        JWT session token obtained via /v1/auth/token.
+        Agent scopes are enforced per token. Available scopes include:
+        memory:read, memory:write, catalogue:read, social:read, social:write,
+        work:read, work:write, wallet:read, wallet:write, admin:read, admin:write,
+        generator:read (read projects, interview specs, components, session state),
+        generator:write (create projects, save interview spec, submit blueprint and components),
+        generator:execute (claim/release sessions, register and activate components, write logs).
     SignatureAuth:
       type: apiKey
       in: header
@@ -13211,3 +13220,609 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+
+  # ── Generator ───────────────────────────────────────────────
+  /v1/generator/projects:
+    post:
+      operationId: createGeneratorProject
+      summary: Create generator project
+      description: Create a new service generator project. Requires `generator:write` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Human-readable project name
+                  example: Neighbourhood Hobby Hub
+                description:
+                  type: string
+                  description: Optional project description
+                  example: A platform for connecting locals around shared interests
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          projectId:
+                            type: string
+                            example: gen-1742300000000-abc123
+                          project:
+                            type: object
+                            properties:
+                              id: { type: string }
+                              name: { type: string }
+                              description: { type: string }
+                              status: { type: string, enum: [draft, active, archived] }
+                              blueprint: { type: object, nullable: true }
+                              createdAt: { type: string, format: date-time }
+                              updatedAt: { type: string, format: date-time }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      operationId: listGeneratorProjects
+      summary: List generator projects
+      description: List all generator projects owned by the caller. Requires `generator:read` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Project list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          projects:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                description: { type: string }
+                                status: { type: string }
+                                createdAt: { type: string, format: date-time }
+                                updatedAt: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}:
+    get:
+      operationId: getGeneratorProject
+      summary: Get generator project
+      description: Get full project state including interview spec, components, and session. Requires `generator:read` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID (e.g. gen-1742300000000-abc123)
+      responses:
+        '200':
+          description: Project state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          project:
+                            type: object
+                            nullable: true
+                          interviewSpec:
+                            type: object
+                            nullable: true
+                          components:
+                            type: array
+                            items:
+                              type: object
+                          session:
+                            type: object
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/generator/{projectId}/interview:
+    post:
+      operationId: saveGeneratorInterviewSpec
+      summary: Save interview spec
+      description: Save or replace the interview spec for a project. Writes with owner visibility so agent JWTs can read it. Requires generator:write scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interviewSpec]
+              properties:
+                interviewSpec:
+                  type: object
+                  description: Interview specification object (validated by generator-validate service)
+      responses:
+        '200':
+          description: Interview spec saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          saved: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Validation error - interview spec failed schema validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/generator/{projectId}/session/claim:
+    post:
+      operationId: claimGeneratorSession
+      summary: Claim a generator execution session
+      description: |
+        Agent claims the execution session for a project. Verifies the agent has the
+        `generator` capability. Returns 409 SESSION_BUSY if another agent holds a fresh
+        session (heartbeat within last 5 minutes). Uses atomic setMemoryIfVersion when
+        available to prevent race conditions. Requires generator:execute scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agentGaii, agentName]
+              properties:
+                agentGaii:
+                  type: string
+                  description: Full GAII of the agent claiming the session (e.g. "claude#alice@aimeat-node")
+                agentName:
+                  type: string
+                  description: Human-readable display name of the agent
+      responses:
+        '200':
+          description: Session successfully claimed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          claimed: { type: boolean }
+                          expiresAt: { type: string, format: date-time }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: SESSION_BUSY - another agent holds an active session for this project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/generator/{projectId}/session/heartbeat:
+    post:
+      operationId: generatorSessionHeartbeat
+      summary: Send agent heartbeat to keep session alive
+      description: |
+        Called by the agent every 60 seconds while working. Resets the session TTL (5 minutes).
+        Optionally updates progress fields (phase, componentId, stepNumber, totalSteps) so the
+        UI can show which component is being generated. Returns 404 SESSION_RELEASED if the
+        session has been deleted — the agent must halt on this response.
+        Requires generator:execute scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  description: Current generation phase (e.g. "generating", "validating", "done")
+                componentId:
+                  type: string
+                  nullable: true
+                  description: ID of the component currently being generated
+                stepNumber:
+                  type: integer
+                  description: Current step index
+                totalSteps:
+                  type: integer
+                  description: Total number of steps
+      responses:
+        '200':
+          description: Heartbeat accepted, session extended
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok: { type: boolean }
+                          expiresAt: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: SESSION_RELEASED - session no longer exists, agent should halt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/generator/{projectId}/session:
+    delete:
+      operationId: releaseGeneratorSession
+      summary: Release generator execution session
+      description: |
+        Releases the execution session for a project. Called by the UI's stop button or
+        by the agent when it has finished. The next heartbeat from a running agent will
+        receive SESSION_RELEASED and halt. Requires generator:execute scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      responses:
+        '200':
+          description: Session released
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          released: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}/steps/blueprint:
+    post:
+      operationId: submitGeneratorBlueprint
+      summary: Validate and store blueprint
+      description: |
+        Validates the blueprint JSON submitted by the agent. On validation failure, returns
+        `valid: false` with structured errors (HTTP 200) so the agent can correct and retry —
+        nothing is written to memory. On success, stores the blueprint in the project record
+        and sets status to `blueprint_ready`. Requires `generator:write` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blueprint]
+              properties:
+                blueprint:
+                  type: string
+                  description: Blueprint JSON string to validate and store
+      responses:
+        '200':
+          description: Validation result (valid or invalid — check `data.valid`)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid: { type: boolean }
+                          errors: { type: array, items: { type: string } }
+                          warnings: { type: array, items: { type: string } }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/generator/{projectId}/components/{componentId}/submit:
+    post:
+      operationId: submitGeneratorComponent
+      summary: Validate and store component content
+      description: |
+        Validates component content submitted by the agent. On validation failure, returns
+        `valid: false` with structured errors (HTTP 200) — nothing is written to memory.
+        On success, writes the validated component to `generator.{id}.component.{componentId}`.
+        Requires `generator:write` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+        - name: componentId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Component ID (matches blueprint component id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, content]
+              properties:
+                type:
+                  type: string
+                  enum: [csm, msm, extension, app, memory, translation, cortex]
+                  description: Component type
+                content:
+                  type: string
+                  description: Component content string to validate and store
+      responses:
+        '200':
+          description: Validation result (valid or invalid — check `data.valid`)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          valid: { type: boolean }
+                          errors: { type: array, items: { type: string } }
+                          warnings: { type: array, items: { type: string } }
+                          extracted:
+                            description: Extracted/normalized content (string or object for cortex)
+                            nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}/components/{componentId}/register:
+    post:
+      tags: [Generator]
+      summary: Register a validated component into the AIMEAT catalogue
+      operationId: generatorRegisterComponent
+      description: >
+        Register a previously submitted and validated component (status `ready`) into the AIMEAT
+        catalogue. Resolves the agent's owner GHII and calls storage registration methods directly,
+        bypassing owner-only HTTP routes. After successful registration the component status is
+        updated to `registered`. Types `memory`, `translation`, and `cortex` are stored in generator
+        memory keys only and require no catalogue registration — this endpoint is a no-op for them.
+        Requires `generator:execute` scope.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: componentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Component registered successfully
+        '400':
+          description: Component not ready or unsupported type
+        '403':
+          description: Agent record not found
+        '404':
+          description: Component not found
+        '500':
+          description: Registration error
+
+  /v1/generator/{projectId}/log:
+    post:
+      operationId: writeGeneratorLog
+      summary: Write a generator log entry
+      description: |
+        Writes a log entry to `generator.{projectId}.logs.{taskId}` in memory.
+        Used by agents to record progress, warnings, and errors during generation.
+        Requires `generator:execute` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId, level, message]
+              properties:
+                taskId:
+                  type: string
+                  description: Unique task/step identifier for this log entry
+                level:
+                  type: string
+                  enum: [info, warn, error]
+                  description: Log level
+                message:
+                  type: string
+                  description: Log message
+                meta:
+                  description: Optional structured metadata
+                  nullable: true
+      responses:
+        '200':
+          description: Log entry written
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok: { type: boolean }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/generator/{projectId}/complete:
+    post:
+      operationId: completeGeneratorProject
+      summary: Mark project active and release session
+      description: |
+        Marks the project status as `active` and records `completedAt`. Also releases the
+        execution session if one exists. Called by the agent when all components have been
+        successfully submitted. Requires `generator:execute` scope.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      responses:
+        '200':
+          description: Project marked active
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, example: active }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'

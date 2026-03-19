@@ -191,6 +191,11 @@ export function requireRole(role: string) {
   };
 }
 
+// Generator scopes (agent-driven service generation):
+// generator:read    — read projects, interview specs, components, session state
+// generator:write   — create projects, save interview spec, submit blueprint and components
+// generator:execute — claim/release sessions, register and activate components, write logs
+
 /**
  * Require specific scopes. Must be used after requireAuth().
  * Checks if the agent's JWT scopes include the required scopes.

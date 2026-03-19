@@ -837,6 +837,39 @@
 .pf-gen-remove-heading   { margin: 0 0 8px; font-weight: 600; }
 .pf-gen-checkbox-label   { display: flex; align-items: center; gap: 4px; font-size: .85em; }
 
+/* ── Agent-driven generator UI ──────────────────────── */
+.pf-gen-agent-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--warning-subtle, var(--surface));
+  border: 1px solid var(--warning-border, var(--border));
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+.pf-gen-agent-banner.stale {
+  background: var(--error-subtle, var(--surface));
+  border-color: var(--error-border, var(--border));
+}
+.pf-gen-agent-banner-info { flex: 1; }
+.pf-gen-agent-banner-phase { display: block; font-size: 0.85em; color: var(--text-dim); margin-top: 4px; }
+.pf-gen-step-indicators { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.pf-gen-step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); display: inline-block; }
+.pf-gen-step-dot.done { background: var(--success); }
+.pf-gen-step-dot.active { background: var(--accent); animation: pf-gen-pulse 1.5s infinite; }
+@keyframes pf-gen-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.pf-gen-agent-selector { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
+.pf-gen-agent-selector-subtitle { color: var(--text-dim); margin-bottom: 12px; }
+.pf-gen-agent-selector-empty { color: var(--text-dim); font-style: italic; }
+.pf-gen-agent-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.pf-gen-agent-option { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.pf-gen-agent-option.selected { border-color: var(--accent); background: var(--bg-dim); }
+.pf-gen-agent-name { font-weight: 600; }
+.pf-gen-agent-gaii { font-size: 0.8em; color: var(--text-dim); }
+.pf-gen-agent-actions { display: flex; gap: 8px; }
+.pf-gen-stop-btn { margin-left: auto; }
+
 /* ── Input for verification codes (email-tab) ── */
 .pf .input-verification-code {
   font-size: 1.5rem; letter-spacing: 6px; text-align: center;
