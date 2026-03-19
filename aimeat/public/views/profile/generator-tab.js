@@ -597,7 +597,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     setAgents(await discoverAgents());
     // Load agent-written logs from memory
     try {
-      const logResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.log.&owner_scope=true`);
+      const logResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.logs.&owner_scope=true`);
       const logItems = logResp?.data?.items || [];
       setAgentLogs(logItems.map(l => l.value).filter(Boolean));
     } catch { /* no logs */ }
