@@ -371,6 +371,9 @@ function NewProjectView({ onBack, onCreated, showToast }) {
           <button class="btn-primary" onClick=${handleSubmitBlueprint} disabled=${!blueprintResult.trim()}>
             ${t('profile.generator.importBlueprint')}
           </button>
+          <button class="btn-outline" onClick=${() => onCreated(project)}>
+            ${t('profile.generator.agentSelector.skipToAgent')}
+          </button>
         </div>
       </div>
     `;

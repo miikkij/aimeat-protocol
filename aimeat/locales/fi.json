@@ -1044,7 +1044,8 @@
         "subtitle": "Haastattelu valmis. Anna agentin generoida loput automaattisesti.",
         "noAgents": "Ei kuuntelevia agentteja. Kopioi agenttiprompt ja liitä se AI-agenttiisi.",
         "startButton": "Käynnistä tällä agentilla",
-        "manualButton": "Jatka manuaalisesti"
+        "manualButton": "Jatka manuaalisesti",
+        "skipToAgent": "Anna agentin hoitaa"
       },
       "agentBanner": {
         "working": "{agentName} työskentelee",

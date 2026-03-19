@@ -1044,7 +1044,8 @@
         "subtitle": "Interview complete. Let an agent execute the rest of the pipeline.",
         "noAgents": "No agents listening. Copy the agent prompt and paste it into your AI agent.",
         "startButton": "Start with this agent",
-        "manualButton": "Continue manually"
+        "manualButton": "Continue manually",
+        "skipToAgent": "Let an agent handle this"
       },
       "agentBanner": {
         "working": "{agentName} is working",
