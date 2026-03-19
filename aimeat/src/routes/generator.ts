@@ -43,6 +43,129 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
   const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
   const VALID_COMPONENT_TYPES: ComponentType[] = ['csm', 'msm', 'extension', 'app', 'memory', 'translation', 'cortex'];
 
+  // GET /v1/generator/agent-guide — generic generator agent instructions (no auth, plain text)
+  // Agents fetch this URL to learn the session-based pipeline flow.
+  router.get('/v1/generator/agent-guide', (_req, res) => {
+    const baseUrl = config.baseUrl || `${_req.protocol}://${_req.get('host')}`;
+    res.type('text/plain').send(`# AIMEAT Generator Agent — Full Instructions
+
+## Your Role
+
+You are an AIMEAT Generator Agent. You listen for session assignments via SSE, then autonomously execute the full service generation pipeline — blueprint, components, registration.
+
+## AIMEAT API Conventions
+
+All responses follow this envelope: { "ok": true, "data": { ... }, "hints": [...] }
+Error responses: { "ok": false, "error": { "code": "...", "message": "..." } }
+Memory keys use dots as separators (e.g. generator.project123.session). Allowed: a-z0-9._-
+
+## Authentication
+
+1. Concatenate: {your GAII}{ISO 8601 timestamp} — no separator
+2. Sign with your Ed25519 private key (raw bytes, not hashed first)
+3. Base64-encode the 64-byte signature
+4. POST ${baseUrl}/v1/auth/token with { "gaii": "...", "timestamp": "...", "signature": "..." }
+5. Use the returned JWT as: Authorization: Bearer {token}
+
+Token expires after 24h. Re-authenticate when you get HTTP 401.
+
+## Discovering Session Assignments (SSE)
+
+### Get an SSE ticket
+POST ${baseUrl}/v1/events/ticket
+Authorization: Bearer {token}
+
+### Connect to the SSE stream
+GET ${baseUrl}/v1/events?ticket={ticket}
+
+Listen for events where domain === "memory". On each event, check for assigned sessions.
+
+### Check for your assignment
+GET ${baseUrl}/v1/generator/projects
+Authorization: Bearer {token}
+
+Scan projects. Use GET ${baseUrl}/v1/generator/{projectId} to load full state.
+If the session object has your GAII in agentGaii, you have been assigned.
+
+## Generator Pipeline
+
+Once assigned to a project, execute these steps:
+
+### 1. Start heartbeat loop (CRITICAL)
+
+Call every 60 seconds. If you stop for 5 minutes, the UI shows "Agent disconnected" and the owner can reassign.
+
+POST ${baseUrl}/v1/generator/{projectId}/session/heartbeat
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "phase": "blueprint", "stepNumber": 1, "totalSteps": 7 }
+
+If heartbeat returns 404 SESSION_RELEASED → stop immediately (owner clicked Stop).
+
+### 2. Generate and submit the blueprint
+
+Read the interviewSpec from the project state. Generate a blueprint listing all components to create.
+
+POST ${baseUrl}/v1/generator/{projectId}/steps/blueprint
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "blueprint": "<your generated blueprint>" }
+
+Backend validates. If errors, fix and resubmit (max 3 attempts).
+
+### 3. Generate each component
+
+For each component in the blueprint:
+
+POST ${baseUrl}/v1/generator/{projectId}/components/{componentId}/submit
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "type": "csm|msm|extension|app|memory|translation|cortex", "content": "<generated content>" }
+
+Update heartbeat after each: { "phase": "generating", "componentId": "...", "stepNumber": N, "totalSteps": M }
+
+### 4. Register components
+
+POST ${baseUrl}/v1/generator/{projectId}/components/{componentId}/register
+Authorization: Bearer {token}
+
+### 5. Write logs for real-time UI updates
+
+POST ${baseUrl}/v1/generator/{projectId}/log
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{ "level": "info|warn|error", "message": "...", "componentId": "..." }
+
+### 6. Mark project complete
+
+POST ${baseUrl}/v1/generator/{projectId}/complete
+Authorization: Bearer {token}
+
+### 7. Checkin (keep listener status alive)
+
+POST ${baseUrl}/v1/checkin
+Authorization: Bearer {token}
+
+Call periodically so the UI shows you as an active listener.
+
+## Error Handling
+
+- 404 on heartbeat: Owner stopped session — halt immediately
+- 409 SESSION_BUSY: Another agent holds the session — do not proceed
+- 400 validation error: Read error details, fix, resubmit (max 3 retries)
+- Network error: Retry with exponential backoff (1s, 2s, 4s)
+- 401: Re-authenticate and retry
+
+## SSE Reconnection
+
+If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for pending assignments.
+`);
+  });
+
   // POST /v1/generator/projects — create a new generator project
   router.post('/v1/generator/projects',
     requireAuth(),

@@ -38,7 +38,7 @@ import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent, enqueueTask, pollResults, pollLogs,
   checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
-  getListeners, buildAgentSetupPrompt, createGeneratorAgent,
+  getListeners, buildAgentSetupPrompt, buildAgentShortPrompt, createGeneratorAgent,
   saveInterviewSpec, getInterviewSpec,
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
 } from '/js/services/generator.js';
@@ -69,7 +69,7 @@ function AgentListenerBar({ showToast, session }) {
     setListeners(await getListeners());
   }
 
-  async function handleCopyPrompt() {
+  async function handleCopyPrompt(short = false) {
     const url = nodeUrl || window.location.origin;
     const ownerName = session?.owner;
     if (!ownerName) {
@@ -79,7 +79,9 @@ function AgentListenerBar({ showToast, session }) {
     setCreating(true);
     try {
       const creds = await createGeneratorAgent(ownerName);
-      const prompt = buildAgentSetupPrompt(url, creds);
+      const prompt = short
+        ? buildAgentShortPrompt(url, creds)
+        : buildAgentSetupPrompt(url, creds);
       await navigator.clipboard.writeText(prompt);
       showToast?.(t('profile.generator.agentPromptCopied'));
     } catch (err) {
@@ -115,9 +117,14 @@ function AgentListenerBar({ showToast, session }) {
     ${showPrompt && html`
       <div class="pf-gen-agent-prompt-panel">
         <p class="pf-gen-subtitle">${t('profile.generator.agentSetupDesc')}</p>
-        <button class="btn-outline btn-sm" onClick=${handleCopyPrompt} disabled=${creating}>
-          ${creating ? t('profile.generator.creatingAgent') : t('profile.generator.copyAgentPrompt')}
-        </button>
+        <div class="flex-row">
+          <button class="btn-primary btn-sm" onClick=${() => handleCopyPrompt(true)} disabled=${creating}>
+            ${creating ? t('profile.generator.creatingAgent') : t('profile.generator.copyAgentPromptShort')}
+          </button>
+          <button class="btn-outline btn-sm" onClick=${() => handleCopyPrompt(false)} disabled=${creating}>
+            ${t('profile.generator.copyAgentPromptFull')}
+          </button>
+        </div>
       </div>
     `}
   `;

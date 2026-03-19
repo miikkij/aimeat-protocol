@@ -1055,6 +1055,8 @@
         "continueManually": "Stop and continue manually"
       },
       "copyAgentPrompt": "Copy Agent Prompt",
+      "copyAgentPromptShort": "Copy prompt (with link)",
+      "copyAgentPromptFull": "Copy prompt (full)",
       "agentPromptCopied": "Agent created and setup prompt copied!",
       "creatingAgent": "Creating agent...",
       "agentCreateFailed": "Failed to create generator agent. Check that you are logged in.",

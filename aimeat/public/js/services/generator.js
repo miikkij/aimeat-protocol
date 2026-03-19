@@ -819,6 +819,41 @@ export async function createGeneratorAgent(ownerName) {
   };
 }
 
+/**
+ * Build a SHORT agent setup prompt with credentials + URL to full instructions.
+ * Suitable for Telegram/chat where long prompts get split into multiple messages.
+ */
+export function buildAgentShortPrompt(nodeUrl, credentials) {
+  const { gaii, name, privateKey } = credentials || {};
+  return `You are an AIMEAT Generator Agent.
+
+## Credentials
+- GAII: ${gaii}
+- Agent name: ${name}
+- Private key (Ed25519, base64): ${privateKey}
+- Node URL: ${nodeUrl}
+
+## Full instructions
+Fetch and read: ${nodeUrl}/v1/generator/agent-guide
+
+That document contains everything: authentication, SSE setup, the full generator pipeline (blueprint → components → registration), heartbeat, error handling.
+
+## Quick start
+1. Authenticate: POST ${nodeUrl}/v1/auth/token — sign (GAII + timestamp) with your private key
+2. Checkin: POST ${nodeUrl}/v1/checkin — marks you as online
+3. Connect SSE: POST ${nodeUrl}/v1/events/ticket → GET ${nodeUrl}/v1/events?ticket={ticket}
+4. Wait for a session assignment (owner assigns you from the UI)
+5. Execute the pipeline per the full instructions above
+
+## Persistent connection
+
+Ask the user: "Do you want me to set up a persistent listener service that runs in the background and automatically handles generator tasks whenever they're assigned? Or should I wait for you to tell me when to start?"
+
+If the user wants persistent: set up a background service/daemon that maintains the SSE connection and auto-executes when assigned. If you cannot create a persistent service on this platform, tell the user clearly.
+
+If the user wants manual: wait for the user to say when to start, then execute once.`;
+}
+
 export function buildAgentSetupPrompt(nodeUrl, credentials) {
   const { gaii, name, privateKey } = credentials || {};
 

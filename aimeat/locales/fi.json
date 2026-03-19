@@ -1055,6 +1055,8 @@
         "continueManually": "Pysäytä ja jatka manuaalisesti"
       },
       "copyAgentPrompt": "Kopioi agentin prompt",
+      "copyAgentPromptShort": "Kopioi prompt (linkillä)",
+      "copyAgentPromptFull": "Kopioi prompt (kokonaisena)",
       "agentPromptCopied": "Agentti luotu ja asennusprompt kopioitu!",
       "creatingAgent": "Luodaan agenttia...",
       "agentCreateFailed": "Generaattoriagentin luonti epäonnistui. Tarkista että olet kirjautunut.",
