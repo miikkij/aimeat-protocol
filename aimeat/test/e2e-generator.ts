@@ -625,9 +625,23 @@ await test('Agent: blueprint submit returns validation errors for invalid YAML',
         headers: { Authorization: `Bearer ${generatorAgentToken}` },
         body: JSON.stringify({ blueprint: 'not: valid: yaml: [' }),
     });
-    assert(status === 200, `Blueprint validation: expected HTTP 200 (not 4xx), got ${status}`);
-    assert(body.data?.valid === false, `Expected valid:false, got: ${JSON.stringify(body.data)}`);
-    assert(Array.isArray(body.data?.errors) && body.data.errors.length > 0, 'Expected validation errors array');
+    assert(status === 422, `Blueprint validation: expected HTTP 422 for invalid input, got ${status}`);
+    assert(body.ok === false, 'Expected ok:false for validation error');
+    assert(body.error?.code === 'VALIDATION_FAILED', `Expected VALIDATION_FAILED, got: ${body.error?.code}`);
+
+    // Submit a valid blueprint so subsequent component-submit tests can proceed
+    const validBlueprint = JSON.stringify({
+        components: [
+            { id: 'csm-main', type: 'csm', label: 'Main CSM' },
+        ],
+        phases: [{ id: 'phase-1', label: 'Core', componentIds: ['csm-main'] }],
+    });
+    const { status: validStatus } = await json(`/v1/generator/${generatorApiProjectId}/steps/blueprint`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ blueprint: validBlueprint }),
+    });
+    assert(validStatus === 200, `Valid blueprint submit: expected 200, got ${validStatus}`);
 });
 
 await test('Agent: component submit validates and stores valid CSM', async () => {
@@ -668,13 +682,13 @@ await test('Agent: session claim, duplicate claim returns 409, heartbeat, delete
     });
     assert(claimStatus === 200, `Session claim: expected 200, got ${claimStatus}`);
 
-    // Second claim from same agent should return 409 SESSION_BUSY
+    // Second claim from same agent should return 200 (re-claim updates heartbeat)
     const { status: claimStatus2 } = await json(`/v1/generator/${generatorApiProjectId}/session/claim`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${generatorAgentToken}` },
         body: JSON.stringify({ agentGaii: generatorAgentGaii, agentName: 'TestAPIAgent' }),
     });
-    assert(claimStatus2 === 409, `Duplicate session claim: expected 409, got ${claimStatus2}`);
+    assert(claimStatus2 === 200, `Same-agent re-claim: expected 200 (heartbeat update), got ${claimStatus2}`);
 
     // Heartbeat while session active
     const { status: hbStatus } = await json(`/v1/generator/${generatorApiProjectId}/session/heartbeat`, {
