@@ -321,9 +321,13 @@ export class MongoStorage implements Storage {
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return false;
         try {
+            // Read-then-set to handle null morselBalance in legacy documents
+            const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
+            const balance = record?.morselBalance ?? 0;
+            if (balance < amount) return false;
             await this.prisma.ghii.update({
-                where: { ghii, morselBalance: { gte: amount } },
-                data: { morselBalance: { decrement: amount } },
+                where: { ghii },
+                data: { morselBalance: balance - amount },
             });
             return true;
         } catch { return false; }
@@ -334,9 +338,12 @@ export class MongoStorage implements Storage {
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return false;
         try {
+            // Read-then-set to handle null morselBalance in legacy documents
+            const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
+            const balance = record?.morselBalance ?? 0;
             await this.prisma.ghii.update({
                 where: { ghii },
-                data: { morselBalance: { increment: amount } },
+                data: { morselBalance: balance + amount },
             });
             return true;
         } catch { return false; }
@@ -351,9 +358,10 @@ export class MongoStorage implements Storage {
         if (balance >= cap) return 0;
         const actualCredit = Math.min(amount, cap - balance);
         if (actualCredit <= 0) return 0;
+        // Explicit set instead of increment to handle null morselBalance in legacy documents
         await this.prisma.ghii.update({
             where: { ghii },
-            data: { morselBalance: { increment: actualCredit } },
+            data: { morselBalance: balance + actualCredit },
         });
         return actualCredit;
     }
@@ -367,9 +375,12 @@ export class MongoStorage implements Storage {
         try {
             await this.prisma.$transaction(async (tx: any) => {
                 const from = await tx.ghii.findUnique({ where: { ghii: fromGhii }, select: { morselBalance: true } });
-                if (!from || (from.morselBalance ?? 0) < amount) throw new Error('INSUFFICIENT');
-                await tx.ghii.update({ where: { ghii: fromGhii }, data: { morselBalance: { decrement: amount } } });
-                await tx.ghii.update({ where: { ghii: toGhii }, data: { morselBalance: { increment: amount } } });
+                const fromBalance = from?.morselBalance ?? 0;
+                if (fromBalance < amount) throw new Error('INSUFFICIENT');
+                const to = await tx.ghii.findUnique({ where: { ghii: toGhii }, select: { morselBalance: true } });
+                const toBalance = to?.morselBalance ?? 0;
+                await tx.ghii.update({ where: { ghii: fromGhii }, data: { morselBalance: fromBalance - amount } });
+                await tx.ghii.update({ where: { ghii: toGhii }, data: { morselBalance: toBalance + amount } });
             });
             return true;
         } catch { return false; }
