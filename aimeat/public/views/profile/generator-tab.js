@@ -1447,12 +1447,12 @@ function ComponentDetail({ component, project, components, agents, projectId, in
 
       <!-- Mode toggle -->
       <div class="pf-gen-mode-toggle">
-        <button class=${`btn btn-sm ${mode === 'chat' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('chat')}
+        <button class=${`btn-sm ${mode === 'chat' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('chat')}
           title=${t('profile.generator.modeChatHint')}>
           ${t('profile.generator.modeChat')}
         </button>
         ${agents.length > 0 && html`
-          <button class=${`btn btn-sm ${mode === 'agent' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('agent')}
+          <button class=${`btn-sm ${mode === 'agent' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('agent')}
             title=${t('profile.generator.modeAgentHint')}>
             ${t('profile.generator.modeAgent')}
           </button>
