@@ -29,6 +29,7 @@
 //   v1.6.0 — 2026-03-19 — Fix emitChange, session ownership, validation status codes, dead code removal, type checks
 //   v1.7.0 — 2026-03-19 — Add GET /v1/generator/my-assignments polling endpoint for agent discovery
 //   v1.8.0 — 2026-03-19 — Update agent guide to use polling instead of SSE for assignment discovery
+//   v1.9.0 — 2026-03-19 — Safety guards: version increment, blueprint immutability, registered component protection, session identity check
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -692,6 +693,15 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
         return;
       }
 
+      const sessionAgent = (existing.value as { agentGaii?: string })?.agentGaii;
+      if (sessionAgent && sessionAgent !== req.auth!.sub) {
+        const isOwner = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+        if (!isOwner) {
+          res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You do not own this session'));
+          return;
+        }
+      }
+
       const now = new Date().toISOString();
       const updated: Record<string, unknown> = { ...(existing.value as Record<string, unknown>), heartbeat: now };
 
@@ -785,13 +795,24 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
         return;
       }
 
+      // Guard: prevent blueprint overwrite if components have been submitted
+      const existingComponents = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
+      const hasSubmitted = existingComponents.some(r => {
+        const val = r.value as { status?: string };
+        return val.status === 'ready' || val.status === 'registered';
+      });
+      if (hasSubmitted) {
+        res.status(409).json(error(config.nodeId, 'BLUEPRINT_LOCKED', 'Cannot overwrite blueprint — components have already been submitted. Delete components first or create a new project.'));
+        return;
+      }
+
       const updatedProject = {
         ...(projectRec.value as Record<string, unknown>),
         blueprint: validation.extracted ?? blueprint,
         status: 'blueprint_ready',
         updatedAt: now,
       };
-      await storage.setMemory({ ...projectRec, value: updatedProject, updatedAt: now });
+      await storage.setMemory({ ...projectRec, value: updatedProject, version: (projectRec.version ?? 1) + 1, updatedAt: now });
 
       res.json(success(config.nodeId, { valid: true, errors: [], warnings: validation.warnings ?? [] }));
       emitChange('memory');
@@ -842,6 +863,13 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
       // Write validated component to memory
       const now = new Date().toISOString();
       const existingRec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
+      if (existingRec) {
+        const existingStatus = (existingRec.value as { status?: string })?.status;
+        if (existingStatus === 'registered') {
+          res.status(409).json(error(config.nodeId, 'ALREADY_REGISTERED', 'Component is already registered. Cannot re-submit.'));
+          return;
+        }
+      }
       const newVersion = existingRec ? existingRec.version + 1 : 1;
 
       const extractedContent = typeof validation.extracted === 'string'
@@ -916,6 +944,7 @@ The key pattern: ALWAYS call \`GET /v1/generator/{projectId}/prompts/{componentI
         await storage.setMemory({
           ...componentRec,
           value: { ...component, status: 'registered', registeredAt: now },
+          version: (componentRec.version ?? 1) + 1,
           updatedAt: now,
         });
         res.json(success(config.nodeId, { registered: true, componentId }));
