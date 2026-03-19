@@ -25,6 +25,7 @@
 //   v1.3.0 — 2026-03-18 — Add blueprint, component submit, log, and complete endpoints (Task 5)
 //   v1.4.0 — 2026-03-18 — Add component registration endpoint (Task 6)
 //   v1.5.0 — 2026-03-18 — Fix session claim: use setMemory for new sessions (setMemoryIfVersion only for CAS on existing stale sessions)
+//   v1.6.0 — 2026-03-19 — Fix emitChange, session ownership, validation status codes, dead code removal, type checks
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -160,12 +161,12 @@ Valid types: csm, msm, extension, app, memory, translation, cortex
 REQUIRED top-level: components (array), phases (array)
 Each phase: id, label, componentIds (array of component ids)
 
-Submit the blueprint:
+Submit the blueprint. Stringify the JSON object before sending:
 POST ${baseUrl}/v1/generator/{projectId}/steps/blueprint
 Authorization: Bearer {token}
 Content-Type: application/json
 
-{ "blueprint": "<JSON string of the blueprint above>" }
+{ "blueprint": "<JSON string — use JSON.stringify() on the blueprint object>" }
 
 Backend validates. If errors, fix the specific fields and resubmit (max 3 attempts).
 
@@ -342,6 +343,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       });
 
       res.status(201).json(success(config.nodeId, { projectId, project }));
+      emitChange('memory');
     }
   );
 
@@ -433,6 +435,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       });
 
       res.json(success(config.nodeId, { saved: true }));
+      emitChange('memory');
     }
   );
 
@@ -447,15 +450,20 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       const projectId = req.params['projectId'] as string;
       const { agentGaii, agentName } = req.body ?? {};
 
-      if (!agentGaii || !agentName) {
-        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'agentGaii and agentName are required'));
+      if (!agentGaii || typeof agentGaii !== 'string' || !agentName || typeof agentName !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'agentGaii and agentName are required strings'));
         return;
       }
 
       // Verify claimed agent exists and has generator capability
       const claimedAgent = await storage.getAgent(agentGaii);
       if (!claimedAgent) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent not found: ${agentGaii}`));
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Agent not found'));
+        return;
+      }
+      // Verify agent belongs to the same owner
+      if (claimedAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Agent belongs to a different owner'));
         return;
       }
       if (!claimedAgent.capabilities.includes('generator')) {
@@ -463,22 +471,23 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
-      // Verify caller has generator capability (skip for owner sessions — they bypass scopes)
-      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-      if (!isOwnerSession) {
-        const callerGaii = resolve(req);
-        const agentRecord = await storage.getAgent(callerGaii);
-        if (!agentRecord || !agentRecord.capabilities.includes('generator')) {
-          res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agent does not have generator capability'));
-          return;
-        }
-      }
-
       // Check for existing fresh session
       const existing = await storage.getMemory(gaii, `generator.${projectId}.session`);
       if (existing) {
-        const session = existing.value as { heartbeat: string };
+        const session = existing.value as { heartbeat: string; agentGaii: string };
         const age = Date.now() - new Date(session.heartbeat).getTime();
+
+        // If same agent is re-claiming, update heartbeat instead of 409
+        if (session.agentGaii === agentGaii && age < SESSION_TTL_MS) {
+          const now = new Date().toISOString();
+          const updated = { ...session, heartbeat: now };
+          await storage.setMemory({ ...existing, value: updated, version: (existing.version ?? 1) + 1, updatedAt: now });
+          const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+          res.json(success(config.nodeId, { claimed: true, expiresAt }));
+          emitChange('memory');
+          return;
+        }
+
         if (age < SESSION_TTL_MS) {
           res.status(409).json(error(config.nodeId, 'SESSION_BUSY', 'Another agent holds an active session for this project'));
           return;
@@ -545,17 +554,18 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       const now = new Date().toISOString();
       const updated: Record<string, unknown> = { ...(existing.value as Record<string, unknown>), heartbeat: now };
 
-      // Allow agent to update progress fields via heartbeat body
+      // Allow agent to update progress fields via heartbeat body — with type checks
       const { phase, componentId, stepNumber, totalSteps } = req.body ?? {};
-      if (phase !== undefined) updated['phase'] = phase;
-      if (componentId !== undefined) updated['componentId'] = componentId;
-      if (stepNumber !== undefined) updated['stepNumber'] = stepNumber;
-      if (totalSteps !== undefined) updated['totalSteps'] = totalSteps;
+      if (phase !== undefined && typeof phase === 'string') updated['phase'] = phase;
+      if (componentId !== undefined && typeof componentId === 'string') updated['componentId'] = componentId;
+      if (stepNumber !== undefined && typeof stepNumber === 'number') updated['stepNumber'] = stepNumber;
+      if (totalSteps !== undefined && typeof totalSteps === 'number') updated['totalSteps'] = totalSteps;
 
-      await storage.setMemory({ ...existing, value: updated, updatedAt: now });
+      await storage.setMemory({ ...existing, value: updated, version: (existing.version ?? 1) + 1, updatedAt: now });
 
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-      res.json(success(config.nodeId, { ok: true, expiresAt }));
+      res.json(success(config.nodeId, { updated: true, expiresAt }));
+      emitChange('memory');
     }
   );
 
@@ -567,8 +577,13 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     async (req, res) => {
       const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
-      await storage.deleteMemory(gaii, `generator.${projectId}.session`);
+      const deleted = await storage.deleteMemory(gaii, `generator.${projectId}.session`);
+      if (!deleted) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No active session to release'));
+        return;
+      }
       res.json(success(config.nodeId, { released: true }));
+      emitChange('memory');
     }
   );
 
@@ -591,7 +606,8 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
       const validation = validateBlueprint(blueprint);
       if (!validation.valid) {
         // Return validation errors to agent — do NOT write to memory
-        res.json(success(config.nodeId, { valid: false, errors: validation.errors, warnings: validation.warnings }));
+        const errors = validation.errors ?? [];
+        res.status(422).json(error(config.nodeId, 'VALIDATION_FAILED', errors.join('; ')));
         return;
       }
 
@@ -603,15 +619,16 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
-      const updated = {
+      const updatedProject = {
         ...(projectRec.value as Record<string, unknown>),
         blueprint: validation.extracted ?? blueprint,
         status: 'blueprint_ready',
         updatedAt: now,
       };
-      await storage.setMemory({ ...projectRec, value: updated, updatedAt: now });
+      await storage.setMemory({ ...projectRec, value: updatedProject, updatedAt: now });
 
       res.json(success(config.nodeId, { valid: true, errors: [], warnings: validation.warnings ?? [] }));
+      emitChange('memory');
     }
   );
 
@@ -635,16 +652,20 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         return;
       }
 
+      // Verify componentId exists in the blueprint
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      const blueprint = (projectRec?.value as any)?.blueprint;
+      if (blueprint?.components && !blueprint.components.some((c: any) => c.id === componentId)) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint`));
+        return;
+      }
+
       const validation = validateComponent(type as ComponentType, content);
 
       if (!validation.valid) {
         // Return errors for agent to correct — do NOT write to memory
-        res.json(success(config.nodeId, {
-          valid: false,
-          errors: validation.errors,
-          warnings: validation.warnings ?? [],
-          extracted: validation.extracted,
-        }));
+        const errors = validation.errors ?? [];
+        res.status(422).json(error(config.nodeId, 'VALIDATION_FAILED', errors.join('; ')));
         return;
       }
 
@@ -675,6 +696,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         warnings: validation.warnings ?? [],
         extracted: validation.extracted,
       }));
+      emitChange('memory');
     }
   );
 
@@ -709,7 +731,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
           case 'csm': await registerCsm(component.content, ownerName, storage); break;
           case 'msm': await registerMsm(component.content, ownerName, storage); break;
           case 'extension': await registerExtension(component.content, ownerName, regGhii, storage, config.maxExtensionsPerOwner); break;
-          case 'app': await registerApp(component.content, ownerName, resolve(req), storage); break;
+          case 'app': await registerApp(component.content, ownerName, regGhii, storage); break;
           case 'memory':
           case 'translation':
           case 'cortex':
@@ -727,6 +749,7 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
           updatedAt: now,
         });
         res.json(success(config.nodeId, { registered: true, componentId }));
+        emitChange('memory');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         res.status(500).json(error(config.nodeId, 'REGISTRATION_ERROR', msg));
@@ -742,23 +765,27 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
     async (req, res) => {
       const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
-      const { taskId, level, message, meta } = req.body ?? {};
+      const { level, message, componentId, meta } = req.body ?? {};
 
-      if (!taskId || typeof taskId !== 'string' || !level || typeof level !== 'string' || !message || typeof message !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'taskId, level, and message must be strings'));
+      if (!level || typeof level !== 'string' || !message || typeof message !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'level and message are required strings'));
         return;
       }
-      if (!['info', 'warn', 'error'].includes(level as string)) {
+      if (!['info', 'warn', 'error'].includes(level)) {
         res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'level must be info, warn, or error'));
         return;
       }
+      if (meta != null && typeof meta !== 'object') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'meta must be an object or null'));
+        return;
+      }
 
+      const logId = `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const now = new Date().toISOString();
-      // Log entries are keyed by taskId — last-write-wins for a given task step (intentional)
       await storage.setMemory({
-        key: `generator.${projectId}.logs.${taskId as string}`,
+        key: `generator.${projectId}.logs.${logId}`,
         ownerGaii: gaii,
-        value: { taskId, level, message, meta: meta ?? null, timestamp: now },
+        value: { logId, level, message, componentId: componentId ?? null, meta: meta ?? null, timestamp: now },
         visibility: 'owner',
         version: 1,
         tags: ['generator', 'log'],
@@ -767,7 +794,8 @@ If SSE disconnects: re-auth if needed → new ticket → reconnect → scan for 
         updatedAt: now,
       });
 
-      res.json(success(config.nodeId, { ok: true }));
+      res.json(success(config.nodeId, { logged: true, logId }));
+      emitChange('memory');
     }
   );
 
