@@ -11377,7 +11377,7 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
 
   # ── Knowledge Packages ──────────────────────────────────────
-  /v1/packages/import:
+  /v1/knowledge/import:
     post:
       operationId: importKnowledgePackage
       summary: Import a knowledge package
@@ -11397,7 +11397,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /v1/packages/{id}:
+  /v1/knowledge/{id}:
     get:
       operationId: getKnowledgePackage
       summary: Get knowledge package
@@ -11415,7 +11415,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /v1/packages/{id}/link:
+  /v1/knowledge/{id}/link:
     post:
       operationId: linkKnowledgeEntry
       summary: Link knowledge entries
@@ -11460,7 +11460,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/links:
+  /v1/knowledge/{id}/links:
     get:
       operationId: getKnowledgeLinks
       summary: Get knowledge entry links
@@ -11475,7 +11475,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/broken-links:
+  /v1/knowledge/{id}/broken-links:
     get:
       operationId: getKnowledgeBrokenLinks
       summary: Find broken links in knowledge package
@@ -11492,7 +11492,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/sharing:
+  /v1/knowledge/{id}/sharing:
     patch:
       operationId: updatePackageSharing
       summary: Update package sharing settings
@@ -11515,7 +11515,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/entries/{entryKey}/visibility:
+  /v1/knowledge/{id}/entries/{entryKey}/visibility:
     patch:
       operationId: updateEntryVisibility
       summary: Update knowledge entry visibility
@@ -11543,7 +11543,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/clone:
+  /v1/knowledge/{id}/clone:
     post:
       operationId: cloneKnowledgePackage
       summary: Clone a knowledge package
@@ -11560,7 +11560,7 @@ paths:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/export:
+  /v1/knowledge/{id}/export:
     get:
       operationId: exportKnowledgePackage
       summary: Export knowledge package
@@ -11576,7 +11576,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/contribute:
+  /v1/knowledge/{id}/contribute:
     post:
       operationId: contributeToPackage
       summary: Contribute to a knowledge package
@@ -11599,7 +11599,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/organism/{id}:
+  /v1/knowledge/organism/{id}:
     get:
       operationId: getOrganismPackages
       summary: Get knowledge packages for an organism
@@ -11616,7 +11616,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/reputation:
+  /v1/knowledge/{id}/reputation:
     get:
       operationId: getPackageReputation
       summary: Get package reputation score
@@ -11631,7 +11631,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/packages/{id}/reviews:
+  /v1/knowledge/{id}/reviews:
     get:
       operationId: getPackageReviews
       summary: Get package reviews
@@ -12317,8 +12317,8 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  # ── Bundles (Component Packages) ──────────────────────────
-  /v1/bundles:
+  # ── Packages (Component Packages) ────────────────────────
+  /v1/packages:
     post:
       operationId: createPackage
       summary: Create package
@@ -12399,7 +12399,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/bundles/import:
+  /v1/packages/import:
     post:
       operationId: importPackage
       summary: Import package
@@ -12443,7 +12443,7 @@ paths:
                       message:
                         type: string
 
-  /v1/bundles/{groupId}:
+  /v1/packages/{groupId}:
     get:
       operationId: getLatestPackage
       summary: Get latest published package
@@ -12499,7 +12499,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /v1/bundles/{groupId}/versions:
+  /v1/packages/{groupId}/versions:
     post:
       operationId: publishPackageVersion
       summary: Publish new version
@@ -12578,7 +12578,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/bundles/{groupId}/versions/{version}:
+  /v1/packages/{groupId}/versions/{version}:
     get:
       operationId: getPackageVersion
       summary: Get specific version
@@ -12663,7 +12663,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /v1/bundles/{groupId}/export:
+  /v1/packages/{groupId}/export:
     get:
       operationId: exportPackage
       summary: Export package
@@ -12685,7 +12685,7 @@ paths:
           description: Package not found
 
   # ── Instances ─────────────────────────────────────────────
-  /v1/bundles/{groupId}/install:
+  /v1/packages/{groupId}/install:
     post:
       operationId: installPackage
       summary: Install package

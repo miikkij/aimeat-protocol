@@ -81,7 +81,7 @@ async function main() {
     const status = pkg.templateId === '(already exists)' ? 'already exists' : 'created';
     console.log(`  ${status === 'created' ? '+' : '='} ${pkg.name} (${status})`);
     if (status === 'created') {
-      console.log(`    Browse:  ${BASE_URL}/v1/bundles/${encodeURIComponent(pkg.packageGroupId)}`);
+      console.log(`    Browse:  ${BASE_URL}/v1/packages/${encodeURIComponent(pkg.packageGroupId)}`);
     }
   }
 

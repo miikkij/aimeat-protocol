@@ -456,7 +456,7 @@ export async function buildPackageComponents(components, blueprint) {
  *
  * @param {string} projectId
  * @param {object} [options] - { visibility, category, tags, includeInterviewSpec }
- * @returns {Promise<object>} - API response from POST /v1/bundles
+ * @returns {Promise<object>} - API response from POST /v1/packages
  */
 export async function packageProject(projectId, options = {}) {
   const project = await getProject(projectId);

@@ -6,7 +6,7 @@
  *   failure, dry_run validation, and hash-based customization detection.
  * @structure
  *   - instancesRouter() — main router factory
- *   - POST /v1/bundles/:groupId/install — install package as instance (supports dry_run)
+ *   - POST /v1/packages/:groupId/install — install package as instance (supports dry_run)
  *   - GET /v1/instances — list my instances
  *   - GET /v1/instances/:id — get instance details
  *   - GET /v1/instances/:id/status — component status with live hash comparison
@@ -20,6 +20,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phases 3-4)
  *   v1.1.0 — 2026-03-15 — rename install route from /v1/packages to /v1/bundles
+ *   v2.1.0 — 2026-03-18 — rename install route back from /v1/bundles to /v1/packages (knowledge moved to /v1/knowledge)
  *   v2.0.0 — 2026-03-15 — full implementation: component registration, rollback,
  *     dry_run, hash comparison, migration apply, component deletion
  */
@@ -87,8 +88,8 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
   // Phase 3: Instance Management
   // ══════════════════════════════════════════════════════════════════════
 
-  // POST /v1/bundles/:groupId/install — Install package as instance
-  router.post('/v1/bundles/:groupId/install', requireAuth(), async (req, res) => {
+  // POST /v1/packages/:groupId/install — Install package as instance
+  router.post('/v1/packages/:groupId/install', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);

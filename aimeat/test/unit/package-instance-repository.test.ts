@@ -2,7 +2,7 @@
  * @file package-instance-repository.test.ts
  * @description API-level tests for the PackageInstanceRepository through HTTP endpoints.
  *   Exercises instance lifecycle: install, get, list with filters, component status
- *   with hash comparison, and instance deletion via the /v1/bundles/:groupId/install
+ *   with hash comparison, and instance deletion via the /v1/packages/:groupId/install
  *   and /v1/instances routes.
  * @usage
  *   cd aimeat && pnpm exec tsx test/unit/package-instance-repository.test.ts
@@ -91,7 +91,7 @@ await test('Owner auth', async () => {
 
 await test('Create and publish a package', async () => {
   // Create
-  const { status, body } = await json('/v1/bundles', {
+  const { status, body } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -113,7 +113,7 @@ await test('Create and publish a package', async () => {
 
   // Publish
   const { status: patchStatus } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${firstVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${firstVersion}`,
     {
       method: 'PATCH',
       headers: authed(ownerToken),
@@ -124,13 +124,13 @@ await test('Create and publish a package', async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Test 1: Install package (POST /v1/bundles/:groupId/install)
+// Test 1: Install package (POST /v1/packages/:groupId/install)
 // ═══════════════════════════════════════════════════════════════════════
 
 console.log('\nTest — Instance Lifecycle');
 
-await test('Install package (POST /v1/bundles/:groupId/install)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+await test('Install package (POST /v1/packages/:groupId/install)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ label: 'My test instance' }),
@@ -159,7 +159,7 @@ await test('Install package (POST /v1/bundles/:groupId/install)', async () => {
 await test('Install draft package should fail with 400', async () => {
   // Create a new draft package (not published)
   const draftPkgName = `draft-pkg-${Date.now()}`;
-  const { body: createBody } = await json('/v1/bundles', {
+  const { body: createBody } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -169,7 +169,7 @@ await test('Install draft package should fail with 400', async () => {
   });
   const draftGroupId = encodeURIComponent(createBody.data.packageGroupId);
 
-  const { status } = await json(`/v1/bundles/${draftGroupId}/install`, {
+  const { status } = await json(`/v1/packages/${draftGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({}),
@@ -287,7 +287,7 @@ console.log('\nTest — Instance Deletion');
 let secondInstanceId = '';
 
 await test('Install second instance for deletion test', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ label: 'Instance to delete' }),

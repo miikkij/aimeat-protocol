@@ -116,7 +116,7 @@ await test('Second owner auth', async () => {
 });
 
 await test('Create and publish a package', async () => {
-  const { status, body } = await json('/v1/bundles', {
+  const { status, body } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -137,7 +137,7 @@ await test('Create and publish a package', async () => {
 
   // Publish it
   const { status: patchStatus } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${firstVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${firstVersion}`,
     {
       method: 'PATCH',
       headers: authed(ownerToken),

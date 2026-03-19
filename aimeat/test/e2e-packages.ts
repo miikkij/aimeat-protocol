@@ -155,8 +155,8 @@ await test('Agent auth — sign + token', async () => {
 
 console.log('\nPhase 1 — Package CRUD');
 
-await test('Create package (POST /v1/bundles)', async () => {
-  const { status, body } = await json('/v1/bundles', {
+await test('Create package (POST /v1/packages)', async () => {
+  const { status, body } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -183,7 +183,7 @@ await test('Create package (POST /v1/bundles)', async () => {
 });
 
 await test('Validation: missing name returns 400', async () => {
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ components: [{ id: 'x', type: 'csm', content: '{}' }] }),
@@ -192,7 +192,7 @@ await test('Validation: missing name returns 400', async () => {
 });
 
 await test('Validation: missing components returns 400', async () => {
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ name: 'no-comps' }),
@@ -201,7 +201,7 @@ await test('Validation: missing components returns 400', async () => {
 });
 
 await test('Validation: empty components array returns 400', async () => {
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ name: 'empty-comps', components: [] }),
@@ -210,7 +210,7 @@ await test('Validation: empty components array returns 400', async () => {
 });
 
 await test('Duplicate package name returns 409', async () => {
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -221,9 +221,9 @@ await test('Duplicate package name returns 409', async () => {
   assert(status === 409, `Expected 409, got ${status}`);
 });
 
-await test('List packages (GET /v1/bundles) — default filters show published+public only', async () => {
+await test('List packages (GET /v1/packages) — default filters show published+public only', async () => {
   // Our package is draft, so it should NOT appear in the default listing
-  const { status, body } = await json('/v1/bundles');
+  const { status, body } = await json('/v1/packages');
   assert(status === 200, `Expected 200, got ${status}`);
   assert(Array.isArray(body.data?.packages), 'Expected packages array');
   const found = body.data.packages.find((p: any) => p.packageGroupId === groupId);
@@ -231,14 +231,14 @@ await test('List packages (GET /v1/bundles) — default filters show published+p
 });
 
 await test('List packages with status=draft shows our package', async () => {
-  const { status, body } = await json(`/v1/bundles?status=draft&author=${ownerName}`);
+  const { status, body } = await json(`/v1/packages?status=draft&author=${ownerName}`);
   assert(status === 200, `Expected 200, got ${status}`);
   const found = body.data.packages.find((p: any) => p.packageGroupId === groupId);
   assert(found, 'Draft package should appear when filtering by status=draft + author');
 });
 
-await test('Import package via POST /v1/bundles/import', async () => {
-  const { status, body } = await json('/v1/bundles/import', {
+await test('Import package via POST /v1/packages/import', async () => {
+  const { status, body } = await json('/v1/packages/import', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -267,7 +267,7 @@ console.log('\nPhase 2 — Versioning');
 
 await test('Publish first version (PATCH status to published)', async () => {
   const { status, body } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${firstVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${firstVersion}`,
     {
       method: 'PATCH',
       headers: authed(ownerToken),
@@ -278,19 +278,19 @@ await test('Publish first version (PATCH status to published)', async () => {
   assert(body.data?.status === 'published', `Expected published, got ${body.data?.status}`);
 });
 
-await test('Get latest published (GET /v1/bundles/:groupId)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}`);
+await test('Get latest published (GET /v1/packages/:groupId)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.packageGroupId === groupId, 'groupId mismatch');
   assert(body.data?.version === firstVersion, `version mismatch: expected ${firstVersion}, got ${body.data?.version}`);
   assert(body.data?.status === 'published', 'Expected published status');
 });
 
-await test('Publish new version (POST /v1/bundles/:groupId/versions)', async () => {
+await test('Publish new version (POST /v1/packages/:groupId/versions)', async () => {
   // Wait 1s to ensure different version timestamp
   await new Promise(r => setTimeout(r, 1100));
 
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/versions`, {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/versions`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -309,14 +309,14 @@ await test('Publish new version (POST /v1/bundles/:groupId/versions)', async () 
   assert(secondVersion !== firstVersion, `New version should differ: ${secondVersion} vs ${firstVersion}`);
 });
 
-await test('List all versions (GET /v1/bundles/:groupId/versions)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/versions`);
+await test('List all versions (GET /v1/packages/:groupId/versions)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/versions`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.versions?.length >= 2, `Expected >= 2 versions, got ${body.data?.versions?.length}`);
 });
 
-await test('Get specific version (GET /v1/bundles/:groupId/versions/:version)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/versions/${firstVersion}`);
+await test('Get specific version (GET /v1/packages/:groupId/versions/:version)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/versions/${firstVersion}`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.version === firstVersion, 'Version mismatch');
   assert(body.data?.components?.length === 2, `Expected 2 components in v1, got ${body.data?.components?.length}`);
@@ -324,7 +324,7 @@ await test('Get specific version (GET /v1/bundles/:groupId/versions/:version)', 
 
 await test('Publish second version', async () => {
   const { status, body } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${secondVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${secondVersion}`,
     {
       method: 'PATCH',
       headers: authed(ownerToken),
@@ -336,14 +336,14 @@ await test('Publish second version', async () => {
 });
 
 await test('Latest now points to second version', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}`);
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.version === secondVersion, `Expected ${secondVersion}, got ${body.data?.version}`);
   assert(body.data?.components?.length === 3, `Expected 3 components in v2, got ${body.data?.components?.length}`);
 });
 
-await test('Export package (GET /v1/bundles/:groupId/export)', async () => {
-  const { status, body, headers } = await json(`/v1/bundles/${encodedGroupId}/export`);
+await test('Export package (GET /v1/packages/:groupId/export)', async () => {
+  const { status, body, headers } = await json(`/v1/packages/${encodedGroupId}/export`);
   assert(status === 200, `Expected 200, got ${status}`);
   const ct = headers.get('content-type') ?? '';
   assert(ct.includes('text/yaml'), `Expected text/yaml, got ${ct}`);
@@ -353,9 +353,9 @@ await test('Export package (GET /v1/bundles/:groupId/export)', async () => {
   assert(raw.includes('aimeat-package'), 'Export should contain aimeat-package header');
 });
 
-await test('Archive first version (DELETE /v1/bundles/:groupId/versions/:version)', async () => {
+await test('Archive first version (DELETE /v1/packages/:groupId/versions/:version)', async () => {
   const { status, body } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${firstVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${firstVersion}`,
     { method: 'DELETE', headers: authed(ownerToken) },
   );
   assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
@@ -363,14 +363,14 @@ await test('Archive first version (DELETE /v1/bundles/:groupId/versions/:version
 });
 
 await test('Archived version status is archived', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/versions/${firstVersion}`);
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/versions/${firstVersion}`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.status === 'archived', `Expected archived, got ${body.data?.status}`);
 });
 
 await test('Invalid status returns 400', async () => {
   const { status } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${secondVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${secondVersion}`,
     {
       method: 'PATCH',
       headers: authed(ownerToken),
@@ -386,8 +386,8 @@ await test('Invalid status returns 400', async () => {
 
 console.log('\nPhase 3 — Package Metadata');
 
-await test('Update group metadata (PATCH /v1/bundles/:groupId)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}`, {
+await test('Update group metadata (PATCH /v1/packages/:groupId)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}`, {
     method: 'PATCH',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -403,12 +403,12 @@ await test('Update group metadata (PATCH /v1/bundles/:groupId)', async () => {
 
 await test('Metadata change applies to all versions', async () => {
   // Check v2 (the non-archived one)
-  const { body } = await json(`/v1/bundles/${encodedGroupId}/versions/${secondVersion}`);
+  const { body } = await json(`/v1/packages/${encodedGroupId}/versions/${secondVersion}`);
   assert(body.data?.description === 'Updated description', 'v2 description not updated');
 });
 
 await test('Invalid visibility returns 400', async () => {
-  const { status } = await json(`/v1/bundles/${encodedGroupId}`, {
+  const { status } = await json(`/v1/packages/${encodedGroupId}`, {
     method: 'PATCH',
     headers: authed(ownerToken),
     body: JSON.stringify({ visibility: 'secret' }),
@@ -422,8 +422,8 @@ await test('Invalid visibility returns 400', async () => {
 
 console.log('\nPhase 4 — Instance Lifecycle');
 
-await test('Dry run install (POST /v1/bundles/:groupId/install with dry_run=true)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+await test('Dry run install (POST /v1/packages/:groupId/install with dry_run=true)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ label: 'Dry Run Test', dry_run: true }),
@@ -441,8 +441,8 @@ await test('Dry run install (POST /v1/bundles/:groupId/install with dry_run=true
   assert(!dryRunInstance, 'Dry run should not create an actual instance');
 });
 
-await test('Install package (POST /v1/bundles/:groupId/install)', async () => {
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+await test('Install package (POST /v1/packages/:groupId/install)', async () => {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ label: 'My Widget Instance' }),
@@ -460,7 +460,7 @@ await test('Install package (POST /v1/bundles/:groupId/install)', async () => {
 
 await test('Cannot install draft package', async () => {
   // Create a draft-only package to test against
-  const { body: draftPkg } = await json('/v1/bundles', {
+  const { body: draftPkg } = await json('/v1/packages', {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -469,7 +469,7 @@ await test('Cannot install draft package', async () => {
     }),
   });
   const draftGroupId = encodeURIComponent(draftPkg.data.packageGroupId);
-  const { status } = await json(`/v1/bundles/${draftGroupId}/install`, {
+  const { status } = await json(`/v1/packages/${draftGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({}),
@@ -520,7 +520,7 @@ await test('Component status (GET /v1/instances/:id/status)', async () => {
 await test('Delete instance with removeComponents (DELETE /v1/instances/:id)', async () => {
   // Install the imported-pack (a different package) to get a throwaway instance
   const importedGroupId = encodeURIComponent(`imported-pack::${ownerName}`);
-  const { status: instStatus, body: inst } = await json(`/v1/bundles/${importedGroupId}/install`, {
+  const { status: instStatus, body: inst } = await json(`/v1/packages/${importedGroupId}/install`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({ label: 'To be deleted' }),
@@ -556,7 +556,7 @@ let thirdVersion = '';
 await test('Create v3 with changed components', async () => {
   await new Promise(r => setTimeout(r, 1100));
 
-  const { status, body } = await json(`/v1/bundles/${encodedGroupId}/versions`, {
+  const { status, body } = await json(`/v1/packages/${encodedGroupId}/versions`, {
     method: 'POST',
     headers: authed(ownerToken),
     body: JSON.stringify({
@@ -916,7 +916,7 @@ await test('Second owner auth', async () => {
 });
 
 await test('Second owner cannot publish version to first owner package', async () => {
-  const { status } = await json(`/v1/bundles/${encodedGroupId}/versions`, {
+  const { status } = await json(`/v1/packages/${encodedGroupId}/versions`, {
     method: 'POST',
     headers: authed(owner2Token),
     body: JSON.stringify({
@@ -928,7 +928,7 @@ await test('Second owner cannot publish version to first owner package', async (
 });
 
 await test('Second owner cannot update first owner package metadata', async () => {
-  const { status } = await json(`/v1/bundles/${encodedGroupId}`, {
+  const { status } = await json(`/v1/packages/${encodedGroupId}`, {
     method: 'PATCH',
     headers: authed(owner2Token),
     body: JSON.stringify({ description: 'Hijacked!' }),
@@ -938,7 +938,7 @@ await test('Second owner cannot update first owner package metadata', async () =
 
 await test('Second owner cannot archive first owner versions', async () => {
   const { status } = await json(
-    `/v1/bundles/${encodedGroupId}/versions/${secondVersion}`,
+    `/v1/packages/${encodedGroupId}/versions/${secondVersion}`,
     { method: 'DELETE', headers: authed(owner2Token) },
   );
   assert(status === 403, `Expected 403, got ${status}`);
@@ -1000,7 +1000,7 @@ await test('Second owner cannot delete first owner template listing', async () =
 });
 
 await test('Unauthenticated create package returns 401', async () => {
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     body: JSON.stringify({ name: 'no-auth', components: [{ id: 'x', type: 'csm', content: '{}' }] }),
   });
@@ -1008,7 +1008,7 @@ await test('Unauthenticated create package returns 401', async () => {
 });
 
 await test('Unauthenticated install returns 401', async () => {
-  const { status } = await json(`/v1/bundles/${encodedGroupId}/install`, {
+  const { status } = await json(`/v1/packages/${encodedGroupId}/install`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
@@ -1022,7 +1022,7 @@ await test('Unauthenticated list instances returns 401', async () => {
 
 await test('Non-existent package returns 404', async () => {
   const fakeGroup = encodeURIComponent('nonexistent::nobody');
-  const { status } = await json(`/v1/bundles/${fakeGroup}`);
+  const { status } = await json(`/v1/packages/${fakeGroup}`);
   assert(status === 404, `Expected 404, got ${status}`);
 });
 
@@ -1047,7 +1047,7 @@ await test('rejects package with too many components (config limit)', async () =
     content: JSON.stringify({ entries: [{ key: `k${i}`, value: `v${i}` }] }),
     dependencies: [],
   }));
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     headers: { ...authed(ownerToken) },
     body: JSON.stringify({
@@ -1061,7 +1061,7 @@ await test('rejects package with too many components (config limit)', async () =
 
 await test('rejects oversized package (config limit)', async () => {
   const bigContent = 'x'.repeat(11 * 1024 * 1024);
-  const { status } = await json('/v1/bundles', {
+  const { status } = await json('/v1/packages', {
     method: 'POST',
     headers: { ...authed(ownerToken) },
     body: JSON.stringify({
