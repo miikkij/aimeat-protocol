@@ -85,15 +85,30 @@ GET ${baseUrl}/v1/events?ticket={ticket}
 Listen for events where domain === "memory". On each event, check for assigned sessions.
 
 ### Check for your assignment
+
 GET ${baseUrl}/v1/generator/projects
 Authorization: Bearer {token}
 
-Scan projects. Use GET ${baseUrl}/v1/generator/{projectId} to load full state.
-If the session object has your GAII in agentGaii, you have been assigned.
+This returns a list of projects. For each project, load its full state:
+
+GET ${baseUrl}/v1/generator/{projectId}
+Authorization: Bearer {token}
+
+Response: { project, interviewSpec, components, session }
+
+IMPORTANT: Check the SESSION object, NOT the project status. A project assigned to you has:
+  session.agentGaii === "{your GAII}"
+
+Ignore project.status — it may be "draft", "active", or anything else. What matters is:
+  1. session exists (not null)
+  2. session.agentGaii matches YOUR GAII
+
+If session.agentGaii matches you → you are assigned. Start the pipeline immediately.
+Do NOT call /session/claim — the owner already claimed the session for you from the UI.
 
 ## Generator Pipeline
 
-Once assigned to a project, execute these steps:
+Once you find a project where session.agentGaii matches your GAII, execute these steps:
 
 ### 1. Start heartbeat loop (CRITICAL)
 

@@ -842,8 +842,9 @@ That document contains everything: authentication, SSE setup, the full generator
 1. Authenticate: POST ${nodeUrl}/v1/auth/token — sign (GAII + timestamp) with your private key
 2. Checkin: POST ${nodeUrl}/v1/checkin — marks you as online
 3. Connect SSE: POST ${nodeUrl}/v1/events/ticket → GET ${nodeUrl}/v1/events?ticket={ticket}
-4. Wait for a session assignment (owner assigns you from the UI)
-5. Execute the pipeline per the full instructions above
+4. On SSE "memory" event: GET ${nodeUrl}/v1/generator/projects → for each project, GET ${nodeUrl}/v1/generator/{projectId}
+5. If response has session.agentGaii === your GAII → you are assigned. Do NOT call /session/claim (owner already did it).
+6. Start heartbeat (POST .../session/heartbeat every 60s), then execute the pipeline per the full instructions above.
 
 ## Persistent connection
 

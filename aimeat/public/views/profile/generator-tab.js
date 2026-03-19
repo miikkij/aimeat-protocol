@@ -36,8 +36,8 @@ import { t, getLocale } from '/js/i18n.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
-  loadAllComponents, saveComponent, enqueueTask, pollResults, pollLogs,
-  checkQueueStatus, discoverAgents, registerComponent, cleanupOldEntries,
+  loadAllComponents, saveComponent,
+  discoverAgents, registerComponent, cleanupOldEntries,
   getListeners, buildAgentSetupPrompt, buildAgentShortPrompt, createGeneratorAgent,
   saveInterviewSpec, getInterviewSpec,
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
@@ -408,6 +408,12 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 }
 
 function AgentProgressBanner({ session, components, projectId, onStop }) {
+  // Re-render every 15s so stale detection and heartbeat time stay current
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 15_000);
+    return () => clearInterval(timer);
+  }, []);
   const isStale = session &&
     (Date.now() - new Date(session.heartbeat).getTime()) > 5 * 60 * 1000;
 
@@ -537,11 +543,25 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
   useEffect(() => { loadData(); }, [projectId]);
 
+  // SSE live updates — instant refresh when agent writes to memory
   useEffect(() => {
     const handler = () => loadData();
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [projectId]);
+
+  // Polling fallback for session heartbeat — refreshes every 10s when agent session is active
+  useEffect(() => {
+    if (!generatorSession) return;
+    const poller = setInterval(async () => {
+      try {
+        const resp = await apiGet(`/v1/memory/generator.${projectId}.session`);
+        const val = resp?.data?.value;
+        setGeneratorSession(val?.agentGaii ? val : null);
+      } catch { /* ignore */ }
+    }, 10_000);
+    return () => clearInterval(poller);
+  }, [projectId, !!generatorSession]);
 
   async function loadData() {
     const p = await getProject(projectId);
@@ -1393,15 +1413,6 @@ function ComponentDetail({ component, project, components, agents, projectId, in
     } catch { /* clipboard fallback */ }
   }
 
-  async function handleSendToAgent() {
-    const agent = agents[0];
-    if (!agent) return;
-    await enqueueTask(projectId, component.id, component.type, prompt, agent.gaii, 'generator');
-    const updated = addHistory(component, 'sent_to_agent', { agent: agent.name || agent.gaii });
-    await saveComponent(projectId, { ...updated, status: 'waiting_agent', prompt });
-    onUpdate();
-  }
-
   const fixPrompt = validationResult && !validationResult.valid
     ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
     : null;
@@ -1484,14 +1495,9 @@ function ComponentDetail({ component, project, components, agents, projectId, in
           </div>
         </div>
       ` : html`
-        <!-- Agent Mode -->
+        <!-- Agent Mode — agent handles generation autonomously via session -->
         <div class="pf-gen-section">
-          <button class="btn-primary btn-sm" onClick=${handleSendToAgent}>
-            ${t('profile.generator.sendToAgent')} ${agents[0]?.name || ''}
-          </button>
-          ${component.status === 'waiting_agent' && html`
-            <div class="pf-gen-agent-status">${t('profile.generator.waitingAgent')}</div>
-          `}
+          <div class="pf-gen-agent-status">${t('profile.generator.agentBanner.working').replace('{agentName}', agents[0]?.name || 'agent')}</div>
         </div>
       `}
 

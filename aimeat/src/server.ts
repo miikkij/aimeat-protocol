@@ -133,6 +133,15 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     invalidateHasOwnersCache: guards.invalidateHasOwnersCache,
   });
 
+  // JSON 404 handler — prevent Express from returning HTML for unknown routes
+  app.use((_req: express.Request, res: express.Response) => {
+    res.status(404).json({
+      ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
+      timestamp: new Date().toISOString(),
+      error: { code: 'NOT_FOUND', message: `Route not found: ${_req.method} ${_req.path}` },
+    });
+  });
+
   // Global error handler
   app.use((err: Error & { status?: number; type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const status = err.status ?? 500;
