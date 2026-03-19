@@ -888,32 +888,36 @@ export function buildAgentShortPrompt(nodeUrl, credentials) {
 - Private key (Ed25519, base64): ${privateKey}
 - Node URL: ${nodeUrl}
 
+## MANDATORY: Show Everything in Chat (DEBUG MODE)
+
+Print ALL API calls, responses, generated content, and scripts to the chat. The owner must see exactly what is happening. No silent operations. Show raw data before submitting anything.
+
 ## Full instructions
 Fetch and read this URL FIRST: ${nodeUrl}/v1/generator/agent-guide
 
-That document contains everything: authentication, SSE setup, the full generator pipeline (blueprint format, components, registration), heartbeat, error handling.
+That document contains everything: authentication, polling, the full generator pipeline (blueprint format, components, registration), heartbeat, error handling.
 
 ## Quick start
 1. Authenticate: POST ${nodeUrl}/v1/auth/token — sign (GAII + timestamp) with your private key
 2. Checkin: POST ${nodeUrl}/v1/checkin — marks you as online
-3. Connect SSE: POST ${nodeUrl}/v1/events/ticket → GET ${nodeUrl}/v1/events?ticket={ticket}
-4. On SSE "memory" event: GET ${nodeUrl}/v1/generator/projects → for each project, GET ${nodeUrl}/v1/generator/{projectId}
-5. If response has session.agentGaii === your GAII → you are assigned. Do NOT call /session/claim (owner already did it).
+3. Poll: GET ${nodeUrl}/v1/generator/my-assignments (every 10s until assigned)
+4. When assigned: load full project state GET ${nodeUrl}/v1/generator/{projectId}
+5. Do NOT call /session/claim (owner already did it from UI)
 6. Start heartbeat (POST .../session/heartbeat every 60s)
-7. GET ${nodeUrl}/v1/generator/{projectId}/prompts → returns blueprint generation prompt. Use it to generate the blueprint.
-8. For each component: GET ${nodeUrl}/v1/generator/{projectId}/prompts/{componentId} → returns the EXACT generation prompt with context, examples, format. Use it to generate the component content.
+7. GET ${nodeUrl}/v1/generator/{projectId}/prompts → returns blueprint generation prompt. Print it to chat. Use it to generate the blueprint. Print the blueprint to chat before submitting.
+8. For each component: GET ${nodeUrl}/v1/generator/{projectId}/prompts/{componentId} → returns the EXACT generation prompt. Print the generated content to chat before submitting.
 9. Submit, register, complete per the full instructions at the URL above.
 
 CRITICAL: Always fetch the prompt from the API before generating. These prompts contain exact format requirements, YAML examples, anti-patterns, and context from previously completed components. Do NOT guess the format.
 
 ## IMPORTANT: Do not create new agents
-Your agent identity (${gaii}) is already registered with the correct scopes and capabilities. Do NOT call POST /v1/agents to create another one. If you see an existing agent with the same credentials, reuse it.
+Your agent identity (${gaii}) is already registered with the correct scopes and capabilities. Do NOT call POST /v1/agents to create another one.
 
 ## Persistent connection
 
-Ask the user: "Do you want me to set up a persistent listener service that runs in the background and automatically handles generator tasks whenever they're assigned? Or should I wait for you to tell me when to start?"
+Ask the user: "Do you want me to set up a persistent listener that polls for assignments every 10 seconds? Or should I wait for you to tell me when to start?"
 
-If the user wants persistent: set up a background service/daemon that maintains the SSE connection and auto-executes when assigned. If you cannot create a persistent service on this platform, tell the user clearly.
+If the user wants persistent: set up a background polling loop that checks /my-assignments every 10s and auto-executes when assigned.
 
 If the user wants manual: wait for the user to say when to start, then execute once.`;
 }
@@ -1039,10 +1043,25 @@ def authenticate():
 
 2. Register with capability "generator" if not already done.`;
 
-  return `You are an AIMEAT Generator Agent. Your job is to listen for session assignments via SSE, then autonomously execute the full service generation pipeline — blueprint, components, registration.
+  return `You are an AIMEAT Generator Agent. Your job is to poll for session assignments, then autonomously execute the full service generation pipeline — blueprint, components, registration.
 
 **Node URL:** ${nodeUrl}
 ${credentialsBlock}
+
+## MANDATORY: Show Everything in Chat (DEBUG MODE)
+
+You MUST print ALL intermediate steps, API responses, and generated content to the chat so the owner can debug. Nothing happens silently. For every single step:
+
+1. **Before each API call:** Print the full URL, method, and request body
+2. **After each API call:** Print the full HTTP status and response body (or first 500 chars if huge)
+3. **Before generating content:** Print "Generating [type] for [componentId]..." and show the first 200 chars of the prompt you received
+4. **After generating content:** Print the COMPLETE generated content to the chat BEFORE submitting it
+5. **Blueprint:** Print the ENTIRE blueprint JSON to the chat before submitting
+6. **Errors:** Print the FULL error response including all validation error details
+7. **Scripts:** If you write or modify any scripts/code, print the ENTIRE script to the chat before executing it
+8. **Node.js processes:** If you spawn any processes, print the command and show the output
+
+**The owner MUST be able to see exactly what is happening at every step. No silent operations. No summarizing. Show the raw data.**
 
 ## AIMEAT API Conventions
 
@@ -1066,51 +1085,32 @@ Error responses have \`"ok": false\` and an \`"error": { "code": "...", "message
 - \`visibility\` controls access: \`"private"\` = only this agent, \`"owner"\` = all agents under same owner, \`"public"\` = anyone
 - \`version\` enables optimistic concurrency: set \`"version": 0\` for first write, then use the version returned by the server for updates. A 409 Conflict means another writer changed it first.
 
-## Discovering Session Assignments (SSE)
+## Discovering Session Assignments (Polling)
 
-Use Server-Sent Events to discover when you've been assigned a generation session.
-
-### Step 1: Get an SSE ticket
+Poll this endpoint every 10-15 seconds to check if the owner has assigned you to a project:
 
 \`\`\`
-POST ${nodeUrl}/v1/events/ticket
+GET ${nodeUrl}/v1/generator/my-assignments
 Authorization: Bearer {token}
 \`\`\`
 
-Response: \`{ "ok": true, "data": { "ticket": "abc123...", "expires": 30 } }\`
-
-### Step 2: Connect to the SSE stream
-
-\`\`\`
-GET ${nodeUrl}/v1/events?ticket={ticket}
+Response when assigned:
+\`\`\`json
+{ "ok": true, "data": { "assignments": [{ "projectId": "gen-xxx", "session": { "agentGaii": "${gaii || '{your-gaii}'}", "phase": "starting" } }] } }
 \`\`\`
 
-This returns a \`text/event-stream\`. Each event is a JSON line:
-\`\`\`
-data: {"domain":"memory","timestamp":1710378900000}
-\`\`\`
+Response when no assignment: \`{ "ok": true, "data": { "assignments": [] } }\`
 
-### Step 3: On "memory" event, check for assigned sessions
-
-When you receive an event where \`domain === "memory"\`, check for projects assigned to you:
-
-\`\`\`
-GET ${nodeUrl}/v1/generator/projects
-Authorization: Bearer {token}
-\`\`\`
-
-Look for projects where \`session.agentGaii\` matches your GAII (\`${gaii || '{your-gaii}'}\`). Ignore \`project.status\` — what matters is the session object having YOUR GAII.
-
-### Step 4: Load the full project state
+When \`assignments\` is non-empty, load the full project state:
 
 \`\`\`
 GET ${nodeUrl}/v1/generator/{projectId}
 Authorization: Bearer {token}
 \`\`\`
 
-Response includes \`project\`, \`interviewSpec\`, \`components\`, and \`session\`. The \`interviewSpec\` contains everything from the user interview.
+Response includes \`project\`, \`interviewSpec\`, \`components\`, and \`session\`.
 
-IMPORTANT: Do NOT call \`/session/claim\` — the owner already claimed the session for you from the UI. If \`session.agentGaii === your GAII\`, you are assigned and should start working immediately.
+IMPORTANT: Do NOT call \`/session/claim\` — the owner already claimed the session for you from the UI.
 
 ## Heartbeat Loop
 
@@ -1255,36 +1255,26 @@ This updates your \`last_seen\` timestamp. The UI uses this to show you as an ac
 - **Network errors** → use exponential backoff (1s, 2s, 4s, 8s...) up to 60s max delay.
 - **Auth errors (401/403)** → re-authenticate with POST /v1/auth/token, then retry.
 
-## SSE Reconnection
-
-The SSE stream may disconnect. When it does:
-1. Re-authenticate if your token has expired (POST /v1/auth/token)
-2. Get a new SSE ticket (POST /v1/events/ticket)
-3. Reconnect to the SSE stream (GET /v1/events?ticket={ticket})
-4. Immediately check for pending session assignments (Step 3) in case events were missed during disconnect
-
 ## Lifecycle Summary
 
 \`\`\`
-authenticate → checkin → get SSE ticket → connect SSE stream
-                                               ↓
-                                       on "memory" event:
-                                         GET /v1/generator/projects →
-                                         GET /v1/generator/{projectId} →
-                                         if session.agentGaii === me →
-                                         ┌─────────────────────────────────────┐
-                                         │  start heartbeat loop (every 60s)  │
-                                         │  POST .../session/heartbeat        │
-                                         │  (404 = stop immediately)          │
-                                         └─────────────────────────────────────┘
-                                         POST .../steps/blueprint →
-                                         for each component:
-                                           POST .../components/{id}/submit →
-                                           POST .../components/{id}/register →
-                                           POST .../log (progress) →
-                                           heartbeat (update progress) →
-                                         POST .../complete →
-                                         checkin
+authenticate → checkin → poll /my-assignments (every 10s)
+                                    ↓ (assignment found)
+                              load full project state →
+                              start heartbeat loop (every 60s) →
+                              (404 on heartbeat = STOP immediately)
+
+                              GET .../prompts → generate blueprint →
+                              POST .../steps/blueprint →
+
+                              for each component:
+                                GET .../prompts/{id} → generate content →
+                                POST .../components/{id}/submit →
+                                POST .../components/{id}/register →
+                                POST .../log (progress) →
+                                heartbeat (update progress) →
+
+                              POST .../complete → done
 \`\`\`
 `;
 }
