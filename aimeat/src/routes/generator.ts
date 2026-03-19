@@ -30,6 +30,7 @@
 //   v1.7.0 — 2026-03-19 — Add GET /v1/generator/my-assignments polling endpoint for agent discovery
 //   v1.8.0 — 2026-03-19 — Update agent guide to use polling instead of SSE for assignment discovery
 //   v1.9.0 — 2026-03-19 — Safety guards: version increment, blueprint immutability, registered component protection, session identity check
+//   v1.7.0 — 2026-03-19 — Add polling endpoint, safety guards, update agent guide to polling
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';

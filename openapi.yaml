@@ -13315,6 +13315,37 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/generator/my-assignments:
+    get:
+      summary: Poll for assigned generator projects
+      description: Returns projects where the calling agent has an active session assignment. Agents call this every 10-15 seconds instead of using SSE.
+      tags:
+        - Generator
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of assignments (may be empty)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      assignments:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            projectId:
+                              type: string
+                            session:
+                              type: object
+
   /v1/generator/{projectId}:
     get:
       operationId: getGeneratorProject

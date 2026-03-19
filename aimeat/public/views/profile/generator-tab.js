@@ -27,7 +27,7 @@
  *   v4.2.0 — 2026-03-18 — Add agent selector UI and progress banner for agent-driven generation
  *   v4.2.1 — 2026-03-19 — Fix session state: check agentGaii presence, not just truthy value,
  *     to avoid treating auto-created empty {} from memory GET as an active session
- *   v4.3.0 — 2026-03-19 — Add activity logging for all user actions (writeProjectLog)
+ *   v4.3.0 — 2026-03-19 — Fix CSS bugs, add activity logging for all user actions
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';

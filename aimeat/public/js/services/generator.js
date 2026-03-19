@@ -35,7 +35,7 @@
  *     translation i18n keys before removing generator state
  *   v4.3.0 — 2026-03-15 — Memory visibility changed to 'public' for cross-component access
  *   v4.4.0 — 2026-03-17 — Add reregisterComponent (deactivate → remove → register → re-activate)
- *   v4.5.0 — 2026-03-19 — Add writeProjectLog for user-action activity logging
+ *   v4.5.0 — 2026-03-19 — Add writeProjectLog for user-action activity logging; fix apiPatch import
  */
 import { apiGet, apiPost, apiPut, apiDelete, apiPatch } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
