@@ -832,7 +832,7 @@ Identity and Access:
 - Permissions: GET /v1/permissions/* — Check permission summaries and per-key access
 
 Knowledge and AI:
-- Packages: CRUD /v1/packages — Knowledge packages (import, clone, export, link, review)
+- Packages: CRUD /v1/knowledge — Knowledge packages (import, clone, export, link, review)
 - Cortex: CRUD /v1/cortex — AI backbone extensions with schemas, prompts, ontologies
 - CSM: CRUD /v1/csm — Community Service Manifests
 - Prompts: GET /v1/prompts/:tier — Tier-specific system prompts
@@ -1156,10 +1156,10 @@ You are an AI agent with direct API access to an AIMEAT node. Your task is to he
 - \`DELETE {{node_url}}/v1/memory/:key\` — Delete entry
 
 ### Knowledge Packages
-- \`POST {{node_url}}/v1/packages/import\` — Import a complete package (body: { package, overrides })
-- \`GET {{node_url}}/v1/packages/:id\` — Get package manifest
-- \`POST {{node_url}}/v1/packages/:id/link\` — Create link (body: { target, relation, description })
-- \`GET {{node_url}}/v1/packages/:id/links\` — List links (?direction=&relation=)
+- \`POST {{node_url}}/v1/knowledge/import\` — Import a complete package (body: { package, overrides })
+- \`GET {{node_url}}/v1/knowledge/:id\` — Get package manifest
+- \`POST {{node_url}}/v1/knowledge/:id/link\` — Create link (body: { target, relation, description })
+- \`GET {{node_url}}/v1/knowledge/:id/links\` — List links (?direction=&relation=)
 
 ### Consent
 - \`POST {{node_url}}/v1/consent\` — Create consent grant (body: { dataPattern, recipient, purpose, scope })
@@ -1183,7 +1183,7 @@ Same as the human prompt workflow, but with enhanced capabilities:
 5. **Present draft** to user with [PUBLIC]/[OWNER]/[PRIVATE] markers
 6. **User confirms**
 7. **Execute API calls**:
-   - \`POST /v1/packages/import\` with the complete package
+   - \`POST /v1/knowledge/import\` with the complete package
    - Create additional links to related packages found in step 4
 8. **Report back**: "Package created with N entries. X public, Y private. Listed in shared catalog. View at: {{node_url}}/v1/profile#knowledge"
 
@@ -1194,7 +1194,7 @@ Same as the human prompt workflow, but with enhanced capabilities:
 3. **Always show visibility clearly** — [PUBLIC] / [OWNER] / [PRIVATE] per entry. Valid JSON values: "public", "owner", "private".
 4. **Never auto-publish** — user must confirm before you make API calls
 5. **Be honest about synthesis level**
-6. **Create manifest FIRST, then entries** (use /v1/packages/import which handles this atomically)
+6. **Create manifest FIRST, then entries** (use /v1/knowledge/import which handles this atomically)
 7. **Set consent grants AFTER entries exist**
 8. **Report back what was created** with direct links
 
@@ -1296,7 +1296,7 @@ Content-Type: application/json
 ### Step 4: Use AIMEAT services
 With your JWT token, you can now:
 - Read/write memory: GET/POST {{node_url}}/v1/memory
-- Access knowledge: GET {{node_url}}/v1/packages
+- Access knowledge: GET {{node_url}}/v1/knowledge
 - Check wallet: GET {{node_url}}/v1/wallet
 - Browse catalogue: GET {{node_url}}/v1/catalogue
 - Post to boards: POST {{node_url}}/v1/boards/:id/posts

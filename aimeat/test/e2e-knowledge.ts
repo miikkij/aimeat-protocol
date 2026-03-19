@@ -114,7 +114,7 @@ await test('Agent auth — sign + token', async () => {
 console.log('\nPhase 1: Package Import');
 
 await test('Import a valid knowledge package', async () => {
-  const { status, body } = await json('/v1/packages/import', {
+  const { status, body } = await json('/v1/knowledge/import', {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({
@@ -149,7 +149,7 @@ await test('Import a valid knowledge package', async () => {
 });
 
 await test('Reject invalid package (missing required fields)', async () => {
-  const { status } = await json('/v1/packages/import', {
+  const { status } = await json('/v1/knowledge/import', {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({ package: { name: 'incomplete' } }),
@@ -158,7 +158,7 @@ await test('Reject invalid package (missing required fields)', async () => {
 });
 
 await test('Get package manifest by ID', async () => {
-  const { status, body } = await json(`/v1/packages/${firstPackageId}`);
+  const { status, body } = await json(`/v1/knowledge/${firstPackageId}`);
   assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
   assert(body.data?.package_id === firstPackageId, 'Package ID mismatch');
   assert(body.data?.manifest?.name === 'Test Research Package', 'Manifest name mismatch');
@@ -169,7 +169,7 @@ console.log('\nPhase 1: Memory Links');
 
 await test('Create and list memory links', async () => {
   // Create a second package to link from
-  const { body: pkg2 } = await json('/v1/packages/import', {
+  const { body: pkg2 } = await json('/v1/knowledge/import', {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({
@@ -188,7 +188,7 @@ await test('Create and list memory links', async () => {
   linkPackageId = pkg2.data.package_id;
 
   // Create a link
-  const { status: linkStatus } = await json(`/v1/packages/${linkPackageId}/link`, {
+  const { status: linkStatus } = await json(`/v1/knowledge/${linkPackageId}/link`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({
@@ -200,13 +200,13 @@ await test('Create and list memory links', async () => {
   assert(linkStatus === 201, `Expected 201 for link, got ${linkStatus}`);
 
   // List links
-  const { status: listStatus, body: listBody } = await json(`/v1/packages/${linkPackageId}/links`);
+  const { status: listStatus, body: listBody } = await json(`/v1/knowledge/${linkPackageId}/links`);
   assert(listStatus === 200, `Expected 200 for list, got ${listStatus}`);
   assert(listBody.data.count >= 1, `Expected at least 1 link, got ${listBody.data.count}`);
 });
 
 await test('Reject link with invalid relation', async () => {
-  const { status } = await json(`/v1/packages/${linkPackageId}/link`, {
+  const { status } = await json(`/v1/knowledge/${linkPackageId}/link`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({
@@ -219,7 +219,7 @@ await test('Reject link with invalid relation', async () => {
 });
 
 await test('Delete a link', async () => {
-  const { status } = await json(`/v1/packages/${linkPackageId}/link`, {
+  const { status } = await json(`/v1/knowledge/${linkPackageId}/link`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({ target: `packages/${firstPackageId}/manifest` }),
@@ -227,7 +227,7 @@ await test('Delete a link', async () => {
   assert(status === 200, `Expected 200 for delete link, got ${status}`);
 
   // Verify link is gone
-  const { body: listBody } = await json(`/v1/packages/${linkPackageId}/links`);
+  const { body: listBody } = await json(`/v1/knowledge/${linkPackageId}/links`);
   assert(listBody.data.count === 0, `Expected 0 links after delete, got ${listBody.data.count}`);
 });
 
@@ -263,7 +263,7 @@ console.log('\nPhase 3: Discovery and Sharing');
 let discoverablePackageId = '';
 
 await test('Import a public package for discovery', async () => {
-  const { status, body } = await json('/v1/packages/import', {
+  const { status, body } = await json('/v1/knowledge/import', {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({
@@ -296,14 +296,14 @@ await test('Discover packages via catalogue', async () => {
 });
 
 await test('Export a package', async () => {
-  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/export?format=json`);
+  const { status, body } = await json(`/v1/knowledge/${discoverablePackageId}/export?format=json`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.aimeat_knowledge_package === true, 'Expected aimeat_knowledge_package flag');
   assert(body.exported_from?.package_id === discoverablePackageId, 'Expected correct package_id in export');
 });
 
 await test('Clone a package', async () => {
-  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/clone`, {
+  const { status, body } = await json(`/v1/knowledge/${discoverablePackageId}/clone`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${agentToken}` },
     body: JSON.stringify({ target_prefix: 'my-clone' }),
@@ -317,7 +317,7 @@ await test('Clone a package', async () => {
 console.log('\nPhase 4: Quality and Moderation');
 
 await test('Get package reputation signals', async () => {
-  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/reputation`);
+  const { status, body } = await json(`/v1/knowledge/${discoverablePackageId}/reputation`);
   assert(status === 200, `Expected 200, got ${status}`);
   assert(body.data?.clone_count !== undefined, 'Expected clone_count');
   assert(body.data?.flag_count !== undefined, 'Expected flag_count');
@@ -345,7 +345,7 @@ await test('Operator can review a package', async () => {
 });
 
 await test('Package owner can see operator reviews', async () => {
-  const { status, body } = await json(`/v1/packages/${discoverablePackageId}/reviews`, {
+  const { status, body } = await json(`/v1/knowledge/${discoverablePackageId}/reviews`, {
     headers: { Authorization: `Bearer ${agentToken}` },
   });
   assert(status === 200, `Expected 200, got ${status}`);

@@ -1,3 +1,32 @@
+/**
+ * @file knowledge.ts
+ * @description Knowledge package routes — import, CRUD, links, sharing, cloning,
+ *   export, organism contribution, reputation, and operator review endpoints.
+ *   All routes are under /v1/knowledge/*.
+ * @structure
+ *   - knowledgeRouter() — main router factory
+ *   - POST /v1/knowledge/import — import a knowledge package
+ *   - GET /v1/knowledge/:id — get package manifest
+ *   - POST /v1/knowledge/:id/link — create memory link
+ *   - GET /v1/knowledge/:id/links — list links
+ *   - DELETE /v1/knowledge/:id/link — delete link
+ *   - GET /v1/knowledge/:id/broken-links — find broken links
+ *   - PATCH /v1/knowledge/:id/sharing — update sharing settings
+ *   - PATCH /v1/knowledge/:id/entries/:entryKey/visibility — update entry visibility
+ *   - POST /v1/knowledge/:id/clone — clone a package
+ *   - GET /v1/knowledge/:id/export — export package as JSON
+ *   - POST /v1/knowledge/:id/contribute — contribute to organism
+ *   - GET /v1/knowledge/organism/:id — list organism packages
+ *   - GET /v1/knowledge/:id/reputation — get quality signals
+ *   - GET /v1/knowledge/:id/reviews — list operator reviews
+ * @usage
+ *   import { knowledgeRouter } from '../routes/knowledge.js';
+ *   app.use(knowledgeRouter(config, storage));
+ * @version-history
+ *   v1.0.0 — 2026-03-07 — initial knowledge package system
+ *   v1.1.0 — 2026-03-18 — rename routes from /v1/packages/* to /v1/knowledge/*
+ */
+
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -27,8 +56,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  /* ── POST /v1/packages/import — Import a knowledge package from AI Chat output ── */
-  router.post('/v1/packages/import', requireAuth(), async (req, res) => {
+  /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
+  router.post('/v1/knowledge/import', requireAuth(), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const { package: pkg, overrides } = req.body;
@@ -191,8 +220,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     emitChange('knowledge');
   });
 
-  /* ── GET /v1/packages/:id — Get package manifest ── */
-  router.get('/v1/packages/:id', async (req, res) => {
+  /* ── GET /v1/knowledge/:id — Get package manifest ── */
+  router.get('/v1/knowledge/:id', async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
@@ -222,8 +251,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }));
   });
 
-  /* ── POST /v1/packages/:id/link — Create a link from this package to another memory ── */
-  router.post('/v1/packages/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── POST /v1/knowledge/:id/link — Create a link from this package to another memory ── */
+  router.post('/v1/knowledge/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const packageId = req.params.id as string;
@@ -270,13 +299,13 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     await storage.setMemory(existing);
 
     res.status(201).json(success(config.nodeId, { link }, [
-      { description: 'List package links', method: 'GET', url: `/v1/packages/${packageId}/links` },
+      { description: 'List package links', method: 'GET', url: `/v1/knowledge/${packageId}/links` },
     ]));
     emitChange('knowledge');
   });
 
-  /* ── GET /v1/packages/:id/links — List links for a package ── */
-  router.get('/v1/packages/:id/links', async (req, res) => {
+  /* ── GET /v1/knowledge/:id/links — List links for a package ── */
+  router.get('/v1/knowledge/:id/links', async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
     const direction = (req.query.direction as string) ?? 'both';
@@ -290,8 +319,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { links, count: links.length }));
   });
 
-  /* ── DELETE /v1/packages/:id/link — Delete a link ── */
-  router.delete('/v1/packages/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── DELETE /v1/knowledge/:id/link — Delete a link ── */
+  router.delete('/v1/knowledge/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const { target } = req.body;
     if (!target) {
@@ -310,8 +339,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     emitChange('knowledge');
   });
 
-  /* ── GET /v1/packages/:id/broken-links — Find broken links ── */
-  router.get('/v1/packages/:id/broken-links', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── GET /v1/knowledge/:id/broken-links — Find broken links ── */
+  router.get('/v1/knowledge/:id/broken-links', requireAuth(), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const broken = await storage.findBrokenLinks(ownerGaii);
 
@@ -381,8 +410,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { prompt: text, ghii, node_url: nodeUrl, node_id: config.nodeId }));
   });
 
-  /* ── PATCH /v1/packages/:id/sharing — Update package sharing settings ── */
-  router.patch('/v1/packages/:id/sharing', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── PATCH /v1/knowledge/:id/sharing — Update package sharing settings ── */
+  router.patch('/v1/knowledge/:id/sharing', requireAuth(), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const packageId = req.params.id as string;
     const { catalog_listed, allow_clone } = req.body ?? {};
@@ -427,8 +456,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     emitChange('knowledge');
   });
 
-  /* ── PATCH /v1/packages/:id/entries/:entryKey/visibility — Change entry visibility ── */
-  router.patch('/v1/packages/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── PATCH /v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility ── */
+  router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const packageId = req.params.id as string;
     const entryKey = req.params.entryKey as string;
@@ -496,8 +525,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     emitChange('knowledge');
   });
 
-  /* ── POST /v1/packages/:id/clone — Clone public entries to your own namespace ── */
-  router.post('/v1/packages/:id/clone', requireAuth(), async (req, res) => {
+  /* ── POST /v1/knowledge/:id/clone — Clone public entries to your own namespace ── */
+  router.post('/v1/knowledge/:id/clone', requireAuth(), async (req, res) => {
     const requesterGaii = resolve(req);
     const requesterGhii = req.auth!.owner as string;
     const sourcePackageId = req.params.id as string;
@@ -614,13 +643,13 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       entries_cloned: clonedEntries.length,
       source_package_id: sourcePackageId,
     }, [
-      { description: 'View cloned package', method: 'GET', url: `/v1/packages/${newPackageId}` },
+      { description: 'View cloned package', method: 'GET', url: `/v1/knowledge/${newPackageId}` },
     ]));
     emitChange('knowledge');
   });
 
-  /* ── GET /v1/packages/:id/export — Export package as portable JSON ── */
-  router.get('/v1/packages/:id/export', async (req, res) => {
+  /* ── GET /v1/knowledge/:id/export — Export package as portable JSON ── */
+  router.get('/v1/knowledge/:id/export', async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
     const requestedEntries = req.query.entries
@@ -688,8 +717,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(exportData);
   });
 
-  /* ── POST /v1/packages/:id/contribute — Contribute a package to an organism ── */
-  router.post('/v1/packages/:id/contribute', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* ── POST /v1/knowledge/:id/contribute — Contribute a package to an organism ── */
+  router.post('/v1/knowledge/:id/contribute', requireAuth(), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const packageId = req.params.id as string;
@@ -754,8 +783,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     emitChange('knowledge');
   });
 
-  /* ── GET /v1/packages/organism/:id — List packages shared with an organism ── */
-  router.get('/v1/packages/organism/:id', requireAuth(), async (req, res) => {
+  /* ── GET /v1/knowledge/organism/:id — List packages shared with an organism ── */
+  router.get('/v1/knowledge/organism/:id', requireAuth(), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const organismId = req.params.id as string;
 
@@ -791,8 +820,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { packages, count: packages.length }));
   });
 
-  /* ── GET /v1/packages/:id/reputation — Get quality signals for a package ── */
-  router.get('/v1/packages/:id/reputation', async (req, res) => {
+  /* ── GET /v1/knowledge/:id/reputation — Get quality signals for a package ── */
+  router.get('/v1/knowledge/:id/reputation', async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
@@ -1172,8 +1201,8 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     emitChange('knowledge');
   });
 
-  /* ── GET /v1/packages/:id/reviews — List operator reviews for a package ── */
-  router.get('/v1/packages/:id/reviews', requireAuth(), async (req, res) => {
+  /* ── GET /v1/knowledge/:id/reviews — List operator reviews for a package ── */
+  router.get('/v1/knowledge/:id/reviews', requireAuth(), async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 

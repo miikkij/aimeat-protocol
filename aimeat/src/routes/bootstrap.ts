@@ -177,7 +177,7 @@ export function bootstrapRouter(
       knowledge_and_ai: {
         description: 'AI-powered knowledge management, service definitions, prompts, and extensibility.',
         endpoints: {
-          packages: { method: 'CRUD', url: '/v1/packages', description: 'Knowledge packages — import, clone, export, link dependencies, review', tier: 1 },
+          packages: { method: 'CRUD', url: '/v1/knowledge', description: 'Knowledge packages — import, clone, export, link dependencies, review', tier: 1 },
           cortex: { method: 'CRUD', url: '/v1/cortex', description: 'AI backbone extensions with schemas, prompts, ontologies, and actions', tier: 1 },
           csm: { method: 'CRUD', url: '/v1/csm', description: 'Community Service Manifests — define data shape and rules for services', tier: 1, templates: '/v1/csm/templates' },
           msm: { method: 'CRUD', url: '/v1/msm', description: 'Machine Service Manifests — AI-consumable API integration definitions', tier: 1, templates: '/v1/msm/templates' },

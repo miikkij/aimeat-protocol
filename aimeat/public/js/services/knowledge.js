@@ -9,7 +9,7 @@ import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 export async function importPackage(pkg, overrides = {}, entryData = null) {
   const body = { package: pkg, overrides };
   if (entryData) body.entry_data = entryData;
-  return apiPost('/v1/packages/import', body);
+  return apiPost('/v1/knowledge/import', body);
 }
 
 /* ── Package CRUD (via memory API) ── */
@@ -21,7 +21,7 @@ export async function listMyPackages() {
 }
 
 export async function getPackage(packageId) {
-  return apiGet(`/v1/packages/${encodeURIComponent(packageId)}`);
+  return apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}`);
 }
 
 export async function deletePackage(ownerGaii, packageId) {
@@ -32,15 +32,15 @@ export async function deletePackage(ownerGaii, packageId) {
 /* ── Links ── */
 
 export async function listLinks(packageId, direction = 'both') {
-  return apiGet(`/v1/packages/${encodeURIComponent(packageId)}/links?direction=${direction}`);
+  return apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}/links?direction=${direction}`);
 }
 
 export async function createLink(packageId, target, relation, description) {
-  return apiPost(`/v1/packages/${encodeURIComponent(packageId)}/link`, { target, relation, description });
+  return apiPost(`/v1/knowledge/${encodeURIComponent(packageId)}/link`, { target, relation, description });
 }
 
 export async function deleteLink(packageId, target) {
-  return apiDelete(`/v1/packages/${encodeURIComponent(packageId)}/link`, { target });
+  return apiDelete(`/v1/knowledge/${encodeURIComponent(packageId)}/link`, { target });
 }
 
 /* ── Prompt Templates ── */
@@ -56,7 +56,7 @@ export async function getAgentPrompt() {
 /* ── Export ── */
 
 export async function exportPackage(packageId, format = 'json') {
-  return apiGet(`/v1/packages/${encodeURIComponent(packageId)}/export?format=${format}`);
+  return apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}/export?format=${format}`);
 }
 
 /* ── Catalogue / Discovery ── */
@@ -75,14 +75,14 @@ export async function discoverPackages(opts = {}) {
 /* ── Sharing Settings ── */
 
 export async function updateSharing(packageId, sharing) {
-  return api(`/v1/packages/${encodeURIComponent(packageId)}/sharing`, {
+  return api(`/v1/knowledge/${encodeURIComponent(packageId)}/sharing`, {
     method: 'PATCH',
     body: JSON.stringify(sharing),
   });
 }
 
 export async function updateEntryVisibility(packageId, entryKey, visibility) {
-  return api(`/v1/packages/${encodeURIComponent(packageId)}/entries/${encodeURIComponent(entryKey)}/visibility`, {
+  return api(`/v1/knowledge/${encodeURIComponent(packageId)}/entries/${encodeURIComponent(entryKey)}/visibility`, {
     method: 'PATCH',
     body: JSON.stringify({ visibility }),
   });
@@ -91,7 +91,7 @@ export async function updateEntryVisibility(packageId, entryKey, visibility) {
 /* ── Clone ── */
 
 export async function clonePackage(packageId, targetPrefix, entries) {
-  return apiPost(`/v1/packages/${encodeURIComponent(packageId)}/clone`, {
+  return apiPost(`/v1/knowledge/${encodeURIComponent(packageId)}/clone`, {
     target_prefix: targetPrefix,
     entries,
   });
@@ -100,21 +100,21 @@ export async function clonePackage(packageId, targetPrefix, entries) {
 /* ── Organism Knowledge ── */
 
 export async function listOrganismPackages(organismId) {
-  return apiGet(`/v1/packages/organism/${encodeURIComponent(organismId)}`);
+  return apiGet(`/v1/knowledge/organism/${encodeURIComponent(organismId)}`);
 }
 
 export async function contributeToOrganism(packageId, organismId) {
-  return apiPost(`/v1/packages/${encodeURIComponent(packageId)}/contribute`, { organism_id: organismId });
+  return apiPost(`/v1/knowledge/${encodeURIComponent(packageId)}/contribute`, { organism_id: organismId });
 }
 
 /* ── Reputation ── */
 
 export async function getPackageReputation(packageId) {
-  return apiGet(`/v1/packages/${encodeURIComponent(packageId)}/reputation`);
+  return apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}/reputation`);
 }
 
 /* ── Reviews ── */
 
 export async function getPackageReviews(packageId) {
-  return apiGet(`/v1/packages/${encodeURIComponent(packageId)}/reviews`);
+  return apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}/reviews`);
 }

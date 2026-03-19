@@ -405,8 +405,8 @@ await test('GET /v1/templates/knowledge-packager-agent — agent prompt', async 
     assert(typeof body.data?.prompt === 'string', 'has prompt text');
 });
 
-await test('POST /v1/packages/import — import AI chat format package', async () => {
-    const { body } = await authJson('/v1/packages/import', agentToken, {
+await test('POST /v1/knowledge/import — import AI chat format package', async () => {
+    const { body } = await authJson('/v1/knowledge/import', agentToken, {
         method: 'POST',
         body: JSON.stringify({
             package: {
@@ -430,8 +430,8 @@ await test('POST /v1/packages/import — import AI chat format package', async (
     assert(body.data?.entries_created === 2, `expected 2 entries, got ${body.data?.entries_created}`);
 });
 
-await test('POST /v1/packages/import — full manifest format', async () => {
-    const { body } = await authJson('/v1/packages/import', agentToken, {
+await test('POST /v1/knowledge/import — full manifest format', async () => {
+    const { body } = await authJson('/v1/knowledge/import', agentToken, {
         method: 'POST',
         body: JSON.stringify({
             package: {
@@ -471,8 +471,8 @@ await test('GET /v1/catalogue/knowledge — discover packages', async () => {
 // Import a clonable package for clone test
 let clonablePackageId = '';
 
-await test('POST /v1/packages/import — import clonable package', async () => {
-    const { body } = await authJson('/v1/packages/import', agentToken, {
+await test('POST /v1/knowledge/import — import clonable package', async () => {
+    const { body } = await authJson('/v1/knowledge/import', agentToken, {
         method: 'POST',
         body: JSON.stringify({
             package: {
@@ -497,17 +497,17 @@ await test('POST /v1/packages/import — import clonable package', async () => {
     assert(clonablePackageId.length > 0, 'got clonable package_id');
 });
 
-await test('GET /v1/packages/:id/export — export package', async () => {
+await test('GET /v1/knowledge/:id/export — export package', async () => {
     if (!clonablePackageId) { assert(false, 'no package to export'); return; }
-    const { status, body } = await authJson(`/v1/packages/${encodeURIComponent(clonablePackageId)}/export`, agentToken);
+    const { status, body } = await authJson(`/v1/knowledge/${encodeURIComponent(clonablePackageId)}/export`, agentToken);
     // Export may return envelope (ok:true) or raw export object (aimeat_knowledge_package:true)
     assert(status === 200, `export: status ${status}`);
     assert(body.ok === true || body.aimeat_knowledge_package === true || body.package, 'has export data');
 });
 
-await test('POST /v1/packages/:id/clone — clone package (allow_clone=true)', async () => {
+await test('POST /v1/knowledge/:id/clone — clone package (allow_clone=true)', async () => {
     if (!clonablePackageId) { assert(false, 'no package to clone'); return; }
-    const { body } = await authJson(`/v1/packages/${encodeURIComponent(clonablePackageId)}/clone`, agentToken, {
+    const { body } = await authJson(`/v1/knowledge/${encodeURIComponent(clonablePackageId)}/clone`, agentToken, {
         method: 'POST',
         body: JSON.stringify({ target_prefix: 'cloned' }),
     });
@@ -515,7 +515,7 @@ await test('POST /v1/packages/:id/clone — clone package (allow_clone=true)', a
     assert(body.data?.cloned_package_id, 'got cloned_package_id');
 });
 
-await test('POST /v1/packages/:id/clone — clone with allow_clone=false should 403', async () => {
+await test('POST /v1/knowledge/:id/clone — clone with allow_clone=false should 403', async () => {
     // The first imported package (e2e-test-pkg) has allow_clone=false by default
     const { body: listBody } = await authJson('/v1/memory?prefix=packages/&tags=knowledge-package', agentToken);
     const entries = listBody.data?.entries || listBody.data?.items || [];
@@ -529,7 +529,7 @@ await test('POST /v1/packages/:id/clone — clone with allow_clone=false should 
         }
     }
     if (!nonClonableId) { return; } // Skip if we can't find one
-    const { status, body } = await authJson(`/v1/packages/${encodeURIComponent(nonClonableId)}/clone`, agentToken, {
+    const { status, body } = await authJson(`/v1/knowledge/${encodeURIComponent(nonClonableId)}/clone`, agentToken, {
         method: 'POST',
         body: JSON.stringify({ target_prefix: 'should-fail' }),
     });
@@ -539,8 +539,8 @@ await test('POST /v1/packages/:id/clone — clone with allow_clone=false should 
 
 // Test default allow_clone behavior — catalog_listed should imply allow_clone
 let defaultClonePackageId = '';
-await test('POST /v1/packages/import — catalog_listed=true defaults allow_clone=true', async () => {
-    const { body } = await authJson('/v1/packages/import', agentToken, {
+await test('POST /v1/knowledge/import — catalog_listed=true defaults allow_clone=true', async () => {
+    const { body } = await authJson('/v1/knowledge/import', agentToken, {
         method: 'POST',
         body: JSON.stringify({
             package: {
@@ -562,9 +562,9 @@ await test('POST /v1/packages/import — catalog_listed=true defaults allow_clon
     assert(defaultClonePackageId.length > 0, 'got package_id');
 });
 
-await test('POST /v1/packages/:id/clone — clone catalog-listed package (default allow_clone)', async () => {
+await test('POST /v1/knowledge/:id/clone — clone catalog-listed package (default allow_clone)', async () => {
     if (!defaultClonePackageId) { assert(false, 'no package to clone'); return; }
-    const { body } = await authJson(`/v1/packages/${encodeURIComponent(defaultClonePackageId)}/clone`, agentToken, {
+    const { body } = await authJson(`/v1/knowledge/${encodeURIComponent(defaultClonePackageId)}/clone`, agentToken, {
         method: 'POST',
         body: JSON.stringify({ target_prefix: 'default-cloned' }),
     });
@@ -577,8 +577,8 @@ await test('POST /v1/packages/:id/clone — clone catalog-listed package (defaul
     await authJson(`/v1/memory/${encodeURIComponent(entryKey)}`, agentToken, { method: 'DELETE' });
 });
 
-await test('POST /v1/packages/import — import with owner token (regression: was 403)', async () => {
-    const { body } = await authJson('/v1/packages/import', ownerToken, {
+await test('POST /v1/knowledge/import — import with owner token (regression: was 403)', async () => {
+    const { body } = await authJson('/v1/knowledge/import', ownerToken, {
         method: 'POST',
         body: JSON.stringify({
             package: {
