@@ -205,6 +205,35 @@ test.describe('Agents — Scope Management', () => {
     // Modal should appear
     await expect(page.locator('.scope-modal')).toBeVisible({ timeout: 5_000 });
   });
+
+  test('saving scopes via modal does not return 404', async ({ page }) => {
+    await setupAgentsTab(page, 'scopesave');
+
+    const card = page.locator('.agent-card').first();
+    await expect(card).toBeVisible({ timeout: 10_000 });
+
+    // Open scope modal
+    const manageBtn = card.locator('.scope-manage-btn');
+    await expect(manageBtn).toBeVisible({ timeout: 5_000 });
+    await manageBtn.click();
+    await expect(page.locator('.scope-modal')).toBeVisible({ timeout: 5_000 });
+
+    // Intercept the PATCH request to verify it's not PUT
+    const [request] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/scopes') && req.method() === 'PATCH', { timeout: 10_000 }),
+      page.locator('.scope-modal .btn-primary').click(),
+    ]);
+
+    expect(request.method()).toBe('PATCH');
+
+    // Should show success toast, not error
+    await page.waitForTimeout(1000);
+    const toast = page.locator('.toast');
+    if (await toast.count() > 0) {
+      const toastText = await toast.textContent();
+      expect(toastText).not.toContain('404');
+    }
+  });
 });
 
 // ── Device auth: pending requests appear inline ────────
