@@ -841,7 +841,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         </p>
       `}
 
-      ${project?.blueprint && !generatorSession && html`
+      ${interviewSpec && !generatorSession && html`
         <${AgentSelector}
           projectId=${projectId}
           listeners=${listeners}
