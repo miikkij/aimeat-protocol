@@ -266,8 +266,18 @@ const validators = {
     // Try fenced yaml block first; if not found, take everything before first // actions/ comment
     let raw = extractCodeBlock(result, 'yaml');
     if (raw === result.trim()) {
-      // extractCodeBlock returned full text = no fence found. Cut at first JS file comment.
-      const jsStart = result.search(/^\/\/\s*actions\//m);
+      // extractCodeBlock returned full text = no fence found.
+      // Cut at first JS file marker: // actions/foo.js, # actions/foo.js, or export default
+      const jsMarkers = [
+        /^\/\/\s*actions\//m,
+        /^#\s*actions\//m,
+        /^export\s+default\s+/m,
+      ];
+      let jsStart = -1;
+      for (const rx of jsMarkers) {
+        const idx = result.search(rx);
+        if (idx > 0 && (jsStart === -1 || idx < jsStart)) jsStart = idx;
+      }
       raw = jsStart > 0 ? result.slice(0, jsStart).trim() : result.trim();
     }
     const { parsed, errors: parseErrors } = tryParseYaml(raw);
