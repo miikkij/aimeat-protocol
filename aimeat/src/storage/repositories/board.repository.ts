@@ -5,6 +5,7 @@ export interface BoardRepository {
   getBoard(id: string): Promise<BoardRecord | null>;
   listBoards(opts?: { visibility?: string; ownerGaii?: string }): Promise<BoardRecord[]>;
   updateBoardVisibility(id: string, visibility: string): Promise<BoardRecord | null>;
+  updateBoardMembers(id: string, allowedGaiis: string[]): Promise<BoardRecord | null>;
   deleteBoard(id: string): Promise<boolean>;
   createPost(post: BoardPostRecord): Promise<BoardPostRecord>;
   getPost(boardId: string, postId: string): Promise<BoardPostRecord | null>;

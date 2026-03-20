@@ -820,6 +820,14 @@ export class MongoStorage implements Storage {
         } catch { return null; }
     }
 
+    async updateBoardMembers(id: string, allowedGaiis: string[]): Promise<import('../../interface.js').BoardRecord | null> {
+      this.ensureReady();
+      try {
+        const row = await this.prisma.board.update({ where: { boardId: id }, data: { allowedGaiis } });
+        return this.toBoardRecord(row);
+      } catch { return null; }
+    }
+
     async deleteBoard(id: string): Promise<boolean> {
         this.ensureReady();
         try {

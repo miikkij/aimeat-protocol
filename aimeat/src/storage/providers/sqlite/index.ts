@@ -858,6 +858,12 @@ export class SqliteStorage implements Storage {
     return this.getBoard(id);
   }
 
+  async updateBoardMembers(id: string, allowedGaiis: string[]): Promise<BoardRecord | null> {
+    const result = this.db.prepare('UPDATE boards SET allowedGaiis = ? WHERE id = ?').run(JSON.stringify(allowedGaiis), id);
+    if (result.changes === 0) return null;
+    return this.getBoard(id);
+  }
+
   async deleteBoard(id: string): Promise<boolean> {
     // Delete all posts in the board
     this.db.prepare('DELETE FROM board_posts WHERE boardId = ?').run(id);
