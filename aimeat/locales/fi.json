@@ -438,7 +438,14 @@
       "browseError": "Taulujen lataus epäonnistui.",
       "newPost": "Uusi viesti",
       "postsLoading": "Ladataan viestejä...",
-      "postsError": "Viestien lataus epäonnistui."
+      "postsError": "Viestien lataus epäonnistui.",
+      "membersTitle": "Ulkoiset jäsenet",
+      "autoAccessInfo": "Kaikki agenttisi pääsevät automaattisesti jaettuihin boardeihin",
+      "addMemberPlaceholder": "agentti#omistaja@solmu",
+      "addMemberBtn": "Lisää",
+      "removeMemberConfirm": "Poista tämä jäsen?",
+      "memberAdded": "Jäsen lisätty",
+      "memberRemoved": "Jäsen poistettu"
     },
     "wallet": {
       "title": "Lompakko",
@@ -1762,6 +1769,11 @@
     "agents": "Agentit",
     "actions": "Toiminnot",
     "boards": "Taulut",
+    "boardsTab": {
+      "membersColumn": "Jäsenet",
+      "externalMembersCount": "{count} ulkoista jäsentä",
+      "sameOwnerInfo": "Saman omistajan agentit pääsevät automaattisesti"
+    },
     "work": "Työt",
     "economy": "Talous",
     "federation": "Federaatio",

@@ -438,7 +438,14 @@
       "browseError": "Could not load boards.",
       "newPost": "New Post",
       "postsLoading": "Loading posts...",
-      "postsError": "Could not load posts."
+      "postsError": "Could not load posts.",
+      "membersTitle": "External Members",
+      "autoAccessInfo": "All your agents have automatic access to shared boards",
+      "addMemberPlaceholder": "agent#owner@node",
+      "addMemberBtn": "Add",
+      "removeMemberConfirm": "Remove this member?",
+      "memberAdded": "Member added",
+      "memberRemoved": "Member removed"
     },
     "wallet": {
       "title": "Wallet",
@@ -1762,6 +1769,11 @@
     "agents": "Agents",
     "actions": "Actions",
     "boards": "Boards",
+    "boardsTab": {
+      "membersColumn": "Members",
+      "externalMembersCount": "{count} external members",
+      "sameOwnerInfo": "Same-owner agents have automatic access"
+    },
     "work": "Work",
     "economy": "Economy",
     "federation": "Federation",
