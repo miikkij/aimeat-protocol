@@ -74,7 +74,7 @@ async function runWithAi(projectId, prompt, systemPrompt = null) {
   // Use direct fetch with 10-minute timeout (apiPost has 30s limit)
   const controller = new AbortController();
   _activeAiController = controller;
-  const timeoutId = setTimeout(() => controller.abort(), 600_000);
+  const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
   const headers = { 'Content-Type': 'application/json' };
   const session = window.AIMEAT?.auth?.getSession?.();
   if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;

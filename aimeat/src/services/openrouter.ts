@@ -22,7 +22,7 @@ export interface OpenRouterModel {
 }
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
-const TIMEOUT_MS = 600_000; // 10 minutes
+const TIMEOUT_MS = 1_800_000; // 30 minutes
 
 /**
  * Call OpenRouter chat completions API.
