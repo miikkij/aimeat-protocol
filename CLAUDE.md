@@ -160,6 +160,14 @@ This is the **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an 
 1. **Protocol specification** (RFC v1.2) in `docs/` and `openapi.yaml`
 2. **Reference implementation** in `aimeat/` — a Node.js/TypeScript server
 
+### Prompt-Driven Workflow
+
+AIMEAT uses a **prompt-driven workflow** (promptipohjainen työnkulku) as its core interaction pattern. The application generates ready-made prompts, the user copies them to their chosen AI chat, and brings the results back. Previous results feed into subsequent prompts.
+
+This pattern is used because it is (1) **free** — users use their own AI chats, (2) **safe** — users see everything AI produces before submitting it to the system, and (3) **AI-agnostic** — any AI works (Claude, ChatGPT, Gemini, etc.).
+
+**When adding features to the generator pipeline**, the work happens in the prompt text — not in UI buttons or backend logic. The app's job is to compose prompts, show them for copying, accept and validate responses, and thread relevant parts of previous responses into subsequent prompts.
+
 ## Architecture
 
 - **Runtime:** Node.js 24.x, ESM (`"type": "module"`)
