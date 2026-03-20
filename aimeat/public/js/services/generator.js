@@ -131,7 +131,7 @@ export async function deleteProject(projectId, session) {
         await apiDelete(`/v1/extensions/${encodeURIComponent(name)}`);
         // Clean extension memory (ext:{name} namespace)
         try {
-          const memResp = await apiGet(`/v1/memory?prefix=&owner=ext:${encodeURIComponent(name)}&owner_scope=true`);
+          const memResp = await apiGet(`/v1/memory?owner=ext:${encodeURIComponent(name)}&owner_scope=true`);
           for (const item of (memResp?.data?.items || [])) {
             try { await apiDelete(`/v1/memory/${encodeURIComponent(item.key)}?owner=ext:${encodeURIComponent(name)}`); } catch { /* best effort */ }
           }
