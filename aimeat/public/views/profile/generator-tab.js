@@ -56,11 +56,24 @@ import {
 
 /* ── OpenRouter Autopilot Helper ──────────────────────── */
 
+// Active AbortController for current AI request — allows instant cancel
+let _activeAiController = null;
+
+/** Strip markdown codeblock wrapper if AI wrapped the response in ``` */
+function stripCodeblock(text) {
+  if (!text) return text;
+  const trimmed = text.trim();
+  // Match ```<optional lang>\n...\n``` or ```<optional lang>\n...```
+  const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```\s*$/);
+  return match ? match[1].trim() : trimmed;
+}
+
 async function runWithAi(projectId, prompt, systemPrompt = null) {
   const body = { projectId, prompt };
   if (systemPrompt) body.systemPrompt = systemPrompt;
   // Use direct fetch with 10-minute timeout (apiPost has 30s limit)
   const controller = new AbortController();
+  _activeAiController = controller;
   const timeoutId = setTimeout(() => controller.abort(), 600_000);
   const headers = { 'Content-Type': 'application/json' };
   const session = window.AIMEAT?.auth?.getSession?.();
@@ -71,13 +84,19 @@ async function runWithAi(projectId, prompt, systemPrompt = null) {
     });
     const resp = await raw.json();
     if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
-    return resp.data.content;
+    return stripCodeblock(resp.data.content);
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('AI request timed out (10 min)');
+    if (e.name === 'AbortError') throw new Error('Cancelled');
     throw e;
   } finally {
     clearTimeout(timeoutId);
+    _activeAiController = null;
   }
+}
+
+/** Abort the active AI request immediately */
+function cancelAiRequest() {
+  if (_activeAiController) _activeAiController.abort();
 }
 
 /* ── Sub-views ───────────────────────────────────────── */
@@ -896,6 +915,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   function handleCancelAutopilot() {
     autopilotCancelledRef.current = true;
+    cancelAiRequest(); // Abort the HTTP request immediately
     setCurrentAutopilotStep(t('profile.generator.openrouter.cancel') + '...');
   }
 
