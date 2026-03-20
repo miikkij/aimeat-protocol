@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
  *   v1.1.0 — 2026-03-21 — Added registerOrganismsTools registration (5 tools + 1 resource)
  *   v1.2.0 — 2026-03-21 — Added registerKnowledgeTools registration (4 tools + 1 resource)
+ *   v1.3.0 — 2026-03-21 — Added registerExtensionsTools registration (2 tools + 1 resource)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -30,6 +31,7 @@ import { registerCoreTools } from './core.js';
 import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerKnowledgeTools } from './knowledge.js';
+import { registerExtensionsTools } from './extensions.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -90,6 +92,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
