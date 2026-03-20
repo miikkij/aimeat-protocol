@@ -26,13 +26,14 @@
  *   v1.3.0 — 2026-03-15 — support YAML bundle string import (text/yaml Content-Type) for POST /v1/packages/import
  *   v1.4.0 — 2026-03-15 — enforce packageMaxSizeMb, packageMaxComponents limits; remove (config as any) casts
  *   v2.0.0 — 2026-03-20 — change export/import from YAML to ZIP format (buildZip/parseZip)
+ *   v2.1.0 — 2026-03-20 — add POST /v1/packages/:groupId/propose endpoint for template gallery proposals
  */
 
 import { Router } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import Busboy from 'busboy';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageRecord, PackageComponent } from '../storage/interface.js';
+import type { Storage, PackageRecord, PackageComponent, TemplateListingRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -347,6 +348,73 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       }
       throw e;
     }
+  });
+
+  // POST /v1/packages/:groupId/propose — propose package as template for gallery
+  router.post('/v1/packages/:groupId/propose', requireAuth(), requireRole('owner'), async (req, res) => {
+    const groupId = decodeURIComponent(req.params.groupId as string);
+    const ghii = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+
+    // Verify the package has at least one published version
+    const pkg = await storage.getLatestPublished(groupId);
+    if (!pkg) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or has no published version'));
+      return;
+    }
+
+    // Verify ownership
+    if (pkg.authorGhii !== ghii) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package author can propose it as a template'));
+      return;
+    }
+
+    // Check for existing listing
+    const existing = await storage.getListingByPackage(groupId);
+    if (existing) {
+      if (existing.status === 'listed') {
+        res.status(400).json(error(config.nodeId, 'ALREADY_LISTED', 'This package is already listed in the template gallery'));
+        return;
+      }
+      // Re-propose a previously rejected/suspended listing
+      const updated = await storage.updateTemplateListing(existing.id, {
+        status: 'pending_review',
+        proposedAt: new Date().toISOString(),
+        proposedBy: ghii,
+        updatedAt: new Date().toISOString(),
+      });
+      emitChange('templates');
+      res.json(success(config.nodeId, { listingId: existing.id, status: 'pending_review' }));
+      return;
+    }
+
+    // Create new listing with pending_review status
+    const now = new Date().toISOString();
+    const record: TemplateListingRecord = {
+      id: randomUUID(),
+      packageGroupId: groupId,
+      packageName: pkg.name,
+      packageAuthor: pkg.author,
+      publishedBy: req.auth!.owner,
+      publishedByGhii: ghii,
+      title: pkg.name,
+      description: pkg.description,
+      screenshots: [],
+      category: pkg.category,
+      tags: pkg.tags,
+      featured: false,
+      installCount: 0,
+      rating: 0,
+      reviewCount: 0,
+      status: 'pending_review',
+      createdAt: now,
+      updatedAt: now,
+      proposedAt: now,
+      proposedBy: ghii,
+    };
+
+    const created = await storage.createTemplateListing(record);
+    emitChange('templates');
+    res.status(201).json(success(config.nodeId, { listingId: created.id, status: 'pending_review' }));
   });
 
   // ── Parameterized routes ─────────────────────────────────────────
