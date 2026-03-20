@@ -170,6 +170,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
   router.post('/v1/openrouter/test',
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
+      req.setTimeout(600_000);
+      res.setTimeout(600_000);
+
       const encKey = requireEncryption(res);
       if (!encKey) return;
 
@@ -199,6 +202,10 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
   router.post('/v1/openrouter/complete',
     requireAuth(), requireRole('owner'), orRateLimit,
     async (req: Request, res: Response) => {
+      // Extend request timeout to 10 minutes for slow AI models
+      req.setTimeout(600_000);
+      res.setTimeout(600_000);
+
       const encKey = requireEncryption(res);
       if (!encKey) return;
 

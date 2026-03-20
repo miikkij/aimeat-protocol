@@ -59,9 +59,25 @@ import {
 async function runWithAi(projectId, prompt, systemPrompt = null) {
   const body = { projectId, prompt };
   if (systemPrompt) body.systemPrompt = systemPrompt;
-  const resp = await apiPost('/v1/openrouter/complete', body);
-  if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
-  return resp.data.content;
+  // Use direct fetch with 10-minute timeout (apiPost has 30s limit)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 600_000);
+  const headers = { 'Content-Type': 'application/json' };
+  const session = window.AIMEAT?.auth?.getSession?.();
+  if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+  try {
+    const raw = await fetch('/v1/openrouter/complete', {
+      method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal,
+    });
+    const resp = await raw.json();
+    if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
+    return resp.data.content;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('AI request timed out (10 min)');
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /* ── Sub-views ───────────────────────────────────────── */
