@@ -29,9 +29,11 @@
  *   v4.3.0 — 2026-03-19 — Fix CSS bugs, add activity logging for all user actions
  *   v5.0.0 — 2026-03-20 — Remove agent UI components (replaced by OpenRouter autopilot)
  *   v5.1.0 — 2026-03-20 — Add OpenRouter settings UI (collapsible panel for API key, model, auto-retry)
+ *   v5.2.0 — 2026-03-20 — Add autopilot buttons (Run with AI) to each step, auto-retry logic,
+ *     and Run All Steps mode for sequential autopilot execution
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
@@ -51,6 +53,16 @@ import {
   packageProject, updatePackageVersion, detectChanges,
   importPackageToGenerator, publishToGallery,
 } from '/js/services/generator-packaging.js';
+
+/* ── OpenRouter Autopilot Helper ──────────────────────── */
+
+async function runWithAi(projectId, prompt, systemPrompt = null) {
+  const body = { projectId, prompt };
+  if (systemPrompt) body.systemPrompt = systemPrompt;
+  const resp = await apiPost('/v1/openrouter/complete', body);
+  if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
+  return resp.data.content;
+}
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -120,7 +132,7 @@ function ProjectListView({ onSelect, onCreate, showToast, session }) {
   `;
 }
 
-function NewProjectView({ onBack, onCreated, showToast }) {
+function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   const [description, setDescription] = useState('');
   const [phase, setPhase] = useState('describe'); // describe | blueprint | review
   const [project, setProject] = useState(null);
@@ -129,6 +141,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
   const [interviewSpec, setInterviewSpec] = useState('');
   const [interviewErrors, setInterviewErrors] = useState([]);
   const [interviewParsed, setInterviewParsed] = useState(null);
+  const [aiRunning, setAiRunning] = useState(null); // null | 'interview' | 'blueprint'
 
   async function handleAnalyze() {
     if (!description.trim()) return;
@@ -193,6 +206,46 @@ function NewProjectView({ onBack, onCreated, showToast }) {
       showToast?.(t('profile.generator.interviewPromptCopied'));
     }
 
+    async function handleRunInterviewAi() {
+      if (!project) return;
+      setAiRunning('interview');
+      try {
+        const prompt = buildInterviewPrompt(description, getLocale());
+        let content = await runWithAi(project.projectId, prompt);
+        setInterviewSpec(content);
+        // Auto-validate
+        let vr = validateInterviewSpec(content);
+        if (!vr.valid && orSettings?.autoRetry) {
+          const max = orSettings.maxRetries || 3;
+          for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+            showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
+            const correctionPrompt = prompt + '\n\n--- PREVIOUS RESPONSE (HAD ERRORS) ---\n' + content + '\n\n--- VALIDATION ERRORS ---\n' + vr.errors.join('\n') + '\n\nPlease fix these errors and return the corrected response.';
+            content = await runWithAi(project.projectId, correctionPrompt);
+            setInterviewSpec(content);
+            vr = validateInterviewSpec(content);
+          }
+        }
+        if (vr.valid) {
+          setInterviewErrors([]);
+          setInterviewParsed(vr.parsed);
+          await saveInterviewSpec(project.projectId, vr.parsed);
+          await writeProjectLog(project.projectId, 'interview_imported', { meta: { by: 'autopilot' } });
+          await updateProject(project.projectId, {
+            interviewDone: true,
+            enhancedDescription: vr.parsed.description,
+          });
+          showToast?.(t('profile.generator.openrouter.stepComplete'));
+          setPhase('blueprint');
+        } else {
+          setInterviewErrors(vr.errors);
+          showToast?.(t('profile.generator.openrouter.stepFailed'), true);
+        }
+      } catch (e) {
+        showToast?.(e.message, true);
+      }
+      setAiRunning(null);
+    }
+
     async function handleSubmitSpec() {
       const vr = validateInterviewSpec(interviewSpec);
       if (!vr.valid) {
@@ -227,9 +280,20 @@ function NewProjectView({ onBack, onCreated, showToast }) {
 
         <div class="pf-gen-section">
           <label>${t('profile.generator.interviewPrompt')}</label>
-          <button class="btn-primary" onClick=${handleCopyInterviewPrompt}>
-            ${t('profile.generator.copyPrompt')}
-          </button>
+          <div class="pf-gen-or-btn-row">
+            <button class="btn-primary" onClick=${handleCopyInterviewPrompt}>
+              ${t('profile.generator.copyPrompt')}
+            </button>
+            ${orSettings?.hasApiKey && html`
+              <button class="btn-outline pf-gen-or-run-btn ${aiRunning === 'interview' ? 'pf-gen-or-running' : ''}"
+                onClick=${handleRunInterviewAi}
+                disabled=${aiRunning !== null}>
+                ${aiRunning === 'interview'
+                  ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.openrouter.waiting')}`
+                  : t('profile.generator.openrouter.runWithAi')}
+              </button>
+            `}
+          </div>
         </div>
 
         <div class="pf-gen-section">
@@ -262,6 +326,61 @@ function NewProjectView({ onBack, onCreated, showToast }) {
     `;
   }
 
+  async function handleRunBlueprintAi() {
+    if (!project) return;
+    setAiRunning('blueprint');
+    try {
+      let cortexLibs = null;
+      try {
+        const resp = await apiGet('/v1/cortex');
+        if (resp.ok !== false && resp.data?.extensions) {
+          cortexLibs = resp.data.extensions
+            .filter(e => e.status === 'active')
+            .map(e => ({ name: e.name, description: e.description, components: e.components }));
+        }
+      } catch { /* proceed without catalog */ }
+      const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
+      let content = await runWithAi(project.projectId, prompt);
+      setBlueprintResult(content);
+      // Auto-validate
+      let vr = validateBlueprint(content);
+      if (!vr.valid && orSettings?.autoRetry) {
+        const max = orSettings.maxRetries || 3;
+        for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+          showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
+          const fixPrompt = buildBlueprintFixPrompt(description, vr.errors, interviewParsed);
+          content = await runWithAi(project.projectId, fixPrompt);
+          setBlueprintResult(content);
+          vr = validateBlueprint(content);
+        }
+      }
+      if (vr.valid) {
+        setBlueprintErrors([]);
+        await updateProject(project.projectId, { blueprint: vr.parsed, status: 'in_progress' });
+        await writeProjectLog(project.projectId, 'blueprint_imported', { meta: { componentCount: vr.parsed.components.length, by: 'autopilot' } });
+        const existing = await loadAllComponents(project.projectId);
+        const existingIds = new Set(existing.map(c => c.id));
+        for (const comp of vr.parsed.components) {
+          if (existingIds.has(comp.id)) continue;
+          await saveComponent(project.projectId, {
+            id: comp.id, type: comp.type, label: comp.label,
+            status: 'not_started', prompt: null, result: null,
+            validationErrors: [], registeredAs: null, history: [],
+            _version: 0,
+          });
+        }
+        showToast?.(t('profile.generator.openrouter.stepComplete'));
+        onCreated({ ...project, blueprint: vr.parsed });
+      } else {
+        setBlueprintErrors(vr.errors);
+        showToast?.(t('profile.generator.openrouter.stepFailed'), true);
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setAiRunning(null);
+  }
+
   if (phase === 'blueprint') {
     const fixPrompt = blueprintErrors.length > 0
       ? buildBlueprintFixPrompt(description, blueprintErrors, interviewParsed)
@@ -273,9 +392,20 @@ function NewProjectView({ onBack, onCreated, showToast }) {
         <div class="section-desc">${t('profile.generator.blueprintDesc')}</div>
         <div class="pf-gen-section">
           <label>${t('profile.generator.prompt')}</label>
-          <button class="btn-primary" onClick=${handleCopyBlueprintPrompt}>
-            ${t('profile.generator.copyPrompt')}
-          </button>
+          <div class="pf-gen-or-btn-row">
+            <button class="btn-primary" onClick=${handleCopyBlueprintPrompt}>
+              ${t('profile.generator.copyPrompt')}
+            </button>
+            ${orSettings?.hasApiKey && html`
+              <button class="btn-outline pf-gen-or-run-btn ${aiRunning === 'blueprint' ? 'pf-gen-or-running' : ''}"
+                onClick=${handleRunBlueprintAi}
+                disabled=${aiRunning !== null}>
+                ${aiRunning === 'blueprint'
+                  ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.openrouter.waiting')}`
+                  : t('profile.generator.openrouter.runWithAi')}
+              </button>
+            `}
+          </div>
         </div>
         <div class="pf-gen-section">
           <label>${t('profile.generator.blueprintResult')}</label>
@@ -331,12 +461,17 @@ function NewProjectView({ onBack, onCreated, showToast }) {
   `;
 }
 
-function ProjectDashboard({ projectId, onBack, session, showToast }) {
+function ProjectDashboard({ projectId, onBack, session, showToast, orSettings }) {
   const [project, setProject] = useState(null);
   const [components, setComponents] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
   const { confirm, ConfirmUI } = useConfirm();
+
+  // Autopilot state
+  const [autopilotRunning, setAutopilotRunning] = useState(false);
+  const [currentAutopilotStep, setCurrentAutopilotStep] = useState('');
+  const autopilotCancelledRef = useRef(false);
 
   // Phase 5: Lifecycle state
   const [liveStatuses, setLiveStatuses] = useState({});
@@ -620,6 +755,134 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     }
   }, [components.length]);
 
+  // Autopilot: Run all remaining steps
+  async function handleRunAll() {
+    if (!orSettings?.hasApiKey || autopilotRunning) return;
+    setAutopilotRunning(true);
+    autopilotCancelledRef.current = false;
+
+    try {
+      // Iterate through all components in phase order
+      for (const cid of phaseOrder) {
+        if (autopilotCancelledRef.current) break;
+        const comp = components.find(c => c.id === cid);
+        if (!comp || comp.registeredAs) continue; // skip already registered
+
+        setCurrentAutopilotStep(comp.label);
+        setSelectedId(cid);
+
+        // Build prompt
+        const latestComps = await loadAllComponents(projectId);
+        const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
+        const prompt = buildComponentPrompt(
+          comp.type, comp.label,
+          project.description, project.blueprint, completedComponents,
+          interviewSpec,
+        );
+
+        // Run AI
+        let content;
+        try {
+          content = await runWithAi(projectId, prompt);
+        } catch (e) {
+          showToast?.(`${comp.label}: ${e.message}`, true);
+          break;
+        }
+        if (autopilotCancelledRef.current) break;
+
+        // Save result
+        let updated = { ...comp, result: content, status: 'validating', prompt,
+          history: [...(comp.history || []), { action: 'ai_response_received', at: new Date().toISOString(), by: 'autopilot' }],
+        };
+        await saveComponent(projectId, updated);
+
+        // Validate
+        let vr = validateComponent(comp.type, content, project.blueprint);
+
+        // Auto-retry if enabled
+        if (!vr.valid && orSettings?.autoRetry) {
+          const max = orSettings.maxRetries || 3;
+          for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+            if (autopilotCancelledRef.current) break;
+            setCurrentAutopilotStep(
+              comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
+            );
+            const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
+            try {
+              content = await runWithAi(projectId, fixPrompt);
+            } catch (e) {
+              showToast?.(`${comp.label}: ${e.message}`, true);
+              break;
+            }
+            vr = validateComponent(comp.type, content, project.blueprint);
+          }
+        }
+
+        if (!vr.valid) {
+          updated = { ...updated, result: content, status: 'errors', validationErrors: vr.errors,
+            history: [...updated.history, { action: 'validation_failed', at: new Date().toISOString(), by: 'autopilot', errors: vr.errors }],
+          };
+          await saveComponent(projectId, updated);
+          await loadData();
+          showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
+          break;
+        }
+        if (autopilotCancelledRef.current) break;
+
+        // Validation passed — save and register
+        updated = { ...updated, result: content, status: 'done', validationErrors: [],
+          history: [...updated.history, { action: 'validation_passed', at: new Date().toISOString(), by: 'autopilot' }],
+        };
+        await saveComponent(projectId, updated);
+
+        // Register component
+        try {
+          const extComp = (await loadAllComponents(projectId)).find(c => c.type === 'extension' && c.registeredAs);
+          const csmComp = (await loadAllComponents(projectId)).find(c => c.type === 'csm' && c.registeredAs);
+          const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
+
+          let resp;
+          if (comp.type === 'cortex') {
+            const cortexVr = validateComponent('cortex', content, project.blueprint);
+            resp = await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
+          } else {
+            resp = await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
+          }
+          const d = resp?.data || {};
+          const regName = d.csm?.name || d.integration?.name || d.extension?.name
+            || d.filename || d.name || d.id
+            || (d.locales ? `i18n-${d.locales.join('-')}` : null)
+            || (d.keys?.length ? `memory:${d.keys[d.keys.length - 1]}` : null)
+            || null;
+          if (regName) {
+            updated = { ...updated, registeredAs: regName,
+              history: [...updated.history, { action: 'registered', at: new Date().toISOString(), by: 'autopilot', registeredAs: regName }],
+            };
+            await saveComponent(projectId, updated);
+            await writeProjectLog(projectId, 'component_registered', { meta: { component: comp.label, registeredAs: regName, by: 'autopilot' } });
+          }
+        } catch (e) {
+          showToast?.(`${comp.label}: Registration failed: ${e.message}`, true);
+          await loadData();
+          break;
+        }
+
+        await loadData();
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+
+    setAutopilotRunning(false);
+    setCurrentAutopilotStep('');
+    await loadData();
+  }
+
+  function handleCancelAutopilot() {
+    autopilotCancelledRef.current = true;
+    setCurrentAutopilotStep(t('profile.generator.openrouter.cancel') + '...');
+  }
+
   // Phase 7: Diagnostics data
   const diagnosticsData = components.map(c => {
     const live = liveStatuses[c.id] || {};
@@ -677,6 +940,29 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         <p class="pf-gen-package-link text-caption mb-half">
           Package: ${project.packageGroupId}${project.lastPackagedVersion ? ' — ' + project.lastPackagedVersion : ''}
         </p>
+      `}
+
+      <!-- Autopilot: Run All Steps -->
+      ${orSettings?.hasApiKey && components.length > 0 && html`
+        <div class="pf-gen-or-run-all-bar">
+          ${autopilotRunning
+            ? html`
+              <div class="pf-gen-or-run-all-status">
+                <span class="pf-gen-or-spinner"></span>
+                <span>${currentAutopilotStep}</span>
+              </div>
+              <button class="btn-danger btn-sm" onClick=${handleCancelAutopilot}>
+                ${t('profile.generator.openrouter.cancel')}
+              </button>
+            `
+            : html`
+              <button class="btn-primary btn-sm" onClick=${handleRunAll}
+                disabled=${components.every(c => c.registeredAs)}>
+                ${t('profile.generator.openrouter.runAll')}
+              </button>
+            `
+          }
+        </div>
       `}
 
       <!-- Phase 5: Lifecycle Toolbar -->
@@ -978,6 +1264,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                 onAdvance=${advanceToNext}
                 showToast=${showToast}
                 session=${session}
+                orSettings=${orSettings}
               />`
             : html`<div class="pf-gen-detail-empty">${t('profile.generator.selectComponent')}</div>`
           }
@@ -1038,10 +1325,11 @@ function StepArrow({ direction = 'right' } = {}) {
   </svg>`;
 }
 
-function ComponentDetail({ component, project, components, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session }) {
+function ComponentDetail({ component, project, components, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session, orSettings }) {
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
   const [registering, setRegistering] = useState(false);
+  const [aiRunning, setAiRunning] = useState(false);
   const resultRef = { current: null };
 
   useEffect(() => {
@@ -1209,6 +1497,50 @@ function ComponentDetail({ component, project, components, projectId, interviewS
     } catch { /* clipboard fallback */ }
   }
 
+  async function handleRunComponentAi() {
+    setAiRunning(true);
+    try {
+      const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
+      const fresh = buildComponentPrompt(
+        component.type, component.label,
+        project.description, project.blueprint, completedComps,
+        interviewSpec,
+      );
+      let content = await runWithAi(projectId, fresh);
+      setResult(content);
+
+      // Validate
+      let vr = validateComponent(component.type, content, project.blueprint);
+
+      // Auto-retry if enabled
+      if (!vr.valid && orSettings?.autoRetry) {
+        const max = orSettings.maxRetries || 3;
+        for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+          showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
+          const fp = buildFixPrompt(fresh, content, vr.errors, component.type);
+          content = await runWithAi(projectId, fp);
+          setResult(content);
+          vr = validateComponent(component.type, content, project.blueprint);
+        }
+      }
+
+      setValidationResult(vr);
+      if (vr.valid) {
+        const done = addHistory(component, 'validation_passed', { by: 'autopilot' });
+        await saveComponent(projectId, { ...done, status: 'done', result: content, validationErrors: [], prompt: fresh });
+        showToast?.(t('profile.generator.openrouter.stepComplete'));
+      } else {
+        const errored = addHistory(component, 'validation_failed', { errors: vr.errors, by: 'autopilot' });
+        await saveComponent(projectId, { ...errored, status: 'errors', result: content, validationErrors: vr.errors, prompt: fresh });
+        showToast?.(t('profile.generator.openrouter.stepFailed'), true);
+      }
+      onUpdate();
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setAiRunning(false);
+  }
+
   const fixPrompt = validationResult && !validationResult.valid
     ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
     : null;
@@ -1231,6 +1563,15 @@ function ComponentDetail({ component, project, components, projectId, interviewS
             title=${t('profile.generator.copyPromptHint')}>
             ${t('profile.generator.copyPrompt')}
           </button>
+          ${orSettings?.hasApiKey && html`
+            <button class="btn-outline btn-sm pf-gen-or-run-btn ${aiRunning ? 'pf-gen-or-running' : ''}"
+              onClick=${handleRunComponentAi}
+              disabled=${aiRunning || component.registeredAs}>
+              ${aiRunning
+                ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.openrouter.waiting')}`
+                : t('profile.generator.openrouter.runWithAi')}
+            </button>
+          `}
           <button class="btn-ghost btn-sm" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint')}>
             ${'↻ ' + (t('profile.generator.regeneratePrompt'))}
           </button>
@@ -1299,7 +1640,7 @@ function ComponentDetail({ component, project, components, projectId, interviewS
 
 /* ── OpenRouter Settings ─────────────────────────────── */
 
-function OpenRouterSettings() {
+function OpenRouterSettings({ onSettingsChange }) {
   const [collapsed, setCollapsed] = useState(true);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
@@ -1328,6 +1669,13 @@ function OpenRouterSettings() {
     } catch { /* no settings yet */ }
     setLoaded(true);
   }
+
+  // Notify parent whenever key settings change
+  useEffect(() => {
+    if (loaded && onSettingsChange) {
+      onSettingsChange({ hasApiKey: hasApiKey, autoRetry, maxRetries });
+    }
+  }, [loaded, hasApiKey, autoRetry, maxRetries]);
 
   async function loadModels() {
     setModelsLoading(true);
@@ -1501,6 +1849,7 @@ export default function GeneratorTab({ session, showToast }) {
   const [view, setView] = useState('list');
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [generatorEnabled, setGeneratorEnabled] = useState(true);
+  const [orSettings, setOrSettings] = useState({ hasApiKey: false, autoRetry: false, maxRetries: 3 });
 
   useEffect(() => {
     apiGet('/?format=json').then(resp => {
@@ -1526,7 +1875,7 @@ export default function GeneratorTab({ session, showToast }) {
   }
 
   if (view === 'new') {
-    return html`<${NewProjectView} onBack=${() => setView('list')} onCreated=${handleCreated} showToast=${showToast} />`;
+    return html`<${NewProjectView} onBack=${() => setView('list')} onCreated=${handleCreated} showToast=${showToast} orSettings=${orSettings} />`;
   }
   if (view === 'dashboard' && activeProjectId) {
     return html`<${ProjectDashboard}
@@ -1534,11 +1883,12 @@ export default function GeneratorTab({ session, showToast }) {
       onBack=${() => { setView('list'); setActiveProjectId(null); }}
       session=${session}
       showToast=${showToast}
+      orSettings=${orSettings}
     />`;
   }
   return html`
     <div>
-      <${OpenRouterSettings} />
+      <${OpenRouterSettings} onSettingsChange=${setOrSettings} />
       <${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} showToast=${showToast} session=${session} />
     </div>
   `;
