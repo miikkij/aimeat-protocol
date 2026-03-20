@@ -375,6 +375,7 @@
 .pf .pkg-upload-btn{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.8rem}
 .pf .pkg-hidden-input{display:none}
 .pf .pkg-rejection{font-size:.8rem;color:var(--danger,#ef4444);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:.5rem .75rem;margin-bottom:.5rem}
+.pf .pkg-remote-header{margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border,#e5e7eb)}
 @media(max-width:600px){
   .pf .pkg-grid{grid-template-columns:1fr}
   .pf .pkg-filters{flex-direction:column}

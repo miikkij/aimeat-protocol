@@ -4036,7 +4036,8 @@
       "remoteTemplates": "Etämallit",
       "syncFromFederation": "Synkronoi federaatiosta",
       "sourceNode": "Lähdesolmu",
-      "installFromRemote": "Asenna etäsolmusta"
+      "installFromRemote": "Asenna etäsolmusta",
+      "syncSuccess": "Federaatiosynkronointi valmis"
     },
     "gallery": {
       "install": "Asenna",

@@ -4036,7 +4036,8 @@
       "remoteTemplates": "Remote Templates",
       "syncFromFederation": "Sync from Federation",
       "sourceNode": "Source Node",
-      "installFromRemote": "Install from Remote"
+      "installFromRemote": "Install from Remote",
+      "syncSuccess": "Federation sync complete"
     },
     "gallery": {
       "install": "Install",

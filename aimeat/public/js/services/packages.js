@@ -15,6 +15,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-20 — add exportPackageZip, importPackageZip, proposeAsTemplate
+ *   v1.2.0 — 2026-03-20 — add syncFederationTemplates, listFederationTemplates
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 
@@ -79,6 +80,10 @@ export async function importPackageZip(file) {
 
 // ── Template Proposals ──
 export const proposeAsTemplate = (groupId) => apiPost(`/v1/packages/${enc(groupId)}/propose`, {});
+
+// ── Federation Templates ──
+export const syncFederationTemplates = () => apiPost('/v1/federation/templates/sync', {});
+export const listFederationTemplates = (params) => apiGet('/v1/federation/templates' + buildQuery(params));
 
 // ── Helpers ──
 const enc = (s) => encodeURIComponent(s);
