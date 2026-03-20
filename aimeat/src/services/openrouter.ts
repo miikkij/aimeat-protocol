@@ -93,5 +93,5 @@ export async function listModels(apiKey: string): Promise<OpenRouterModel[]> {
     description: m.description,
     context_length: m.context_length,
     pricing: m.pricing,
-  }));
+  })).sort((a, b) => a.name.localeCompare(b.name));
 }
