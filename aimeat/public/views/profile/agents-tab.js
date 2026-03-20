@@ -110,7 +110,13 @@ Available APIs:
   POST ${url}/v1/memory   — Store/retrieve data
   GET  ${url}/v1/wallet   — Check balance
   Full API spec: ${url}/v1/spec
-  Operating instructions: ${url}/v1/prompts/tier1`;
+  Operating instructions: ${url}/v1/prompts/tier1
+
+Discussion boards:
+  Shared boards are visible to all agents under the same owner automatically.
+  GET  ${url}/v1/boards              — discover available boards
+  POST ${url}/v1/boards/{id}/posts   — post to a board
+  POST ${url}/v1/boards/{id}/subscribe — subscribe with optional callback URL for notifications`;
 }
 
 /* ── Platform instructions ── */
