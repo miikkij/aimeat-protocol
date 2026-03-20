@@ -116,6 +116,8 @@ tags:
     description: Template gallery, reviews, discussions
   - name: Generator
     description: Agent-driven service generation pipeline. Endpoints allow AI agents to autonomously create and configure AIMEAT services on behalf of a user.
+  - name: OpenRouter
+    description: OpenRouter AI integration for automated generator steps. Owner-only endpoints.
 
 components:
   securitySchemes:
@@ -13315,37 +13317,6 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /v1/generator/my-assignments:
-    get:
-      summary: Poll for assigned generator projects
-      description: Returns projects where the calling agent has an active session assignment. Agents call this every 10-15 seconds instead of using SSE.
-      tags:
-        - Generator
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of assignments (may be empty)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  data:
-                    type: object
-                    properties:
-                      assignments:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            projectId:
-                              type: string
-                            session:
-                              type: object
-
   /v1/generator/{projectId}:
     get:
       operationId: getGeneratorProject
@@ -13444,167 +13415,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
-
-  /v1/generator/{projectId}/session/claim:
-    post:
-      operationId: claimGeneratorSession
-      summary: Claim a generator execution session
-      description: |
-        Agent claims the execution session for a project. Verifies the agent has the
-        `generator` capability. Returns 409 SESSION_BUSY if another agent holds a fresh
-        session (heartbeat within last 5 minutes). Uses atomic setMemoryIfVersion when
-        available to prevent race conditions. Requires generator:execute scope.
-      tags: [Generator]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: projectId
-          in: path
-          required: true
-          schema: { type: string }
-          description: Project ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [agentGaii, agentName]
-              properties:
-                agentGaii:
-                  type: string
-                  description: Full GAII of the agent claiming the session (e.g. "claude#alice@aimeat-node")
-                agentName:
-                  type: string
-                  description: Human-readable display name of the agent
-      responses:
-        '200':
-          description: Session successfully claimed
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          claimed: { type: boolean }
-                          expiresAt: { type: string, format: date-time }
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          description: SESSION_BUSY - another agent holds an active session for this project
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
-
-  /v1/generator/{projectId}/session/heartbeat:
-    post:
-      operationId: generatorSessionHeartbeat
-      summary: Send agent heartbeat to keep session alive
-      description: |
-        Called by the agent every 60 seconds while working. Resets the session TTL (5 minutes).
-        Optionally updates progress fields (phase, componentId, stepNumber, totalSteps) so the
-        UI can show which component is being generated. Returns 404 SESSION_RELEASED if the
-        session has been deleted — the agent must halt on this response.
-        Requires generator:execute scope.
-      tags: [Generator]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: projectId
-          in: path
-          required: true
-          schema: { type: string }
-          description: Project ID
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                phase:
-                  type: string
-                  description: Current generation phase (e.g. "generating", "validating", "done")
-                componentId:
-                  type: string
-                  nullable: true
-                  description: ID of the component currently being generated
-                stepNumber:
-                  type: integer
-                  description: Current step index
-                totalSteps:
-                  type: integer
-                  description: Total number of steps
-      responses:
-        '200':
-          description: Heartbeat accepted, session extended
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          ok: { type: boolean }
-                          expiresAt: { type: string, format: date-time }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          description: SESSION_RELEASED - session no longer exists, agent should halt
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
-
-  /v1/generator/{projectId}/session:
-    delete:
-      operationId: releaseGeneratorSession
-      summary: Release generator execution session
-      description: |
-        Releases the execution session for a project. Called by the UI's stop button or
-        by the agent when it has finished. The next heartbeat from a running agent will
-        receive SESSION_RELEASED and halt. Requires generator:execute scope.
-      tags: [Generator]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: projectId
-          in: path
-          required: true
-          schema: { type: string }
-          description: Project ID
-      responses:
-        '200':
-          description: Session released
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          released: { type: boolean }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
 
   /v1/generator/{projectId}/steps/blueprint:
     post:
@@ -13857,3 +13667,319 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+
+  # -- OpenRouter -----------------------------------------------
+  /v1/openrouter/settings:
+    put:
+      operationId: saveOpenRouterSettings
+      summary: Save OpenRouter API key and preferences
+      description: Save API key and preferences for OpenRouter integration. Owner-only.
+      tags: [OpenRouter]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+                  description: OpenRouter API key
+                model:
+                  type: string
+                  description: Default model to use (e.g. openai/gpt-4o)
+                autoRetry:
+                  type: boolean
+                  description: Whether to automatically retry failed completions
+                maxRetries:
+                  type: integer
+                  description: Maximum number of retry attempts
+      responses:
+        '200':
+          description: Settings saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          saved: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Encryption not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+    get:
+      operationId: getOpenRouterSettings
+      summary: Get OpenRouter settings (API key not returned)
+      description: Get current OpenRouter settings. The API key is never returned for security. Owner-only.
+      tags: [OpenRouter]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          hasApiKey:
+                            type: boolean
+                            description: Whether an API key has been saved
+                          model:
+                            type: string
+                            nullable: true
+                            description: Currently configured default model
+                          autoRetry:
+                            type: boolean
+                            description: Whether auto-retry is enabled
+                          maxRetries:
+                            type: integer
+                            description: Maximum retry count
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Encryption not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+    delete:
+      operationId: deleteOpenRouterSettings
+      summary: Remove OpenRouter API key and settings
+      description: Permanently removes the stored API key and all OpenRouter settings. Owner-only.
+      tags: [OpenRouter]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Settings deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/openrouter/models:
+    get:
+      operationId: listOpenRouterModels
+      summary: List available OpenRouter models
+      description: Fetches the list of available models from OpenRouter using the configured API key. Owner-only.
+      tags: [OpenRouter]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          models:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  description: Model identifier (e.g. openai/gpt-4o)
+                                name:
+                                  type: string
+                                  description: Human-readable model name
+                                description:
+                                  type: string
+                                  description: Model description
+                                context_length:
+                                  type: integer
+                                  description: Maximum context window in tokens
+                                pricing:
+                                  type: object
+                                  properties:
+                                    prompt:
+                                      type: string
+                                      description: Cost per prompt token
+                                    completion:
+                                      type: string
+                                      description: Cost per completion token
+        '400':
+          description: No API key configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          description: Encryption not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/openrouter/test:
+    post:
+      operationId: testOpenRouterKey
+      summary: Test OpenRouter API key validity
+      description: Sends a minimal test request to OpenRouter to verify the stored API key is valid. Owner-only.
+      tags: [OpenRouter]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: API key is valid
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok:
+                            type: boolean
+                          model:
+                            type: string
+                            description: Model used for the test request
+        '400':
+          description: No API key configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          description: Encryption not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/openrouter/complete:
+    post:
+      operationId: openRouterComplete
+      summary: Run AI completion via OpenRouter
+      description: |
+        Sends a prompt to OpenRouter and returns the AI completion. Used by the generator
+        pipeline to automate steps without requiring the user to copy/paste to an AI chat.
+        Owner-only.
+      tags: [OpenRouter]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [projectId, prompt]
+              properties:
+                projectId:
+                  type: string
+                  description: Generator project ID for context and logging
+                prompt:
+                  type: string
+                  description: The user prompt to send to the AI model
+                systemPrompt:
+                  type: string
+                  description: Optional system prompt to prepend
+                model:
+                  type: string
+                  description: Override the default model for this request
+      responses:
+        '200':
+          description: Completion result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          content:
+                            type: string
+                            description: The AI model's response text
+                          model:
+                            type: string
+                            description: The model that produced the response
+        '400':
+          description: Invalid request body or no API key configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '429':
+          description: Rate limited by OpenRouter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '502':
+          description: OpenRouter returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          description: Encryption not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
