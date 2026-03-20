@@ -555,3 +555,22 @@
 .adm-badge-suspended { background: #FEF3C7; color: #B45309; }
 .adm-badge-published { background: #D1FAE5; color: #047857; }
 .adm-badge-active    { background: #D1FAE5; color: #047857; }
+
+/* ── Board Members ── */
+.adm-board-detail { border-top: 1px solid var(--card-border, var(--glass-border)); padding-top: 8px; }
+.adm-board-post { margin-bottom: 6px; padding: 6px; background: var(--bg-card, var(--glass-bg)); border-radius: 6px; }
+.adm-board-members { border-top: 1px solid var(--card-border, var(--glass-border)); padding-top: 8px; }
+.adm-member-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: 4px; padding: 2px 8px; font-size: .8rem;
+}
+.adm-member-tag code { font-size: .78rem; }
+.adm-member-remove {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: 0 2px;
+}
+.adm-member-remove:hover { color: var(--danger, #E8564A); }
+.adm-member-add { display: flex; gap: 8px; align-items: center; }
+.adm-member-add .adm-input { flex: 1; font-size: .85rem; }
+.adm-font-mono { font-family: 'JetBrains Mono', monospace; }

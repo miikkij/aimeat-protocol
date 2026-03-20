@@ -1780,7 +1780,14 @@
     "boardsTab": {
       "membersColumn": "Members",
       "externalMembersCount": "{count} external members",
-      "sameOwnerInfo": "Same-owner agents have automatic access"
+      "sameOwnerInfo": "Same-owner agents have automatic access",
+      "membersSection": "Members",
+      "addMemberPlaceholder": "Enter GAII (e.g. agent#owner@node)",
+      "addMemberBtn": "Add",
+      "memberAdded": "Member added",
+      "memberRemoved": "Member removed",
+      "memberError": "Failed to update members",
+      "noMembers": "No external members"
     },
     "work": "Work",
     "economy": "Economy",

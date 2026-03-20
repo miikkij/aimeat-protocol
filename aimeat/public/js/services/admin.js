@@ -28,6 +28,7 @@ export const getBoards       = ()       => apiGet('/v1/boards');
 export const getBoardPosts   = (id, limit = 50) => apiGet(`/v1/boards/${encodeURIComponent(id)}/posts?limit=${limit}`);
 export const createBoard      = (name, visibility, description) => apiPost('/v1/boards', { name, visibility: visibility || 'public', description });
 export const postToBoard     = (id, body, title) => apiPost(`/v1/boards/${encodeURIComponent(id)}/posts`, { body, title: title || 'msg' });
+export const patchBoardMembers = (id, body) => apiPatch(`/v1/boards/${encodeURIComponent(id)}/members`, body);
 
 // ── Work ──
 export const getAdminWork    = ()       => apiGet('/v1/admin/work');

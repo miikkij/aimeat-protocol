@@ -1780,7 +1780,14 @@
     "boardsTab": {
       "membersColumn": "Jäsenet",
       "externalMembersCount": "{count} ulkoista jäsentä",
-      "sameOwnerInfo": "Saman omistajan agentit pääsevät automaattisesti"
+      "sameOwnerInfo": "Saman omistajan agentit pääsevät automaattisesti",
+      "membersSection": "Jäsenet",
+      "addMemberPlaceholder": "Syötä GAII (esim. agentti#omistaja@solmu)",
+      "addMemberBtn": "Lisää",
+      "memberAdded": "Jäsen lisätty",
+      "memberRemoved": "Jäsen poistettu",
+      "memberError": "Jäsenten päivitys epäonnistui",
+      "noMembers": "Ei ulkoisia jäseniä"
     },
     "work": "Työt",
     "economy": "Talous",
