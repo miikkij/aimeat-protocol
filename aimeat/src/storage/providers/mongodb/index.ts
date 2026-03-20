@@ -4446,6 +4446,12 @@ export class MongoStorage implements Storage {
                 status: record.status,
                 createdAt: new Date(record.createdAt),
                 updatedAt: new Date(record.updatedAt),
+                ...(record.rejectionReason !== undefined ? { rejectionReason: record.rejectionReason } : {}),
+                ...(record.reviewedBy !== undefined ? { reviewedBy: record.reviewedBy } : {}),
+                ...(record.reviewedAt !== undefined ? { reviewedAt: new Date(record.reviewedAt) } : {}),
+                ...(record.reviewComment !== undefined ? { reviewComment: record.reviewComment } : {}),
+                ...(record.proposedAt !== undefined ? { proposedAt: new Date(record.proposedAt) } : {}),
+                ...(record.proposedBy !== undefined ? { proposedBy: record.proposedBy } : {}),
             },
         });
         return this.toTemplateListingRecord(row);
@@ -4507,6 +4513,12 @@ export class MongoStorage implements Storage {
         if (updates.tags !== undefined) data.tags = updates.tags;
         if (updates.featured !== undefined) data.featured = updates.featured;
         if (updates.status !== undefined) data.status = updates.status;
+        if (updates.rejectionReason !== undefined) data.rejectionReason = updates.rejectionReason;
+        if (updates.reviewedBy !== undefined) data.reviewedBy = updates.reviewedBy;
+        if (updates.reviewedAt !== undefined) data.reviewedAt = new Date(updates.reviewedAt);
+        if (updates.reviewComment !== undefined) data.reviewComment = updates.reviewComment;
+        if (updates.proposedAt !== undefined) data.proposedAt = new Date(updates.proposedAt);
+        if (updates.proposedBy !== undefined) data.proposedBy = updates.proposedBy;
         data.updatedAt = new Date();
         try {
             const row = await this.prisma.templateListing.update({ where: { id }, data });
@@ -4534,6 +4546,17 @@ export class MongoStorage implements Storage {
             where: { id: listingId },
             data: { installCount: { increment: 1 } },
         });
+    }
+
+    async listPendingTemplates(limit = 20, offset = 0): Promise<TemplateListingRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.templateListing.findMany({
+            where: { status: 'pending_review' },
+            orderBy: { createdAt: 'asc' },
+            skip: offset,
+            take: limit,
+        });
+        return rows.map((r: any) => this.toTemplateListingRecord(r));
     }
 
     // ── Reviews ──
@@ -4701,6 +4724,12 @@ export class MongoStorage implements Storage {
             status: row.status ?? 'listed',
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+            ...(row.rejectionReason ? { rejectionReason: row.rejectionReason } : {}),
+            ...(row.reviewedBy ? { reviewedBy: row.reviewedBy } : {}),
+            ...(row.reviewedAt ? { reviewedAt: row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt } : {}),
+            ...(row.reviewComment ? { reviewComment: row.reviewComment } : {}),
+            ...(row.proposedAt ? { proposedAt: row.proposedAt instanceof Date ? row.proposedAt.toISOString() : row.proposedAt } : {}),
+            ...(row.proposedBy ? { proposedBy: row.proposedBy } : {}),
         };
     }
 

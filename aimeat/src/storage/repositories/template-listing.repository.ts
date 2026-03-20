@@ -7,6 +7,7 @@
  * @usage import type { TemplateListingRepository } from './template-listing.repository.js';
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 1 storage layer)
+ *   v1.1.0 — 2026-03-20 — add listPendingTemplates method for moderation workflow
  */
 
 import type { TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter } from '../interface.js';
@@ -20,6 +21,7 @@ export interface TemplateListingRepository {
   updateTemplateListing(id: string, updates: Partial<TemplateListingRecord>): Promise<TemplateListingRecord | null>;
   deleteTemplateListing(id: string): Promise<boolean>;
   incrementInstallCount(listingId: string): Promise<void>;
+  listPendingTemplates(limit?: number, offset?: number): Promise<TemplateListingRecord[]>;
 
   // ── Reviews (separate table) ──
   addReview(review: TemplateReview): Promise<TemplateReview>;

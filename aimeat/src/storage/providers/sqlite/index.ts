@@ -4883,6 +4883,12 @@ export class SqliteStorage implements Storage {
       status: row.status as TemplateListingRecord['status'],
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
+      ...(row.rejectionReason ? { rejectionReason: row.rejectionReason as string } : {}),
+      ...(row.reviewedBy ? { reviewedBy: row.reviewedBy as string } : {}),
+      ...(row.reviewedAt ? { reviewedAt: row.reviewedAt as string } : {}),
+      ...(row.reviewComment ? { reviewComment: row.reviewComment as string } : {}),
+      ...(row.proposedAt ? { proposedAt: row.proposedAt as string } : {}),
+      ...(row.proposedBy ? { proposedBy: row.proposedBy as string } : {}),
     };
   }
 
@@ -4912,14 +4918,16 @@ export class SqliteStorage implements Storage {
 
   async createTemplateListing(record: TemplateListingRecord): Promise<TemplateListingRecord> {
     this.db.prepare(
-      `INSERT INTO template_listings (id, packageGroupId, packageName, packageAuthor, publishedBy, publishedByGhii, title, description, screenshots, category, tags, featured, installCount, rating, reviewCount, status, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO template_listings (id, packageGroupId, packageName, packageAuthor, publishedBy, publishedByGhii, title, description, screenshots, category, tags, featured, installCount, rating, reviewCount, status, createdAt, updatedAt, rejectionReason, reviewedBy, reviewedAt, reviewComment, proposedAt, proposedBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.packageGroupId, record.packageName, record.packageAuthor,
       record.publishedBy, record.publishedByGhii, record.title, record.description,
       JSON.stringify(record.screenshots), record.category, JSON.stringify(record.tags),
       record.featured ? 1 : 0, record.installCount, record.rating, record.reviewCount,
       record.status, record.createdAt, record.updatedAt,
+      record.rejectionReason ?? null, record.reviewedBy ?? null, record.reviewedAt ?? null,
+      record.reviewComment ?? null, record.proposedAt ?? null, record.proposedBy ?? null,
     );
     return record;
   }
@@ -4982,13 +4990,16 @@ export class SqliteStorage implements Storage {
       `UPDATE template_listings SET packageGroupId = ?, packageName = ?, packageAuthor = ?,
        publishedBy = ?, publishedByGhii = ?, title = ?, description = ?, screenshots = ?,
        category = ?, tags = ?, featured = ?, installCount = ?, rating = ?, reviewCount = ?,
-       status = ?, updatedAt = ? WHERE id = ?`
+       status = ?, updatedAt = ?, rejectionReason = ?, reviewedBy = ?, reviewedAt = ?,
+       reviewComment = ?, proposedAt = ?, proposedBy = ? WHERE id = ?`
     ).run(
       merged.packageGroupId, merged.packageName, merged.packageAuthor,
       merged.publishedBy, merged.publishedByGhii, merged.title, merged.description,
       JSON.stringify(merged.screenshots), merged.category, JSON.stringify(merged.tags),
       merged.featured ? 1 : 0, merged.installCount, merged.rating, merged.reviewCount,
-      merged.status, merged.updatedAt, id,
+      merged.status, merged.updatedAt, merged.rejectionReason ?? null,
+      merged.reviewedBy ?? null, merged.reviewedAt ?? null, merged.reviewComment ?? null,
+      merged.proposedAt ?? null, merged.proposedBy ?? null, id,
     );
     return merged;
   }
@@ -5002,6 +5013,13 @@ export class SqliteStorage implements Storage {
 
   async incrementInstallCount(listingId: string): Promise<void> {
     this.db.prepare('UPDATE template_listings SET installCount = installCount + 1 WHERE id = ?').run(listingId);
+  }
+
+  async listPendingTemplates(limit = 20, offset = 0): Promise<TemplateListingRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM template_listings WHERE status = ? ORDER BY createdAt ASC LIMIT ? OFFSET ?'
+    ).all('pending_review', limit, offset) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeTemplateListing(r));
   }
 
   async addReview(review: TemplateReview): Promise<TemplateReview> {

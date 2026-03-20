@@ -1156,9 +1156,17 @@ export interface TemplateListingRecord {
   rating: number;                  // average 0.0–5.0 (denormalized)
   reviewCount: number;             // denormalized count
 
-  status: 'listed' | 'unlisted' | 'moderated';
+  status: 'listed' | 'unlisted' | 'moderated' | 'pending_review' | 'rejected' | 'suspended';
   createdAt: string;
   updatedAt: string;
+
+  // Moderation fields
+  rejectionReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewComment?: string;
+  proposedAt?: string;
+  proposedBy?: string;
 }
 
 export interface TemplateReview {

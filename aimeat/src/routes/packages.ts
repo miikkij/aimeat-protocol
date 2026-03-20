@@ -13,8 +13,8 @@
  *   - PATCH /v1/packages/:groupId — update group metadata
  *   - PATCH /v1/packages/:groupId/versions/:version — update version status
  *   - DELETE /v1/packages/:groupId/versions/:version — archive version
- *   - GET /v1/packages/:groupId/export — export as YAML bundle
- *   - POST /v1/packages/import — import from YAML bundle
+ *   - GET /v1/packages/:groupId/export — export as ZIP bundle
+ *   - POST /v1/packages/import — import from ZIP bundle
  * @usage
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
@@ -25,17 +25,20 @@
  *   v1.2.0 — 2026-03-15 — GHII resolution, YAML export, import validation, duplicate detection
  *   v1.3.0 — 2026-03-15 — support YAML bundle string import (text/yaml Content-Type) for POST /v1/packages/import
  *   v1.4.0 — 2026-03-15 — enforce packageMaxSizeMb, packageMaxComponents limits; remove (config as any) casts
+ *   v2.0.0 — 2026-03-20 — change export/import from YAML to ZIP format (buildZip/parseZip)
+ *   v2.1.0 — 2026-03-20 — add POST /v1/packages/:groupId/propose endpoint for template gallery proposals
  */
 
-import express, { Router } from 'express';
+import { Router } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
-import YAML from 'yaml';
+import Busboy from 'busboy';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageRecord, PackageComponent } from '../storage/interface.js';
+import type { Storage, PackageRecord, PackageComponent, TemplateListingRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
+import { buildZip, parseZip, ZipValidationError } from '../services/package-zip.js';
 
 /** Generate a date-based version string: v{YYYY}-{MM}-{DD}-{HHmm} */
 function generateVersion(): string {
@@ -58,8 +61,8 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
 
-  // POST /v1/packages/import — import from YAML bundle
-  router.post('/v1/packages/import', express.text({ type: ['text/yaml', 'application/x-yaml'] }), requireAuth(), async (req, res) => {
+  // POST /v1/packages/import — import from ZIP bundle
+  router.post('/v1/packages/import', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles;
 
@@ -70,124 +73,131 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Accept either YAML bundle string, { package: { ... } } wrapper, or direct { name, components, ... }
-    let raw: any = req.body;
-    if (typeof raw === 'string') {
-      try {
-        // Split on YAML document separators, preserving component ID comments
-        const sections = raw.split(/^---\s*/m).filter(Boolean);
-        if (sections.length === 0) {
-          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Empty YAML bundle'));
-          return;
-        }
+    // Collect uploaded ZIP file via busboy
+    const maxBytes = config.packageMaxSizeMb * 1024 * 1024;
+    let fileBuffer: Buffer | null = null;
+    let fileReceived = false;
+    let sizeLimitHit = false;
 
-        // First section is the manifest
-        const manifest = YAML.parse(sections[0]) as Record<string, unknown>;
-        const manifestComps = (manifest.components ?? []) as Array<Record<string, unknown>>;
-        const compMetaMap = new Map(manifestComps.map(c => [c.id as string, c]));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const busboy = Busboy({
+          headers: req.headers,
+          limits: { files: 1, fileSize: maxBytes },
+        });
 
-        // Remaining sections are component contents with "# component: {id}" headers
-        const yamlComponents: any[] = [];
-        for (let i = 1; i < sections.length; i++) {
-          const section = sections[i];
-          // Parse component ID from "# component: {id}\n" prefix
-          const idMatch = section.match(/^#\s*component:\s*(\S+)\s*\n/);
-          const compId = idMatch?.[1];
-          const content = idMatch ? section.slice(idMatch[0].length) : section;
-
-          if (compId && compMetaMap.has(compId)) {
-            const meta = compMetaMap.get(compId)!;
-            yamlComponents.push({
-              id: compId,
-              type: meta.type,
-              label: meta.label ?? '',
-              content: content.trim(),
-              dependencies: meta.dependencies ?? [],
-            });
+        busboy.on('file', (_fieldname: string, stream: NodeJS.ReadableStream, _info: { filename: string; encoding: string; mimeType: string }) => {
+          if (fileReceived) {
+            stream.resume();
+            return;
           }
-        }
+          fileReceived = true;
+          const chunks: Buffer[] = [];
 
-        raw = {
-          name: manifest.name as string,
-          description: (manifest.description as string) ?? '',
-          category: (manifest.category as string) ?? 'other',
-          tags: manifest.tags ?? [],
-          changelog: (manifest.changelog as string) ?? 'Imported from YAML',
-          visibility: 'private',
-          status: 'draft',
-          manifest: YAML.stringify(manifest),
-          components: yamlComponents,
+          stream.on('data', (chunk: Buffer) => { chunks.push(chunk); });
+          (stream as NodeJS.EventEmitter).on('limit', () => { sizeLimitHit = true; });
+          stream.on('end', () => { fileBuffer = Buffer.concat(chunks); });
+          stream.on('error', reject);
+        });
+
+        busboy.on('finish', () => resolve());
+        busboy.on('error', reject);
+        req.pipe(busboy);
+      });
+    } catch (e: any) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', e.message ?? 'Failed to parse multipart upload'));
+      return;
+    }
+
+    if (!fileBuffer) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No file uploaded. Send a multipart/form-data request with a ZIP file.'));
+      return;
+    }
+
+    if (sizeLimitHit) {
+      res.status(413).json(error(config.nodeId, 'SIZE_EXCEEDED',
+        `Uploaded file exceeds limit of ${config.packageMaxSizeMb}MB`));
+      return;
+    }
+
+    // Parse and validate ZIP
+    let parsed;
+    try {
+      parsed = await parseZip(fileBuffer, { maxSizeMb: config.packageMaxSizeMb });
+    } catch (e: unknown) {
+      if (e instanceof ZipValidationError) {
+        const statusMap: Record<string, number> = {
+          SIZE_EXCEEDED: 413,
         };
-      } catch (yamlErr: any) {
-        res.status(400).json(error(config.nodeId, 'INVALID_YAML', yamlErr.message ?? 'Invalid YAML bundle'));
+        const status = statusMap[e.code] ?? 400;
+        res.status(status).json(error(config.nodeId, e.code, e.message));
         return;
       }
-    }
-    if (!raw || typeof raw !== 'object') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Request body must be a valid package object'));
-      return;
-    }
-    const body = (raw.package && typeof raw.package === 'object') ? raw.package : raw;
-
-    if (!body.name || typeof body.name !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name is required for import'));
-      return;
-    }
-    if (!Array.isArray(body.components) || body.components.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'components must be an array with at least 1 item'));
+      const msg = e instanceof Error ? e.message : String(e);
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', msg));
       return;
     }
 
     // Check max components
-    if (body.components.length > config.packageMaxComponents) {
+    if (parsed.components.length > config.packageMaxComponents) {
       res.status(413).json(error(config.nodeId, 'COMPONENT_LIMIT_EXCEEDED',
-        `Package has ${body.components.length} components, max is ${config.packageMaxComponents}`));
+        `Package has ${parsed.components.length} components, max is ${config.packageMaxComponents}`));
       return;
     }
 
-    // Check total size
-    const importSizeBytes = (body.components as any[]).reduce((sum: number, c: any) =>
-      sum + Buffer.byteLength(c.content ?? '', 'utf-8'), 0);
-    const importMaxBytes = config.packageMaxSizeMb * 1024 * 1024;
-    if (importSizeBytes > importMaxBytes) {
-      res.status(413).json(error(config.nodeId, 'SIZE_EXCEEDED',
-        `Total component size ${(importSizeBytes / 1024 / 1024).toFixed(1)}MB exceeds limit of ${config.packageMaxSizeMb}MB`));
+    // Check max packages per author
+    const maxPerAuthor = config.packageMaxPerAuthor ?? MAX_PACKAGES_PER_AUTHOR;
+    const existingCount = await storage.listPackages({ author: owner, limit: 1, offset: 0 });
+    if (existingCount.total >= maxPerAuthor) {
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+        `Maximum ${maxPerAuthor} packages per author. Archive unused packages first.`));
       return;
+    }
+
+    // Check name conflicts — same name, different author = reject; same author = allow as new version
+    const packageGroupId = `${parsed.name}::${owner}`;
+    const existingGroup = await storage.listVersions(packageGroupId, 1, 0);
+    if (existingGroup.total > 0) {
+      const existingPkg = existingGroup.versions[0];
+      if (existingPkg.author !== owner) {
+        res.status(409).json(error(config.nodeId, 'CONFLICT',
+          `Package "${parsed.name}" already exists by a different author`));
+        return;
+      }
+      // Same author — will create as a new version
     }
 
     try {
       const now = new Date().toISOString();
       const id = randomUUID();
-      const name = body.name as string;
       const author = owner;
       const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
-      const packageGroupId = `${name}::${author}`;
       const version = generateVersion();
 
-      const components: PackageComponent[] = (body.components ?? []).map((c: any) => ({
+      const components: PackageComponent[] = parsed.components.map(c => ({
         id: c.id,
-        type: c.type,
+        type: c.type as PackageComponent['type'],
         label: c.label ?? '',
         content: c.content ?? '',
-        contentHash: hashContent(c.content ?? ''),
+        contentHash: c.contentHash ?? hashContent(c.content ?? ''),
         dependencies: c.dependencies ?? [],
       }));
 
       const record: PackageRecord = {
         id,
         packageGroupId,
-        name,
+        name: parsed.name,
         author,
         authorGhii,
         version,
-        changelog: body.changelog ?? 'Imported package',
-        description: body.description ?? '',
-        category: body.category ?? 'other',
-        tags: body.tags ?? [],
-        visibility: body.visibility ?? 'private',
-        status: body.status ?? 'draft',
+        changelog: parsed.changelog ?? 'Imported from ZIP',
+        description: parsed.description ?? '',
+        category: parsed.category ?? 'other',
+        tags: parsed.tags ?? [],
+        visibility: 'private',
+        status: 'draft',
         components,
-        manifest: body.manifest ?? '',
+        manifest: '',
         createdAt: now,
         updatedAt: now,
       };
@@ -199,7 +209,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       emitChange('packages');
     } catch (e: any) {
       if (e.message === 'PACKAGE_EXISTS' || e.code === 'SQLITE_CONSTRAINT_UNIQUE' || e.code === 'P2002') {
-        res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${body.name}" already exists for this author`));
+        res.status(409).json(error(config.nodeId, 'CONFLICT', `Package "${parsed.name}" already exists for this author`));
         return;
       }
       res.status(500).json(error(config.nodeId, 'IMPORT_FAILED', e.message ?? 'Import failed'));
@@ -340,6 +350,73 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
+  // POST /v1/packages/:groupId/propose — propose package as template for gallery
+  router.post('/v1/packages/:groupId/propose', requireAuth(), requireRole('owner'), async (req, res) => {
+    const groupId = decodeURIComponent(req.params.groupId as string);
+    const ghii = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+
+    // Verify the package has at least one published version
+    const pkg = await storage.getLatestPublished(groupId);
+    if (!pkg) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or has no published version'));
+      return;
+    }
+
+    // Verify ownership
+    if (pkg.authorGhii !== ghii) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package author can propose it as a template'));
+      return;
+    }
+
+    // Check for existing listing
+    const existing = await storage.getListingByPackage(groupId);
+    if (existing) {
+      if (existing.status === 'listed') {
+        res.status(400).json(error(config.nodeId, 'ALREADY_LISTED', 'This package is already listed in the template gallery'));
+        return;
+      }
+      // Re-propose a previously rejected/suspended listing
+      const updated = await storage.updateTemplateListing(existing.id, {
+        status: 'pending_review',
+        proposedAt: new Date().toISOString(),
+        proposedBy: ghii,
+        updatedAt: new Date().toISOString(),
+      });
+      emitChange('templates');
+      res.json(success(config.nodeId, { listingId: existing.id, status: 'pending_review' }));
+      return;
+    }
+
+    // Create new listing with pending_review status
+    const now = new Date().toISOString();
+    const record: TemplateListingRecord = {
+      id: randomUUID(),
+      packageGroupId: groupId,
+      packageName: pkg.name,
+      packageAuthor: pkg.author,
+      publishedBy: req.auth!.owner,
+      publishedByGhii: ghii,
+      title: pkg.name,
+      description: pkg.description,
+      screenshots: [],
+      category: pkg.category,
+      tags: pkg.tags,
+      featured: false,
+      installCount: 0,
+      rating: 0,
+      reviewCount: 0,
+      status: 'pending_review',
+      createdAt: now,
+      updatedAt: now,
+      proposedAt: now,
+      proposedBy: ghii,
+    };
+
+    const created = await storage.createTemplateListing(record);
+    emitChange('templates');
+    res.status(201).json(success(config.nodeId, { listingId: created.id, status: 'pending_review' }));
+  });
+
   // ── Parameterized routes ─────────────────────────────────────────
 
   // POST /v1/packages/:groupId/versions — publish new version
@@ -459,7 +536,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { versions: filtered, total: result.total }));
   });
 
-  // GET /v1/packages/:groupId/export — export as YAML bundle
+  // GET /v1/packages/:groupId/export — export as ZIP bundle
   router.get('/v1/packages/:groupId/export', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const versionParam = req.query.version as string | undefined;
@@ -482,31 +559,15 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Build YAML bundle: manifest document + component content documents
-    const manifest = {
-      'aimeat-package': '1.0',
-      name: pkg.name,
-      author: pkg.author,
-      version: pkg.version,
-      description: pkg.description,
-      category: pkg.category,
-      tags: pkg.tags,
-      changelog: pkg.changelog,
-      components: pkg.components.map(c => ({
-        id: c.id,
-        type: c.type,
-        label: c.label,
-        dependencies: c.dependencies,
-      })),
-    };
-
-    const parts = [YAML.stringify(manifest)];
-    for (const comp of pkg.components) {
-      parts.push(`--- # component: ${comp.id}\n${comp.content}`);
-    }
-
-    res.setHeader('Content-Type', 'text/yaml');
-    res.send(parts.join('\n'));
+    // Build ZIP bundle
+    const zip = await buildZip(pkg);
+    const filename = `${pkg.name}-${pkg.version}.zip`;
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(zip.length),
+    });
+    res.send(zip);
   });
 
   // GET /v1/packages/:groupId — get latest published version
@@ -527,7 +588,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
 
     res.json(success(config.nodeId, pkg, [
       { description: 'List all versions', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
-      { description: 'Export as YAML', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/export` },
+      { description: 'Export as ZIP', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/export` },
     ]));
   });
 

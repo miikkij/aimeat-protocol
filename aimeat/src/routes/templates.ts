@@ -21,6 +21,7 @@
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 5)
  *   v1.1.0 — 2026-03-15 — GHII resolution via identity system
  *   v1.2.0 — 2026-03-15 — enforce templateReviewsEnabled/templateDiscussionsEnabled config; remove (config as any) cast
+ *   v1.3.0 — 2026-03-20 — add moderation endpoints: pending, review, approve, reject, suspend
  */
 
 import { Router } from 'express';
@@ -133,9 +134,166 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         search,
         limit,
         offset,
+        status: 'listed',
       });
 
       res.json(success(config.nodeId, { templates: result.listings, total: result.total }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
+    }
+  });
+
+  // ── GET /v1/templates/pending — List pending templates (operator) ──
+  router.get('/v1/templates/pending', requireAuth(), requireRole('operator'), async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 100);
+      const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
+
+      const listings = await storage.listPendingTemplates(limit, offset);
+      res.json(success(config.nodeId, { templates: listings, total: listings.length }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
+    }
+  });
+
+  // ── GET /v1/templates/:id/review — Review details for moderation (operator) ──
+  router.get('/v1/templates/:id/review', requireAuth(), requireRole('operator'), async (req, res) => {
+    const id = req.params.id as string;
+
+    try {
+      const listing = await storage.getTemplateListing(id);
+      if (!listing) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Template listing not found'));
+        return;
+      }
+
+      const pkg = await storage.getLatestPublished(listing.packageGroupId);
+      if (!pkg) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or has no published version'));
+        return;
+      }
+
+      res.json(success(config.nodeId, {
+        listing,
+        manifest: {
+          name: pkg.name,
+          author: pkg.author,
+          version: pkg.version,
+          description: pkg.description,
+          category: pkg.category,
+          tags: pkg.tags,
+          changelog: pkg.changelog,
+        },
+        components: pkg.components,
+        dryRun: { conflicts: [], warnings: [] },
+      }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
+    }
+  });
+
+  // ── POST /v1/templates/:id/approve — Approve listing (operator) ──
+  router.post('/v1/templates/:id/approve', requireAuth(), requireRole('operator'), async (req, res) => {
+    const id = req.params.id as string;
+
+    try {
+      const listing = await storage.getTemplateListing(id);
+      if (!listing) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Template listing not found'));
+        return;
+      }
+      if (listing.status !== 'pending_review') {
+        res.status(400).json(error(config.nodeId, 'INVALID_STATUS', `Cannot approve a listing with status "${listing.status}". Only pending_review listings can be approved.`));
+        return;
+      }
+
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const now = new Date().toISOString();
+      const { comment } = req.body ?? {};
+
+      const updated = await storage.updateTemplateListing(id, {
+        status: 'listed',
+        reviewedBy,
+        reviewedAt: now,
+        reviewComment: comment ?? undefined,
+        updatedAt: now,
+      });
+
+      emitChange('templates');
+      res.json(success(config.nodeId, { listing: updated }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
+    }
+  });
+
+  // ── POST /v1/templates/:id/reject — Reject listing (operator) ──
+  router.post('/v1/templates/:id/reject', requireAuth(), requireRole('operator'), async (req, res) => {
+    const id = req.params.id as string;
+    const { reason } = req.body ?? {};
+
+    if (!reason || typeof reason !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'reason is required and must be a string'));
+      return;
+    }
+
+    try {
+      const listing = await storage.getTemplateListing(id);
+      if (!listing) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Template listing not found'));
+        return;
+      }
+      if (listing.status !== 'pending_review') {
+        res.status(400).json(error(config.nodeId, 'INVALID_STATUS', `Cannot reject a listing with status "${listing.status}". Only pending_review listings can be rejected.`));
+        return;
+      }
+
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const now = new Date().toISOString();
+
+      const updated = await storage.updateTemplateListing(id, {
+        status: 'rejected',
+        rejectionReason: reason,
+        reviewedBy,
+        reviewedAt: now,
+        updatedAt: now,
+      });
+
+      emitChange('templates');
+      res.json(success(config.nodeId, { listing: updated }));
+    } catch (err) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
+    }
+  });
+
+  // ── POST /v1/templates/:id/suspend — Suspend listed template (operator) ──
+  router.post('/v1/templates/:id/suspend', requireAuth(), requireRole('operator'), async (req, res) => {
+    const id = req.params.id as string;
+
+    try {
+      const listing = await storage.getTemplateListing(id);
+      if (!listing) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Template listing not found'));
+        return;
+      }
+      if (listing.status !== 'listed') {
+        res.status(400).json(error(config.nodeId, 'INVALID_STATUS', `Cannot suspend a listing with status "${listing.status}". Only listed templates can be suspended.`));
+        return;
+      }
+
+      const reviewedBy = await resolveGhii(storage, req.auth!.owner, req.auth!.sub);
+      const now = new Date().toISOString();
+      const { comment } = req.body ?? {};
+
+      const updated = await storage.updateTemplateListing(id, {
+        status: 'suspended',
+        reviewedBy,
+        reviewedAt: now,
+        reviewComment: comment ?? undefined,
+        updatedAt: now,
+      });
+
+      emitChange('templates');
+      res.json(success(config.nodeId, { listing: updated }));
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', (err as Error).message));
     }

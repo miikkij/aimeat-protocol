@@ -2182,7 +2182,33 @@ components:
           type: integer
         status:
           type: string
-          enum: [listed, unlisted, moderated]
+          enum: [listed, unlisted, moderated, pending_review, rejected, suspended]
+        moderationStatus:
+          type: string
+          enum: [pending_review, approved, rejected, suspended]
+          description: Current moderation state of the template
+        reviewedBy:
+          type: string
+          description: GHII of the operator who reviewed the template
+        reviewedAt:
+          type: string
+          format: date-time
+        reviewComment:
+          type: string
+          description: Comment left by the reviewer on approval
+        rejectionReason:
+          type: string
+          description: Reason provided when template was rejected
+        suspensionReason:
+          type: string
+          description: Reason provided when template was suspended
+        proposedAt:
+          type: string
+          format: date-time
+          description: When the template was proposed for review
+        proposedBy:
+          type: string
+          description: GHII of the user who proposed the template
         createdAt:
           type: string
           format: date-time
@@ -12413,24 +12439,23 @@ paths:
   /v1/packages/import:
     post:
       operationId: importPackage
-      summary: Import package
-      description: Import a package from an exported bundle.
+      summary: Import package from ZIP
+      description: Import a package from a ZIP bundle uploaded as multipart/form-data.
       tags: [Packages]
       security:
         - BearerAuth: []
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              required: [bundle]
+              required: [file]
               properties:
-                bundle: { type: string, description: 'Base64-encoded or JSON package bundle' }
-          text/yaml:
-            schema:
-              type: string
-              description: YAML bundle string (multi-document YAML with manifest + components)
+                file:
+                  type: string
+                  format: binary
+                  description: ZIP archive containing manifest.yaml and component files
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -12677,8 +12702,8 @@ paths:
   /v1/packages/{groupId}/export:
     get:
       operationId: exportPackage
-      summary: Export package
-      description: Export a package as a portable bundle for import on other nodes.
+      summary: Export package as ZIP
+      description: Export a package as a ZIP bundle containing manifest.yaml and component files.
       tags: [Packages]
       parameters:
         - name: groupId
@@ -12691,7 +12716,41 @@ paths:
           schema: { type: string }
       responses:
         '200':
+          description: ZIP archive of the package
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+              description: 'attachment; filename="name-version.zip"'
+        '404':
+          description: Package not found
+
+  /v1/packages/{groupId}/propose:
+    post:
+      operationId: proposePackageAsTemplate
+      summary: Propose package as template
+      description: Submit a published package for template gallery review by operators.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: Package not published or already proposed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: Package not found
 
@@ -13214,6 +13273,171 @@ paths:
               required: [featured]
               properties:
                 featured: { type: boolean }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Template Moderation ──────────────────────────────────────
+  /v1/templates/pending:
+    get:
+      operationId: listPendingTemplates
+      summary: List pending templates
+      description: List templates awaiting operator review. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/templates/{id}/review:
+    get:
+      operationId: reviewTemplate
+      summary: Get template review details
+      description: Retrieve full details of a template for moderation review. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Template not found
+
+  /v1/templates/{id}/approve:
+    post:
+      operationId: approveTemplate
+      summary: Approve template
+      description: Approve a pending template for gallery listing. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment: { type: string, description: Optional approval comment }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Template not found
+
+  /v1/templates/{id}/reject:
+    post:
+      operationId: rejectTemplate
+      summary: Reject template
+      description: Reject a pending template with a reason. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, description: Reason for rejection }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Template not found
+
+  /v1/templates/{id}/suspend:
+    post:
+      operationId: suspendTemplate
+      summary: Suspend template
+      description: Suspend a published template, removing it from the gallery. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, description: Reason for suspension }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Template not found
+
+  # ── Federation Templates ─────────────────────────────────────
+  /v1/federation/templates:
+    get:
+      operationId: listFederationTemplates
+      summary: List federation templates
+      description: Serve approved template listings to peer nodes for federation sync.
+      tags: [Federation]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/federation/templates/sync:
+    post:
+      operationId: syncFederationTemplates
+      summary: Sync templates from federation
+      description: Pull template listings from all active peer nodes. Operator only.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
