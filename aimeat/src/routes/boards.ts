@@ -11,7 +11,7 @@ import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveIdentity, isSameOwner } from '../utils/gaii.js';
+import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -138,6 +138,55 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     res.json(success(config.nodeId, { id: updated.id, visibility: updated.visibility }));
+    emitChange('boards');
+  });
+
+  // ── Update board members ───────────────────────────────
+  router.patch('/v1/boards/:boardId/members', requireAuth(), async (req, res) => {
+    const boardId = req.params.boardId as string;
+    const board = await storage.getBoard(boardId);
+    if (!board) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+      return;
+    }
+
+    // Authorization: only owner session (GHII, not agent) or operator
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const isOperator = req.auth!.roles.includes('operator');
+    if (!isOwnerSession && !isOperator) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can manage members'));
+      return;
+    }
+    // Verify this owner actually owns the board
+    if (isOwnerSession && !isOperator) {
+      const boardOwner = parseGaiiLoose(board.ownerGaii).owner;
+      if (req.auth!.owner !== boardOwner) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this board'));
+        return;
+      }
+    }
+
+    const { add, remove } = req.body ?? {};
+    if (!add && !remove) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide "add" and/or "remove" arrays'));
+      return;
+    }
+
+    // Compute new list
+    const members = new Set(board.allowedGaiis);
+    if (Array.isArray(add)) for (const g of add) members.add(g);
+    if (Array.isArray(remove)) for (const g of remove) members.delete(g);
+
+    const updated = await storage.updateBoardMembers(boardId, [...members]);
+    if (!updated) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board members'));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      board_id: updated.id,
+      allowed_gaiis: updated.allowedGaiis,
+    }));
     emitChange('boards');
   });
 
