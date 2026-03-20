@@ -83,6 +83,14 @@ export function parseGaiiLoose(gaii: string): { agent: string; owner: string; no
   };
 }
 
+/**
+ * Check if two GAII/GHII identities belong to the same owner.
+ * Handles both GHII ("alice@node") and GAII ("agent#alice@node") formats.
+ */
+export function isSameOwner(gaiiA: string, gaiiB: string): boolean {
+  return parseGaiiLoose(gaiiA).owner === parseGaiiLoose(gaiiB).owner;
+}
+
 // Chat Instance ID format: platform-appname#owner@node
 // Same syntax as GAII but semantically different — represents a human-operated AI session
 // Examples:
