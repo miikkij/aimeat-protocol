@@ -14,6 +14,7 @@
  *   v1.2.0 — 2026-03-21 — Added registerKnowledgeTools registration (4 tools + 1 resource)
  *   v1.3.0 — 2026-03-21 — Added registerExtensionsTools registration (2 tools + 1 resource)
  *   v1.4.0 — 2026-03-21 — Added registerCatalogueTools (3), registerMemoryExtendedTools (2), registerWalletExtendedTools (1)
+ *   v1.5.0 — 2026-03-21 — Added registerConsentTools (3), registerChatInstancesTools (3), registerFlagsTools (1), registerPromptsTools (1)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -36,6 +37,10 @@ import { registerExtensionsTools } from './extensions.js';
 import { registerCatalogueTools } from './catalogue.js';
 import { registerMemoryExtendedTools } from './memory-extended.js';
 import { registerWalletExtendedTools } from './wallet-extended.js';
+import { registerConsentTools } from './consent.js';
+import { registerChatInstancesTools } from './chat-instances.js';
+import { registerFlagsTools } from './flags.js';
+import { registerPromptsTools } from './prompts.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -100,6 +105,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerCatalogueTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWalletExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
