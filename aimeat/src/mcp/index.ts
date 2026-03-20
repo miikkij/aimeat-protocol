@@ -13,6 +13,7 @@
  *   v1.1.0 — 2026-03-21 — Added registerOrganismsTools registration (5 tools + 1 resource)
  *   v1.2.0 — 2026-03-21 — Added registerKnowledgeTools registration (4 tools + 1 resource)
  *   v1.3.0 — 2026-03-21 — Added registerExtensionsTools registration (2 tools + 1 resource)
+ *   v1.4.0 — 2026-03-21 — Added registerCatalogueTools (3), registerMemoryExtendedTools (2), registerWalletExtendedTools (1)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -32,6 +33,9 @@ import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerExtensionsTools } from './extensions.js';
+import { registerCatalogueTools } from './catalogue.js';
+import { registerMemoryExtendedTools } from './memory-extended.js';
+import { registerWalletExtendedTools } from './wallet-extended.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -93,6 +97,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerCatalogueTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerWalletExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
