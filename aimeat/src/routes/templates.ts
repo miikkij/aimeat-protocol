@@ -134,6 +134,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         search,
         limit,
         offset,
+        status: 'listed',
       });
 
       res.json(success(config.nodeId, { templates: result.listings, total: result.total }));
