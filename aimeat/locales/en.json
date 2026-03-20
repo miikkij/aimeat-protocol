@@ -3,6 +3,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "delete": "Delete",
+    "somethingWentWrong": "Something went wrong",
+    "retry": "Retry",
     "save": "Save",
     "close": "Close"
   },
@@ -1203,6 +1205,7 @@
         "retrying": "Retrying (attempt {current}/{max})...",
         "stepComplete": "Step completed via AI",
         "stepFailed": "AI could not complete this step",
+        "stepDone": "{name} updated successfully",
         "noApiKey": "Configure OpenRouter API key above to use AI autopilot",
         "encryptionNotConfigured": "Server encryption not configured. Contact the node operator."
       }

@@ -225,6 +225,32 @@ export async function getInterviewSpec(projectId) {
   } catch { return null; }
 }
 
+/* ── Pending Edit State ─────────────────────────────── */
+
+export async function savePendingEdit(projectId, data) {
+  return apiPost('/v1/memory', {
+    key: `generator.${projectId}.pending-edit`,
+    value: data,
+    visibility: 'owner',
+  });
+}
+
+export async function getPendingEdit(projectId) {
+  try {
+    const key = `generator.${projectId}.pending-edit`;
+    const resp = await apiGet(`/v1/memory?prefix=${key}&owner_scope=true`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    if (!item?.value) return null;
+    return typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
+  } catch { return null; }
+}
+
+export async function clearPendingEdit(projectId) {
+  try {
+    await apiDelete(`/v1/memory/generator.${projectId}.pending-edit`);
+  } catch { /* ignore */ }
+}
+
 /* ── Component State ─────────────────────────────────── */
 
 export async function getComponent(projectId, componentId) {

@@ -3,6 +3,8 @@
     "cancel": "Peruuta",
     "confirm": "Vahvista",
     "delete": "Poista",
+    "somethingWentWrong": "Jokin meni pieleen",
+    "retry": "Yritä uudelleen",
     "save": "Tallenna",
     "close": "Sulje"
   },
@@ -1203,6 +1205,7 @@
         "retrying": "Yritetään uudelleen ({current}/{max})...",
         "stepComplete": "Vaihe suoritettu tekoälyllä",
         "stepFailed": "Tekoäly ei pystynyt suorittamaan tätä vaihetta",
+        "stepDone": "{name} päivitetty onnistuneesti",
         "noApiKey": "Määritä OpenRouter API-avain yllä käyttääksesi tekoälyautomaatiota",
         "encryptionNotConfigured": "Palvelimen salausta ei ole määritetty. Ota yhteyttä noden ylläpitäjään."
       }

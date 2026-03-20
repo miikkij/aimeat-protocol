@@ -178,9 +178,9 @@ That response includes:
           };
           return html`
             <div style="text-align:center; padding:3rem 1.5rem; color:var(--text-dim,#888);">
-              <h2 style="color:var(--text-bright,#fff); margin-bottom:0.5rem;">Something went wrong</h2>
+              <h2 style="color:var(--text-bright,#fff); margin-bottom:0.5rem;">${t('common.somethingWentWrong')}</h2>
               <p style="margin-bottom:1rem; font-size:0.9rem;">${this.state.error?.message || 'Unknown error'}</p>
-              <button class="btn-primary" onClick=${retry} style="animation:none;">Retry</button>
+              <button class="btn-primary" onClick=${retry} style="animation:none;">${t('common.retry')}</button>
             </div>
           `;
         }

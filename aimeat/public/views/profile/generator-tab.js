@@ -45,6 +45,7 @@ import {
   saveInterviewSpec, getInterviewSpec,
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
   writeProjectLog,
+  savePendingEdit, getPendingEdit, clearPendingEdit,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
@@ -581,6 +582,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       }
     }
     cleanupOldEntries(projectId).catch(() => {});
+    // Restore pending edit if exists
+    try {
+      const pending = await getPendingEdit(projectId);
+      if (pending) {
+        setChangeRequest(pending.changeRequest || '');
+        setImpactParsed(pending.impactParsed || null);
+        setImpactResult(pending.impactResult || '');
+        setEditMode(pending.impactParsed ? 'editing' : 'request');
+      }
+    } catch { /* no pending edit */ }
   }
 
   // Phase 5: Refresh live statuses
@@ -706,6 +717,14 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   }
 
   // Phase 6: Edit service handlers
+  function exitEditMode() {
+    setEditMode(null);
+    setChangeRequest('');
+    setImpactResult('');
+    setImpactParsed(null);
+    setImpactErrors([]);
+    clearPendingEdit(projectId).catch(() => {});
+  }
   function handleCopyImpactPrompt() {
     const prompt = buildImpactPrompt(changeRequest, project?.blueprint);
     navigator.clipboard.writeText(prompt).catch(() => {});
@@ -730,6 +749,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         setImpactParsed(parsed);
         setImpactErrors([]);
         setEditMode('editing');
+        savePendingEdit(projectId, { changeRequest, impactParsed: parsed, impactResult: content }).catch(() => {});
       }
     } catch (e) {
       showToast?.(e.message, true);
@@ -750,6 +770,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       setImpactParsed(parsed);
       setImpactErrors([]);
       setEditMode('editing');
+      savePendingEdit(projectId, { changeRequest, impactParsed: parsed, impactResult }).catch(() => {});
     } catch (e) {
       setImpactErrors([t('profile.generator.invalidJson').replace('{error}', e.message)]);
     }
@@ -857,6 +878,61 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     );
     navigator.clipboard.writeText(prompt).catch(() => {});
     showToast?.(t('profile.generator.editPromptCopied').replace('{name}', comp.label));
+  }
+
+  async function handleRunSingleEditAi(comp, suggestedChange) {
+    if (!orSettings?.hasApiKey) return;
+    setAiRunning(comp.id);
+    try {
+      const upstream = impactParsed?.analysis
+        ?.filter(a => a.impact === 'root' && a.id !== comp.id)
+        ?.map(a => `- ${a.label}: ${a.suggestedChange}`)
+        ?.join('\n') || '';
+      const prompt = buildEditPrompt(
+        comp.type, comp.label,
+        comp.result || '(no current code)',
+        suggestedChange || changeRequest,
+        upstream || null,
+      );
+      let content = await runWithAi(projectId, prompt);
+      if (comp.type === 'extension') content = stripCodeblock(content);
+      let vr = validateComponent(comp.type, content, project.blueprint);
+
+      if (!vr.valid && orSettings?.autoRetry) {
+        const max = orSettings.maxRetries || 3;
+        for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+          const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
+          try { content = await runWithAi(projectId, fp); } catch { break; }
+          if (comp.type === 'extension') content = stripCodeblock(content);
+          vr = validateComponent(comp.type, content, project.blueprint);
+        }
+      }
+
+      if (!vr.valid) {
+        const errored = addHistory(comp, 'validation_failed', { errors: vr.errors, by: 'autopilot' });
+        await saveComponent(projectId, { ...errored, status: 'errors', result: content, validationErrors: vr.errors });
+        await loadData();
+        showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
+        setAiRunning(null);
+        return;
+      }
+
+      const updated = addHistory(comp, 'edited', { by: 'autopilot', change: suggestedChange });
+      await saveComponent(projectId, { ...updated, status: 'done', result: content, validationErrors: [] });
+      const serviceSlug = components.find(c => c.type === 'csm' && c.registeredAs)?.registeredAs?.split('/')?.pop() || '';
+      if (comp.type === 'cortex') {
+        const cortexVr = validateComponent('cortex', content, project.blueprint);
+        await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
+      } else {
+        await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
+      }
+      await writeProjectLog(projectId, 'component_edited', { meta: { component: comp.label, by: 'autopilot' } });
+      await loadData();
+      showToast?.(t('profile.generator.openrouter.stepDone').replace('{name}', comp.label));
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setAiRunning(null);
   }
 
   const selected = components.find(c => c.id === selectedId);
@@ -1144,7 +1220,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             <button class="btn-outline btn-sm" onClick=${() => refreshStatuses()} title=${t('profile.generator.refreshTitle')}>
               ${t('profile.generator.refresh')}
             </button>
-            <button class="btn-ghost btn-sm" onClick=${() => setEditMode(editMode ? null : 'request')}>
+            <button class="btn-ghost btn-sm" onClick=${() => editMode ? exitEditMode() : setEditMode('request')}>
               ${editMode ? t('profile.generator.cancelEdit') : t('profile.generator.editService')}
             </button>
             <button class="btn-ghost btn-sm" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
@@ -1337,10 +1413,21 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                   </div>
                   <div class="pf-gen-impact-reason">${a.reason}</div>
                   ${(a.impact === 'root' || a.impact === 'update') && comp && html`
-                    <button class="btn-outline btn-sm mt-xs"
-                      onClick=${() => handleCopyEditPrompt(comp, a.suggestedChange)}>
-                      ${t('profile.generator.copyEditPrompt')}
-                    </button>
+                    <div class="pf-gen-actions mt-xs">
+                      <button class="btn-outline btn-sm"
+                        onClick=${() => handleCopyEditPrompt(comp, a.suggestedChange)}>
+                        ${t('profile.generator.copyEditPrompt')}
+                      </button>
+                      ${orSettings?.hasApiKey && html`
+                        <button class="btn-outline btn-sm pf-gen-or-run-btn ${aiRunning === comp.id ? 'pf-gen-or-running' : ''}"
+                          onClick=${() => handleRunSingleEditAi(comp, a.suggestedChange)}
+                          disabled=${aiRunning !== null || autopilotRunning}>
+                          ${aiRunning === comp.id
+                            ? html`<span class="pf-gen-or-spin">⟳</span> ${t('profile.generator.openrouter.waiting')}`
+                            : t('profile.generator.openrouter.runWithAi')}
+                        </button>
+                      `}
+                    </div>
                   `}
                 </div>
               `;
@@ -1362,7 +1449,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               `}
             `}
             <button class="btn-outline btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
+            <button class="btn-ghost btn-sm" onClick=${exitEditMode}>${t('profile.generator.done')}</button>
           </div>
         </div>
       `}
