@@ -10,6 +10,7 @@
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
+ *   v1.1.0 — 2026-03-21 — Added registerOrganismsTools registration (5 tools + 1 resource)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -26,6 +27,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { registerCoreTools } from './core.js';
 import { registerBoardsTools } from './boards.js';
+import { registerOrganismsTools } from './organisms.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -84,6 +86,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
         registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
