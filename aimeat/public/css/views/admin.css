@@ -516,3 +516,42 @@
   color: #dc2626; border-color: #fecaca;
 }
 .adm-btn-danger:hover { background: #fef2f2; }
+
+/* Subtabs row */
+.adm-subtabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+
+/* Active subtab button */
+.adm-btn-active,
+.adm-btn-active:hover { background: var(--accent, #6366F1); color: #fff; }
+
+/* Packages tab seed card */
+.adm-pkg-seed-card { margin-bottom: 16px; text-align: center; padding: 24px; }
+.adm-pkg-seed-text { margin-bottom: 12px; }
+.adm-pkg-seed-msg { margin-top: 8px; font-size: .85rem; color: var(--green, #34d399); }
+
+/* Template moderation */
+.adm-mod-section { margin-bottom: 16px; }
+.adm-mod-review { margin-top: 8px; }
+.adm-mod-review-title { font-size: 1rem; font-weight: 700; margin-bottom: 8px; color: var(--text-bright, #1A1A2E); }
+.adm-mod-desc { font-size: .85rem; color: var(--text-dim, #6B7280); margin-bottom: 8px; }
+.adm-mod-meta-grid { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; font-size: .84rem; }
+.adm-mod-meta-item { color: var(--text-dim, #6B7280); }
+.adm-mod-meta-item strong { color: var(--text-bright, #1A1A2E); }
+.adm-mod-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.adm-mod-pre { font-size: .78rem; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; font-family: var(--font-mono); background: var(--bg-deep, #F8FAFC); border: 1px solid var(--glass-border, #E5E7EB); border-radius: 6px; padding: 10px; }
+.adm-mod-components { margin-bottom: 12px; }
+.adm-mod-components h5 { font-size: .84rem; margin-bottom: 6px; }
+.adm-mod-actions { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+.adm-mod-action-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 6px; }
+.adm-mod-action-label { font-size: .78rem; font-weight: 600; color: var(--text-dim, #6B7280); }
+.adm-mod-input { padding: 6px 10px; border: 1px solid var(--glass-border, #E5E7EB); border-radius: 6px; font-size: .85rem; background: var(--glass-bg, #fff); color: inherit; }
+.adm-mod-suspend-panel { margin-top: 8px; }
+.adm-mod-suspend-row { display: flex; gap: 8px; align-items: center; }
+.adm-mod-suspend-row .adm-mod-input { flex: 1; }
+
+/* Badge aliases for moderation statuses */
+.adm-badge-approved  { background: #D1FAE5; color: #047857; }
+.adm-badge-rejected  { background: #FEE2E2; color: #DC2626; }
+.adm-badge-suspended { background: #FEF3C7; color: #B45309; }
+.adm-badge-published { background: #D1FAE5; color: #047857; }
+.adm-badge-active    { background: #D1FAE5; color: #047857; }

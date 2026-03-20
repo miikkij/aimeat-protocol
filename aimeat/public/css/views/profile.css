@@ -370,9 +370,15 @@
 .pf .pkg-badge-draft{background:rgba(156,163,175,0.15);color:#9ca3af}
 .pf .pkg-empty{color:var(--muted,#888);font-size:.85rem;text-align:center;padding:2rem 0}
 .pf .pkg-stats{display:flex;gap:.5rem;align-items:center;font-size:.8rem;color:var(--muted,#888)}
+.pf .pkg-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.pf .pkg-section-header h3{margin:0}
+.pf .pkg-upload-btn{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.8rem}
+.pf .pkg-hidden-input{display:none}
+.pf .pkg-rejection{font-size:.8rem;color:var(--danger,#ef4444);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:.5rem .75rem;margin-bottom:.5rem}
 @media(max-width:600px){
   .pf .pkg-grid{grid-template-columns:1fr}
   .pf .pkg-filters{flex-direction:column}
+  .pf .pkg-section-header{flex-direction:column;gap:.5rem;align-items:flex-start}
 }
 
 /* ── Knowledge Tab (kpkg-*) ── */

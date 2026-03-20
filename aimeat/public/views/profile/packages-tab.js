@@ -14,6 +14,7 @@
  *   v1.1.0 — 2026-03-16 — restyle to match extensions-tab pattern (grid cards, consistent CSS)
  *   v1.2.0 — 2026-03-17 — add "Open in Generator" / "Edit in Generator" buttons for
  *     importing packages into generator projects (fork vs edit detection)
+ *   v1.3.0 — 2026-03-20 — add ZIP upload/download and template proposal buttons
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -113,6 +114,49 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     }
   };
 
+  const handleDownloadZip = async (groupId, name) => {
+    try {
+      const blob = await pkgService.exportPackageZip(groupId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast(t('packages.exportFailed') || e.message, true);
+    }
+  };
+
+  const handleUploadZip = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      await pkgService.importPackageZip(file);
+      showToast(t('packages.importSuccess') || 'Package imported');
+      loadData();
+    } catch (err) {
+      showToast(err.message || t('packages.importFailed'), true);
+    }
+  };
+
+  const handleProposeAsTemplate = async (groupId) => {
+    try {
+      const res = await pkgService.proposeAsTemplate(groupId);
+      if (res.ok) {
+        showToast(t('packages.proposePending'));
+        loadData();
+      } else {
+        showToast(res.error || 'Proposal failed', true);
+      }
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  };
+
   if (loading) return html`<${Spinner} />`;
 
   const filtered = packages.filter(p => {
@@ -167,7 +211,13 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
 
       ${view === 'browse' && html`
         <div class="pkg-section">
-          <h3>${t('packages.browse') || 'Available Packages'}</h3>
+          <div class="pkg-section-header">
+            <h3>${t('packages.browse') || 'Available Packages'}</h3>
+            <label class="btn-outline pkg-upload-btn">
+              ${t('packages.uploadZip') || 'Upload ZIP'}
+              <input type="file" accept=".zip" class="pkg-hidden-input" onChange=${handleUploadZip} />
+            </label>
+          </div>
           <div class="pkg-filters">
             <input type="text" placeholder=${t('packages.search') || 'Search...'}
               value=${search} onInput=${e => setSearch(e.target.value)} />
@@ -198,16 +248,29 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                     <span>${t('packages.by') || 'by'} ${escHtml(pkg.author)}</span>
                     <span>\u00B7 ${pkg.components?.length ?? 0} ${t('packages.components') || 'components'}</span>
                   </div>
+                  ${pkg.templateStatus === 'rejected' && pkg.rejectionReason && html`
+                    <div class="pkg-rejection">
+                      ${t('packages.moderation.rejectionReason')}: ${escHtml(pkg.rejectionReason)}
+                    </div>
+                  `}
                   <div class="pkg-card-footer">
                     <div class="pkg-card-actions">
                       <button class="primary" onClick=${() => handleInstall(pkg.packageGroupId)}>
                         ${t('packages.install') || 'Install'}
+                      </button>
+                      <button onClick=${() => handleDownloadZip(pkg.packageGroupId, pkg.name)}>
+                        ${t('packages.downloadZip') || 'Download ZIP'}
                       </button>
                       <button onClick=${() => handleOpenInGenerator(pkg.packageGroupId, pkg.author)}>
                         ${pkg.author === session?.owner
                           ? (t('packages.editInGenerator') || 'Edit in Generator')
                           : (t('packages.openInGenerator') || 'Open in Generator')}
                       </button>
+                      ${pkg.status === 'published' && !pkg.templateStatus && pkg.author === session?.owner && html`
+                        <button class="btn-outline" onClick=${() => handleProposeAsTemplate(pkg.packageGroupId)}>
+                          ${t('packages.proposeAsTemplate') || 'Propose as Template'}
+                        </button>
+                      `}
                     </div>
                   </div>
                 </div>
@@ -240,6 +303,9 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                     <div class="pkg-card-actions">
                       <button class="primary" onClick=${() => handleInstall(tpl.packageGroupId)}>
                         ${t('packages.install') || 'Install'}
+                      </button>
+                      <button onClick=${() => handleDownloadZip(tpl.packageGroupId, tpl.title)}>
+                        ${t('packages.downloadZip') || 'Download ZIP'}
                       </button>
                       <button onClick=${() => handleOpenInGenerator(tpl.packageGroupId, tpl.packageAuthor)}>
                         ${tpl.packageAuthor === session?.owner

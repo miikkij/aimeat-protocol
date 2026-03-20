@@ -220,6 +220,13 @@ export const reviewKnowledgePackage = (packageId, reason, action, customText) =>
     reason, action, custom_text: customText,
   });
 
+// ── Template Moderation ──
+export const listPendingTemplates  = ()           => apiGet('/v1/templates/pending');
+export const reviewTemplate        = (id)         => apiGet(`/v1/templates/${encodeURIComponent(id)}/review`);
+export const approveTemplate       = (id, comment) => apiPost(`/v1/templates/${encodeURIComponent(id)}/approve`, { comment });
+export const rejectTemplate        = (id, reason) => apiPost(`/v1/templates/${encodeURIComponent(id)}/reject`, { reason });
+export const suspendTemplate       = (id, reason) => apiPost(`/v1/templates/${encodeURIComponent(id)}/suspend`, { reason });
+
 // ── System Prompts ──
 export const getSystemPrompts     = (group) => apiGet('/v1/admin/prompts' + (group ? '?group=' + encodeURIComponent(group) : ''));
 export const getSystemPrompt      = (id)    => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}`);
