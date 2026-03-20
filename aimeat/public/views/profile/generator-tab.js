@@ -83,11 +83,18 @@ async function runWithAi(projectId, prompt, systemPrompt = null) {
     const raw = await fetch('/v1/openrouter/complete', {
       method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal,
     });
+    if (!raw.ok) {
+      // Try to parse error body, fall back to status text
+      let msg = `HTTP ${raw.status}`;
+      try { const e = await raw.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
+      throw new Error(msg);
+    }
     const resp = await raw.json();
     if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
     return resp.data.content;
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('Cancelled');
+    if (e.name === 'TypeError') throw new Error('Network error — connection lost');
     throw e;
   } finally {
     clearTimeout(timeoutId);
