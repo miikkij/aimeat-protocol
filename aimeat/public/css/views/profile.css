@@ -870,6 +870,110 @@
 .pf-gen-agent-actions { display: flex; gap: 8px; }
 .pf-gen-stop-btn { margin-left: auto; }
 
+/* ── OpenRouter Settings (pf-gen-or-*) ──────────────── */
+.pf-gen-or-wrapper {
+  margin-bottom: 1.25rem;
+  background: var(--card, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pf-gen-or-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text, #1A1A2E);
+  text-align: left;
+}
+.pf-gen-or-toggle:hover { background: var(--bg-dim, #F3F4F6); }
+.pf-gen-or-toggle-icon { font-size: 0.65em; color: var(--text-dim, #6B7280); width: 1rem; flex-shrink: 0; }
+.pf-gen-or-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--success, #22c55e);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.pf-gen-or-panel {
+  padding: 0 14px 14px;
+}
+.pf-gen-or-field {
+  margin-bottom: 12px;
+}
+.pf-gen-or-label {
+  display: block;
+  font-size: 0.8em;
+  color: var(--text-dim, #6B7280);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.pf-gen-or-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  color: var(--text, #1A1A2E);
+  font-size: 0.85rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.pf-gen-or-input:focus { outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1); }
+.pf-gen-or-input-sm { max-width: 100px; }
+.pf-gen-or-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  color: var(--text, #1A1A2E);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.pf-gen-or-select:disabled { opacity: 0.5; cursor: not-allowed; }
+.pf-gen-or-select:focus { outline: none; border-color: var(--accent, #E8564A); }
+.pf-gen-or-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+  cursor: pointer;
+}
+.pf-gen-or-checkbox input[type="checkbox"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; }
+.pf-gen-or-loading { font-size: 0.85em; color: var(--text-dim, #6B7280); font-style: italic; }
+.pf-gen-or-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.pf-gen-or-message {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85em;
+  margin-top: 8px;
+}
+.pf-gen-or-message-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success, #22c55e);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.pf-gen-or-message-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
 /* ── Input for verification codes (email-tab) ── */
 .pf .input-verification-code {
   font-size: 1.5rem; letter-spacing: 6px; text-align: center;

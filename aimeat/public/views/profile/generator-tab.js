@@ -28,13 +28,14 @@
  *     to avoid treating auto-created empty {} from memory GET as an active session
  *   v4.3.0 — 2026-03-19 — Fix CSS bugs, add activity logging for all user actions
  *   v5.0.0 — 2026-03-20 — Remove agent UI components (replaced by OpenRouter autopilot)
+ *   v5.1.0 — 2026-03-20 — Add OpenRouter settings UI (collapsible panel for API key, model, auto-retry)
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent,
@@ -1296,6 +1297,204 @@ function ComponentDetail({ component, project, components, projectId, interviewS
   `;
 }
 
+/* ── OpenRouter Settings ─────────────────────────────── */
+
+function OpenRouterSettings() {
+  const [collapsed, setCollapsed] = useState(true);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [model, setModel] = useState('');
+  const [models, setModels] = useState([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [autoRetry, setAutoRetry] = useState(false);
+  const [maxRetries, setMaxRetries] = useState(3);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState(null); // { text, error }
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => { loadSettings(); }, []);
+
+  async function loadSettings() {
+    try {
+      const resp = await apiGet('/v1/openrouter/settings');
+      if (resp.ok !== false && resp.data) {
+        setHasApiKey(!!resp.data.hasApiKey);
+        setModel(resp.data.model || '');
+        setAutoRetry(!!resp.data.autoRetry);
+        setMaxRetries(resp.data.maxRetries || 3);
+        if (resp.data.hasApiKey) loadModels();
+      }
+    } catch { /* no settings yet */ }
+    setLoaded(true);
+  }
+
+  async function loadModels() {
+    setModelsLoading(true);
+    try {
+      const resp = await apiGet('/v1/openrouter/models');
+      if (resp.ok !== false && resp.data?.models) {
+        setModels(resp.data.models);
+      }
+    } catch { /* couldn't fetch models */ }
+    setModelsLoading(false);
+  }
+
+  function showMsg(text, error = false) {
+    setMessage({ text, error });
+    setTimeout(() => setMessage(null), 4000);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const body = { model, autoRetry, maxRetries };
+      if (apiKey) body.apiKey = apiKey;
+      const resp = await apiPut('/v1/openrouter/settings', body);
+      if (resp.ok === false) {
+        showMsg(resp.error?.message || t('profile.generator.openrouter.testFail'), true);
+      } else {
+        showMsg(t('profile.generator.openrouter.apiKeySaved'));
+        setHasApiKey(true);
+        setApiKey('');
+        if (apiKey) loadModels();
+      }
+    } catch (e) {
+      showMsg(e.message, true);
+    }
+    setSaving(false);
+  }
+
+  async function handleTest() {
+    setTesting(true);
+    try {
+      const resp = await apiPost('/v1/openrouter/test');
+      if (resp.ok === false) {
+        showMsg(t('profile.generator.openrouter.testFail') + (resp.error?.message ? ': ' + resp.error.message : ''), true);
+      } else {
+        showMsg(t('profile.generator.openrouter.testSuccess'));
+      }
+    } catch (e) {
+      showMsg(t('profile.generator.openrouter.testFail') + ': ' + e.message, true);
+    }
+    setTesting(false);
+  }
+
+  async function handleDelete() {
+    if (!confirm(t('profile.generator.openrouter.deleteConfirm'))) return;
+    try {
+      await apiDelete('/v1/openrouter/settings');
+      setHasApiKey(false);
+      setApiKey('');
+      setModel('');
+      setModels([]);
+      setAutoRetry(false);
+      setMaxRetries(3);
+      showMsg(t('profile.generator.openrouter.delete'));
+    } catch (e) {
+      showMsg(e.message, true);
+    }
+  }
+
+  if (!loaded) return null;
+
+  return html`
+    <div class="pf-gen-or-wrapper">
+      <button class="pf-gen-or-toggle" onClick=${() => setCollapsed(!collapsed)}>
+        <span class="pf-gen-or-toggle-icon">${collapsed ? '\u25B6' : '\u25BC'}</span>
+        <span>${t('profile.generator.openrouter.title')}</span>
+        ${hasApiKey && html`<span class="pf-gen-or-status-dot"></span>`}
+      </button>
+      ${!collapsed && html`
+        <div class="pf-gen-or-panel">
+          <!-- API Key -->
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.apiKey')}</label>
+            <input
+              type="password"
+              class="pf-gen-or-input"
+              placeholder=${hasApiKey ? t('profile.generator.openrouter.apiKeyMasked') : t('profile.generator.openrouter.apiKeyPlaceholder')}
+              value=${apiKey}
+              onInput=${e => setApiKey(e.target.value)}
+            />
+          </div>
+
+          <!-- Model -->
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.model')}</label>
+            ${modelsLoading
+              ? html`<span class="pf-gen-or-loading">${t('profile.loading')}</span>`
+              : html`
+                <select
+                  class="pf-gen-or-select"
+                  value=${model}
+                  onChange=${e => setModel(e.target.value)}
+                  disabled=${!hasApiKey && !apiKey}
+                >
+                  <option value="">${t('profile.generator.openrouter.modelSelect')}</option>
+                  ${models.map(m => html`
+                    <option value=${m.id}>${m.name || m.id}</option>
+                  `)}
+                </select>
+              `
+            }
+          </div>
+
+          <!-- Auto-retry -->
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-checkbox">
+              <input
+                type="checkbox"
+                checked=${autoRetry}
+                onChange=${e => setAutoRetry(e.target.checked)}
+              />
+              ${t('profile.generator.openrouter.autoRetry')}
+            </label>
+          </div>
+
+          <!-- Max retries (conditional) -->
+          ${autoRetry && html`
+            <div class="pf-gen-or-field">
+              <label class="pf-gen-or-label">${t('profile.generator.openrouter.maxRetries')}</label>
+              <input
+                type="number"
+                class="pf-gen-or-input pf-gen-or-input-sm"
+                min="1"
+                max="10"
+                value=${maxRetries}
+                onInput=${e => setMaxRetries(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+              />
+            </div>
+          `}
+
+          <!-- Message -->
+          ${message && html`
+            <div class="pf-gen-or-message ${message.error ? 'pf-gen-or-message-error' : 'pf-gen-or-message-success'}">
+              ${message.text}
+            </div>
+          `}
+
+          <!-- Actions -->
+          <div class="pf-gen-or-actions">
+            <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
+              ${saving ? '...' : t('profile.generator.openrouter.save')}
+            </button>
+            ${hasApiKey && html`
+              <button class="btn-outline" onClick=${handleTest} disabled=${testing}>
+                ${testing ? html`<span class="spinner"></span>` : ''}
+                ${t('profile.generator.openrouter.testConnection')}
+              </button>
+              <button class="btn-danger" onClick=${handleDelete}>
+                ${t('profile.generator.openrouter.delete')}
+              </button>
+            `}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+
 /* ── Main Tab ────────────────────────────────────────── */
 
 export default function GeneratorTab({ session, showToast }) {
@@ -1337,5 +1536,10 @@ export default function GeneratorTab({ session, showToast }) {
       showToast=${showToast}
     />`;
   }
-  return html`<${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} showToast=${showToast} session=${session} />`;
+  return html`
+    <div>
+      <${OpenRouterSettings} />
+      <${ProjectListView} onSelect=${handleSelectProject} onCreate=${() => setView('new')} showToast=${showToast} session=${session} />
+    </div>
+  `;
 }
