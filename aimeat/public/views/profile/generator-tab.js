@@ -516,6 +516,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   const [removeMemory, setRemoveMemory] = useState(false);
 
   // Phase 6: Edit service state
+  const [aiRunning, setAiRunning] = useState(null); // null | 'impact'
   const [editMode, setEditMode] = useState(null); // null | 'request' | 'impact' | 'editing'
   const [changeRequest, setChangeRequest] = useState('');
   const [impactResult, setImpactResult] = useState('');
