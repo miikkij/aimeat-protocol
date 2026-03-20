@@ -712,6 +712,30 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     setEditMode('impact');
   }
 
+  async function handleRunImpactAi() {
+    if (!orSettings?.hasApiKey) return;
+    setAiRunning('impact');
+    try {
+      const prompt = buildImpactPrompt(changeRequest, project?.blueprint);
+      const content = await runWithAi(projectId, prompt);
+      setImpactResult(content);
+      setEditMode('impact');
+      // Auto-parse
+      let text = content.trim();
+      const jsonMatch = text.match(/```json\s*\n([\s\S]*?)```/i);
+      if (jsonMatch) text = jsonMatch[1].trim();
+      const parsed = JSON.parse(text);
+      if (parsed.analysis && Array.isArray(parsed.analysis)) {
+        setImpactParsed(parsed);
+        setImpactErrors([]);
+        setEditMode('editing');
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setAiRunning(null);
+  }
+
   function handleParseImpact() {
     try {
       let text = impactResult.trim();
@@ -728,6 +752,95 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     } catch (e) {
       setImpactErrors([t('profile.generator.invalidJson').replace('{error}', e.message)]);
     }
+  }
+
+  async function handleRunAllEditsAi() {
+    if (!orSettings?.hasApiKey || !impactParsed?.analysis) return;
+    setAutopilotRunning(true);
+    autopilotCancelledRef.current = false;
+    try {
+      const editable = impactParsed.analysis.filter(a => a.impact === 'root' || a.impact === 'update');
+      for (const item of editable) {
+        if (autopilotCancelledRef.current) break;
+        const comp = components.find(c => c.id === item.id);
+        if (!comp) continue;
+        setCurrentAutopilotStep(comp.label);
+        setSelectedId(comp.id);
+
+        // Build edit prompt (same as handleCopyEditPrompt)
+        const upstream = impactParsed.analysis
+          .filter(a => a.impact === 'root' && a.id !== comp.id)
+          .map(a => `- ${a.label}: ${a.suggestedChange}`)
+          .join('\n') || '';
+        const prompt = buildEditPrompt(
+          comp.type, comp.label,
+          comp.result || '(no current code)',
+          item.suggestedChange || changeRequest,
+          upstream || null,
+        );
+
+        let content;
+        try {
+          content = await runWithAi(projectId, prompt);
+        } catch (e) {
+          showToast?.(`${comp.label}: ${e.message}`, true);
+          break;
+        }
+        if (autopilotCancelledRef.current) break;
+        if (comp.type === 'extension') content = stripCodeblock(content);
+
+        // Validate
+        let vr = validateComponent(comp.type, content, project.blueprint);
+
+        // Auto-retry
+        if (!vr.valid && orSettings?.autoRetry) {
+          const max = orSettings.maxRetries || 3;
+          for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+            if (autopilotCancelledRef.current) break;
+            setCurrentAutopilotStep(
+              comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
+            );
+            const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
+            try { content = await runWithAi(projectId, fp); } catch (e) { break; }
+            if (comp.type === 'extension') content = stripCodeblock(content);
+            vr = validateComponent(comp.type, content, project.blueprint);
+          }
+        }
+
+        if (!vr.valid) {
+          const errored = addHistory(comp, 'validation_failed', { errors: vr.errors, by: 'autopilot' });
+          await saveComponent(projectId, { ...errored, status: 'errors', result: content, validationErrors: vr.errors });
+          await loadData();
+          showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
+          break;
+        }
+
+        // Save + re-register
+        const updated = addHistory(comp, 'edited', { by: 'autopilot', change: item.suggestedChange });
+        await saveComponent(projectId, { ...updated, status: 'done', result: content, validationErrors: [] });
+
+        try {
+          const serviceSlug = components.find(c => c.type === 'csm' && c.registeredAs)?.registeredAs?.split('/')?.pop() || '';
+          if (comp.type === 'cortex') {
+            const cortexVr = validateComponent('cortex', content, project.blueprint);
+            await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
+          } else {
+            await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
+          }
+          await writeProjectLog(projectId, 'component_edited', { meta: { component: comp.label, by: 'autopilot' } });
+        } catch (e) {
+          showToast?.(`${comp.label}: Registration failed: ${e.message}`, true);
+          await loadData();
+          break;
+        }
+        await loadData();
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setAutopilotRunning(false);
+    setCurrentAutopilotStep('');
+    showToast?.(t('profile.generator.openrouter.stepComplete'));
   }
 
   function handleCopyEditPrompt(comp, suggestedChange) {
@@ -1171,6 +1284,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             <button class="btn-primary btn-sm" onClick=${handleCopyImpactPrompt} disabled=${!changeRequest.trim()}>
               ${t('profile.generator.copyImpactPrompt')}
             </button>
+            ${orSettings?.hasApiKey && html`
+              <button class="btn-outline btn-sm pf-gen-or-run-btn ${aiRunning === 'impact' ? 'pf-gen-or-running' : ''}"
+                onClick=${handleRunImpactAi}
+                disabled=${!changeRequest.trim() || aiRunning !== null}>
+                ${aiRunning === 'impact'
+                  ? html`<span class="pf-gen-or-spin">⟳</span> ${t('profile.generator.openrouter.waiting')}`
+                  : t('profile.generator.openrouter.runWithAi')}
+              </button>
+            `}
           </div>
         </div>
       `}
@@ -1224,6 +1346,20 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             })}
           </div>
           <div class="pf-gen-actions">
+            ${orSettings?.hasApiKey && impactParsed.analysis.some(a => a.impact === 'root' || a.impact === 'update') && html`
+              <button class="btn-primary btn-sm pf-gen-or-run-btn ${autopilotRunning ? 'pf-gen-or-running' : ''}"
+                onClick=${handleRunAllEditsAi}
+                disabled=${autopilotRunning}>
+                ${autopilotRunning
+                  ? html`<span class="pf-gen-or-spin">⟳</span> ${currentAutopilotStep}`
+                  : t('profile.generator.openrouter.runAll')}
+              </button>
+              ${autopilotRunning && html`
+                <button class="btn-danger btn-sm" onClick=${handleCancelAutopilot}>
+                  ${t('profile.generator.openrouter.cancel')}
+                </button>
+              `}
+            `}
             <button class="btn-outline btn-sm" onClick=${() => setEditMode('impact')}>${t('profile.generator.backToImpact')}</button>
             <button class="btn-ghost btn-sm" onClick=${() => setEditMode(null)}>${t('profile.generator.done')}</button>
           </div>
