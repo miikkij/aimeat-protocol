@@ -84,7 +84,7 @@ async function runWithAi(projectId, prompt, systemPrompt = null) {
     });
     const resp = await raw.json();
     if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
-    return stripCodeblock(resp.data.content);
+    return resp.data.content;
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('Cancelled');
     throw e;
@@ -824,6 +824,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           break;
         }
         if (autopilotCancelledRef.current) break;
+        // Strip codeblock wrappers for extensions (AI models often wrap in ```)
+        if (comp.type === 'extension') content = stripCodeblock(content);
 
         // Save result
         let updated = { ...comp, result: content, status: 'validating', prompt,
@@ -1543,6 +1545,8 @@ function ComponentDetail({ component, project, components, projectId, interviewS
         interviewSpec,
       );
       let content = await runWithAi(projectId, fresh);
+      // Strip codeblock wrappers for extensions (AI models often wrap in ```)
+      if (component.type === 'extension') content = stripCodeblock(content);
       setResult(content);
 
       // Validate
