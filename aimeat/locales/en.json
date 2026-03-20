@@ -1179,6 +1179,32 @@
         "validating": "Validating",
         "errors": "Errors",
         "done": "Done"
+      },
+      "openrouter": {
+        "title": "OpenRouter Settings",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "sk-or-v1-...",
+        "apiKeySaved": "API key saved",
+        "apiKeyMasked": "●●●●●●●●",
+        "model": "AI Model",
+        "modelSelect": "Select model",
+        "autoRetry": "Auto-retry on validation error",
+        "maxRetries": "Max retries",
+        "testConnection": "Test connection",
+        "testSuccess": "Connection successful",
+        "testFail": "Connection failed",
+        "save": "Save settings",
+        "delete": "Remove API key",
+        "deleteConfirm": "Are you sure you want to remove your OpenRouter API key?",
+        "runWithAi": "Run with AI",
+        "runAll": "Run all steps",
+        "cancel": "Cancel",
+        "waiting": "Waiting for AI response...",
+        "retrying": "Retrying (attempt {current}/{max})...",
+        "stepComplete": "Step completed via AI",
+        "stepFailed": "AI could not complete this step",
+        "noApiKey": "Configure OpenRouter API key above to use AI autopilot",
+        "encryptionNotConfigured": "Server encryption not configured. Contact the node operator."
       }
     },
     "visibility": {

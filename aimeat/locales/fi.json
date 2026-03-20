@@ -1179,6 +1179,32 @@
         "validating": "Validoidaan",
         "errors": "Virheitä",
         "done": "Valmis"
+      },
+      "openrouter": {
+        "title": "OpenRouter-asetukset",
+        "apiKey": "API-avain",
+        "apiKeyPlaceholder": "sk-or-v1-...",
+        "apiKeySaved": "API-avain tallennettu",
+        "apiKeyMasked": "●●●●●●●●",
+        "model": "Tekoälymalli",
+        "modelSelect": "Valitse malli",
+        "autoRetry": "Automaattinen uudelleenyritys validointivirheessä",
+        "maxRetries": "Uudelleenyritysten enimmäismäärä",
+        "testConnection": "Testaa yhteys",
+        "testSuccess": "Yhteys onnistui",
+        "testFail": "Yhteys epäonnistui",
+        "save": "Tallenna asetukset",
+        "delete": "Poista API-avain",
+        "deleteConfirm": "Haluatko varmasti poistaa OpenRouter API-avaimesi?",
+        "runWithAi": "Aja tekoälyllä",
+        "runAll": "Aja kaikki vaiheet",
+        "cancel": "Keskeytä",
+        "waiting": "Odotetaan tekoälyn vastausta...",
+        "retrying": "Yritetään uudelleen ({current}/{max})...",
+        "stepComplete": "Vaihe suoritettu tekoälyllä",
+        "stepFailed": "Tekoäly ei pystynyt suorittamaan tätä vaihetta",
+        "noApiKey": "Määritä OpenRouter API-avain yllä käyttääksesi tekoälyautomaatiota",
+        "encryptionNotConfigured": "Palvelimen salausta ei ole määritetty. Ota yhteyttä noden ylläpitäjään."
       }
     },
     "visibility": {
