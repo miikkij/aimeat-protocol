@@ -62,6 +62,14 @@ export async function deletePost(boardId, postId) {
   return apiDelete(`/v1/boards/${encodeURIComponent(boardId)}/posts/${encodeURIComponent(postId)}`);
 }
 
+/** Update board members (add/remove GAIIs). */
+export async function updateBoardMembers(boardId, { add, remove }) {
+  return api(`/v1/boards/${encodeURIComponent(boardId)}/members`, {
+    method: 'PATCH',
+    body: JSON.stringify({ add, remove }),
+  });
+}
+
 /** React to a post with an emoji. */
 export async function reactToPost(boardId, postId, emoji) {
   return api(`/v1/boards/${encodeURIComponent(boardId)}/posts/${encodeURIComponent(postId)}/react`, {

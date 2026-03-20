@@ -1,8 +1,9 @@
 /**
  * @file boards-tab.js
- * @description Profile tab for discussion boards — create, subscribe, browse, post, react, delete.
+ * @description Profile tab for discussion boards — create, subscribe, browse, post, react, delete, member management.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
+ *   v1.1.0 — 2026-03-20 — Add board member management UI for shared boards
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -13,6 +14,18 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as boardsService from '/js/services/boards.js';
+
+/** Extract the owner name from a GAII or GHII string. */
+function extractOwner(gaii) {
+  if (!gaii) return '';
+  // agent#owner@node -> owner
+  const hashIdx = gaii.indexOf('#');
+  const atIdx = gaii.indexOf('@');
+  if (hashIdx >= 0 && atIdx > hashIdx) return gaii.slice(hashIdx + 1, atIdx);
+  // owner@node -> owner
+  if (atIdx >= 0) return gaii.slice(0, atIdx);
+  return gaii;
+}
 
 export default function BoardsTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -57,9 +70,9 @@ export default function BoardsTab({ session, showToast }) {
     } else showToast(t('profile.boards.createFailed'), true);
   }
 
-  const cycleVis = ['private', 'public'];
-  const visColor = { private: '#c084fc', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', public: 'rgba(0,200,100,.2)' };
+  const cycleVis = ['private', 'shared', 'public'];
+  const visColor = { private: '#c084fc', shared: '#60a5fa', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', shared: 'rgba(96,165,250,.2)', public: 'rgba(0,200,100,.2)' };
 
   async function handleUpdateBoardVisibility(boardId, newVis) {
     setMyBoards(prev => prev?.map(b => (b.board_id || b.id) === boardId ? { ...b, visibility: newVis } : b));
@@ -82,8 +95,11 @@ export default function BoardsTab({ session, showToast }) {
   async function viewPosts(boardId, boardName) {
     try {
       const posts = await boardsService.listPosts(boardId);
-      setBoardView({ id: boardId, name: boardName, posts });
-    } catch { setBoardView({ id: boardId, name: boardName, posts: [] }); }
+      // Find the board data to get owner_gaii and allowed_gaiis
+      const boardData = myBoards?.find(b => (b.board_id || b.id) === boardId)
+        || allBoards?.find(b => (b.board_id || b.id) === boardId);
+      setBoardView({ id: boardId, name: boardName, posts, boardData });
+    } catch { setBoardView({ id: boardId, name: boardName, posts: [], boardData: null }); }
   }
 
   async function handlePost(boardId, content) {
@@ -122,16 +138,50 @@ export default function BoardsTab({ session, showToast }) {
     }, { danger: true });
   }
 
+  async function handleAddMember(boardId, gaii) {
+    try {
+      await boardsService.updateBoardMembers(boardId, { add: [gaii] });
+      showToast(t('profile.boards.memberAdded'));
+      // Reload board list to get updated allowed_gaiis, then refresh the view
+      await loadMyData();
+      viewPosts(boardId, boardView?.name);
+    } catch (e) { showToast(e.message || t('profile.boards.memberError'), true); }
+  }
+
+  async function handleRemoveMember(boardId, gaii) {
+    try {
+      await boardsService.updateBoardMembers(boardId, { remove: [gaii] });
+      showToast(t('profile.boards.memberRemoved'));
+      await loadMyData();
+      viewPosts(boardId, boardView?.name);
+    } catch (e) { showToast(e.message || t('profile.boards.memberError'), true); }
+  }
+
   function isMyPost(post) {
     const author = post.author_gaii || post.author || '';
     return author === session?.ghii || author === session?.owner || author === session?.gaii;
   }
 
+  /** Check if current user owns the board. */
+  function isBoardOwner(boardData) {
+    if (!boardData?.owner_gaii || !session?.owner) return false;
+    return extractOwner(boardData.owner_gaii) === session.owner;
+  }
+
   if (boardView) {
     const postRef = useRef(null);
+    const memberInputRef = useRef(null);
+    const bd = boardView.boardData;
+    const showMembers = bd && bd.visibility === 'shared' && isBoardOwner(bd);
     return html`
       <button class="btn-outline mb-1" onClick=${() => setBoardView(null)}>\u2190 ${t('profile.boards.backToBoards')}</button>
       <div class="section-title">${escHtml(boardView.name)}</div>
+      ${showMembers && html`<${BoardMembers}
+        boardId=${boardView.id}
+        allowedGaiis=${bd.allowed_gaiis || []}
+        onAdd=${(gaii) => handleAddMember(boardView.id, gaii)}
+        onRemove=${(gaii) => handleRemoveMember(boardView.id, gaii)}
+      />`}
       <div class="mb-1">
         <textarea ref=${postRef} class="input-field" rows="2" placeholder=${t('profile.boards.postPlaceholder')}></textarea>
         <button class="btn-primary mb-half" onClick=${() => { handlePost(boardView.id, postRef.current?.value); if (postRef.current) postRef.current.value = ''; }}>${t('profile.boards.postBtn')}</button>
@@ -207,6 +257,49 @@ export default function BoardsTab({ session, showToast }) {
   `;
 }
 
+/** Board member management section for shared boards. */
+function BoardMembers({ boardId, allowedGaiis, onAdd, onRemove }) {
+  const inputRef = useRef(null);
+
+  function handleAdd() {
+    const val = inputRef.current?.value?.trim();
+    if (!val) return;
+    onAdd(val);
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') { e.preventDefault(); handleAdd(); }
+  }
+
+  /** Truncate long GAII for display. */
+  function truncGaii(gaii) {
+    if (!gaii || gaii.length <= 40) return gaii;
+    return gaii.slice(0, 18) + '\u2026' + gaii.slice(-18);
+  }
+
+  return html`
+    <div class="brd-members card mb-1">
+      <div class="card-title">${t('profile.boards.membersTitle')}</div>
+      <div class="text-meta-sm mb-half">${t('profile.boards.autoAccessInfo')}</div>
+      ${allowedGaiis.length > 0 && html`
+        <div class="brd-member-tags mb-half">
+          ${allowedGaiis.map(g => html`
+            <span class="brd-member-tag" title=${escHtml(g)}>
+              <span>${escHtml(truncGaii(g))}</span>
+              <button class="brd-member-remove" onClick=${() => onRemove(g)} aria-label="Remove">\u00D7</button>
+            </span>
+          `)}
+        </div>
+      `}
+      <div class="brd-member-add">
+        <input ref=${inputRef} class="input-field" placeholder=${t('profile.boards.addMemberPlaceholder')} onKeyDown=${handleKeyDown} />
+        <button class="btn-primary btn-sm" onClick=${handleAdd}>${t('profile.boards.addMember')}</button>
+      </div>
+    </div>
+  `;
+}
+
 function BoardForm({ onCreate, onCancel }) {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
@@ -218,6 +311,7 @@ function BoardForm({ onCreate, onCancel }) {
       <div class="form-row"><label>${t('profile.boards.visLabel')}</label>
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.boards.visPrivate')}</option>
+          <option value="shared">${t('profile.boards.visShared')}</option>
           <option value="public">${t('profile.boards.visPublic')}</option>
         </select>
       </div>

@@ -231,6 +231,14 @@
 .pf .post-reactions{display:flex;gap:.4rem;margin-top:.5rem}
 .pf .reaction-btn{padding:2px 8px;border-radius:12px;border:1px solid var(--border,#E5E7EB);background:transparent;cursor:pointer;font-size:.8rem;transition:all .2s}
 .pf .reaction-btn:hover{border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
+/* Board member management */
+.pf .brd-members{padding:1rem}
+.pf .brd-member-tags{display:flex;flex-wrap:wrap;gap:.4rem}
+.pf .brd-member-tag{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .5rem;background:var(--bg-dim,#F3F4F6);border:1px solid var(--border,#E5E7EB);border-radius:12px;font-size:.78rem;color:var(--text,#1F2937);line-height:1.3}
+.pf .brd-member-remove{background:none;border:none;cursor:pointer;color:var(--text-dim,#6B7280);font-size:1rem;padding:0 .15rem;line-height:1;border-radius:50%}
+.pf .brd-member-remove:hover{color:var(--danger,#ef4444)}
+.pf .brd-member-add{display:flex;gap:.5rem;align-items:center}
+.pf .brd-member-add .input-field{flex:1}
 .pf .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
 .pf .modal{background:var(--bg,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);padding:2rem;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
 .pf .modal h3{color:var(--accent,#E8564A);margin-bottom:1rem}
