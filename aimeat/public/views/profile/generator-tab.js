@@ -3,9 +3,8 @@
  * @description Service Generator tab for the profile view — multi-phase UI for
  *   creating AIMEAT services via AI-assisted prompts. Includes requirements
  *   interview phase, blueprint generation, per-component generation with
- *   validation, agent queue management, and component registration (including cortex).
+ *   validation, and component registration (including cortex).
  * @structure
- *   - AgentListenerBar: agent discovery + setup prompt copy
  *   - ProjectList: project CRUD, archive, cleanup
  *   - ProjectEditor: blueprint + component generation workflow
  *   - Interview phase: structured requirements gathering before blueprint
@@ -28,18 +27,18 @@
  *   v4.2.1 — 2026-03-19 — Fix session state: check agentGaii presence, not just truthy value,
  *     to avoid treating auto-created empty {} from memory GET as an active session
  *   v4.3.0 — 2026-03-19 — Fix CSS bugs, add activity logging for all user actions
+ *   v5.0.0 — 2026-03-20 — Remove agent UI components (replaced by OpenRouter autopilot)
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { apiGet } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent,
-  discoverAgents, registerComponent, cleanupOldEntries,
-  getListeners, buildAgentSetupPrompt, buildAgentShortPrompt, createGeneratorAgent,
+  registerComponent, cleanupOldEntries,
   saveInterviewSpec, getInterviewSpec,
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
   writeProjectLog,
@@ -51,86 +50,6 @@ import {
   packageProject, updatePackageVersion, detectChanges,
   importPackageToGenerator, publishToGallery,
 } from '/js/services/generator-packaging.js';
-
-/* ── Agent Listener Status ───────────────────────────── */
-
-function AgentListenerBar({ showToast, session }) {
-  const [listeners, setListeners] = useState([]);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [nodeUrl, setNodeUrl] = useState('');
-  const [creating, setCreating] = useState(false);
-
-  useEffect(() => {
-    loadListeners();
-    apiGet('/?format=json').then(resp => {
-      setNodeUrl(resp?.data?.this_node?.base_url || resp?.data?.base_url || window.location.origin);
-    }).catch(() => setNodeUrl(window.location.origin));
-  }, []);
-
-  async function loadListeners() {
-    setListeners(await getListeners());
-  }
-
-  async function handleCopyPrompt(short = false) {
-    const url = nodeUrl || window.location.origin;
-    const ownerName = session?.owner;
-    if (!ownerName) {
-      showToast?.(t('profile.generator.agentCreateFailed'));
-      return;
-    }
-    setCreating(true);
-    try {
-      const creds = await createGeneratorAgent(ownerName);
-      const prompt = short
-        ? buildAgentShortPrompt(url, creds)
-        : buildAgentSetupPrompt(url, creds);
-      await navigator.clipboard.writeText(prompt);
-      showToast?.(t('profile.generator.agentPromptCopied'));
-    } catch (err) {
-      console.error('Failed to create generator agent:', err);
-      showToast?.(t('profile.generator.agentCreateFailed'));
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  const online = listeners.filter(l => l.online);
-  const lastSync = online.length > 0
-    ? new Date(Math.max(...online.map(l => new Date(l.lastPoll).getTime()))).toLocaleTimeString()
-    : null;
-
-  return html`
-    <div class="pf-gen-listener-bar">
-      <div class="pf-gen-listener-status">
-        <span class="pf-gen-listener-dot ${online.length > 0 ? 'online' : 'offline'}"></span>
-        <span class="pf-gen-listener-count">
-          ${online.length > 0
-            ? `${online.length} ${t('profile.generator.agentsListening')}`
-            : t('profile.generator.noAgentsListening')}
-        </span>
-        ${lastSync && html`<span class="pf-gen-listener-sync">${t('profile.generator.lastSync')}: ${lastSync}</span>`}
-      </div>
-      <div class="pf-gen-listener-actions">
-        <button class="btn-ghost btn-xs" onClick=${() => setShowPrompt(!showPrompt)}>
-          ${showPrompt ? t('profile.generator.hideSetup') : t('profile.generator.agentSetup')}
-        </button>
-      </div>
-    </div>
-    ${showPrompt && html`
-      <div class="pf-gen-agent-prompt-panel">
-        <p class="pf-gen-subtitle">${t('profile.generator.agentSetupDesc')}</p>
-        <div class="flex-row">
-          <button class="btn-primary btn-sm" onClick=${() => handleCopyPrompt(true)} disabled=${creating}>
-            ${creating ? t('profile.generator.creatingAgent') : t('profile.generator.copyAgentPromptShort')}
-          </button>
-          <button class="btn-outline btn-sm" onClick=${() => handleCopyPrompt(false)} disabled=${creating}>
-            ${t('profile.generator.copyAgentPromptFull')}
-          </button>
-        </div>
-      </div>
-    `}
-  `;
-}
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -164,7 +83,6 @@ function ProjectListView({ onSelect, onCreate, showToast, session }) {
 
   return html`
     <div class="pf-gen-project-list">
-      <${AgentListenerBar} showToast=${showToast} session=${session} />
       <div class="pf-gen-header">
         <div class="section-title">${t('profile.generator.title')}</div>
         <div class="pf-gen-header-actions">
@@ -384,7 +302,7 @@ function NewProjectView({ onBack, onCreated, showToast }) {
             ${t('profile.generator.importBlueprint')}
           </button>
           <button class="btn-outline" onClick=${() => onCreated(project)}>
-            ${t('profile.generator.agentSelector.skipToAgent')}
+            ${t('profile.generator.skipBlueprint')}
           </button>
         </div>
       </div>
@@ -412,106 +330,10 @@ function NewProjectView({ onBack, onCreated, showToast }) {
   `;
 }
 
-function AgentProgressBanner({ session, components, projectId, onStop }) {
-  // Re-render every 15s so stale detection and heartbeat time stay current
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 15_000);
-    return () => clearInterval(timer);
-  }, []);
-  const isStale = session &&
-    (Date.now() - new Date(session.heartbeat).getTime()) > 5 * 60 * 1000;
-
-  async function handleStop() {
-    try {
-      await apiDelete(`/v1/generator/${projectId}/session`);
-    } catch { /* best effort */ }
-    onStop();
-  }
-
-  if (!session) return null;
-
-  const phaseLabels = {
-    starting: t('profile.generator.agentBanner.phaseStarting'),
-    blueprint: t('profile.generator.agentBanner.phaseBlueprint'),
-    generating: t('profile.generator.agentBanner.phaseGenerating'),
-    registering: t('profile.generator.agentBanner.phaseRegistering'),
-    completing: t('profile.generator.agentBanner.phaseCompleting'),
-  };
-  const phaseLabel = phaseLabels[session?.phase] || session?.phase || '';
-
-  return html`<div class="pf-gen-agent-banner ${isStale ? 'stale' : ''}">
-    <div class="pf-gen-agent-banner-info">
-      <strong>${isStale
-        ? t('profile.generator.agentBanner.disconnected')
-        : t('profile.generator.agentBanner.working').replace('{agentName}', session.agentName)
-      }</strong>
-      ${' '}
-      <span class="pf-gen-agent-banner-phase">${phaseLabel}</span>
-      ${session.totalSteps > 0 && html`
-        <span class="text-caption">(${session.stepNumber}/${session.totalSteps})</span>
-      `}
-      <span class="text-caption"> | ${t('profile.generator.agentBanner.lastHeartbeat')}: ${session.heartbeat ? new Date(session.heartbeat).toLocaleTimeString() : '-'}</span>
-    </div>
-    <div class="pf-gen-step-indicators">
-      ${components.map(c => html`
-        <span class="pf-gen-step-dot ${c.status === 'registered' ? 'done' : c.id === session.componentId ? 'active' : 'pending'}"
-              title=${c.id}></span>
-      `)}
-    </div>
-    <button class="btn-ghost pf-gen-stop-btn" onClick=${handleStop}>
-      ${isStale
-        ? t('profile.generator.agentBanner.continueManually')
-        : t('profile.generator.agentBanner.stopButton')
-      }
-    </button>
-  </div>`;
-}
-
-function AgentSelector({ projectId, listeners, onAgentStart, onManual }) {
-  const [selected, setSelected] = useState(listeners[0]?.gaii ?? null);
-
-  useEffect(() => {
-    if (listeners.length > 0 && !listeners.find(a => a.gaii === selected)) {
-      setSelected(listeners[0].gaii);
-    }
-  }, [listeners]);
-
-  if (listeners.length === 0) {
-    return html`<div class="pf-gen-agent-selector">
-      <p class="pf-gen-agent-selector-empty">${t('profile.generator.agentSelector.noAgents')}</p>
-      <button class="btn-ghost" onClick=${onManual}>${t('profile.generator.agentSelector.manualButton')}</button>
-    </div>`;
-  }
-
-  return html`<div class="pf-gen-agent-selector">
-    <p class="pf-gen-agent-selector-subtitle">${t('profile.generator.agentSelector.subtitle')}</p>
-    <div class="pf-gen-agent-list">
-      ${listeners.map(agent => html`
-        <label class="pf-gen-agent-option ${selected === agent.gaii ? 'selected' : ''}">
-          <input type="radio" name="agent" value=${agent.gaii}
-            checked=${selected === agent.gaii}
-            onChange=${() => setSelected(agent.gaii)} />
-          <span class="pf-gen-agent-name">${agent.name ?? agent.gaii}</span>
-          <span class="pf-gen-agent-gaii">${agent.gaii}</span>
-        </label>
-      `)}
-    </div>
-    <div class="pf-gen-agent-actions">
-      <button class="btn-primary" disabled=${!selected}
-        onClick=${() => selected && onAgentStart(selected)}>
-        ${t('profile.generator.agentSelector.startButton')}
-      </button>
-      <button class="btn-ghost" onClick=${onManual}>${t('profile.generator.agentSelector.manualButton')}</button>
-    </div>
-  </div>`;
-}
-
 function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const [project, setProject] = useState(null);
   const [components, setComponents] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [agents, setAgents] = useState([]);
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -548,32 +370,19 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   // Interview spec (loaded for locale threading to component prompts)
   const [interviewSpec, setInterviewSpec] = useState(null);
 
-  // Agent-driven session state
-  const [generatorSession, setGeneratorSession] = useState(null);
-  const [listeners, setListeners] = useState([]);
-  const [agentLogs, setAgentLogs] = useState([]);
-
   useEffect(() => { loadData(); }, [projectId]);
 
-  // SSE live updates — instant refresh when agent writes to memory
+  // SSE live updates — instant refresh when data changes
   useEffect(() => {
     const handler = () => loadData();
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [projectId]);
 
-  // Polling fallback — full reload every 10s when agent session is active
-  useEffect(() => {
-    if (!generatorSession) return;
-    const poller = setInterval(() => loadData(), 10_000);
-    return () => clearInterval(poller);
-  }, [projectId, !!generatorSession]);
-
   async function loadData() {
     const p = await getProject(projectId);
     if (!p || !p.projectId) {
-      // Project deleted — stop polling, go back
-      setGeneratorSession(null);
+      // Project deleted — go back
       onBack();
       return;
     }
@@ -583,26 +392,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
       const spec = await getInterviewSpec(projectId);
       setInterviewSpec(spec);
     } catch { /* no interview spec — that's fine */ }
-    // Load generator session state (if any agent is executing)
-    // Only treat as active if the value has agentGaii — the memory GET auto-creates {}
-    // for missing keys, so we must distinguish a real session from an empty auto-created one.
-    try {
-      const sessionKey = `generator.${projectId}.session`;
-      const sessionResp = await apiGet(`/v1/memory?prefix=${sessionKey}&owner_scope=true`);
-      const sessionItem = (sessionResp?.data?.items || []).find(i => i.key === sessionKey);
-      const val = sessionItem?.value;
-      setGeneratorSession(val?.agentGaii ? val : null);
-    } catch { /* no session — that's fine */ }
-    // Load listening agents for the selector
-    try {
-      setListeners(await getListeners(projectId));
-    } catch { /* best effort */ }
     if (p?.blueprint?.components) {
       const comps = await loadAllComponents(projectId);
       if (comps.length > 0) {
         setComponents(comps);
       } else {
-        // Blueprint exists but no component records yet (e.g. agent submitted blueprint via API).
+        // Blueprint exists but no component records yet (e.g. submitted blueprint via API).
         // Initialize component records in memory — same as handleSubmitBlueprint() does for UI flow.
         const initialized = [];
         for (const c of p.blueprint.components) {
@@ -613,13 +408,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         setComponents(initialized);
       }
     }
-    setAgents(await discoverAgents());
-    // Load agent-written logs from memory
-    try {
-      const logResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.logs.&owner_scope=true`);
-      const logItems = logResp?.data?.items || [];
-      setAgentLogs(logItems.map(l => l.value).filter(Boolean));
-    } catch { /* no logs */ }
     cleanupOldEntries(projectId).catch(() => {});
   }
 
@@ -789,21 +577,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
   const selected = components.find(c => c.id === selectedId);
   const phases = project?.blueprint?.phases || [];
 
-  // Build activity log from component histories + agent API logs
+  // Build activity log from component histories
   const componentLogs = components.flatMap(c =>
     (c.history || []).map(h => ({ ...h, componentId: c.id, componentLabel: c.label }))
   );
-  const apiLogs = (agentLogs || []).map(l => ({
-    action: l.source === 'ui'
-      ? (t(`profile.generator.logActions.${l.message}`) || l.message)
-      : `[${l.level || 'info'}] ${l.message}`,
-    at: l.timestamp,
-    componentId: l.componentId || null,
-    componentLabel: l.componentId
-      ? (components.find(c => c.id === l.componentId)?.label || l.componentId)
-      : (l.source === 'ui' ? 'system' : 'agent'),
-  }));
-  const allLogs = [...componentLogs, ...apiLogs].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  const allLogs = componentLogs.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const filteredLogs = logFilter ? allLogs.filter(l => l.componentId === logFilter) : allLogs;
 
   // Phase 5: Compute summary for lifecycle toolbar
@@ -855,20 +633,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
     };
   });
 
-  async function handleAgentStart(agentGaii) {
-    const agentRecord = listeners.find(a => a.gaii === agentGaii);
-    try {
-      await apiPost(`/v1/generator/${projectId}/session/claim`, {
-        agentGaii,
-        agentName: agentRecord?.name ?? agentGaii,
-      });
-      await writeProjectLog(projectId, 'agent_started', { meta: { agentGaii, agentName: agentRecord?.name } });
-      await loadData();
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
-  }
-
   function handleDeleteProject() {
     confirm(t('profile.generator.confirmDelete'), async () => {
       try {
@@ -886,12 +650,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
 
   return html`
     <div class="pf-gen-dashboard">
-      <${AgentProgressBanner}
-        session=${generatorSession}
-        components=${components}
-        projectId=${projectId}
-        onStop=${async () => { await writeProjectLog(projectId, 'agent_stopped'); await loadData(); }}
-      />
       <${ConfirmUI} />
       <div class="pf-gen-dash-header">
         <button class="btn-outline" onClick=${onBack}>${t('profile.generator.back')}</button>
@@ -918,15 +676,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
         <p class="pf-gen-package-link text-caption mb-half">
           Package: ${project.packageGroupId}${project.lastPackagedVersion ? ' — ' + project.lastPackagedVersion : ''}
         </p>
-      `}
-
-      ${interviewSpec && !generatorSession && html`
-        <${AgentSelector}
-          projectId=${projectId}
-          listeners=${listeners}
-          onAgentStart=${handleAgentStart}
-          onManual=${() => { /* just dismiss — user proceeds manually */ }}
-        />
       `}
 
       <!-- Phase 5: Lifecycle Toolbar -->
@@ -1221,7 +970,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast }) {
                 component=${selected}
                 project=${project}
                 components=${components}
-                agents=${agents}
                 projectId=${projectId}
                 interviewSpec=${interviewSpec}
                 liveStatuses=${liveStatuses}
@@ -1289,8 +1037,7 @@ function StepArrow({ direction = 'right' } = {}) {
   </svg>`;
 }
 
-function ComponentDetail({ component, project, components, agents, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session }) {
-  const [mode, setMode] = useState('chat');
+function ComponentDetail({ component, project, components, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session }) {
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
   const [registering, setRegistering] = useState(false);
@@ -1473,81 +1220,60 @@ function ComponentDetail({ component, project, components, agents, projectId, in
         <span class="pf-gen-status-badge status-${component.status}">${component.status}</span>
       </div>
 
-      <!-- Mode toggle -->
-      <div class="pf-gen-mode-toggle">
-        <button class=${`btn-sm ${mode === 'chat' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('chat')}
-          title=${t('profile.generator.modeChatHint')}>
-          ${t('profile.generator.modeChat')}
-        </button>
-        ${agents.length > 0 && html`
-          <button class=${`btn-sm ${mode === 'agent' ? 'btn-primary' : 'btn-ghost'}`} onClick=${() => setMode('agent')}
-            title=${t('profile.generator.modeAgentHint')}>
-            ${t('profile.generator.modeAgent')}
+      <!-- AI Chat Mode -->
+      <div class="pf-gen-section">
+        <label>${t('profile.generator.prompt')}</label>
+        <pre class="pf-gen-prompt-box">${prompt}</pre>
+        <div class="flex-row-wrap">
+          ${workflowStep === 'copy' && html`<${StepArrow} />`}
+          <button class="btn-outline btn-sm" onClick=${handleCopyPrompt}
+            title=${t('profile.generator.copyPromptHint')}>
+            ${t('profile.generator.copyPrompt')}
           </button>
-        `}
+          <button class="btn-ghost btn-sm" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint')}>
+            ${'↻ ' + (t('profile.generator.regeneratePrompt'))}
+          </button>
+        </div>
       </div>
-
-      ${mode === 'chat' ? html`
-        <!-- AI Chat Mode -->
-        <div class="pf-gen-section">
-          <label>${t('profile.generator.prompt')}</label>
-          <pre class="pf-gen-prompt-box">${prompt}</pre>
-          <div class="flex-row-wrap">
-            ${workflowStep === 'copy' && html`<${StepArrow} />`}
-            <button class="btn-outline btn-sm" onClick=${handleCopyPrompt}
-              title=${t('profile.generator.copyPromptHint')}>
-              ${t('profile.generator.copyPrompt')}
-            </button>
-            <button class="btn-ghost btn-sm" onClick=${handleRegeneratePrompt} title=${t('profile.generator.regeneratePromptHint')}>
-              ${'↻ ' + (t('profile.generator.regeneratePrompt'))}
-            </button>
-          </div>
+      <div class="pf-gen-section">
+        <div class="flex-row">
+          <label>${t('profile.generator.result')}</label>
+          ${workflowStep === 'paste' && html`<${StepArrow} direction="down" />`}
         </div>
-        <div class="pf-gen-section">
-          <div class="flex-row">
-            <label>${t('profile.generator.result')}</label>
-            ${workflowStep === 'paste' && html`<${StepArrow} direction="down" />`}
-          </div>
-          ${component.type === 'extension' && html`
-            <p class="pf-gen-hint">${t('profile.generator.extensionPasteHint')}</p>
+        ${component.type === 'extension' && html`
+          <p class="pf-gen-hint">${t('profile.generator.extensionPasteHint')}</p>
+        `}
+        <textarea
+          ref=${el => { resultRef.current = el; }}
+          class="pf-gen-result-area"
+          rows="12"
+          placeholder=${component.type === 'extension'
+            ? t('profile.generator.extensionResultPlaceholder')
+            : t('profile.generator.resultPlaceholder')}
+          value=${result}
+          onInput=${e => setResult(e.target.value)}
+        />
+        <div class="pf-gen-actions">
+          ${workflowStep === 'validate' && html`<${StepArrow} />`}
+          <button class="btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
+            title=${t('profile.generator.validateHint')}>
+            ${t('profile.generator.validate')}
+          </button>
+          ${validationResult?.valid && html`
+            ${workflowStep === 'register' && html`<${StepArrow} />`}
+            <button class="btn-success btn-sm" onClick=${handleRegister} disabled=${registering}
+              title=${t('profile.generator.registerHint')}>
+              ${registering ? '...' : t('profile.generator.register')}
+            </button>
           `}
-          <textarea
-            ref=${el => { resultRef.current = el; }}
-            class="pf-gen-result-area"
-            rows="12"
-            placeholder=${component.type === 'extension'
-              ? t('profile.generator.extensionResultPlaceholder')
-              : t('profile.generator.resultPlaceholder')}
-            value=${result}
-            onInput=${e => setResult(e.target.value)}
-          />
-          <div class="pf-gen-actions">
-            ${workflowStep === 'validate' && html`<${StepArrow} />`}
-            <button class="btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
-              title=${t('profile.generator.validateHint')}>
-              ${t('profile.generator.validate')}
+          ${component.registeredAs && result.trim() && html`
+            <button class="btn-outline btn-sm" onClick=${handleReregister} disabled=${registering}
+              title=${t('profile.generator.reregisterHint')}>
+              ${registering ? '...' : (t('profile.generator.reregister'))}
             </button>
-            ${validationResult?.valid && html`
-              ${workflowStep === 'register' && html`<${StepArrow} />`}
-              <button class="btn-success btn-sm" onClick=${handleRegister} disabled=${registering}
-                title=${t('profile.generator.registerHint')}>
-                ${registering ? '...' : t('profile.generator.register')}
-              </button>
-            `}
-            ${component.registeredAs && result.trim() && html`
-              <button class="btn-outline btn-sm" onClick=${handleReregister} disabled=${registering}
-                title=${t('profile.generator.reregisterHint')}>
-                ${registering ? '...' : (t('profile.generator.reregister'))}
-              </button>
-            `}
-          </div>
+          `}
         </div>
-      ` : html`
-        <!-- Agent Mode — agent handles generation autonomously via session -->
-        <div class="pf-gen-section">
-          <div class="pf-gen-agent-status">${t('profile.generator.agentBanner.working').replace('{agentName}', agents[0]?.name || 'agent')}</div>
-        </div>
-      `}
+      </div>
 
       <!-- Errors -->
       ${validationResult && !validationResult.valid && html`

@@ -1081,6 +1081,7 @@
       "specImported": "Specification imported successfully!",
       "importSpec": "Import Specification",
       "skipInterview": "Skip (use description only)",
+      "skipBlueprint": "Skip (go to components)",
       "cortexPhase": "Connect & Integrate",
       "cortexDesc": "Client-side domain library bridging extensions and app",
       "registeredLabel": "registered",

@@ -1081,6 +1081,7 @@
       "specImported": "Määrittely tuotu onnistuneesti!",
       "importSpec": "Tuo määrittely",
       "skipInterview": "Ohita (käytä vain kuvausta)",
+      "skipBlueprint": "Ohita (siirry komponentteihin)",
       "cortexPhase": "Yhdistä ja integroi",
       "cortexDesc": "Asiakaspuolen domain-kirjasto laajennusten ja sovelluksen välillä",
       "registeredLabel": "rekisteröity",
