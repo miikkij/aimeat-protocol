@@ -183,7 +183,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       try {
         const apiKey = decrypt(encrypted, encKey);
         const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
-        const model = (prefsRecord?.value as { model?: string })?.model ?? 'openai/gpt-4o-mini';
+        const model = (prefsRecord?.value as { model?: string })?.model || 'openai/gpt-4o-mini';
         await complete(apiKey, model, 'Reply with exactly: OK');
         res.json(success(config.nodeId, { ok: true, model }));
       } catch (e) {
@@ -234,7 +234,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       try {
         const apiKey = decrypt(encrypted, encKey);
         const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
-        const defaultModel = (prefsRecord?.value as { model?: string })?.model ?? 'anthropic/claude-sonnet-4';
+        const defaultModel = (prefsRecord?.value as { model?: string })?.model || 'anthropic/claude-sonnet-4';
         const model = (typeof modelOverride === 'string' && modelOverride) ? modelOverride : defaultModel;
 
         const result = await complete(apiKey, model, prompt, systemPrompt);

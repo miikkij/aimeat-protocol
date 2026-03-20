@@ -1832,7 +1832,7 @@ function OpenRouterSettings({ onSettingsChange }) {
                 ${testing ? html`<span class="spinner"></span>` : ''}
                 ${t('profile.generator.openrouter.testConnection')}
               </button>
-              <button class="btn-danger" onClick=${handleDelete}>
+              <button class="btn-outline btn-sm pf-gen-or-delete" onClick=${handleDelete}>
                 ${t('profile.generator.openrouter.delete')}
               </button>
             `}

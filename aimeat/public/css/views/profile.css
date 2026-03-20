@@ -957,6 +957,14 @@
   margin-top: 14px;
   flex-wrap: wrap;
 }
+.pf-gen-or-delete {
+  color: var(--danger, #ef4444);
+  border-color: var(--danger, #ef4444);
+}
+.pf-gen-or-delete:hover {
+  background: var(--danger, #ef4444);
+  color: #fff;
+}
 .pf-gen-or-message {
   padding: 8px 12px;
   border-radius: 6px;
