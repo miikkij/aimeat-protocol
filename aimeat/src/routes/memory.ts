@@ -6,7 +6,7 @@ import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
 import { checkMemoryQuota, checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
-import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { enqueueMemoryReplication } from '../services/memory-replication.js';
 import { resolveIdentity } from '../utils/gaii.js';

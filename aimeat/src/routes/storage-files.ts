@@ -8,7 +8,7 @@ import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { randomBytes } from 'node:crypto';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
-import { emitResourceUpdated, emitResourceListChanged } from './mcp.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */

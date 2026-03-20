@@ -38,7 +38,7 @@ import { disputesRouter } from '../routes/disputes.js';
 import { microMemoryRouter } from '../routes/micro-memory.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
 import { validateRouter } from '../routes/validate.js';
-import { mcpRouter } from '../routes/mcp.js';
+import { mcpRouter } from '../mcp/index.js';
 import { portalRouter } from '../routes/portal.js';
 import { portfolioRouter } from '../routes/portfolio.js';
 import { portalApiRouter } from '../routes/portal-api.js';
