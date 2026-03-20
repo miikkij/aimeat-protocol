@@ -1364,7 +1364,7 @@ function ComponentDetail({ component, project, components, projectId, interviewS
         history: [...(component.history || []), { action: 'prompt_generated', at: new Date().toISOString(), by: 'system' }],
       }).then(() => onUpdate());
     }
-  }, [component.id]);
+  }, [component.id, component.result, component.status]);
 
   const completedComponents = components.filter(c => c.status === 'done' && c.registeredAs);
   const prompt = component.prompt || buildComponentPrompt(
