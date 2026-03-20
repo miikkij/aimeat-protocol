@@ -1013,10 +1013,17 @@ export function initializeSchema(db: Database.Database): void {
       reviewCount       INTEGER DEFAULT 0,
       status            TEXT DEFAULT 'listed',
       createdAt         TEXT NOT NULL,
-      updatedAt         TEXT NOT NULL
+      updatedAt         TEXT NOT NULL,
+      rejectionReason   TEXT,
+      reviewedBy        TEXT,
+      reviewedAt        TEXT,
+      reviewComment     TEXT,
+      proposedAt        TEXT,
+      proposedBy        TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_template_listings_category ON template_listings(category);
     CREATE INDEX IF NOT EXISTS idx_template_listings_featured ON template_listings(featured);
+    CREATE INDEX IF NOT EXISTS idx_template_listings_status ON template_listings(status);
 
     -- ── Template Reviews (separate table — avoids race conditions) ──
     CREATE TABLE IF NOT EXISTS template_reviews (

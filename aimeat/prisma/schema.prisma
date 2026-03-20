@@ -1031,9 +1031,16 @@ model TemplateListing {
   status          String   @default("listed")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  rejectionReason String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewComment   String?
+  proposedAt      DateTime?
+  proposedBy      String?
 
   @@index([category])
   @@index([featured])
+  @@index([status])
 }
 
 model TemplateReview {
