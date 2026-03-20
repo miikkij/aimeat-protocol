@@ -11,7 +11,7 @@ import { checkOtkSession } from './auth.js';
 import { logger } from '../utils/logger.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isSameOwner } from '../utils/gaii.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -95,6 +95,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       if (b.visibility === 'public' || b.visibility === 'system') return true;
       if (!gaii) return false;
       if (b.ownerGaii === gaii) return true;
+      if (b.visibility === 'shared' && isSameOwner(b.ownerGaii, gaii)) return true;
       if (b.allowedGaiis.includes(gaii)) return true;
       return false;
     });
@@ -107,6 +108,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         visibility: b.visibility,
         semantic: b.semantic,
         created_at: b.createdAt,
+        ...(gaii ? { owner_gaii: b.ownerGaii, allowed_gaiis: b.allowedGaiis } : {}),
       })),
       total: visible.length,
     }));
@@ -190,7 +192,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Cannot post to this private board'));
       return;
     }
-    if (board.visibility === 'shared' && board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
+    if (board.visibility === 'shared' && board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not invited to this board'));
       return;
     }
@@ -265,7 +267,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
         return;
       }
-      if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
+      if (board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
         // Consent fallback: check if the caller has a consent grant for this board
         if (config.consentEnabled) {
           const consentResult = await checkConsentForRead(
@@ -377,7 +379,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
         return;
       }
-      if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
+      if (board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
         // Consent fallback: check if the caller has a consent grant for this board
         if (config.consentEnabled) {
           const consentResult = await checkConsentForRead(
@@ -533,7 +535,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Check access for non-public boards (system boards are publicly accessible)
     if (board.visibility !== 'public' && board.visibility !== 'system') {
-      if (board.ownerGaii !== gaii && !board.allowedGaiis.includes(gaii)) {
+      if (board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
         return;
       }
