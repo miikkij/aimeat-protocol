@@ -72,6 +72,7 @@ import { adminExtensionsRouter } from '../routes/admin-extensions.js';
 import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
 import { generatorRouter } from '../routes/generator.js';
+import { openrouterRouter } from '../routes/openrouter.js';
 
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
@@ -179,6 +180,7 @@ export function mountRoutes(
   if (config.generatorEnabled) {
     app.use(generatorRouter(config, storage));   // Agent-driven service generator
   }
+  app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));
