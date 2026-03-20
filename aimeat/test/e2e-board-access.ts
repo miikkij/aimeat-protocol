@@ -6,6 +6,7 @@
  *   and that board listing aggregation works correctly for owners.
  * @version-history
  *   v1.0.0 — 2026-03-20 — Initial scaffold for board access control test suite
+ *   v1.1.0 — 2026-03-20 — Implemented all test phases with real assertions
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-board-access.ts
@@ -109,6 +110,11 @@ let agentCToken = '';
 // Board IDs
 let sharedBoardId = '';
 let privateBoardId = '';
+let agentBBoardId = '';
+let agentCBoardId = '';
+
+// Post IDs
+let sharedBoardPostId = '';
 
 console.log('\n=== AIMEAT Board Access Control E2E Test ===\n');
 
@@ -172,91 +178,221 @@ await test('Register agent-C (under owner2, external agent)', async () => {
 console.log('\nPhase 1 — Same-owner shared board access');
 
 await test('1. agent-A creates a shared board', async () => {
-    // Placeholder — to be implemented
+    const { status, body } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ name: 'BA Shared Board', visibility: 'shared' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    sharedBoardId = body.data.id;
+    assert(sharedBoardId.startsWith('board-'), `id: ${sharedBoardId}`);
 });
 
-await test('2. agent-A can read the shared board', async () => {
-    // Placeholder — to be implemented
+await test('2. agent-A posts to the shared board', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ title: 'Hello from agent-A', body: 'Initial shared board post' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    sharedBoardPostId = body.data.id;
+    assert(sharedBoardPostId.startsWith('post-'), `post id: ${sharedBoardPostId}`);
 });
 
-await test('3. agent-B (same owner) can read the shared board without being in allowedGaiis', async () => {
-    // Placeholder — to be implemented
+await test('3. agent-B (same owner) can list the shared board in GET /v1/boards', async () => {
+    const { status, body } = await json('/v1/boards', {
+        headers: { Authorization: `Bearer ${agentBToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const boards: any[] = body.data.boards;
+    const found = boards.find((b: any) => b.id === sharedBoardId);
+    assert(!!found, `shared board ${sharedBoardId} not visible to agent-B; boards: ${boards.map((b: any) => b.id).join(', ')}`);
 });
 
-await test('4. agent-B can post to the shared board', async () => {
-    // Placeholder — to be implemented
+await test('4. agent-B can read posts on the shared board', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentBToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const posts: any[] = body.data.posts;
+    const found = posts.find((p: any) => p.id === sharedBoardPostId);
+    assert(!!found, `agent-A's post not visible to agent-B`);
 });
 
-await test('5. owner1 token can read the shared board', async () => {
-    // Placeholder — to be implemented
+await test('5. agent-B can post to the shared board', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentBToken}` },
+        body: JSON.stringify({ title: 'Hello from agent-B', body: 'Same-owner agent posting' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
 });
 
-await test('6. agent-C (external) cannot read the shared board', async () => {
-    // Placeholder — to be implemented
+await test('6. agent-B can subscribe to the shared board', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/subscribe`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentBToken}` },
+        body: JSON.stringify({}),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.board_id === sharedBoardId, `board_id: ${body.data.board_id}`);
+    // Cleanup subscription so it doesn't interfere with later tests
+    await json(`/v1/boards/${sharedBoardId}/subscribe`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentBToken}` },
+    });
 });
 
 // ─── Phase 2: Private board isolation ───
 console.log('\nPhase 2 — Private board isolation');
 
 await test('7. agent-A creates a private board', async () => {
-    // Placeholder — to be implemented
+    const { status, body } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ name: 'BA Private Board', visibility: 'private' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    privateBoardId = body.data.id;
+    assert(privateBoardId.startsWith('board-'), `id: ${privateBoardId}`);
 });
 
-await test('8. agent-B (same owner) cannot access the private board', async () => {
-    // Placeholder — to be implemented
+await test('8. agent-B (same owner) CANNOT read posts on the private board', async () => {
+    const { status } = await json(`/v1/boards/${privateBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentBToken}` },
+    });
+    assert(status === 403, `expected 403 (private board), got ${status}`);
 });
 
-await test('9. agent-C (external) cannot access the private board', async () => {
-    // Placeholder — to be implemented
+await test('9. agent-C (external) CANNOT read posts on the private board', async () => {
+    const { status } = await json(`/v1/boards/${privateBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(status === 403, `expected 403 (private board), got ${status}`);
 });
 
 // ─── Phase 3: External agent access via PATCH members ───
 console.log('\nPhase 3 — External agent access via PATCH members');
 
-await test('10. agent-A PATCHes agent-C into allowedGaiis of shared board', async () => {
-    // Placeholder — to be implemented
+await test('10. agent-C CANNOT read the shared board (not in allowedGaiis, different owner)', async () => {
+    const { status } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(status === 403, `expected 403 for external agent, got ${status}`);
 });
 
-await test('11. agent-C can now read the shared board', async () => {
-    // Placeholder — to be implemented
+await test('11. owner1 adds agent-C to shared board via PATCH /v1/boards/{id}/members', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/members`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${owner1Token}` },
+        body: JSON.stringify({ add: [agentCGaii] }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const allowedGaiis: string[] = body.data.allowed_gaiis;
+    assert(allowedGaiis.includes(agentCGaii), `agent-C not in allowed_gaiis after add: ${JSON.stringify(allowedGaiis)}`);
 });
 
-await test('12. agent-C can post to the shared board after being added', async () => {
-    // Placeholder — to be implemented
+await test('12. agent-C CAN now read posts on the shared board', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(Array.isArray(body.data.posts), 'posts array');
 });
 
-await test('13. agent-A removes agent-C from allowedGaiis', async () => {
-    // Placeholder — to be implemented
+await test('13. agent-C CAN post to the shared board after being added', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentCToken}` },
+        body: JSON.stringify({ title: 'Hello from agent-C', body: 'External agent granted access' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
 });
 
-await test('14. agent-C can no longer read the shared board', async () => {
-    // Placeholder — to be implemented
+await test('14. owner1 removes agent-C from shared board via PATCH { remove: [...] }', async () => {
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/members`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${owner1Token}` },
+        body: JSON.stringify({ remove: [agentCGaii] }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const allowedGaiis: string[] = body.data.allowed_gaiis;
+    assert(!allowedGaiis.includes(agentCGaii), `agent-C still in allowed_gaiis after remove: ${JSON.stringify(allowedGaiis)}`);
 });
 
-await test('15. agent-C cannot read the shared board after removal', async () => {
-    // Placeholder — to be implemented
+await test('15. agent-C CANNOT read the shared board after removal', async () => {
+    const { status } = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(status === 403, `expected 403 after removal, got ${status}`);
 });
 
 // ─── Phase 4: PATCH members authorization ───
 console.log('\nPhase 4 — PATCH members authorization');
 
-await test('16. agent-B (non-owner of board) cannot PATCH allowedGaiis', async () => {
-    // Placeholder — to be implemented
+await test('16. agent-A (agent session, not owner session) gets 403 on PATCH /v1/boards/{id}/members', async () => {
+    const { status } = await json(`/v1/boards/${sharedBoardId}/members`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ add: [agentCGaii] }),
+    });
+    assert(status === 403, `expected 403 for agent session on PATCH members, got ${status}`);
 });
 
-await test('17. agent-C (external) cannot PATCH allowedGaiis', async () => {
-    // Placeholder — to be implemented
+await test('17. owner1 (operator) can PATCH members on a board owned by agent-C (different owner)', async () => {
+    // First create a board under agent-C
+    const { status: createStatus, body: createBody } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentCToken}` },
+        body: JSON.stringify({ name: 'BA Agent-C Board', visibility: 'shared' }),
+    });
+    assert(createStatus === 201, `create board status ${createStatus}: ${JSON.stringify(createBody)}`);
+    agentCBoardId = createBody.data.id;
+
+    // owner1 (operator) PATCH members on agent-C's board
+    const { status, body } = await json(`/v1/boards/${agentCBoardId}/members`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${owner1Token}` },
+        body: JSON.stringify({ add: [agentAGaii] }),
+    });
+    assert(status === 200, `expected 200 for operator PATCH on foreign board, got ${status}: ${JSON.stringify(body)}`);
 });
 
 // ─── Phase 5: Board listing aggregation ───
 console.log('\nPhase 5 — Board listing aggregation');
 
-await test('18. owner1 token sees boards created by agent-A and agent-B', async () => {
-    // Placeholder — to be implemented
+await test('18. agent-B creates a board so owner1 has boards from two of their agents', async () => {
+    const { status, body } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentBToken}` },
+        body: JSON.stringify({ name: 'BA Agent-B Board', visibility: 'shared' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    agentBBoardId = body.data.id;
+    assert(agentBBoardId.startsWith('board-'), `id: ${agentBBoardId}`);
 });
 
-await test('19. owner2 token sees only boards created by agent-C', async () => {
-    // Placeholder — to be implemented
+await test('19. agent-A sees both agent-A board and agent-B board in GET /v1/boards (same owner)', async () => {
+    const { status, body } = await json('/v1/boards', {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const ids = body.data.boards.map((b: any) => b.id);
+    assert(ids.includes(sharedBoardId), `agent-A's own board ${sharedBoardId} not in list`);
+    assert(ids.includes(agentBBoardId), `agent-B's board ${agentBBoardId} not visible to agent-A (same owner)`);
+});
+
+await test('20. owner2 token sees only boards created under owner2 (agent-C)', async () => {
+    const { status, body } = await json('/v1/boards', {
+        headers: { Authorization: `Bearer ${owner2Token}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const ids: string[] = body.data.boards.map((b: any) => b.id);
+    // agent-C's board should be visible to owner2
+    assert(ids.includes(agentCBoardId), `agent-C's board ${agentCBoardId} not visible to owner2`);
+    // agent-A's and agent-B's boards should NOT be visible to owner2 (shared boards of different owner)
+    assert(!ids.includes(sharedBoardId), `owner1's shared board ${sharedBoardId} incorrectly visible to owner2`);
+    assert(!ids.includes(agentBBoardId), `agent-B's board ${agentBBoardId} incorrectly visible to owner2`);
 });
 
 // ─── Cleanup ───

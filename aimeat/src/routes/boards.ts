@@ -150,15 +150,16 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Authorization: only owner session (GHII, not agent) or operator
+    // Authorization: only owner session (GHII, not agent). Operator owner sessions can manage any board.
+    // Agent sessions are always rejected — even operator agents must use their owner session.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    const isOperator = req.auth!.roles.includes('operator');
-    if (!isOwnerSession && !isOperator) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can manage members'));
+    const isOperatorOwner = isOwnerSession && req.auth!.roles.includes('operator');
+    if (!isOwnerSession) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));
       return;
     }
-    // Verify this owner actually owns the board
-    if (isOwnerSession && !isOperator) {
+    // Non-operator owner sessions must own the board
+    if (!isOperatorOwner) {
       const boardOwner = parseGaiiLoose(board.ownerGaii).owner;
       if (req.auth!.owner !== boardOwner) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this board'));
@@ -316,7 +317,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
         return;
       }
-      if (board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
+      // isSameOwner only grants access on shared boards — private boards are strictly owner-only
+      const sameOwnerAccess = board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii);
+      if (board.ownerGaii !== gaii && !sameOwnerAccess && !board.allowedGaiis.includes(gaii)) {
         // Consent fallback: check if the caller has a consent grant for this board
         if (config.consentEnabled) {
           const consentResult = await checkConsentForRead(
@@ -428,7 +431,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
         return;
       }
-      if (board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
+      // isSameOwner only grants access on shared boards — private boards are strictly owner-only
+      const sameOwnerAccessSingle = board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii);
+      if (board.ownerGaii !== gaii && !sameOwnerAccessSingle && !board.allowedGaiis.includes(gaii)) {
         // Consent fallback: check if the caller has a consent grant for this board
         if (config.consentEnabled) {
           const consentResult = await checkConsentForRead(
@@ -583,8 +588,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const gaii = resolve(req);
 
     // Check access for non-public boards (system boards are publicly accessible)
+    // isSameOwner only grants access on shared boards — private boards are strictly owner-only
     if (board.visibility !== 'public' && board.visibility !== 'system') {
-      if (board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
+      const sameOwnerSub = board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii);
+      if (board.ownerGaii !== gaii && !sameOwnerSub && !board.allowedGaiis.includes(gaii)) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
         return;
       }
