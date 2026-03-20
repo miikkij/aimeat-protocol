@@ -429,7 +429,7 @@ await test('16. List tools', async () => {
     assert(toolNames.includes('aimeat_board_read'), 'has aimeat_board_read');
     assert(toolNames.includes('aimeat_storage_upload'), 'has aimeat_storage_upload');
     assert(toolNames.includes('aimeat_storage_download'), 'has aimeat_storage_download');
-    assert(body.result.tools.length === 18, `expected 18 tools, got ${body.result.tools.length}`);
+    assert(body.result.tools.length === 25, `expected 25 tools, got ${body.result.tools.length}`);
 });
 
 await test('17. List resources', async () => {

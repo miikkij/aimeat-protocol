@@ -25,6 +25,7 @@ import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { registerCoreTools } from './core.js';
+import { registerBoardsTools } from './boards.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -82,6 +83,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         );
 
         registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }

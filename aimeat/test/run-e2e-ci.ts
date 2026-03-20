@@ -34,6 +34,7 @@ const ALL_SUITES = [
     'test/e2e-knowledge.ts',
     'test/e2e-libs.ts',
     'test/e2e-mcp.ts',
+    'test/e2e-mcp-boards.ts',
     'test/e2e-packages.ts',
     'test/e2e-micro-memory.ts',
     'test/e2e-personal-node.ts',
