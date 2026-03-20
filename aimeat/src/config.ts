@@ -45,6 +45,7 @@ export interface RateLimitsConfig {
   federation: RateLimitTier;
   catalogue: RateLimitTier;
   authChallenge: RateLimitTier;
+  openrouter: RateLimitTier;
   roleMultipliers: RoleMultipliers;
 }
 
@@ -136,6 +137,9 @@ export interface AimeatConfig {
   totpSecretEncryptionKey: string | null;
   totpMaxFailedAttempts: number;
   totpLockoutSeconds: number;
+
+  // General-purpose encryption key (fallback: totpSecretEncryptionKey)
+  encryptionKey: string | null;
 
   // MSM installation role restriction
   msmInstallRole: 'operator' | 'owner';
@@ -464,6 +468,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     totpSecretEncryptionKey: process.env.AIMEAT_TOTP_ENCRYPTION_KEY ?? null,
     totpMaxFailedAttempts: parseInt(process.env.AIMEAT_TOTP_MAX_FAILED ?? '5', 10),
     totpLockoutSeconds: parseInt(process.env.AIMEAT_TOTP_LOCKOUT_SECONDS ?? '300', 10),
+    encryptionKey: process.env.AIMEAT_ENCRYPTION_KEY ?? null,
     msmInstallRole: (process.env.AIMEAT_MSM_INSTALL_ROLE as 'operator' | 'owner') || 'owner',
     extInstallRole: (process.env.AIMEAT_EXT_INSTALL_ROLE as 'operator' | 'owner') || 'owner',
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
@@ -630,6 +635,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       federation: { windowMs: 1_000, max: rlFederation },
       catalogue: { windowMs: 1_000, max: rlCatalogue },
       authChallenge: { windowMs: 1_000, max: rlAuthChallenge },
+      openrouter: { windowMs: 60_000, max: parseInt(process.env.AIMEAT_RL_OPENROUTER ?? '30', 10) },
       roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },
   };

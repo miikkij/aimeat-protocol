@@ -41,6 +41,7 @@ const ALL_SUITES = [
     'test/e2e-security.ts',
     'test/e2e-storage-visibility.ts',
     'test/cortex-ui-e2e.ts',
+    'test/openrouter.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
