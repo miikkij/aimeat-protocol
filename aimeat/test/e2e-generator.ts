@@ -673,45 +673,7 @@ consent_requirements:
     assert(memStatus === 200, `Component should be stored in memory after valid submit, got ${memStatus}`);
 });
 
-await test('Agent: session claim, duplicate claim returns 409, heartbeat, delete, post-delete heartbeat returns 404', async () => {
-    // Claim
-    const { status: claimStatus } = await json(`/v1/generator/${generatorApiProjectId}/session/claim`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${generatorAgentToken}` },
-        body: JSON.stringify({ agentGaii: generatorAgentGaii, agentName: 'TestAPIAgent' }),
-    });
-    assert(claimStatus === 200, `Session claim: expected 200, got ${claimStatus}`);
-
-    // Second claim from same agent should return 200 (re-claim updates heartbeat)
-    const { status: claimStatus2 } = await json(`/v1/generator/${generatorApiProjectId}/session/claim`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${generatorAgentToken}` },
-        body: JSON.stringify({ agentGaii: generatorAgentGaii, agentName: 'TestAPIAgent' }),
-    });
-    assert(claimStatus2 === 200, `Same-agent re-claim: expected 200 (heartbeat update), got ${claimStatus2}`);
-
-    // Heartbeat while session active
-    const { status: hbStatus } = await json(`/v1/generator/${generatorApiProjectId}/session/heartbeat`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${generatorAgentToken}` },
-        body: JSON.stringify({ phase: 'blueprint', stepNumber: 1, totalSteps: 5 }),
-    });
-    assert(hbStatus === 200, `Heartbeat: expected 200, got ${hbStatus}`);
-
-    // Release session
-    const { status: delStatus } = await json(`/v1/generator/${generatorApiProjectId}/session`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${generatorAgentToken}` },
-    });
-    assert(delStatus === 200, `Session release: expected 200, got ${delStatus}`);
-
-    // Heartbeat after release should return 404 SESSION_RELEASED
-    const { status: hbAfter } = await json(`/v1/generator/${generatorApiProjectId}/session/heartbeat`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${generatorAgentToken}` },
-    });
-    assert(hbAfter === 404, `Post-release heartbeat: expected 404 SESSION_RELEASED, got ${hbAfter}`);
-});
+// Session claim/heartbeat/release tests removed — agent session endpoints removed in OpenRouter autopilot refactor
 
 await test('Agent: cleanup generator API test project', async () => {
     // Delete all generator.{id}.* keys
