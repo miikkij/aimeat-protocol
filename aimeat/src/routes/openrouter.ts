@@ -1,6 +1,7 @@
 /**
  * @file openrouter.ts
- * @description REST endpoints for OpenRouter settings management and AI completions.
+ * @description REST endpoints for AI provider settings management and completions.
+ *   Supports OpenRouter, LM Studio, and custom OpenAI-compatible providers.
  *   All endpoints require owner authentication. API keys are encrypted at rest
  *   using AES-256-GCM via the encryption service.
  * @structure
@@ -11,6 +12,7 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.1.0 — 2026-03-21 — Add provider type (openrouter/lmstudio/custom) support
  *   v1.0.0 — 2026-03-20 — Initial implementation
  */
 
@@ -25,7 +27,26 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { complete, listModels } from '../services/openrouter.js';
 
-// Per-user model cache: Map<ghii, { models, expiresAt }>
+function validateProviderUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return null;
+    if (parsed.protocol === 'https:') return null;
+    return 'Only localhost (http) or remote (https) URLs allowed';
+  } catch {
+    return 'Invalid URL format';
+  }
+}
+
+type ProviderType = 'openrouter' | 'lmstudio' | 'custom';
+
+const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
+  openrouter: 'https://openrouter.ai/api/v1',
+  lmstudio: 'http://localhost:1234/v1',
+  custom: '',
+};
+
+// Per-user model cache: Map<cacheKey, { models, expiresAt }>
 const modelCache = new Map<string, { models: unknown[]; expiresAt: number }>();
 const MODEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -66,36 +87,65 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
   router.put('/v1/openrouter/settings',
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
-      const encKey = requireEncryption(res);
-      if (!encKey) return;
-
       const gaii = resolve(req);
-      const { apiKey, model, autoRetry, maxRetries } = req.body as {
+      const { apiKey, model, autoRetry, maxRetries, provider, baseUrl } = req.body as {
         apiKey?: string;
         model?: string;
         autoRetry?: unknown;
         maxRetries?: unknown;
+        provider?: string;
+        baseUrl?: string;
       };
 
-      // Save API key (encrypted) in separate memory key
+      // Resolve provider type
+      const validProviders: ProviderType[] = ['openrouter', 'lmstudio', 'custom'];
+      const effectiveProvider: ProviderType = (provider && validProviders.includes(provider as ProviderType))
+        ? provider as ProviderType
+        : 'openrouter';
+
+      // Resolve base URL
+      let effectiveBaseUrl: string;
+      if (baseUrl && typeof baseUrl === 'string') {
+        effectiveBaseUrl = baseUrl;
+      } else {
+        effectiveBaseUrl = DEFAULT_BASE_URLS[effectiveProvider];
+      }
+
+      // Validate URL for non-openrouter providers (custom requires a URL)
+      if (effectiveProvider === 'custom' && !effectiveBaseUrl) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'baseUrl is required for custom provider.'));
+      }
+      if (effectiveBaseUrl) {
+        const urlError = validateProviderUrl(effectiveBaseUrl);
+        if (urlError) {
+          return res.status(400).json(error(config.nodeId, 'INVALID_BODY', urlError));
+        }
+      }
+
+      // API key: required for openrouter, optional for lmstudio/custom
       if (apiKey && typeof apiKey === 'string') {
+        const encKey = requireEncryption(res);
+        if (!encKey) return;
         const encrypted = encrypt(apiKey, encKey);
         await upsertMemory(gaii, 'openrouter.apikey', { encrypted }, ['openrouter', 'secret']);
       }
 
       // Save preferences (plaintext)
-      const prefs: Record<string, unknown> = {};
+      const existing = await storage.getMemory(gaii, 'openrouter.settings');
+      const base = existing
+        ? (existing.value as object)
+        : { model: 'anthropic/claude-sonnet-4', autoRetry: true, maxRetries: 3 };
+
+      const prefs: Record<string, unknown> = {
+        ...base,
+        provider: effectiveProvider,
+        baseUrl: effectiveBaseUrl,
+      };
       if (model !== undefined) prefs.model = model;
       if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
       if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || 3));
 
-      if (Object.keys(prefs).length > 0) {
-        const existing = await storage.getMemory(gaii, 'openrouter.settings');
-        const merged = existing
-          ? { ...(existing.value as object), ...prefs }
-          : { model: 'anthropic/claude-sonnet-4', autoRetry: true, maxRetries: 3, ...prefs };
-        await upsertMemory(gaii, 'openrouter.settings', merged, ['openrouter', 'settings']);
-      }
+      await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
 
       res.json(success(config.nodeId, { saved: true }));
     });
@@ -111,9 +161,14 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         storage.getMemory(gaii, 'openrouter.settings'),
       ]);
 
+      const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
       res.json(success(config.nodeId, {
         hasApiKey: !!(apiKeyRecord?.value as { encrypted?: string })?.encrypted,
-        ...(prefsRecord?.value as object ?? { model: null, autoRetry: true, maxRetries: 3 }),
+        model: prefs.model ?? null,
+        autoRetry: prefs.autoRetry ?? true,
+        maxRetries: prefs.maxRetries ?? 3,
+        provider: prefs.provider ?? 'openrouter',
+        baseUrl: prefs.baseUrl ?? DEFAULT_BASE_URLS.openrouter,
       }));
     });
 
@@ -126,7 +181,10 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         storage.deleteMemory(gaii, 'openrouter.apikey').catch(() => {}),
         storage.deleteMemory(gaii, 'openrouter.settings').catch(() => {}),
       ]);
-      modelCache.delete(gaii);
+      // Clear all cache entries for this user (keys are gaii:baseUrl)
+      for (const key of modelCache.keys()) {
+        if (key.startsWith(`${gaii}:`)) modelCache.delete(key);
+      }
       res.json(success(config.nodeId, { deleted: true }));
     });
 
@@ -134,33 +192,41 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/openrouter/models',
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
-      const encKey = requireEncryption(res);
-      if (!encKey) return;
-
       const gaii = resolve(req);
 
-      // Check cache
-      const cached = modelCache.get(gaii);
+      // Resolve provider settings
+      const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
+      const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
+      const provider = (prefs.provider as ProviderType) || 'openrouter';
+      const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
+
+      // Check cache (keyed by baseUrl to avoid cross-provider collisions)
+      const cacheKey = `${gaii}:${baseUrl}`;
+      const cached = modelCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
         return res.json(success(config.nodeId, { models: cached.models }));
       }
 
-      // Decrypt API key
+      // Decrypt API key (optional for non-openrouter providers)
+      let decryptedKey: string | undefined;
       const apiKeyRecord = await storage.getMemory(gaii, 'openrouter.apikey');
       const encrypted = (apiKeyRecord?.value as { encrypted?: string })?.encrypted;
-      if (!encrypted) {
+      if (encrypted) {
+        const encKey = requireEncryption(res);
+        if (!encKey) return;
+        decryptedKey = decrypt(encrypted, encKey);
+      } else if (provider === 'openrouter') {
         return res.status(400).json(error(config.nodeId, 'NO_API_KEY', 'No OpenRouter API key configured.'));
       }
 
       try {
-        const apiKey = decrypt(encrypted, encKey);
-        const models = await listModels(apiKey);
-        modelCache.set(gaii, { models, expiresAt: Date.now() + MODEL_CACHE_TTL });
+        const models = await listModels(decryptedKey, baseUrl);
+        modelCache.set(cacheKey, { models, expiresAt: Date.now() + MODEL_CACHE_TTL });
         res.json(success(config.nodeId, { models }));
       } catch (e) {
         const status = (e as { status?: number }).status;
         if (status === 401) {
-          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'OpenRouter rejected the API key.'));
+          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'API key was rejected.'));
         }
         return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
       }
@@ -173,26 +239,36 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       req.setTimeout(1_800_000);
       res.setTimeout(1_800_000);
 
-      const encKey = requireEncryption(res);
-      if (!encKey) return;
-
       const gaii = resolve(req);
-      const apiKeyRecord = await storage.getMemory(gaii, 'openrouter.apikey');
+
+      // Resolve provider settings
+      const [apiKeyRecord, prefsRecord] = await Promise.all([
+        storage.getMemory(gaii, 'openrouter.apikey'),
+        storage.getMemory(gaii, 'openrouter.settings'),
+      ]);
+      const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
+      const provider = (prefs.provider as ProviderType) || 'openrouter';
+      const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
+
+      // Decrypt API key (optional for non-openrouter providers)
+      let decryptedKey: string | undefined;
       const encrypted = (apiKeyRecord?.value as { encrypted?: string })?.encrypted;
-      if (!encrypted) {
+      if (encrypted) {
+        const encKey = requireEncryption(res);
+        if (!encKey) return;
+        decryptedKey = decrypt(encrypted, encKey);
+      } else if (provider === 'openrouter') {
         return res.status(400).json(error(config.nodeId, 'NO_API_KEY', 'No OpenRouter API key configured.'));
       }
 
       try {
-        const apiKey = decrypt(encrypted, encKey);
-        const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
-        const model = (prefsRecord?.value as { model?: string })?.model || 'openai/gpt-4o-mini';
-        await complete(apiKey, model, 'Reply with exactly: OK');
+        const model = (prefs.model as string) || 'openai/gpt-4o-mini';
+        await complete(decryptedKey, model, 'Reply with exactly: OK', undefined, baseUrl);
         res.json(success(config.nodeId, { ok: true, model }));
       } catch (e) {
         const status = (e as { status?: number }).status;
         if (status === 401) {
-          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'OpenRouter rejected the API key.'));
+          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'API key was rejected.'));
         }
         return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
       }
@@ -205,9 +281,6 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // Extend request timeout to 10 minutes for slow AI models
       req.setTimeout(1_800_000);
       res.setTimeout(1_800_000);
-
-      const encKey = requireEncryption(res);
-      if (!encKey) return;
 
       const gaii = resolve(req);
       const { projectId, prompt, systemPrompt, model: modelOverride } = req.body as {
@@ -231,28 +304,39 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found or not owned by you.'));
       }
 
-      // Decrypt API key
-      const apiKeyRecord = await storage.getMemory(gaii, 'openrouter.apikey');
+      // Resolve provider settings
+      const [apiKeyRecord, prefsRecord] = await Promise.all([
+        storage.getMemory(gaii, 'openrouter.apikey'),
+        storage.getMemory(gaii, 'openrouter.settings'),
+      ]);
+      const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
+      const provider = (prefs.provider as ProviderType) || 'openrouter';
+      const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
+
+      // Decrypt API key (optional for non-openrouter providers)
+      let decryptedKey: string | undefined;
       const encrypted = (apiKeyRecord?.value as { encrypted?: string })?.encrypted;
-      if (!encrypted) {
+      if (encrypted) {
+        const encKey = requireEncryption(res);
+        if (!encKey) return;
+        decryptedKey = decrypt(encrypted, encKey);
+      } else if (provider === 'openrouter') {
         return res.status(400).json(error(config.nodeId, 'NO_API_KEY', 'No OpenRouter API key configured.'));
       }
 
       try {
-        const apiKey = decrypt(encrypted, encKey);
-        const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
-        const defaultModel = (prefsRecord?.value as { model?: string })?.model || 'anthropic/claude-sonnet-4';
+        const defaultModel = (prefs.model as string) || 'anthropic/claude-sonnet-4';
         const model = (typeof modelOverride === 'string' && modelOverride) ? modelOverride : defaultModel;
 
-        const result = await complete(apiKey, model, prompt, systemPrompt);
+        const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl);
         res.json(success(config.nodeId, result));
       } catch (e) {
         const status = (e as { status?: number }).status;
         if (status === 401) {
-          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'OpenRouter rejected the API key.'));
+          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'API key was rejected.'));
         }
         if (status === 429) {
-          return res.status(429).json(error(config.nodeId, 'RATE_LIMITED', 'OpenRouter rate limit hit. Try again later.'));
+          return res.status(429).json(error(config.nodeId, 'RATE_LIMITED', 'Rate limit hit. Try again later.'));
         }
         return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
       }
