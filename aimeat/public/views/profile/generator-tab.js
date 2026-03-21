@@ -1125,6 +1125,19 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
         await loadData();
 
+        // Activate extension/cortex immediately after registration so tests (and the service) can use it
+        if ((comp.type === 'extension' || comp.type === 'cortex') && updated.registeredAs) {
+          try {
+            const activateUrl = comp.type === 'extension'
+              ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/activate`
+              : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}/activate`;
+            await apiPost(activateUrl);
+            await writeProjectLog(projectId, 'component_activated', { meta: { component: comp.label, registeredAs: updated.registeredAs, by: 'autopilot' } });
+          } catch (e) {
+            await writeProjectLog(projectId, 'component_activation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+          }
+        }
+
         // Per-component test immediately after registration (prompt-driven: AI generates test code)
         if (!autopilotCancelledRef.current && testScope !== 'none') {
           const testableTypes = ['extension', 'cortex', 'app'];
@@ -1234,6 +1247,13 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                       await registerComponent(comp.type, fixVr.extracted || content, session, slug2);
                     }
                     await writeProjectLog(projectId, 'test_fix_reregistered', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
+                    // Re-activate after re-register
+                    if (comp.type === 'extension' || comp.type === 'cortex') {
+                      const actUrl = comp.type === 'extension'
+                        ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/activate`
+                        : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}/activate`;
+                      await apiPost(actUrl);
+                    }
                   } catch (e) {
                     showToast?.(`${comp.label}: Re-register failed: ${e.message}`, true);
                     await writeProjectLog(projectId, 'test_fix_reregister_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
@@ -1350,6 +1370,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
     for (const comp of testableComps) {
       const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
+
+      // Ensure extension/cortex is activated before testing
+      if (comp.type === 'extension' || comp.type === 'cortex') {
+        try {
+          const actUrl = comp.type === 'extension'
+            ? `/v1/extensions/${encodeURIComponent(comp.registeredAs)}/activate`
+            : `/v1/cortex/${encodeURIComponent(comp.registeredAs)}/activate`;
+          await apiPost(actUrl);
+        } catch { /* already active or activation failed — test will reveal */ }
+      }
 
       // Use saved test code if available, otherwise generate new
       let testCode = comp.testCode;
@@ -2272,6 +2302,15 @@ function ComponentDetail({ component, project, components, projectId, interviewS
     if (!testCode.trim()) return;
     setTestRunning(true);
     setTestResult(null);
+    // Ensure extension/cortex is activated before testing
+    if (component.type === 'extension' || component.type === 'cortex') {
+      try {
+        const actUrl = component.type === 'extension'
+          ? `/v1/extensions/${encodeURIComponent(component.registeredAs)}/activate`
+          : `/v1/cortex/${encodeURIComponent(component.registeredAs)}/activate`;
+        await apiPost(actUrl);
+      } catch { /* already active */ }
+    }
     await writeProjectLog(projectId, 'test_executing', { meta: { component: component.label, environment: testEnvironment, by: 'user' } });
     try {
       const resp = await runComponentTest(projectId, component.id, testCode, testEnvironment);
@@ -2301,6 +2340,15 @@ function ComponentDetail({ component, project, components, projectId, interviewS
     if (!isTestable || !orSettings?.hasApiKey) return;
     setTestRunning(true);
     setTestResult(null);
+    // Ensure extension/cortex is activated before testing
+    if (component.type === 'extension' || component.type === 'cortex') {
+      try {
+        const actUrl = component.type === 'extension'
+          ? `/v1/extensions/${encodeURIComponent(component.registeredAs)}/activate`
+          : `/v1/cortex/${encodeURIComponent(component.registeredAs)}/activate`;
+        await apiPost(actUrl);
+      } catch { /* already active */ }
+    }
     await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: component.label, type: component.type, by: 'user-ai' } });
     try {
       let aiCode = await runWithAi(projectId, currentTestPrompt);
