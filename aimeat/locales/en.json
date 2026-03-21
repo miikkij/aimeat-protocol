@@ -1197,6 +1197,13 @@
         "errors": "Errors",
         "done": "Done"
       },
+      "settings_title": "Service Settings",
+      "settings_description": "Your service needs the following settings to function. These will be used during testing.",
+      "settings_required": "Required",
+      "settings_optional": "Optional",
+      "settings_save": "Save and continue",
+      "settings_skip": "Skip (no external services)",
+      "settings_no_settings": "No settings needed — continuing to generation.",
       "openrouter": {
         "title": "OpenRouter Settings",
         "apiKey": "API Key",

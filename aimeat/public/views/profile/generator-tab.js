@@ -32,6 +32,7 @@
  *   v5.2.0 — 2026-03-20 — Add autopilot buttons (Run with AI) to each step, auto-retry logic,
  *     and Run All Steps mode for sequential autopilot execution
  *   v5.3.0 — 2026-03-21 — Add provider selector (OpenRouter / LM Studio / Custom) with baseUrl field
+ *   v5.4.0 — 2026-03-21 — Add SettingsCollectionView for blueprint settings between approval and generation
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -47,6 +48,7 @@ import {
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
   writeProjectLog,
   savePendingEdit, getPendingEdit, clearPendingEdit,
+  saveProjectSettings,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
@@ -2152,11 +2154,80 @@ function OpenRouterSettings({ onSettingsChange }) {
   `;
 }
 
+/* ── Settings Collection ─────────────────────────────── */
+
+function SettingsCollectionView({ project, blueprint, onComplete, showToast }) {
+  const [values, setValues] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState([]);
+
+  const serviceSettings = blueprint?.settings?.service || [];
+  const userSettingsDef = blueprint?.settings?.user || [];
+  const allSettings = [...serviceSettings, ...userSettingsDef];
+
+  // If no settings needed, auto-skip
+  if (allSettings.length === 0) {
+    useEffect(() => { onComplete({}); }, []);
+    return html`<p class="pf-gen-notice">${t('profile.generator.settings_no_settings')}</p>`;
+  }
+
+  const handleSave = async () => {
+    setSaving(true);
+    setErrors([]);
+
+    // Check required fields
+    const missing = serviceSettings.filter(s => s.required && !values[s.key]);
+    if (missing.length > 0) {
+      setErrors(missing.map(s => s.label + ' ' + t('profile.generator.settings_required').toLowerCase()));
+      setSaving(false);
+      return;
+    }
+
+    // Identify secret keys for encryption
+    const secretKeys = allSettings.filter(s => s.type === 'secret').map(s => s.key);
+
+    try {
+      await saveProjectSettings(project.projectId, values, secretKeys);
+      onComplete(values);
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setSaving(false);
+  };
+
+  return html`<div class="pf-gen-settings-collection">
+    <div class="section-title section-title-spaced">${t('profile.generator.settings_title')}</div>
+    <p class="section-desc">${t('profile.generator.settings_description')}</p>
+    ${errors.length > 0 && html`<div class="pf-gen-errors">
+      ${errors.map(e => html`<p class="pf-gen-error-line">${e}</p>`)}
+    </div>`}
+    ${allSettings.map(s => html`<div class="pf-gen-section">
+      <label>
+        ${s.label}
+        ${s.required ? html` <span class="pf-gen-required">*</span>` : ''}
+      </label>
+      <input type=${s.type === 'secret' ? 'password' : s.type === 'number' ? 'number' : 'text'}
+        value=${values[s.key] || s.default || ''}
+        placeholder=${s.default ? String(s.default) : ''}
+        onInput=${e => setValues(prev => ({ ...prev, [s.key]: e.target.value }))} />
+    </div>`)}
+    <div class="pf-gen-actions">
+      <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
+        ${t('profile.generator.settings_save')}
+      </button>
+      <button class="btn-outline" onClick=${() => onComplete({})}>
+        ${t('profile.generator.settings_skip')}
+      </button>
+    </div>
+  </div>`;
+}
+
 /* ── Main Tab ────────────────────────────────────────── */
 
 export default function GeneratorTab({ session, showToast }) {
   const [view, setView] = useState('list');
   const [activeProjectId, setActiveProjectId] = useState(null);
+  const [activeProject, setActiveProject] = useState(null);
   const [generatorEnabled, setGeneratorEnabled] = useState(true);
   const [orSettings, setOrSettings] = useState({ hasApiKey: false, autoRetry: false, maxRetries: 3 });
 
@@ -2180,16 +2251,39 @@ export default function GeneratorTab({ session, showToast }) {
 
   function handleCreated(project) {
     setActiveProjectId(project.projectId);
+    setActiveProject(project);
+    // Show settings collection if blueprint has settings definitions
+    const bp = project.blueprint;
+    const hasSettings = bp?.settings && (
+      (bp.settings.service && bp.settings.service.length > 0) ||
+      (bp.settings.user && bp.settings.user.length > 0)
+    );
+    if (hasSettings) {
+      setView('settings');
+    } else {
+      setView('dashboard');
+    }
+  }
+
+  function handleSettingsComplete() {
     setView('dashboard');
   }
 
   if (view === 'new') {
     return html`<${NewProjectView} onBack=${() => setView('list')} onCreated=${handleCreated} showToast=${showToast} orSettings=${orSettings} />`;
   }
+  if (view === 'settings' && activeProject) {
+    return html`<${SettingsCollectionView}
+      project=${activeProject}
+      blueprint=${activeProject.blueprint}
+      onComplete=${handleSettingsComplete}
+      showToast=${showToast}
+    />`;
+  }
   if (view === 'dashboard' && activeProjectId) {
     return html`<${ProjectDashboard}
       projectId=${activeProjectId}
-      onBack=${() => { setView('list'); setActiveProjectId(null); }}
+      onBack=${() => { setView('list'); setActiveProjectId(null); setActiveProject(null); }}
       session=${session}
       showToast=${showToast}
       orSettings=${orSettings}

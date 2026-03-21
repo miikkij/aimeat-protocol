@@ -622,6 +622,12 @@
 .pf-gen-errors label { color: #dc2626; }
 .pf-gen-errors ul { margin: 8px 0; padding-left: 20px; font-size: 0.85em; }
 .pf-gen-errors li { margin-bottom: 4px; color: #991b1b; }
+.pf-gen-error-line { color: #dc2626; font-size: 0.85em; margin: 2px 0; }
+
+.pf-gen-settings-collection { max-width: 700px; }
+.pf-gen-settings-collection input { width: 100%; padding: 8px 10px; border: 1px solid var(--border,#E5E7EB); border-radius: 6px; background: var(--card,#fff); color: var(--text); font-size: 0.9em; }
+.pf-gen-required { color: #dc2626; font-weight: 700; }
+.pf-gen-notice { color: var(--muted); font-style: italic; padding: 12px 0; }
 
 .pf-gen-agent-status { margin-top: 8px; color: var(--muted); font-style: italic; }
 

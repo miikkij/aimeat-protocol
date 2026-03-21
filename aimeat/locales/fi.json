@@ -1197,6 +1197,13 @@
         "errors": "Virheitä",
         "done": "Valmis"
       },
+      "settings_title": "Palvelun asetukset",
+      "settings_description": "Palvelusi tarvitsee seuraavat asetukset toimiakseen. N\u00e4it\u00e4 k\u00e4ytet\u00e4\u00e4n testauksessa.",
+      "settings_required": "Pakollinen",
+      "settings_optional": "Valinnainen",
+      "settings_save": "Tallenna ja jatka",
+      "settings_skip": "Ohita (ei ulkoisia palveluita)",
+      "settings_no_settings": "Asetuksia ei tarvita \u2014 jatketaan generointiin.",
       "openrouter": {
         "title": "OpenRouter-asetukset",
         "apiKey": "API-avain",
