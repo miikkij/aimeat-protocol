@@ -2533,9 +2533,14 @@ For TRANSLATION tests:
 - Read the translation key, verify it has content`;
 
   const bpComponents = blueprint?.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
-  const useCases = interviewSpec?.useCases?.map((uc, i) => `${i + 1}. ${uc}`).join('\n') || 'No use cases specified';
+  const useCases = interviewSpec?.useCases?.map((uc, i) => {
+    if (typeof uc === 'string') return `${i + 1}. ${uc}`;
+    if (uc?.description) return `${i + 1}. ${uc.description}`;
+    if (uc?.title) return `${i + 1}. ${uc.title}`;
+    return `${i + 1}. ${JSON.stringify(uc)}`;
+  }).join('\n') || 'No use cases specified';
 
-  // Build test scenarios from blueprint data (NOT by parsing code)
+  // Build test scenarios from blueprint data, mapped to ACTUAL action names from the extension code
   let testSection = '';
   if (blueprint) {
     const bpComp = blueprint.components?.find(c => c.label === componentLabel);
@@ -2546,35 +2551,21 @@ For TRANSLATION tests:
       .flatMap(ts => ts.scenarios || []);
 
     if (componentType === 'extension' && scenarios.length > 0) {
-      testSection += `\n## Test Scenarios (from blueprint — test EXACTLY these)
+      testSection += `\n## Test Scenarios (from blueprint)
 
 ALL extension calls are POST to /v1/ext/${registeredAs}/{actionId}
 Response envelope: { ok: true, data: { ...action return value... } }
-
 API keys and settings ARE configured in ctx.config.
 
-## How to judge test results
-
-There are TWO types of actions:
-1. MEMORY-ONLY actions (init, addToWatchlist, removeFromWatchlist, getWatchlist, addAlert, removeAlert,
-   getAlerts, saveForecastLine, deleteForecastLine, getForecastLines, getSettings, saveSettings):
-   These MUST always succeed. If they fail → test failure.
-
-2. EXTERNAL API actions (refreshQuotes, searchSymbol, getCandles, getIndicators, getProfile, getQuotes, checkAlerts):
-   These call third-party APIs that may be rate-limited, return empty data, or fail.
-   For these actions, a test PASSES if:
-   - The call does NOT return HTTP 500 (no crash)
-   - The response has r.body?.ok === true (extension handled the call)
-   - The response data has EITHER a success field OR an error field (graceful handling)
-   A test FAILS only if: HTTP 500, no response, or "API key not configured" error.
-   Do NOT fail the test just because external data is empty or the API returned no results.
+For actions that call external APIs: a test PASSES if the call does NOT crash (no HTTP 500)
+and the response has r.body?.ok === true. Empty data from external APIs is acceptable.
+Only fail if: HTTP 500, or "API key not configured" error.
 
 ${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
    Input: ${JSON.stringify(s.input)}
    Expected: ${s.expect}`).join('\n\n')}
 
-Test EVERY scenario above. Use the EXACT action names and inputs shown.
-Do NOT invent your own action names — use only what is listed here.\n`;
+Test EVERY scenario above. Use the EXACT action names shown.\n`;
     }
 
     if (componentType === 'cortex' && scenarios.length > 0) {

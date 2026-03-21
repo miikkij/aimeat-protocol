@@ -265,7 +265,7 @@ const validators = {
     return { valid: errors.length === 0, errors, extracted: cleaned };
   },
 
-  extension(result) {
+  extension(result, blueprint) {
     const errors = [];
     // Extract YAML portion: strip codeblock fences, then cut before JS code
     let raw = extractCodeBlock(result, 'yaml');
@@ -300,6 +300,22 @@ const validators = {
           if (!action?.method) errors.push(`${pfx}: missing method`);
           if (!action?.path) errors.push(`${pfx}: missing path`);
           if (!action?.script) errors.push(`${pfx}: missing script`);
+        }
+      }
+    }
+
+    // Validate action IDs match blueprint testScenarios (if available)
+    if (blueprint?.testScenarios && Array.isArray(parsed?.actions)) {
+      const bpComp = blueprint.components?.find(c => c.type === 'extension');
+      if (bpComp) {
+        const testActions = (blueprint.testScenarios || [])
+          .filter(ts => ts.component === bpComp.id)
+          .flatMap(ts => (ts.scenarios || []).map(s => s.action));
+        const actualIds = new Set(parsed.actions.map(a => a.id));
+        for (const expected of testActions) {
+          if (!actualIds.has(expected)) {
+            errors.push(`Blueprint expects action "${expected}" but extension does not have it. Add it or rename the matching action to "${expected}".`);
+          }
         }
       }
     }
