@@ -1118,7 +1118,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             await writeProjectLog(projectId, 'component_registered', { meta: { component: comp.label, registeredAs: regName, by: 'autopilot' } });
           }
         } catch (e) {
-          showToast?.(`${comp.label}: Registration failed: ${e.message}`, true);
+          const errMsg = e.message || String(e);
+          showToast?.(`${comp.label}: Registration failed: ${errMsg}`, true);
+          await writeProjectLog(projectId, 'component_registration_failed', { meta: { component: comp.label, type: comp.type, error: errMsg, by: 'autopilot' } });
           await loadData();
           break;
         }

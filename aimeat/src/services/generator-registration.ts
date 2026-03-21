@@ -38,10 +38,10 @@ export async function registerCsm(content: string, ownerName: string, storage: S
     throw new Error(`CSM validation failed: ${validationErrors.join('; ')}`);
   }
 
-  // Check if CSM name is already taken
+  // If CSM already exists, remove it first (generator always overwrites)
   const existing = await storage.getCsm(definition.service.name);
   if (existing) {
-    throw new Error(`CSM service "${definition.service.name}" is already registered`);
+    await storage.deleteCsm(definition.service.name);
   }
 
   // Generate JSON Schema from CSM data_schema
@@ -105,30 +105,23 @@ export async function registerMsm(content: string, ownerName: string, storage: S
     throw new Error(`MSM validation failed: ${validationErrors.join('; ')}`);
   }
 
-  // Check if MSM name is already taken
+  // If MSM already exists, remove it first (generator always overwrites)
   const existing = await storage.getMsm(definition.service.name);
   if (existing) {
-    throw new Error(`MSM integration "${definition.service.name}" is already registered`);
+    await storage.deleteMsm(definition.service.name);
   }
 
   const now = new Date().toISOString();
-  try {
-    await storage.createMsm({
-      name: definition.service.name,
-      definition: definition as unknown as Record<string, unknown>,
-      category: definition.service.category,
-      authType: definition.auth.type,
-      actionsCount: definition.actions.length,
-      registeredBy: ownerName,
-      registeredAt: now,
-      updatedAt: now,
-    });
-  } catch (err) {
-    if (String(err).includes('MSM_NAME_TAKEN')) {
-      throw new Error(`MSM integration "${definition.service.name}" is already registered`, { cause: err });
-    }
-    throw err;
-  }
+  await storage.createMsm({
+    name: definition.service.name,
+    definition: definition as unknown as Record<string, unknown>,
+    category: definition.service.category,
+    authType: definition.auth.type,
+    actionsCount: definition.actions.length,
+    registeredBy: ownerName,
+    registeredAt: now,
+    updatedAt: now,
+  });
 }
 
 /**
@@ -224,11 +217,11 @@ export async function registerExtension(content: string, ownerName: string, owne
     }
   }
 
-  // Check if extension name already exists
+  // If extension already exists, remove it first (generator always overwrites)
   const name = metadata.name as string;
   const existingExt = await storage.getExtension(name);
   if (existingExt) {
-    throw new Error(`Extension "${name}" is already installed`);
+    await storage.deleteExtension(name);
   }
 
   // Build ExtensionRecord — mirrors POST /v1/extensions exactly
