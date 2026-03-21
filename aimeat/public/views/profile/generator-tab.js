@@ -1353,10 +1353,13 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               </button>
             `
             : html`
-              <button class="btn-primary btn-sm" onClick=${handleRunAll}
-                disabled=${components.every(c => c.registeredAs)}>
-                ${t('profile.generator.openrouter.runAll')}
-              </button>
+              <div class="pf-gen-or-run-all-controls">
+                <button class="btn-primary btn-sm" onClick=${handleRunAll}
+                  disabled=${components.every(c => c.registeredAs)}>
+                  ${t('profile.generator.openrouter.runAll')}
+                </button>
+                <${TestScopeSelector} value=${testScope} onChange=${setTestScope} compact=${true} />
+              </div>
             `
           }
         </div>
@@ -2103,15 +2106,19 @@ function ComponentDetail({ component, project, components, projectId, interviewS
 
 /* ── Test Scope & Results ────────────────────────────── */
 
-function TestScopeSelector({ value, onChange }) {
-  return html`<div class="pf-gen-test-scope">
-    <h4>${t('profile.generator.test_scope_title')}</h4>
+function TestScopeSelector({ value, onChange, compact }) {
+  return html`<div class="pf-gen-test-scope ${compact ? 'pf-gen-test-scope-compact' : ''}">
+    ${!compact && html`<h4>${t('profile.generator.test_scope_title')}</h4>`}
     ${['comprehensive', 'basic', 'none'].map(level => html`
-      <label class="pf-gen-or-radio-label">
-        <input type="radio" name="test-scope" value=${level}
+      <label class="pf-gen-or-radio-label" title=${t('profile.generator.test_scope_' + level)}>
+        <input type="radio" name="test-scope-${compact ? 'compact' : 'full'}" value=${level}
           checked=${value === level}
           onChange=${() => onChange(level)} />
-        ${t('profile.generator.test_scope_' + level)}
+        ${compact
+          ? (level === 'comprehensive' ? '✓ ' + t('profile.generator.test_scope_comprehensive_short')
+            : level === 'basic' ? '○ ' + t('profile.generator.test_scope_basic_short')
+            : '— ' + t('profile.generator.test_scope_none_short'))
+          : t('profile.generator.test_scope_' + level)}
       </label>
     `)}
   </div>`;

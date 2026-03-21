@@ -1604,6 +1604,13 @@
 .pf-gen-test-scope {
   margin: 1rem 0;
 }
+.pf-gen-test-scope-compact {
+  display: flex; gap: 8px; align-items: center; margin: 0; font-size: 0.85em;
+}
+.pf-gen-test-scope-compact .pf-gen-or-radio-label { margin: 0; white-space: nowrap; }
+.pf-gen-or-run-all-controls {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+}
 
 /* ── Test results ─────────────────────── */
 .pf-gen-test-results {
