@@ -82,6 +82,10 @@ function preCleanYaml(text) {
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  // Fix common AI mistake: action list items missing "id:" key
+  // e.g. "  - refreshQuotes\n    description:" → "  - id: refreshQuotes\n    description:"
+  // Only match lines under "actions:" where the list item is a bare word followed by description on next line
+  s = s.replace(/^(\s+- )([a-zA-Z][\w-]*)\n(\s+description:)/gm, '$1id: $2\n$3');
   return s;
 }
 

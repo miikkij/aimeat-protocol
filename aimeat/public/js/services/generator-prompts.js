@@ -959,15 +959,35 @@ limits:
   timeout_ms: 30000
   max_api_calls: 500
 actions:
-  - id: action-id
+  - id: first-action
     description: "What this action does"
     method: POST
-    path: /v1/ext/{name}/action-id
+    path: /v1/ext/{name}/first-action
     auth: required
     input: {}
     output: {}
-    script: action-id.js
+    script: first-action.js
+  - id: second-action
+    description: "Another action"
+    method: POST
+    path: /v1/ext/{name}/second-action
+    auth: required
+    input:
+      type: object
+      properties:
+        name:
+          type: string
+      required: [name]
+    output:
+      type: object
+    script: second-action.js
 schedules: []
+
+YAML actions format — EVERY action MUST have "- id:" as the FIRST key:
+  CORRECT: - id: myAction        (id: is explicit key)
+  WRONG:   - myAction            (bare value — causes YAML parse error)
+  WRONG:   - myAction:           (colon after name — causes YAML parse error)
+NEVER omit "id:" from any action entry. This is the #1 cause of validation failures.
 // actions/action-id.js
 export default async function(ctx, input) {
   // ── Reading from EXTERNAL APIs (ctx.fetch) ──
