@@ -1304,20 +1304,27 @@ If a cortex library has a getI18n(locale) method, use that instead (recommended)
 
 \\\`\\\`\\\`javascript
 // Helper for extension calls (copy this EXACTLY):
-async function extCall(extName, actionId, body = {}, instanceId = null) {
+// method MUST match the extension action's declared HTTP method (GET or POST)
+async function extCall(extName, actionId, body = {}, method = 'POST') {
   const session = AIMEAT.auth.getSession();
   if (!session) throw new Error('Not logged in');
-  const path = instanceId
-    ? '/v1/ext/' + extName + '/' + instanceId + '/' + actionId
-    : '/v1/ext/' + extName + '/' + actionId;
-  const resp = await session.fetch(path, { method: 'POST', body: JSON.stringify(body) });
+  const basePath = '/v1/ext/' + extName + '/' + actionId;
+  const opts = { method };
+  if (method === 'POST' || method === 'PUT') {
+    opts.body = JSON.stringify(body || {});
+  }
+  const url = method === 'GET' && body && Object.keys(body).length > 0
+    ? basePath + '?' + new URLSearchParams(body).toString()
+    : basePath;
+  const resp = await session.fetch(url, opts);
   // resp is ALREADY parsed JSON — never call resp.json()
   if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
   return resp.data;  // unwrapped payload
 }
 
-// Usage:
-const result = await extCall('my-extension', 'my-action', { query: 'test' });
+// Usage — check the extension manifest for each action's method:
+const result = await extCall('my-extension', 'my-action', { query: 'test' }, 'POST');
+const data = await extCall('my-extension', 'get-data', {}, 'GET');
 \\\`\\\`\\\``}
 
 ## CDN Libraries & Design Resources
