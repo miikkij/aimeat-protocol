@@ -9,6 +9,7 @@
  *   v1.1.0 — 2026-03-18 — Add agent-driven generator API endpoint tests
  *   v1.2.0 — 2026-03-21 — Add provider settings E2E tests (lmstudio, custom, URL validation)
  *   v1.3.0 — 2026-03-21 — Add generator settings collection E2E tests
+ *   v1.4.0 — 2026-03-21 — Add test execution endpoint E2E tests (none/basic/invalid/404)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-generator.ts
@@ -743,6 +744,72 @@ await test('GET /v1/generator/:projectId/settings returns empty for no settings'
     });
     assert(res.status === 200, `Expected 200, got ${res.status}`);
     assert(Object.keys(res.body.data?.values ?? {}).length === 0, 'Should return empty values');
+});
+
+// ─── Test Execution ───
+console.log('\nTest Execution');
+
+await test('POST /v1/generator/:projectId/test with level none returns empty', async () => {
+  const res = await json(`/v1/generator/${generatorApiProjectId}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ level: 'none' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert(res.body.data?.report?.overall === 'passed', `None level should pass, got: ${res.body.data?.report?.overall}`);
+  assert(res.body.data?.report?.components?.length === 0, `None level no components, got: ${res.body.data?.report?.components?.length}`);
+});
+
+// Create a fresh test project with blueprint stored as a parsed object so the test endpoint can read it
+const testExecProjectId = 'prj-texec-' + Date.now().toString(36);
+await json('/v1/memory', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+        key: `generator.${testExecProjectId}.project`,
+        value: {
+            projectId: testExecProjectId,
+            name: 'Test Exec Project',
+            description: 'E2E test for test execution endpoint',
+            status: 'blueprint_ready',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            blueprint: { components: [{ id: 'cmp-1', type: 'csm', label: 'Main CSM', produces: [], consumes: [] }], phases: [], testScenarios: [] },
+        },
+        visibility: 'owner',
+    }),
+});
+
+await test('POST /v1/generator/:projectId/test with level basic runs', async () => {
+  const res = await json(`/v1/generator/${testExecProjectId}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ level: 'basic' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert(res.body.data?.report, `Expected test report, got: ${JSON.stringify(res.body.data)}`);
+  assert(res.body.data?.report?.level === 'basic', `Expected basic level, got: ${res.body.data?.report?.level}`);
+  assert(Array.isArray(res.body.data?.report?.components), `Expected components array`);
+  assert(['passed', 'failed'].includes(res.body.data?.report?.overall), `Expected overall passed/failed, got: ${res.body.data?.report?.overall}`);
+});
+
+await test('POST /v1/generator/:projectId/test rejects invalid level', async () => {
+  const res = await json(`/v1/generator/${generatorApiProjectId}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ level: 'invalid' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 400, `Expected 400, got ${res.status}`);
+});
+
+await test('POST /v1/generator/:projectId/test returns 404 for non-existent project', async () => {
+  const res = await json('/v1/generator/nonexistent-proj-xyz/test', {
+    method: 'POST',
+    body: JSON.stringify({ level: 'basic' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  // 404 or 400 (no blueprint) are both acceptable; not 200
+  assert(res.status === 404 || res.status === 400, `Expected 404 or 400, got ${res.status}`);
 });
 
 await test('Agent: cleanup generator API test project', async () => {
