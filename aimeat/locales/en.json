@@ -1110,6 +1110,8 @@
       "refreshTitle": "Re-check component status from server",
       "editService": "Edit Service",
       "cancelEdit": "Cancel Edit",
+      "editSettings": "Settings",
+      "hideSettings": "Hide Settings",
       "diagnostics": "Diagnostics",
       "hideDiagnostics": "Hide Diagnostics",
       "cancelRemove": "Cancel",

@@ -527,6 +527,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   const [lifecycleLoading, setLifecycleLoading] = useState(null); // 'activate' | 'deactivate' | null
   const [showRemovePanel, setShowRemovePanel] = useState(false);
   const [removeSelection, setRemoveSelection] = useState({});
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [removeMemory, setRemoveMemory] = useState(false);
 
   // Phase 6: Edit service state
@@ -1406,6 +1407,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         </p>
       `}
 
+      <!-- Test Scope — always visible when components exist -->
+      ${components.length > 0 && !autopilotRunning && html`
+        <${TestScopeSelector} value=${testScope} onChange=${setTestScope} />
+      `}
+
       <!-- Autopilot: Run All Steps -->
       ${orSettings?.hasApiKey && components.length > 0 && html`
         <div class="pf-gen-or-run-all-bar">
@@ -1420,13 +1426,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               </button>
             `
             : html`
-              <div class="pf-gen-or-run-all-controls">
-                <button class="btn-primary btn-sm" onClick=${handleRunAll}
-                  disabled=${components.every(c => c.registeredAs)}>
-                  ${t('profile.generator.openrouter.runAll')}
-                </button>
-                <${TestScopeSelector} value=${testScope} onChange=${setTestScope} compact=${true} />
-              </div>
+              <button class="btn-primary btn-sm" onClick=${handleRunAll}
+                disabled=${components.every(c => c.registeredAs)}>
+                ${t('profile.generator.openrouter.runAll')}
+              </button>
             `
           }
         </div>
@@ -1462,6 +1465,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             <button class="btn-ghost btn-sm" onClick=${() => editMode ? exitEditMode() : setEditMode('request')}>
               ${editMode ? t('profile.generator.cancelEdit') : t('profile.generator.editService')}
             </button>
+            ${project?.blueprint?.settings && html`
+              <button class="btn-ghost btn-sm" onClick=${() => setShowSettingsPanel(!showSettingsPanel)}>
+                ${showSettingsPanel ? t('profile.generator.hideSettings') : t('profile.generator.editSettings')}
+              </button>
+            `}
             <button class="btn-ghost btn-sm" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
               ${showDiagnostics ? t('profile.generator.hideDiagnostics') : t('profile.generator.diagnostics')}
             </button>
@@ -1728,10 +1736,21 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         </div>
       `}
 
+      <!-- Settings Panel (inline edit) -->
+      ${showSettingsPanel && project?.blueprint?.settings && html`
+        <div class="pf-gen-settings-inline">
+          <${SettingsCollectionView}
+            project=${project}
+            blueprint=${project.blueprint}
+            onComplete=${() => setShowSettingsPanel(false)}
+            showToast=${showToast}
+          />
+        </div>
+      `}
+
       <!-- Test Execution Panel -->
       ${registeredCount > 0 && html`
         <div class="pf-gen-test-panel">
-          <${TestScopeSelector} value=${testScope} onChange=${setTestScope} />
           <div class="pf-gen-actions">
             <button class="btn-primary btn-sm"
               onClick=${handleRunTests}

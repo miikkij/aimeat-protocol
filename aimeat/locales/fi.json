@@ -1110,6 +1110,8 @@
       "refreshTitle": "Tarkista komponenttien tila palvelimelta",
       "editService": "Muokkaa palvelua",
       "cancelEdit": "Peruuta muokkaus",
+      "editSettings": "Asetukset",
+      "hideSettings": "Piilota asetukset",
       "diagnostics": "Diagnostiikka",
       "hideDiagnostics": "Piilota diagnostiikka",
       "cancelRemove": "Peruuta",
