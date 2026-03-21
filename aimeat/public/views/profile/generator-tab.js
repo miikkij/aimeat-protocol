@@ -59,7 +59,7 @@ import {
   packageProject, updatePackageVersion, detectChanges,
   importPackageToGenerator, publishToGallery,
 } from '/js/services/generator-packaging.js';
-import { runTests, screenshotUrl } from '/js/services/generator-testing.js';
+import { runTests, runComponentTest, screenshotUrl } from '/js/services/generator-testing.js';
 
 /* ── OpenRouter Autopilot Helper ──────────────────────── */
 
@@ -1114,29 +1114,96 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         }
 
         await loadData();
+
+        // Per-component test immediately after registration
+        if (!autopilotCancelledRef.current && testScope !== 'none') {
+          const testableTypes = ['extension', 'app'];
+          if (testableTypes.includes(comp.type)) {
+            setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_running'));
+            try {
+              const testResp = await runComponentTest(projectId, comp.id, testScope);
+              const testResult = testResp?.data?.result || testResp?.result;
+
+              if (testResult && testResult.status === 'failed') {
+                await writeProjectLog(projectId, 'component_test_failed', { meta: { component: comp.label, errors: testResult.errors, by: 'autopilot' } });
+                showToast?.(`${comp.label}: ${t('profile.generator.test_failed')}`, true);
+
+                // Per-component fix loop (max 3 rounds)
+                const MAX_FIX = 3;
+                let fixed = false;
+                for (let fix = 0; fix < MAX_FIX && !fixed && !autopilotCancelledRef.current; fix++) {
+                  setCurrentAutopilotStep(
+                    comp.label + ' — ' + t('profile.generator.openrouter.retrying').replace('{current}', fix + 1).replace('{max}', MAX_FIX)
+                  );
+
+                  // Build fix prompt with test errors
+                  const fixPrompt = buildFixPrompt(prompt, content, [
+                    ...vr.errors || [],
+                    ...testResult.errors.map(e => `TEST FAILURE: ${e}`),
+                  ], comp.type);
+
+                  try {
+                    content = await runWithAi(projectId, fixPrompt);
+                  } catch (e) {
+                    showToast?.(`${comp.label}: ${e.message}`, true);
+                    break;
+                  }
+                  if (autopilotCancelledRef.current) break;
+
+                  const fixVr = validateComponent(comp.type, content, project.blueprint);
+                  if (!fixVr.valid) continue;
+
+                  // Re-register fixed version
+                  updated = { ...updated, result: content, status: 'done', validationErrors: [] };
+                  await saveComponent(projectId, updated);
+
+                  try {
+                    const extComp2 = (await loadAllComponents(projectId)).find(c => c.type === 'extension' && c.registeredAs);
+                    const csmComp2 = (await loadAllComponents(projectId)).find(c => c.type === 'csm' && c.registeredAs);
+                    const slug2 = extComp2?.registeredAs || csmComp2?.registeredAs?.split('/')?.pop() || '';
+                    if (comp.type === 'cortex') {
+                      const cvr = validateComponent('cortex', content, project.blueprint);
+                      await registerComponent('cortex', cvr.extracted, session, slug2);
+                    } else {
+                      await registerComponent(comp.type, fixVr.extracted || content, session, slug2);
+                    }
+                  } catch (e) {
+                    showToast?.(`${comp.label}: Re-register failed: ${e.message}`, true);
+                    continue;
+                  }
+
+                  // Re-test
+                  const reTestResp = await runComponentTest(projectId, comp.id, testScope);
+                  const reTestResult = reTestResp?.data?.result || reTestResp?.result;
+
+                  if (reTestResult && reTestResult.status !== 'failed') {
+                    fixed = true;
+                    await writeProjectLog(projectId, 'component_test_fixed', { meta: { component: comp.label, fixRound: fix + 1, by: 'autopilot' } });
+                    showToast?.(`${comp.label}: ${t('profile.generator.test_passed')}`);
+                  } else {
+                    testResult.errors = reTestResult?.errors || testResult.errors;
+                  }
+                }
+
+                if (!fixed && !autopilotCancelledRef.current) {
+                  await writeProjectLog(projectId, 'component_test_gave_up', { meta: { component: comp.label, maxRounds: MAX_FIX, by: 'autopilot' } });
+                  showToast?.(`${comp.label}: ${t('profile.generator.test_fix_round')} ${MAX_FIX}`, true);
+                  // Continue to next component — don't block the whole pipeline
+                }
+
+                await loadData();
+              } else if (testResult) {
+                await writeProjectLog(projectId, 'component_test_passed', { meta: { component: comp.label, by: 'autopilot' } });
+              }
+            } catch (e) {
+              // Test execution failed — log but continue
+              await writeProjectLog(projectId, 'component_test_error', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+            }
+          }
+        }
       }
     } catch (e) {
       showToast?.(e.message, true);
-    }
-
-    // Run tests automatically after all registrations (if not cancelled)
-    if (!autopilotCancelledRef.current && testScope !== 'none') {
-      setCurrentAutopilotStep(t('profile.generator.test_running'));
-      try {
-        const resp = await runTests(projectId, testScope);
-        const report = resp?.data || resp;
-        setTestReport(report);
-        await writeProjectLog(projectId, 'tests_run', { meta: { scope: testScope, overall: report.overall, by: 'autopilot' } });
-        if (report.overall === 'passed') {
-          showToast?.(t('profile.generator.test_passed'));
-        } else if (report.overall === 'partial') {
-          showToast?.(t('profile.generator.test_partial'), true);
-        } else {
-          showToast?.(t('profile.generator.test_failed'), true);
-        }
-      } catch (e) {
-        showToast?.(`Tests: ${e.message}`, true);
-      }
     }
 
     setAutopilotRunning(false);

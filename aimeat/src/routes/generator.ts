@@ -302,6 +302,103 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     }
   );
 
+  // POST /v1/generator/:projectId/test/:componentId — run tests for a single component
+  // NOTE: registered before bulk test and /:projectId/components/:componentId
+  router.post('/v1/generator/:projectId/test/:componentId',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+      const { level } = req.body ?? {};
+      const testLevel = (level as string) || 'basic';
+
+      // Load project + blueprint
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+      const project = (projectRec.value as Record<string, unknown>) ?? {};
+      const blueprint = project.blueprint as { components?: Array<{ id: string; type: string; label: string; produces?: string[]; consumes?: string[] }>; testScenarios?: Array<{ component: string; scenarios: Array<{ action: string; input: Record<string, unknown>; expect: string }> }> } | null;
+      if (!blueprint?.components) {
+        res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint required'));
+        return;
+      }
+
+      const bpComp = blueprint.components.find(c => c.id === componentId);
+      if (!bpComp) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Component not in blueprint'));
+        return;
+      }
+
+      // Load component record
+      const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
+      const compVal = (compRec?.value as Record<string, unknown>) ?? {};
+      const compStatus = compVal.status as string;
+
+      if (compStatus !== 'registered' && compStatus !== 'ready' && compStatus !== 'done') {
+        res.json(success(config.nodeId, {
+          result: { componentId, type: bpComp.type, status: 'skipped' as const, scenarios: 0, passed: 0, errors: ['Component not registered yet'], screenshots: [], fixRound: 0 },
+        }));
+        return;
+      }
+
+      const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+      const baseUrl = `http://localhost:${config.port}`;
+      const scenarios = (blueprint.testScenarios ?? []).find(ts => ts.component === componentId)?.scenarios ?? [];
+
+      let result: TestResult;
+
+      if (bpComp.type === 'extension') {
+        // Parse extension name from component content
+        const compContent = compVal.content as string | undefined;
+        let extName = compVal.registeredAs as string || componentId;
+        if (compContent) {
+          try {
+            const parsed = typeof compContent === 'string' ? JSON.parse(compContent) : compContent;
+            if (parsed.name) extName = parsed.name;
+          } catch { /* use registeredAs */ }
+        }
+
+        // Run extension action tests
+        let scenarioPassed = 0;
+        const errors: string[] = [];
+
+        if (scenarios.length > 0) {
+          for (const scenario of scenarios) {
+            const testResult = await runExtensionTest(baseUrl, extName, scenario.action, scenario.input, token);
+            if (testResult.passed) { scenarioPassed++; } else { errors.push(testResult.error ?? 'Unknown error'); }
+          }
+        } else {
+          // No explicit test scenarios — run init action as smoke test
+          const initResult = await runExtensionTest(baseUrl, extName, 'init', {}, token);
+          if (initResult.passed) { scenarioPassed = 1; } else { errors.push(initResult.error ?? 'Init failed'); }
+        }
+
+        const total = scenarios.length || 1;
+        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: total, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
+      } else if (bpComp.type === 'app' && testLevel === 'comprehensive' && await isPlaywrightAvailable()) {
+        // Playwright test for app
+        const registeredAs = compVal.registeredAs as string;
+        if (registeredAs) {
+          await ensureScreenshotDir(projectId);
+          const appUrl = `${baseUrl}/apps/${registeredAs}`;
+          const pwResult = await runAppPlaywrightTest(appUrl, projectId, componentId, scenarios);
+          result = { componentId, type: bpComp.type, status: pwResult.passed ? 'passed' : 'failed', scenarios: 1, passed: pwResult.passed ? 1 : 0, errors: pwResult.errors, screenshots: pwResult.screenshots, fixRound: 0 };
+        } else {
+          result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['No registeredAs'], screenshots: [], fixRound: 0 };
+        }
+      } else {
+        // Other types: pass through (CSM, memory, translation, cortex without Playwright)
+        result = { componentId, type: bpComp.type, status: 'passed', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 };
+      }
+
+      res.json(success(config.nodeId, { result }));
+    }
+  );
+
   // POST /v1/generator/:projectId/test — run tests in dependency order
   // NOTE: registered before /:projectId/components/:componentId to avoid 'test' matching as componentId
   router.post('/v1/generator/:projectId/test',

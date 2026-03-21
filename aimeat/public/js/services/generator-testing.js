@@ -23,6 +23,17 @@ export async function runTests(projectId, level = 'comprehensive') {
 }
 
 /**
+ * Run tests for a single component in a generator project.
+ * @param {string} projectId - The project
+ * @param {string} componentId - The component to test
+ * @param {'comprehensive'|'basic'} level - Test scope level
+ * @returns {Promise<Object>} Single component test result
+ */
+export async function runComponentTest(projectId, componentId, level = 'basic') {
+  return apiPost(`/v1/generator/${projectId}/test/${componentId}`, { level });
+}
+
+/**
  * Build a URL for a test screenshot.
  * @param {string} projectId - The project that owns the screenshot
  * @param {string} filename - Screenshot filename
