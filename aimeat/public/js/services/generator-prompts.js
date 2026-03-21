@@ -113,6 +113,10 @@
  *     "architecture" field at output top level.
  *   v10.1.0 — 2026-03-21 — Add testContext parameter to buildFixPrompt for test-driven
  *     fix loops: includes test errors, dependency results, and blueprint component spec
+ *   v10.2.0 — 2026-03-21 — Replace full extension/cortex code injection with compact API
+ *     summaries (summarizeExtensionApi, summarizeCortexApi). Prevents prompt bloat that
+ *     overwhelms AI with thousands of lines of upstream code. Summaries include action
+ *     endpoints, memory keys, data shapes, and public methods.
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -1593,6 +1597,8 @@ Example — if label is "English (en) Strings":
     let extRef = '';
     if (extComponents.length > 0) {
       extRef = `\n## Registered Extensions (your cortex wraps these)\n`;
+      extRef += `\nIMPORTANT: Use readExtMemory(EXT.name, 'key') to read from extension namespace.\n`;
+      extRef += `The extension name in EXT object MUST exactly match the registered metadata.name.\n\n`;
       for (const ext of extComponents) {
         // Use registeredAs (canonical name from registration), fallback to regex then label
         const extName = ext.registeredAs
@@ -1600,9 +1606,10 @@ Example — if label is "English (en) Strings":
           || ext.label;
         extRef += `- **${extName}** (${ext.label}): memory owner = \`ext:${extName}\`\n`;
         if (ext.result) {
-          // Include FULL extension code — cortex MUST see exact memory keys, data
-          // shapes, and action logic to generate correct wrapper methods.
-          extRef += `  Full extension code:\n${ext.result}\n`;
+          // Include API summary with memory keys and data shapes — NOT full code.
+          // This gives the cortex enough info to generate correct wrapper methods
+          // without overwhelming the AI with thousands of lines of extension code.
+          extRef += summarizeExtensionApi(ext.result);
         }
       }
     }
@@ -1620,22 +1627,22 @@ It wraps raw AIMEAT API calls (extension actions, memory reads from extension na
 clean, documented domain methods. Apps import the cortex and call simple methods like
 \`AIMEAT.myLib.getData()\` instead of knowing about memory namespaces and extension names.
 
-## CRITICAL: Read the Extension Code Above CAREFULLY
+## CRITICAL: Use the Extension API Summary Above
 
-The extension code shown above is the ACTUAL code running on the server. Your cortex MUST match it EXACTLY:
+The extension API summary shows the EXACT memory keys and data shapes. Your cortex MUST match them:
 
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  1. Find every ctx.memory.set() call → those are the EXACT keys        ║
-║  2. Look at the value passed to set() → that is the EXACT data shape   ║
-║  3. Find every ctx.memory.get() call → those are keys you can read     ║
-║  4. Your getPublic() calls MUST use those EXACT same keys              ║
-║  5. Your methods MUST return data in the EXACT shape the extension     ║
+║  1. Use the "Memory writes" keys as your readExtMemory() keys          ║
+║  2. Use the "Data shape" info to know what fields the data contains    ║
+║  3. Your getPublic() calls MUST use those EXACT same keys              ║
+║  4. Your methods MUST return data in the EXACT shape the extension     ║
 ║     stores it — do NOT invent new field names or structures            ║
+║  5. Use the "Action" endpoints for callExt() on-demand calls           ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-Example: if the extension does \`ctx.memory.set("orders.by-date.2026-03-14", [{ id, title, ... }])\`
-then your cortex must read \`getPublic('ext:extension-name', 'orders.by-date.2026-03-14')\`
-and return objects with the SAME array structure — NOT \`data\`, NOT \`entries\`, NOT \`results\`.
+Example: if the extension writes to key "orders.data" with shape { id, title, ... }
+then your cortex must read \`getPublic('ext:extension-name', 'orders.data')\`
+and return objects with the SAME structure — NOT \`data\`, NOT \`entries\`, NOT \`results\`.
 
 ## Design Principles
 
@@ -1953,6 +1960,111 @@ NEVER assume data exists — the user may open the app before any extension has 
   },
 };
 
+/**
+ * Summarize extension code into a compact API reference (actions, memory keys, data shapes).
+ * Avoids injecting thousands of lines of full extension code into prompts.
+ */
+function summarizeExtensionApi(result) {
+  if (!result) return '  (no code available)\n';
+  const lines = typeof result === 'string' ? result.split('\n') : [];
+  const summary = [];
+
+  // Extract metadata.name
+  const nameMatch = result.match(/name:\s*"?([^\s"]+)"?/);
+  if (nameMatch) summary.push(`  Extension name: ${nameMatch[1]}`);
+
+  // Extract actions (id, method, path, description)
+  const actionRegex = /- id:\s*(\S+)/g;
+  const descRegex = /description:\s*"([^"]+)"/g;
+  const methodRegex = /method:\s*(\S+)/g;
+  const pathRegex = /path:\s*(\S+)/g;
+
+  // Parse YAML actions section
+  const actionsStart = result.indexOf('actions:');
+  const schedulesStart = result.indexOf('schedules:');
+  const actionsSection = actionsStart >= 0
+    ? result.substring(actionsStart, schedulesStart >= 0 ? schedulesStart : undefined)
+    : '';
+
+  if (actionsSection) {
+    const actionBlocks = actionsSection.split(/\n  - id:/);
+    for (const block of actionBlocks.slice(1)) {
+      const id = block.split('\n')[0].trim();
+      const desc = block.match(/description:\s*"([^"]+)"/)?.[1] || '';
+      const method = block.match(/method:\s*(\S+)/)?.[1] || 'POST';
+      const path = block.match(/path:\s*(\S+)/)?.[1] || '';
+      summary.push(`  Action: ${method} ${path} (${id}) — ${desc}`);
+      // Extract input properties
+      const inputProps = block.match(/properties:\n((?:\s+\w+:\n(?:\s+\w+:.*\n)*)*)/);
+      if (inputProps) {
+        const propNames = [...inputProps[1].matchAll(/^\s{8}(\w+):/gm)].map(m => m[1]);
+        if (propNames.length) summary.push(`    Input: { ${propNames.join(', ')} }`);
+      }
+    }
+  }
+
+  // Extract memory keys from ctx.memory.set() and ctx.memory.get() calls
+  const memSetKeys = new Set();
+  const memGetKeys = new Set();
+  for (const match of result.matchAll(/ctx\.memory\.set\(['"]([^'"]+)['"]/g)) {
+    memSetKeys.add(match[1]);
+  }
+  for (const match of result.matchAll(/ctx\.memory\.get\(['"]([^'"]+)['"]/g)) {
+    memGetKeys.add(match[1]);
+  }
+  if (memSetKeys.size > 0) summary.push(`  Memory writes: ${[...memSetKeys].join(', ')}`);
+  if (memGetKeys.size > 0) summary.push(`  Memory reads: ${[...memGetKeys].join(', ')}`);
+
+  // Extract data shapes from ctx.memory.set() values (first occurrence)
+  for (const key of memSetKeys) {
+    const setPattern = new RegExp(`ctx\\.memory\\.set\\(['"]${key.replace(/\./g, '\\.')}['"],\\s*\\{([^}]{1,200})`);
+    const shapeMatch = result.match(setPattern);
+    if (shapeMatch) {
+      summary.push(`  Data shape for "${key}": { ${shapeMatch[1].trim()} ... }`);
+    }
+  }
+
+  return summary.join('\n') + '\n';
+}
+
+/**
+ * Summarize cortex code into a compact API reference (public methods).
+ */
+function summarizeCortexApi(result) {
+  if (!result) return '  (no code available)\n';
+  const summary = [];
+
+  // Extract metadata.name
+  const nameMatch = result.match(/name:\s*"?([^\s"]+)"?/);
+  if (nameMatch) summary.push(`  Cortex name: ${nameMatch[1]}`);
+
+  // Extract LIB_NAME
+  const libMatch = result.match(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
+  if (libMatch) summary.push(`  JS access: AIMEAT.${libMatch[1]}`);
+
+  // Extract public methods (async function declarations that are exported)
+  const methodRegex = /async\s+function\s+(\w+)\s*\(/g;
+  const methods = [];
+  let match;
+  while ((match = methodRegex.exec(result)) !== null) {
+    methods.push(match[1]);
+  }
+  if (methods.length > 0) summary.push(`  Public methods: ${methods.join(', ')}`);
+
+  // Extract EXT object (extension names this cortex wraps)
+  const extMatch = result.match(/const\s+EXT\s*=\s*\{([^}]+)\}/);
+  if (extMatch) summary.push(`  Wraps extensions: ${extMatch[1].trim()}`);
+
+  // Extract readExtMemory calls (memory keys this cortex reads)
+  const readKeys = new Set();
+  for (const m of result.matchAll(/readExtMemory\([^,]+,\s*['"]([^'"]+)['"]/g)) {
+    readKeys.add(m[1]);
+  }
+  if (readKeys.size > 0) summary.push(`  Reads memory keys: ${[...readKeys].join(', ')}`);
+
+  return summary.join('\n') + '\n';
+}
+
 export function buildComponentPrompt(type, label, projectDescription, blueprint, completedComponents, interviewSpec) {
   const template = COMPONENT_TEMPLATES[type];
   if (!template) throw new Error(`No template for type: ${type}`);
@@ -2002,10 +2114,13 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     context += '\nAlready completed:\n';
     for (const c of completedComponents) {
       context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
-      // Include full result for extensions and cortex — downstream components
-      // MUST see the complete code to know exact API methods and implementation.
-      if (c.result && (c.type === 'extension' || c.type === 'cortex')) {
-        context += `  Full code:\n${c.result}\n`;
+      // For extensions and cortex: include API summary instead of full code to avoid
+      // prompt bloat that overwhelms the AI. Full code is injected by the cortex/app
+      // template only for the specific components that template needs.
+      if (c.result && c.type === 'extension') {
+        context += `  API summary:\n${summarizeExtensionApi(c.result)}\n`;
+      } else if (c.result && c.type === 'cortex') {
+        context += `  API summary:\n${summarizeCortexApi(c.result)}\n`;
       }
     }
   }
