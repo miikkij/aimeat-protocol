@@ -1747,16 +1747,26 @@ Use callExt() for TWO purposes:
 2. **Writing shared data** — extension actions run server-side and CAN write to ext: namespace
 
 \\\`\\\`\\\`javascript
-async function callExt(extName, actionId, body) {
+// method MUST match the extension action's declared method (GET or POST)
+async function callExt(extName, actionId, body, method = 'POST') {
   const session = AIMEAT.auth && AIMEAT.auth.getSession();
   if (!session) throw new Error('Not logged in');
-  const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, {
-    method: 'POST', body: JSON.stringify(body || {}),
-  });
+  const opts = { method };
+  if (method === 'POST' || method === 'PUT') {
+    opts.body = JSON.stringify(body || {});
+  }
+  const url = method === 'GET' && body && Object.keys(body).length > 0
+    ? '/v1/ext/' + extName + '/' + actionId + '?' + new URLSearchParams(body).toString()
+    : '/v1/ext/' + extName + '/' + actionId;
+  const resp = await session.fetch(url, opts);
   if (!resp.ok) throw new Error((resp.error && resp.error.message) || 'Extension call failed');
   return resp.data;
 }
 \\\`\\\`\\\`
+
+CRITICAL: Check the extension manifest above — each action declares its HTTP method.
+Use \`callExt(EXT.name, 'actionId', {input}, 'GET')\` for GET actions and
+\`callExt(EXT.name, 'actionId', {input})\` for POST actions. Using the WRONG method will fail.
 
 ### Where to store different types of data
 
@@ -1845,12 +1855,18 @@ Second block — JavaScript library:
   // ║  CRITICAL: session.fetch() returns ALREADY-PARSED JSON (not Response). ║
   // ║  Do NOT call resp.json() — it will crash. Use resp.data directly.      ║
   // ╚══════════════════════════════════════════════════════════════════════════╝
-  async function callExt(extName, actionId, body) {
+  // method MUST match extension action's declared method (GET or POST)
+  async function callExt(extName, actionId, body, method = 'POST') {
     const session = AIMEAT.auth && AIMEAT.auth.getSession();
     if (!session) return null;
-    const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, {
-      method: 'POST', body: JSON.stringify(body || {}),
-    });
+    const opts = { method };
+    if (method === 'POST' || method === 'PUT') {
+      opts.body = JSON.stringify(body || {});
+    }
+    const url = method === 'GET' && body && Object.keys(body).length > 0
+      ? '/v1/ext/' + extName + '/' + actionId + '?' + new URLSearchParams(body).toString()
+      : '/v1/ext/' + extName + '/' + actionId;
+    const resp = await session.fetch(url, opts);
     if (!resp || !resp.ok) return null;
     return resp.data;  // ALREADY parsed — never call resp.json()
   }
