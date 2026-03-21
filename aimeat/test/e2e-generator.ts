@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-03-14 — Initial generator E2E test suite
  *   v1.1.0 — 2026-03-18 — Add agent-driven generator API endpoint tests
  *   v1.2.0 — 2026-03-21 — Add provider settings E2E tests (lmstudio, custom, URL validation)
+ *   v1.3.0 — 2026-03-21 — Add generator settings collection E2E tests
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-generator.ts
@@ -675,6 +676,74 @@ consent_requirements:
 });
 
 // Session claim/heartbeat/release tests removed — agent session endpoints removed in OpenRouter autopilot refactor
+
+// ─── Generator Settings Collection ───
+console.log('\nGenerator — Settings Collection');
+
+await test('POST /v1/generator/:projectId/settings stores values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ values: { finnhub_api_key: 'test-key-123', default_city: 'Helsinki' } }),
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.stored === 2, `Expected 2 stored, got ${res.body.data?.stored}`);
+});
+
+await test('GET /v1/generator/:projectId/settings retrieves values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.values?.finnhub_api_key === 'test-key-123', `Key mismatch: ${res.body.data?.values?.finnhub_api_key}`);
+    assert(res.body.data?.values?.default_city === 'Helsinki', `City mismatch: ${res.body.data?.values?.default_city}`);
+});
+
+await test('POST /v1/generator/:projectId/settings overwrites existing values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ values: { finnhub_api_key: 'updated-key', new_setting: true } }),
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}`);
+    assert(res.body.data?.stored === 2, `Expected 2 stored`);
+
+    // Verify new values replaced old
+    const getRes = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(getRes.body.data?.values?.finnhub_api_key === 'updated-key', 'Key should be updated');
+    assert(getRes.body.data?.values?.new_setting === true, 'New setting should exist');
+    // Old default_city should be gone (full replace)
+    assert(getRes.body.data?.values?.default_city === undefined, 'Old key should be gone after overwrite');
+});
+
+await test('POST /v1/generator/:projectId/settings rejects missing values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({}),
+    });
+    assert(res.status === 400, `Expected 400, got ${res.status}`);
+});
+
+await test('POST /v1/generator/:projectId/settings returns 404 for non-existent project', async () => {
+    const res = await json('/v1/generator/nonexistent-project/settings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ values: { key: 'value' } }),
+    });
+    assert(res.status === 404, `Expected 404, got ${res.status}`);
+});
+
+await test('GET /v1/generator/:projectId/settings returns empty for no settings', async () => {
+    // Use the memory-based projectId which has no settings stored via the settings endpoint
+    const res = await json(`/v1/generator/${projectId}/settings`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}`);
+    assert(Object.keys(res.body.data?.values ?? {}).length === 0, 'Should return empty values');
+});
 
 await test('Agent: cleanup generator API test project', async () => {
     // Delete all generator.{id}.* keys
