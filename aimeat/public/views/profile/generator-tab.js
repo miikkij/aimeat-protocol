@@ -2164,10 +2164,14 @@ function SettingsCollectionView({ project, blueprint, onComplete, showToast }) {
   const serviceSettings = blueprint?.settings?.service || [];
   const userSettingsDef = blueprint?.settings?.user || [];
   const allSettings = [...serviceSettings, ...userSettingsDef];
+  const noSettings = allSettings.length === 0;
 
-  // If no settings needed, auto-skip
-  if (allSettings.length === 0) {
-    useEffect(() => { onComplete({}); }, []);
+  // Auto-skip when no settings needed (hook always called, respecting rules of hooks)
+  useEffect(() => {
+    if (noSettings) onComplete({});
+  }, [noSettings]);
+
+  if (noSettings) {
     return html`<p class="pf-gen-notice">${t('profile.generator.settings_no_settings')}</p>`;
   }
 
