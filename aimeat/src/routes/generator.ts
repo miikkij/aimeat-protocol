@@ -13,6 +13,8 @@
 //   POST   /v1/generator/:projectId/steps/blueprint                         — validate + store blueprint
 //   POST   /v1/generator/:projectId/components/:componentId/submit          — validate + store component content
 //   POST   /v1/generator/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
+//   POST   /v1/generator/:projectId/test                                    — run tests in dependency order
+//   GET    /v1/generator/:projectId/screenshots/:filename                   — serve test screenshot PNGs
 //   POST   /v1/generator/:projectId/log                                     — write log entry to memory
 //   POST   /v1/generator/:projectId/complete                                — mark project active
 //   GET    /v1/generator/:projectId/prompts/:componentId                    — get the generation prompt for a component
@@ -34,6 +36,7 @@
 //   v2.0.0 — 2026-03-19 — Add DELETE /v1/generator/:projectId cascade delete; validate componentId in heartbeat against blueprint
 //   v5.0.0 — 2026-03-20 — Remove agent guide, my-assignments, and session endpoints (replaced by OpenRouter autopilot)
 //   v5.1.0 — 2026-03-21 — Add settings collection endpoints (POST/GET /v1/generator/:projectId/settings)
+//   v5.2.0 — 2026-03-21 — Add test execution endpoint, screenshot serving, and screenshot cleanup on delete (Task 16)
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -45,6 +48,10 @@ import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
+import { topologicalSort, runExtensionTest, runAppPlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
+import type { TestReport, TestResult } from '../services/generator-testing.js';
+import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 // @ts-ignore — frontend ESM module, no .d.ts
 import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
 
@@ -172,6 +179,9 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         await storage.deleteMemory(gaii, rec.key);
       }
 
+      // Clean up test screenshots from filesystem
+      await cleanupScreenshots(projectId);
+
       res.json(success(config.nodeId, { deleted: true, keysRemoved: allRecords.length }));
       emitChange('memory');
     }
@@ -289,6 +299,182 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const values = (rec?.value as Record<string, unknown>) ?? {};
 
       res.json(success(config.nodeId, { values }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/test — run tests in dependency order
+  // NOTE: registered before /:projectId/components/:componentId to avoid 'test' matching as componentId
+  router.post('/v1/generator/:projectId/test',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const { level } = req.body ?? {};
+      const testLevel = (level as string) || 'basic';
+
+      if (!['comprehensive', 'basic', 'none'].includes(testLevel)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'level must be comprehensive, basic, or none'));
+        return;
+      }
+
+      // Level 'none' — return empty report
+      if (testLevel === 'none') {
+        const report: TestReport = { level: 'none', timestamp: new Date().toISOString(), components: [], overall: 'passed' };
+        res.json(success(config.nodeId, { report }));
+        return;
+      }
+
+      // Load project + blueprint
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+      const project = (projectRec.value as Record<string, unknown>) ?? {};
+      const blueprint = project.blueprint as { components?: Array<{ id: string; type: string; label: string; produces?: string[]; consumes?: string[] }>; testScenarios?: Array<{ component: string; scenarios: Array<{ action: string; input: Record<string, unknown>; expect: string }> }> } | null;
+      if (!blueprint?.components) {
+        res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint required before running tests'));
+        return;
+      }
+
+      // Load settings
+      const settingsRec = await storage.getMemory(gaii, `generator.${projectId}.settings`);
+      const settings = (settingsRec?.value as Record<string, unknown>) ?? {};
+      void settings; // reserved for future use in test configuration
+
+      // Run topological sort
+      const testPlan = topologicalSort(blueprint.components, blueprint.testScenarios ?? []);
+      const results: TestResult[] = [];
+      const passedComponents = new Set<string>();
+      const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+      const baseUrl = `http://localhost:${config.port}`;
+
+      for (const plan of testPlan) {
+        // Check dependencies passed
+        const depsFailed = plan.dependencies.some(d => !passedComponents.has(d));
+        if (depsFailed) {
+          results.push({ componentId: plan.componentId, type: plan.type, status: 'skipped', scenarios: plan.scenarios.length, passed: 0, errors: ['Dependency not satisfied'], screenshots: [], fixRound: 0 });
+          continue;
+        }
+
+        // Load component record
+        const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${plan.componentId}`);
+        const compVal = (compRec?.value as Record<string, unknown>) ?? {};
+        const compStatus = compVal.status as string;
+
+        if (compStatus !== 'registered' && compStatus !== 'ready') {
+          results.push({ componentId: plan.componentId, type: plan.type, status: 'skipped', scenarios: plan.scenarios.length, passed: 0, errors: ['Component not ready or registered'], screenshots: [], fixRound: 0 });
+          continue;
+        }
+
+        // B-level tests by type
+        if (plan.type === 'extension') {
+          const compContent = compVal.content as string | undefined;
+          let extName = plan.componentId;
+          if (compContent) {
+            try {
+              const parsed = typeof compContent === 'string' ? JSON.parse(compContent) : compContent;
+              if (parsed.name) extName = parsed.name;
+            } catch { /* use componentId */ }
+          }
+          let scenarioPassed = 0;
+          const errors: string[] = [];
+          for (const scenario of plan.scenarios) {
+            const result = await runExtensionTest(baseUrl, extName, scenario.action, scenario.input, token);
+            if (result.passed) { scenarioPassed++; } else { errors.push(result.error ?? 'Unknown error'); }
+          }
+          const allPassed = errors.length === 0 && plan.scenarios.length > 0;
+          const status = plan.scenarios.length === 0 ? 'passed' : (allPassed ? 'passed' : 'failed');
+          results.push({ componentId: plan.componentId, type: plan.type, status, scenarios: plan.scenarios.length, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 });
+          if (status === 'passed') passedComponents.add(plan.componentId);
+        } else {
+          // Other types: pass through for now (no B-level test runner yet)
+          results.push({ componentId: plan.componentId, type: plan.type, status: 'passed', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 });
+          passedComponents.add(plan.componentId);
+        }
+      }
+
+      // C-level: Playwright tests for apps (comprehensive only)
+      if (testLevel === 'comprehensive' && await isPlaywrightAvailable()) {
+        await ensureScreenshotDir(projectId);
+        for (const plan of testPlan) {
+          if (plan.type !== 'app') continue;
+          const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${plan.componentId}`);
+          const compVal = (compRec?.value as Record<string, unknown>) ?? {};
+          const registeredAs = compVal.registeredAs as string | undefined;
+          if (!registeredAs) continue;
+
+          const appUrl = `${baseUrl}/apps/${registeredAs}`;
+          const pwResult = await runAppPlaywrightTest(appUrl, projectId, plan.componentId, plan.scenarios);
+
+          // Update existing result for this component
+          const existing = results.find(r => r.componentId === plan.componentId);
+          if (existing) {
+            existing.screenshots = pwResult.screenshots;
+            if (!pwResult.passed) {
+              existing.status = 'failed';
+              existing.errors.push(...pwResult.errors);
+              passedComponents.delete(plan.componentId);
+            }
+          }
+        }
+      }
+
+      // Determine overall status
+      const failedCount = results.filter(r => r.status === 'failed').length;
+      const passedCount = results.filter(r => r.status === 'passed').length;
+      const overall = failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed');
+
+      const report: TestReport = {
+        level: testLevel as 'comprehensive' | 'basic',
+        timestamp: new Date().toISOString(),
+        components: results,
+        overall,
+      };
+
+      // Store report in memory
+      const now = new Date().toISOString();
+      const existingReport = await storage.getMemory(gaii, `generator.${projectId}.test-report`);
+      await storage.setMemory({
+        key: `generator.${projectId}.test-report`,
+        ownerGaii: gaii,
+        value: report,
+        visibility: 'owner',
+        version: existingReport ? existingReport.version + 1 : 1,
+        tags: ['generator', 'test-report'],
+        ttlHours: null,
+        createdAt: existingReport?.createdAt ?? now,
+        updatedAt: now,
+      });
+
+      res.json(success(config.nodeId, { report }));
+      emitChange('memory');
+    }
+  );
+
+  // GET /v1/generator/:projectId/screenshots/:filename — serve test screenshot PNGs
+  // NOTE: registered before /:projectId/components/:componentId to avoid 'screenshots' matching as componentId
+  router.get('/v1/generator/:projectId/screenshots/:filename',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const projectId = req.params['projectId'] as string;
+      const filename = req.params['filename'] as string;
+
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'Invalid filename'));
+        return;
+      }
+
+      const filepath = join(screenshotDir(projectId), filename);
+      try {
+        const data = await readFile(filepath);
+        res.set('Content-Type', 'image/png');
+        res.send(data);
+      } catch {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Screenshot not found'));
+      }
     }
   );
 

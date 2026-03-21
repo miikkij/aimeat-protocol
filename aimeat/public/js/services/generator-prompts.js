@@ -111,6 +111,8 @@
  *     sharing model, admin app recommendation, user settings). Blueprint: add cortex-modular
  *     architecture guidance, settings inheritance from InterviewSpec, test scenario generation,
  *     "architecture" field at output top level.
+ *   v10.1.0 — 2026-03-21 — Add testContext parameter to buildFixPrompt for test-driven
+ *     fix loops: includes test errors, dependency results, and blueprint component spec
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -2163,7 +2165,7 @@ Common mistakes to avoid:
 ${buildBlueprintPrompt(description, interviewSpec)}`;
 }
 
-export function buildFixPrompt(originalPrompt, failedResult, errors, componentType) {
+export function buildFixPrompt(originalPrompt, failedResult, errors, componentType, testContext) {
   // Type-specific constraints that must be preserved during fixes
   const typeRules = {
     extension: `
@@ -2207,8 +2209,26 @@ ${failedResult}
 
 ERRORS:
 ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
-
+${testContext ? buildTestContextSection(testContext) : ''}
 Return the corrected result in the same format as the original.`;
+}
+
+/** Build a test failure context section for fix prompts */
+function buildTestContextSection(testContext) {
+  let section = '\n\n## Test Failure Context\n';
+  section += 'Test errors:\n' + testContext.errors.join('\n') + '\n';
+  if (testContext.dependencyResults) {
+    section += '\nDependency test results (these passed):\n';
+    for (const dep of testContext.dependencyResults) {
+      section += '- ' + dep.componentId + ': ' + dep.status + '\n';
+    }
+  }
+  if (testContext.blueprintComponent) {
+    const bc = testContext.blueprintComponent;
+    section += '\nBlueprint component spec:\n';
+    section += '- type: ' + bc.type + ', produces: ' + (bc.produces || []).join(', ') + ', consumes: ' + (bc.consumes || []).join(', ') + '\n';
+  }
+  return section;
 }
 
 /* ── Impact & Edit Prompts (Phase 6) ────────────────── */

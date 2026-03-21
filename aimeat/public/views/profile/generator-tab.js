@@ -33,6 +33,8 @@
  *     and Run All Steps mode for sequential autopilot execution
  *   v5.3.0 — 2026-03-21 — Add provider selector (OpenRouter / LM Studio / Custom) with baseUrl field
  *   v5.4.0 — 2026-03-21 — Add SettingsCollectionView for blueprint settings between approval and generation
+ *   v6.0.0 — 2026-03-21 — Add test execution UI (TestScopeSelector, TestResultsView),
+ *     test fix loop integration with buildFixPrompt testContext, screenshot display
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -57,6 +59,7 @@ import {
   packageProject, updatePackageVersion, detectChanges,
   importPackageToGenerator, publishToGallery,
 } from '/js/services/generator-packaging.js';
+import { runTests, screenshotUrl } from '/js/services/generator-testing.js';
 
 /* ── OpenRouter Autopilot Helper ──────────────────────── */
 
@@ -552,6 +555,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   // Interview spec (loaded for locale threading to component prompts)
   const [interviewSpec, setInterviewSpec] = useState(null);
+
+  // Test execution state
+  const [testScope, setTestScope] = useState('comprehensive');
+  const [testRunning, setTestRunning] = useState(false);
+  const [testReport, setTestReport] = useState(null);
+  const [testFixRound, setTestFixRound] = useState(0);
 
   useEffect(() => { loadData(); }, [projectId]);
 
@@ -1148,6 +1157,136 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     }, { title: t('profile.generator.deleteProject'), confirmLabel: t('profile.generator.deleteProject'), cancelLabel: t('profile.generator.back'), danger: true });
   }
 
+  // Test execution handler
+  async function handleRunTests() {
+    if (testScope === 'none') return;
+    setTestRunning(true);
+    setTestReport(null);
+    try {
+      const resp = await runTests(projectId, testScope);
+      const report = resp?.data || resp;
+      setTestReport(report);
+      await writeProjectLog(projectId, 'tests_run', { meta: { scope: testScope, overall: report.overall } });
+      if (report.overall === 'passed') {
+        showToast?.(t('profile.generator.test_passed'));
+      } else {
+        showToast?.(t('profile.generator.test_failed'), true);
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setTestRunning(false);
+  }
+
+  // Test fix loop handler — auto-fix failed component, re-register, re-test (max 3 rounds)
+  async function handleTestFixRequest(componentId, action) {
+    if (action === 'skip') return;
+    if (action === 'manual') {
+      // Select the failed component for manual editing
+      setSelectedId(componentId);
+      return;
+    }
+    // action === 'auto' — run fix loop
+    const MAX_FIX_ROUNDS = 3;
+    if (testFixRound >= MAX_FIX_ROUNDS) {
+      showToast?.(t('profile.generator.test_fix_round') + ' ' + MAX_FIX_ROUNDS + ' — ' + t('profile.generator.test_fix_manual'), true);
+      return;
+    }
+
+    const comp = components.find(c => c.id === componentId);
+    if (!comp) return;
+
+    const failedTestComp = testReport?.components?.find(c => c.componentId === componentId);
+    if (!failedTestComp) return;
+
+    // Build test context for the fix prompt
+    const blueprintComp = project?.blueprint?.components?.find(c => c.id === componentId);
+    const testContext = {
+      errors: failedTestComp.errors || [],
+      dependencyResults: (testReport?.components || [])
+        .filter(c => c.componentId !== componentId && c.status === 'passed')
+        .map(c => ({ componentId: c.componentId, status: c.status })),
+      blueprintComponent: blueprintComp || null,
+    };
+
+    setTestRunning(true);
+    setTestFixRound(prev => prev + 1);
+    showToast?.(t('profile.generator.test_fix_round') + ' ' + (testFixRound + 1));
+
+    try {
+      // Build fix prompt with test context
+      const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
+      const originalPrompt = comp.prompt || buildComponentPrompt(
+        comp.type, comp.label,
+        project.description, project.blueprint, completedComps,
+        interviewSpec,
+      );
+      const fixP = buildFixPrompt(originalPrompt, comp.result || '', failedTestComp.errors || [], comp.type, testContext);
+
+      // Run AI for fix
+      let content = await runWithAi(projectId, fixP);
+      if (comp.type === 'extension') content = stripCodeblock(content);
+
+      // Validate
+      let vr = validateComponent(comp.type, content, project.blueprint);
+
+      // Auto-retry validation if enabled
+      if (!vr.valid && orSettings?.autoRetry) {
+        const max = orSettings.maxRetries || 3;
+        for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+          showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
+          const retryP = buildFixPrompt(originalPrompt, content, vr.errors, comp.type);
+          content = await runWithAi(projectId, retryP);
+          if (comp.type === 'extension') content = stripCodeblock(content);
+          vr = validateComponent(comp.type, content, project.blueprint);
+        }
+      }
+
+      if (!vr.valid) {
+        showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
+        setTestRunning(false);
+        return;
+      }
+
+      // Save fixed result
+      const updated = {
+        ...comp, status: 'done', result: content, validationErrors: [],
+        history: [...(comp.history || []),
+          { action: 'test_fix', at: new Date().toISOString(), by: 'autopilot', round: testFixRound + 1 },
+        ],
+      };
+      await saveComponent(projectId, updated);
+
+      // Re-register
+      const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
+      const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
+      const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
+      if (comp.type === 'cortex') {
+        const cortexVr = validateComponent('cortex', content, project.blueprint);
+        await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
+      } else {
+        await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
+      }
+      await writeProjectLog(projectId, 'test_fix_registered', { meta: { component: comp.label, round: testFixRound + 1 } });
+      await loadData();
+
+      // Re-run tests
+      const resp = await runTests(projectId, testScope);
+      const report = resp?.data || resp;
+      setTestReport(report);
+      await writeProjectLog(projectId, 'tests_rerun', { meta: { scope: testScope, overall: report.overall, fixRound: testFixRound + 1 } });
+
+      if (report.overall === 'passed') {
+        showToast?.(t('profile.generator.test_passed'));
+      } else {
+        showToast?.(t('profile.generator.test_failed'), true);
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setTestRunning(false);
+  }
+
   if (!project) return html`<div class="pf-gen-loading">${t('profile.loading')}</div>`;
 
   return html`
@@ -1496,6 +1635,29 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               `)}
             </tbody>
           </table>
+        </div>
+      `}
+
+      <!-- Test Execution Panel -->
+      ${registeredCount > 0 && html`
+        <div class="pf-gen-test-panel">
+          <${TestScopeSelector} value=${testScope} onChange=${setTestScope} />
+          <div class="pf-gen-actions">
+            <button class="btn-primary btn-sm"
+              onClick=${handleRunTests}
+              disabled=${testRunning || testScope === 'none'}>
+              ${testRunning
+                ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.test_running')}`
+                : t('profile.generator.test_scope_title')}
+            </button>
+          </div>
+          ${testReport && html`
+            <${TestResultsView}
+              report=${testReport}
+              projectId=${projectId}
+              onFixRequest=${orSettings?.hasApiKey ? handleTestFixRequest : null}
+            />
+          `}
         </div>
       `}
 
@@ -1910,6 +2072,64 @@ function ComponentDetail({ component, project, components, projectId, interviewS
       `}
     </div>
   `;
+}
+
+/* ── Test Scope & Results ────────────────────────────── */
+
+function TestScopeSelector({ value, onChange }) {
+  return html`<div class="pf-gen-test-scope">
+    <h4>${t('profile.generator.test_scope_title')}</h4>
+    ${['comprehensive', 'basic', 'none'].map(level => html`
+      <label class="pf-gen-or-radio-label">
+        <input type="radio" name="test-scope" value=${level}
+          checked=${value === level}
+          onChange=${() => onChange(level)} />
+        ${t('profile.generator.test_scope_' + level)}
+      </label>
+    `)}
+  </div>`;
+}
+
+function TestResultsView({ report, projectId, onFixRequest }) {
+  if (!report) return null;
+
+  return html`<div class="pf-gen-test-results">
+    <div class="pf-gen-test-overall pf-gen-test-${report.overall}">
+      ${report.overall === 'passed'
+        ? t('profile.generator.test_passed')
+        : t('profile.generator.test_failed')}
+    </div>
+    ${(report.components || []).map(c => html`
+      <div class="pf-gen-test-component pf-gen-test-${c.status}">
+        <strong>${c.componentId}</strong>
+        <span class="pf-gen-test-badge">${t('profile.generator.test_component_' + c.status)}</span>
+        <span>${c.passed}/${c.scenarios}</span>
+        ${c.errors && c.errors.length > 0 && html`<ul class="pf-gen-test-errors">
+          ${c.errors.map(e => html`<li>${e}</li>`)}
+        </ul>`}
+        ${c.screenshots && c.screenshots.length > 0 && html`<div class="pf-gen-test-screenshots">
+          <strong>${t('profile.generator.test_screenshots')}</strong>
+          <div class="pf-gen-screenshot-grid">
+            ${c.screenshots.map(s => html`
+              <img src=${screenshotUrl(projectId, s)} class="pf-gen-screenshot" alt=${s}
+                onClick=${() => window.open(screenshotUrl(projectId, s), '_blank')} />
+            `)}
+          </div>
+        </div>`}
+        ${c.status === 'failed' && onFixRequest && html`<div class="pf-gen-test-fix-actions">
+          <button class="btn-primary" onClick=${() => onFixRequest(c.componentId, 'auto')}>
+            ${t('profile.generator.test_fix_auto')}
+          </button>
+          <button class="btn-outline" onClick=${() => onFixRequest(c.componentId, 'manual')}>
+            ${t('profile.generator.test_fix_manual')}
+          </button>
+          <button class="btn-ghost" onClick=${() => onFixRequest(c.componentId, 'skip')}>
+            ${t('profile.generator.test_fix_skip')}
+          </button>
+        </div>`}
+      </div>
+    `)}
+  </div>`;
 }
 
 /* ── OpenRouter Settings ─────────────────────────────── */
