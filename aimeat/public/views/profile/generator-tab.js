@@ -1017,7 +1017,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       // Iterate through all components in phase order
       for (const cid of phaseOrder) {
         if (autopilotCancelledRef.current) break;
-        const comp = components.find(c => c.id === cid);
+        // IMPORTANT: always fetch fresh state from API, not from closure (which is stale after loadData)
+        const freshComps = await loadAllComponents(projectId);
+        const comp = freshComps.find(c => c.id === cid);
         if (!comp || comp.registeredAs) continue; // skip already registered
 
         setCurrentAutopilotStep(comp.label);
@@ -1333,7 +1335,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     setTestRunning(true);
     setTestReport(null);
     const testableTypes = ['extension', 'cortex', 'app'];
-    const testableComps = components.filter(c => testableTypes.includes(c.type) && c.registeredAs);
+    // Fetch fresh state from API — closure components may be stale
+    const freshComps = await loadAllComponents(projectId);
+    const testableComps = freshComps.filter(c => testableTypes.includes(c.type) && c.registeredAs);
 
     if (testableComps.length === 0) {
       showToast?.(t('profile.generator.test_no_testable'), true);
