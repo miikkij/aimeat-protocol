@@ -48,7 +48,7 @@ import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
-import { topologicalSort, runExtensionTest, runAppPlaywrightTest, runCortexPlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir, buildCortexMethodTestCode } from '../services/generator-testing.js';
+import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
 import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -302,7 +302,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     }
   );
 
-  // POST /v1/generator/:projectId/test/:componentId — run tests for a single component
+  // POST /v1/generator/:projectId/test/:componentId — execute AI-generated test code
   // NOTE: registered before bulk test and /:projectId/components/:componentId
   router.post('/v1/generator/:projectId/test/:componentId',
     requireAuth(),
@@ -311,468 +311,72 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const gaii = ownerGhii(req);
       const projectId = req.params['projectId'] as string;
       const componentId = req.params['componentId'] as string;
-      const { level } = req.body ?? {};
-      const testLevel = (level as string) || 'basic';
+      const { testCode, environment } = req.body ?? {};
 
-      // Load project + blueprint
-      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
-      if (!projectRec) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
-        return;
-      }
-      const project = (projectRec.value as Record<string, unknown>) ?? {};
-      const blueprint = project.blueprint as { components?: Array<{ id: string; type: string; label: string; produces?: string[]; consumes?: string[] }>; testScenarios?: Array<{ component: string; scenarios: Array<{ action: string; input: Record<string, unknown>; expect: string }> }> } | null;
-      if (!blueprint?.components) {
-        res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint required'));
+      if (!testCode) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'testCode is required — AI must generate the test code first'));
         return;
       }
 
-      const bpComp = blueprint.components.find(c => c.id === componentId);
-      if (!bpComp) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Component not in blueprint'));
-        return;
-      }
-
-      // Load component record
+      // Load component record for metadata
       const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
       const compVal = (compRec?.value as Record<string, unknown>) ?? {};
-      const compStatus = compVal.status as string;
-
-      if (compStatus !== 'registered' && compStatus !== 'ready' && compStatus !== 'done') {
-        res.json(success(config.nodeId, {
-          result: { componentId, type: bpComp.type, status: 'skipped' as const, scenarios: 0, passed: 0, errors: ['Component not registered yet'], screenshots: [], fixRound: 0 },
-        }));
-        return;
-      }
+      const compType = (compVal.type as string) || 'unknown';
+      const registeredAs = compVal.registeredAs as string || componentId;
 
       const token = (req.headers.authorization ?? '').replace('Bearer ', '');
       const baseUrl = `http://localhost:${config.port}`;
-      const scenarios = (blueprint.testScenarios ?? []).find(ts => ts.component === componentId)?.scenarios ?? [];
 
       let result: TestResult;
 
-      if (bpComp.type === 'extension') {
-        // ── Extension test: call every action with correct HTTP method ──
-        const registeredAs = compVal.registeredAs as string || componentId;
-        let scenarioPassed = 0;
-        const errors: string[] = [];
+      // Determine execution environment: browser (Playwright) or server (HTTP)
+      const env = (environment as string) || (compType === 'cortex' || compType === 'app' ? 'browser' : 'server');
 
-        if (scenarios.length > 0) {
-          // Use explicit test scenarios from blueprint
-          for (const scenario of scenarios) {
-            const tr = await runExtensionTest(baseUrl, registeredAs, scenario.action, scenario.input, token);
-            if (tr.passed) { scenarioPassed++; } else { errors.push(`${scenario.action}: ${tr.error ?? 'Unknown error'}`); }
-          }
+      if (env === 'browser') {
+        // Browser test — execute AI-generated code in Playwright
+        if (!await isPlaywrightAvailable()) {
+          result = { componentId, type: compType, status: 'skipped', scenarios: 0, passed: 0, errors: ['Playwright not available'], screenshots: [], fixRound: 0 };
         } else {
-          // No explicit scenarios — auto-discover actions from extension metadata and test each
-          try {
-            const metaRes = await fetch(`${baseUrl}/v1/extensions/${registeredAs}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (metaRes.ok) {
-              const metaBody = await metaRes.json() as Record<string, unknown>;
-              const metaData = metaBody?.data as Record<string, unknown> | undefined;
-              const metaExt = metaData?.extension as Record<string, unknown> | undefined;
-              const actions = ((metaData?.actions ?? metaExt?.actions ?? []) as Array<{ id: string; method?: string }>);
-              for (const action of actions) {
-                const tr = await runExtensionTest(baseUrl, registeredAs, action.id, {}, token, action.method);
-                if (tr.passed) { scenarioPassed++; } else { errors.push(`${action.id} (${action.method || 'POST'}): ${tr.error ?? 'Unknown error'}`); }
-              }
-            } else {
-              // Fallback: at least try init
-              const tr = await runExtensionTest(baseUrl, registeredAs, 'init', {}, token);
-              if (tr.passed) { scenarioPassed = 1; } else { errors.push(`init: ${tr.error ?? 'Failed'}`); }
-            }
-          } catch {
-            const tr = await runExtensionTest(baseUrl, registeredAs, 'init', {}, token);
-            if (tr.passed) { scenarioPassed = 1; } else { errors.push(`init: ${tr.error ?? 'Failed'}`); }
-          }
-        }
-
-        const total = scenarios.length || Math.max(scenarioPassed + errors.length, 1);
-        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: total, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
-
-      } else if (bpComp.type === 'msm') {
-        // ── MSM test: verify the integration endpoint responds ──
-        const registeredAs = compVal.registeredAs as string;
-        const errors: string[] = [];
-        let scenarioPassed = 0;
-
-        if (registeredAs) {
-          try {
-            // MSM integrations are accessible via catalogue — check it exists
-            const catRes = await fetch(`${baseUrl}/v1/catalogue/integrations/${encodeURIComponent(registeredAs)}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (catRes.ok) {
-              scenarioPassed++;
-            } else {
-              errors.push(`MSM not found in catalogue: HTTP ${catRes.status}`);
-            }
-          } catch (e) {
-            errors.push(`MSM catalogue check failed: ${(e as Error).message}`);
-          }
-        } else {
-          errors.push('MSM not registered');
-        }
-
-        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
-
-      } else if (bpComp.type === 'memory') {
-        // ── Memory test: write test data, read it back, validate ──
-        const errors: string[] = [];
-        let scenarioPassed = 0;
-        const testKey = `_test.generator.${projectId}.${componentId}`;
-        const testValue = { _test: true, ts: new Date().toISOString() };
-
-        try {
-          // Write
-          const writeRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(testKey)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ value: testValue }),
-          });
-          if (!writeRes.ok) {
-            const wb = await writeRes.json() as Record<string, unknown>;
-            errors.push(`Memory write failed: HTTP ${writeRes.status} — ${JSON.stringify(wb)}`);
+          // Determine target URL
+          let targetUrl: string;
+          if (compType === 'app') {
+            targetUrl = `${baseUrl}/apps/${registeredAs}`;
+          } else if (compType === 'cortex') {
+            // Cortex test page loads the cortex lib
+            targetUrl = `${baseUrl}/v1/cortex/${registeredAs}/libs/${registeredAs}.js`;
           } else {
-            scenarioPassed++;
-
-            // Read back
-            const readRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(testKey)}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (!readRes.ok) {
-              errors.push(`Memory read failed: HTTP ${readRes.status}`);
-            } else {
-              const rb = await readRes.json() as Record<string, unknown>;
-              const readData = rb?.data as Record<string, unknown> | undefined;
-              const readValue = readData?.value as Record<string, unknown> | undefined;
-              if (readValue?._test === true) {
-                scenarioPassed++;
-              } else {
-                errors.push(`Memory read returned unexpected value: ${JSON.stringify(readValue)}`);
-              }
-            }
-
-            // Cleanup test key
-            await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(testKey)}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
+            targetUrl = baseUrl;
           }
-        } catch (e) {
-          errors.push(`Memory test error: ${(e as Error).message}`);
-        }
 
-        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 2, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
-
-      } else if (bpComp.type === 'translation') {
-        // ── Translation test: verify keys exist and en/fi parity ──
-        const errors: string[] = [];
-        let scenarioPassed = 0;
-
-        // Find the translation key from registeredAs (e.g., "osakeanalyysi.i18n-fi")
-        const regAs = compVal.registeredAs as string;
-        if (regAs) {
-          try {
-            const transRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(regAs)}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (transRes.ok) {
-              const transBody = await transRes.json() as Record<string, unknown>;
-              const transData = transBody?.data as Record<string, unknown> | undefined;
-              const transValue = transData?.value;
-              if (transValue && typeof transValue === 'object') {
-                const keys = Object.keys(transValue as Record<string, unknown>);
-                if (keys.length > 0) {
-                  scenarioPassed++;
-
-                  // Check parity with sibling locale
-                  const isFi = regAs.includes('-fi');
-                  const isEn = regAs.includes('-en');
-                  const siblingKey = isFi ? regAs.replace('-fi', '-en') : isEn ? regAs.replace('-en', '-fi') : null;
-
-                  if (siblingKey) {
-                    try {
-                      const sibRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(siblingKey)}`, {
-                        headers: { 'Authorization': `Bearer ${token}` },
-                      });
-                      if (sibRes.ok) {
-                        const sibBody = await sibRes.json() as Record<string, unknown>;
-                        const sibData = sibBody?.data as Record<string, unknown> | undefined;
-                        const sibValue = sibData?.value;
-                        if (sibValue && typeof sibValue === 'object') {
-                          const sibKeys = Object.keys(sibValue as Record<string, unknown>);
-                          const missing = keys.filter(k => !sibKeys.includes(k));
-                          const extra = sibKeys.filter(k => !keys.includes(k));
-                          if (missing.length === 0 && extra.length === 0) {
-                            scenarioPassed++;
-                          } else {
-                            if (missing.length > 0) errors.push(`Keys in ${regAs} but missing in ${siblingKey}: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` (+${missing.length - 5} more)` : ''}`);
-                            if (extra.length > 0) errors.push(`Keys in ${siblingKey} but missing in ${regAs}: ${extra.slice(0, 5).join(', ')}${extra.length > 5 ? ` (+${extra.length - 5} more)` : ''}`);
-                          }
-                        }
-                      }
-                    } catch { /* sibling not available yet — skip parity check */ }
-                  }
-                } else {
-                  errors.push('Translation file is empty (0 keys)');
-                }
-              } else {
-                errors.push('Translation value is not an object');
-              }
-            } else {
-              errors.push(`Translation key not found: HTTP ${transRes.status}`);
-            }
-          } catch (e) {
-            errors.push(`Translation test error: ${(e as Error).message}`);
-          }
-        } else {
-          errors.push('Translation not registered');
-        }
-
-        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 2, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
-
-      } else if (bpComp.type === 'cortex') {
-        // ── Cortex test: load lib, call init() AND all public methods ──
-        const registeredAs = compVal.registeredAs as string;
-        if (registeredAs && await isPlaywrightAvailable()) {
-          const camelName = registeredAs.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase());
-          // Get the cortex source code to discover public methods
-          const cortexSource = (compVal.content as string) || (compVal.result as string) || '';
-          const testCode = buildCortexMethodTestCode(camelName, cortexSource);
-          const cortexResult = await runCortexPlaywrightTest(
-            baseUrl, projectId, componentId, registeredAs, testCode,
-          );
-          result = { componentId, type: bpComp.type, status: cortexResult.passed ? 'passed' : 'failed', scenarios: 1, passed: cortexResult.passed ? 1 : 0, errors: cortexResult.errors, screenshots: [], fixRound: 0 };
-        } else if (registeredAs) {
-          // No Playwright — HTTP check that lib file loads and has AIMEAT registration
-          const errors: string[] = [];
-          try {
-            const libRes = await fetch(`${baseUrl}/v1/cortex/${registeredAs}/libs/${registeredAs}.js`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (libRes.ok) {
-              const libText = await libRes.text();
-              if (!libText.includes('AIMEAT')) errors.push('Cortex JS does not reference AIMEAT namespace');
-              if (!(libText.includes('register') || libText.includes('AIMEAT['))) errors.push('Cortex JS does not register itself');
-              if (!libText.includes('init')) errors.push('Cortex JS does not contain init() function');
-            } else {
-              errors.push(`Cortex lib HTTP ${libRes.status}`);
-            }
-          } catch (e) {
-            errors.push(`Cortex fetch error: ${(e as Error).message}`);
-          }
-          result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: errors.length === 0 ? 1 : 0, errors, screenshots: [], fixRound: 0 };
-        } else {
-          result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['Not registered'], screenshots: [], fixRound: 0 };
-        }
-
-      } else if (bpComp.type === 'app') {
-        // ── App test: Playwright loads page, checks content + console errors ──
-        const registeredAs = compVal.registeredAs as string;
-        if (registeredAs && await isPlaywrightAvailable()) {
           await ensureScreenshotDir(projectId);
-          const appUrl = `${baseUrl}/apps/${registeredAs}`;
-          const pwResult = await runAppPlaywrightTest(appUrl, projectId, componentId, scenarios);
-          result = { componentId, type: bpComp.type, status: pwResult.passed ? 'passed' : 'failed', scenarios: 1, passed: pwResult.passed ? 1 : 0, errors: pwResult.errors, screenshots: pwResult.screenshots, fixRound: 0 };
-        } else if (registeredAs) {
-          // No Playwright — basic HTTP check that app loads
-          const errors: string[] = [];
-          try {
-            const appRes = await fetch(`${baseUrl}/apps/${registeredAs}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (appRes.ok) {
-              const html = await appRes.text();
-              if (html.length < 50) errors.push('App HTML is suspiciously short');
-            } else {
-              errors.push(`App returned HTTP ${appRes.status}`);
-            }
-          } catch (e) {
-            errors.push(`App fetch error: ${(e as Error).message}`);
-          }
-          result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: errors.length === 0 ? 1 : 0, errors, screenshots: [], fixRound: 0 };
-        } else {
-          result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['Not registered'], screenshots: [], fixRound: 0 };
+          const pwResult = await executePlaywrightTest(testCode as string, projectId, componentId, targetUrl);
+          result = { componentId, type: compType, status: pwResult.passed ? 'passed' : 'failed', scenarios: 1, passed: pwResult.passed ? 1 : 0, errors: pwResult.errors, screenshots: pwResult.screenshots, fixRound: 0 };
         }
-
-      } else if (bpComp.type === 'csm') {
-        // ── CSM test: verify it exists in schema catalogue ──
-        const registeredAs = compVal.registeredAs as string;
-        const errors: string[] = [];
-        if (registeredAs) {
-          try {
-            const csmRes = await fetch(`${baseUrl}/v1/schemas/${encodeURIComponent(registeredAs)}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (!csmRes.ok) errors.push(`CSM not found in schemas: HTTP ${csmRes.status}`);
-          } catch (e) {
-            errors.push(`CSM check error: ${(e as Error).message}`);
-          }
-        } else {
-          errors.push('CSM not registered');
-        }
-        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: errors.length === 0 ? 1 : 0, errors, screenshots: [], fixRound: 0 };
-
       } else {
-        // Unknown type — skip
-        result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 };
+        // Server test — execute AI-generated code with testFetch helper
+        const httpResult = await executeHttpTest(testCode as string, baseUrl, token);
+        result = { componentId, type: compType, status: httpResult.passed ? 'passed' : 'failed', scenarios: 1, passed: httpResult.passed ? 1 : 0, errors: httpResult.errors, screenshots: [], fixRound: 0 };
       }
 
       res.json(success(config.nodeId, { result }));
     }
   );
 
-  // POST /v1/generator/:projectId/test — run tests in dependency order
-  // NOTE: registered before /:projectId/components/:componentId to avoid 'test' matching as componentId
+  // POST /v1/generator/:projectId/test — legacy bulk test endpoint
+  // Tests are now per-component via AI-generated code. This endpoint returns a stub.
   router.post('/v1/generator/:projectId/test',
     requireAuth(),
     requireRole('owner'),
     async (req, res) => {
-      const gaii = ownerGhii(req);
-      const projectId = req.params['projectId'] as string;
-      const { level } = req.body ?? {};
-      const testLevel = (level as string) || 'basic';
-
-      if (!['comprehensive', 'basic', 'none'].includes(testLevel)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'level must be comprehensive, basic, or none'));
-        return;
-      }
-
-      // Level 'none' — return empty report
-      if (testLevel === 'none') {
-        const report: TestReport = { level: 'none', timestamp: new Date().toISOString(), components: [], overall: 'passed' };
-        res.json(success(config.nodeId, { report }));
-        return;
-      }
-
-      // Load project + blueprint
-      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
-      if (!projectRec) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
-        return;
-      }
-      const project = (projectRec.value as Record<string, unknown>) ?? {};
-      const blueprint = project.blueprint as { components?: Array<{ id: string; type: string; label: string; produces?: string[]; consumes?: string[] }>; testScenarios?: Array<{ component: string; scenarios: Array<{ action: string; input: Record<string, unknown>; expect: string }> }> } | null;
-      if (!blueprint?.components) {
-        res.status(400).json(error(config.nodeId, 'NO_BLUEPRINT', 'Blueprint required before running tests'));
-        return;
-      }
-
-      // Load settings
-      const settingsRec = await storage.getMemory(gaii, `generator.${projectId}.settings`);
-      const settings = (settingsRec?.value as Record<string, unknown>) ?? {};
-      void settings; // reserved for future use in test configuration
-
-      // Run topological sort
-      const testPlan = topologicalSort(blueprint.components, blueprint.testScenarios ?? []);
-      const results: TestResult[] = [];
-      const passedComponents = new Set<string>();
-      const token = (req.headers.authorization ?? '').replace('Bearer ', '');
-      const baseUrl = `http://localhost:${config.port}`;
-
-      for (const plan of testPlan) {
-        // Check dependencies passed
-        const depsFailed = plan.dependencies.some(d => !passedComponents.has(d));
-        if (depsFailed) {
-          results.push({ componentId: plan.componentId, type: plan.type, status: 'skipped', scenarios: plan.scenarios.length, passed: 0, errors: ['Dependency not satisfied'], screenshots: [], fixRound: 0 });
-          continue;
-        }
-
-        // Load component record
-        const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${plan.componentId}`);
-        const compVal = (compRec?.value as Record<string, unknown>) ?? {};
-        const compStatus = compVal.status as string;
-
-        if (compStatus !== 'registered' && compStatus !== 'ready') {
-          results.push({ componentId: plan.componentId, type: plan.type, status: 'skipped', scenarios: plan.scenarios.length, passed: 0, errors: ['Component not ready or registered'], screenshots: [], fixRound: 0 });
-          continue;
-        }
-
-        // B-level tests by type
-        if (plan.type === 'extension') {
-          const compContent = compVal.content as string | undefined;
-          let extName = plan.componentId;
-          if (compContent) {
-            try {
-              const parsed = typeof compContent === 'string' ? JSON.parse(compContent) : compContent;
-              if (parsed.name) extName = parsed.name;
-            } catch { /* use componentId */ }
-          }
-          let scenarioPassed = 0;
-          const errors: string[] = [];
-          for (const scenario of plan.scenarios) {
-            const result = await runExtensionTest(baseUrl, extName, scenario.action, scenario.input, token);
-            if (result.passed) { scenarioPassed++; } else { errors.push(result.error ?? 'Unknown error'); }
-          }
-          const allPassed = errors.length === 0 && plan.scenarios.length > 0;
-          const status = plan.scenarios.length === 0 ? 'passed' : (allPassed ? 'passed' : 'failed');
-          results.push({ componentId: plan.componentId, type: plan.type, status, scenarios: plan.scenarios.length, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 });
-          if (status === 'passed') passedComponents.add(plan.componentId);
-        } else {
-          // Other types: pass through for now (no B-level test runner yet)
-          results.push({ componentId: plan.componentId, type: plan.type, status: 'passed', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 });
-          passedComponents.add(plan.componentId);
-        }
-      }
-
-      // C-level: Playwright tests for apps (comprehensive only)
-      if (testLevel === 'comprehensive' && await isPlaywrightAvailable()) {
-        await ensureScreenshotDir(projectId);
-        for (const plan of testPlan) {
-          if (plan.type !== 'app') continue;
-          const compRec = await storage.getMemory(gaii, `generator.${projectId}.component.${plan.componentId}`);
-          const compVal = (compRec?.value as Record<string, unknown>) ?? {};
-          const registeredAs = compVal.registeredAs as string | undefined;
-          if (!registeredAs) continue;
-
-          const appUrl = `${baseUrl}/apps/${registeredAs}`;
-          const pwResult = await runAppPlaywrightTest(appUrl, projectId, plan.componentId, plan.scenarios);
-
-          // Update existing result for this component
-          const existing = results.find(r => r.componentId === plan.componentId);
-          if (existing) {
-            existing.screenshots = pwResult.screenshots;
-            if (!pwResult.passed) {
-              existing.status = 'failed';
-              existing.errors.push(...pwResult.errors);
-              passedComponents.delete(plan.componentId);
-            }
-          }
-        }
-      }
-
-      // Determine overall status
-      const failedCount = results.filter(r => r.status === 'failed').length;
-      const passedCount = results.filter(r => r.status === 'passed').length;
-      const overall = failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed');
-
       const report: TestReport = {
-        level: testLevel as 'comprehensive' | 'basic',
+        level: 'none',
         timestamp: new Date().toISOString(),
-        components: results,
-        overall,
+        components: [],
+        overall: 'passed',
       };
-
-      // Store report in memory
-      const now = new Date().toISOString();
-      const existingReport = await storage.getMemory(gaii, `generator.${projectId}.test-report`);
-      await storage.setMemory({
-        key: `generator.${projectId}.test-report`,
-        ownerGaii: gaii,
-        value: report,
-        visibility: 'owner',
-        version: existingReport ? existingReport.version + 1 : 1,
-        tags: ['generator', 'test-report'],
-        ttlHours: null,
-        createdAt: existingReport?.createdAt ?? now,
-        updatedAt: now,
-      });
-
-      res.json(success(config.nodeId, { report }));
-      emitChange('memory');
+      res.json(success(config.nodeId, { report }, [
+        { description: 'Tests are now per-component. Use POST /v1/generator/:projectId/test/:componentId with AI-generated testCode.', method: 'POST', url: `/v1/generator/${req.params['projectId'] as string}/test/:componentId` },
+      ]));
     }
   );
 

@@ -1213,6 +1213,7 @@
       "test_scope_comprehensive_short": "Full",
       "test_scope_basic_short": "Basic",
       "test_scope_none_short": "Skip",
+      "test_generating": "AI generating tests...",
       "test_running": "Running tests...",
       "test_passed": "All tests passed",
       "test_partial": "Some tests passed, some failed",

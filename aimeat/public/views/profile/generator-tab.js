@@ -52,7 +52,7 @@ import {
   savePendingEdit, getPendingEdit, clearPendingEdit,
   saveProjectSettings,
 } from '/js/services/generator.js';
-import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
+import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildTestPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
 import { useConfirm } from '/components/Modal.js';
 import {
@@ -1116,13 +1116,35 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
         await loadData();
 
-        // Per-component test immediately after registration
+        // Per-component test immediately after registration (prompt-driven: AI generates test code)
         if (!autopilotCancelledRef.current && testScope !== 'none') {
           const testableTypes = ['csm', 'msm', 'extension', 'cortex', 'app', 'memory', 'translation'];
           if (testableTypes.includes(comp.type)) {
+            // Step 1: AI generates the test code
+            setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_generating'));
+            const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
+            let aiTestCode;
+            try {
+              const testPrompt = buildTestPrompt(
+                comp.type, content, comp.label, updated.registeredAs,
+                project.blueprint, interviewSpec
+              );
+              aiTestCode = await runWithAi(projectId, testPrompt);
+              // Strip markdown code fences if AI wraps the response
+              aiTestCode = stripCodeblock(aiTestCode);
+              await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, by: 'autopilot' } });
+            } catch (e) {
+              await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+              showToast?.(`${comp.label}: Test generation failed: ${e.message}`, true);
+              await loadData();
+              continue; // Skip testing, move to next component
+            }
+            if (autopilotCancelledRef.current) break;
+
+            // Step 2: Execute the AI-generated test code
             setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_running'));
             try {
-              const testResp = await runComponentTest(projectId, comp.id, testScope);
+              const testResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
               const testResult = testResp?.data?.result || testResp?.result;
 
               // Accumulate result into testReport for sidebar indicators

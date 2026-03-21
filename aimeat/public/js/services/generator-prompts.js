@@ -2369,6 +2369,110 @@ function buildTestContextSection(testContext) {
   return section;
 }
 
+/* ── Test Generation Prompts (Prompt-Driven) ─────────── */
+
+/**
+ * Build a prompt for the AI to generate executable test code for a component.
+ * The AI writes JavaScript that will be executed to test the component.
+ * Same flow as component generation: prompt → AI → result → execute.
+ *
+ * For server-side tests (extension, MSM, memory, translation):
+ *   AI generates JS that uses testFetch(url, opts) and returns { passed, errors, details }
+ *
+ * For client-side tests (cortex, app):
+ *   AI generates JS that runs in browser (Playwright), sets window.__testResults = { passed, errors }
+ */
+export function buildTestPrompt(componentType, componentCode, componentLabel, registeredAs, blueprint, interviewSpec) {
+  const testEnvDoc = componentType === 'cortex' || componentType === 'app'
+    ? `## Test Environment: Browser (Playwright)
+Your test code runs inside a real browser page via Playwright.
+You have access to the full DOM, window object, and can make fetch calls.
+Set your results on: window.__testResults = { passed: boolean, errors: string[], details: string }
+
+For CORTEX tests:
+- The cortex library is loaded at: /v1/cortex/{name}/libs/{name}.js
+- Access it via: window.AIMEAT.{camelCaseName}
+- Test init() AND every public method
+- Call methods with realistic arguments based on the component code
+- Verify return values are not null/undefined and have expected shape
+
+For APP tests:
+- The app is already loaded in the page
+- Wait for data to render: await new Promise(r => setTimeout(r, 3000));
+- Check DOM elements exist: document.querySelector(...)
+- Click buttons and navigation, verify results
+- Check no error messages visible
+- Take note of what the interview spec says the use cases are`
+    : `## Test Environment: Server-side (Node.js)
+Your test code runs on the server. You have ONE helper function:
+
+  const resp = await testFetch(url, { method, body, headers });
+  // resp = { status: number, ok: boolean, body: object }
+
+URLs should start with / (e.g., /v1/extensions/my-ext/actions/init)
+The baseUrl and auth token are injected automatically.
+
+Your code MUST return: { passed: boolean, errors: string[], details: string }
+
+For EXTENSION tests:
+- Call each action endpoint using the correct HTTP method (GET/POST as declared in manifest)
+- Use the registered extension name in the URL: /v1/ext/{registeredName}/{actionId}
+- NOT /v1/extensions/... — the correct path is /v1/ext/{name}/{actionId}
+- Verify response has ok:true and data field
+- For GET actions: pass input as query params in URL
+- For POST actions: pass input as JSON body
+- Test with realistic input data based on what the extension does
+
+For MSM tests:
+- Verify the integration exists in the catalogue
+- Test the external API endpoint if accessible
+
+For MEMORY tests:
+- Write a test value, read it back, verify, cleanup
+- Use PUT /v1/memory/{key} to write, GET /v1/memory/{key} to read
+
+For TRANSLATION tests:
+- Read the translation key, verify it has content
+- Check en/fi parity if both exist`;
+
+  const bpComponents = blueprint?.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+  const useCases = interviewSpec?.useCases?.map((uc, i) => `${i + 1}. ${uc}`).join('\n') || 'No use cases specified';
+
+  return `${INSTRUCTION_DISCLAIMER}You are generating TEST CODE for a component in an AIMEAT service.
+
+## Component Under Test
+- Type: ${componentType}
+- Label: ${componentLabel}
+- Registered as: ${registeredAs || 'unknown'}
+
+## Component Code
+\`\`\`
+${componentCode}
+\`\`\`
+
+## Project Context
+Blueprint components:
+${bpComponents}
+
+Use cases from interview:
+${useCases}
+
+${testEnvDoc}
+
+## Output Format
+Return ONLY executable JavaScript code — no markdown fences, no explanation.
+The code must be a self-contained script that tests the component thoroughly.
+
+Test REAL functionality:
+- Does the component actually work? Not just "does it exist"
+- Call real endpoints with real input data
+- Verify response shapes match what the code produces
+- Test edge cases (empty input, missing data)
+- For apps: verify the use cases from the interview actually work in the UI
+
+DO NOT write placeholder tests. Every assertion must verify real behavior.`;
+}
+
 /* ── Impact & Edit Prompts (Phase 6) ────────────────── */
 
 /**

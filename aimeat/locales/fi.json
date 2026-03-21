@@ -1213,6 +1213,7 @@
       "test_scope_comprehensive_short": "Kattava",
       "test_scope_basic_short": "Perustaso",
       "test_scope_none_short": "Ohita",
+      "test_generating": "Tekoäly generoi testit...",
       "test_running": "Ajetaan testejä...",
       "test_passed": "Kaikki testit läpäisty",
       "test_partial": "Osa testeistä läpäisty, osa epäonnistui",
