@@ -13966,6 +13966,14 @@ paths:
                 maxRetries:
                   type: integer
                   description: Maximum number of retry attempts
+                provider:
+                  type: string
+                  enum: [openrouter, lmstudio, custom]
+                  description: AI provider type
+                baseUrl:
+                  type: string
+                  format: uri
+                  description: Custom API base URL (required for custom provider, optional for lmstudio)
       responses:
         '200':
           description: Settings saved
@@ -14022,6 +14030,15 @@ paths:
                           maxRetries:
                             type: integer
                             description: Maximum retry count
+                          provider:
+                            type: string
+                            enum: [openrouter, lmstudio, custom]
+                            default: openrouter
+                            description: AI provider type
+                          baseUrl:
+                            type: string
+                            format: uri
+                            description: Custom API base URL
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
