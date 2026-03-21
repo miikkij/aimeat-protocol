@@ -566,6 +566,26 @@ export function validateInterviewSpec(result) {
       });
     }
 
+    // Validate optional externalServices
+    if (spec.externalServices !== undefined) {
+      if (!Array.isArray(spec.externalServices)) {
+        errors.push('externalServices must be an array');
+      } else {
+        for (const svc of spec.externalServices) {
+          if (!svc.name || typeof svc.name !== 'string') errors.push('externalServices[].name required');
+          if (!Array.isArray(svc.requiredSettings)) errors.push(`externalServices[${svc.name}].requiredSettings must be array`);
+          if (!['shared', 'per-user'].includes(svc.sharingModel)) errors.push(`externalServices[${svc.name}].sharingModel invalid`);
+        }
+      }
+    }
+
+    // Validate optional userSettings
+    if (spec.userSettings !== undefined) {
+      if (!Array.isArray(spec.userSettings)) {
+        errors.push('userSettings must be an array');
+      }
+    }
+
     if (errors.length > 0) return { valid: false, errors, warnings };
     return { valid: true, errors: [], warnings, parsed: spec };
   } catch (e) {
@@ -584,7 +604,7 @@ export function validateBlueprint(result) {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed.components)) errors.push('Missing "components" array');
     else {
-      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses']);
+      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses', 'role']);
       parsed.components = parsed.components.map(c => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
@@ -610,6 +630,7 @@ export function validateBlueprint(result) {
           warnings.push(`Component "${c.id || '?'}" had extra fields stripped: ${extraKeys.join(', ')}`);
         }
         const clean = { id: c.id, type: c.type, label: c.label };
+        if (typeof c.role === 'string') clean.role = c.role;
         if (Array.isArray(c.produces)) clean.produces = c.produces;
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes;
         if (Array.isArray(c.schedules) && c.type === 'extension') {
@@ -695,6 +716,28 @@ export function validateBlueprint(result) {
     } else {
       warnings.push('Missing "dataModel" — downstream components will not have schema guidance');
     }
+
+    // Validate optional settings
+    if (parsed.settings) {
+      const s = parsed.settings;
+      if (s.service && !Array.isArray(s.service)) errors.push('settings.service must be an array');
+      if (s.user && !Array.isArray(s.user)) errors.push('settings.user must be an array');
+      if (Array.isArray(s.service)) {
+        for (const entry of s.service) {
+          if (!entry.key || !entry.type || !entry.label) {
+            errors.push('settings.service entry missing key/type/label');
+          }
+          if (entry.type && !['secret', 'url', 'string', 'number', 'boolean'].includes(entry.type)) {
+            warnings.push(`settings.service[${entry.key}] has unknown type: ${entry.type}`);
+          }
+        }
+      }
+    }
+
+    // Preserve new top-level blueprint fields
+    if (parsed.settings) parsed.settings = parsed.settings;
+    if (parsed.testScenarios) parsed.testScenarios = parsed.testScenarios;
+    if (parsed.architecture) parsed.architecture = parsed.architecture;
 
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e) {

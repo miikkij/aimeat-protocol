@@ -7,6 +7,9 @@
  * @version-history
  *   v1.0.0 — 2026-03-14 — Initial generator E2E test suite
  *   v1.1.0 — 2026-03-18 — Add agent-driven generator API endpoint tests
+ *   v1.2.0 — 2026-03-21 — Add provider settings E2E tests (lmstudio, custom, URL validation)
+ *   v1.3.0 — 2026-03-21 — Add generator settings collection E2E tests
+ *   v1.4.0 — 2026-03-21 — Add test execution endpoint E2E tests (none/basic/invalid/404)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-generator.ts
@@ -675,6 +678,140 @@ consent_requirements:
 
 // Session claim/heartbeat/release tests removed — agent session endpoints removed in OpenRouter autopilot refactor
 
+// ─── Generator Settings Collection ───
+console.log('\nGenerator — Settings Collection');
+
+await test('POST /v1/generator/:projectId/settings stores values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ values: { finnhub_api_key: 'test-key-123', default_city: 'Helsinki' } }),
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.stored === 2, `Expected 2 stored, got ${res.body.data?.stored}`);
+});
+
+await test('GET /v1/generator/:projectId/settings retrieves values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.values?.finnhub_api_key === 'test-key-123', `Key mismatch: ${res.body.data?.values?.finnhub_api_key}`);
+    assert(res.body.data?.values?.default_city === 'Helsinki', `City mismatch: ${res.body.data?.values?.default_city}`);
+});
+
+await test('POST /v1/generator/:projectId/settings overwrites existing values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ values: { finnhub_api_key: 'updated-key', new_setting: true } }),
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}`);
+    assert(res.body.data?.stored === 2, `Expected 2 stored`);
+
+    // Verify new values replaced old
+    const getRes = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(getRes.body.data?.values?.finnhub_api_key === 'updated-key', 'Key should be updated');
+    assert(getRes.body.data?.values?.new_setting === true, 'New setting should exist');
+    // Old default_city should be gone (full replace)
+    assert(getRes.body.data?.values?.default_city === undefined, 'Old key should be gone after overwrite');
+});
+
+await test('POST /v1/generator/:projectId/settings rejects missing values', async () => {
+    const res = await json(`/v1/generator/${generatorApiProjectId}/settings`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({}),
+    });
+    assert(res.status === 400, `Expected 400, got ${res.status}`);
+});
+
+await test('POST /v1/generator/:projectId/settings returns 404 for non-existent project', async () => {
+    const res = await json('/v1/generator/nonexistent-project/settings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ values: { key: 'value' } }),
+    });
+    assert(res.status === 404, `Expected 404, got ${res.status}`);
+});
+
+await test('GET /v1/generator/:projectId/settings returns empty for no settings', async () => {
+    // Use the memory-based projectId which has no settings stored via the settings endpoint
+    const res = await json(`/v1/generator/${projectId}/settings`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}`);
+    assert(Object.keys(res.body.data?.values ?? {}).length === 0, 'Should return empty values');
+});
+
+// ─── Test Execution ───
+console.log('\nTest Execution');
+
+await test('POST /v1/generator/:projectId/test with level none returns empty', async () => {
+  const res = await json(`/v1/generator/${generatorApiProjectId}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ level: 'none' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert(res.body.data?.report?.overall === 'passed', `None level should pass, got: ${res.body.data?.report?.overall}`);
+  assert(res.body.data?.report?.components?.length === 0, `None level no components, got: ${res.body.data?.report?.components?.length}`);
+});
+
+// Create a fresh test project with blueprint stored as a parsed object so the test endpoint can read it
+const testExecProjectId = 'prj-texec-' + Date.now().toString(36);
+await json('/v1/memory', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+        key: `generator.${testExecProjectId}.project`,
+        value: {
+            projectId: testExecProjectId,
+            name: 'Test Exec Project',
+            description: 'E2E test for test execution endpoint',
+            status: 'blueprint_ready',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            blueprint: { components: [{ id: 'cmp-1', type: 'csm', label: 'Main CSM', produces: [], consumes: [] }], phases: [], testScenarios: [] },
+        },
+        visibility: 'owner',
+    }),
+});
+
+await test('POST /v1/generator/:projectId/test with level basic runs', async () => {
+  const res = await json(`/v1/generator/${testExecProjectId}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ level: 'basic' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert(res.body.data?.report, `Expected test report, got: ${JSON.stringify(res.body.data)}`);
+  assert(res.body.data?.report?.level === 'basic', `Expected basic level, got: ${res.body.data?.report?.level}`);
+  assert(Array.isArray(res.body.data?.report?.components), `Expected components array`);
+  assert(['passed', 'failed'].includes(res.body.data?.report?.overall), `Expected overall passed/failed, got: ${res.body.data?.report?.overall}`);
+});
+
+await test('POST /v1/generator/:projectId/test rejects invalid level', async () => {
+  const res = await json(`/v1/generator/${generatorApiProjectId}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ level: 'invalid' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 400, `Expected 400, got ${res.status}`);
+});
+
+await test('POST /v1/generator/:projectId/test returns 404 for non-existent project', async () => {
+  const res = await json('/v1/generator/nonexistent-proj-xyz/test', {
+    method: 'POST',
+    body: JSON.stringify({ level: 'basic' }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+  });
+  // 404 or 400 (no blueprint) are both acceptable; not 200
+  assert(res.status === 404 || res.status === 400, `Expected 404 or 400, got ${res.status}`);
+});
+
 await test('Agent: cleanup generator API test project', async () => {
     // Delete all generator.{id}.* keys
     const { body: listBody } = await json(`/v1/memory?prefix=${encodeURIComponent(`generator.${generatorApiProjectId}.`)}`, {
@@ -687,6 +824,47 @@ await test('Agent: cleanup generator API test project', async () => {
             headers: { Authorization: `Bearer ${generatorAgentToken}` },
         });
     }
+});
+
+// ─── Provider Settings ───
+console.log('\nProvider Settings');
+
+await test('PUT /v1/openrouter/settings with lmstudio provider (no API key)', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model' }),
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+});
+
+await test('PUT /v1/openrouter/settings with lmstudio + API key', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model', apiKey: 'lms-key-123' }),
+  });
+  // Without AIMEAT_ENCRYPTION_KEY configured, storing an API key returns 503.
+  // With encryption configured, it returns 200. Both are valid outcomes.
+  assert(res.status === 200 || res.status === 503, `Expected 200 or 503, got ${res.status}: ${JSON.stringify(res.body)}`);
+});
+
+await test('GET /v1/openrouter/settings returns provider info', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert(res.body.data?.provider === 'lmstudio', `Expected lmstudio, got ${res.body.data?.provider}`);
+  assert(res.body.data?.baseUrl === 'http://localhost:1234/v1', `Bad baseUrl: ${res.body.data?.baseUrl}`);
+});
+
+await test('PUT /v1/openrouter/settings rejects insecure remote URL', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ provider: 'custom', baseUrl: 'http://evil.com/v1' }),
+  });
+  assert(res.status === 400, `Expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
 });
 
 // ─── Generator Cleanup ───

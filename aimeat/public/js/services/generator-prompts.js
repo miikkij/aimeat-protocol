@@ -107,6 +107,12 @@
  *     Cortex prompt: add critical rule that ext: namespace is read-only from client-side.
  *     Client CANNOT PUT to /v1/memory/ext:name/key — must use callExt() for shared writes
  *     or writeOwnerMemory() for personal data. Add data storage decision table.
+ *   v10.0.0 — 2026-03-21 — Interview: add settings detection section (external services,
+ *     sharing model, admin app recommendation, user settings). Blueprint: add cortex-modular
+ *     architecture guidance, settings inheritance from InterviewSpec, test scenario generation,
+ *     "architecture" field at output top level.
+ *   v10.1.0 — 2026-03-21 — Add testContext parameter to buildFixPrompt for test-driven
+ *     fix loops: includes test errors, dependency results, and blueprint component spec
  */
 
 /* ── AIMEAT Capabilities Context ─────────────────────── */
@@ -219,7 +225,7 @@ ${description}
 ${specContext}${langNote}${cortexCatalog}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
-CRITICAL: Return ONLY a JSON object with "components", "phases", and "dataModel". Nothing else.
+CRITICAL: Return ONLY a JSON object with "architecture", "components", "phases", "dataModel", and optionally "settings" and "testScenarios". Nothing else.
 Each component has these fields: "id", "type", "label", "produces", "consumes". Extension components may also have "schedules".
 Do NOT include manifest content, code, HTML, translations, or any implementation details.
 The blueprint is a lightweight plan — actual content is generated later per component.
@@ -375,7 +381,59 @@ Place it in an early phase (before extensions that consume it).
 ### How They Work Together
 - Extension: fetches external data → stores in memory (scheduled, server-side)
 - Cortex: reads extension memory → transforms → exposes clean domain API (client-side library)
-- App: calls cortex methods → renders UI → handles user interaction (client-side HTML/JS)`;
+- App: calls cortex methods → renders UI → handles user interaction (client-side HTML/JS)
+
+## Cortex-Modular Architecture
+
+Structure the service using cortex layers, not monolithic apps:
+
+1. **Extensions** at the bottom — fetch external data, handle storage
+2. **Data Cortex** — unifies extension data into a single interface. ALWAYS create when there are extensions.
+3. **UI Cortexes** — self-contained view components (list, detail, settings). Each is a complete functional unit like charts-cortex or drawing-board.
+4. **Admin Cortex** — only if adminAppRecommended in interview spec. Handles settings management, moderation.
+5. **App** — lightweight shell that composes cortexes. No heavy logic, just layout + cortex composition.
+6. **Admin App** — only if admin cortex exists. Uses type "app" with "role": "admin" in component metadata.
+
+Cortexes can use other cortexes. UI cortexes consume data cortex. Data cortex consumes extensions.
+
+IMPORTANT: Do NOT add user management — AIMEAT handles that already.
+
+Include "architecture": "cortex-modular" at the top level of the output JSON (alongside "components", "phases", "dataModel").
+
+## Settings
+
+Inherit settings from the InterviewSpec (if provided):
+
+"settings": {
+  "service": [/* from interviewSpec.externalServices[].requiredSettings — add "sharing" ("shared" or "per-user") from the parent externalService's sharingModel, and "required": true/false based on whether the service can function without it */],
+  "user": [/* from interviewSpec.userSettings — carry over key, type, label, default */]
+}
+
+Each service setting gets a "sharing" field ("shared" or "per-user") from the InterviewSpec's externalServices.
+Add "required": true/false based on whether the service can function without it.
+The blueprint may refine defaults but must not invent new settings not in the InterviewSpec.
+If no InterviewSpec is provided or it has no settings, omit the "settings" field.
+
+## Test Scenarios
+
+For each component that produces data, generate test scenarios:
+
+"testScenarios": [
+  {
+    "component": "component-id",
+    "scenarios": [
+      {
+        "action": "action-name",
+        "input": { "key": "value" },
+        "expect": "natural language description of expected result"
+      }
+    ]
+  }
+]
+
+Be concrete: use real-world example values (e.g., symbol "AAPL" for stock data, city "Helsinki" for weather).
+Test the happy path — the test system handles error paths.
+Include testScenarios at the top level of the output JSON (alongside "components", "phases", "dataModel").`;
 }
 
 /* ── Interview Prompt ──────────────────────────────────── */
@@ -504,7 +562,23 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       - Layout preference: tabs, single page, split panels?
       - Any apps or websites whose look they admire?
 
-   f) CONSTRAINTS & PREFERENCES (1-2 questions)
+   f) SETTINGS & EXTERNAL SERVICES — What configuration does this need? (1-2 questions)
+      As you interview the user, identify external services and settings needs:
+
+      1. When the user describes data sources, recognize external API dependencies. For each:
+         - Name the service (e.g., "Finnhub", "OpenWeatherMap")
+         - Identify required settings (API key, base URL, refresh interval, etc.)
+         - Suggest whether settings should be shared (one key for all users) or per-user
+
+      2. Ask ONE simple question: "Will you share this service with other users or use it only yourself?"
+         This drives the architecture — personal use means simpler settings, shared means admin capabilities may be needed.
+
+      3. Identify user-configurable preferences (default values, display options, limits).
+
+      4. If the service is complex with shared sensitive settings, recommend a separate admin app.
+         If simple or personal-use, a single app is fine. Do NOT create an admin app unless clearly justified.
+
+   g) CONSTRAINTS & PREFERENCES (1-2 questions)
       Ask in ONE batch:
       - How often should data refresh?
       - What languages does the UI need?
@@ -601,6 +675,21 @@ The user describes WHAT they want and WHY. The generator decides HOW.
     "displayContext": "desktop|mobile|kiosk|embedded",
     "references": "Any reference apps or styles the user mentioned"
   },
+  "externalServices": [
+    {
+      "name": "ServiceName",
+      "purpose": "what it provides",
+      "requiredSettings": [{ "key": "api_key_name", "type": "secret|string|url|number", "label": "Human-readable Label" }],
+      "sharingModel": "shared|per-user",
+      "suggestedBy": "ai"
+    }
+  ],
+  "sharedService": true,
+  "adminAppRecommended": false,
+  "adminAppReason": "reason string or null — only set if adminAppRecommended is true",
+  "userSettings": [
+    { "key": "setting_name", "type": "string|number|boolean|select", "label": "Human-readable Label", "default": "default value" }
+  ],
   "constraints": {
     "updateMode": "realtime|scheduled|on-demand",
     "scheduleInterval": "15m|1h|daily|null",
@@ -2076,7 +2165,7 @@ Common mistakes to avoid:
 ${buildBlueprintPrompt(description, interviewSpec)}`;
 }
 
-export function buildFixPrompt(originalPrompt, failedResult, errors, componentType) {
+export function buildFixPrompt(originalPrompt, failedResult, errors, componentType, testContext) {
   // Type-specific constraints that must be preserved during fixes
   const typeRules = {
     extension: `
@@ -2120,8 +2209,26 @@ ${failedResult}
 
 ERRORS:
 ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
-
+${testContext ? buildTestContextSection(testContext) : ''}
 Return the corrected result in the same format as the original.`;
+}
+
+/** Build a test failure context section for fix prompts */
+function buildTestContextSection(testContext) {
+  let section = '\n\n## Test Failure Context\n';
+  section += 'Test errors:\n' + testContext.errors.join('\n') + '\n';
+  if (testContext.dependencyResults) {
+    section += '\nDependency test results (these passed):\n';
+    for (const dep of testContext.dependencyResults) {
+      section += '- ' + dep.componentId + ': ' + dep.status + '\n';
+    }
+  }
+  if (testContext.blueprintComponent) {
+    const bc = testContext.blueprintComponent;
+    section += '\nBlueprint component spec:\n';
+    section += '- type: ' + bc.type + ', produces: ' + (bc.produces || []).join(', ') + ', consumes: ' + (bc.consumes || []).join(', ') + '\n';
+  }
+  return section;
 }
 
 /* ── Impact & Edit Prompts (Phase 6) ────────────────── */

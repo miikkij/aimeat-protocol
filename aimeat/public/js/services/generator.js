@@ -36,6 +36,7 @@
  *   v4.4.0 — 2026-03-17 — Add reregisterComponent (deactivate → remove → register → re-activate)
  *   v4.5.0 — 2026-03-19 — Add writeProjectLog for user-action activity logging; fix apiPatch import
  *   v5.0.0 — 2026-03-20 — Remove agent-related functions (replaced by OpenRouter autopilot)
+ *   v5.1.0 — 2026-03-21 — Add saveProjectSettings/getProjectSettings for settings collection step
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
@@ -243,6 +244,17 @@ export async function clearPendingEdit(projectId) {
   try {
     await apiDelete(`/v1/memory/generator.${projectId}.pending-edit`);
   } catch { /* ignore */ }
+}
+
+/* ── Project Settings ────────────────────────────────── */
+
+export async function saveProjectSettings(projectId, values, secretKeys) {
+  return apiPost(`/v1/generator/${projectId}/settings`, { values, secretKeys });
+}
+
+export async function getProjectSettings(projectId) {
+  const res = await apiGet(`/v1/generator/${projectId}/settings`);
+  return res?.data?.values || {};
 }
 
 /* ── Component State ─────────────────────────────────── */

@@ -1,11 +1,12 @@
 /**
  * @file openrouter.ts
- * @description OpenRouter API client for making AI completions and listing models.
+ * @description Provider-agnostic AI client for OpenAI-compatible APIs (OpenRouter, LM Studio, etc.).
  * @structure
- *   - complete(apiKey, model, prompt, systemPrompt?) — call OpenRouter chat completions
- *   - listModels(apiKey) — fetch available models
+ *   - complete(apiKey, model, prompt, systemPrompt?, baseUrl?) — call chat completions
+ *   - listModels(apiKey, baseUrl?) — fetch available models
  * @version-history
  *   v1.0.0 — 2026-03-20 — Initial implementation
+ *   v1.1.0 — 2026-03-21 — Made provider-agnostic with baseUrl parameter; apiKey optional
  */
 
 export interface OpenRouterCompletionResult {
@@ -25,13 +26,14 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const TIMEOUT_MS = 1_800_000; // 30 minutes
 
 /**
- * Call OpenRouter chat completions API.
+ * Call an OpenAI-compatible chat completions API.
  */
 export async function complete(
-  apiKey: string,
+  apiKey: string | undefined,
   model: string,
   prompt: string,
   systemPrompt?: string,
+  baseUrl: string = OPENROUTER_BASE,
 ): Promise<OpenRouterCompletionResult> {
   const messages: Array<{ role: string; content: string }> = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
@@ -40,15 +42,18 @@ export async function complete(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+  // Only add OpenRouter-specific headers when using OpenRouter
+  if (baseUrl === OPENROUTER_BASE) {
+    headers['HTTP-Referer'] = 'https://aimeat.io';
+    headers['X-Title'] = 'AIMEAT Generator';
+  }
+
   try {
-    const resp = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://aimeat.io',
-        'X-Title': 'AIMEAT Generator',
-      },
+      headers,
       body: JSON.stringify({ model, messages }),
       signal: controller.signal,
     });
@@ -73,12 +78,16 @@ export async function complete(
 }
 
 /**
- * Fetch available models from OpenRouter.
+ * Fetch available models from an OpenAI-compatible API.
  */
-export async function listModels(apiKey: string): Promise<OpenRouterModel[]> {
-  const resp = await fetch(`${OPENROUTER_BASE}/models`, {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-  });
+export async function listModels(
+  apiKey: string | undefined,
+  baseUrl: string = OPENROUTER_BASE,
+): Promise<OpenRouterModel[]> {
+  const headers: Record<string, string> = {};
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+  const resp = await fetch(`${baseUrl}/models`, { headers });
 
   if (!resp.ok) {
     const err = new Error(`OpenRouter ${resp.status}`) as Error & { status: number };
