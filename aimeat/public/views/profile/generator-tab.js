@@ -35,6 +35,13 @@
  *   v5.4.0 — 2026-03-21 — Add SettingsCollectionView for blueprint settings between approval and generation
  *   v6.0.0 — 2026-03-21 — Add test execution UI (TestScopeSelector, TestResultsView),
  *     test fix loop integration with buildFixPrompt testContext, screenshot display
+ *   v6.1.0 — 2026-03-21 — Fix testing system end-to-end:
+ *     - Fix re-test passing testScope string instead of aiTestCode (critical bug)
+ *     - Save testPrompt/testCode/testResult to component records for persistence
+ *     - Add manual test UI in ComponentDetail (prompt, textarea, run button)
+ *     - Replace stub bulk test with real per-component sequential testing
+ *     - Add comprehensive activity logging at every test step
+ *     - Add "Generate & run test with AI" button per component
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -1122,17 +1129,25 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           if (testableTypes.includes(comp.type)) {
             // Step 1: AI generates the test code
             setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_generating'));
+            await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'autopilot' } });
             const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
             let aiTestCode;
+            let testPromptText;
             try {
-              const testPrompt = buildTestPrompt(
+              testPromptText = buildTestPrompt(
                 comp.type, content, comp.label, updated.registeredAs,
                 project.blueprint, interviewSpec
               );
-              aiTestCode = await runWithAi(projectId, testPrompt);
+              await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
+              aiTestCode = await runWithAi(projectId, testPromptText);
               // Strip markdown code fences if AI wraps the response
               aiTestCode = stripCodeblock(aiTestCode);
-              await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, by: 'autopilot' } });
+              // Save test prompt and test code to the component record
+              updated = { ...updated, testPrompt: testPromptText, testCode: aiTestCode, testEnvironment,
+                history: [...(updated.history || []), { action: 'test_code_generated', at: new Date().toISOString(), by: 'autopilot' }],
+              };
+              await saveComponent(projectId, updated);
+              await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, codeLength: aiTestCode.length, by: 'autopilot' } });
             } catch (e) {
               await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
               showToast?.(`${comp.label}: Test generation failed: ${e.message}`, true);
@@ -1143,9 +1158,18 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
             // Step 2: Execute the AI-generated test code
             setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_running'));
+            await writeProjectLog(projectId, 'test_executing', { meta: { component: comp.label, environment: testEnvironment, by: 'autopilot' } });
             try {
               const testResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
               const testResult = testResp?.data?.result || testResp?.result;
+
+              // Save test result to the component record
+              if (testResult) {
+                updated = { ...updated, testResult,
+                  history: [...(updated.history || []), { action: 'test_' + testResult.status, at: new Date().toISOString(), by: 'autopilot', errors: testResult.errors }],
+                };
+                await saveComponent(projectId, updated);
+              }
 
               // Accumulate result into testReport for sidebar indicators
               if (testResult) {
@@ -1170,10 +1194,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                   setCurrentAutopilotStep(
                     comp.label + ' — ' + t('profile.generator.openrouter.retrying').replace('{current}', fix + 1).replace('{max}', MAX_FIX)
                   );
+                  await writeProjectLog(projectId, 'test_fix_round_start', { meta: { component: comp.label, round: fix + 1, maxRounds: MAX_FIX, by: 'autopilot' } });
 
                   // Build fix prompt with test errors
                   const fixPrompt = buildFixPrompt(prompt, content, [
-                    ...vr.errors || [],
+                    ...(vr.errors || []),
                     ...testResult.errors.map(e => `TEST FAILURE: ${e}`),
                   ], comp.type);
 
@@ -1181,12 +1206,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                     content = await runWithAi(projectId, fixPrompt);
                   } catch (e) {
                     showToast?.(`${comp.label}: ${e.message}`, true);
+                    await writeProjectLog(projectId, 'test_fix_ai_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
                     break;
                   }
                   if (autopilotCancelledRef.current) break;
 
                   const fixVr = validateComponent(comp.type, content, project.blueprint);
-                  if (!fixVr.valid) continue;
+                  if (!fixVr.valid) {
+                    await writeProjectLog(projectId, 'test_fix_validation_failed', { meta: { component: comp.label, round: fix + 1, errors: fixVr.errors, by: 'autopilot' } });
+                    continue;
+                  }
 
                   // Re-register fixed version
                   updated = { ...updated, result: content, status: 'done', validationErrors: [] };
@@ -1202,13 +1231,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                     } else {
                       await registerComponent(comp.type, fixVr.extracted || content, session, slug2);
                     }
+                    await writeProjectLog(projectId, 'test_fix_reregistered', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
                   } catch (e) {
                     showToast?.(`${comp.label}: Re-register failed: ${e.message}`, true);
+                    await writeProjectLog(projectId, 'test_fix_reregister_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
                     continue;
                   }
 
-                  // Re-test
-                  const reTestResp = await runComponentTest(projectId, comp.id, testScope);
+                  // Re-test with the same AI-generated test code
+                  await writeProjectLog(projectId, 'test_fix_retesting', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
+                  const reTestResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
                   const reTestResult = reTestResp?.data?.result || reTestResp?.result;
 
                   // Update sidebar indicator with re-test result
@@ -1229,6 +1261,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                     showToast?.(`${comp.label}: ${t('profile.generator.test_passed')}`);
                   } else {
                     testResult.errors = reTestResult?.errors || testResult.errors;
+                    await writeProjectLog(projectId, 'test_fix_still_failing', { meta: { component: comp.label, round: fix + 1, errors: reTestResult?.errors, by: 'autopilot' } });
                   }
                 }
 
@@ -1241,10 +1274,13 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                 await loadData();
               } else if (testResult) {
                 await writeProjectLog(projectId, 'component_test_passed', { meta: { component: comp.label, by: 'autopilot' } });
+              } else {
+                await writeProjectLog(projectId, 'component_test_no_result', { meta: { component: comp.label, response: JSON.stringify(testResp).slice(0, 200), by: 'autopilot' } });
               }
             } catch (e) {
               // Test execution failed — log but continue
               await writeProjectLog(projectId, 'component_test_error', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+              showToast?.(`${comp.label}: Test error: ${e.message}`, true);
             }
           }
         }
@@ -1291,25 +1327,79 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     }, { title: t('profile.generator.deleteProject'), confirmLabel: t('profile.generator.deleteProject'), cancelLabel: t('profile.generator.back'), danger: true });
   }
 
-  // Test execution handler
+  // Test execution handler — runs per-component AI-generated tests sequentially
   async function handleRunTests() {
     if (testScope === 'none') return;
     setTestRunning(true);
     setTestReport(null);
-    try {
-      const resp = await runTests(projectId, testScope);
-      const report = resp?.data || resp;
-      setTestReport(report);
-      await writeProjectLog(projectId, 'tests_run', { meta: { scope: testScope, overall: report.overall } });
-      if (report.overall === 'passed') {
-        showToast?.(t('profile.generator.test_passed'));
-      } else {
-        showToast?.(t('profile.generator.test_failed'), true);
+    const testableTypes = ['extension', 'cortex', 'app'];
+    const testableComps = components.filter(c => testableTypes.includes(c.type) && c.registeredAs);
+
+    if (testableComps.length === 0) {
+      showToast?.(t('profile.generator.test_no_testable'), true);
+      setTestRunning(false);
+      return;
+    }
+
+    const report = { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
+    await writeProjectLog(projectId, 'tests_batch_start', { meta: { scope: testScope, count: testableComps.length } });
+
+    for (const comp of testableComps) {
+      const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
+
+      // Use saved test code if available, otherwise generate new
+      let testCode = comp.testCode;
+      if (!testCode) {
+        try {
+          await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'batch' } });
+          const testPrompt = buildTestPrompt(
+            comp.type, comp.result, comp.label, comp.registeredAs,
+            project.blueprint, interviewSpec
+          );
+          testCode = await runWithAi(projectId, testPrompt);
+          testCode = stripCodeblock(testCode);
+          // Save generated test code
+          await saveComponent(projectId, { ...comp, testPrompt: testPrompt, testCode, testEnvironment });
+          await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, by: 'batch' } });
+        } catch (e) {
+          await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'batch' } });
+          report.components.push({ componentId: comp.id, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [`Test generation failed: ${e.message}`], screenshots: [], fixRound: 0 });
+          continue;
+        }
       }
-    } catch (e) {
-      showToast?.(e.message, true);
+
+      // Execute test
+      try {
+        await writeProjectLog(projectId, 'test_executing', { meta: { component: comp.label, environment: testEnvironment, by: 'batch' } });
+        const testResp = await runComponentTest(projectId, comp.id, testCode, testEnvironment);
+        const testResult = testResp?.data?.result || testResp?.result;
+        if (testResult) {
+          report.components.push(testResult);
+          await saveComponent(projectId, { ...comp, testResult });
+          await writeProjectLog(projectId, 'component_test_' + testResult.status, { meta: { component: comp.label, errors: testResult.errors, by: 'batch' } });
+        } else {
+          report.components.push({ componentId: comp.id, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: ['No test result returned'], screenshots: [], fixRound: 0 });
+        }
+      } catch (e) {
+        report.components.push({ componentId: comp.id, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [e.message], screenshots: [], fixRound: 0 });
+        await writeProjectLog(projectId, 'component_test_error', { meta: { component: comp.label, error: e.message, by: 'batch' } });
+      }
+
+      // Update report status
+      const failedCount = report.components.filter(c => c.status === 'failed').length;
+      const passedCount = report.components.filter(c => c.status === 'passed').length;
+      report.overall = failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed');
+      setTestReport({ ...report });
+    }
+
+    await writeProjectLog(projectId, 'tests_batch_complete', { meta: { scope: testScope, overall: report.overall, total: report.components.length } });
+    if (report.overall === 'passed') {
+      showToast?.(t('profile.generator.test_passed'));
+    } else {
+      showToast?.(t('profile.generator.test_failed'), true);
     }
     setTestRunning(false);
+    await loadData();
   }
 
   // Test fix loop handler — auto-fix failed component, re-register, re-test (max 3 rounds)
@@ -1935,8 +2025,15 @@ function ComponentDetail({ component, project, components, projectId, interviewS
   const [aiRunning, setAiRunning] = useState(false);
   const resultRef = { current: null };
 
+  // Test state
+  const [testCode, setTestCode] = useState(component.testCode || '');
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState(component.testResult || null);
+
   useEffect(() => {
     setResult(component.result || '');
+    setTestCode(component.testCode || '');
+    setTestResult(component.testResult || null);
     setValidationResult(null);
     // Auto-transition to prompt_ready when opening an unstarted component
     if (component.status === 'not_started') {
@@ -2150,6 +2247,88 @@ function ComponentDetail({ component, project, components, projectId, interviewS
     ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
     : null;
 
+  // Test prompt for testable component types
+  const testableTypes = ['extension', 'cortex', 'app'];
+  const isTestable = testableTypes.includes(component.type) && component.registeredAs;
+  const testEnvironment = (component.type === 'cortex' || component.type === 'app') ? 'browser' : 'server';
+  const currentTestPrompt = isTestable
+    ? buildTestPrompt(component.type, component.result || result, component.label, component.registeredAs, project.blueprint, interviewSpec)
+    : null;
+
+  async function handleCopyTestPrompt() {
+    if (!currentTestPrompt) return;
+    try {
+      await navigator.clipboard.writeText(currentTestPrompt);
+      showToast?.(t('profile.generator.test_prompt_copied'));
+      await writeProjectLog(projectId, 'test_prompt_copied', { meta: { component: component.label, by: 'user' } });
+    } catch { /* clipboard fallback */ }
+  }
+
+  async function handleRunComponentTest() {
+    if (!testCode.trim()) return;
+    setTestRunning(true);
+    setTestResult(null);
+    await writeProjectLog(projectId, 'test_executing', { meta: { component: component.label, environment: testEnvironment, by: 'user' } });
+    try {
+      const resp = await runComponentTest(projectId, component.id, testCode, testEnvironment);
+      const tr = resp?.data?.result || resp?.result;
+      setTestResult(tr);
+      // Save test code and result to component
+      await saveComponent(projectId, {
+        ...component, testCode, testPrompt: currentTestPrompt, testEnvironment, testResult: tr,
+        history: [...(component.history || []), { action: 'test_' + (tr?.status || 'unknown'), at: new Date().toISOString(), by: 'user', errors: tr?.errors }],
+      });
+      if (tr?.status === 'passed') {
+        showToast?.(t('profile.generator.test_passed'));
+        await writeProjectLog(projectId, 'component_test_passed', { meta: { component: component.label, by: 'user' } });
+      } else {
+        showToast?.(t('profile.generator.test_failed'), true);
+        await writeProjectLog(projectId, 'component_test_failed', { meta: { component: component.label, errors: tr?.errors, by: 'user' } });
+      }
+      onUpdate();
+    } catch (e) {
+      showToast?.(`Test error: ${e.message}`, true);
+      await writeProjectLog(projectId, 'component_test_error', { meta: { component: component.label, error: e.message, by: 'user' } });
+    }
+    setTestRunning(false);
+  }
+
+  async function handleRunTestWithAi() {
+    if (!isTestable || !orSettings?.hasApiKey) return;
+    setTestRunning(true);
+    setTestResult(null);
+    await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: component.label, type: component.type, by: 'user-ai' } });
+    try {
+      let aiCode = await runWithAi(projectId, currentTestPrompt);
+      aiCode = stripCodeblock(aiCode);
+      setTestCode(aiCode);
+      await saveComponent(projectId, { ...component, testCode: aiCode, testPrompt: currentTestPrompt, testEnvironment });
+      await writeProjectLog(projectId, 'test_code_generated', { meta: { component: component.label, environment: testEnvironment, codeLength: aiCode.length, by: 'user-ai' } });
+
+      // Execute immediately
+      await writeProjectLog(projectId, 'test_executing', { meta: { component: component.label, environment: testEnvironment, by: 'user-ai' } });
+      const resp = await runComponentTest(projectId, component.id, aiCode, testEnvironment);
+      const tr = resp?.data?.result || resp?.result;
+      setTestResult(tr);
+      await saveComponent(projectId, {
+        ...component, testCode: aiCode, testPrompt: currentTestPrompt, testEnvironment, testResult: tr,
+        history: [...(component.history || []), { action: 'test_' + (tr?.status || 'unknown'), at: new Date().toISOString(), by: 'user-ai', errors: tr?.errors }],
+      });
+      if (tr?.status === 'passed') {
+        showToast?.(t('profile.generator.test_passed'));
+        await writeProjectLog(projectId, 'component_test_passed', { meta: { component: component.label, by: 'user-ai' } });
+      } else {
+        showToast?.(t('profile.generator.test_failed'), true);
+        await writeProjectLog(projectId, 'component_test_failed', { meta: { component: component.label, errors: tr?.errors, by: 'user-ai' } });
+      }
+      onUpdate();
+    } catch (e) {
+      showToast?.(`Test error: ${e.message}`, true);
+      await writeProjectLog(projectId, 'component_test_error', { meta: { component: component.label, error: e.message, by: 'user-ai' } });
+    }
+    setTestRunning(false);
+  }
+
   return html`
     <div class="pf-gen-component-detail">
       <div class="pf-gen-comp-header">
@@ -2238,6 +2417,71 @@ function ComponentDetail({ component, project, components, projectId, interviewS
             </div>
           `}
         </div>
+      `}
+
+      <!-- Test Section (for registered testable components) -->
+      <!-- Same structure as component generation: PROMPT → RESULT (test code) → RUN -->
+      ${isTestable && html`
+        <div class="pf-gen-section pf-gen-test-section">
+          <label>${t('profile.generator.test_prompt')} (${testEnvironment})</label>
+          <pre class="pf-gen-prompt-box">${currentTestPrompt}</pre>
+          <div class="flex-row-wrap">
+            <button class="btn-outline btn-sm" onClick=${handleCopyTestPrompt}>
+              ${t('profile.generator.test_copy_prompt')}
+            </button>
+            ${orSettings?.hasApiKey && html`
+              <button class="btn-outline btn-sm pf-gen-or-run-btn ${testRunning ? 'pf-gen-or-running' : ''}"
+                onClick=${handleRunTestWithAi}
+                disabled=${testRunning}>
+                ${testRunning
+                  ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.test_running')}`
+                  : t('profile.generator.test_run_with_ai')}
+              </button>
+            `}
+          </div>
+        </div>
+        <div class="pf-gen-section">
+          <label>${t('profile.generator.test_code')}</label>
+          <textarea
+            class="pf-gen-result-area"
+            rows="8"
+            placeholder=${t('profile.generator.test_code_placeholder')}
+            value=${testCode}
+            onInput=${e => setTestCode(e.target.value)}
+          />
+          <div class="pf-gen-actions">
+            <button class="btn-primary btn-sm" onClick=${handleRunComponentTest}
+              disabled=${!testCode.trim() || testRunning}>
+              ${testRunning
+                ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.test_running')}`
+                : t('profile.generator.test_run')}
+            </button>
+          </div>
+        </div>
+
+        <!-- Test Result -->
+        ${testResult && html`
+          <div class="pf-gen-section">
+            <div class="pf-gen-test-result-detail pf-gen-test-${testResult.status}">
+              <strong>${t('profile.generator.test_result_title')}: ${t('profile.generator.test_component_' + testResult.status)}</strong>
+              ${testResult.errors && testResult.errors.length > 0 && html`
+                <ul class="pf-gen-test-errors">
+                  ${testResult.errors.map(e => html`<li>${e}</li>`)}
+                </ul>
+              `}
+              ${testResult.screenshots && testResult.screenshots.length > 0 && html`
+                <div class="pf-gen-test-screenshots">
+                  <div class="pf-gen-screenshot-grid">
+                    ${testResult.screenshots.map(s => html`
+                      <img src=${screenshotUrl(projectId, s)} class="pf-gen-screenshot" alt=${s}
+                        onClick=${() => window.open(screenshotUrl(projectId, s), '_blank')} />
+                    `)}
+                  </div>
+                </div>
+              `}
+            </div>
+          </div>
+        `}
       `}
     </div>
   `;

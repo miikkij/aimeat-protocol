@@ -1708,6 +1708,26 @@
   margin-top: 0.5rem;
 }
 
+/* ─── Component Detail: Test Section ─── */
+.pf-gen-test-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.pf-gen-test-result-detail {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+.pf-gen-test-result-detail.pf-gen-test-passed {
+  border-color: var(--success, #22c55e);
+  background: color-mix(in srgb, var(--success, #22c55e) 5%, transparent);
+}
+.pf-gen-test-result-detail.pf-gen-test-failed {
+  border-color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, #ef4444) 5%, transparent);
+}
+
 /* ─── Responsive: tablet ─── */
 @media (min-width: 480px) {
   .pf .pf-ghost-grid { grid-template-columns: repeat(4, 1fr); }
