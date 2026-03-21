@@ -321,15 +321,12 @@ export class MongoStorage implements Storage {
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return false;
         try {
-            // Read-then-set to handle null morselBalance in legacy documents
-            const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
-            const balance = record?.morselBalance ?? 0;
-            if (balance < amount) return false;
-            await this.prisma.ghii.update({
-                where: { ghii },
-                data: { morselBalance: balance - amount },
+            // Atomic: update only if balance >= amount (prevents double-spend race)
+            const result = await this.prisma.ghii.updateMany({
+                where: { ghii, morselBalance: { gte: amount } },
+                data: { morselBalance: { decrement: amount } },
             });
-            return true;
+            return result.count > 0;
         } catch { return false; }
     }
 
@@ -338,12 +335,10 @@ export class MongoStorage implements Storage {
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return false;
         try {
-            // Read-then-set to handle null morselBalance in legacy documents
-            const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
-            const balance = record?.morselBalance ?? 0;
+            // Atomic increment (MongoDB $inc treats null as 0)
             await this.prisma.ghii.update({
                 where: { ghii },
-                data: { morselBalance: balance + amount },
+                data: { morselBalance: { increment: amount } },
             });
             return true;
         } catch { return false; }
@@ -353,17 +348,21 @@ export class MongoStorage implements Storage {
         this.ensureReady();
         const ghii = await this.resolveGhii(gaii);
         if (!ghii) return 0;
-        const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
-        const balance = record?.morselBalance ?? 0;
-        if (balance >= cap) return 0;
-        const actualCredit = Math.min(amount, cap - balance);
-        if (actualCredit <= 0) return 0;
-        // Explicit set instead of increment to handle null morselBalance in legacy documents
-        await this.prisma.ghii.update({
-            where: { ghii },
-            data: { morselBalance: balance + actualCredit },
-        });
-        return actualCredit;
+        // Optimistic concurrency: read, calculate, CAS-update (retry on conflict)
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const record = await this.prisma.ghii.findUnique({ where: { ghii }, select: { morselBalance: true } });
+            const balance = record?.morselBalance ?? 0;
+            if (balance >= cap) return 0;
+            const actualCredit = Math.min(amount, cap - balance);
+            if (actualCredit <= 0) return 0;
+            // CAS: only update if balance hasn't changed since read
+            const result = await this.prisma.ghii.updateMany({
+                where: { ghii, morselBalance: balance },
+                data: { morselBalance: { increment: actualCredit } },
+            });
+            if (result.count > 0) return actualCredit;
+        }
+        return 0;
     }
 
     async transferBalance(fromGaii: string, toGaii: string, amount: number): Promise<boolean> {
