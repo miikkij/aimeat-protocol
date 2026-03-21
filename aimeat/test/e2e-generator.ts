@@ -7,6 +7,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-14 — Initial generator E2E test suite
  *   v1.1.0 — 2026-03-18 — Add agent-driven generator API endpoint tests
+ *   v1.2.0 — 2026-03-21 — Add provider settings E2E tests (lmstudio, custom, URL validation)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-generator.ts
@@ -687,6 +688,47 @@ await test('Agent: cleanup generator API test project', async () => {
             headers: { Authorization: `Bearer ${generatorAgentToken}` },
         });
     }
+});
+
+// ─── Provider Settings ───
+console.log('\nProvider Settings');
+
+await test('PUT /v1/openrouter/settings with lmstudio provider (no API key)', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model' }),
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+});
+
+await test('PUT /v1/openrouter/settings with lmstudio + API key', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model', apiKey: 'lms-key-123' }),
+  });
+  // Without AIMEAT_ENCRYPTION_KEY configured, storing an API key returns 503.
+  // With encryption configured, it returns 200. Both are valid outcomes.
+  assert(res.status === 200 || res.status === 503, `Expected 200 or 503, got ${res.status}: ${JSON.stringify(res.body)}`);
+});
+
+await test('GET /v1/openrouter/settings returns provider info', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+  assert(res.body.data?.provider === 'lmstudio', `Expected lmstudio, got ${res.body.data?.provider}`);
+  assert(res.body.data?.baseUrl === 'http://localhost:1234/v1', `Bad baseUrl: ${res.body.data?.baseUrl}`);
+});
+
+await test('PUT /v1/openrouter/settings rejects insecure remote URL', async () => {
+  const res = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ provider: 'custom', baseUrl: 'http://evil.com/v1' }),
+  });
+  assert(res.status === 400, `Expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
 });
 
 // ─── Generator Cleanup ───
