@@ -15,6 +15,7 @@
  * @usage import { validateBlueprint, validateComponent, validateInterviewSpec, validateAntiPatterns } from '../services/generator-validate.js';
  * @version-history
  *   v1.0.0 — 2026-03-18 — Initial port from public/js/services/generator-validate.js (v4.5.0)
+ *   v1.1.0 — 2026-03-21 — Add externalServices/userSettings to InterviewSpec; settings/testScenarios/architecture/role to Blueprint
  */
 
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -64,6 +65,26 @@ export interface InterviewSpec {
   views: Array<{ type: string; title: string } & Record<string, unknown>>;
   constraints?: Record<string, unknown>;
   interviewNotes?: string;
+  externalServices?: Array<{
+    name: string;
+    purpose: string;
+    requiredSettings: Array<{
+      key: string;
+      type: 'secret' | 'url' | 'string' | 'number' | 'boolean';
+      label: string;
+    }>;
+    sharingModel: 'shared' | 'per-user';
+    suggestedBy: 'ai' | 'user';
+  }>;
+  sharedService?: boolean;
+  adminAppRecommended?: boolean;
+  adminAppReason?: string | null;
+  userSettings?: Array<{
+    key: string;
+    type: 'string' | 'number' | 'boolean';
+    label: string;
+    default?: string | number | boolean;
+  }>;
 }
 
 export interface AntiPatternResult {
@@ -635,6 +656,26 @@ export function validateInterviewSpec(result: string): InterviewSpecValidationRe
       });
     }
 
+    // Validate optional externalServices
+    if (spec.externalServices !== undefined) {
+      if (!Array.isArray(spec.externalServices)) {
+        errors.push('externalServices must be an array');
+      } else {
+        for (const svc of spec.externalServices) {
+          if (!svc.name || typeof svc.name !== 'string') errors.push('externalServices[].name required');
+          if (!Array.isArray(svc.requiredSettings)) errors.push(`externalServices[${svc.name}].requiredSettings must be array`);
+          if (!['shared', 'per-user'].includes(svc.sharingModel)) errors.push(`externalServices[${svc.name}].sharingModel invalid`);
+        }
+      }
+    }
+
+    // Validate optional userSettings
+    if (spec.userSettings !== undefined) {
+      if (!Array.isArray(spec.userSettings)) {
+        errors.push('userSettings must be an array');
+      }
+    }
+
     if (errors.length > 0) return { valid: false, errors, warnings };
     return { valid: true, errors: [], warnings, parsed: spec };
   } catch (e: unknown) {
@@ -664,6 +705,7 @@ interface CleanComponent {
   consumes?: string[];
   schedules?: Array<{ action?: string; cron?: string }>;
   uses?: unknown[];
+  role?: string;
 }
 
 export function validateBlueprint(result: string): BlueprintValidationResult {
@@ -677,7 +719,7 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
     if (!Array.isArray(parsed.components)) {
       errors.push('Missing "components" array');
     } else {
-      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses']);
+      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses', 'role']);
       parsed.components = (parsed.components as BlueprintComponent[]).map((c): CleanComponent => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
@@ -707,6 +749,7 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
         }
 
         const clean: CleanComponent = { id: c.id, type: c.type, label: c.label };
+        if (typeof c.role === 'string') clean.role = c.role;
         if (Array.isArray(c.produces)) clean.produces = c.produces as string[];
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes as string[];
 
@@ -799,6 +842,28 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
     } else {
       warnings.push('Missing "dataModel" — downstream components will not have schema guidance');
     }
+
+    // Validate optional settings
+    if (parsed.settings) {
+      const s = parsed.settings as Record<string, unknown>;
+      if (s.service && !Array.isArray(s.service)) errors.push('settings.service must be an array');
+      if (s.user && !Array.isArray(s.user)) errors.push('settings.user must be an array');
+      if (Array.isArray(s.service)) {
+        for (const entry of s.service as Array<Record<string, unknown>>) {
+          if (!entry.key || !entry.type || !entry.label) {
+            errors.push('settings.service entry missing key/type/label');
+          }
+          if (entry.type && !['secret', 'url', 'string', 'number', 'boolean'].includes(entry.type as string)) {
+            warnings.push(`settings.service[${entry.key}] has unknown type: ${entry.type}`);
+          }
+        }
+      }
+    }
+
+    // Preserve new top-level blueprint fields
+    if (parsed.settings) parsed.settings = parsed.settings;
+    if (parsed.testScenarios) parsed.testScenarios = parsed.testScenarios;
+    if (parsed.architecture) parsed.architecture = parsed.architecture;
 
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e: unknown) {
