@@ -1690,14 +1690,21 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               ${(phase.componentIds || []).map(cid => {
                 const comp = components.find(c => c.id === cid) || { id: cid, label: cid, type: '?', status: 'not_started' };
                 const live = liveStatuses[cid];
+                const testComp = testReport?.components?.find(c => c.componentId === cid);
                 return html`
                   <div
                     class="pf-gen-comp-item ${selectedId === cid ? 'active' : ''} status-${comp.status}"
                     onClick=${() => setSelectedId(cid)}
                   >
                     <span class="pf-gen-comp-name">${comp.label}</span>
-                    <span class="pf-gen-type-badge type-${comp.type} ${live ? (live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing') : ''}"
-                      title=${live?.status || ''}>${comp.type.toUpperCase()}</span>
+                    <span class="pf-gen-comp-indicators">
+                      ${testComp && html`<span class="pf-gen-test-icon pf-gen-test-icon-${testComp.status}"
+                        title=${t('profile.generator.test_component_' + testComp.status) + (testComp.scenarios > 0 ? ` (${testComp.passed}/${testComp.scenarios})` : '')}>${
+                        testComp.status === 'passed' ? '✓' : testComp.status === 'failed' ? '✗' : '—'
+                      }</span>`}
+                      <span class="pf-gen-type-badge type-${comp.type} ${live ? (live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing') : ''}"
+                        title=${live?.status || ''}>${comp.type.toUpperCase()}</span>
+                    </span>
                   </div>
                 `;
               })}

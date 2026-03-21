@@ -553,6 +553,12 @@
 .pf-gen-comp-item.status-done { border-left-color: #22c55e; }
 .pf-gen-comp-item.status-validating { border-left-color: #c084fc; }
 
+.pf-gen-comp-indicators { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.pf-gen-test-icon { font-size: 0.8em; font-weight: 700; width: 16px; text-align: center; line-height: 1; }
+.pf-gen-test-icon-passed { color: var(--success, #22c55e); }
+.pf-gen-test-icon-failed { color: var(--danger, #ef4444); }
+.pf-gen-test-icon-skipped { color: var(--text-muted, #9ca3af); }
+
 .pf-gen-type-badge {
   font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase;
 }
