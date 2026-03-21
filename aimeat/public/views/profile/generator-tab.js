@@ -1118,7 +1118,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
         // Per-component test immediately after registration
         if (!autopilotCancelledRef.current && testScope !== 'none') {
-          const testableTypes = ['extension', 'cortex', 'app'];
+          const testableTypes = ['csm', 'msm', 'extension', 'cortex', 'app', 'memory', 'translation'];
           if (testableTypes.includes(comp.type)) {
             setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_running'));
             try {
@@ -1804,7 +1804,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                 const comp = components.find(c => c.id === cid) || { id: cid, label: cid, type: '?', status: 'not_started' };
                 const live = liveStatuses[cid];
                 const testComp = testReport?.components?.find(c => c.componentId === cid);
-                const isTestable = ['extension', 'cortex', 'app'].includes(comp.type);
+                const isTestable = ['csm', 'msm', 'extension', 'cortex', 'app', 'memory', 'translation'].includes(comp.type);
                 return html`
                   <div
                     class="pf-gen-comp-item ${selectedId === cid ? 'active' : ''} status-${comp.status}"

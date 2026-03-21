@@ -352,44 +352,200 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       let result: TestResult;
 
       if (bpComp.type === 'extension') {
-        // Parse extension name from component content
-        const compContent = compVal.content as string | undefined;
-        let extName = compVal.registeredAs as string || componentId;
-        if (compContent) {
-          try {
-            const parsed = typeof compContent === 'string' ? JSON.parse(compContent) : compContent;
-            if (parsed.name) extName = parsed.name;
-          } catch { /* use registeredAs */ }
-        }
-
-        // Run extension action tests
+        // ── Extension test: call every action with correct HTTP method ──
+        const registeredAs = compVal.registeredAs as string || componentId;
         let scenarioPassed = 0;
         const errors: string[] = [];
 
         if (scenarios.length > 0) {
+          // Use explicit test scenarios from blueprint
           for (const scenario of scenarios) {
-            const testResult = await runExtensionTest(baseUrl, extName, scenario.action, scenario.input, token);
-            if (testResult.passed) { scenarioPassed++; } else { errors.push(testResult.error ?? 'Unknown error'); }
+            const tr = await runExtensionTest(baseUrl, registeredAs, scenario.action, scenario.input, token);
+            if (tr.passed) { scenarioPassed++; } else { errors.push(`${scenario.action}: ${tr.error ?? 'Unknown error'}`); }
           }
         } else {
-          // No explicit test scenarios — run init action as smoke test
-          const initResult = await runExtensionTest(baseUrl, extName, 'init', {}, token);
-          if (initResult.passed) { scenarioPassed = 1; } else { errors.push(initResult.error ?? 'Init failed'); }
+          // No explicit scenarios — auto-discover actions from extension metadata and test each
+          try {
+            const metaRes = await fetch(`${baseUrl}/v1/extensions/${registeredAs}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (metaRes.ok) {
+              const metaBody = await metaRes.json() as Record<string, unknown>;
+              const metaData = metaBody?.data as Record<string, unknown> | undefined;
+              const metaExt = metaData?.extension as Record<string, unknown> | undefined;
+              const actions = ((metaData?.actions ?? metaExt?.actions ?? []) as Array<{ id: string; method?: string }>);
+              for (const action of actions) {
+                const tr = await runExtensionTest(baseUrl, registeredAs, action.id, {}, token, action.method);
+                if (tr.passed) { scenarioPassed++; } else { errors.push(`${action.id} (${action.method || 'POST'}): ${tr.error ?? 'Unknown error'}`); }
+              }
+            } else {
+              // Fallback: at least try init
+              const tr = await runExtensionTest(baseUrl, registeredAs, 'init', {}, token);
+              if (tr.passed) { scenarioPassed = 1; } else { errors.push(`init: ${tr.error ?? 'Failed'}`); }
+            }
+          } catch {
+            const tr = await runExtensionTest(baseUrl, registeredAs, 'init', {}, token);
+            if (tr.passed) { scenarioPassed = 1; } else { errors.push(`init: ${tr.error ?? 'Failed'}`); }
+          }
         }
 
-        const total = scenarios.length || 1;
+        const total = scenarios.length || Math.max(scenarioPassed + errors.length, 1);
         result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: total, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
+
+      } else if (bpComp.type === 'msm') {
+        // ── MSM test: verify the integration endpoint responds ──
+        const registeredAs = compVal.registeredAs as string;
+        const errors: string[] = [];
+        let scenarioPassed = 0;
+
+        if (registeredAs) {
+          try {
+            // MSM integrations are accessible via catalogue — check it exists
+            const catRes = await fetch(`${baseUrl}/v1/catalogue/integrations/${encodeURIComponent(registeredAs)}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (catRes.ok) {
+              scenarioPassed++;
+            } else {
+              errors.push(`MSM not found in catalogue: HTTP ${catRes.status}`);
+            }
+          } catch (e) {
+            errors.push(`MSM catalogue check failed: ${(e as Error).message}`);
+          }
+        } else {
+          errors.push('MSM not registered');
+        }
+
+        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
+
+      } else if (bpComp.type === 'memory') {
+        // ── Memory test: write test data, read it back, validate ──
+        const errors: string[] = [];
+        let scenarioPassed = 0;
+        const testKey = `_test.generator.${projectId}.${componentId}`;
+        const testValue = { _test: true, ts: new Date().toISOString() };
+
+        try {
+          // Write
+          const writeRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(testKey)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ value: testValue }),
+          });
+          if (!writeRes.ok) {
+            const wb = await writeRes.json() as Record<string, unknown>;
+            errors.push(`Memory write failed: HTTP ${writeRes.status} — ${JSON.stringify(wb)}`);
+          } else {
+            scenarioPassed++;
+
+            // Read back
+            const readRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(testKey)}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!readRes.ok) {
+              errors.push(`Memory read failed: HTTP ${readRes.status}`);
+            } else {
+              const rb = await readRes.json() as Record<string, unknown>;
+              const readData = rb?.data as Record<string, unknown> | undefined;
+              const readValue = readData?.value as Record<string, unknown> | undefined;
+              if (readValue?._test === true) {
+                scenarioPassed++;
+              } else {
+                errors.push(`Memory read returned unexpected value: ${JSON.stringify(readValue)}`);
+              }
+            }
+
+            // Cleanup test key
+            await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(testKey)}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+          }
+        } catch (e) {
+          errors.push(`Memory test error: ${(e as Error).message}`);
+        }
+
+        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 2, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
+
+      } else if (bpComp.type === 'translation') {
+        // ── Translation test: verify keys exist and en/fi parity ──
+        const errors: string[] = [];
+        let scenarioPassed = 0;
+
+        // Find the translation key from registeredAs (e.g., "osakeanalyysi.i18n-fi")
+        const regAs = compVal.registeredAs as string;
+        if (regAs) {
+          try {
+            const transRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(regAs)}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (transRes.ok) {
+              const transBody = await transRes.json() as Record<string, unknown>;
+              const transData = transBody?.data as Record<string, unknown> | undefined;
+              const transValue = transData?.value;
+              if (transValue && typeof transValue === 'object') {
+                const keys = Object.keys(transValue as Record<string, unknown>);
+                if (keys.length > 0) {
+                  scenarioPassed++;
+
+                  // Check parity with sibling locale
+                  const isFi = regAs.includes('-fi');
+                  const isEn = regAs.includes('-en');
+                  const siblingKey = isFi ? regAs.replace('-fi', '-en') : isEn ? regAs.replace('-en', '-fi') : null;
+
+                  if (siblingKey) {
+                    try {
+                      const sibRes = await fetch(`${baseUrl}/v1/memory/${encodeURIComponent(siblingKey)}`, {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                      });
+                      if (sibRes.ok) {
+                        const sibBody = await sibRes.json() as Record<string, unknown>;
+                        const sibData = sibBody?.data as Record<string, unknown> | undefined;
+                        const sibValue = sibData?.value;
+                        if (sibValue && typeof sibValue === 'object') {
+                          const sibKeys = Object.keys(sibValue as Record<string, unknown>);
+                          const missing = keys.filter(k => !sibKeys.includes(k));
+                          const extra = sibKeys.filter(k => !keys.includes(k));
+                          if (missing.length === 0 && extra.length === 0) {
+                            scenarioPassed++;
+                          } else {
+                            if (missing.length > 0) errors.push(`Keys in ${regAs} but missing in ${siblingKey}: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` (+${missing.length - 5} more)` : ''}`);
+                            if (extra.length > 0) errors.push(`Keys in ${siblingKey} but missing in ${regAs}: ${extra.slice(0, 5).join(', ')}${extra.length > 5 ? ` (+${extra.length - 5} more)` : ''}`);
+                          }
+                        }
+                      }
+                    } catch { /* sibling not available yet — skip parity check */ }
+                  }
+                } else {
+                  errors.push('Translation file is empty (0 keys)');
+                }
+              } else {
+                errors.push('Translation value is not an object');
+              }
+            } else {
+              errors.push(`Translation key not found: HTTP ${transRes.status}`);
+            }
+          } catch (e) {
+            errors.push(`Translation test error: ${(e as Error).message}`);
+          }
+        } else {
+          errors.push('Translation not registered');
+        }
+
+        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 2, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
+
       } else if (bpComp.type === 'cortex') {
-        // Cortex test: verify JS loads without errors and init() returns { ready: true }
+        // ── Cortex test: verify JS loads and init() returns { ready: true } ──
         const registeredAs = compVal.registeredAs as string;
         if (registeredAs && await isPlaywrightAvailable()) {
+          const camelName = registeredAs.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase());
           const cortexResult = await runCortexPlaywrightTest(
             baseUrl, projectId, componentId, registeredAs,
             `(async () => {
               try {
-                const lib = window.AIMEAT && window.AIMEAT['${registeredAs.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())}'];
-                if (!lib) { window.__testResults = { passed: false, errors: ['Cortex not found on AIMEAT namespace'] }; return; }
-                if (typeof lib.init !== 'function') { window.__testResults = { passed: false, errors: ['init() not found'] }; return; }
+                const lib = window.AIMEAT && window.AIMEAT['${camelName}'];
+                if (!lib) { window.__testResults = { passed: false, errors: ['Cortex "' + '${camelName}' + '" not found on AIMEAT namespace. Available: ' + Object.keys(window.AIMEAT || {}).join(', ')] }; return; }
+                if (typeof lib.init !== 'function') { window.__testResults = { passed: false, errors: ['init() not found on cortex'] }; return; }
                 const initResult = await lib.init();
                 if (!initResult || !initResult.ready) { window.__testResults = { passed: false, errors: ['init() did not return { ready: true }, got: ' + JSON.stringify(initResult)] }; return; }
                 window.__testResults = { passed: true, errors: [] };
@@ -398,38 +554,78 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
           );
           result = { componentId, type: bpComp.type, status: cortexResult.passed ? 'passed' : 'failed', scenarios: 1, passed: cortexResult.passed ? 1 : 0, errors: cortexResult.errors, screenshots: [], fixRound: 0 };
         } else if (registeredAs) {
-          // No Playwright — basic HTTP check that the cortex lib file loads
+          // No Playwright — HTTP check that lib file loads and has AIMEAT registration
+          const errors: string[] = [];
           try {
             const libRes = await fetch(`${baseUrl}/v1/cortex/${registeredAs}/libs/${registeredAs}.js`, {
               headers: { 'Authorization': `Bearer ${token}` },
             });
             if (libRes.ok) {
               const libText = await libRes.text();
-              const hasRegister = libText.includes('AIMEAT') && (libText.includes('register') || libText.includes('AIMEAT['));
-              result = { componentId, type: bpComp.type, status: hasRegister ? 'passed' : 'failed', scenarios: 1, passed: hasRegister ? 1 : 0, errors: hasRegister ? [] : ['Cortex JS does not register on AIMEAT namespace'], screenshots: [], fixRound: 0 };
+              if (!libText.includes('AIMEAT')) errors.push('Cortex JS does not reference AIMEAT namespace');
+              if (!(libText.includes('register') || libText.includes('AIMEAT['))) errors.push('Cortex JS does not register itself');
+              if (!libText.includes('init')) errors.push('Cortex JS does not contain init() function');
             } else {
-              result = { componentId, type: bpComp.type, status: 'failed', scenarios: 1, passed: 0, errors: [`Cortex lib returned HTTP ${libRes.status}`], screenshots: [], fixRound: 0 };
+              errors.push(`Cortex lib HTTP ${libRes.status}`);
             }
           } catch (e) {
-            result = { componentId, type: bpComp.type, status: 'failed', scenarios: 1, passed: 0, errors: [`Fetch error: ${(e as Error).message}`], screenshots: [], fixRound: 0 };
+            errors.push(`Cortex fetch error: ${(e as Error).message}`);
           }
+          result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: errors.length === 0 ? 1 : 0, errors, screenshots: [], fixRound: 0 };
         } else {
           result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['Not registered'], screenshots: [], fixRound: 0 };
         }
-      } else if (bpComp.type === 'app' && await isPlaywrightAvailable()) {
-        // Playwright test for app
+
+      } else if (bpComp.type === 'app') {
+        // ── App test: Playwright loads page, checks content + console errors ──
         const registeredAs = compVal.registeredAs as string;
-        if (registeredAs) {
+        if (registeredAs && await isPlaywrightAvailable()) {
           await ensureScreenshotDir(projectId);
           const appUrl = `${baseUrl}/apps/${registeredAs}`;
           const pwResult = await runAppPlaywrightTest(appUrl, projectId, componentId, scenarios);
           result = { componentId, type: bpComp.type, status: pwResult.passed ? 'passed' : 'failed', scenarios: 1, passed: pwResult.passed ? 1 : 0, errors: pwResult.errors, screenshots: pwResult.screenshots, fixRound: 0 };
+        } else if (registeredAs) {
+          // No Playwright — basic HTTP check that app loads
+          const errors: string[] = [];
+          try {
+            const appRes = await fetch(`${baseUrl}/apps/${registeredAs}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (appRes.ok) {
+              const html = await appRes.text();
+              if (html.length < 50) errors.push('App HTML is suspiciously short');
+            } else {
+              errors.push(`App returned HTTP ${appRes.status}`);
+            }
+          } catch (e) {
+            errors.push(`App fetch error: ${(e as Error).message}`);
+          }
+          result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: errors.length === 0 ? 1 : 0, errors, screenshots: [], fixRound: 0 };
         } else {
-          result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['No registeredAs'], screenshots: [], fixRound: 0 };
+          result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['Not registered'], screenshots: [], fixRound: 0 };
         }
+
+      } else if (bpComp.type === 'csm') {
+        // ── CSM test: verify it exists in schema catalogue ──
+        const registeredAs = compVal.registeredAs as string;
+        const errors: string[] = [];
+        if (registeredAs) {
+          try {
+            const csmRes = await fetch(`${baseUrl}/v1/schemas/${encodeURIComponent(registeredAs)}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!csmRes.ok) errors.push(`CSM not found in schemas: HTTP ${csmRes.status}`);
+          } catch (e) {
+            errors.push(`CSM check error: ${(e as Error).message}`);
+          }
+        } else {
+          errors.push('CSM not registered');
+        }
+        result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 1, passed: errors.length === 0 ? 1 : 0, errors, screenshots: [], fixRound: 0 };
+
       } else {
-        // Other types: pass through (CSM, memory, translation)
-        result = { componentId, type: bpComp.type, status: 'passed', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 };
+        // Unknown type — skip
+        result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 };
       }
 
       res.json(success(config.nodeId, { result }));
