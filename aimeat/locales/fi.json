@@ -1222,7 +1222,13 @@
         "stepFailed": "Tekoäly ei pystynyt suorittamaan tätä vaihetta",
         "stepDone": "{name} päivitetty onnistuneesti",
         "noApiKey": "Määritä OpenRouter API-avain yllä käyttääksesi tekoälyautomaatiota",
-        "encryptionNotConfigured": "Palvelimen salausta ei ole määritetty. Ota yhteyttä noden ylläpitäjään."
+        "encryptionNotConfigured": "Palvelimen salausta ei ole määritetty. Ota yhteyttä noden ylläpitäjään.",
+        "provider": "Tekoälypalveluntarjoaja",
+        "provider_openrouter": "OpenRouter — pilvipalvelu, satoja malleja",
+        "provider_lmstudio": "LM Studio — paikallinen tekoäly (localhost)",
+        "provider_custom": "Custom — mikä tahansa OpenAI-yhteensopiva API",
+        "baseUrl": "API-osoite",
+        "baseUrl_hint": "esim. http://localhost:1234/v1"
       }
     },
     "visibility": {

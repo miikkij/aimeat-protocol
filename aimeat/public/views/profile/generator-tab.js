@@ -31,6 +31,7 @@
  *   v5.1.0 — 2026-03-20 — Add OpenRouter settings UI (collapsible panel for API key, model, auto-retry)
  *   v5.2.0 — 2026-03-20 — Add autopilot buttons (Run with AI) to each step, auto-retry logic,
  *     and Run All Steps mode for sequential autopilot execution
+ *   v5.3.0 — 2026-03-21 — Add provider selector (OpenRouter / LM Studio / Custom) with baseUrl field
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -1920,6 +1921,8 @@ function OpenRouterSettings({ onSettingsChange }) {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [autoRetry, setAutoRetry] = useState(false);
   const [maxRetries, setMaxRetries] = useState(3);
+  const [provider, setProvider] = useState('openrouter');
+  const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState(null); // { text, error }
@@ -1935,6 +1938,8 @@ function OpenRouterSettings({ onSettingsChange }) {
         setModel(resp.data.model || '');
         setAutoRetry(!!resp.data.autoRetry);
         setMaxRetries(resp.data.maxRetries || 3);
+        setProvider(resp.data.provider || 'openrouter');
+        setBaseUrl(resp.data.baseUrl || '');
         if (resp.data.hasApiKey) loadModels();
       }
     } catch { /* no settings yet */ }
@@ -1944,9 +1949,9 @@ function OpenRouterSettings({ onSettingsChange }) {
   // Notify parent whenever key settings change
   useEffect(() => {
     if (loaded && onSettingsChange) {
-      onSettingsChange({ hasApiKey: hasApiKey, autoRetry, maxRetries });
+      onSettingsChange({ hasApiKey: hasApiKey, autoRetry, maxRetries, provider, baseUrl });
     }
-  }, [loaded, hasApiKey, autoRetry, maxRetries]);
+  }, [loaded, hasApiKey, autoRetry, maxRetries, provider, baseUrl]);
 
   async function loadModels() {
     setModelsLoading(true);
@@ -1967,7 +1972,7 @@ function OpenRouterSettings({ onSettingsChange }) {
   async function handleSave() {
     setSaving(true);
     try {
-      const body = { model, autoRetry, maxRetries };
+      const body = { model, autoRetry, maxRetries: parseInt(maxRetries) || 3, provider, baseUrl };
       if (apiKey) body.apiKey = apiKey;
       const resp = await apiPut('/v1/openrouter/settings', body);
       if (resp.ok === false) {
@@ -2026,6 +2031,39 @@ function OpenRouterSettings({ onSettingsChange }) {
       </button>
       ${!collapsed && html`
         <div class="pf-gen-or-panel">
+          <!-- Provider selector -->
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.provider')}</label>
+            <div class="pf-gen-or-radio-group">
+              ${['openrouter', 'lmstudio', 'custom'].map(p => html`
+                <label class="pf-gen-or-radio-label">
+                  <input type="radio" name="ai-provider" value=${p}
+                    checked=${provider === p}
+                    onChange=${() => {
+                      setProvider(p);
+                      if (p === 'lmstudio') setBaseUrl('http://localhost:1234/v1');
+                      else if (p === 'openrouter') setBaseUrl('');
+                    }} />
+                  ${t('profile.generator.openrouter.provider_' + p)}
+                </label>
+              `)}
+            </div>
+          </div>
+
+          <!-- Base URL (lmstudio / custom) -->
+          ${provider !== 'openrouter' && html`
+            <div class="pf-gen-or-field">
+              <label class="pf-gen-or-label">${t('profile.generator.openrouter.baseUrl')}</label>
+              <input
+                type="url"
+                class="pf-gen-or-input"
+                value=${baseUrl}
+                placeholder=${t('profile.generator.openrouter.baseUrl_hint')}
+                onInput=${e => setBaseUrl(e.target.value)}
+              />
+            </div>
+          `}
+
           <!-- API Key -->
           <div class="pf-gen-or-field">
             <label class="pf-gen-or-label">${t('profile.generator.openrouter.apiKey')}</label>

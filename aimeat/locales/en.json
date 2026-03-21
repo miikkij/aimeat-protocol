@@ -1222,7 +1222,13 @@
         "stepFailed": "AI could not complete this step",
         "stepDone": "{name} updated successfully",
         "noApiKey": "Configure OpenRouter API key above to use AI autopilot",
-        "encryptionNotConfigured": "Server encryption not configured. Contact the node operator."
+        "encryptionNotConfigured": "Server encryption not configured. Contact the node operator.",
+        "provider": "AI Provider",
+        "provider_openrouter": "OpenRouter — cloud service, hundreds of models",
+        "provider_lmstudio": "LM Studio — local AI (localhost)",
+        "provider_custom": "Custom — any OpenAI-compatible API",
+        "baseUrl": "API URL",
+        "baseUrl_hint": "e.g. http://localhost:1234/v1"
       }
     },
     "visibility": {
