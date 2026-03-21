@@ -48,7 +48,7 @@ import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
-import { topologicalSort, runExtensionTest, runAppPlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
+import { topologicalSort, runExtensionTest, runAppPlaywrightTest, runCortexPlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
 import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -379,7 +379,44 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
         const total = scenarios.length || 1;
         result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: total, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
-      } else if (bpComp.type === 'app' && testLevel === 'comprehensive' && await isPlaywrightAvailable()) {
+      } else if (bpComp.type === 'cortex') {
+        // Cortex test: verify JS loads without errors and init() returns { ready: true }
+        const registeredAs = compVal.registeredAs as string;
+        if (registeredAs && await isPlaywrightAvailable()) {
+          const cortexResult = await runCortexPlaywrightTest(
+            baseUrl, projectId, componentId, registeredAs,
+            `(async () => {
+              try {
+                const lib = window.AIMEAT && window.AIMEAT['${registeredAs.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())}'];
+                if (!lib) { window.__testResults = { passed: false, errors: ['Cortex not found on AIMEAT namespace'] }; return; }
+                if (typeof lib.init !== 'function') { window.__testResults = { passed: false, errors: ['init() not found'] }; return; }
+                const initResult = await lib.init();
+                if (!initResult || !initResult.ready) { window.__testResults = { passed: false, errors: ['init() did not return { ready: true }, got: ' + JSON.stringify(initResult)] }; return; }
+                window.__testResults = { passed: true, errors: [] };
+              } catch (e) { window.__testResults = { passed: false, errors: [e.message] }; }
+            })()`,
+          );
+          result = { componentId, type: bpComp.type, status: cortexResult.passed ? 'passed' : 'failed', scenarios: 1, passed: cortexResult.passed ? 1 : 0, errors: cortexResult.errors, screenshots: [], fixRound: 0 };
+        } else if (registeredAs) {
+          // No Playwright — basic HTTP check that the cortex lib file loads
+          try {
+            const libRes = await fetch(`${baseUrl}/v1/cortex/${registeredAs}/libs/${registeredAs}.js`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (libRes.ok) {
+              const libText = await libRes.text();
+              const hasRegister = libText.includes('AIMEAT') && (libText.includes('register') || libText.includes('AIMEAT['));
+              result = { componentId, type: bpComp.type, status: hasRegister ? 'passed' : 'failed', scenarios: 1, passed: hasRegister ? 1 : 0, errors: hasRegister ? [] : ['Cortex JS does not register on AIMEAT namespace'], screenshots: [], fixRound: 0 };
+            } else {
+              result = { componentId, type: bpComp.type, status: 'failed', scenarios: 1, passed: 0, errors: [`Cortex lib returned HTTP ${libRes.status}`], screenshots: [], fixRound: 0 };
+            }
+          } catch (e) {
+            result = { componentId, type: bpComp.type, status: 'failed', scenarios: 1, passed: 0, errors: [`Fetch error: ${(e as Error).message}`], screenshots: [], fixRound: 0 };
+          }
+        } else {
+          result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['Not registered'], screenshots: [], fixRound: 0 };
+        }
+      } else if (bpComp.type === 'app' && await isPlaywrightAvailable()) {
         // Playwright test for app
         const registeredAs = compVal.registeredAs as string;
         if (registeredAs) {
@@ -391,7 +428,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
           result = { componentId, type: bpComp.type, status: 'skipped', scenarios: 0, passed: 0, errors: ['No registeredAs'], screenshots: [], fixRound: 0 };
         }
       } else {
-        // Other types: pass through (CSM, memory, translation, cortex without Playwright)
+        // Other types: pass through (CSM, memory, translation)
         result = { componentId, type: bpComp.type, status: 'passed', scenarios: 0, passed: 0, errors: [], screenshots: [], fixRound: 0 };
       }
 

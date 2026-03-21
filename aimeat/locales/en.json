@@ -1225,6 +1225,7 @@
       "test_component_passed": "Passed",
       "test_component_failed": "Failed",
       "test_component_skipped": "Skipped",
+      "test_planned": "Test planned — will run after registration",
       "test_playwright_unavailable": "Playwright not available, skipping browser tests",
       "openrouter": {
         "title": "OpenRouter Settings",

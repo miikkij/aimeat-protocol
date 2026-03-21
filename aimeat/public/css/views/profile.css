@@ -558,6 +558,7 @@
 .pf-gen-test-icon-passed { color: var(--success, #22c55e); }
 .pf-gen-test-icon-failed { color: var(--danger, #ef4444); }
 .pf-gen-test-icon-skipped { color: var(--text-muted, #9ca3af); }
+.pf-gen-test-icon-planned { color: var(--info, #3b82f6); opacity: 0.6; }
 
 .pf-gen-type-badge {
   font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase;

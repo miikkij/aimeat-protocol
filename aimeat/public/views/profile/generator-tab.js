@@ -1118,7 +1118,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
         // Per-component test immediately after registration
         if (!autopilotCancelledRef.current && testScope !== 'none') {
-          const testableTypes = ['extension', 'app'];
+          const testableTypes = ['extension', 'cortex', 'app'];
           if (testableTypes.includes(comp.type)) {
             setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_running'));
             try {
@@ -1804,6 +1804,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                 const comp = components.find(c => c.id === cid) || { id: cid, label: cid, type: '?', status: 'not_started' };
                 const live = liveStatuses[cid];
                 const testComp = testReport?.components?.find(c => c.componentId === cid);
+                const isTestable = ['extension', 'cortex', 'app'].includes(comp.type);
                 return html`
                   <div
                     class="pf-gen-comp-item ${selectedId === cid ? 'active' : ''} status-${comp.status}"
@@ -1811,10 +1812,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                   >
                     <span class="pf-gen-comp-name">${comp.label}</span>
                     <span class="pf-gen-comp-indicators">
-                      ${testComp && html`<span class="pf-gen-test-icon pf-gen-test-icon-${testComp.status}"
-                        title=${t('profile.generator.test_component_' + testComp.status) + (testComp.scenarios > 0 ? ` (${testComp.passed}/${testComp.scenarios})` : '')}>${
-                        testComp.status === 'passed' ? '✓' : testComp.status === 'failed' ? '✗' : '—'
-                      }</span>`}
+                      ${testComp
+                        ? html`<span class="pf-gen-test-icon pf-gen-test-icon-${testComp.status}"
+                            title=${t('profile.generator.test_component_' + testComp.status) + (testComp.scenarios > 0 ? ` (${testComp.passed}/${testComp.scenarios})` : '')}>${
+                            testComp.status === 'passed' ? '✓' : testComp.status === 'failed' ? '✗' : '—'
+                          }</span>`
+                        : isTestable && testScope !== 'none'
+                          ? html`<span class="pf-gen-test-icon pf-gen-test-icon-planned"
+                              title=${t('profile.generator.test_planned')}>◉</span>`
+                          : null
+                      }
                       <span class="pf-gen-type-badge type-${comp.type} ${live ? (live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing') : ''}"
                         title=${live?.status || ''}>${comp.type.toUpperCase()}</span>
                     </span>
