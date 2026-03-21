@@ -1125,6 +1125,18 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               const testResp = await runComponentTest(projectId, comp.id, testScope);
               const testResult = testResp?.data?.result || testResp?.result;
 
+              // Accumulate result into testReport for sidebar indicators
+              if (testResult) {
+                setTestReport(prev => {
+                  const existing = prev || { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
+                  const comps = existing.components.filter(c => c.componentId !== comp.id);
+                  comps.push(testResult);
+                  const failedCount = comps.filter(c => c.status === 'failed').length;
+                  const passedCount = comps.filter(c => c.status === 'passed').length;
+                  return { ...existing, components: comps, overall: failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed') };
+                });
+              }
+
               if (testResult && testResult.status === 'failed') {
                 await writeProjectLog(projectId, 'component_test_failed', { meta: { component: comp.label, errors: testResult.errors, by: 'autopilot' } });
                 showToast?.(`${comp.label}: ${t('profile.generator.test_failed')}`, true);
@@ -1176,6 +1188,18 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                   // Re-test
                   const reTestResp = await runComponentTest(projectId, comp.id, testScope);
                   const reTestResult = reTestResp?.data?.result || reTestResp?.result;
+
+                  // Update sidebar indicator with re-test result
+                  if (reTestResult) {
+                    setTestReport(prev => {
+                      const existing = prev || { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
+                      const comps = existing.components.filter(c => c.componentId !== comp.id);
+                      comps.push(reTestResult);
+                      const failedCount = comps.filter(c => c.status === 'failed').length;
+                      const passedCount = comps.filter(c => c.status === 'passed').length;
+                      return { ...existing, components: comps, overall: failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed') };
+                    });
+                  }
 
                   if (reTestResult && reTestResult.status !== 'failed') {
                     fixed = true;
