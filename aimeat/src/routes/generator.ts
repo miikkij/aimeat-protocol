@@ -48,7 +48,7 @@ import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
-import { topologicalSort, runExtensionTest, runAppPlaywrightTest, runCortexPlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
+import { topologicalSort, runExtensionTest, runAppPlaywrightTest, runCortexPlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir, buildCortexMethodTestCode } from '../services/generator-testing.js';
 import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -535,22 +535,15 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         result = { componentId, type: bpComp.type, status: errors.length === 0 ? 'passed' : 'failed', scenarios: 2, passed: scenarioPassed, errors, screenshots: [], fixRound: 0 };
 
       } else if (bpComp.type === 'cortex') {
-        // ── Cortex test: verify JS loads and init() returns { ready: true } ──
+        // ── Cortex test: load lib, call init() AND all public methods ──
         const registeredAs = compVal.registeredAs as string;
         if (registeredAs && await isPlaywrightAvailable()) {
           const camelName = registeredAs.replace(/-([a-z])/g, (_: string, c: string) => c.toUpperCase());
+          // Get the cortex source code to discover public methods
+          const cortexSource = (compVal.content as string) || (compVal.result as string) || '';
+          const testCode = buildCortexMethodTestCode(camelName, cortexSource);
           const cortexResult = await runCortexPlaywrightTest(
-            baseUrl, projectId, componentId, registeredAs,
-            `(async () => {
-              try {
-                const lib = window.AIMEAT && window.AIMEAT['${camelName}'];
-                if (!lib) { window.__testResults = { passed: false, errors: ['Cortex "' + '${camelName}' + '" not found on AIMEAT namespace. Available: ' + Object.keys(window.AIMEAT || {}).join(', ')] }; return; }
-                if (typeof lib.init !== 'function') { window.__testResults = { passed: false, errors: ['init() not found on cortex'] }; return; }
-                const initResult = await lib.init();
-                if (!initResult || !initResult.ready) { window.__testResults = { passed: false, errors: ['init() did not return { ready: true }, got: ' + JSON.stringify(initResult)] }; return; }
-                window.__testResults = { passed: true, errors: [] };
-              } catch (e) { window.__testResults = { passed: false, errors: [e.message] }; }
-            })()`,
+            baseUrl, projectId, componentId, registeredAs, testCode,
           );
           result = { componentId, type: bpComp.type, status: cortexResult.passed ? 'passed' : 'failed', scenarios: 1, passed: cortexResult.passed ? 1 : 0, errors: cortexResult.errors, screenshots: [], fixRound: 0 };
         } else if (registeredAs) {

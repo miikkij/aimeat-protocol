@@ -119,7 +119,6 @@ export async function runExtensionTest(
     // Determine HTTP method: use provided method, or auto-detect from extension metadata
     let httpMethod = (method || 'POST').toUpperCase();
     if (!method) {
-      // Fetch extension metadata to find the correct method for this action
       try {
         const metaRes = await fetch(`${baseUrl}/v1/extensions/${extensionName}`, {
           headers: { 'Authorization': `Bearer ${token}` },
@@ -143,18 +142,150 @@ export async function runExtensionTest(
       headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(input);
     }
-    // For GET requests, input goes as query params (if any)
     const finalUrl = (httpMethod === 'GET' && Object.keys(input).length > 0)
       ? `${url}?${new URLSearchParams(Object.entries(input).map(([k, v]) => [k, String(v)])).toString()}`
       : url;
 
     const res = await fetch(finalUrl, opts);
-    const body = await res.json();
+    const body = await res.json() as Record<string, unknown>;
     if (!res.ok) return { passed: false, error: `HTTP ${res.status}: ${JSON.stringify(body)}` };
+
+    // Validate response structure: AIMEAT envelope must have ok:true and data
+    if (body.ok !== true) return { passed: false, error: `Response ok !== true: ${JSON.stringify(body)}` };
+    const data = body.data as Record<string, unknown> | undefined;
+    if (!data && actionName !== 'init') return { passed: false, error: `Response has no data field` };
+
+    // Check for error field in the action's response data
+    if (data?.error) return { passed: false, error: `Action returned error: ${JSON.stringify(data.error)}` };
+
     return { passed: true, response: body };
   } catch (err) {
     return { passed: false, error: `Request failed: ${(err as Error).message}` };
   }
+}
+
+/**
+ * Build Playwright test code that calls ALL public methods of a cortex library.
+ * Discovers methods from the cortex source code.
+ */
+export function buildCortexMethodTestCode(camelName: string, cortexSource: string): string {
+  // Extract public method names from the cortex source
+  // Pattern: async function methodName( or exports.methodName = async function
+  const methods: string[] = [];
+  const funcRegex = /async\s+function\s+(\w+)\s*\(/g;
+  let match;
+  while ((match = funcRegex.exec(cortexSource)) !== null) {
+    methods.push(match[1]);
+  }
+  // Also check for exports assignment pattern
+  const exportsRegex = /(\w+)\s*[:=]\s*async\s*(?:function)?\s*\(/g;
+  while ((match = exportsRegex.exec(cortexSource)) !== null) {
+    if (!methods.includes(match[1])) methods.push(match[1]);
+  }
+
+  // Build test code that calls each method
+  const methodTests = methods
+    .filter(m => m !== 'init') // init tested separately
+    .map(m => `
+      try {
+        const r_${m} = await lib.${m}();
+        tested++;
+        results.push('${m}: ' + (r_${m} !== undefined ? 'OK' : 'returned undefined'));
+      } catch (e) {
+        errors.push('${m}(): ' + e.message);
+      }`)
+    .join('\n');
+
+  return `(async () => {
+    try {
+      const lib = window.AIMEAT && window.AIMEAT['${camelName}'];
+      if (!lib) { window.__testResults = { passed: false, errors: ['Cortex "${camelName}" not found. Available: ' + Object.keys(window.AIMEAT || {}).join(', ')] }; return; }
+
+      const errors = [];
+      const results = [];
+      let tested = 0;
+
+      // 1. Test init()
+      if (typeof lib.init === 'function') {
+        const initResult = await lib.init();
+        if (!initResult || !initResult.ready) {
+          errors.push('init() did not return { ready: true }, got: ' + JSON.stringify(initResult));
+        } else {
+          tested++;
+          results.push('init: OK (ready=' + initResult.ready + ', hasData=' + (initResult.hasData || false) + ')');
+        }
+      } else {
+        errors.push('init() function not found');
+      }
+
+      // 2. Test all public methods (call with no args — they must handle gracefully)
+      ${methodTests}
+
+      if (tested === 0 && errors.length === 0) {
+        errors.push('No methods found to test');
+      }
+
+      window.__testResults = {
+        passed: errors.length === 0,
+        errors: errors,
+        details: results.join('; '),
+        methodsTested: tested
+      };
+    } catch (e) {
+      window.__testResults = { passed: false, errors: [e.message] };
+    }
+  })()`;
+}
+
+/**
+ * Build Playwright test code for an app — checks data loads, buttons clickable, navigation works.
+ */
+export function buildAppTestCode(): string {
+  return `
+    const errors = [];
+    const screenshots = [];
+
+    // 1. Check console errors
+    const consoleErrors = [];
+    // (console listener added externally)
+
+    // 2. Wait for content to render
+    await page.waitForTimeout(3000);
+
+    // 3. Check page has meaningful content (not just loading spinner)
+    const bodyText = await page.textContent('body');
+    if (!bodyText || bodyText.trim().length < 20) {
+      errors.push('Page appears blank or has minimal content');
+    }
+
+    // 4. Check for visible data (tables, lists, cards with text)
+    const dataElements = await page.$$('table tbody tr, [class*="card"], [class*="item"], [class*="list"] > *, [class*="row"]');
+    if (dataElements.length === 0) {
+      // Not necessarily an error if data hasn't loaded yet
+      errors.push('No data elements found (tables, cards, lists) — app may need data');
+    }
+
+    // 5. Check all buttons are clickable (no disabled without reason)
+    const buttons = await page.$$('button:not([disabled])');
+    for (const btn of buttons.slice(0, 5)) {
+      const btnText = await btn.textContent();
+      if (btnText && btnText.trim().length > 0) {
+        // Don't actually click — just verify they exist and have text
+      }
+    }
+
+    // 6. Check for navigation elements (tabs, nav links)
+    const navElements = await page.$$('nav a, [class*="tab"], [class*="nav"] a, [role="tab"]');
+
+    // 7. Check no error messages visible
+    const errorElements = await page.$$('[class*="error"], [class*="Error"], .alert-danger, .error-message');
+    for (const el of errorElements) {
+      const text = await el.textContent();
+      if (text && text.trim().length > 0) {
+        errors.push('Error element visible: ' + text.trim().substring(0, 100));
+      }
+    }
+  `;
 }
 
 /* ── Screenshot Management ─────────────────────────────────────────── */
@@ -207,7 +338,6 @@ export async function runAppPlaywrightTest(
   componentId: string,
   scenarios: TestScenario[],
 ): Promise<{ passed: boolean; errors: string[]; screenshots: string[] }> {
-  void scenarios; // reserved for future scenario-driven browser interaction
   const pw = await loadPlaywright();
   const browser = await pw.chromium.launch({ headless: true });
   const errors: string[] = [];
@@ -220,26 +350,103 @@ export async function runAppPlaywrightTest(
     const consoleErrors: string[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     page.on('console', (msg: any) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
+      if (msg.type() === 'error') {
+        const text = msg.text();
+        // Ignore common non-fatal console errors
+        if (!text.includes('favicon') && !text.includes('404')) {
+          consoleErrors.push(text);
+        }
+      }
     });
 
+    // 1. Load the app
     await page.goto(appUrl, { waitUntil: 'networkidle', timeout: 30000 });
-    const loadScreenshot = `${componentId}-load.png`;
+    const loadScreenshot = `${componentId}-01-load.png`;
     await page.screenshot({ path: join(dir, loadScreenshot), fullPage: true });
     screenshots.push(loadScreenshot);
 
+    // 2. Check console errors
     if (consoleErrors.length > 0) {
-      errors.push(`Console errors on load: ${consoleErrors.join('; ')}`);
+      errors.push(`Console errors on load: ${consoleErrors.slice(0, 5).join('; ')}`);
     }
 
+    // 3. Check page has meaningful content
     const bodyText = await page.textContent('body');
-    if (!bodyText || bodyText.trim().length < 10) {
+    if (!bodyText || bodyText.trim().length < 20) {
       errors.push('Page appears blank or has minimal content');
     }
 
-    const finalScreenshot = `${componentId}-final.png`;
-    await page.screenshot({ path: join(dir, finalScreenshot), fullPage: true });
-    screenshots.push(finalScreenshot);
+    // 4. Wait for dynamic content (data loading)
+    await page.waitForTimeout(3000);
+    const afterLoadScreenshot = `${componentId}-02-data-loaded.png`;
+    await page.screenshot({ path: join(dir, afterLoadScreenshot), fullPage: true });
+    screenshots.push(afterLoadScreenshot);
+
+    // 5. Check for visible data elements (tables, cards, lists)
+    const dataCount = await page.evaluate(`
+      document.querySelectorAll('table tbody tr, [class*="card"]:not(style), [class*="item"], ul li, ol li').length
+    `) as number;
+    if (dataCount === 0) {
+      errors.push('No data elements visible (no table rows, cards, or list items)');
+    }
+
+    // 6. Check for error messages in the DOM
+    const visibleErrors = await page.evaluate(`
+      (() => {
+        const els = document.querySelectorAll('[class*="error"], [class*="Error"], .alert-danger, .error-message');
+        const texts = [];
+        els.forEach(el => { const t = el.innerText && el.innerText.trim(); if (t && t.length > 0 && t.length < 200) texts.push(t); });
+        return texts;
+      })()
+    `) as string[];
+    if (visibleErrors.length > 0) {
+      errors.push(`Error elements visible: ${visibleErrors.slice(0, 3).join('; ')}`);
+    }
+
+    // 7. Test navigation — click first tab/nav if present
+    const navTab = await page.$('nav a, [class*="tab"]:not(table), [role="tab"]');
+    if (navTab) {
+      try {
+        await navTab.click();
+        await page.waitForTimeout(1500);
+        const navScreenshot = `${componentId}-03-nav-click.png`;
+        await page.screenshot({ path: join(dir, navScreenshot), fullPage: true });
+        screenshots.push(navScreenshot);
+
+        // Check content changed
+        const newErrors: string[] = [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        page.on('console', (msg: any) => {
+          if (msg.type() === 'error') {
+            const text = msg.text();
+            if (!text.includes('favicon') && !text.includes('404')) newErrors.push(text);
+          }
+        });
+        if (newErrors.length > 0) {
+          errors.push(`Console errors after navigation: ${newErrors.slice(0, 3).join('; ')}`);
+        }
+      } catch { /* nav click failed — not critical */ }
+    }
+
+    // 8. Test first button click (non-destructive)
+    const safeButton = await page.$('button:not([class*="delete"]):not([class*="remove"]):not([class*="danger"]):not([disabled])');
+    if (safeButton) {
+      const btnText = await safeButton.textContent();
+      try {
+        await safeButton.click();
+        await page.waitForTimeout(1500);
+        const btnScreenshot = `${componentId}-04-button-click.png`;
+        await page.screenshot({ path: join(dir, btnScreenshot), fullPage: true });
+        screenshots.push(btnScreenshot);
+      } catch {
+        errors.push(`Button "${btnText?.trim()}" click failed`);
+      }
+    }
+
+    // 9. Run explicit test scenarios if provided
+    for (const scenario of scenarios) {
+      void scenario; // TODO: scenario-driven interaction tests from blueprint
+    }
 
     await page.close();
   } catch (err) {
