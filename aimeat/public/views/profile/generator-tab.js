@@ -1119,6 +1119,26 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       showToast?.(e.message, true);
     }
 
+    // Run tests automatically after all registrations (if not cancelled)
+    if (!autopilotCancelledRef.current && testScope !== 'none') {
+      setCurrentAutopilotStep(t('profile.generator.test_running'));
+      try {
+        const resp = await runTests(projectId, testScope);
+        const report = resp?.data || resp;
+        setTestReport(report);
+        await writeProjectLog(projectId, 'tests_run', { meta: { scope: testScope, overall: report.overall, by: 'autopilot' } });
+        if (report.overall === 'passed') {
+          showToast?.(t('profile.generator.test_passed'));
+        } else if (report.overall === 'partial') {
+          showToast?.(t('profile.generator.test_partial'), true);
+        } else {
+          showToast?.(t('profile.generator.test_failed'), true);
+        }
+      } catch (e) {
+        showToast?.(`Tests: ${e.message}`, true);
+      }
+    }
+
     setAutopilotRunning(false);
     setCurrentAutopilotStep('');
     await loadData();
@@ -2093,11 +2113,13 @@ function TestScopeSelector({ value, onChange }) {
 function TestResultsView({ report, projectId, onFixRequest }) {
   if (!report) return null;
 
+  const overallKey = report.overall === 'passed' ? 'test_passed'
+    : report.overall === 'partial' ? 'test_partial'
+    : 'test_failed';
+
   return html`<div class="pf-gen-test-results">
     <div class="pf-gen-test-overall pf-gen-test-${report.overall}">
-      ${report.overall === 'passed'
-        ? t('profile.generator.test_passed')
-        : t('profile.generator.test_failed')}
+      ${t('profile.generator.' + overallKey)}
     </div>
     ${(report.components || []).map(c => html`
       <div class="pf-gen-test-component pf-gen-test-${c.status}">
