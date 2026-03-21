@@ -1125,8 +1125,17 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
         await loadData();
 
-        // Activate extension/cortex immediately after registration so tests (and the service) can use it
+        // Apply project settings to extension config (API keys, etc.) + activate
         if ((comp.type === 'extension' || comp.type === 'cortex') && updated.registeredAs) {
+          // Inject project settings into extension config before activation
+          if (comp.type === 'extension') {
+            try {
+              await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
+              await writeProjectLog(projectId, 'settings_applied', { meta: { component: comp.label, registeredAs: updated.registeredAs, by: 'autopilot' } });
+            } catch (e) {
+              await writeProjectLog(projectId, 'settings_apply_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+            }
+          }
           try {
             const activateUrl = comp.type === 'extension'
               ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/activate`

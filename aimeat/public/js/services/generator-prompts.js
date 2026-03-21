@@ -2204,6 +2204,26 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
+  // Inject blueprint settings as extension config keys
+  // The user enters settings values BEFORE generation. These values are injected into ctx.config
+  // at runtime. The extension MUST use these EXACT key names in ctx.config.
+  if (type === 'extension' && blueprint?.settings) {
+    const allSettings = [...(blueprint.settings.service || []), ...(blueprint.settings.user || [])];
+    if (allSettings.length > 0) {
+      context += '\n## Extension Config Keys (from blueprint settings — use EXACTLY these)\n';
+      context += 'These settings are injected into `ctx.config` at runtime. Use these EXACT key names:\n\n';
+      context += '```yaml\nconfig:\n';
+      for (const s of allSettings) {
+        const yamlType = s.type === 'secret' ? 'string' : s.type === 'boolean' ? 'boolean' : s.type === 'number' ? 'number' : 'string';
+        context += `  ${s.key}:\n    type: ${yamlType}\n    description: "${s.label}"\n`;
+        if (s.required) context += `    required: true\n`;
+      }
+      context += '```\n\n';
+      context += 'In your action code, read these as: `ctx.config?.${allSettings[0].key}`\n';
+      context += 'Do NOT rename these keys. Do NOT use different key names like "apiKey" when the blueprint says "' + allSettings[0].key + '".\n\n';
+    }
+  }
+
   // Thread interview data source details to extension prompts
   if (type === 'extension' && interviewSpec?.dataSources) {
     context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';
@@ -2403,6 +2423,33 @@ function buildTestContextSection(testContext) {
  *   AI generates JS that runs in browser (Playwright), sets window.__testResults = { passed, errors }
  */
 export function buildTestPrompt(componentType, componentCode, componentLabel, registeredAs, blueprint, interviewSpec) {
+  // For cortex/app: build list of methods/APIs from blueprint produces/consumes
+  let cortexMethods = '';
+  let appApis = '';
+  if (blueprint?.components) {
+    const bpComp = blueprint.components.find(c => c.label === componentLabel);
+    if (bpComp && componentType === 'cortex') {
+      const methods = (bpComp.produces || [])
+        .filter(p => p.startsWith('api:'))
+        .map(p => p.replace('api:', ''));
+      if (methods.length > 0) {
+        cortexMethods = `\n## Cortex Methods to Test (from blueprint — test ALL of these)
+${methods.map(m => `- ${m}()`).join('\n')}
+
+Test EVERY method above. Call with realistic arguments based on the component code.\n`;
+      }
+    }
+    if (bpComp && componentType === 'app') {
+      const apis = (bpComp.consumes || [])
+        .filter(p => p.startsWith('api:'))
+        .map(p => p.replace('api:', ''));
+      if (apis.length > 0) {
+        appApis = `\n## App Uses These APIs (verify they work in the UI)
+${apis.map(a => `- ${a}`).join('\n')}\n`;
+      }
+    }
+  }
+
   const testEnvDoc = componentType === 'cortex' || componentType === 'app'
     ? `## Test Environment: Browser (page.evaluate sandbox)
 
@@ -2417,17 +2464,18 @@ CRITICAL SANDBOX RULES — violating ANY of these will crash the test:
 For CORTEX tests:
 - The cortex library is loaded at: /v1/cortex/{name}/libs/{name}.js
 - Access it via: window.AIMEAT.{camelCaseName}
-- Test init() AND every public method
+- Test init() AND every public method listed below
 - Call methods with realistic arguments based on the component code
 - Verify return values are not null/undefined and have expected shape
-
+${cortexMethods}
 For APP tests:
 - The app is already loaded in the page
 - Wait for data to render: await new Promise(r => setTimeout(r, 3000));
 - Check DOM elements exist: document.querySelector(...)
 - Click buttons and navigation, verify results
 - Check no error messages visible
-- Take note of what the interview spec says the use cases are`
+- Take note of what the interview spec says the use cases are
+${appApis}`
     : `## Test Environment: Server-side sandbox (new Function)
 
 CRITICAL SANDBOX RULES — violating ANY of these will crash the test:
@@ -2468,12 +2516,14 @@ return { passed: errors.length === 0, errors, details: 'Tested N actions' };
 \`\`\`
 
 For EXTENSION tests:
-- Call each action endpoint: /v1/ext/{registeredName}/{actionId}
+- ALL extension actions use POST — the backend only has a POST route for /v1/ext/{name}/{actionId}
+- Even if the manifest says method: GET, you MUST use POST with testFetch
+- URL pattern: /v1/ext/{registeredName}/{actionId}
 - NOT /v1/extensions/... — correct path is /v1/ext/{name}/{actionId}
-- Use the correct HTTP method (GET/POST as declared in the extension manifest)
-- For GET actions: append query params to URL (e.g., /v1/ext/name/action?param=value)
-- For POST actions: pass input as JSON body with JSON.stringify()
-- Verify response has ok:true and meaningful data field
+- Always pass input as JSON body: testFetch(url, { method: 'POST', body: JSON.stringify({...}) })
+- For actions with no input: testFetch(url, { method: 'POST', body: JSON.stringify({}) })
+- Response envelope: { ok: true, data: { ...action return value... } }
+  So check r.body?.ok and r.body?.data — NOT r.body?.success directly
 - Test with realistic input based on what the extension does
 
 For MEMORY tests:
@@ -2485,13 +2535,79 @@ For TRANSLATION tests:
   const bpComponents = blueprint?.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
   const useCases = interviewSpec?.useCases?.map((uc, i) => `${i + 1}. ${uc}`).join('\n') || 'No use cases specified';
 
+  // Build test scenarios from blueprint data (NOT by parsing code)
+  let testSection = '';
+  if (blueprint) {
+    const bpComp = blueprint.components?.find(c => c.label === componentLabel);
+
+    // Extract test scenarios from blueprint.testScenarios for this component
+    const scenarios = (blueprint.testScenarios || [])
+      .filter(ts => bpComp && ts.component === bpComp.id)
+      .flatMap(ts => ts.scenarios || []);
+
+    // Check if extension requires external API keys (from blueprint.settings.service)
+    let apiKeyWarning = '';
+    if (componentType === 'extension' && blueprint.settings?.service) {
+      const requiredSecrets = blueprint.settings.service
+        .filter(s => s.type === 'secret' || s.required)
+        .map(s => s.label || s.key);
+      if (requiredSecrets.length > 0) {
+        apiKeyWarning = `
+## IMPORTANT: External API Keys Not Available During Testing
+
+This extension requires: ${requiredSecrets.join(', ')}
+These are NOT configured during testing — the extension has no API keys.
+
+Split your tests into TWO groups:
+1. TESTABLE (no external API needed): init, settings, watchlist, alerts, forecast lines — any action
+   that only reads/writes memory. These MUST return success.
+2. EXTERNAL API (will fail gracefully): actions that call ctx.fetch() to external APIs.
+   For these, verify only that the action returns a clear error message (e.g., "API key not configured")
+   and does NOT crash with a 500 error. Expect r.body?.data?.error to contain a message.
+
+Do NOT mark a test as failed if an external-API action returns an error about missing API key.
+That is CORRECT behavior — the action handles the missing key gracefully.\n`;
+      }
+    }
+
+    if (componentType === 'extension' && scenarios.length > 0) {
+      testSection += `\n## Test Scenarios (from blueprint — test EXACTLY these)
+
+ALL extension calls are POST to /v1/ext/${registeredAs}/{actionId}
+Response envelope: { ok: true, data: { ...action return value... } }
+${apiKeyWarning}
+${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
+   Input: ${JSON.stringify(s.input)}
+   Expected: ${s.expect}`).join('\n\n')}
+
+Test EVERY scenario above. Use the EXACT action names and inputs shown.
+Do NOT invent your own action names — use only what is listed here.\n`;
+    }
+
+    if (componentType === 'cortex' && scenarios.length > 0) {
+      testSection += `\n## Test Scenarios (from blueprint — test EXACTLY these)
+
+${scenarios.map((s, i) => `${i + 1}. Call ${s.action}(${JSON.stringify(s.input)})
+   Expected: ${s.expect}`).join('\n\n')}
+
+Test EVERY scenario above.\n`;
+    }
+
+    if (componentType === 'app' && scenarios.length > 0) {
+      testSection += `\n## Test Scenarios (from blueprint — verify EXACTLY these in the UI)
+
+${scenarios.map((s, i) => `${i + 1}. ${s.action}: ${s.expect}`).join('\n')}
+\n`;
+    }
+  }
+
   return `${INSTRUCTION_DISCLAIMER}You are generating TEST CODE for a component in an AIMEAT service.
 
 ## Component Under Test
 - Type: ${componentType}
 - Label: ${componentLabel}
 - Registered as: ${registeredAs || 'unknown'}
-
+${testSection}
 ## Component Code
 \`\`\`
 ${componentCode}
@@ -2523,32 +2639,32 @@ ${testEnvDoc}
 - For apps: verify the use cases from the interview actually work in the UI
 - DO NOT write placeholder tests — every assertion must verify real behavior
 
-## Complete server-side example (extension with two actions)
+## Complete server-side example (extension with actions: init, getItems, addItem)
 
 const errors = [];
 
-// Test getItems action (GET)
-const r1 = await testFetch('/v1/ext/my-service/getItems?limit=5');
+// ALL extension calls use POST — even "get" actions
+// Response envelope: { ok: true, data: { ...action return value... } }
+
+// Test init action (no input)
+const r0 = await testFetch('/v1/ext/my-service/init', { method: 'POST', body: JSON.stringify({}) });
+if (!r0.ok) errors.push('init: HTTP ' + r0.status);
+else if (!r0.body?.ok) errors.push('init: response not ok');
+
+// Test getItems action (POST, not GET!)
+const r1 = await testFetch('/v1/ext/my-service/getItems', { method: 'POST', body: JSON.stringify({}) });
 if (!r1.ok) errors.push('getItems: HTTP ' + r1.status);
 else if (!r1.body?.data) errors.push('getItems: no data in response');
-else if (!Array.isArray(r1.body.data.items)) errors.push('getItems: items is not an array');
 
-// Test addItem action (POST)
+// Test addItem action
 const r2 = await testFetch('/v1/ext/my-service/addItem', {
   method: 'POST',
   body: JSON.stringify({ name: 'Test Item', value: 42 })
 });
 if (!r2.ok) errors.push('addItem: HTTP ' + r2.status);
-else if (!r2.body?.data?.id) errors.push('addItem: no id returned');
+else if (!r2.body?.data?.success) errors.push('addItem: not successful');
 
-// Test edge case: empty body
-const r3 = await testFetch('/v1/ext/my-service/addItem', {
-  method: 'POST',
-  body: JSON.stringify({})
-});
-if (r3.ok) errors.push('addItem with empty body should fail but returned ok');
-
-return { passed: errors.length === 0, errors, details: 'Tested getItems, addItem, edge case: ' + (3 - errors.length) + '/3 passed' };`;
+return { passed: errors.length === 0, errors, details: 'Tested ' + (3 - errors.length) + '/3 actions' };`;
 }
 
 /* ── Impact & Edit Prompts (Phase 6) ────────────────── */

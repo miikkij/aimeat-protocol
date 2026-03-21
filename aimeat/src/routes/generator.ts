@@ -342,8 +342,9 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
           if (compType === 'app') {
             targetUrl = `${baseUrl}/apps/${registeredAs}`;
           } else if (compType === 'cortex') {
-            // Cortex test page loads the cortex lib
-            targetUrl = `${baseUrl}/v1/cortex/${registeredAs}/libs/${registeredAs}.js`;
+            // Cortex needs an HTML page that loads the cortex library
+            // Use the portal page which loads the AIMEAT SPA (cortex libs are available there)
+            targetUrl = `${baseUrl}/v1/portal`;
           } else {
             targetUrl = baseUrl;
           }
@@ -359,6 +360,56 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       res.json(success(config.nodeId, { result }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/apply-settings/:extensionName — inject project settings into extension config
+  // Reads settings from generator.{projectId}.settings and merges them into the extension's config object.
+  // This bridges blueprint settings (collected from user) to the extension's runtime config (ctx.config).
+  router.post('/v1/generator/:projectId/apply-settings/:extensionName',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const extensionName = req.params['extensionName'] as string;
+
+      // Load project settings
+      const settingsRec = await storage.getMemory(gaii, `generator.${projectId}.settings`);
+      const settings = (settingsRec?.value as Record<string, unknown>) ?? {};
+
+      if (Object.keys(settings).length === 0) {
+        res.json(success(config.nodeId, { applied: 0, message: 'No settings to apply' }));
+        return;
+      }
+
+      // Load extension
+      const ext = await storage.getExtension(extensionName);
+      if (!ext) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${extensionName}" not found`));
+        return;
+      }
+
+      // Decrypt secrets if needed
+      const encKey = getEncryptionKey(config);
+      const decrypted: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(settings)) {
+        if (typeof val === 'string' && val.startsWith('enc:') && encKey) {
+          try {
+            decrypted[key] = decrypt(val, encKey);
+          } catch {
+            decrypted[key] = val; // pass through if decryption fails
+          }
+        } else {
+          decrypted[key] = val;
+        }
+      }
+
+      // Merge settings into extension config (preserving __schedules and other internal keys)
+      const newConfig = { ...ext.config, ...decrypted };
+      await storage.updateExtension(extensionName, { config: newConfig });
+
+      res.json(success(config.nodeId, { applied: Object.keys(decrypted).length, keys: Object.keys(decrypted) }));
     }
   );
 
