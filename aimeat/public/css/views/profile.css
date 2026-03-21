@@ -1594,6 +1594,106 @@
 .pf .pf-panel-subheading { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim, #9CA3AF); padding: 0; margin-bottom: 4px; }
 .pf .pf-panel-sub-available { margin-top: 12px; }
 
+/* ── Test scope selector ─────────────── */
+.pf-gen-test-scope {
+  margin: 1rem 0;
+}
+
+/* ── Test results ─────────────────────── */
+.pf-gen-test-results {
+  margin: 1rem 0;
+}
+
+.pf-gen-test-overall {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.pf-gen-test-passed {
+  background: var(--bg-success, rgba(34, 197, 94, 0.1));
+  color: var(--success, #22c55e);
+}
+
+.pf-gen-test-failed {
+  background: var(--bg-danger, rgba(239, 68, 68, 0.1));
+  color: var(--danger, #ef4444);
+}
+
+.pf-gen-test-component {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pf-gen-test-badge {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-sm, 4px);
+  font-weight: 500;
+}
+
+.pf-gen-test-component.pf-gen-test-passed .pf-gen-test-badge {
+  background: var(--bg-success, rgba(34, 197, 94, 0.1));
+  color: var(--success, #22c55e);
+}
+
+.pf-gen-test-component.pf-gen-test-failed .pf-gen-test-badge {
+  background: var(--bg-danger, rgba(239, 68, 68, 0.1));
+  color: var(--danger, #ef4444);
+}
+
+.pf-gen-test-component.pf-gen-test-skipped .pf-gen-test-badge {
+  background: var(--bg-dim);
+  color: var(--text-muted);
+}
+
+.pf-gen-test-errors {
+  width: 100%;
+  margin: 0.5rem 0 0;
+  padding-left: 1.5rem;
+  color: var(--danger, #ef4444);
+  font-size: 0.875rem;
+}
+
+.pf-gen-test-screenshots {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.pf-gen-screenshot-grid {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.pf-gen-screenshot {
+  width: 200px;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.pf-gen-screenshot:hover {
+  opacity: 0.8;
+}
+
+.pf-gen-test-fix-actions {
+  width: 100%;
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 /* ─── Responsive: tablet ─── */
 @media (min-width: 480px) {
   .pf .pf-ghost-grid { grid-template-columns: repeat(4, 1fr); }
