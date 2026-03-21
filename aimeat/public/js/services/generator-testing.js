@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-03-21 — Initial implementation
  */
 
-import { apiGet, apiPost } from '/js/services/api.js';
+import { apiGet, apiPost } from '/js/api.js';
 
 /**
  * Run tests for a generator project.
