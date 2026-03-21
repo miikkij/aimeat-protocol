@@ -8,6 +8,8 @@
 //   GET    /v1/generator/:projectId                                         — get full project state (project, interviewSpec, components)
 //   DELETE /v1/generator/:projectId                                         — delete project and all associated data (cascade)
 //   POST   /v1/generator/:projectId/interview                               — save/update interview spec for a project
+//   POST   /v1/generator/:projectId/settings                                — store project settings values (with optional encryption)
+//   GET    /v1/generator/:projectId/settings                                — retrieve project settings values
 //   POST   /v1/generator/:projectId/steps/blueprint                         — validate + store blueprint
 //   POST   /v1/generator/:projectId/components/:componentId/submit          — validate + store component content
 //   POST   /v1/generator/:projectId/components/:componentId/register        — register a validated component into the AIMEAT catalogue
@@ -31,6 +33,7 @@
 //   v1.9.0 — 2026-03-19 — Safety guards: version increment, blueprint immutability, registered component protection, session identity check
 //   v2.0.0 — 2026-03-19 — Add DELETE /v1/generator/:projectId cascade delete; validate componentId in heartbeat against blueprint
 //   v5.0.0 — 2026-03-20 — Remove agent guide, my-assignments, and session endpoints (replaced by OpenRouter autopilot)
+//   v5.1.0 — 2026-03-21 — Add settings collection endpoints (POST/GET /v1/generator/:projectId/settings)
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +44,7 @@ import { validateInterviewSpec, validateBlueprint, validateComponent } from '../
 import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
+import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 // @ts-ignore — frontend ESM module, no .d.ts
 import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
 
@@ -211,6 +215,80 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
       res.json(success(config.nodeId, { saved: true }));
       emitChange('memory');
+    }
+  );
+
+  // POST /v1/generator/:projectId/settings — store project settings values
+  router.post('/v1/generator/:projectId/settings',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const projectId = req.params['projectId'] as string;
+      const gaii = ownerGhii(req);
+      const { values, secretKeys } = req.body as {
+        values: Record<string, string | number | boolean>;
+        secretKeys?: string[];
+      };
+
+      if (!values || typeof values !== 'object') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'values object required'));
+        return;
+      }
+
+      // Verify project exists
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      // Encrypt secret-type values
+      const storedValues = { ...values };
+      if (secretKeys?.length) {
+        const encKey = getEncryptionKey(config);
+        if (!encKey) {
+          res.status(503).json(error(config.nodeId, 'ENCRYPTION_UNAVAILABLE', 'Encryption key not configured'));
+          return;
+        }
+        for (const key of secretKeys) {
+          if (storedValues[key] && typeof storedValues[key] === 'string') {
+            storedValues[key] = encrypt(storedValues[key] as string, encKey);
+          }
+        }
+      }
+
+      // Store using full MemoryRecord pattern
+      const now = new Date().toISOString();
+      const existing = await storage.getMemory(gaii, `generator.${projectId}.settings`);
+      await storage.setMemory({
+        key: `generator.${projectId}.settings`,
+        ownerGaii: gaii,
+        value: storedValues,
+        visibility: 'owner',
+        version: existing ? existing.version + 1 : 1,
+        tags: ['generator', 'settings'],
+        ttlHours: null,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      });
+
+      res.json(success(config.nodeId, { stored: Object.keys(values).length }));
+      emitChange('memory');
+    }
+  );
+
+  // GET /v1/generator/:projectId/settings — retrieve project settings values
+  router.get('/v1/generator/:projectId/settings',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const projectId = req.params['projectId'] as string;
+      const gaii = ownerGhii(req);
+
+      const rec = await storage.getMemory(gaii, `generator.${projectId}.settings`);
+      const values = (rec?.value as Record<string, unknown>) ?? {};
+
+      res.json(success(config.nodeId, { values }));
     }
   );
 
