@@ -327,6 +327,8 @@ const validators = {
     const actionCount = Array.isArray(parsed?.actions) ? parsed.actions.length : 0;
     if (actionCount > 0 && jsBlockCount === 0) {
       errors.push(`Extension defines ${actionCount} action(s) but no JavaScript code blocks found`);
+    } else if (actionCount > 0 && jsBlockCount > 0 && jsBlockCount < actionCount) {
+      errors.push(`Extension defines ${actionCount} action(s) but only ${jsBlockCount} JavaScript code blocks found — each action needs its own script`);
     }
 
     // Anti-pattern scan

@@ -2122,6 +2122,10 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     const componentId = blueprint.components?.find(c => c.label === label)?.id;
     const relevant = {};
     for (const [key, schema] of Object.entries(blueprint.dataModel)) {
+      // CSM: show all data model keys (CSM defines the service schema)
+      if (type === 'csm') {
+        relevant[key] = schema;
+      }
       // Memory component: show keys it produces
       if (type === 'memory' && schema.producedBy === componentId) {
         relevant[key] = schema;
@@ -2132,6 +2136,10 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       }
       // Cortex: show all keys it consumes
       if (type === 'cortex' && schema.consumedBy?.includes(componentId)) {
+        relevant[key] = schema;
+      }
+      // App: show all keys it consumes (via cortex)
+      if (type === 'app' && schema.consumedBy?.includes(componentId)) {
         relevant[key] = schema;
       }
       // Translation: show i18n keys it produces
@@ -2224,6 +2232,43 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
+  // Inject required action/method names from blueprint testScenarios
+  // These are the EXACT names the component MUST implement — tests will call them by name
+  if ((type === 'extension' || type === 'cortex' || type === 'app') && blueprint?.testScenarios) {
+    const componentId = blueprint.components?.find(c => c.label === label)?.id;
+    const scenarios = (blueprint.testScenarios || [])
+      .filter(ts => ts.component === componentId)
+      .flatMap(ts => ts.scenarios || []);
+    if (scenarios.length > 0) {
+      const names = [...new Set(scenarios.map(s => s.action))];
+      if (type === 'extension') {
+        context += '\n## Required Action IDs (from blueprint — use EXACTLY these names)\n';
+        context += 'The blueprint specifies these EXACT action IDs. Your extension MUST use these names:\n\n';
+        for (const s of scenarios) {
+          context += `- **${s.action}** — ${s.expect.split('.')[0]}.\n`;
+          if (Object.keys(s.input).length > 0) context += `  Input: ${JSON.stringify(s.input)}\n`;
+        }
+        context += `\nDo NOT rename these actions. Use "${names.join('", "')}" as the action id values in your YAML manifest.\n`;
+        context += 'If you use different names (e.g., "getCandles" instead of "fetchCandles"), validation WILL fail.\n\n';
+      } else if (type === 'cortex') {
+        context += '\n## Required Method Names (from blueprint — use EXACTLY these)\n';
+        context += 'Tests will call these methods by name. Your cortex MUST export them:\n\n';
+        for (const s of scenarios) {
+          context += `- **${s.action}()** — ${s.expect.split('.')[0]}.\n`;
+          if (Object.keys(s.input).length > 0) context += `  Args: ${JSON.stringify(s.input)}\n`;
+        }
+        context += '\nDo NOT rename these methods. Validation WILL fail if names don\'t match.\n\n';
+      } else if (type === 'app') {
+        context += '\n## Required User Flows (from blueprint — the app MUST support these)\n';
+        context += 'Tests will verify these workflows exist and function in the UI:\n\n';
+        for (const s of scenarios) {
+          context += `- **${s.action}** — ${s.expect}\n`;
+        }
+        context += '\n';
+      }
+    }
+  }
+
   // Thread interview data source details to extension prompts
   if (type === 'extension' && interviewSpec?.dataSources) {
     context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';
@@ -2234,6 +2279,21 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       if (ds.staticData && Array.isArray(ds.staticData)) {
         context += `  **STATIC DATA (${ds.staticData.length} entries) — pre-loaded in OWNER memory. Read with ctx.memory.getPublic(ctx.caller.owner, key), do NOT re-create it.**\n`;
       }
+    }
+  }
+
+  // Inject use cases from interview spec to app prompts — drives UI design
+  if (type === 'app' && interviewSpec?.useCases) {
+    const cases = interviewSpec.useCases.map(uc => {
+      if (typeof uc === 'string') return uc;
+      if (uc?.description) return uc.description;
+      if (uc?.title) return uc.title;
+      return JSON.stringify(uc);
+    }).filter(Boolean);
+    if (cases.length > 0) {
+      context += '\n## Use Cases (from interview — the app MUST support ALL of these)\n';
+      cases.forEach((c, i) => { context += `${i + 1}. ${c}\n`; });
+      context += '\nDesign the UI around these workflows. Every use case must be reachable.\n\n';
     }
   }
 

@@ -1222,11 +1222,18 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                   );
                   await writeProjectLog(projectId, 'test_fix_round_start', { meta: { component: comp.label, round: fix + 1, maxRounds: MAX_FIX, by: 'autopilot' } });
 
-                  // Build fix prompt with test errors
+                  // FIX 4: Build fix prompt WITH testContext
+                  const testContext = {
+                    errors: testResult.errors,
+                    dependencyResults: (testReport?.components || [])
+                      .filter(c => c.componentId !== comp.id && c.status === 'passed')
+                      .map(c => ({ componentId: c.componentId, status: c.status })),
+                    blueprintComponent: project.blueprint?.components?.find(c => c.label === comp.label) || null,
+                  };
                   const fixPrompt = buildFixPrompt(prompt, content, [
                     ...(vr.errors || []),
                     ...testResult.errors.map(e => `TEST FAILURE: ${e}`),
-                  ], comp.type);
+                  ], comp.type, testContext);
 
                   try {
                     content = await runWithAi(projectId, fixPrompt);
@@ -1258,7 +1265,13 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                       await registerComponent(comp.type, fixVr.extracted || content, session, slug2);
                     }
                     await writeProjectLog(projectId, 'test_fix_reregistered', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
-                    // Re-activate after re-register
+
+                    // FIX 5: Re-apply settings after re-register (config was lost)
+                    if (comp.type === 'extension') {
+                      await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
+                    }
+
+                    // Re-activate after re-register + apply-settings
                     if (comp.type === 'extension' || comp.type === 'cortex') {
                       const actUrl = comp.type === 'extension'
                         ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/activate`
@@ -1271,7 +1284,18 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                     continue;
                   }
 
-                  // Re-test with the same AI-generated test code
+                  // FIX 6: Regenerate test code for the fixed component (old test may be invalid)
+                  await writeProjectLog(projectId, 'test_fix_regenerating_test', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
+                  try {
+                    const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec);
+                    let newTestCode = await runWithAi(projectId, newTestPrompt);
+                    newTestCode = stripCodeblock(newTestCode);
+                    aiTestCode = newTestCode;
+                  } catch (e) {
+                    await writeProjectLog(projectId, 'test_fix_regen_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
+                    // Fall back to original test code if regeneration fails
+                  }
+
                   await writeProjectLog(projectId, 'test_fix_retesting', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
                   const reTestResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
                   const reTestResult = reTestResp?.data?.result || reTestResp?.result;
