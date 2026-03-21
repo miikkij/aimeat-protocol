@@ -2551,9 +2551,23 @@ For TRANSLATION tests:
 ALL extension calls are POST to /v1/ext/${registeredAs}/{actionId}
 Response envelope: { ok: true, data: { ...action return value... } }
 
-API keys and settings ARE configured — they were injected into the extension config before testing.
-Test ALL actions including those that call external APIs. Expect them to work.
-If an external API returns an error (rate limit, network), that is acceptable — but "API key not configured" means the settings injection failed and IS a test failure.
+API keys and settings ARE configured in ctx.config.
+
+## How to judge test results
+
+There are TWO types of actions:
+1. MEMORY-ONLY actions (init, addToWatchlist, removeFromWatchlist, getWatchlist, addAlert, removeAlert,
+   getAlerts, saveForecastLine, deleteForecastLine, getForecastLines, getSettings, saveSettings):
+   These MUST always succeed. If they fail → test failure.
+
+2. EXTERNAL API actions (refreshQuotes, searchSymbol, getCandles, getIndicators, getProfile, getQuotes, checkAlerts):
+   These call third-party APIs that may be rate-limited, return empty data, or fail.
+   For these actions, a test PASSES if:
+   - The call does NOT return HTTP 500 (no crash)
+   - The response has r.body?.ok === true (extension handled the call)
+   - The response data has EITHER a success field OR an error field (graceful handling)
+   A test FAILS only if: HTTP 500, no response, or "API key not configured" error.
+   Do NOT fail the test just because external data is empty or the API returned no results.
 
 ${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
    Input: ${JSON.stringify(s.input)}
@@ -2618,32 +2632,32 @@ ${testEnvDoc}
 - For apps: verify the use cases from the interview actually work in the UI
 - DO NOT write placeholder tests — every assertion must verify real behavior
 
-## Complete server-side example (extension with actions: init, getItems, addItem)
+## Complete server-side example
 
 const errors = [];
+// ALL extension calls use POST. Response: { ok: true, data: { ...action return... } }
 
-// ALL extension calls use POST — even "get" actions
-// Response envelope: { ok: true, data: { ...action return value... } }
-
-// Test init action (no input)
+// MEMORY-ONLY action — MUST succeed
 const r0 = await testFetch('/v1/ext/my-service/init', { method: 'POST', body: JSON.stringify({}) });
 if (!r0.ok) errors.push('init: HTTP ' + r0.status);
-else if (!r0.body?.ok) errors.push('init: response not ok');
+else if (!r0.body?.data?.success) errors.push('init: no success');
 
-// Test getItems action (POST, not GET!)
-const r1 = await testFetch('/v1/ext/my-service/getItems', { method: 'POST', body: JSON.stringify({}) });
-if (!r1.ok) errors.push('getItems: HTTP ' + r1.status);
-else if (!r1.body?.data) errors.push('getItems: no data in response');
-
-// Test addItem action
-const r2 = await testFetch('/v1/ext/my-service/addItem', {
-  method: 'POST',
-  body: JSON.stringify({ name: 'Test Item', value: 42 })
+// MEMORY-ONLY action — MUST succeed
+const r1 = await testFetch('/v1/ext/my-service/addItem', {
+  method: 'POST', body: JSON.stringify({ name: 'Test' })
 });
-if (!r2.ok) errors.push('addItem: HTTP ' + r2.status);
-else if (!r2.body?.data?.success) errors.push('addItem: not successful');
+if (!r1.ok) errors.push('addItem: HTTP ' + r1.status);
+else if (!r1.body?.data?.success) errors.push('addItem: not successful');
 
-return { passed: errors.length === 0, errors, details: 'Tested ' + (3 - errors.length) + '/3 actions' };`;
+// EXTERNAL API action — accept success OR graceful error (not crash)
+const r2 = await testFetch('/v1/ext/my-service/fetchData', {
+  method: 'POST', body: JSON.stringify({ query: 'test' })
+});
+if (!r2.ok && r2.status === 500) errors.push('fetchData: crashed with 500');
+else if (r2.body?.data?.error && r2.body.data.error.includes('API key')) errors.push('fetchData: API key not configured');
+// Empty results from external API are OK — not a test failure
+
+return { passed: errors.length === 0, errors, details: 'Tested actions' };`;
 }
 
 /* ── Impact & Edit Prompts (Phase 6) ────────────────── */
