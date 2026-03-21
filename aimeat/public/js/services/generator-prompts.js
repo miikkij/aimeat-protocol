@@ -2384,10 +2384,15 @@ function buildTestContextSection(testContext) {
  */
 export function buildTestPrompt(componentType, componentCode, componentLabel, registeredAs, blueprint, interviewSpec) {
   const testEnvDoc = componentType === 'cortex' || componentType === 'app'
-    ? `## Test Environment: Browser (Playwright)
-Your test code runs inside a real browser page via Playwright.
-You have access to the full DOM, window object, and can make fetch calls.
-Set your results on: window.__testResults = { passed: boolean, errors: string[], details: string }
+    ? `## Test Environment: Browser (page.evaluate sandbox)
+
+CRITICAL SANDBOX RULES — violating ANY of these will crash the test:
+- NO import statements — FORBIDDEN
+- NO require() calls — FORBIDDEN
+- NO export statements — FORBIDDEN
+- Your code runs inside page.evaluate() in a real browser page
+- You have access to: window, document, fetch, DOM APIs
+- Set results on: window.__testResults = { passed: boolean, errors: string[], details: string }
 
 For CORTEX tests:
 - The cortex library is loaded at: /v1/cortex/{name}/libs/{name}.js
@@ -2403,37 +2408,59 @@ For APP tests:
 - Click buttons and navigation, verify results
 - Check no error messages visible
 - Take note of what the interview spec says the use cases are`
-    : `## Test Environment: Server-side (Node.js)
-Your test code runs on the server. You have ONE helper function:
+    : `## Test Environment: Server-side sandbox (new Function)
+
+CRITICAL SANDBOX RULES — violating ANY of these will crash the test:
+- NO import statements (import x from '...')  — FORBIDDEN, causes "Cannot use import statement"
+- NO require() calls — FORBIDDEN, not available
+- NO export statements — FORBIDDEN
+- NO top-level declarations with const/let outside of the function body scope
+- You are inside an async function body. Just write sequential code.
+- You have exactly TWO variables available: testFetch and baseUrl
+- No other globals, no Node.js APIs, no fs, no path, no process
+
+Available helper:
 
   const resp = await testFetch(url, { method, body, headers });
   // resp = { status: number, ok: boolean, body: object }
+  // Auth token is injected automatically. Do NOT set Authorization header.
 
-URLs should start with / (e.g., /v1/extensions/my-ext/actions/init)
-The baseUrl and auth token are injected automatically.
+URLs must start with / (e.g., /v1/ext/my-ext/actionId)
+baseUrl is available but testFetch prepends it automatically for / URLs.
 
-Your code MUST return: { passed: boolean, errors: string[], details: string }
+Your code MUST end with: return { passed: boolean, errors: string[], details: string }
+- passed: true if ALL checks succeeded
+- errors: array of failure descriptions (empty array if passed)
+- details: human-readable summary of what was tested
+
+PATTERN — follow this exact structure:
+\`\`\`
+const errors = [];
+
+// Test 1
+const r1 = await testFetch('/v1/ext/${registeredAs}/actionName', { method: 'POST', body: JSON.stringify({ key: 'value' }) });
+if (!r1.ok) errors.push('actionName failed: status ' + r1.status);
+else if (!r1.body?.data) errors.push('actionName returned no data');
+
+// Test 2 ...
+
+return { passed: errors.length === 0, errors, details: 'Tested N actions' };
+\`\`\`
 
 For EXTENSION tests:
-- Call each action endpoint using the correct HTTP method (GET/POST as declared in manifest)
-- Use the registered extension name in the URL: /v1/ext/{registeredName}/{actionId}
-- NOT /v1/extensions/... — the correct path is /v1/ext/{name}/{actionId}
-- Verify response has ok:true and data field
-- For GET actions: pass input as query params in URL
-- For POST actions: pass input as JSON body
-- Test with realistic input data based on what the extension does
-
-For MSM tests:
-- Verify the integration exists in the catalogue
-- Test the external API endpoint if accessible
+- Call each action endpoint: /v1/ext/{registeredName}/{actionId}
+- NOT /v1/extensions/... — correct path is /v1/ext/{name}/{actionId}
+- Use the correct HTTP method (GET/POST as declared in the extension manifest)
+- For GET actions: append query params to URL (e.g., /v1/ext/name/action?param=value)
+- For POST actions: pass input as JSON body with JSON.stringify()
+- Verify response has ok:true and meaningful data field
+- Test with realistic input based on what the extension does
 
 For MEMORY tests:
-- Write a test value, read it back, verify, cleanup
-- Use PUT /v1/memory/{key} to write, GET /v1/memory/{key} to read
+- Write a test value with PUT /v1/memory/{key}, read with GET /v1/memory/{key}, verify, cleanup
 
 For TRANSLATION tests:
-- Read the translation key, verify it has content
-- Check en/fi parity if both exist`;
+- Read the translation key, verify it has content`;
 
   const bpComponents = blueprint?.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
   const useCases = interviewSpec?.useCases?.map((uc, i) => `${i + 1}. ${uc}`).join('\n') || 'No use cases specified';
@@ -2459,18 +2486,49 @@ ${useCases}
 
 ${testEnvDoc}
 
-## Output Format
-Return ONLY executable JavaScript code — no markdown fences, no explanation.
-The code must be a self-contained script that tests the component thoroughly.
+## Output Rules
 
-Test REAL functionality:
+1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text, NO comments outside code
+2. NO import/require/export — your code runs in a sandbox (new Function for server, page.evaluate for browser)
+3. Code must be a self-contained async function body (you are already inside an async function)
+4. For server tests: you MUST return { passed: boolean, errors: string[], details: string }
+5. For browser tests: you MUST set window.__testResults = { passed: boolean, errors: string[], details: string }
+
+## What to test
+
 - Does the component actually work? Not just "does it exist"
-- Call real endpoints with real input data
+- Call real endpoints with real input data based on the component code above
 - Verify response shapes match what the code produces
-- Test edge cases (empty input, missing data)
+- Test error handling (empty input, missing fields)
 - For apps: verify the use cases from the interview actually work in the UI
+- DO NOT write placeholder tests — every assertion must verify real behavior
 
-DO NOT write placeholder tests. Every assertion must verify real behavior.`;
+## Complete server-side example (extension with two actions)
+
+const errors = [];
+
+// Test getItems action (GET)
+const r1 = await testFetch('/v1/ext/my-service/getItems?limit=5');
+if (!r1.ok) errors.push('getItems: HTTP ' + r1.status);
+else if (!r1.body?.data) errors.push('getItems: no data in response');
+else if (!Array.isArray(r1.body.data.items)) errors.push('getItems: items is not an array');
+
+// Test addItem action (POST)
+const r2 = await testFetch('/v1/ext/my-service/addItem', {
+  method: 'POST',
+  body: JSON.stringify({ name: 'Test Item', value: 42 })
+});
+if (!r2.ok) errors.push('addItem: HTTP ' + r2.status);
+else if (!r2.body?.data?.id) errors.push('addItem: no id returned');
+
+// Test edge case: empty body
+const r3 = await testFetch('/v1/ext/my-service/addItem', {
+  method: 'POST',
+  body: JSON.stringify({})
+});
+if (r3.ok) errors.push('addItem with empty body should fail but returned ok');
+
+return { passed: errors.length === 0, errors, details: 'Tested getItems, addItem, edge case: ' + (3 - errors.length) + '/3 passed' };`;
 }
 
 /* ── Impact & Edit Prompts (Phase 6) ────────────────── */
