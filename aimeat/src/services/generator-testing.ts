@@ -113,13 +113,42 @@ export async function runExtensionTest(
   actionName: string,
   input: Record<string, unknown>,
   token: string,
+  method?: string,
 ): Promise<{ passed: boolean; error?: string; response?: unknown }> {
   try {
-    const res = await fetch(`${baseUrl}/v1/extensions/${extensionName}/actions/${actionName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(input),
-    });
+    // Determine HTTP method: use provided method, or auto-detect from extension metadata
+    let httpMethod = (method || 'POST').toUpperCase();
+    if (!method) {
+      // Fetch extension metadata to find the correct method for this action
+      try {
+        const metaRes = await fetch(`${baseUrl}/v1/extensions/${extensionName}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (metaRes.ok) {
+          const metaBody = await metaRes.json() as Record<string, unknown>;
+          const metaData = metaBody?.data as Record<string, unknown> | undefined;
+          const metaExt = metaData?.extension as Record<string, unknown> | undefined;
+          const actions = (metaData?.actions ?? metaExt?.actions ?? []) as Array<{ id?: string; method?: string }>;
+          const action = actions.find((a: { id?: string; method?: string }) => a.id === actionName);
+          if (action?.method) httpMethod = action.method.toUpperCase();
+        }
+      } catch { /* fallback to POST */ }
+    }
+
+    const url = `${baseUrl}/v1/extensions/${extensionName}/actions/${actionName}`;
+    const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
+    const opts: RequestInit = { method: httpMethod, headers };
+
+    if (httpMethod === 'POST' || httpMethod === 'PUT' || httpMethod === 'PATCH') {
+      headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(input);
+    }
+    // For GET requests, input goes as query params (if any)
+    const finalUrl = (httpMethod === 'GET' && Object.keys(input).length > 0)
+      ? `${url}?${new URLSearchParams(Object.entries(input).map(([k, v]) => [k, String(v)])).toString()}`
+      : url;
+
+    const res = await fetch(finalUrl, opts);
     const body = await res.json();
     if (!res.ok) return { passed: false, error: `HTTP ${res.status}: ${JSON.stringify(body)}` };
     return { passed: true, response: body };
