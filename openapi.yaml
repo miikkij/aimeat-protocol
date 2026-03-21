@@ -13938,6 +13938,221 @@ paths:
           $ref: '#/components/responses/NotFound'
 
 
+  /v1/generator/{projectId}/settings:
+    post:
+      operationId: saveGeneratorProjectSettings
+      summary: Store project settings values
+      description: |
+        Stores a full set of key-value settings for a generator project.
+        Values are written to `generator.{projectId}.settings` in memory.
+        Replaces the entire settings object — performs a full overwrite.
+        `secretKeys` lists which keys hold sensitive values (for UI masking).
+        Owner-only endpoint.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values:
+                  type: object
+                  description: Key-value settings to store
+                  additionalProperties: true
+                secretKeys:
+                  type: array
+                  description: Keys whose values are secrets (for UI masking)
+                  items: { type: string }
+      responses:
+        '200':
+          description: Settings stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stored:
+                            type: integer
+                            description: Number of settings keys stored
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: getGeneratorProjectSettings
+      summary: Retrieve project settings values
+      description: |
+        Returns the stored settings for a generator project.
+        Reads from `generator.{projectId}.settings` in memory.
+        Returns an empty `values` object if no settings have been stored.
+        Owner-only endpoint.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      responses:
+        '200':
+          description: Project settings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          values:
+                            type: object
+                            description: Stored key-value settings
+                            additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/generator/{projectId}/test:
+    post:
+      operationId: runGeneratorProjectTests
+      summary: Run project component tests
+      description: |
+        Runs tests against the project's components in dependency order (topological sort).
+        Level `none` returns an empty passed report immediately without executing tests.
+        Level `basic` tests each registered component against its blueprint test scenarios.
+        Level `comprehensive` runs the full test suite (reserved for future expansion).
+        Requires an active blueprint with components. Owner-only endpoint.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  type: string
+                  enum: [comprehensive, basic, none]
+                  description: Test depth level (defaults to basic)
+      responses:
+        '200':
+          description: Test report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          report:
+                            type: object
+                            properties:
+                              level:
+                                type: string
+                                description: Test level used
+                              timestamp:
+                                type: string
+                                format: date-time
+                              overall:
+                                type: string
+                                enum: [passed, failed]
+                                description: Overall test outcome
+                              components:
+                                type: array
+                                description: Per-component test results
+                                items:
+                                  type: object
+                                  properties:
+                                    componentId: { type: string }
+                                    type: { type: string }
+                                    status:
+                                      type: string
+                                      enum: [passed, failed, skipped]
+                                    scenarios: { type: integer }
+                                    passed: { type: integer }
+                                    errors:
+                                      type: array
+                                      items: { type: string }
+                                    screenshots:
+                                      type: array
+                                      items: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/generator/{projectId}/screenshots/{filename}:
+    get:
+      operationId: getGeneratorScreenshot
+      summary: Serve test screenshot image
+      description: |
+        Returns a PNG screenshot captured during test execution.
+        Screenshots are stored in the server's temp directory keyed by project ID and filename.
+        Owner-only endpoint.
+      tags: [Generator]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Project ID
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+          description: Screenshot filename (e.g. step-001.png)
+      responses:
+        '200':
+          description: PNG image binary
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # -- OpenRouter -----------------------------------------------
   /v1/openrouter/settings:
     put:
