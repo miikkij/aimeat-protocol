@@ -2545,37 +2545,16 @@ For TRANSLATION tests:
       .filter(ts => bpComp && ts.component === bpComp.id)
       .flatMap(ts => ts.scenarios || []);
 
-    // Check if extension requires external API keys (from blueprint.settings.service)
-    let apiKeyWarning = '';
-    if (componentType === 'extension' && blueprint.settings?.service) {
-      const requiredSecrets = blueprint.settings.service
-        .filter(s => s.type === 'secret' || s.required)
-        .map(s => s.label || s.key);
-      if (requiredSecrets.length > 0) {
-        apiKeyWarning = `
-## IMPORTANT: External API Keys Not Available During Testing
-
-This extension requires: ${requiredSecrets.join(', ')}
-These are NOT configured during testing — the extension has no API keys.
-
-Split your tests into TWO groups:
-1. TESTABLE (no external API needed): init, settings, watchlist, alerts, forecast lines — any action
-   that only reads/writes memory. These MUST return success.
-2. EXTERNAL API (will fail gracefully): actions that call ctx.fetch() to external APIs.
-   For these, verify only that the action returns a clear error message (e.g., "API key not configured")
-   and does NOT crash with a 500 error. Expect r.body?.data?.error to contain a message.
-
-Do NOT mark a test as failed if an external-API action returns an error about missing API key.
-That is CORRECT behavior — the action handles the missing key gracefully.\n`;
-      }
-    }
-
     if (componentType === 'extension' && scenarios.length > 0) {
       testSection += `\n## Test Scenarios (from blueprint — test EXACTLY these)
 
 ALL extension calls are POST to /v1/ext/${registeredAs}/{actionId}
 Response envelope: { ok: true, data: { ...action return value... } }
-${apiKeyWarning}
+
+API keys and settings ARE configured — they were injected into the extension config before testing.
+Test ALL actions including those that call external APIs. Expect them to work.
+If an external API returns an error (rate limit, network), that is acceptable — but "API key not configured" means the settings injection failed and IS a test failure.
+
 ${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
    Input: ${JSON.stringify(s.input)}
    Expected: ${s.expect}`).join('\n\n')}
