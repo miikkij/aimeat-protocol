@@ -240,6 +240,35 @@ What IS available:
 - \`ctx\` API object (ONLY the properties listed above)
 - \`export default async function(ctx, input) { ... }\` — the action entry point
 
+## Actions are INDEPENDENT — CANNOT call each other
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Each action is a SEPARATE function. Actions CANNOT call each other.   ║
+║  There is NO ctx.otherAction() or ctx.callAction() method.             ║
+║  Writing ctx.getCompany() or ctx.searchItems() will CRASH with:        ║
+║    "ctx.getCompany is not a function"                                  ║
+║                                                                        ║
+║  If multiple actions need the same logic (e.g., fetching from API),    ║
+║  define a HELPER FUNCTION above the action exports:                    ║
+║                                                                        ║
+║    async function fetchFromApi(ctx, id) {                              ║
+║      const resp = await ctx.fetch(url + id);                           ║
+║      if (!resp.ok) return null;                                        ║
+║      return JSON.parse(resp.text);                                     ║
+║    }                                                                   ║
+║                                                                        ║
+║    // actions/getItem.js                                               ║
+║    export default async function(ctx, input) {                         ║
+║      return await fetchFromApi(ctx, input.id);                         ║
+║    }                                                                   ║
+║                                                                        ║
+║    // actions/addToList.js                                              ║
+║    export default async function(ctx, input) {                         ║
+║      const item = await fetchFromApi(ctx, input.id);                   ║
+║      // ... add to list ...                                            ║
+║    }                                                                   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 ## ctx.memory API — CRITICAL details
 
 ### ctx.memory.get(key) — WILL CRASH if you use JSON.parse()
