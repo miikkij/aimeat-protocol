@@ -47,7 +47,7 @@
  *     AI utilities (runWithAi, stripCodeblock, cancelAiRequest) to generator-detail.js
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
@@ -66,11 +66,12 @@ import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js
 import { useConfirm } from '/components/Modal.js';
 import { runTests, runComponentTest } from '/js/services/generator-testing.js';
 import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
-import { ComponentDetail, TestScopeSelector, TestResultsView, runWithAi, stripCodeblock, cancelAiRequest } from './generator-detail.js';
+import { ComponentDetail, TestScopeSelector, TestResultsView, runWithAi, stripCodeblock } from './generator-detail.js';
 import { usePackaging } from './generator-dashboard/use-packaging.js';
 import { PackageDialog } from './generator-dashboard/PackageDialog.js';
 import { useLifecycle } from './generator-dashboard/use-lifecycle.js';
 import { RemovePanel } from './generator-dashboard/RemovePanel.js';
+import { useAutopilotState } from './generator-dashboard/use-autopilot-state.js';
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -476,10 +477,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
   const { confirm, ConfirmUI } = useConfirm();
 
-  // Autopilot state
-  const [autopilotRunning, setAutopilotRunning] = useState(false);
-  const [currentAutopilotStep, setCurrentAutopilotStep] = useState('');
-  const autopilotCancelledRef = useRef(false);
+  // Autopilot state (hook-per-domain)
+  const autopilotState = useAutopilotState();
 
   // Phase 5: Lifecycle state
   const [liveStatuses, setLiveStatuses] = useState({});
@@ -656,15 +655,14 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   async function handleRunAllEditsAi() {
     if (!orSettings?.hasApiKey || !impactParsed?.analysis) return;
-    setAutopilotRunning(true);
-    autopilotCancelledRef.current = false;
+    autopilotState.start();
     try {
       const editable = impactParsed.analysis.filter(a => a.impact === 'root' || a.impact === 'update');
       for (const item of editable) {
-        if (autopilotCancelledRef.current) break;
+        if (autopilotState.cancelledRef.current) break;
         const comp = components.find(c => c.id === item.id);
         if (!comp) continue;
-        setCurrentAutopilotStep(comp.label);
+        autopilotState.setStep(comp.label);
         setSelectedId(comp.id);
 
         // Build edit prompt (same as handleCopyEditPrompt)
@@ -686,7 +684,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           showToast?.(`${comp.label}: ${e.message}`, true);
           break;
         }
-        if (autopilotCancelledRef.current) break;
+        if (autopilotState.cancelledRef.current) break;
         if (comp.type === 'extension') content = stripCodeblock(content);
 
         // Validate
@@ -696,8 +694,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         if (!vr.valid && orSettings?.autoRetry) {
           const max = orSettings.maxRetries || 3;
           for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
-            if (autopilotCancelledRef.current) break;
-            setCurrentAutopilotStep(
+            if (autopilotState.cancelledRef.current) break;
+            autopilotState.setStep(
               comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
             );
             const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
@@ -738,8 +736,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     } catch (e) {
       showToast?.(e.message, true);
     }
-    setAutopilotRunning(false);
-    setCurrentAutopilotStep('');
+    autopilotState.finish();
     showToast?.(t('profile.generator.openrouter.stepComplete'));
   }
 
@@ -860,20 +857,19 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   // Autopilot: Run all remaining steps
   async function handleRunAll() {
-    if (!orSettings?.hasApiKey || autopilotRunning) return;
-    setAutopilotRunning(true);
-    autopilotCancelledRef.current = false;
+    if (!orSettings?.hasApiKey || autopilotState.running) return;
+    autopilotState.start();
 
     try {
       // Iterate through all components in phase order
       for (const cid of phaseOrder) {
-        if (autopilotCancelledRef.current) break;
+        if (autopilotState.cancelledRef.current) break;
         // IMPORTANT: always fetch fresh state from API, not from closure (which is stale after loadData)
         const freshComps = await loadAllComponents(projectId);
         const comp = freshComps.find(c => c.id === cid);
         if (!comp || comp.registeredAs) continue; // skip already registered
 
-        setCurrentAutopilotStep(comp.label);
+        autopilotState.setStep(comp.label);
         setSelectedId(cid);
 
         // Build prompt
@@ -893,7 +889,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           showToast?.(`${comp.label}: ${e.message}`, true);
           break;
         }
-        if (autopilotCancelledRef.current) break;
+        if (autopilotState.cancelledRef.current) break;
         // Strip codeblock wrappers for extensions (AI models often wrap in ```)
         if (comp.type === 'extension') content = stripCodeblock(content);
 
@@ -910,8 +906,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         if (!vr.valid && orSettings?.autoRetry) {
           const max = orSettings.maxRetries || 3;
           for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
-            if (autopilotCancelledRef.current) break;
-            setCurrentAutopilotStep(
+            if (autopilotState.cancelledRef.current) break;
+            autopilotState.setStep(
               comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
             );
             const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
@@ -934,7 +930,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
           break;
         }
-        if (autopilotCancelledRef.current) break;
+        if (autopilotState.cancelledRef.current) break;
 
         // Validation passed — save and register
         updated = { ...updated, result: content, status: 'done', validationErrors: [],
@@ -1001,11 +997,11 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         }
 
         // Per-component test immediately after registration (prompt-driven: AI generates test code)
-        if (!autopilotCancelledRef.current && testScope !== 'none') {
+        if (!autopilotState.cancelledRef.current && testScope !== 'none') {
           const testableTypes = ['extension', 'cortex', 'app'];
           if (testableTypes.includes(comp.type)) {
             // Step 1: AI generates the test code
-            setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_generating'));
+            autopilotState.setStep(comp.label + ' — ' + t('profile.generator.test_generating'));
             await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'autopilot' } });
             const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
             let aiTestCode;
@@ -1031,10 +1027,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               await loadData();
               continue; // Skip testing, move to next component
             }
-            if (autopilotCancelledRef.current) break;
+            if (autopilotState.cancelledRef.current) break;
 
             // Step 2: Execute the AI-generated test code
-            setCurrentAutopilotStep(comp.label + ' — ' + t('profile.generator.test_running'));
+            autopilotState.setStep(comp.label + ' — ' + t('profile.generator.test_running'));
             await writeProjectLog(projectId, 'test_executing', { meta: { component: comp.label, environment: testEnvironment, by: 'autopilot' } });
             try {
               const testResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
@@ -1069,8 +1065,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                 // Per-component fix loop (max 3 rounds)
                 const MAX_FIX = 3;
                 let fixed = false;
-                for (let fix = 0; fix < MAX_FIX && !fixed && !autopilotCancelledRef.current; fix++) {
-                  setCurrentAutopilotStep(
+                for (let fix = 0; fix < MAX_FIX && !fixed && !autopilotState.cancelledRef.current; fix++) {
+                  autopilotState.setStep(
                     comp.label + ' — ' + t('profile.generator.openrouter.retrying').replace('{current}', fix + 1).replace('{max}', MAX_FIX)
                   );
                   await writeProjectLog(projectId, 'test_fix_round_start', { meta: { component: comp.label, round: fix + 1, maxRounds: MAX_FIX, by: 'autopilot' } });
@@ -1097,7 +1093,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                     await writeProjectLog(projectId, 'test_fix_ai_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
                     break;
                   }
-                  if (autopilotCancelledRef.current) break;
+                  if (autopilotState.cancelledRef.current) break;
 
                   const fixVr = validateComponent(comp.type, content, project.blueprint);
                   if (!fixVr.valid) {
@@ -1189,7 +1185,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                   }
                 }
 
-                if (!fixed && !autopilotCancelledRef.current) {
+                if (!fixed && !autopilotState.cancelledRef.current) {
                   updated = { ...updated, history: [...(updated.history || []), { action: 'test_gave_up', at: new Date().toISOString(), by: 'autopilot', maxRounds: MAX_FIX }] };
                   await saveComponent(projectId, updated);
                   await writeProjectLog(projectId, 'component_test_gave_up', { meta: { component: comp.label, maxRounds: MAX_FIX, by: 'autopilot' } });
@@ -1216,16 +1212,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       showToast?.(e.message, true);
     }
 
-    setAutopilotRunning(false);
-    setCurrentAutopilotStep('');
+    autopilotState.finish();
     await loadData();
   }
 
-  function handleCancelAutopilot() {
-    autopilotCancelledRef.current = true;
-    cancelAiRequest(); // Abort the HTTP request immediately
-    setCurrentAutopilotStep(t('profile.generator.openrouter.cancel') + '...');
-  }
 
   // Phase 7: Diagnostics data
   const diagnosticsData = components.map(c => {
@@ -1489,20 +1479,20 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       `}
 
       <!-- Test Scope — always visible when components exist -->
-      ${components.length > 0 && !autopilotRunning && html`
+      ${components.length > 0 && !autopilotState.running && html`
         <${TestScopeSelector} value=${testScope} onChange=${setTestScope} />
       `}
 
       <!-- Autopilot: Run All Steps -->
       ${orSettings?.hasApiKey && components.length > 0 && html`
         <div class="pf-gen-or-run-all-bar">
-          ${autopilotRunning
+          ${autopilotState.running
             ? html`
               <div class="pf-gen-or-run-all-status">
                 <span class="pf-gen-or-spinner"></span>
-                <span>${currentAutopilotStep}</span>
+                <span>${autopilotState.step}</span>
               </div>
-              <button class="btn-danger btn-sm" onClick=${handleCancelAutopilot}>
+              <button class="btn-danger btn-sm" onClick=${autopilotState.cancel}>
                 ${t('profile.generator.openrouter.cancel')}
               </button>
             `
@@ -1651,7 +1641,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                       ${orSettings?.hasApiKey && html`
                         <button class="btn-outline btn-sm pf-gen-or-run-btn ${aiRunning === comp.id ? 'pf-gen-or-running' : ''}"
                           onClick=${() => handleRunSingleEditAi(comp, a.suggestedChange)}
-                          disabled=${aiRunning !== null || autopilotRunning}>
+                          disabled=${aiRunning !== null || autopilotState.running}>
                           ${aiRunning === comp.id
                             ? html`<span class="pf-gen-or-spin">⟳</span> ${t('profile.generator.openrouter.waiting')}`
                             : t('profile.generator.openrouter.runWithAi')}
@@ -1665,15 +1655,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           </div>
           <div class="pf-gen-actions">
             ${orSettings?.hasApiKey && impactParsed.analysis.some(a => a.impact === 'root' || a.impact === 'update') && html`
-              <button class="btn-primary btn-sm pf-gen-or-run-btn ${autopilotRunning ? 'pf-gen-or-running' : ''}"
+              <button class="btn-primary btn-sm pf-gen-or-run-btn ${autopilotState.running ? 'pf-gen-or-running' : ''}"
                 onClick=${handleRunAllEditsAi}
-                disabled=${autopilotRunning}>
-                ${autopilotRunning
-                  ? html`<span class="pf-gen-or-spin">⟳</span> ${currentAutopilotStep}`
+                disabled=${autopilotState.running}>
+                ${autopilotState.running
+                  ? html`<span class="pf-gen-or-spin">⟳</span> ${autopilotState.step}`
                   : t('profile.generator.openrouter.runAll')}
               </button>
-              ${autopilotRunning && html`
-                <button class="btn-danger btn-sm" onClick=${handleCancelAutopilot}>
+              ${autopilotState.running && html`
+                <button class="btn-danger btn-sm" onClick=${autopilotState.cancel}>
                   ${t('profile.generator.openrouter.cancel')}
                 </button>
               `}
