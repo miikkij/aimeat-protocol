@@ -57,7 +57,7 @@ import {
   getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
   writeProjectLog,
   savePendingEdit, getPendingEdit, clearPendingEdit,
-  saveProjectSettings,
+  saveProjectSettings, getProjectSettings,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildTestPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
@@ -2899,11 +2899,28 @@ function SettingsCollectionView({ project, blueprint, onComplete, showToast }) {
   const [values, setValues] = useState({});
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState([]);
+  const [loaded, setLoaded] = useState(false);
 
   const serviceSettings = blueprint?.settings?.service || [];
   const userSettingsDef = blueprint?.settings?.user || [];
   const allSettings = [...serviceSettings, ...userSettingsDef];
   const noSettings = allSettings.length === 0;
+
+  // Load previously saved settings
+  useEffect(() => {
+    if (noSettings || loaded) return;
+    getProjectSettings(project.projectId).then(saved => {
+      if (saved && Object.keys(saved).length > 0) {
+        // Merge saved values with defaults (saved values take priority)
+        const merged = {};
+        for (const s of allSettings) {
+          merged[s.key] = saved[s.key] !== undefined ? saved[s.key] : (s.default || '');
+        }
+        setValues(merged);
+      }
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, [project.projectId]);
 
   // Auto-skip when no settings needed (hook always called, respecting rules of hooks)
   useEffect(() => {
