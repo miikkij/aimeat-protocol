@@ -86,6 +86,11 @@ Available helper:
 
 URLs must start with / (e.g., /v1/ext/my-ext/actionId)
 baseUrl is available but testFetch prepends it automatically for / URLs.
+CRITICAL: GET and DELETE requests MUST NOT include a body. Node.js fetch throws
+"Request with GET/HEAD method cannot have body" if you pass body with method: 'GET'.
+WRONG: testFetch(url, { method: 'GET', body: JSON.stringify({}) })
+CORRECT: testFetch(url, { method: 'GET' })
+CORRECT: testFetch(url) — defaults to GET with no body
 
 Your code MUST end with: return { passed: boolean, errors: string[], details: string }
 - passed: true if ALL checks succeeded

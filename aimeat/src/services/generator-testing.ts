@@ -120,7 +120,13 @@ export async function executeHttpTest(
     const testFetch = async (url: string, opts?: RequestInit) => {
       const hdrs: Record<string, string> = { ...((opts?.headers as Record<string, string>) || {}), 'Authorization': `Bearer ${token}` };
       if (opts?.body && !hdrs['Content-Type']) hdrs['Content-Type'] = 'application/json';
-      const res = await fetch(url.startsWith('/') ? `${baseUrl}${url}` : url, { ...opts, headers: hdrs });
+      // Strip body from GET/HEAD requests — Node.js fetch throws "cannot have body" otherwise
+      const method = (opts?.method || 'GET').toUpperCase();
+      const fetchOpts = { ...opts, headers: hdrs };
+      if ((method === 'GET' || method === 'HEAD') && fetchOpts.body) {
+        delete fetchOpts.body;
+      }
+      const res = await fetch(url.startsWith('/') ? `${baseUrl}${url}` : url, fetchOpts);
       const body = await res.json();
       return { status: res.status, ok: res.ok, body };
     };
