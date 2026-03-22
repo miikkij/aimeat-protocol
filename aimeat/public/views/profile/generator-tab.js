@@ -55,11 +55,11 @@ import { apiGet, apiPost } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent,
-  registerComponent, cleanupOldEntries,
+  registerComponent,
   saveInterviewSpec, getInterviewSpec,
-  getComponentStatuses, getAppLaunchUrl,
+  getAppLaunchUrl,
   writeProjectLog,
-  savePendingEdit, getPendingEdit, clearPendingEdit,
+  savePendingEdit, clearPendingEdit,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildTestPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
@@ -72,6 +72,7 @@ import { PackageDialog } from './generator-dashboard/PackageDialog.js';
 import { useLifecycle } from './generator-dashboard/use-lifecycle.js';
 import { RemovePanel } from './generator-dashboard/RemovePanel.js';
 import { useAutopilotState } from './generator-dashboard/use-autopilot-state.js';
+import { useDashboardCore } from './generator-dashboard/use-dashboard-core.js';
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -471,21 +472,17 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
 }
 
 function ProjectDashboard({ projectId, onBack, session, showToast, orSettings }) {
-  const [project, setProject] = useState(null);
-  const [components, setComponents] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
   const [logFilter, setLogFilter] = useState(null); // null = all, or componentId
   const { confirm, ConfirmUI } = useConfirm();
+
+  // Core shared data (hook-per-domain)
+  const core = useDashboardCore(projectId, onBack, showToast);
 
   // Autopilot state (hook-per-domain)
   const autopilotState = useAutopilotState();
 
-  // Phase 5: Lifecycle state
-  const [liveStatuses, setLiveStatuses] = useState({});
-
-  // Lifecycle (hook-per-domain) — needs refreshStatuses/loadData passed via core-like object
-  const lifecycleCore = { loadData, refreshStatuses: () => refreshStatuses() };
-  const lifecycle = useLifecycle(lifecycleCore, projectId, showToast, session);
+  // Lifecycle (hook-per-domain)
+  const lifecycle = useLifecycle(core, projectId, showToast, session);
 
   // Phase 6: Edit service state
   const [aiRunning, setAiRunning] = useState(null); // null | 'impact'
@@ -499,14 +496,18 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // Packaging (hook-per-domain)
-  const pkg = usePackaging({ project, components, loadData }, projectId, showToast);
+  const pkg = usePackaging(core, projectId, showToast);
+
+  // Convenience aliases from core (used by functions still in this file, will be removed as hooks extract them)
+  const { project, components, interviewSpec, selectedId, liveStatuses } = core;
+  const loadData = core.loadData;
+  const refreshStatuses = core.refreshStatuses;
+  const setSelectedId = core.setSelectedId;
+  const advanceToNext = core.advanceToNext;
 
   // Editable project name
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
-
-  // Interview spec (loaded for locale threading to component prompts)
-  const [interviewSpec, setInterviewSpec] = useState(null);
 
   // Test execution state
   const [testScope, setTestScope] = useState('comprehensive');
@@ -514,66 +515,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   const [testReport, setTestReport] = useState(null);
   const [testFixRound, setTestFixRound] = useState(0);
 
-  useEffect(() => { loadData(); }, [projectId]);
-
-  // SSE live updates — instant refresh when data changes
-  useEffect(() => {
-    const handler = () => loadData();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [projectId]);
-
-  async function loadData() {
-    const p = await getProject(projectId);
-    if (!p || !p.projectId) {
-      // Project deleted — go back
-      onBack();
-      return;
-    }
-    setProject(p);
-    // Load interview spec BEFORE components — prompts need it for locale/data source threading
-    try {
-      const spec = await getInterviewSpec(projectId);
-      setInterviewSpec(spec);
-    } catch { /* no interview spec — that's fine */ }
-    if (p?.blueprint?.components) {
-      const comps = await loadAllComponents(projectId);
-      if (comps.length > 0) {
-        setComponents(comps);
-      } else {
-        // Blueprint exists but no component records yet (e.g. submitted blueprint via API).
-        // Initialize component records in memory — same as handleSubmitBlueprint() does for UI flow.
-        const initialized = [];
-        for (const c of p.blueprint.components) {
-          const comp = { id: c.id, type: c.type, label: c.label, status: 'not_started', prompt: null, result: null, validationErrors: [], registeredAs: null, history: [], _version: 0 };
-          await saveComponent(projectId, comp);
-          initialized.push(comp);
-        }
-        setComponents(initialized);
-      }
-    }
-    cleanupOldEntries(projectId).catch(() => {});
-    // Restore pending edit if exists
-    try {
-      const pending = await getPendingEdit(projectId);
-      if (pending) {
-        setChangeRequest(pending.changeRequest || '');
-        setImpactParsed(pending.impactParsed || null);
-        setImpactResult(pending.impactResult || '');
-        setEditMode(pending.impactParsed ? 'editing' : 'request');
-      }
-    } catch { /* no pending edit */ }
-  }
-
-  // Phase 5: Refresh live statuses
-  async function refreshStatuses() {
-    try {
-      const s = await getComponentStatuses(projectId);
-      setLiveStatuses(s);
-    } catch { /* best effort */ }
-  }
-
-  useEffect(() => { if (project) refreshStatuses(); }, [project]);
 
   async function handleNameSave() {
     const trimmed = nameDraft.trim();
@@ -828,32 +769,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   // Compute phase-ordered component list for auto-advance
   const phaseOrder = phases.flatMap(p => p.componentIds || []);
-
-  function advanceToNext(currentId) {
-    const idx = phaseOrder.indexOf(currentId);
-    // Find the next component that isn't fully registered
-    for (let i = idx + 1; i < phaseOrder.length; i++) {
-      const comp = components.find(c => c.id === phaseOrder[i]);
-      if (comp && !comp.registeredAs) {
-        setSelectedId(phaseOrder[i]);
-        return;
-      }
-    }
-    // All done — select nothing, show completion state
-    showToast?.(t('profile.generator.allComponentsRegistered'));
-  }
-
-  // Auto-select first incomplete component if nothing is selected
-  useEffect(() => {
-    if (!selectedId && phaseOrder.length > 0 && components.length > 0) {
-      const firstIncomplete = phaseOrder.find(cid => {
-        const comp = components.find(c => c.id === cid);
-        return comp && !comp.registeredAs;
-      });
-      if (firstIncomplete) setSelectedId(firstIncomplete);
-      else if (phaseOrder.length > 0) setSelectedId(phaseOrder[0]);
-    }
-  }, [components.length]);
 
   // Autopilot: Run all remaining steps
   async function handleRunAll() {
