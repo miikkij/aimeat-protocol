@@ -43,6 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { logger } from '../utils/logger.js';
 import { validateInterviewSpec, validateBlueprint, validateComponent } from '../services/generator-validate.js';
 import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
@@ -378,8 +379,18 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const settingsRec = await storage.getMemory(gaii, `generator.${projectId}.settings`);
       const settings = (settingsRec?.value as Record<string, unknown>) ?? {};
 
-      if (Object.keys(settings).length === 0) {
-        res.json(success(config.nodeId, { applied: 0, message: 'No settings to apply' }));
+      // Debug: log what we found
+      const settingsKeys = Object.keys(settings);
+      const settingsDebug = settingsKeys.map(k => {
+        const v = settings[k];
+        if (typeof v === 'string' && v.startsWith('enc:')) return `${k}: [encrypted ${v.length} chars]`;
+        if (typeof v === 'string') return `${k}: "${v.slice(0, 3)}...[${v.length} chars]"`;
+        return `${k}: ${JSON.stringify(v)}`;
+      });
+      logger.info(`apply-settings: found ${settingsKeys.length} settings for project ${projectId}`, { keys: settingsDebug });
+
+      if (settingsKeys.length === 0) {
+        res.json(success(config.nodeId, { applied: 0, message: 'No settings to apply', debug: { settingsRecordExists: !!settingsRec } }));
         return;
       }
 
@@ -390,26 +401,46 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
+      logger.info(`apply-settings: extension ${extensionName} current config keys: ${Object.keys(ext.config).join(', ')}`);
+
       // Decrypt secrets if needed
       const encKey = getEncryptionKey(config);
       const decrypted: Record<string, unknown> = {};
+      const decryptLog: string[] = [];
       for (const [key, val] of Object.entries(settings)) {
         if (typeof val === 'string' && val.startsWith('enc:') && encKey) {
           try {
-            decrypted[key] = decrypt(val, encKey);
-          } catch {
-            decrypted[key] = val; // pass through if decryption fails
+            const plain = decrypt(val, encKey);
+            decrypted[key] = plain;
+            decryptLog.push(`${key}: decrypted OK (${typeof plain === 'string' ? plain.length + ' chars' : typeof plain})`);
+          } catch (err) {
+            // Decryption failed — this means the key is LOST
+            decryptLog.push(`${key}: DECRYPT FAILED — ${(err as Error).message}`);
+            logger.error(`apply-settings: DECRYPT FAILED for key "${key}"`, { error: (err as Error).message });
+            // Do NOT pass through enc: value — it's useless to the extension
           }
         } else {
           decrypted[key] = val;
+          decryptLog.push(`${key}: plain value (${typeof val})`);
         }
       }
+
+      logger.info(`apply-settings: decrypt results`, { results: decryptLog });
 
       // Merge settings into extension config (preserving __schedules and other internal keys)
       const newConfig = { ...ext.config, ...decrypted };
       await storage.updateExtension(extensionName, { config: newConfig });
 
-      res.json(success(config.nodeId, { applied: Object.keys(decrypted).length, keys: Object.keys(decrypted) }));
+      // Log final state (masked)
+      const finalKeys = Object.keys(newConfig).filter(k => !k.startsWith('__'));
+      const finalDebug = finalKeys.map(k => {
+        const v = newConfig[k];
+        if (typeof v === 'string' && v.length > 3) return `${k}: "${v.slice(0, 3)}..."`;
+        return `${k}: ${JSON.stringify(v)}`;
+      });
+      logger.info(`apply-settings: extension ${extensionName} config updated`, { configKeys: finalDebug });
+
+      res.json(success(config.nodeId, { applied: Object.keys(decrypted).length, keys: Object.keys(decrypted), decryptLog }));
     }
   );
 

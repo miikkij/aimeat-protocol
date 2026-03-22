@@ -2618,11 +2618,18 @@ For TRANSLATION tests:
 
 ALL extension calls are POST to /v1/ext/${registeredAs}/{actionId}
 Response envelope: { ok: true, data: { ...action return value... } }
+IMPORTANT: r.body.ok is the AIMEAT envelope — it is ALWAYS true even when the action failed.
+You MUST check r.body.data for the ACTUAL result. The action returns either:
+  - Success: r.body.data.success === true (or has meaningful data fields)
+  - Error: r.body.data.error contains an error message string
+
 API keys and settings ARE configured in ctx.config.
 
-For actions that call external APIs: a test PASSES if the call does NOT crash (no HTTP 500)
-and the response has r.body?.ok === true. Empty data from external APIs is acceptable.
-Only fail if: HTTP 500, or "API key not configured" error.
+## How to check results:
+- MEMORY-ONLY actions (no external API): r.body.data.success MUST be true. If r.body.data.error → FAIL.
+- EXTERNAL API actions: r.body.data.success MUST be true OR r.body.data has meaningful data.
+  If r.body.data.error exists → FAIL (even "API key not configured" or "haku epäonnistui").
+  Empty results from a SUCCESSFUL call are OK, but an error response is NOT OK.
 
 ${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
    Input: ${JSON.stringify(s.input)}
@@ -2703,13 +2710,13 @@ const r1 = await testFetch('/v1/ext/my-service/addItem', {
 if (!r1.ok) errors.push('addItem: HTTP ' + r1.status);
 else if (!r1.body?.data?.success) errors.push('addItem: not successful');
 
-// EXTERNAL API action — accept success OR graceful error (not crash)
+// EXTERNAL API action — check data.error, not just HTTP status
 const r2 = await testFetch('/v1/ext/my-service/fetchData', {
   method: 'POST', body: JSON.stringify({ query: 'test' })
 });
-if (!r2.ok && r2.status === 500) errors.push('fetchData: crashed with 500');
-else if (r2.body?.data?.error && r2.body.data.error.includes('API key')) errors.push('fetchData: API key not configured');
-// Empty results from external API are OK — not a test failure
+if (!r2.ok) errors.push('fetchData: HTTP ' + r2.status);
+else if (r2.body?.data?.error) errors.push('fetchData: ' + r2.body.data.error);
+else if (!r2.body?.data?.success && !r2.body?.data?.results) errors.push('fetchData: no success or data');
 
 return { passed: errors.length === 0, errors, details: 'Tested actions' };`;
 }
