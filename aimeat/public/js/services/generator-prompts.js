@@ -2577,6 +2577,9 @@ return { passed: errors.length === 0, errors, details: 'Tested N actions' };
 
 For EXTENSION tests:
 - ALL extension actions use POST — the backend only has a POST route for /v1/ext/{name}/{actionId}
+- The {actionId} in the URL is the action's "id" field from the YAML manifest, NOT the "path" field
+- Example: if manifest has id: searchSymbol and path: /v1/ext/name/search-symbol, use /v1/ext/name/searchSymbol
+- Do NOT convert action IDs to kebab-case in URLs — use them exactly as-is from the test scenarios above
 - Even if the manifest says method: GET, you MUST use POST with testFetch
 - URL pattern: /v1/ext/{registeredName}/{actionId}
 - NOT /v1/extensions/... — correct path is /v1/ext/{name}/{actionId}

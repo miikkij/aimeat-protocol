@@ -1325,7 +1325,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                 if (!fixed && !autopilotCancelledRef.current) {
                   await writeProjectLog(projectId, 'component_test_gave_up', { meta: { component: comp.label, maxRounds: MAX_FIX, by: 'autopilot' } });
                   showToast?.(`${comp.label}: ${t('profile.generator.test_fix_round')} ${MAX_FIX}`, true);
-                  // Continue to next component — don't block the whole pipeline
+                  // STOP autopilot — downstream components depend on this one working
+                  break;
                 }
 
                 await loadData();
