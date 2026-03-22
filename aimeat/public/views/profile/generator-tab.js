@@ -1151,6 +1151,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
               // Accumulate result into testReport for sidebar indicators
               if (testResult) {
+                // Enrich with label so TestResultsView can show human-readable name
+                testResult.label = comp.label;
                 setTestReport(prev => {
                   const existing = prev || { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
                   const comps = existing.components.filter(c => c.componentId !== comp.id);
@@ -1173,6 +1175,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
                     comp.label + ' — ' + t('profile.generator.openrouter.retrying').replace('{current}', fix + 1).replace('{max}', MAX_FIX)
                   );
                   await writeProjectLog(projectId, 'test_fix_round_start', { meta: { component: comp.label, round: fix + 1, maxRounds: MAX_FIX, by: 'autopilot' } });
+                  updated = { ...updated, history: [...(updated.history || []), { action: 'test_fix_round', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, maxRounds: MAX_FIX }] };
+                  await saveComponent(projectId, updated);
 
                   // FIX 4: Build fix prompt WITH testContext
                   const testContext = {
@@ -1198,6 +1202,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
                   const fixVr = validateComponent(comp.type, content, project.blueprint);
                   if (!fixVr.valid) {
+                    updated = { ...updated, history: [...(updated.history || []), { action: 'test_fix_validation_failed', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, errors: fixVr.errors }] };
+                    await saveComponent(projectId, updated);
                     await writeProjectLog(projectId, 'test_fix_validation_failed', { meta: { component: comp.label, round: fix + 1, errors: fixVr.errors, by: 'autopilot' } });
                     continue;
                   }
@@ -1254,6 +1260,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
                   // Update sidebar indicator with re-test result
                   if (reTestResult) {
+                    reTestResult.label = comp.label;
+                    reTestResult.fixRound = fix + 1;
                     setTestReport(prev => {
                       const existing = prev || { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
                       const comps = existing.components.filter(c => c.componentId !== comp.id);
@@ -1266,15 +1274,25 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
                   if (reTestResult && reTestResult.status !== 'failed') {
                     fixed = true;
+                    updated = { ...updated, testResult: reTestResult, testCode: aiTestCode,
+                      history: [...(updated.history || []), { action: 'test_fixed', at: new Date().toISOString(), by: 'autopilot', round: fix + 1 }],
+                    };
+                    await saveComponent(projectId, updated);
                     await writeProjectLog(projectId, 'component_test_fixed', { meta: { component: comp.label, fixRound: fix + 1, by: 'autopilot' } });
                     showToast?.(`${comp.label}: ${t('profile.generator.test_passed')}`);
                   } else {
                     testResult.errors = reTestResult?.errors || testResult.errors;
+                    updated = { ...updated, testResult: reTestResult || testResult, testCode: aiTestCode,
+                      history: [...(updated.history || []), { action: 'test_fix_still_failing', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, errors: reTestResult?.errors }],
+                    };
+                    await saveComponent(projectId, updated);
                     await writeProjectLog(projectId, 'test_fix_still_failing', { meta: { component: comp.label, round: fix + 1, errors: reTestResult?.errors, by: 'autopilot' } });
                   }
                 }
 
                 if (!fixed && !autopilotCancelledRef.current) {
+                  updated = { ...updated, history: [...(updated.history || []), { action: 'test_gave_up', at: new Date().toISOString(), by: 'autopilot', maxRounds: MAX_FIX }] };
+                  await saveComponent(projectId, updated);
                   await writeProjectLog(projectId, 'component_test_gave_up', { meta: { component: comp.label, maxRounds: MAX_FIX, by: 'autopilot' } });
                   showToast?.(`${comp.label}: ${t('profile.generator.test_fix_round')} ${MAX_FIX}`, true);
                   // STOP autopilot — downstream components depend on this one working
@@ -1390,7 +1408,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, by: 'batch' } });
         } catch (e) {
           await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'batch' } });
-          report.components.push({ componentId: comp.id, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [`Test generation failed: ${e.message}`], screenshots: [], fixRound: 0 });
+          report.components.push({ componentId: comp.id, label: comp.label, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [`Test generation failed: ${e.message}`], screenshots: [], fixRound: 0 });
           continue;
         }
       }
@@ -1401,14 +1419,15 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         const testResp = await runComponentTest(projectId, comp.id, testCode, testEnvironment);
         const testResult = testResp?.data?.result || testResp?.result;
         if (testResult) {
+          testResult.label = comp.label;
           report.components.push(testResult);
           await saveComponent(projectId, { ...comp, testResult });
           await writeProjectLog(projectId, 'component_test_' + testResult.status, { meta: { component: comp.label, errors: testResult.errors, by: 'batch' } });
         } else {
-          report.components.push({ componentId: comp.id, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: ['No test result returned'], screenshots: [], fixRound: 0 });
+          report.components.push({ componentId: comp.id, label: comp.label, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: ['No test result returned'], screenshots: [], fixRound: 0 });
         }
       } catch (e) {
-        report.components.push({ componentId: comp.id, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [e.message], screenshots: [], fixRound: 0 });
+        report.components.push({ componentId: comp.id, label: comp.label, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [e.message], screenshots: [], fixRound: 0 });
         await writeProjectLog(projectId, 'component_test_error', { meta: { component: comp.label, error: e.message, by: 'batch' } });
       }
 
@@ -2005,7 +2024,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             <div class="pf-gen-log-entry">
               <span class="pf-gen-log-time">${new Date(l.at).toLocaleTimeString()}</span>
               <span class="pf-gen-log-comp">[${l.componentLabel}]</span>
-              <span class="pf-gen-log-msg">${l.action}${l.errors ? ': ' + l.errors.join(', ') : ''}</span>
+              <span class="pf-gen-log-msg">${l.action}${l.round ? ' (' + l.round + '/' + (l.maxRounds || '?') + ')' : ''}${l.errors ? ': ' + (Array.isArray(l.errors) ? l.errors.join(', ') : l.errors) : ''}</span>
             </div>
           `)}
         </div>

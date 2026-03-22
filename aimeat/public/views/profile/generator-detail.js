@@ -637,9 +637,12 @@ export function TestResultsView({ report, projectId, onFixRequest }) {
     </div>
     ${(report.components || []).map(c => html`
       <div class="pf-gen-test-component pf-gen-test-${c.status}">
-        <strong>${c.componentId}</strong>
+        <strong>${c.label || c.componentId}</strong>
         <span class="pf-gen-test-badge">${t('profile.generator.test_component_' + c.status)}</span>
-        <span>${c.passed}/${c.scenarios}</span>
+        ${c.fixRound > 0 && html`<span class="pf-gen-test-badge">${t('profile.generator.test_fix_round')} ${c.fixRound}</span>`}
+        ${c.errors && c.errors.length > 0
+          ? html`<span>${c.errors.length} ${t('profile.generator.test_errors_count')}</span>`
+          : html`<span>${c.passed}/${c.scenarios}</span>`}
         ${c.errors && c.errors.length > 0 && html`<ul class="pf-gen-test-errors">
           ${c.errors.map(e => html`<li>${e}</li>`)}
         </ul>`}

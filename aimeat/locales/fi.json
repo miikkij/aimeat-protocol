@@ -1223,6 +1223,7 @@
       "test_fix_manual": "Testaa manuaalisesti",
       "test_fix_skip": "Ohita",
       "test_fix_round": "Korjauskierros",
+      "test_errors_count": "virhettä",
       "test_component_passed": "Läpäisty",
       "test_component_failed": "Epäonnistunut",
       "test_component_skipped": "Ohitettu",

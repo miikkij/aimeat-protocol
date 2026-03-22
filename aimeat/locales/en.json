@@ -1223,6 +1223,7 @@
       "test_fix_manual": "Test manually",
       "test_fix_skip": "Skip",
       "test_fix_round": "Fix round",
+      "test_errors_count": "errors",
       "test_component_passed": "Passed",
       "test_component_failed": "Failed",
       "test_component_skipped": "Skipped",
