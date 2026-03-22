@@ -246,22 +246,19 @@ export async function cleanupScreenshots(projectId: string): Promise<void> {
 
 /* ── Playwright Helpers ────────────────────────────────────────────── */
 
-const PLAYWRIGHT_MODULE = 'playwright';
+const PLAYWRIGHT_MODULE = '@playwright/test';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadPlaywright(): Promise<any> {
   return import(PLAYWRIGHT_MODULE);
 }
 
-let playwrightAvailable: boolean | null = null;
-
 export async function isPlaywrightAvailable(): Promise<boolean> {
-  if (playwrightAvailable !== null) return playwrightAvailable;
+  // Check every time — don't cache, playwright may be installed after server start
   try {
     await loadPlaywright();
-    playwrightAvailable = true;
+    return true;
   } catch {
-    playwrightAvailable = false;
+    return false;
   }
-  return playwrightAvailable;
 }

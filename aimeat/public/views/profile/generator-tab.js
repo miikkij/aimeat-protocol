@@ -2798,6 +2798,7 @@ function OpenRouterSettings({ onSettingsChange }) {
             <label class="pf-gen-or-label">${t('profile.generator.openrouter.apiKey')}</label>
             <input
               type="password"
+              autocomplete="off" data-1p-ignore data-lpignore="true"
               class="pf-gen-or-input"
               placeholder=${hasApiKey ? t('profile.generator.openrouter.apiKeyMasked') : t('profile.generator.openrouter.apiKeyPlaceholder')}
               value=${apiKey}
@@ -2938,6 +2939,7 @@ function SettingsCollectionView({ project, blueprint, onComplete, showToast }) {
         ${s.required ? html` <span class="pf-gen-required">*</span>` : ''}
       </label>
       <input type=${s.type === 'secret' ? 'password' : s.type === 'number' ? 'number' : 'text'}
+        autocomplete="off" data-1p-ignore data-lpignore="true"
         value=${values[s.key] || s.default || ''}
         placeholder=${s.default ? String(s.default) : ''}
         onInput=${e => setValues(prev => ({ ...prev, [s.key]: e.target.value }))} />
