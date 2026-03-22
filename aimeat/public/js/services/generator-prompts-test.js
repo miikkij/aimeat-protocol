@@ -162,14 +162,28 @@ The action can return ANY shape — there is no mandatory "success" or "error" f
 Look at the Component Code above to see what each action actually returns.
 
 - For ALL actions: FAIL if HTTP status is 500 (extension crashed).
-- For MEMORY-ONLY actions: check that the response data matches what the action code returns on success. Read the action code to know the expected shape.
-- For EXTERNAL API actions: the extension may return an error message if the third-party API refused the call (403, 429, etc). This is CORRECT behavior — the extension handled it gracefully. Only FAIL if HTTP 500.
+- For MEMORY-ONLY actions (type: "memory"): check that the response data matches what the action code returns on success. Read the action code to know the expected shape.
+- For EXTERNAL API actions (type: "external-api"): the extension calls a third-party API that may be down, rate-limited, or return errors.
+  ╔═══════════════════════════════════════════════════════════════════════════════╗
+  ║  CRITICAL: For external-api actions, NEVER assert specific data values.     ║
+  ║  The external API may be unreachable. A graceful error response from the    ║
+  ║  extension is CORRECT behavior — it means the code handled the API error.   ║
+  ║  PASS if: HTTP is not 500 AND response has valid shape (data OR error msg). ║
+  ║  FAIL only if: HTTP 500 (crash) OR response body is completely empty/null.  ║
+  ║  The "Expected" descriptions below are IDEAL outcomes — they show what the  ║
+  ║  action SHOULD do when the API works. Do NOT hard-assert them.              ║
+  ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
+${scenarios.map((s, i) => {
+      const typeTag = s.type === 'external-api' ? ' [EXTERNAL API]' : ' [MEMORY]';
+      return `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}${typeTag}
    Input: ${JSON.stringify(s.input)}
-   Expected: ${s.expect}`).join('\n\n')}
+   Expected: ${s.expect}`;
+    }).join('\n\n')}
 
-Test EVERY scenario above. Use the EXACT action names shown.\n`;
+Test EVERY scenario above. Use the EXACT action names shown.
+For [EXTERNAL API] scenarios: check response shape only, do NOT assert specific values.
+For [MEMORY] scenarios: assert actual return values match the expected behavior.\n`;
     }
 
     if (componentType === 'cortex' && scenarios.length > 0) {
@@ -232,24 +246,37 @@ ${testEnvDoc}
 const errors = [];
 // ALL extension calls use POST. Response: { ok: true, data: { ...action return... } }
 
-// MEMORY-ONLY action — MUST succeed
+// [MEMORY] action — MUST succeed with expected data
 const r0 = await testFetch('/v1/ext/my-service/init', { method: 'POST', body: JSON.stringify({}) });
 if (!r0.ok) errors.push('init: HTTP ' + r0.status);
-else if (!r0.body?.data?.success) errors.push('init: no success');
+else if (!r0.body?.data?.initialized) errors.push('init: not initialized');
 
-// MEMORY-ONLY action — MUST succeed
+// [MEMORY] action — MUST succeed, assert actual values
 const r1 = await testFetch('/v1/ext/my-service/addItem', {
   method: 'POST', body: JSON.stringify({ name: 'Test' })
 });
 if (!r1.ok) errors.push('addItem: HTTP ' + r1.status);
 else if (!r1.body?.data?.success) errors.push('addItem: not successful');
 
-// EXTERNAL API action — must not crash (HTTP 500); graceful errors are acceptable
+// [EXTERNAL API] action — check shape only, NOT specific values
+// The external API may be down or return errors — that's fine if handled gracefully
 const r2 = await testFetch('/v1/ext/my-service/fetchData', {
   method: 'POST', body: JSON.stringify({ query: 'test' })
 });
 if (r2.status === 500) errors.push('fetchData: crashed with HTTP 500');
-// r.body.data.error with a message is OK — extension handled the third-party error gracefully
+else {
+  const d = r2.body?.data;
+  if (d === undefined || d === null) errors.push('fetchData: no response data at all');
+  // d.error is OK (API returned error, extension handled it) — do NOT push error
+  // d.results is OK (API worked) — do NOT assert specific result values
+}
+
+// [MEMORY] error handling — MUST return proper error
+const r3 = await testFetch('/v1/ext/my-service/addItem', {
+  method: 'POST', body: JSON.stringify({})
+});
+if (r3.status === 500) errors.push('addItem(empty): crashed');
+else if (!r3.body?.data?.error) errors.push('addItem(empty): no error message for invalid input');
 
 return { passed: errors.length === 0, errors, details: 'Tested actions' };`;
 }

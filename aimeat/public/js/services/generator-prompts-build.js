@@ -264,11 +264,21 @@ For each component that produces data, generate test scenarios:
       {
         "action": "action-name",
         "input": { "key": "value" },
-        "expect": "natural language description of expected result"
+        "expect": "natural language description of expected result",
+        "type": "memory | external-api"
       }
     ]
   }
 ]
+
+IMPORTANT — classify each scenario's "type":
+- "memory": action uses ONLY ctx.memory (no ctx.fetch to external URLs). Tests MUST assert specific return values.
+- "external-api": action calls ctx.fetch to a third-party API. Tests check response SHAPE only (has data OR error message), because the external API may be down or rate-limited. Graceful error handling is correct behavior.
+
+Examples:
+  { "action": "init", "input": {}, "expect": "Initializes data structures", "type": "memory" }
+  { "action": "searchCompanies", "input": { "query": "Nokia" }, "expect": "Returns matching companies from PRH API", "type": "external-api" }
+  { "action": "removeFromWatchlist", "input": { "businessId": "123" }, "expect": "Removes entry from memory", "type": "memory" }
 
 Be concrete: use real-world example values (e.g., symbol "AAPL" for stock data, city "Helsinki" for weather).
 Test the happy path — the test system handles error paths.

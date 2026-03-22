@@ -288,6 +288,16 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                     continue;
                   }
 
+                  // Deactivate before re-registering to ensure clean state
+                  if (comp.type === 'extension' || comp.type === 'cortex') {
+                    try {
+                      const deactUrl = comp.type === 'extension'
+                        ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/deactivate`
+                        : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}/deactivate`;
+                      await apiPost(deactUrl);
+                    } catch { /* may not be active */ }
+                  }
+
                   // Re-register fixed version
                   updated = { ...updated, result: content, status: 'done', validationErrors: [] };
                   await saveComponent(projectId, updated);
