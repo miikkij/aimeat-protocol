@@ -55,15 +55,13 @@ import { apiGet, apiPost } from '/js/api.js';
 import {
   listProjects, getProject, createProject, updateProject, deleteProject, archiveProject,
   loadAllComponents, saveComponent,
-  registerComponent,
   saveInterviewSpec, getInterviewSpec,
   getAppLaunchUrl,
   writeProjectLog,
 } from '/js/services/generator.js';
-import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildTestPrompt, buildInterviewPrompt } from '/js/services/generator-prompts.js';
+import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildInterviewPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
 import { useConfirm } from '/components/Modal.js';
-import { runComponentTest } from '/js/services/generator-testing.js';
 import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
 import { ComponentDetail, TestScopeSelector, TestResultsView, runWithAi, stripCodeblock } from './generator-detail.js';
 import { usePackaging } from './generator-dashboard/use-packaging.js';
@@ -75,6 +73,7 @@ import { useDashboardCore } from './generator-dashboard/use-dashboard-core.js';
 import { useTestExecution } from './generator-dashboard/use-test-execution.js';
 import { useEditMode } from './generator-dashboard/use-edit-mode.js';
 import { EditModePanel } from './generator-dashboard/EditModePanel.js';
+import { useAutopilot } from './generator-dashboard/use-autopilot.js';
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -489,6 +488,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   // Edit mode (hook-per-domain)
   const edit = useEditMode(core, autopilotState, projectId, orSettings, session, showToast);
 
+  // Autopilot (hook-per-domain)
+  const autopilot = useAutopilot(core, autopilotState, projectId, orSettings, session, testExec, showToast);
+
   // Phase 7: Diagnostics state
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
@@ -550,351 +552,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   // Compute phase-ordered component list for auto-advance
   const phaseOrder = phases.flatMap(p => p.componentIds || []);
-
-  // Autopilot: Run all remaining steps
-  async function handleRunAll() {
-    if (!orSettings?.hasApiKey || autopilotState.running) return;
-    autopilotState.start();
-
-    try {
-      // Iterate through all components in phase order
-      for (const cid of phaseOrder) {
-        if (autopilotState.cancelledRef.current) break;
-        // IMPORTANT: always fetch fresh state from API, not from closure (which is stale after loadData)
-        const freshComps = await loadAllComponents(projectId);
-        const comp = freshComps.find(c => c.id === cid);
-        if (!comp || comp.registeredAs) continue; // skip already registered
-
-        autopilotState.setStep(comp.label);
-        setSelectedId(cid);
-
-        // Build prompt
-        const latestComps = await loadAllComponents(projectId);
-        const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
-        const prompt = buildComponentPrompt(
-          comp.type, comp.label,
-          project.description, project.blueprint, completedComponents,
-          interviewSpec,
-        );
-
-        // Run AI
-        let content;
-        try {
-          content = await runWithAi(projectId, prompt);
-        } catch (e) {
-          showToast?.(`${comp.label}: ${e.message}`, true);
-          break;
-        }
-        if (autopilotState.cancelledRef.current) break;
-        // Strip codeblock wrappers for extensions (AI models often wrap in ```)
-        if (comp.type === 'extension') content = stripCodeblock(content);
-
-        // Save result
-        let updated = { ...comp, result: content, status: 'validating', prompt,
-          history: [...(comp.history || []), { action: 'ai_response_received', at: new Date().toISOString(), by: 'autopilot' }],
-        };
-        await saveComponent(projectId, updated);
-
-        // Validate
-        let vr = validateComponent(comp.type, content, project.blueprint);
-
-        // Auto-retry if enabled
-        if (!vr.valid && orSettings?.autoRetry) {
-          const max = orSettings.maxRetries || 3;
-          for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
-            if (autopilotState.cancelledRef.current) break;
-            autopilotState.setStep(
-              comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
-            );
-            const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
-            try {
-              content = await runWithAi(projectId, fixPrompt);
-            } catch (e) {
-              showToast?.(`${comp.label}: ${e.message}`, true);
-              break;
-            }
-            vr = validateComponent(comp.type, content, project.blueprint);
-          }
-        }
-
-        if (!vr.valid) {
-          updated = { ...updated, result: content, status: 'errors', validationErrors: vr.errors,
-            history: [...updated.history, { action: 'validation_failed', at: new Date().toISOString(), by: 'autopilot', errors: vr.errors }],
-          };
-          await saveComponent(projectId, updated);
-          await loadData();
-          showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
-          break;
-        }
-        if (autopilotState.cancelledRef.current) break;
-
-        // Validation passed — save and register
-        updated = { ...updated, result: content, status: 'done', validationErrors: [],
-          history: [...updated.history, { action: 'validation_passed', at: new Date().toISOString(), by: 'autopilot' }],
-        };
-        await saveComponent(projectId, updated);
-
-        // Register component
-        try {
-          const extComp = (await loadAllComponents(projectId)).find(c => c.type === 'extension' && c.registeredAs);
-          const csmComp = (await loadAllComponents(projectId)).find(c => c.type === 'csm' && c.registeredAs);
-          const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
-
-          let resp;
-          if (comp.type === 'cortex') {
-            const cortexVr = validateComponent('cortex', content, project.blueprint);
-            resp = await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
-          } else {
-            resp = await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
-          }
-          const d = resp?.data || {};
-          const regName = d.csm?.name || d.integration?.name || d.extension?.name
-            || d.filename || d.name || d.id
-            || (d.locales ? `i18n-${d.locales.join('-')}` : null)
-            || (d.keys?.length ? `memory:${d.keys[d.keys.length - 1]}` : null)
-            || null;
-          if (regName) {
-            updated = { ...updated, registeredAs: regName,
-              history: [...updated.history, { action: 'registered', at: new Date().toISOString(), by: 'autopilot', registeredAs: regName }],
-            };
-            await saveComponent(projectId, updated);
-            await writeProjectLog(projectId, 'component_registered', { meta: { component: comp.label, registeredAs: regName, by: 'autopilot' } });
-          }
-        } catch (e) {
-          const errMsg = e.message || String(e);
-          showToast?.(`${comp.label}: Registration failed: ${errMsg}`, true);
-          await writeProjectLog(projectId, 'component_registration_failed', { meta: { component: comp.label, type: comp.type, error: errMsg, by: 'autopilot' } });
-          await loadData();
-          break;
-        }
-
-        await loadData();
-
-        // Apply project settings to extension config (API keys, etc.) + activate
-        if ((comp.type === 'extension' || comp.type === 'cortex') && updated.registeredAs) {
-          // Inject project settings into extension config before activation
-          if (comp.type === 'extension') {
-            try {
-              await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
-              await writeProjectLog(projectId, 'settings_applied', { meta: { component: comp.label, registeredAs: updated.registeredAs, by: 'autopilot' } });
-            } catch (e) {
-              await writeProjectLog(projectId, 'settings_apply_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
-            }
-          }
-          try {
-            const activateUrl = comp.type === 'extension'
-              ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/activate`
-              : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}/activate`;
-            await apiPost(activateUrl);
-            await writeProjectLog(projectId, 'component_activated', { meta: { component: comp.label, registeredAs: updated.registeredAs, by: 'autopilot' } });
-          } catch (e) {
-            await writeProjectLog(projectId, 'component_activation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
-          }
-        }
-
-        // Per-component test immediately after registration (prompt-driven: AI generates test code)
-        if (!autopilotState.cancelledRef.current && testScope !== 'none') {
-          const testableTypes = ['extension', 'cortex', 'app'];
-          if (testableTypes.includes(comp.type)) {
-            // Step 1: AI generates the test code
-            autopilotState.setStep(comp.label + ' — ' + t('profile.generator.test_generating'));
-            await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'autopilot' } });
-            const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
-            let aiTestCode;
-            let testPromptText;
-            try {
-              testPromptText = buildTestPrompt(
-                comp.type, content, comp.label, updated.registeredAs,
-                project.blueprint, interviewSpec
-              );
-              await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
-              aiTestCode = await runWithAi(projectId, testPromptText);
-              // Strip markdown code fences if AI wraps the response
-              aiTestCode = stripCodeblock(aiTestCode);
-              // Save test prompt and test code to the component record
-              updated = { ...updated, testPrompt: testPromptText, testCode: aiTestCode, testEnvironment,
-                history: [...(updated.history || []), { action: 'test_code_generated', at: new Date().toISOString(), by: 'autopilot' }],
-              };
-              await saveComponent(projectId, updated);
-              await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, codeLength: aiTestCode.length, by: 'autopilot' } });
-            } catch (e) {
-              await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
-              showToast?.(`${comp.label}: Test generation failed: ${e.message}`, true);
-              await loadData();
-              continue; // Skip testing, move to next component
-            }
-            if (autopilotState.cancelledRef.current) break;
-
-            // Step 2: Execute the AI-generated test code
-            autopilotState.setStep(comp.label + ' — ' + t('profile.generator.test_running'));
-            await writeProjectLog(projectId, 'test_executing', { meta: { component: comp.label, environment: testEnvironment, by: 'autopilot' } });
-            try {
-              const testResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
-              const testResult = testResp?.data?.result || testResp?.result;
-
-              // Save test result to the component record
-              if (testResult) {
-                updated = { ...updated, testResult,
-                  history: [...(updated.history || []), { action: 'test_' + testResult.status, at: new Date().toISOString(), by: 'autopilot', errors: testResult.errors }],
-                };
-                await saveComponent(projectId, updated);
-              }
-
-              // Accumulate result into testReport for sidebar indicators
-              if (testResult) {
-                testExec.pushTestResult(comp.id, comp.label, testResult);
-              }
-
-              if (testResult && testResult.status === 'failed') {
-                await writeProjectLog(projectId, 'component_test_failed', { meta: { component: comp.label, errors: testResult.errors, by: 'autopilot' } });
-                showToast?.(`${comp.label}: ${t('profile.generator.test_failed')}`, true);
-
-                // Per-component fix loop (max 3 rounds)
-                const MAX_FIX = 3;
-                let fixed = false;
-                for (let fix = 0; fix < MAX_FIX && !fixed && !autopilotState.cancelledRef.current; fix++) {
-                  autopilotState.setStep(
-                    comp.label + ' — ' + t('profile.generator.openrouter.retrying').replace('{current}', fix + 1).replace('{max}', MAX_FIX)
-                  );
-                  await writeProjectLog(projectId, 'test_fix_round_start', { meta: { component: comp.label, round: fix + 1, maxRounds: MAX_FIX, by: 'autopilot' } });
-                  updated = { ...updated, history: [...(updated.history || []), { action: 'test_fix_round', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, maxRounds: MAX_FIX }] };
-                  await saveComponent(projectId, updated);
-
-                  // FIX 4: Build fix prompt WITH testContext
-                  const testContext = {
-                    errors: testResult.errors,
-                    dependencyResults: (testReport?.components || [])
-                      .filter(c => c.componentId !== comp.id && c.status === 'passed')
-                      .map(c => ({ componentId: c.componentId, status: c.status })),
-                    blueprintComponent: project.blueprint?.components?.find(c => c.label === comp.label) || null,
-                  };
-                  const fixPrompt = buildFixPrompt(prompt, content, [
-                    ...(vr.errors || []),
-                    ...testResult.errors.map(e => `TEST FAILURE: ${e}`),
-                  ], comp.type, testContext);
-
-                  try {
-                    content = await runWithAi(projectId, fixPrompt);
-                  } catch (e) {
-                    showToast?.(`${comp.label}: ${e.message}`, true);
-                    await writeProjectLog(projectId, 'test_fix_ai_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
-                    break;
-                  }
-                  if (autopilotState.cancelledRef.current) break;
-
-                  const fixVr = validateComponent(comp.type, content, project.blueprint);
-                  if (!fixVr.valid) {
-                    updated = { ...updated, history: [...(updated.history || []), { action: 'test_fix_validation_failed', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, errors: fixVr.errors }] };
-                    await saveComponent(projectId, updated);
-                    await writeProjectLog(projectId, 'test_fix_validation_failed', { meta: { component: comp.label, round: fix + 1, errors: fixVr.errors, by: 'autopilot' } });
-                    continue;
-                  }
-
-                  // Re-register fixed version
-                  updated = { ...updated, result: content, status: 'done', validationErrors: [] };
-                  await saveComponent(projectId, updated);
-
-                  try {
-                    const extComp2 = (await loadAllComponents(projectId)).find(c => c.type === 'extension' && c.registeredAs);
-                    const csmComp2 = (await loadAllComponents(projectId)).find(c => c.type === 'csm' && c.registeredAs);
-                    const slug2 = extComp2?.registeredAs || csmComp2?.registeredAs?.split('/')?.pop() || '';
-                    if (comp.type === 'cortex') {
-                      const cvr = validateComponent('cortex', content, project.blueprint);
-                      await registerComponent('cortex', cvr.extracted, session, slug2);
-                    } else {
-                      await registerComponent(comp.type, fixVr.extracted || content, session, slug2);
-                    }
-                    await writeProjectLog(projectId, 'test_fix_reregistered', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
-
-                    // FIX 5: Re-apply settings after re-register (config was lost)
-                    if (comp.type === 'extension') {
-                      await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
-                    }
-
-                    // Re-activate after re-register + apply-settings
-                    if (comp.type === 'extension' || comp.type === 'cortex') {
-                      const actUrl = comp.type === 'extension'
-                        ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/activate`
-                        : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}/activate`;
-                      await apiPost(actUrl);
-                    }
-                  } catch (e) {
-                    showToast?.(`${comp.label}: Re-register failed: ${e.message}`, true);
-                    await writeProjectLog(projectId, 'test_fix_reregister_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
-                    continue;
-                  }
-
-                  // FIX 6: Regenerate test code for the fixed component (old test may be invalid)
-                  await writeProjectLog(projectId, 'test_fix_regenerating_test', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
-                  try {
-                    const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec);
-                    let newTestCode = await runWithAi(projectId, newTestPrompt);
-                    newTestCode = stripCodeblock(newTestCode);
-                    aiTestCode = newTestCode;
-                  } catch (e) {
-                    await writeProjectLog(projectId, 'test_fix_regen_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
-                    // Fall back to original test code if regeneration fails
-                  }
-
-                  await writeProjectLog(projectId, 'test_fix_retesting', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
-                  const reTestResp = await runComponentTest(projectId, comp.id, aiTestCode, testEnvironment);
-                  const reTestResult = reTestResp?.data?.result || reTestResp?.result;
-
-                  // Update sidebar indicator with re-test result
-                  if (reTestResult) {
-                    reTestResult.fixRound = fix + 1;
-                    testExec.pushTestResult(comp.id, comp.label, reTestResult);
-                  }
-
-                  if (reTestResult && reTestResult.status !== 'failed') {
-                    fixed = true;
-                    updated = { ...updated, testResult: reTestResult, testCode: aiTestCode,
-                      history: [...(updated.history || []), { action: 'test_fixed', at: new Date().toISOString(), by: 'autopilot', round: fix + 1 }],
-                    };
-                    await saveComponent(projectId, updated);
-                    await writeProjectLog(projectId, 'component_test_fixed', { meta: { component: comp.label, fixRound: fix + 1, by: 'autopilot' } });
-                    showToast?.(`${comp.label}: ${t('profile.generator.test_passed')}`);
-                  } else {
-                    testResult.errors = reTestResult?.errors || testResult.errors;
-                    updated = { ...updated, testResult: reTestResult || testResult, testCode: aiTestCode,
-                      history: [...(updated.history || []), { action: 'test_fix_still_failing', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, errors: reTestResult?.errors }],
-                    };
-                    await saveComponent(projectId, updated);
-                    await writeProjectLog(projectId, 'test_fix_still_failing', { meta: { component: comp.label, round: fix + 1, errors: reTestResult?.errors, by: 'autopilot' } });
-                  }
-                }
-
-                if (!fixed && !autopilotState.cancelledRef.current) {
-                  updated = { ...updated, history: [...(updated.history || []), { action: 'test_gave_up', at: new Date().toISOString(), by: 'autopilot', maxRounds: MAX_FIX }] };
-                  await saveComponent(projectId, updated);
-                  await writeProjectLog(projectId, 'component_test_gave_up', { meta: { component: comp.label, maxRounds: MAX_FIX, by: 'autopilot' } });
-                  showToast?.(`${comp.label}: ${t('profile.generator.test_fix_round')} ${MAX_FIX}`, true);
-                  // STOP autopilot — downstream components depend on this one working
-                  break;
-                }
-
-                await loadData();
-              } else if (testResult) {
-                await writeProjectLog(projectId, 'component_test_passed', { meta: { component: comp.label, by: 'autopilot' } });
-              } else {
-                await writeProjectLog(projectId, 'component_test_no_result', { meta: { component: comp.label, response: JSON.stringify(testResp).slice(0, 200), by: 'autopilot' } });
-              }
-            } catch (e) {
-              // Test execution failed — log but continue
-              await writeProjectLog(projectId, 'component_test_error', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
-              showToast?.(`${comp.label}: Test error: ${e.message}`, true);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
-
-    autopilotState.finish();
-    await loadData();
-  }
-
 
   // Phase 7: Diagnostics data
   const diagnosticsData = components.map(c => {
@@ -974,7 +631,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               </button>
             `
             : html`
-              <button class="btn-primary btn-sm" onClick=${handleRunAll}
+              <button class="btn-primary btn-sm" onClick=${autopilot.handleRunAll}
                 disabled=${components.every(c => c.registeredAs)}>
                 ${t('profile.generator.openrouter.runAll')}
               </button>
