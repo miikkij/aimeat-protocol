@@ -380,6 +380,11 @@ The user describes WHAT they want and WHY. The generator decides HOW.
 
       For VERIFIED sources:
         - Capture at least ONE real sample entry in the spec
+        - CRITICAL: Also capture the response ENVELOPE — the top-level JSON structure that wraps the entries.
+          Example: if the API returns {"totalResults": 1, "companies": [...]}, the envelope is:
+          {"totalResults": "number", "companies": "array of company objects"}
+          Put this in the "responseEnvelope" field. This prevents the extension generator from guessing
+          wrong field names (e.g., using "results" when the API returns "companies").
         - Note non-obvious characteristics: encoding declaration, nested structures,
           timestamps with ambiguous formats, mixed-language content
         - NEVER generate parsing code based on assumed format — you need real evidence
@@ -482,6 +487,7 @@ The user describes WHAT they want and WHY. The generator decides HOW.
       "format": "xml|json|html|csv|unknown",
       "encoding": "utf-8|iso-8859-1|auto",
       "sampleEntry": "One raw entry from the source, copy-pasted exactly as-is",
+      "responseEnvelope": "For API/RSS sources: describe the top-level response structure that WRAPS the entries. Example for REST API: { \"totalResults\": \"number\", \"companies\": \"array of company objects\" }. Example for RSS: { \"channel\": { \"item\": \"array of items\" } }. This tells the extension generator which field name to use when accessing the results array (e.g., response.companies, not response.results). CRITICAL for correct parsing.",
       "staticData": "For type 'user-input' ONLY: the COMPLETE dataset as an array of {key, value} objects. Include EVERY row the user provided, parsed into clean JSON. Example: [{ \"key\": \"Item A\", \"value\": { \"score\": 42.5, \"status\": \"active\" } }]. Omit this field for non-user-input sources.",
       "updateFrequency": "realtime|minutes|hourly|daily|on-demand",
       "sampleFields": ["field1", "field2"],
@@ -722,7 +728,11 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     for (const ds of interviewSpec.dataSources) {
       context += `- **${ds.name}** (${ds.type}): ${ds.url || 'user-input'}\n`;
       if (ds.encoding) context += `  Encoding: ${ds.encoding}\n`;
-      if (ds.sampleEntry) context += `  Sample entry (REAL DATA — write your parser against this):\n  \`\`\`\n  ${ds.sampleEntry}\n  \`\`\`\n`;
+      if (ds.responseEnvelope) {
+        context += `  Response envelope (top-level JSON structure): \`${typeof ds.responseEnvelope === 'string' ? ds.responseEnvelope : JSON.stringify(ds.responseEnvelope)}\`\n`;
+        context += `  ⚠️ Use the EXACT field names from this envelope to access the results array. Do NOT guess field names like "results" or "data" — use what the API actually returns.\n`;
+      }
+      if (ds.sampleEntry) context += `  Sample entry (ONE item from the results array — write your parser against this):\n  \`\`\`\n  ${ds.sampleEntry}\n  \`\`\`\n`;
       if (ds.staticData && Array.isArray(ds.staticData)) {
         context += `  **STATIC DATA (${ds.staticData.length} entries) — pre-loaded in OWNER memory. Read with ctx.memory.getPublic(ctx.caller.owner, key), do NOT re-create it.**\n`;
       }
