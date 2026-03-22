@@ -57,7 +57,7 @@ import {
   loadAllComponents, saveComponent,
   registerComponent, cleanupOldEntries,
   saveInterviewSpec, getInterviewSpec,
-  getComponentStatuses, activateAll, deactivateAll, removeComponents, reregisterComponent, getAppLaunchUrl,
+  getComponentStatuses, getAppLaunchUrl,
   writeProjectLog,
   savePendingEdit, getPendingEdit, clearPendingEdit,
 } from '/js/services/generator.js';
@@ -69,6 +69,8 @@ import { OpenRouterSettings, SettingsCollectionView } from './generator-settings
 import { ComponentDetail, TestScopeSelector, TestResultsView, runWithAi, stripCodeblock, cancelAiRequest } from './generator-detail.js';
 import { usePackaging } from './generator-dashboard/use-packaging.js';
 import { PackageDialog } from './generator-dashboard/PackageDialog.js';
+import { useLifecycle } from './generator-dashboard/use-lifecycle.js';
+import { RemovePanel } from './generator-dashboard/RemovePanel.js';
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -481,11 +483,10 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
   // Phase 5: Lifecycle state
   const [liveStatuses, setLiveStatuses] = useState({});
-  const [lifecycleLoading, setLifecycleLoading] = useState(null); // 'activate' | 'deactivate' | null
-  const [showRemovePanel, setShowRemovePanel] = useState(false);
-  const [removeSelection, setRemoveSelection] = useState({});
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [removeMemory, setRemoveMemory] = useState(false);
+
+  // Lifecycle (hook-per-domain) — needs refreshStatuses/loadData passed via core-like object
+  const lifecycleCore = { loadData, refreshStatuses: () => refreshStatuses() };
+  const lifecycle = useLifecycle(lifecycleCore, projectId, showToast, session);
 
   // Phase 6: Edit service state
   const [aiRunning, setAiRunning] = useState(null); // null | 'impact'
@@ -574,55 +575,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   }
 
   useEffect(() => { if (project) refreshStatuses(); }, [project]);
-
-  async function handleActivateAll() {
-    setLifecycleLoading('activate');
-    try {
-      const result = await activateAll(projectId);
-      if (result.errors.length > 0) {
-        showToast?.(t('profile.generator.activatedWithErrors').replace('{count}', result.activated.length).replace('{errors}', result.errors.length), true);
-      } else {
-        showToast?.(t('profile.generator.activatedCount').replace('{count}', result.activated.length));
-      }
-      await writeProjectLog(projectId, 'all_activated');
-      await refreshStatuses();
-    } catch (e) { showToast?.(e.message, true); }
-    setLifecycleLoading(null);
-  }
-
-  async function handleDeactivateAll() {
-    setLifecycleLoading('deactivate');
-    try {
-      const result = await deactivateAll(projectId);
-      if (result.errors.length > 0) {
-        showToast?.(t('profile.generator.deactivatedWithErrors').replace('{count}', result.deactivated.length).replace('{errors}', result.errors.length), true);
-      } else {
-        showToast?.(t('profile.generator.deactivatedCount').replace('{count}', result.deactivated.length));
-      }
-      await writeProjectLog(projectId, 'all_deactivated');
-      await refreshStatuses();
-    } catch (e) { showToast?.(e.message, true); }
-    setLifecycleLoading(null);
-  }
-
-  async function handleRemoveConfirmed() {
-    const ids = Object.entries(removeSelection).filter(([, v]) => v).map(([k]) => k);
-    if (ids.length === 0) return;
-    setLifecycleLoading('remove');
-    try {
-      const result = await removeComponents(projectId, ids, removeMemory, session);
-      if (result.errors.length > 0) {
-        showToast?.(t('profile.generator.removedWithErrors').replace('{count}', result.removed.length).replace('{errors}', result.errors.length), true);
-      } else {
-        showToast?.(t('profile.generator.removedCount').replace('{count}', result.removed.length));
-      }
-      setShowRemovePanel(false);
-      setRemoveSelection({});
-      await loadData();
-      await refreshStatuses();
-    } catch (e) { showToast?.(e.message, true); }
-    setLifecycleLoading(null);
-  }
 
   async function handleNameSave() {
     const trimmed = nameDraft.trim();
@@ -1574,14 +1526,14 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
           </div>
           <div class="pf-gen-lifecycle-actions">
             <button class="btn-success btn-sm"
-              onClick=${handleActivateAll}
-              disabled=${lifecycleLoading !== null || registeredCount === 0}>
-              ${lifecycleLoading === 'activate' ? '...' : t('profile.generator.activateAll')}
+              onClick=${lifecycle.handleActivateAll}
+              disabled=${lifecycle.lifecycleLoading !== null || registeredCount === 0}>
+              ${lifecycle.lifecycleLoading === 'activate' ? '...' : t('profile.generator.activateAll')}
             </button>
             <button class="btn-outline btn-sm"
-              onClick=${handleDeactivateAll}
-              disabled=${lifecycleLoading !== null || activeCount === 0}>
-              ${lifecycleLoading === 'deactivate' ? '...' : t('profile.generator.deactivateAll')}
+              onClick=${lifecycle.handleDeactivateAll}
+              disabled=${lifecycle.lifecycleLoading !== null || activeCount === 0}>
+              ${lifecycle.lifecycleLoading === 'deactivate' ? '...' : t('profile.generator.deactivateAll')}
             </button>
             ${hasApp && html`
               <button class="btn-primary btn-sm" onClick=${handleLaunchApp}>
@@ -1595,16 +1547,16 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
               ${editMode ? t('profile.generator.cancelEdit') : t('profile.generator.editService')}
             </button>
             ${project?.blueprint?.settings && html`
-              <button class="btn-ghost btn-sm" onClick=${() => setShowSettingsPanel(!showSettingsPanel)}>
-                ${showSettingsPanel ? t('profile.generator.hideSettings') : t('profile.generator.editSettings')}
+              <button class="btn-ghost btn-sm" onClick=${() => lifecycle.setShowSettingsPanel(!lifecycle.showSettingsPanel)}>
+                ${lifecycle.showSettingsPanel ? t('profile.generator.hideSettings') : t('profile.generator.editSettings')}
               </button>
             `}
             <button class="btn-ghost btn-sm" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
               ${showDiagnostics ? t('profile.generator.hideDiagnostics') : t('profile.generator.diagnostics')}
             </button>
             <button class="btn-outline btn-sm pf-gen-remove-toggle"
-              onClick=${() => { setShowRemovePanel(!showRemovePanel); setRemoveSelection({}); }}>
-              ${showRemovePanel ? t('profile.generator.cancelRemove') : t('profile.generator.removeEllipsis')}
+              onClick=${() => { lifecycle.setShowRemovePanel(!lifecycle.showRemovePanel); lifecycle.setRemoveSelection({}); }}>
+              ${lifecycle.showRemovePanel ? t('profile.generator.cancelRemove') : t('profile.generator.removeEllipsis')}
             </button>
             ${doneCount > 0 && html`
               <button class="btn-info btn-sm"
@@ -1623,35 +1575,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       ${pkg.showDialog && html`<${PackageDialog} project=${project} pkg=${pkg} />`}
 
       <!-- Phase 5: Remove Panel -->
-      ${showRemovePanel && html`
-        <div class="pf-gen-remove-panel">
-          <p class="pf-gen-remove-heading">${t('profile.generator.removeSelectLabel')}</p>
-          <div class="pf-gen-remove-list">
-            ${components.filter(c => c.registeredAs).map(c => html`
-              <label class="pf-gen-remove-item">
-                <input type="checkbox"
-                  checked=${!!removeSelection[c.id]}
-                  onChange=${e => setRemoveSelection({ ...removeSelection, [c.id]: e.target.checked })}
-                />
-                <span>${c.label}</span>
-                <span class="pf-gen-type-badge type-${c.type}">${c.type}</span>
-                <span class="pf-gen-remove-name">${c.registeredAs}</span>
-              </label>
-            `)}
-          </div>
-          <div class="flex-row">
-            <label class="pf-gen-checkbox-label">
-              <input type="checkbox" checked=${removeMemory} onChange=${e => setRemoveMemory(e.target.checked)} />
-              ${t('profile.generator.deleteExtensionMemory')}
-            </label>
-            <button class="btn-danger-solid btn-sm"
-              onClick=${handleRemoveConfirmed}
-              disabled=${lifecycleLoading === 'remove' || Object.values(removeSelection).filter(Boolean).length === 0}>
-              ${lifecycleLoading === 'remove' ? t('profile.generator.removingLabel') : t('profile.generator.removeSelected').replace('{count}', Object.values(removeSelection).filter(Boolean).length)}
-            </button>
-          </div>
-        </div>
-      `}
+      ${lifecycle.showRemovePanel && html`<${RemovePanel} components=${components} lifecycle=${lifecycle} />`}
 
       <!-- Phase 6: Edit Service Panel -->
       ${editMode === 'request' && html`
@@ -1796,12 +1720,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
       `}
 
       <!-- Settings Panel (inline edit) -->
-      ${showSettingsPanel && project?.blueprint?.settings && html`
+      ${lifecycle.showSettingsPanel && project?.blueprint?.settings && html`
         <div class="pf-gen-settings-inline">
           <${SettingsCollectionView}
             project=${project}
             blueprint=${project.blueprint}
-            onComplete=${() => setShowSettingsPanel(false)}
+            onComplete=${() => lifecycle.setShowSettingsPanel(false)}
             showToast=${showToast}
           />
         </div>
