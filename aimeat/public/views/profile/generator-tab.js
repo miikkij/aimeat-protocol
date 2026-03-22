@@ -1422,9 +1422,9 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         } catch { /* already active or activation failed — test will reveal */ }
       }
 
-      // Use saved test code if available, otherwise generate new
-      let testCode = comp.testCode;
-      if (!testCode) {
+      // Always generate fresh test code — prompts evolve, saved code may be outdated
+      let testCode = null;
+      {
         try {
           await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'batch' } });
           const testPrompt = buildTestPrompt(

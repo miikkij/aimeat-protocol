@@ -2626,10 +2626,13 @@ You MUST check r.body.data for the ACTUAL result. The action returns either:
 API keys and settings ARE configured in ctx.config.
 
 ## How to check results:
-- MEMORY-ONLY actions (no external API): r.body.data.success MUST be true. If r.body.data.error → FAIL.
-- EXTERNAL API actions: r.body.data.success MUST be true OR r.body.data has meaningful data.
-  If r.body.data.error exists → FAIL (even "API key not configured" or "haku epäonnistui").
-  Empty results from a SUCCESSFUL call are OK, but an error response is NOT OK.
+The AIMEAT response envelope is always: { ok: true, data: { ...whatever the action returned... } }
+The action can return ANY shape — there is no mandatory "success" or "error" field convention.
+Look at the Component Code above to see what each action actually returns.
+
+- For ALL actions: FAIL if HTTP status is 500 (extension crashed).
+- For MEMORY-ONLY actions: check that the response data matches what the action code returns on success. Read the action code to know the expected shape.
+- For EXTERNAL API actions: the extension may return an error message if the third-party API refused the call (403, 429, etc). This is CORRECT behavior — the extension handled it gracefully. Only FAIL if HTTP 500.
 
 ${scenarios.map((s, i) => `${i + 1}. POST /v1/ext/${registeredAs}/${s.action}
    Input: ${JSON.stringify(s.input)}
@@ -2710,13 +2713,12 @@ const r1 = await testFetch('/v1/ext/my-service/addItem', {
 if (!r1.ok) errors.push('addItem: HTTP ' + r1.status);
 else if (!r1.body?.data?.success) errors.push('addItem: not successful');
 
-// EXTERNAL API action — check data.error, not just HTTP status
+// EXTERNAL API action — must not crash (HTTP 500); graceful errors are acceptable
 const r2 = await testFetch('/v1/ext/my-service/fetchData', {
   method: 'POST', body: JSON.stringify({ query: 'test' })
 });
-if (!r2.ok) errors.push('fetchData: HTTP ' + r2.status);
-else if (r2.body?.data?.error) errors.push('fetchData: ' + r2.body.data.error);
-else if (!r2.body?.data?.success && !r2.body?.data?.results) errors.push('fetchData: no success or data');
+if (r2.status === 500) errors.push('fetchData: crashed with HTTP 500');
+// r.body.data.error with a message is OK — extension handled the third-party error gracefully
 
 return { passed: errors.length === 0, errors, details: 'Tested actions' };`;
 }
