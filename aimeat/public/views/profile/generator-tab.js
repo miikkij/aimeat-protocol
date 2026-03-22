@@ -64,7 +64,7 @@ import {
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildComponentPrompt, buildFixPrompt, buildTestPrompt, buildInterviewPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/generator-prompts.js';
 import { validateBlueprint, validateComponent, validateInterviewSpec } from '/js/services/generator-validate.js';
 import { useConfirm } from '/components/Modal.js';
-import { runTests, runComponentTest } from '/js/services/generator-testing.js';
+import { runComponentTest } from '/js/services/generator-testing.js';
 import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
 import { ComponentDetail, TestScopeSelector, TestResultsView, runWithAi, stripCodeblock } from './generator-detail.js';
 import { usePackaging } from './generator-dashboard/use-packaging.js';
@@ -73,6 +73,7 @@ import { useLifecycle } from './generator-dashboard/use-lifecycle.js';
 import { RemovePanel } from './generator-dashboard/RemovePanel.js';
 import { useAutopilotState } from './generator-dashboard/use-autopilot-state.js';
 import { useDashboardCore } from './generator-dashboard/use-dashboard-core.js';
+import { useTestExecution } from './generator-dashboard/use-test-execution.js';
 
 /* ── Sub-views ───────────────────────────────────────── */
 
@@ -498,22 +499,21 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
   // Packaging (hook-per-domain)
   const pkg = usePackaging(core, projectId, showToast);
 
-  // Convenience aliases from core (used by functions still in this file, will be removed as hooks extract them)
+  // Convenience aliases from core and testExec (used by functions still in this file, removed as hooks extract them)
   const { project, components, interviewSpec, selectedId, liveStatuses } = core;
   const loadData = core.loadData;
   const refreshStatuses = core.refreshStatuses;
   const setSelectedId = core.setSelectedId;
   const advanceToNext = core.advanceToNext;
+  const { testScope, testRunning, testReport } = testExec;
+  const setTestScope = testExec.setTestScope;
 
   // Editable project name
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
 
-  // Test execution state
-  const [testScope, setTestScope] = useState('comprehensive');
-  const [testRunning, setTestRunning] = useState(false);
-  const [testReport, setTestReport] = useState(null);
-  const [testFixRound, setTestFixRound] = useState(0);
+  // Test execution (hook-per-domain)
+  const testExec = useTestExecution(core, projectId, orSettings, session, showToast);
 
 
   async function handleNameSave() {
@@ -961,16 +961,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
               // Accumulate result into testReport for sidebar indicators
               if (testResult) {
-                // Enrich with label so TestResultsView can show human-readable name
-                testResult.label = comp.label;
-                setTestReport(prev => {
-                  const existing = prev || { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
-                  const comps = existing.components.filter(c => c.componentId !== comp.id);
-                  comps.push(testResult);
-                  const failedCount = comps.filter(c => c.status === 'failed').length;
-                  const passedCount = comps.filter(c => c.status === 'passed').length;
-                  return { ...existing, components: comps, overall: failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed') };
-                });
+                testExec.pushTestResult(comp.id, comp.label, testResult);
               }
 
               if (testResult && testResult.status === 'failed') {
@@ -1070,16 +1061,8 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
 
                   // Update sidebar indicator with re-test result
                   if (reTestResult) {
-                    reTestResult.label = comp.label;
                     reTestResult.fixRound = fix + 1;
-                    setTestReport(prev => {
-                      const existing = prev || { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
-                      const comps = existing.components.filter(c => c.componentId !== comp.id);
-                      comps.push(reTestResult);
-                      const failedCount = comps.filter(c => c.status === 'failed').length;
-                      const passedCount = comps.filter(c => c.status === 'passed').length;
-                      return { ...existing, components: comps, overall: failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed') };
-                    });
+                    testExec.pushTestResult(comp.id, comp.label, reTestResult);
                   }
 
                   if (reTestResult && reTestResult.status !== 'failed') {
@@ -1157,208 +1140,6 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         showToast?.(e.message, true);
       }
     }, { title: t('profile.generator.deleteProject'), confirmLabel: t('profile.generator.deleteProject'), cancelLabel: t('profile.generator.back'), danger: true });
-  }
-
-  // Test execution handler — runs per-component AI-generated tests sequentially
-  async function handleRunTests() {
-    if (testScope === 'none') return;
-    setTestRunning(true);
-    setTestReport(null);
-    const testableTypes = ['extension', 'cortex', 'app'];
-    // Fetch fresh state from API — closure components may be stale
-    const freshComps = await loadAllComponents(projectId);
-    const testableComps = freshComps.filter(c => testableTypes.includes(c.type) && c.registeredAs);
-
-    if (testableComps.length === 0) {
-      showToast?.(t('profile.generator.test_no_testable'), true);
-      setTestRunning(false);
-      return;
-    }
-
-    const report = { level: testScope, timestamp: new Date().toISOString(), components: [], overall: 'passed' };
-    await writeProjectLog(projectId, 'tests_batch_start', { meta: { scope: testScope, count: testableComps.length } });
-
-    for (const comp of testableComps) {
-      const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
-
-      // Ensure settings are applied and extension/cortex is activated before testing
-      if (comp.type === 'extension') {
-        try {
-          await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(comp.registeredAs)}`);
-        } catch { /* settings may not exist */ }
-      }
-      if (comp.type === 'extension' || comp.type === 'cortex') {
-        try {
-          const actUrl = comp.type === 'extension'
-            ? `/v1/extensions/${encodeURIComponent(comp.registeredAs)}/activate`
-            : `/v1/cortex/${encodeURIComponent(comp.registeredAs)}/activate`;
-          await apiPost(actUrl);
-        } catch { /* already active or activation failed — test will reveal */ }
-      }
-
-      // Always generate fresh test code — prompts evolve, saved code may be outdated
-      let testCode = null;
-      {
-        try {
-          await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'batch' } });
-          const testPrompt = buildTestPrompt(
-            comp.type, comp.result, comp.label, comp.registeredAs,
-            project.blueprint, interviewSpec
-          );
-          testCode = await runWithAi(projectId, testPrompt);
-          testCode = stripCodeblock(testCode);
-          // Save generated test code
-          await saveComponent(projectId, { ...comp, testPrompt: testPrompt, testCode, testEnvironment });
-          await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, by: 'batch' } });
-        } catch (e) {
-          await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'batch' } });
-          report.components.push({ componentId: comp.id, label: comp.label, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [`Test generation failed: ${e.message}`], screenshots: [], fixRound: 0 });
-          continue;
-        }
-      }
-
-      // Execute test
-      try {
-        await writeProjectLog(projectId, 'test_executing', { meta: { component: comp.label, environment: testEnvironment, by: 'batch' } });
-        const testResp = await runComponentTest(projectId, comp.id, testCode, testEnvironment);
-        const testResult = testResp?.data?.result || testResp?.result;
-        if (testResult) {
-          testResult.label = comp.label;
-          report.components.push(testResult);
-          await saveComponent(projectId, { ...comp, testResult });
-          await writeProjectLog(projectId, 'component_test_' + testResult.status, { meta: { component: comp.label, errors: testResult.errors, by: 'batch' } });
-        } else {
-          report.components.push({ componentId: comp.id, label: comp.label, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: ['No test result returned'], screenshots: [], fixRound: 0 });
-        }
-      } catch (e) {
-        report.components.push({ componentId: comp.id, label: comp.label, type: comp.type, status: 'failed', scenarios: 0, passed: 0, errors: [e.message], screenshots: [], fixRound: 0 });
-        await writeProjectLog(projectId, 'component_test_error', { meta: { component: comp.label, error: e.message, by: 'batch' } });
-      }
-
-      // Update report status
-      const failedCount = report.components.filter(c => c.status === 'failed').length;
-      const passedCount = report.components.filter(c => c.status === 'passed').length;
-      report.overall = failedCount === 0 ? 'passed' : (passedCount > 0 ? 'partial' : 'failed');
-      setTestReport({ ...report });
-    }
-
-    await writeProjectLog(projectId, 'tests_batch_complete', { meta: { scope: testScope, overall: report.overall, total: report.components.length } });
-    if (report.overall === 'passed') {
-      showToast?.(t('profile.generator.test_passed'));
-    } else {
-      showToast?.(t('profile.generator.test_failed'), true);
-    }
-    setTestRunning(false);
-    await loadData();
-  }
-
-  // Test fix loop handler — auto-fix failed component, re-register, re-test (max 3 rounds)
-  async function handleTestFixRequest(componentId, action) {
-    if (action === 'skip') return;
-    if (action === 'manual') {
-      // Select the failed component for manual editing
-      setSelectedId(componentId);
-      return;
-    }
-    // action === 'auto' — run fix loop
-    const MAX_FIX_ROUNDS = 3;
-    if (testFixRound >= MAX_FIX_ROUNDS) {
-      showToast?.(t('profile.generator.test_fix_round') + ' ' + MAX_FIX_ROUNDS + ' — ' + t('profile.generator.test_fix_manual'), true);
-      return;
-    }
-
-    const comp = components.find(c => c.id === componentId);
-    if (!comp) return;
-
-    const failedTestComp = testReport?.components?.find(c => c.componentId === componentId);
-    if (!failedTestComp) return;
-
-    // Build test context for the fix prompt
-    const blueprintComp = project?.blueprint?.components?.find(c => c.id === componentId);
-    const testContext = {
-      errors: failedTestComp.errors || [],
-      dependencyResults: (testReport?.components || [])
-        .filter(c => c.componentId !== componentId && c.status === 'passed')
-        .map(c => ({ componentId: c.componentId, status: c.status })),
-      blueprintComponent: blueprintComp || null,
-    };
-
-    setTestRunning(true);
-    setTestFixRound(prev => prev + 1);
-    showToast?.(t('profile.generator.test_fix_round') + ' ' + (testFixRound + 1));
-
-    try {
-      // Build fix prompt with test context
-      const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
-      const originalPrompt = comp.prompt || buildComponentPrompt(
-        comp.type, comp.label,
-        project.description, project.blueprint, completedComps,
-        interviewSpec,
-      );
-      const fixP = buildFixPrompt(originalPrompt, comp.result || '', failedTestComp.errors || [], comp.type, testContext);
-
-      // Run AI for fix
-      let content = await runWithAi(projectId, fixP);
-      if (comp.type === 'extension') content = stripCodeblock(content);
-
-      // Validate
-      let vr = validateComponent(comp.type, content, project.blueprint);
-
-      // Auto-retry validation if enabled
-      if (!vr.valid && orSettings?.autoRetry) {
-        const max = orSettings.maxRetries || 3;
-        for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
-          showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
-          const retryP = buildFixPrompt(originalPrompt, content, vr.errors, comp.type);
-          content = await runWithAi(projectId, retryP);
-          if (comp.type === 'extension') content = stripCodeblock(content);
-          vr = validateComponent(comp.type, content, project.blueprint);
-        }
-      }
-
-      if (!vr.valid) {
-        showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
-        setTestRunning(false);
-        return;
-      }
-
-      // Save fixed result
-      const updated = {
-        ...comp, status: 'done', result: content, validationErrors: [],
-        history: [...(comp.history || []),
-          { action: 'test_fix', at: new Date().toISOString(), by: 'autopilot', round: testFixRound + 1 },
-        ],
-      };
-      await saveComponent(projectId, updated);
-
-      // Re-register
-      const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
-      const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
-      const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
-      if (comp.type === 'cortex') {
-        const cortexVr = validateComponent('cortex', content, project.blueprint);
-        await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
-      } else {
-        await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
-      }
-      await writeProjectLog(projectId, 'test_fix_registered', { meta: { component: comp.label, round: testFixRound + 1 } });
-      await loadData();
-
-      // Re-run tests
-      const resp = await runTests(projectId, testScope);
-      const report = resp?.data || resp;
-      setTestReport(report);
-      await writeProjectLog(projectId, 'tests_rerun', { meta: { scope: testScope, overall: report.overall, fixRound: testFixRound + 1 } });
-
-      if (report.overall === 'passed') {
-        showToast?.(t('profile.generator.test_passed'));
-      } else {
-        showToast?.(t('profile.generator.test_failed'), true);
-      }
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
-    setTestRunning(false);
   }
 
   if (!project) return html`<div class="pf-gen-loading">${t('profile.loading')}</div>`;
@@ -1641,7 +1422,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
         <div class="pf-gen-test-panel">
           <div class="pf-gen-actions">
             <button class="btn-primary btn-sm"
-              onClick=${handleRunTests}
+              onClick=${testExec.handleRunTests}
               disabled=${testRunning || testScope === 'none'}>
               ${testRunning
                 ? html`<span class="pf-gen-or-spinner"></span> ${t('profile.generator.test_running')}`
@@ -1652,7 +1433,7 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
             <${TestResultsView}
               report=${testReport}
               projectId=${projectId}
-              onFixRequest=${orSettings?.hasApiKey ? handleTestFixRequest : null}
+              onFixRequest=${orSettings?.hasApiKey ? testExec.handleTestFixRequest : null}
             />
           `}
         </div>
