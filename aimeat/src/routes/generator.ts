@@ -48,7 +48,7 @@ import { validateInterviewSpec, validateBlueprint, validateComponent } from '../
 import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
-import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
+// encryption removed from generator settings — values stored as plain text in owner-scoped memory
 import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
 import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
@@ -253,20 +253,8 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      // Encrypt secret-type values
+      // Store values as-is (no encryption — settings are already protected by owner-scoped memory)
       const storedValues = { ...values };
-      if (secretKeys?.length) {
-        const encKey = getEncryptionKey(config);
-        if (!encKey) {
-          res.status(503).json(error(config.nodeId, 'ENCRYPTION_UNAVAILABLE', 'Encryption key not configured'));
-          return;
-        }
-        for (const key of secretKeys) {
-          if (storedValues[key] && typeof storedValues[key] === 'string') {
-            storedValues[key] = encrypt(storedValues[key] as string, encKey);
-          }
-        }
-      }
 
       // Store using full MemoryRecord pattern
       const now = new Date().toISOString();
@@ -403,27 +391,12 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
       logger.info(`apply-settings: extension ${extensionName} current config keys: ${Object.keys(ext.config).join(', ')}`);
 
-      // Decrypt secrets if needed
-      const encKey = getEncryptionKey(config);
-      const decrypted: Record<string, unknown> = {};
-      const decryptLog: string[] = [];
-      for (const [key, val] of Object.entries(settings)) {
-        if (typeof val === 'string' && val.startsWith('enc:') && encKey) {
-          try {
-            const plain = decrypt(val, encKey);
-            decrypted[key] = plain;
-            decryptLog.push(`${key}: decrypted OK (${typeof plain === 'string' ? plain.length + ' chars' : typeof plain})`);
-          } catch (err) {
-            // Decryption failed — this means the key is LOST
-            decryptLog.push(`${key}: DECRYPT FAILED — ${(err as Error).message}`);
-            logger.error(`apply-settings: DECRYPT FAILED for key "${key}"`, { error: (err as Error).message });
-            // Do NOT pass through enc: value — it's useless to the extension
-          }
-        } else {
-          decrypted[key] = val;
-          decryptLog.push(`${key}: plain value (${typeof val})`);
-        }
-      }
+      // Pass values through as-is (no encryption/decryption)
+      const decrypted = { ...settings };
+      const decryptLog = Object.keys(settings).map(k => {
+        const v = settings[k];
+        return `${k}: ${typeof v === 'string' ? v.length + ' chars' : typeof v}`;
+      });
 
       logger.info(`apply-settings: decrypt results`, { results: decryptLog });
 
