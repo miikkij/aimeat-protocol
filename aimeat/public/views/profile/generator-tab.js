@@ -1407,7 +1407,12 @@ function ProjectDashboard({ projectId, onBack, session, showToast, orSettings })
     for (const comp of testableComps) {
       const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
 
-      // Ensure extension/cortex is activated before testing
+      // Ensure settings are applied and extension/cortex is activated before testing
+      if (comp.type === 'extension') {
+        try {
+          await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(comp.registeredAs)}`);
+        } catch { /* settings may not exist */ }
+      }
       if (comp.type === 'extension' || comp.type === 'cortex') {
         try {
           const actUrl = comp.type === 'extension'
@@ -2338,7 +2343,10 @@ function ComponentDetail({ component, project, components, projectId, interviewS
     if (!testCode.trim()) return;
     setTestRunning(true);
     setTestResult(null);
-    // Ensure extension/cortex is activated before testing
+    // Ensure settings are applied and extension/cortex is activated before testing
+    if (component.type === 'extension') {
+      try { await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(component.registeredAs)}`); } catch { /* */ }
+    }
     if (component.type === 'extension' || component.type === 'cortex') {
       try {
         const actUrl = component.type === 'extension'
