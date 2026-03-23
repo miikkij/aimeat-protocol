@@ -15,7 +15,8 @@
     "apps": "Apps",
     "profile": "Profile",
     "logout": "Log Out",
-    "loggedInAs": "logged in as"
+    "loggedInAs": "logged in as",
+    "help": "Help"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",
@@ -4160,5 +4161,12 @@
     "addAppBtn": "Add new app",
     "generatorHint": "Building something more complex with background services and data pipelines?",
     "generatorLink": "Try the Generator"
+  },
+  "help": {
+    "title": "Help your AI work with AIMEAT",
+    "description": "If your AI assistant is having trouble connecting to or using this node, copy the prompt below and paste it into your AI chat. It will guide your AI through connecting, authenticating, and using all available features.",
+    "copyBtn": "Copy to clipboard",
+    "copied": "Copied!",
+    "loadError": "Failed to load help prompt."
   }
 }

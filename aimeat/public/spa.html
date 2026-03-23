@@ -93,6 +93,7 @@ That response includes:
   <link rel="stylesheet" href="/css/views/openclaw.css">
   <link rel="stylesheet" href="/css/views/portfolio.css">
   <link rel="stylesheet" href="/css/components/tags.css">
+  <link rel="stylesheet" href="/css/views/help.css">
   <link rel="stylesheet" href="/css/views/admin.css">
   <script type="importmap">
   {
@@ -209,6 +210,7 @@ That response includes:
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),
       '/v1/admin':       () => import('/views/admin.js' + B),
+      '/v1/help':        () => import('/views/help.js' + B),
     };
 
     // Match route, handling query params for special views
@@ -372,6 +374,7 @@ That response includes:
           <div class="topnav-right">
             <a href="/v1/classic" onClick=${(e) => handleNav(e, '/v1/classic')} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
             <a href="/v1/portal?view=dev" onClick=${(e) => handleNav(e, '/v1/portal?view=dev')}>${t('nav.devView')}</a>
+            <a href="/v1/help" onClick=${(e) => handleNav(e, '/v1/help')} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
             ${session && html`
               <a href="/app-catalog.html" target="_blank" class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
               <a href="/v1/profile" class="profile-link visible" onClick=${(e) => handleNav(e, '/v1/profile')}>

@@ -1,10 +1,24 @@
 import { Router } from 'express';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** Load AIMEAT_Help_Prompt.md once at startup (strip the preamble before the --- separator) */
+const HELP_PROMPT_RAW = (() => {
+  const mdPath = resolve(__dirname, '../../../docs/AIMEAT_Help_Prompt.md');
+  const content = readFileSync(mdPath, 'utf-8');
+  // Strip everything before the first --- line (title + "Paste this..." preamble)
+  const separatorIdx = content.indexOf('\n---\n');
+  return separatorIdx !== -1 ? content.slice(separatorIdx + 5) : content;
+})();
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
@@ -242,6 +256,7 @@ export function bootstrapRouter(
           portfolio: { method: 'GET', url: '/v1/portfolio/catalog', description: 'User portfolio showcase — published content catalog', tier: 0 },
           profile: { method: 'GET', url: '/v1/profile', description: 'User profile with data wallet, agents, and consent management', tier: 0 },
           validate: { method: 'POST', url: '/v1/validate', description: 'Validate a request body against endpoint schemas', tier: 1 },
+          help_prompt: { method: 'GET', url: '/v1/help/prompt', description: 'AI help prompt — paste to your AI assistant if it needs guidance working with this node', tier: 0 },
         },
       },
 
@@ -260,7 +275,20 @@ export function bootstrapRouter(
       { description: 'Browse the action catalogue', method: 'GET', url: '/v1/catalogue' },
       { description: 'Full OpenAPI specification', method: 'GET', url: '/v1/spec' },
       { description: 'Node discovery', method: 'GET', url: '/.well-known/aimeat' },
+      { description: 'If your AI is struggling, fetch the help prompt and paste it to your AI chat', method: 'GET', url: '/v1/help/prompt' },
     ]));
+  });
+
+  // GET /v1/help/prompt — AI help prompt as plain markdown (Tier 0, no auth)
+  router.get('/v1/help/prompt', (_req, res) => {
+    const base = config.baseUrl;
+    const host = base.replace(/^https?:\/\//, '');
+    const rendered = substituteVariables(HELP_PROMPT_RAW, {
+      node_url: base,
+      node_id: config.nodeId,
+      node_host: host,
+    });
+    res.type('text/markdown; charset=utf-8').send(rendered);
   });
 
   // GET /v1/health — simple liveness/readiness check (Tier 0, no auth)

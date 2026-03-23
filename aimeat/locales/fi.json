@@ -15,7 +15,8 @@
     "apps": "Sovellukset",
     "profile": "Profiili",
     "logout": "Kirjaudu ulos",
-    "loggedInAs": "kirjautuneena"
+    "loggedInAs": "kirjautuneena",
+    "help": "Apua"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
@@ -4160,5 +4161,12 @@
     "addAppBtn": "Lisää uusi sovellus",
     "generatorHint": "Rakennatko jotain monimutkaisempaa taustapalveluilla ja dataputkilla?",
     "generatorLink": "Kokeile Generaattoria"
+  },
+  "help": {
+    "title": "Auta tekoälyäsi työskentelemään AIMEAT:n kanssa",
+    "description": "Jos tekoälyavustajallasi on vaikeuksia yhdistää tai käyttää tätä nodea, kopioi alla oleva kehote ja liitä se tekoälykeskusteluusi. Se opastaa tekoälyäsi yhdistämään, tunnistautumaan ja käyttämään kaikkia ominaisuuksia.",
+    "copyBtn": "Kopioi leikepöydälle",
+    "copied": "Kopioitu!",
+    "loadError": "Apukehotteen lataaminen epäonnistui."
   }
 }

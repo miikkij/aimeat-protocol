@@ -1,0 +1,136 @@
+/**
+ * @file help.css
+ * @description Styles for the AI Help Prompt page — warm white aesthetic,
+ *   DM Sans body text, JetBrains Mono for the prompt code block.
+ * @version-history
+ *   v1.0.0 — 2026-03-23 — Initial implementation
+ */
+
+/* ── Container ── */
+.hlp-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+/* ── Card ── */
+.hlp-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg, 16px);
+  padding: 40px 36px;
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.08));
+}
+
+/* ── Title ── */
+.hlp-title {
+  font-family: var(--font);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 12px;
+  line-height: 1.3;
+}
+
+/* ── Description ── */
+.hlp-desc {
+  font-family: var(--font);
+  font-size: 1rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin: 0 0 28px;
+}
+
+/* ── Prompt wrapper ── */
+.hlp-prompt-wrapper {
+  background: var(--bg-surface, var(--card-bg-alt));
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm, 8px);
+  max-height: 480px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+/* ── Prompt text ── */
+.hlp-prompt-text {
+  margin: 0;
+  padding: 20px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  tab-size: 2;
+}
+
+.hlp-prompt-text code {
+  font-family: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* ── Loading ── */
+.hlp-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+}
+
+/* ── Error ── */
+.hlp-error {
+  padding: 20px;
+  color: var(--accent);
+  text-align: center;
+  font-family: var(--font);
+}
+
+/* ── Copy button (coral-red CTA) ── */
+.hlp-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 28px;
+  background: linear-gradient(135deg, #E8564A 0%, #FF6B6B 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: var(--shadow-heart, 0 4px 12px rgba(232, 86, 74, 0.25));
+  min-width: 180px;
+}
+
+.hlp-copy-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(232, 86, 74, 0.35);
+}
+
+.hlp-copy-btn:active {
+  transform: translateY(0);
+}
+
+/* ── Copied state ── */
+.hlp-copy-btn.hlp-copied {
+  background: linear-gradient(135deg, #10B981, #059669);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .hlp-container {
+    padding: 24px 16px 48px;
+  }
+  .hlp-card {
+    padding: 24px 20px;
+  }
+  .hlp-title {
+    font-size: 1.4rem;
+  }
+  .hlp-prompt-wrapper {
+    max-height: 360px;
+  }
+}

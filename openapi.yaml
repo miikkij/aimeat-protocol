@@ -6259,6 +6259,24 @@ paths:
 
   # ── Additional Implemented Endpoints ───────────────────────
 
+  /v1/help/prompt:
+    get:
+      operationId: getHelpPrompt
+      summary: AI help prompt
+      description: >-
+        Returns the AI help prompt as raw markdown text. Paste this to your AI
+        assistant if it needs guidance connecting to and using this node.
+        Node-specific values (base_url, node_id) are rendered dynamically.
+        No authentication required (Tier 0).
+      tags: [Bootstrap]
+      responses:
+        '200':
+          description: Help prompt markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+
   /v1/health:
     get:
       operationId: getHealth
