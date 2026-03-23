@@ -67,6 +67,38 @@ export default function GeneratorDebugTab() {
     } catch { /* */ }
   }
 
+  const [copying, setCopying] = useState(false);
+
+  async function handleCopyAll(projId) {
+    setCopying(true);
+    try {
+      const resp = await apiGet(`/v1/generator/debug/${projId}/files`);
+      const allFiles = resp?.data?.files || [];
+      const sorted = [...allFiles].sort((a, b) => {
+        const order = (f) => {
+          if (f.startsWith('project') || f.startsWith('interview') || f.startsWith('blueprint')) return '0_' + f;
+          if (f.includes('logs/')) return '9_' + f;
+          const phaseOrder = { 'prompt.txt': 1, 'generated.txt': 2, 'validation.json': 3, 'test-prompt.txt': 4, 'test-code.js': 5, 'test-result.json': 6 };
+          const name = f.split('/').pop();
+          return '5_' + f.replace(name, String(phaseOrder[name] || 7).padStart(2, '0'));
+        };
+        return order(a).localeCompare(order(b));
+      });
+      const parts = [`=== GENERATOR DEBUG DUMP — ${projId} ===`, `Date: ${new Date().toISOString()}`, `Files: ${allFiles.length}`, ''];
+      for (const f of sorted) {
+        try {
+          const r = await apiGet(`/v1/generator/debug/${projId}/file?path=${encodeURIComponent(f)}`);
+          parts.push('='.repeat(60), `FILE: ${f}`, '='.repeat(60), r?.data?.content || '(empty)', '');
+        } catch { parts.push(`--- ${f}: (failed to load) ---`); }
+      }
+      await navigator.clipboard.writeText(parts.join('\n'));
+      setCopying('done');
+      setTimeout(() => setCopying(false), 2000);
+    } catch (e) {
+      setCopying(false);
+    }
+  }
+
   // Group files by directory
   const grouped = {};
   for (const f of files) {
@@ -103,6 +135,9 @@ export default function GeneratorDebugTab() {
             <div class="adm-card adm-card-clickable" onClick=${() => selectProject(p.projectId)}>
               <div class="adm-card-header">
                 <strong>${p.projectId}</strong>
+                <button class="btn-primary btn-sm" onClick=${e => { e.stopPropagation(); handleCopyAll(p.projectId); }}>
+                  ${copying === 'done' ? '\u2705 Copied!' : copying ? '...' : 'Copy All'}
+                </button>
                 <button class="btn-ghost btn-sm" onClick=${e => { e.stopPropagation(); handleDeleteProject(p.projectId); }}>
                   Delete
                 </button>
@@ -124,6 +159,9 @@ export default function GeneratorDebugTab() {
               ← Back to projects
             </button>
             <strong>${selectedProject}</strong>
+            <button class="btn-primary btn-sm" onClick=${() => handleCopyAll(selectedProject)}>
+              ${copying === 'done' ? '\u2705 Copied!' : copying ? '...' : 'Copy All Debug'}
+            </button>
             <span class="adm-count">${files.length} files</span>
           </div>
 

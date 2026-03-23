@@ -67,6 +67,54 @@ export function DebugPanel({ projectId }) {
     } catch { /* */ }
   }
 
+  const [copying, setCopying] = useState(false);
+
+  async function handleCopyAll() {
+    setCopying(true);
+    try {
+      // Sort files in logical order: project meta first, then by component, then logs last
+      const sorted = [...files].sort((a, b) => {
+        const order = (f) => {
+          if (f.startsWith('project') || f.startsWith('interview') || f.startsWith('blueprint')) return '0_' + f;
+          if (f.includes('logs/')) return '9_' + f;
+          // Components: sort by component ID, then by phase
+          const phaseOrder = { 'prompt.txt': 1, 'generated.txt': 2, 'validation.json': 3, 'test-prompt.txt': 4, 'test-code.js': 5, 'test-result.json': 6 };
+          const name = f.split('/').pop();
+          return '5_' + f.replace(name, String(phaseOrder[name] || 7).padStart(2, '0'));
+        };
+        return order(a).localeCompare(order(b));
+      });
+
+      const parts = [];
+      parts.push(`=== GENERATOR DEBUG DUMP — ${projectId} ===`);
+      parts.push(`Date: ${new Date().toISOString()}`);
+      parts.push(`Files: ${files.length}`);
+      parts.push('');
+
+      for (const f of sorted) {
+        try {
+          const resp = await apiGet(`/v1/generator/debug/${projectId}/file?path=${encodeURIComponent(f)}`);
+          const content = resp?.data?.content || '(empty)';
+          parts.push(`${'='.repeat(60)}`);
+          parts.push(`FILE: ${f}`);
+          parts.push(`${'='.repeat(60)}`);
+          parts.push(content);
+          parts.push('');
+        } catch {
+          parts.push(`--- ${f}: (failed to load) ---`);
+        }
+      }
+
+      await navigator.clipboard.writeText(parts.join('\n'));
+      // Brief visual feedback
+      setCopying('done');
+      setTimeout(() => setCopying(false), 2000);
+    } catch (e) {
+      setCopying(false);
+      alert('Copy failed: ' + e.message);
+    }
+  }
+
   // Group files by component
   const grouped = {};
   for (const f of files) {
@@ -102,6 +150,9 @@ export function DebugPanel({ projectId }) {
     <div class="pf-gen-debug-header">
       <h4>Debug Artifacts</h4>
       <span class="pf-gen-debug-count">${files.length} files</span>
+      <button class="btn-primary btn-sm" onClick=${handleCopyAll} disabled=${copying}>
+        ${copying === 'done' ? '\u2705 Copied!' : copying ? 'Copying...' : 'Copy All Debug'}
+      </button>
       <button class="btn-ghost btn-sm" onClick=${() => loadFiles()}>Refresh</button>
       <button class="btn-ghost btn-sm pf-gen-debug-delete" onClick=${handleDelete}>Delete all</button>
     </div>
@@ -124,6 +175,7 @@ export function DebugPanel({ projectId }) {
         ${selectedFile ? html`
           <div class="pf-gen-debug-content-header">
             <span class="pf-gen-debug-path">${selectedFile}</span>
+            <button class="btn-ghost btn-sm" onClick=${() => fileContent && navigator.clipboard.writeText(fileContent)}>Copy</button>
           </div>
           ${loadingFile
             ? html`<p>${t('profile.loading')}</p>`
