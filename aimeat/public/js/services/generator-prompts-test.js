@@ -112,19 +112,43 @@ return { passed: errors.length === 0, errors, details: 'Tested N actions' };
 \`\`\`
 
 For EXTENSION tests:
+
+## How to call extension actions
 - ALL extension actions use POST — the backend only has a POST route for /v1/ext/{name}/{actionId}
-- The {actionId} in the URL is the action's "id" field from the YAML manifest, NOT the "path" field
-- Example: if manifest has id: searchSymbol and path: /v1/ext/name/search-symbol, use /v1/ext/name/searchSymbol
-- Do NOT convert action IDs to kebab-case in URLs — use them exactly as-is from the test scenarios above
-- Even if the manifest says method: GET, you MUST use POST with testFetch
+- The {actionId} is the action's "id" field from YAML manifest, NOT the "path" field
+- Do NOT convert action IDs to kebab-case — use them exactly as-is
 - URL pattern: /v1/ext/{registeredName}/{actionId}
 - NOT /v1/extensions/... — correct path is /v1/ext/{name}/{actionId}
-- Always pass input as JSON body: testFetch(url, { method: 'POST', body: JSON.stringify({...}) })
-- DO NOT use /v1/memory/ API to verify extension state — extensions store data in their own isolated namespace (ext:{name}/key), which is NOT accessible via the owner's /v1/memory/ API. Only test by calling extension actions and checking their return values.
-- To verify side effects, call the extension action that reads the data (e.g., call getWatchlist to verify addToWatchlist worked) rather than reading memory directly.
-- For actions with no input: testFetch(url, { method: 'POST', body: JSON.stringify({}) })
+- Always: testFetch(url, { method: 'POST', body: JSON.stringify({...}) })
+- For actions with no input: body: JSON.stringify({})
 - Response envelope: { ok: true, data: { ...action return value... } }
-  So check r.body?.ok and r.body?.data — NOT r.body?.success directly
+
+## How to verify side effects — test like a CORTEX consumer
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Test the extension THE SAME WAY a cortex or app would consume it.    ║
+║                                                                        ║
+║  Extensions store data in ISOLATED namespace (ext:{name}/key).         ║
+║  This is NOT accessible via /v1/memory/ API (that's owner namespace). ║
+║                                                                        ║
+║  NEVER do this:                                                        ║
+║    await testFetch('/v1/memory/watchlist.items', { method: 'GET' })   ║
+║    → Returns null (wrong namespace!)                                   ║
+║                                                                        ║
+║  INSTEAD — verify by calling extension actions:                        ║
+║    1. Call addToWatchlist → check return value confirms success        ║
+║    2. Call getWatchlist → check it contains the added item             ║
+║    3. Call removeFromWatchlist → check return value                    ║
+║    4. Call getWatchlist → check item is gone                           ║
+║                                                                        ║
+║  This is exactly how cortex consumers use extensions:                  ║
+║    callExt('my-ext', 'addItem', { ... })                              ║
+║    callExt('my-ext', 'getItems', {})    // verify side effect         ║
+║                                                                        ║
+║  DO NOT create getMemory/setMemory/deleteMemory helpers.              ║
+║  DO NOT access /v1/memory/ directly.                                   ║
+║  The extension's OWN actions are your only interface.                  ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 - Test with realistic input based on what the extension does
 
 For MEMORY tests:
@@ -253,20 +277,27 @@ ${testEnvDoc}
 const errors = [];
 // ALL extension calls use POST. Response: { ok: true, data: { ...action return... } }
 
-// [MEMORY] action — MUST succeed with expected data
+// [MEMORY] init — MUST succeed
 const r0 = await testFetch('/v1/ext/my-service/init', { method: 'POST', body: JSON.stringify({}) });
 if (!r0.ok) errors.push('init: HTTP ' + r0.status);
-else if (!r0.body?.data?.initialized) errors.push('init: not initialized');
+else if (!r0.body?.data) errors.push('init: no data');
 
-// [MEMORY] action — MUST succeed, assert actual values
+// [MEMORY] add item — MUST succeed, assert return values
 const r1 = await testFetch('/v1/ext/my-service/addItem', {
-  method: 'POST', body: JSON.stringify({ name: 'Test' })
+  method: 'POST', body: JSON.stringify({ name: 'Test Item' })
 });
 if (!r1.ok) errors.push('addItem: HTTP ' + r1.status);
 else if (!r1.body?.data?.success) errors.push('addItem: not successful');
 
-// [EXTERNAL API] action — check shape only, NOT specific values
-// The external API may be down or return errors — that's fine if handled gracefully
+// Verify side effect by calling the READ action (NOT /v1/memory/ directly!)
+const r1v = await testFetch('/v1/ext/my-service/getItems', { method: 'POST', body: JSON.stringify({}) });
+if (r1v.ok && r1v.body?.data?.items) {
+  if (r1v.body.data.items.length === 0) errors.push('addItem: getItems returned empty after add');
+} else {
+  errors.push('getItems: failed to verify addItem side effect');
+}
+
+// [EXTERNAL API] — check shape only, NOT specific values
 const r2 = await testFetch('/v1/ext/my-service/fetchData', {
   method: 'POST', body: JSON.stringify({ query: 'test' })
 });
@@ -274,16 +305,16 @@ if (r2.status === 500) errors.push('fetchData: crashed with HTTP 500');
 else {
   const d = r2.body?.data;
   if (d === undefined || d === null) errors.push('fetchData: no response data at all');
-  // d.error is OK (API returned error, extension handled it) — do NOT push error
-  // d.results is OK (API worked) — do NOT assert specific result values
+  // d.error is OK (API error handled gracefully) — do NOT push error
+  // d.results/d.items is OK (API worked) — do NOT assert specific values
 }
 
-// [MEMORY] error handling — MUST return proper error
+// [MEMORY] error handling — MUST return proper error for bad input
 const r3 = await testFetch('/v1/ext/my-service/addItem', {
   method: 'POST', body: JSON.stringify({})
 });
 if (r3.status === 500) errors.push('addItem(empty): crashed');
-else if (!r3.body?.data?.error) errors.push('addItem(empty): no error message for invalid input');
+else if (!r3.body?.data?.error) errors.push('addItem(empty): no error for invalid input');
 
 return { passed: errors.length === 0, errors, details: 'Tested actions' };`;
 }
