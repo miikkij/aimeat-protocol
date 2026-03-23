@@ -2039,6 +2039,7 @@
     "consulSetupDetail": "1. Käynnistä Consul: docker run -d -p 8500:8500 hashicorp/consul. 2. Aseta AIMEAT_CONSUL_ENABLED=true ja AIMEAT_CONSUL_URL=http://consul:8500. 3. Käytä Vientiä nykyisten asetusten työntämiseen tai Tuontia jaettujen asetusten hakemiseen.",
     "scheduler": "Ajastin",
     "schedulerDesc": "Ajastetut tehtävät ja cron-ajastimet",
+    "generatorDebug": "Generaattori Debug",
     "schedulerJobs": "Ajastetut tehtävät",
     "schedulerNoJobs": "Ei ajastettuja tehtäviä",
     "schedulerRunNow": "Aja nyt",

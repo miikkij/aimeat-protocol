@@ -46,6 +46,7 @@ import KnowledgeAdminTab from './admin/knowledge-tab.js';
 import PromptsTab        from './admin/prompts-tab.js';
 import PackagesAdminTab  from './admin/packages-tab.js';
 import MemoryAdminTab    from './admin/memory-tab.js';
+import GeneratorDebugTab from './admin/generator-debug-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -78,6 +79,7 @@ const NAV_GROUPS = [
     { id: 'push',   icon: '\u{1F514}',  key: 'dashboard.push',   component: PushTab },
     { id: 'consul',    icon: '\u{1F5C4}',  key: 'dashboard.consul',    component: ConsulTab },
     { id: 'scheduler', icon: '\u{23F0}',   key: 'dashboard.scheduler', component: SchedulerTab },
+    { id: 'generator-debug', icon: '\u{1F41E}', key: 'dashboard.generatorDebug', component: GeneratorDebugTab },
   ]},
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   icon: '\u{1F4D6}', key: 'dashboard.directory',      component: DirectoryTab },

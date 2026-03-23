@@ -2039,6 +2039,7 @@
     "consulSetupDetail": "1. Run Consul: docker run -d -p 8500:8500 hashicorp/consul. 2. Set AIMEAT_CONSUL_ENABLED=true and AIMEAT_CONSUL_URL=http://consul:8500. 3. Use Export to push current config, or Import to pull shared config.",
     "scheduler": "Scheduler",
     "schedulerDesc": "Scheduled jobs and cron tasks",
+    "generatorDebug": "Generator Debug",
     "schedulerJobs": "Scheduled Jobs",
     "schedulerNoJobs": "No scheduled jobs",
     "schedulerRunNow": "Run Now",

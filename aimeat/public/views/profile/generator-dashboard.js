@@ -48,6 +48,7 @@ import { PackageDialog } from './generator-dashboard/PackageDialog.js';
 import { RemovePanel } from './generator-dashboard/RemovePanel.js';
 import { EditModePanel } from './generator-dashboard/EditModePanel.js';
 import { DiagnosticsPanel } from './generator-dashboard/DiagnosticsPanel.js';
+import { DebugPanel } from './generator-dashboard/DebugPanel.js';
 
 export function ProjectDashboard({ projectId, onBack, session, showToast, orSettings }) {
   // Local UI state
@@ -55,6 +56,7 @@ export function ProjectDashboard({ projectId, onBack, session, showToast, orSett
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const { confirm, ConfirmUI } = useConfirm();
 
   // Wire hooks (order matters — testExec before autopilot, core before everything)
@@ -214,6 +216,9 @@ export function ProjectDashboard({ projectId, onBack, session, showToast, orSett
             <button class="btn-ghost btn-sm" onClick=${() => setShowDiagnostics(!showDiagnostics)}>
               ${showDiagnostics ? t('profile.generator.hideDiagnostics') : t('profile.generator.diagnostics')}
             </button>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowDebug(!showDebug)}>
+              ${showDebug ? 'Hide Debug' : 'Debug'}
+            </button>
             <button class="btn-outline btn-sm pf-gen-remove-toggle"
               onClick=${() => { lifecycle.setShowRemovePanel(!lifecycle.showRemovePanel); lifecycle.setRemoveSelection({}); }}>
               ${lifecycle.showRemovePanel ? t('profile.generator.cancelRemove') : t('profile.generator.removeEllipsis')}
@@ -236,6 +241,7 @@ export function ProjectDashboard({ projectId, onBack, session, showToast, orSett
       ${lifecycle.showRemovePanel && html`<${RemovePanel} components=${components} lifecycle=${lifecycle} />`}
       ${editMode && html`<${EditModePanel} edit=${edit} core=${core} autopilotState=${autopilotState} orSettings=${orSettings} />`}
       ${showDiagnostics && html`<${DiagnosticsPanel} components=${components} liveStatuses=${liveStatuses} />`}
+      ${showDebug && html`<${DebugPanel} projectId=${projectId} />`}
 
       <!-- Settings Panel -->
       ${lifecycle.showSettingsPanel && project?.blueprint?.settings && html`

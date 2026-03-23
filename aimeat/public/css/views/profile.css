@@ -1739,3 +1739,29 @@
 @media (min-width: 900px) {
   .pf .pf-landing { max-width: 820px; margin: 0 auto; }
 }
+
+/* ── Generator Debug Panel ──────────────────────────── */
+.pf-gen-debug-panel { margin: var(--sp-3) 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: var(--sp-3); }
+.pf-gen-debug-header { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
+.pf-gen-debug-header h4 { margin: 0; flex: 1; }
+.pf-gen-debug-count { font-size: 0.8rem; color: var(--text-dim); }
+.pf-gen-debug-delete { color: var(--danger) !important; }
+.pf-gen-debug-empty { color: var(--text-dim); font-style: italic; }
+.pf-gen-debug-body { display: grid; grid-template-columns: 240px 1fr; gap: var(--sp-2); min-height: 300px; }
+.pf-gen-debug-tree { border-right: 1px solid var(--border); padding-right: var(--sp-2); overflow-y: auto; max-height: 500px; }
+.pf-gen-debug-group { margin-bottom: var(--sp-2); }
+.pf-gen-debug-group-label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--sp-1); padding: 2px 4px; }
+.pf-gen-debug-file { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 0.82rem; }
+.pf-gen-debug-file:hover { background: var(--bg-dim); }
+.pf-gen-debug-file.active { background: var(--accent-bg, rgba(49,130,206,0.1)); color: var(--accent); }
+.pf-gen-debug-icon { font-size: 0.9rem; }
+.pf-gen-debug-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-gen-debug-content { overflow: auto; }
+.pf-gen-debug-content-header { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-1); padding-bottom: var(--sp-1); border-bottom: 1px solid var(--border); }
+.pf-gen-debug-path { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); }
+.pf-gen-debug-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-2); font-family: var(--mono); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; overflow: auto; max-height: 500px; line-height: 1.4; }
+.pf-gen-debug-hint { color: var(--text-dim); font-style: italic; padding: var(--sp-4); text-align: center; }
+@media (max-width: 700px) {
+  .pf-gen-debug-body { grid-template-columns: 1fr; }
+  .pf-gen-debug-tree { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: var(--sp-2); max-height: 200px; }
+}
