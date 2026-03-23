@@ -120,6 +120,8 @@ For EXTENSION tests:
 - URL pattern: /v1/ext/{registeredName}/{actionId}
 - NOT /v1/extensions/... — correct path is /v1/ext/{name}/{actionId}
 - Always pass input as JSON body: testFetch(url, { method: 'POST', body: JSON.stringify({...}) })
+- DO NOT use /v1/memory/ API to verify extension state — extensions store data in their own isolated namespace (ext:{name}/key), which is NOT accessible via the owner's /v1/memory/ API. Only test by calling extension actions and checking their return values.
+- To verify side effects, call the extension action that reads the data (e.g., call getWatchlist to verify addToWatchlist worked) rather than reading memory directly.
 - For actions with no input: testFetch(url, { method: 'POST', body: JSON.stringify({}) })
 - Response envelope: { ok: true, data: { ...action return value... } }
   So check r.body?.ok and r.body?.data — NOT r.body?.success directly
