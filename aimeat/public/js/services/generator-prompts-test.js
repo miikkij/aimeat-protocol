@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
  */
 
-import { INSTRUCTION_DISCLAIMER } from './generator-prompts-base.js';
+import { INSTRUCTION_DISCLAIMER, NAMESPACE_RULES, SANDBOX_CONSTRAINTS, EXTENSION_CONSUMPTION_RULES, INIT_CONTRACT } from './generator-prompts-base.js';
 
 export function buildTestPrompt(componentType, componentCode, componentLabel, registeredAs, blueprint, interviewSpec) {
   // For cortex/app: build list of methods/APIs from blueprint produces/consumes
@@ -254,6 +254,13 @@ Use cases from interview:
 ${useCases}
 
 ${testEnvDoc}
+
+## Platform Rules (shared across all AIMEAT prompts)
+${componentType === 'extension' ? SANDBOX_CONSTRAINTS + '\n\n' : ''}${NAMESPACE_RULES}
+
+${EXTENSION_CONSUMPTION_RULES}
+
+${INIT_CONTRACT}
 
 ## Output Rules
 

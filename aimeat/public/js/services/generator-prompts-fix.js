@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
  */
 
-import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER } from './generator-prompts-base.js';
+import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, NAMESPACE_RULES, SANDBOX_CONSTRAINTS, EXTENSION_CONSUMPTION_RULES, HTML_ENTITY_RULES } from './generator-prompts-base.js';
 import { buildBlueprintPrompt } from './generator-prompts-build.js';
 
 export function buildBlueprintFixPrompt(description, errors, interviewSpec = null) {
@@ -33,40 +33,28 @@ ${buildBlueprintPrompt(description, interviewSpec)}`;
 }
 
 export function buildFixPrompt(originalPrompt, failedResult, errors, componentType, testContext) {
-  // Type-specific constraints that must be preserved during fixes
-  const typeRules = {
-    extension: `
-EXTENSION CONSTRAINTS (V8 sandbox):
-- No require(), no import (except export default for entry point)
-- No Node.js APIs (fs, path, crypto, Buffer, process)
-- No fetch() global — use ctx.fetch() instead
-- No setTimeout, setInterval, console.log — use ctx.log.*
-- All helpers must be INSIDE the same script file
-- Always null-check ctx.memory.get() results: \`const data = await ctx.memory.get("key") || []\``,
-    cortex: `
+  // Type-specific constraints using shared platform rules
+  let typeConstraint = '';
+  if (componentType === 'extension') {
+    typeConstraint = `\n${SANDBOX_CONSTRAINTS}\n\n${NAMESPACE_RULES}\n`;
+  } else if (componentType === 'cortex') {
+    typeConstraint = `\n${NAMESPACE_RULES}\n\n${EXTENSION_CONSUMPTION_RULES}\n
 CORTEX CONSTRAINTS (browser IIFE):
 - Must be a single IIFE registering on window.AIMEAT
 - YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must match
-- init() must follow the init() contract: check data, trigger collector if empty, return { ready: true }
-- Every readExtMemory/getPublic call must be null-checked`,
-    app: `
+- Every readExtMemory/getPublic call must be null-checked\n`;
+  } else if (componentType === 'app') {
+    typeConstraint = `\n${NAMESPACE_RULES}\n
 APP CONSTRAINTS (browser HTML):
 - Include CSP meta tag if using CDN scripts
 - Use AIMEAT.auth for login, AIMEAT.data for memory access
 - Call cortex init() before accessing data
-- Handle empty state gracefully (no data on first run)`,
-  };
-
-  const typeConstraint = typeRules[componentType] || '';
+- Handle empty state gracefully (no data on first run)\n`;
+  }
 
   return `${INSTRUCTION_DISCLAIMER}The following result had validation errors. Fix ONLY the errors listed below.
 
-CRITICAL: Your output MUST use proper JavaScript/YAML syntax. NEVER output HTML entities:
-- Use => NOT =&gt;
-- Use && NOT &amp;&amp;
-- Use >= NOT &gt;=
-- Use < NOT &lt;  and > NOT &gt;
-HTML entities in code will crash the V8 sandbox or the browser.
+${HTML_ENTITY_RULES}
 ${typeConstraint}
 ORIGINAL PROMPT:
 ${originalPrompt}
@@ -163,20 +151,11 @@ export function buildEditPrompt(type, label, currentCode, changeRequest, upstrea
     type === 'translation' ? 'Translation file' :
     type === 'memory' ? 'Memory structure' : type;
 
-  // Type-specific constraints to include in edit prompt
+  // Type-specific constraints using shared platform rules
   const typeConstraints = {
-    extension: `
-## Extension Constraints (V8 sandbox — do NOT violate during edit)
-- No require(), no import, no Node.js APIs, no fetch() global — use ctx.fetch()
-- No setTimeout/setInterval/console.log — use ctx.log.*
-- All helpers INSIDE the same script file — no cross-file references
-- Always null-check ctx.memory.get() results`,
-    cortex: `
-## Cortex Constraints (browser IIFE — do NOT violate during edit)
-- Must remain a single IIFE on window.AIMEAT
-- init() must follow contract: check data, trigger if empty, return { ready: true }
-- Every readExtMemory/getPublic call must be null-checked`,
-    app: `
+    extension: `\n${SANDBOX_CONSTRAINTS}\n\n${NAMESPACE_RULES}\n\n${HTML_ENTITY_RULES}`,
+    cortex: `\n${NAMESPACE_RULES}\n\n${EXTENSION_CONSUMPTION_RULES}`,
+    app: `\n${NAMESPACE_RULES}\n
 ## App Constraints (browser HTML — do NOT violate during edit)
 - Keep CSP meta tag if using CDN scripts
 - Keep AIMEAT.auth/data setup intact
