@@ -75,78 +75,70 @@ CRITICAL SANDBOX RULES — violating ANY of these will crash the test:
 - NO export statements — FORBIDDEN
 - NO top-level declarations with const/let outside of the function body scope
 - You are inside an async function body. Just write sequential code.
-- You have exactly TWO variables available: testFetch and baseUrl
+- You have FOUR variables available: testFetch, baseUrl, callExt, readExtMemory
 - No other globals, no Node.js APIs, no fs, no path, no process
 
-Available helper:
+Available helpers:
 
+  // LOW-LEVEL: raw HTTP call (use only when callExt doesn't fit)
   const resp = await testFetch(url, { method, body, headers });
   // resp = { status: number, ok: boolean, body: object }
   // Auth token is injected automatically. Do NOT set Authorization header.
 
-URLs must start with / (e.g., /v1/ext/my-ext/actionId)
-baseUrl is available but testFetch prepends it automatically for / URLs.
-CRITICAL: GET and DELETE requests MUST NOT include a body. Node.js fetch throws
-"Request with GET/HEAD method cannot have body" if you pass body with method: 'GET'.
-WRONG: testFetch(url, { method: 'GET', body: JSON.stringify({}) })
-CORRECT: testFetch(url, { method: 'GET' })
-CORRECT: testFetch(url) — defaults to GET with no body
+  // HIGH-LEVEL: call extension action (PREFERRED — same as cortex callExt)
+  const result = await callExt('extension-name', 'actionId', { key: 'value' });
+  // Returns the action's return value directly (AIMEAT envelope unwrapped)
+  // result is whatever the action returned: { success: true, data: ... } or { error: '...' }
+
+  // HIGH-LEVEL: read extension memory (PREFERRED — same as cortex readExtMemory)
+  const data = await readExtMemory('extension-name', 'memory.key');
+  // Returns the value from ext:{name} namespace, or null if not found
+
+IMPORTANT: For extension tests, ALWAYS use callExt instead of testFetch.
+callExt is the same interface that cortex and apps use to consume extensions.
+It unwraps the AIMEAT envelope automatically — you get the action's direct return value.
 
 Your code MUST end with: return { passed: boolean, errors: string[], details: string }
 - passed: true if ALL checks succeeded
 - errors: array of failure descriptions (empty array if passed)
 - details: human-readable summary of what was tested
 
-PATTERN — follow this exact structure:
+PATTERN — follow this exact structure using callExt:
 \`\`\`
 const errors = [];
 
-// Test 1
-const r1 = await testFetch('/v1/ext/${registeredAs}/actionName', { method: 'POST', body: JSON.stringify({ key: 'value' }) });
-if (!r1.ok) errors.push('actionName failed: status ' + r1.status);
-else if (!r1.body?.data) errors.push('actionName returned no data');
+// Test 1: call extension action via callExt (same as cortex)
+const r1 = await callExt('${registeredAs}', 'actionName', { key: 'value' });
+// r1 is the action's direct return value (envelope already unwrapped)
+if (!r1) errors.push('actionName: no response');
+else if (r1.error) errors.push('actionName: ' + r1.error);
 
-// Test 2 ...
+// Test 2: verify side effects via readExtMemory (same as cortex)
+const data = await readExtMemory('${registeredAs}', 'some.key');
+if (!data) errors.push('some.key not written after action');
 
 return { passed: errors.length === 0, errors, details: 'Tested N actions' };
 \`\`\`
 
 For EXTENSION tests:
 
-## How to call extension actions
-- ALL extension actions use POST — the backend only has a POST route for /v1/ext/{name}/{actionId}
-- The {actionId} is the action's "id" field from YAML manifest, NOT the "path" field
-- Do NOT convert action IDs to kebab-case — use them exactly as-is
-- URL pattern: /v1/ext/{registeredName}/{actionId}
-- NOT /v1/extensions/... — correct path is /v1/ext/{name}/{actionId}
-- Always: testFetch(url, { method: 'POST', body: JSON.stringify({...}) })
-- For actions with no input: body: JSON.stringify({})
-- Response envelope: { ok: true, data: { ...action return value... } }
-
-## How to verify side effects — test like a CORTEX consumer
+## Use callExt and readExtMemory (MANDATORY)
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  Test the extension THE SAME WAY a cortex or app would consume it.    ║
+║  ALWAYS use callExt() to call extension actions.                       ║
+║  ALWAYS use readExtMemory() to read extension memory.                  ║
+║  These are the SAME interfaces that cortex/apps use in production.     ║
 ║                                                                        ║
-║  Extensions store data in ISOLATED namespace (ext:{name}/key).         ║
-║  This is NOT accessible via /v1/memory/ API (that's owner namespace). ║
+║  callExt('ext-name', 'actionId', { input })                           ║
+║    → Returns the action's direct return value (envelope unwrapped)     ║
+║    → Example: { success: true, data: [...] } or { error: '...' }      ║
 ║                                                                        ║
-║  NEVER do this:                                                        ║
-║    await testFetch('/v1/memory/watchlist.items', { method: 'GET' })   ║
-║    → Returns null (wrong namespace!)                                   ║
+║  readExtMemory('ext-name', 'memory.key')                               ║
+║    → Returns value from ext:{name} namespace, or null                  ║
+║    → Use to verify side effects (e.g., watchlist was updated)          ║
 ║                                                                        ║
-║  INSTEAD — verify by calling extension actions:                        ║
-║    1. Call addToWatchlist → check return value confirms success        ║
-║    2. Call getWatchlist → check it contains the added item             ║
-║    3. Call removeFromWatchlist → check return value                    ║
-║    4. Call getWatchlist → check item is gone                           ║
-║                                                                        ║
-║  This is exactly how cortex consumers use extensions:                  ║
-║    callExt('my-ext', 'addItem', { ... })                              ║
-║    callExt('my-ext', 'getItems', {})    // verify side effect         ║
-║                                                                        ║
+║  DO NOT use testFetch for extension actions.                           ║
 ║  DO NOT create getMemory/setMemory/deleteMemory helpers.              ║
 ║  DO NOT access /v1/memory/ directly.                                   ║
-║  The extension's OWN actions are your only interface.                  ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
 - Test with realistic input based on what the extension does
@@ -285,43 +277,31 @@ const errors = [];
 // ALL extension calls use POST. Response: { ok: true, data: { ...action return... } }
 
 // [MEMORY] init — MUST succeed
-const r0 = await testFetch('/v1/ext/my-service/init', { method: 'POST', body: JSON.stringify({}) });
-if (!r0.ok) errors.push('init: HTTP ' + r0.status);
-else if (!r0.body?.data) errors.push('init: no data');
+const r0 = await callExt('my-service', 'init', {});
+if (!r0) errors.push('init: no response');
+else if (r0.error) errors.push('init: ' + r0.error);
 
 // [MEMORY] add item — MUST succeed, assert return values
-const r1 = await testFetch('/v1/ext/my-service/addItem', {
-  method: 'POST', body: JSON.stringify({ name: 'Test Item' })
-});
-if (!r1.ok) errors.push('addItem: HTTP ' + r1.status);
-else if (!r1.body?.data?.success) errors.push('addItem: not successful');
+const r1 = await callExt('my-service', 'addItem', { name: 'Test Item' });
+if (!r1) errors.push('addItem: no response');
+else if (!r1.success) errors.push('addItem: not successful');
 
-// Verify side effect by calling the READ action (NOT /v1/memory/ directly!)
-const r1v = await testFetch('/v1/ext/my-service/getItems', { method: 'POST', body: JSON.stringify({}) });
-if (r1v.ok && r1v.body?.data?.items) {
-  if (r1v.body.data.items.length === 0) errors.push('addItem: getItems returned empty after add');
-} else {
-  errors.push('getItems: failed to verify addItem side effect');
+// Verify side effect via readExtMemory (same as cortex readExtMemory)
+const items = await readExtMemory('my-service', 'items.list');
+if (!items || !Array.isArray(items) || items.length === 0) {
+  errors.push('addItem: items.list empty after add');
 }
 
 // [EXTERNAL API] — check shape only, NOT specific values
-const r2 = await testFetch('/v1/ext/my-service/fetchData', {
-  method: 'POST', body: JSON.stringify({ query: 'test' })
-});
-if (r2.status === 500) errors.push('fetchData: crashed with HTTP 500');
-else {
-  const d = r2.body?.data;
-  if (d === undefined || d === null) errors.push('fetchData: no response data at all');
-  // d.error is OK (API error handled gracefully) — do NOT push error
-  // d.results/d.items is OK (API worked) — do NOT assert specific values
-}
+const r2 = await callExt('my-service', 'fetchData', { query: 'test' });
+if (r2 === null) errors.push('fetchData: no response at all');
+// r2.error is OK (API error handled gracefully) — do NOT push error
+// r2.results/r2.items is OK (API worked) — do NOT assert specific values
 
 // [MEMORY] error handling — MUST return proper error for bad input
-const r3 = await testFetch('/v1/ext/my-service/addItem', {
-  method: 'POST', body: JSON.stringify({})
-});
-if (r3.status === 500) errors.push('addItem(empty): crashed');
-else if (!r3.body?.data?.error) errors.push('addItem(empty): no error for invalid input');
+const r3 = await callExt('my-service', 'addItem', {});
+if (r3 === null) errors.push('addItem(empty): no response');
+else if (!r3.error) errors.push('addItem(empty): no error for invalid input');
 
 return { passed: errors.length === 0, errors, details: 'Tested actions' };`;
 }

@@ -1622,12 +1622,16 @@ Extensions expose TWO interfaces to the outside world:
   NEVER read extension data via /v1/memory/{key} — that reads the OWNER's
   namespace, not the extension's. You'll get null.
 
-### Testing extensions — verify like a cortex consumer
-  To verify side effects after calling a write action:
-  1. Call the WRITE action (e.g., addToWatchlist)
-  2. Call a READ action to verify (e.g., getWatchlist)
-  DO NOT use /v1/memory/ API to verify — wrong namespace.
-  DO NOT create getMemory/setMemory/deleteMemory helpers.
+### Testing extensions — use callExt and readExtMemory
+  The test sandbox provides callExt() and readExtMemory() — the SAME helpers
+  that cortex uses in production. Use these instead of raw testFetch:
+
+  callExt('ext-name', 'actionId', { input })  → action's return value (unwrapped)
+  readExtMemory('ext-name', 'key')              → value from ext:{name} namespace
+
+  DO NOT use testFetch for extension actions — use callExt.
+  DO NOT use /v1/memory/ to read extension data — use readExtMemory.
+  DO NOT create custom getMemory/setMemory helpers.
 
 ### Action types for testing
   - [MEMORY] actions: use ONLY ctx.memory (no external API). Tests MUST assert specific return values.

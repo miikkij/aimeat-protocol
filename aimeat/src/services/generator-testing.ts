@@ -132,12 +132,33 @@ export async function executeHttpTest(
       return { status: res.status, ok: res.ok, body };
     };
 
-    type TestFetchFn = (url: string, opts?: RequestInit) => Promise<{ status: number; ok: boolean; body: unknown }>;
-    // Execute the AI-generated test code
-    const testFn = new Function('testFetch', 'baseUrl', `return (async () => { ${testCode} })()`) as
-      (testFetch: TestFetchFn, baseUrl: string) => Promise<{ passed: boolean; errors: string[]; details?: string }>;
+    // Cortex-style helpers — same interface cortex uses to consume extensions
+    const callExt = async (extName: string, actionId: string, body: Record<string, unknown> = {}) => {
+      const resp = await testFetch(`/v1/ext/${extName}/${actionId}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      // Return the action's actual data (unwrap AIMEAT envelope)
+      const b = resp.body as Record<string, unknown> | null;
+      return (b as any)?.data ?? null;
+    };
 
-    const result = await testFn(testFetch, baseUrl);
+    const readExtMemory = async (extName: string, key: string) => {
+      const resp = await testFetch(`/v1/memory/ext:${extName}/${key}`, { method: 'GET' });
+      const b = resp.body as Record<string, unknown> | null;
+      if (resp.ok && (b as any)?.data?.value !== undefined) return (b as any).data.value;
+      if (resp.ok && (b as any)?.data !== undefined) return (b as any).data;
+      return null;
+    };
+
+    type TestFetchFn = (url: string, opts?: RequestInit) => Promise<{ status: number; ok: boolean; body: unknown }>;
+    type CallExtFn = (extName: string, actionId: string, body?: Record<string, unknown>) => Promise<unknown>;
+    type ReadExtMemoryFn = (extName: string, key: string) => Promise<unknown>;
+    // Execute the AI-generated test code — provides testFetch + callExt + readExtMemory
+    const testFn = new Function('testFetch', 'baseUrl', 'callExt', 'readExtMemory', `return (async () => { ${testCode} })()`) as
+      (testFetch: TestFetchFn, baseUrl: string, callExt: CallExtFn, readExtMemory: ReadExtMemoryFn) => Promise<{ passed: boolean; errors: string[]; details?: string }>;
+
+    const result = await testFn(testFetch, baseUrl, callExt, readExtMemory);
     return {
       passed: result?.passed ?? false,
       errors: result?.errors ?? ['Test returned no result'],
