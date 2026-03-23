@@ -200,6 +200,22 @@ export async function writeProjectLog(projectId, action, details = {}) {
   } catch { /* best-effort logging — don't block user flow */ }
 }
 
+/* ── Debug Artifact Writer ─────────────────────────── */
+
+/**
+ * Write a debug artifact to disk for a generator component.
+ * Best-effort — failures are silently ignored (don't block user flow).
+ * @param {string} projectId
+ * @param {string} componentId
+ * @param {string} phase — 'prompt'|'generated'|'validation'|'test-prompt'|'test-code'|'test-result'|'project-meta'
+ * @param {string|object} content
+ */
+export async function writeDebugArtifact(projectId, componentId, phase, content) {
+  try {
+    await apiPost(`/v1/generator/${projectId}/debug/${componentId}`, { phase, content });
+  } catch { /* best-effort */ }
+}
+
 /* ── Interview Spec ─────────────────────────────────── */
 
 export async function saveInterviewSpec(projectId, spec) {

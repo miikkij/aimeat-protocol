@@ -30,7 +30,7 @@
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
 import {
-  loadAllComponents, saveComponent, registerComponent, writeProjectLog,
+  loadAllComponents, saveComponent, registerComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
 import { buildComponentPrompt, buildFixPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
@@ -58,6 +58,13 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
     const phases = project?.blueprint?.phases || [];
     const phaseOrder = phases.flatMap(p => p.componentIds || []);
 
+    // Debug: write project metadata at autopilot start
+    writeDebugArtifact(projectId, '_project', 'project-meta', {
+      project: { projectId, name: project?.name, description: project?.description },
+      interviewSpec,
+      blueprint: project?.blueprint,
+    });
+
     try {
       // Iterate through all components in phase order
       for (const cid of phaseOrder) {
@@ -78,6 +85,8 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           project.description, project.blueprint, completedComponents,
           interviewSpec,
         );
+        // Debug: write prompt
+        writeDebugArtifact(projectId, cid, 'prompt', prompt);
 
         // Run AI
         let content;
@@ -90,6 +99,8 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         if (autopilotState.cancelledRef.current) break;
         // Strip codeblock wrappers for extensions (AI models often wrap in ```)
         if (comp.type === 'extension') content = stripCodeblock(content);
+        // Debug: write generated code
+        writeDebugArtifact(projectId, cid, 'generated', content);
 
         // Save result
         let updated = { ...comp, result: content, status: 'validating', prompt,
@@ -209,8 +220,10 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                 project.blueprint, interviewSpec
               );
               await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
+              writeDebugArtifact(projectId, cid, 'test-prompt', testPromptText);
               aiTestCode = await runWithAi(projectId, testPromptText);
               aiTestCode = stripCodeblock(aiTestCode);
+              writeDebugArtifact(projectId, cid, 'test-code', aiTestCode);
               updated = { ...updated, testPrompt: testPromptText, testCode: aiTestCode, testEnvironment,
                 history: [...(updated.history || []), { action: 'test_code_generated', at: new Date().toISOString(), by: 'autopilot' }],
               };

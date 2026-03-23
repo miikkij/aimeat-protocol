@@ -55,6 +55,7 @@ import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 // @ts-ignore — frontend ESM module, no .d.ts
 import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
+import { GeneratorDebugWriter } from '../services/generator-debug.js';
 
 export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -348,7 +349,71 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         result = { componentId, type: compType, status: httpResult.passed ? 'passed' : 'failed', scenarios: 1, passed: httpResult.passed ? 1 : 0, errors: httpResult.errors, screenshots: [], fixRound: 0 };
       }
 
+      // Debug: write test artifacts to disk and log to terminal
+      const debugWriter = new GeneratorDebugWriter(projectId);
+      const compLabel = (compVal.label as string) || componentId;
+      await debugWriter.writeTestCode(componentId, testCode as string);
+      await debugWriter.writeTestResult(componentId, result as unknown as Record<string, unknown>);
+      await debugWriter.appendLog({
+        event: 'test_executed',
+        componentId,
+        componentLabel: compLabel,
+        type: compType,
+        environment: env,
+        status: result.status,
+        errors: result.errors,
+        passed: result.passed,
+        scenarios: result.scenarios,
+      });
+
+      // Terminal output — clear summary of what happened
+      const statusIcon = result.status === 'passed' ? '\u2705' : result.status === 'failed' ? '\u274C' : '\u23ED';
+      logger.info(`[generator-test] ${statusIcon} ${compLabel} (${compType}): ${result.status}${result.errors.length > 0 ? ' — ' + result.errors.length + ' errors' : ''}`, {
+        projectId, componentId, environment: env, errors: result.errors.slice(0, 3),
+      });
+
       res.json(success(config.nodeId, { result }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/debug/:componentId — write debug artifact to disk
+  router.post('/v1/generator/:projectId/debug/:componentId',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+      const { phase, content } = req.body ?? {};
+
+      if (!phase || !content) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'phase and content are required'));
+        return;
+      }
+
+      const debugWriter = new GeneratorDebugWriter(projectId);
+      const phases: Record<string, () => Promise<void>> = {
+        'prompt': () => debugWriter.writeComponentPrompt(componentId, content as string),
+        'generated': () => debugWriter.writeComponentGenerated(componentId, content as string),
+        'validation': () => debugWriter.writeValidation(componentId, content as Record<string, unknown>),
+        'test-prompt': () => debugWriter.writeTestPrompt(componentId, content as string),
+        'test-code': () => debugWriter.writeTestCode(componentId, content as string),
+        'test-result': () => debugWriter.writeTestResult(componentId, content as Record<string, unknown>),
+        'project-meta': () => debugWriter.writeProjectMeta(
+          (content as Record<string, unknown>).project as Record<string, unknown>,
+          (content as Record<string, unknown>).interviewSpec,
+          (content as Record<string, unknown>).blueprint,
+        ),
+      };
+
+      const handler = phases[phase as string];
+      if (!handler) {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', `Unknown phase: ${phase}. Valid: ${Object.keys(phases).join(', ')}`));
+        return;
+      }
+
+      await handler();
+      await debugWriter.appendLog({ event: `debug_${phase}`, componentId, timestamp: new Date().toISOString() });
+      res.json(success(config.nodeId, { written: true, phase, componentId }));
     }
   );
 
@@ -854,6 +919,64 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const prompt = buildBlueprintPrompt(project.description || '', interviewSpec);
 
       res.json(success(config.nodeId, { prompt }));
+    }
+  );
+
+  // ── Debug file viewer API ────────────────────────────────────────────
+
+  // GET /v1/generator/debug/projects — list all projects with debug data
+  router.get('/v1/generator/debug/projects',
+    requireAuth(),
+    requireRole('owner'),
+    async (_req, res) => {
+      const { listDebugProjects } = await import('../services/generator-debug.js');
+      const projects = await listDebugProjects();
+      res.json(success(config.nodeId, { projects }));
+    }
+  );
+
+  // GET /v1/generator/debug/:projectId/files — list files for a project
+  router.get('/v1/generator/debug/:projectId/files',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const { listDebugFiles } = await import('../services/generator-debug.js');
+      const projectId = req.params['projectId'] as string;
+      const files = await listDebugFiles(projectId);
+      res.json(success(config.nodeId, { projectId, files }));
+    }
+  );
+
+  // GET /v1/generator/debug/:projectId/file — read a specific file (path in query param)
+  router.get('/v1/generator/debug/:projectId/file',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const { readDebugFile } = await import('../services/generator-debug.js');
+      const projectId = req.params['projectId'] as string;
+      const filePath = (req.query['path'] as string) || '';
+      if (!filePath) {
+        res.status(400).json(error(config.nodeId, 'INVALID_QUERY', 'path query parameter is required'));
+        return;
+      }
+      const content = await readDebugFile(projectId, filePath);
+      if (content === null) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
+        return;
+      }
+      res.json(success(config.nodeId, { projectId, path: filePath, content }));
+    }
+  );
+
+  // DELETE /v1/generator/debug/:projectId — delete debug data for a project
+  router.delete('/v1/generator/debug/:projectId',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const { deleteDebugProject } = await import('../services/generator-debug.js');
+      const projectId = req.params['projectId'] as string;
+      const deleted = await deleteDebugProject(projectId);
+      res.json(success(config.nodeId, { deleted, projectId }));
     }
   );
 
