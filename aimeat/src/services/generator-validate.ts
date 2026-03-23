@@ -322,13 +322,38 @@ function validateMsm(result: string): ValidationResult {
 
 function validateExtension(result: string): ValidationResult {
   const errors: string[] = [];
-  // Try fenced yaml block first; if not found, take everything before first // actions/ comment
-  let raw = extractCodeBlock(result, 'yaml');
-  if (raw === result.trim()) {
-    // extractCodeBlock returned full text = no fence found. Cut at first JS file comment.
+
+  // ── Extract YAML manifest — supports three formats ──
+  // Format 1 (preferred): Single untagged code block with YAML first, then // actions/*.js separator
+  // Format 2: Fenced ```yaml block
+  // Format 3: Raw text (no fences) — cut at first // actions/ comment
+  let raw: string | null = null;
+
+  // Format 1: single untagged code block — split at first // actions/ separator
+  const untaggedMatch = result.match(/```\s*\n([\s\S]*?)```/);
+  if (untaggedMatch) {
+    const content = untaggedMatch[1];
+    const actionSep = content.match(/^\/\/\s*actions\/\S+\.js\s*$/m);
+    if (actionSep) {
+      const sepIndex = content.indexOf(actionSep[0]);
+      raw = content.slice(0, sepIndex).trim();
+    }
+  }
+
+  // Format 2: fenced ```yaml block
+  if (!raw) {
+    const fenced = extractCodeBlock(result, 'yaml');
+    if (fenced !== result.trim()) {
+      raw = fenced;
+    }
+  }
+
+  // Format 3: no fences — cut at first // actions/ comment in raw text
+  if (!raw) {
     const jsStart = result.search(/^\/\/\s*actions\//m);
     raw = jsStart > 0 ? result.slice(0, jsStart).trim() : result.trim();
   }
+
   const { parsed, errors: parseErrors } = tryParseYaml(raw);
   errors.push(...parseErrors);
 

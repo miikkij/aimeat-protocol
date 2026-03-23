@@ -13181,6 +13181,27 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
   /v1/templates/{id}/review:
+    get:
+      operationId: reviewTemplate
+      summary: Get template review details
+      description: Retrieve full details of a template for moderation review. Operator only.
+      tags: [Templates]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Template not found
     post:
       operationId: addTemplateReview
       summary: Add review
@@ -13360,29 +13381,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-
-  /v1/templates/{id}/review:
-    get:
-      operationId: reviewTemplate
-      summary: Get template review details
-      description: Retrieve full details of a template for moderation review. Operator only.
-      tags: [Templates]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          description: Template not found
 
   /v1/templates/{id}/approve:
     post:

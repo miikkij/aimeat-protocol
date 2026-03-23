@@ -267,20 +267,39 @@ const validators = {
 
   extension(result, blueprint) {
     const errors = [];
-    // Extract YAML portion: strip codeblock fences, then cut before JS code
-    let raw = extractCodeBlock(result, 'yaml');
-    // Always cut at first JS file marker (AI may wrap YAML+JS in one fence)
-    const jsMarkers = [
-      /^\/\/\s*actions\//m,
-      /^#\s*actions\//m,
-      /^export\s+default\s+/m,
-    ];
-    let jsStart = -1;
-    for (const rx of jsMarkers) {
-      const idx = raw.search(rx);
-      if (idx > 0 && (jsStart === -1 || idx < jsStart)) jsStart = idx;
+
+    // ── Extract YAML manifest — supports three formats ──
+    // Format 1 (preferred): Single untagged code block with // actions/*.js separator
+    // Format 2: Fenced ```yaml block + JS markers
+    // Format 3: Raw text with JS markers
+    let raw = null;
+
+    // Format 1: single untagged code block — extract content, split at // actions/
+    const untaggedMatch = result.match(/```\s*\n([\s\S]*?)```/);
+    if (untaggedMatch) {
+      const content = untaggedMatch[1];
+      const actionSep = content.match(/^\/\/\s*actions\/\S+\.js\s*$/m);
+      if (actionSep) {
+        const sepIndex = content.indexOf(actionSep[0]);
+        raw = content.slice(0, sepIndex).trim();
+      }
     }
-    if (jsStart > 0) raw = raw.slice(0, jsStart).trim();
+
+    // Format 2/3: fenced ```yaml block or raw text — cut at JS markers
+    if (!raw) {
+      raw = extractCodeBlock(result, 'yaml');
+      const jsMarkers = [
+        /^\/\/\s*actions\//m,
+        /^#\s*actions\//m,
+        /^export\s+default\s+/m,
+      ];
+      let jsStart = -1;
+      for (const rx of jsMarkers) {
+        const idx = raw.search(rx);
+        if (idx > 0 && (jsStart === -1 || idx < jsStart)) jsStart = idx;
+      }
+      if (jsStart > 0) raw = raw.slice(0, jsStart).trim();
+    }
     const { parsed, errors: parseErrors } = tryParseYaml(raw);
     errors.push(...parseErrors);
 
