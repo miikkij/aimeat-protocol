@@ -207,67 +207,7 @@ WRONG: description: > This is a folded string
 WRONG: description: This has (parens) and colons: here
 CORRECT: description: "This has (parens) and colons: here — all on one line"
 
-## V8 Sandbox Constraints (CRITICAL — read before writing code)
-
-Extension code runs in an ISOLATED V8 sandbox. The following are NOT available:
-- No \`require()\`, no \`import\` (except \`export default\` for the action entry point)
-- No Node.js APIs (fs, path, crypto, Buffer, process, etc.)
-- No \`fetch()\` global — use \`ctx.fetch()\` instead
-- No \`setTimeout\`, \`setInterval\`, \`setImmediate\`
-- No \`console.log\` — use \`ctx.log.info/warn/error()\`
-- No DOM APIs (document, window, etc.)
-- No \`ctx.notify()\`, \`ctx.email()\`, \`ctx.sms()\`, \`ctx.push()\` — these DO NOT EXIST
-- No \`ctx.http\`, \`ctx.request\`, \`ctx.axios\` — use \`ctx.fetch()\` for ALL HTTP requests
-
-╔══════════════════════════════════════════════════════════════════════════╗
-║  The ctx object has ONLY these properties:                              ║
-║  ctx.memory (get/set/search/delete/getPublic)                          ║
-║  ctx.fetch(url, opts)                                                   ║
-║  ctx.wallet (consume/deposit/balance)                                   ║
-║  ctx.consent (check/request)                                            ║
-║  ctx.trust (getScore)                                                   ║
-║  ctx.caller (gaii/owner/roles)                                          ║
-║  ctx.config (extension config object)                                   ║
-║  ctx.log (info/warn/error)                                              ║
-║  ctx.notify(message, {title?, priority?, channel?}) → boolean           ║
-║  ctx.email(to, subject, body) → boolean (requires SMTP configured)      ║
-║  ctx.instance (id/config — only for instance-scoped actions)            ║
-║  NOTHING ELSE. Do NOT invent methods that are not listed here.          ║
-╚══════════════════════════════════════════════════════════════════════════╝
-
-What IS available:
-- Standard JS built-ins: JSON, Math, Date, String, Array, Object, Map, Set, RegExp, Promise, etc.
-- \`ctx\` API object (ONLY the properties listed above)
-- \`export default async function(ctx, input) { ... }\` — the action entry point
-
-## Actions are INDEPENDENT — CANNOT call each other
-
-╔══════════════════════════════════════════════════════════════════════════╗
-║  Each action is a SEPARATE function. Actions CANNOT call each other.   ║
-║  There is NO ctx.otherAction() or ctx.callAction() method.             ║
-║  Writing ctx.getCompany() or ctx.searchItems() will CRASH with:        ║
-║    "ctx.getCompany is not a function"                                  ║
-║                                                                        ║
-║  If multiple actions need the same logic (e.g., fetching from API),    ║
-║  define a HELPER FUNCTION above the action exports:                    ║
-║                                                                        ║
-║    async function fetchFromApi(ctx, id) {                              ║
-║      const resp = await ctx.fetch(url + id);                           ║
-║      if (!resp.ok) return null;                                        ║
-║      return JSON.parse(resp.text);                                     ║
-║    }                                                                   ║
-║                                                                        ║
-║    // actions/getItem.js                                               ║
-║    export default async function(ctx, input) {                         ║
-║      return await fetchFromApi(ctx, input.id);                         ║
-║    }                                                                   ║
-║                                                                        ║
-║    // actions/addToList.js                                              ║
-║    export default async function(ctx, input) {                         ║
-║      const item = await fetchFromApi(ctx, input.id);                   ║
-║      // ... add to list ...                                            ║
-║    }                                                                   ║
-╚══════════════════════════════════════════════════════════════════════════╝
+${SANDBOX_CONSTRAINTS}
 
 ## ctx.memory API — CRITICAL details
 
@@ -535,19 +475,7 @@ everyone via \`getPublic('ext:{name}', key)\`.
   Use \`ctx.memory.getPublic(ctx.caller.owner, key)\` to read them — NOT \`ctx.memory.get(key)\`.
   \`ctx.memory.get()\` only reads from the extension's own \`ext:{name}\` namespace.
   Common pattern: \`const data = await ctx.memory.getPublic(ctx.caller.owner, "lookup.data") || [];\`
-- NEVER output HTML entities in JavaScript code — this crashes the V8 sandbox. See rules below.
-
-## CRITICAL: No HTML Entities in JavaScript (violations CRASH the sandbox)
-
-╔════════════════════════════════════════════════════════════════════╗
-║  Your JavaScript code MUST use real operators, NOT HTML entities.  ║
-║  The V8 sandbox executes raw JS — HTML entities are syntax errors. ║
-╚════════════════════════════════════════════════════════════════════╝
-
-WRONG (crashes):  const gt = a =&gt; a &gt; 0 &amp;&amp; b;
-CORRECT:          const gt = a => a > 0 && b;
-
-Check your ENTIRE output before responding. If you see &gt; &lt; &amp; &quot; &#39; anywhere in JavaScript code, replace them with > < & " ' respectively.`,
+${HTML_ENTITY_RULES}`,
 
   app: (label, context, completedComponents) => {
     // Check if any cortex libraries are in completed components
@@ -854,15 +782,7 @@ Add this error collector at the TOP of your main <script>, before any other code
 \\\`\\\`\\\`
 This lets users see runtime errors without opening the browser console.
 
-## CRITICAL: Code Quality — No HTML Entities in JavaScript
-
-Your output MUST use proper JavaScript operators. NEVER output HTML entities in code:
-- Use => NOT =&gt;
-- Use && NOT &amp;&amp;
-- Use >= NOT &gt;=
-- Use < NOT &lt;
-- Use > NOT &gt;
-If your output contains &amp; &lt; &gt; inside JavaScript code, the app WILL crash.
+${HTML_ENTITY_RULES}
 
 Return a complete HTML file with an app manifest comment at the top:
 
