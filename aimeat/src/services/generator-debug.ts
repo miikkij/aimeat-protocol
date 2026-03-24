@@ -126,6 +126,17 @@ export class GeneratorDebugWriter {
     );
   }
 
+  /** Write any named artifact — generic fallback for custom phases */
+  async writeArtifact(componentId: string, name: string, content: string): Promise<void> {
+    // Sanitize name to prevent path traversal
+    const safeName = name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const ext = safeName.endsWith('.json') ? '' : '.txt';
+    await this.safeWrite(
+      join(this.projectPath, 'components', componentId, safeName + ext),
+      content,
+    );
+  }
+
   /** Write fix round data */
   async writeFixRound(componentId: string, round: number, data: {
     fixPrompt?: string;

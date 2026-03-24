@@ -450,12 +450,13 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       };
 
       const handler = phases[phase as string];
-      if (!handler) {
-        res.status(400).json(error(config.nodeId, 'INVALID_BODY', `Unknown phase: ${phase}. Valid: ${Object.keys(phases).join(', ')}`));
-        return;
+      if (handler) {
+        await handler();
+      } else {
+        // Generic fallback — write any phase as a text artifact
+        const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+        await debugWriter.writeArtifact(componentId, phase as string, text);
       }
-
-      await handler();
       await debugWriter.appendLog({ event: `debug_${phase}`, componentId, timestamp: new Date().toISOString() });
       res.json(success(config.nodeId, { written: true, phase, componentId }));
     }
