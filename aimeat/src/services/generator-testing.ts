@@ -203,6 +203,8 @@ export async function executePlaywrightTest(
   projectId: string,
   componentId: string,
   targetUrl: string,
+  preScripts: string[] = [],
+  authToken?: string,
 ): Promise<{ passed: boolean; errors: string[]; screenshots: string[] }> {
   let pw;
   let browser;
@@ -230,6 +232,50 @@ export async function executePlaywrightTest(
 
     // Navigate to target
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
+
+    // Inject auth session so cortex/app can make authenticated API calls
+    if (authToken) {
+      const authSetup = `
+        window.AIMEAT = window.AIMEAT || {};
+        window.AIMEAT.auth = {
+          getSession: function() {
+            var jwt = ${JSON.stringify(authToken)};
+            return {
+              jwt: jwt,
+              fetch: async function(url, opts) {
+                var hdrs = Object.assign({}, (opts && opts.headers) || {}, { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' });
+                var resp = await fetch(url, Object.assign({}, opts, { headers: hdrs }));
+                return resp.json();
+              }
+            };
+          }
+        };
+        window.AIMEAT.data = {
+          getPublic: async function(ns, key) {
+            var url = '/v1/memory/' + encodeURIComponent(ns) + '/' + encodeURIComponent(key);
+            var resp = await fetch(url);
+            if (!resp.ok) return null;
+            var json = await resp.json();
+            return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
+          },
+          get: async function(key) {
+            var jwt = ${JSON.stringify(authToken)};
+            var resp = await fetch('/v1/memory/' + encodeURIComponent(key), { headers: { 'Authorization': 'Bearer ' + jwt } });
+            if (!resp.ok) return null;
+            var json = await resp.json();
+            return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
+          }
+        };
+      `;
+      await page.evaluate(authSetup);
+    }
+
+    // Inject pre-scripts (e.g., cortex library) before test code runs
+    const origin = new URL(targetUrl).origin;
+    for (const src of preScripts) {
+      await page.addScriptTag({ url: `${origin}${src}` });
+      await page.waitForTimeout(500);
+    }
 
     // Take initial screenshot
     const initScreenshot = `${componentId}-01-load.png`;

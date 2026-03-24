@@ -370,15 +370,19 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
           if (compType === 'app') {
             targetUrl = `${baseUrl}/apps/${registeredAs}`;
           } else if (compType === 'cortex') {
-            // Cortex needs an HTML page that loads the cortex library
-            // Use the portal page which loads the AIMEAT SPA (cortex libs are available there)
+            // Cortex test uses a blank page — the cortex library is injected via preScripts
             targetUrl = `${baseUrl}/v1/portal`;
           } else {
             targetUrl = baseUrl;
           }
 
           await ensureScreenshotDir(projectId);
-          const pwResult = await executePlaywrightTest(testCode as string, projectId, componentId, targetUrl);
+          // For cortex tests: inject the cortex library script before running test code
+          const preScripts: string[] = [];
+          if (compType === 'cortex' && registeredAs) {
+            preScripts.push(`/v1/cortex/${registeredAs}/libs/${registeredAs}.js`);
+          }
+          const pwResult = await executePlaywrightTest(testCode as string, projectId, componentId, targetUrl, preScripts, token);
           result = { componentId, type: compType, status: pwResult.passed ? 'passed' : 'failed', scenarios: 1, passed: pwResult.passed ? 1 : 0, errors: pwResult.errors, screenshots: pwResult.screenshots, fixRound: 0 };
         }
       } else {
