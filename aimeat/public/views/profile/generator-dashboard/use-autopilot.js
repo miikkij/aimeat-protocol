@@ -28,7 +28,7 @@
  *   v1.0.0 — 2026-03-22 — Extracted from generator-tab.js ProjectDashboard
  */
 import { t } from '/js/i18n.js';
-import { apiPost } from '/js/api.js';
+import { apiPost, apiDelete } from '/js/api.js';
 import {
   loadAllComponents, saveComponent, registerComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
@@ -155,11 +155,36 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
 
           let resp;
-          if (comp.type === 'cortex') {
-            const cortexVr = validateComponent('cortex', content, project.blueprint);
-            resp = await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
-          } else {
-            resp = await registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
+          const doRegister = async () => {
+            if (comp.type === 'cortex') {
+              const cortexVr = validateComponent('cortex', content, project.blueprint);
+              return registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
+            }
+            return registerComponent(comp.type, vr.extracted || content, session, serviceSlug);
+          };
+          try {
+            resp = await doRegister();
+          } catch (regErr) {
+            // If "already installed", remove the old one and retry
+            if (regErr.message?.includes('already installed') || regErr.message?.includes('already exists') || regErr.message?.includes('409')) {
+              const oldName = vr.extracted?.match?.(/name:\s*"?([^\s"]+)/)?.[1] || content?.match?.(/name:\s*"?([^\s"]+)/)?.[1];
+              if (oldName) {
+                await writeProjectLog(projectId, 'component_reregistering', { meta: { component: comp.label, oldName, by: 'autopilot' } });
+                try {
+                  const deactUrl = comp.type === 'extension' ? `/v1/extensions/${encodeURIComponent(oldName)}/deactivate` : `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`;
+                  await apiPost(deactUrl).catch(() => {});
+                  const delUrl = comp.type === 'extension' ? `/v1/extensions/${encodeURIComponent(oldName)}` : `/v1/cortex/${encodeURIComponent(oldName)}`;
+                  await apiDelete(delUrl);
+                  resp = await doRegister();
+                } catch (reregErr) {
+                  throw reregErr;
+                }
+              } else {
+                throw regErr;
+              }
+            } else {
+              throw regErr;
+            }
           }
           const d = resp?.data || {};
           const regName = d.csm?.name || d.integration?.name || d.extension?.name
@@ -305,14 +330,18 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                     continue;
                   }
 
-                  // Deactivate before re-registering to ensure clean state
-                  if (comp.type === 'extension' || comp.type === 'cortex') {
+                  // Deactivate + remove before re-registering to ensure clean state
+                  if ((comp.type === 'extension' || comp.type === 'cortex') && updated.registeredAs) {
                     try {
                       const deactUrl = comp.type === 'extension'
                         ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}/deactivate`
                         : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}/deactivate`;
-                      await apiPost(deactUrl);
-                    } catch { /* may not be active */ }
+                      await apiPost(deactUrl).catch(() => {});
+                      const delUrl = comp.type === 'extension'
+                        ? `/v1/extensions/${encodeURIComponent(updated.registeredAs)}`
+                        : `/v1/cortex/${encodeURIComponent(updated.registeredAs)}`;
+                      await apiDelete(delUrl);
+                    } catch { /* may not exist */ }
                   }
 
                   // Re-register fixed version
