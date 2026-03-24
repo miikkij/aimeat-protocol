@@ -9,6 +9,7 @@
  *   import { buildTestPrompt } from '/js/services/generator-prompts-test.js';
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
+ *   v1.1.0 — 2026-03-24 — Add writeExtMemory helper, test idempotency rules, cleanup pattern
  */
 
 import { INSTRUCTION_DISCLAIMER, NAMESPACE_RULES, SANDBOX_CONSTRAINTS, EXTENSION_CONSUMPTION_RULES, INIT_CONTRACT } from './generator-prompts-base.js';
@@ -75,7 +76,7 @@ CRITICAL SANDBOX RULES — violating ANY of these will crash the test:
 - NO export statements — FORBIDDEN
 - NO top-level declarations with const/let outside of the function body scope
 - You are inside an async function body. Just write sequential code.
-- You have FOUR variables available: testFetch, baseUrl, callExt, readExtMemory
+- You have FIVE variables available: testFetch, baseUrl, callExt, readExtMemory, writeExtMemory
 - No other globals, no Node.js APIs, no fs, no path, no process
 
 Available helpers:
@@ -94,9 +95,34 @@ Available helpers:
   const data = await readExtMemory('extension-name', 'memory.key');
   // Returns the value from ext:{name} namespace, or null if not found
 
+  // HIGH-LEVEL: write extension memory directly (for test setup/cleanup ONLY)
+  await writeExtMemory('extension-name', 'memory.key', value);
+  // Writes a value to ext:{name} namespace. Use for resetting state, NOT for testing logic.
+
 IMPORTANT: For extension tests, ALWAYS use callExt instead of testFetch.
 callExt is the same interface that cortex and apps use to consume extensions.
 It unwraps the AIMEAT envelope automatically — you get the action's direct return value.
+
+## CRITICAL: Test Idempotency — Clean State at Start
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Tests MUST work correctly on EVERY run — first run, re-run, or after  ║
+║  a previous failed run left stale data behind.                         ║
+║                                                                        ║
+║  BEFORE the first test scenario, RESET state using writeExtMemory:     ║
+║    await writeExtMemory('ext-name', 'list.key', []);                   ║
+║    await writeExtMemory('ext-name', 'counter.key', 0);                 ║
+║                                                                        ║
+║  Reset ALL memory keys that the extension writes to (from blueprint    ║
+║  produces list). This ensures a clean starting point regardless of     ║
+║  what previous runs left behind.                                       ║
+║                                                                        ║
+║  The init action is IDEMPOTENT — it creates data only if missing.      ║
+║  It does NOT reset existing data. You MUST reset manually.             ║
+║                                                                        ║
+║  ALSO: If you add extra scenarios beyond the blueprint (e.g., testing  ║
+║  duplicate detection), track the state changes from prior scenarios.   ║
+║  After add+remove, the item is GONE — adding again is NOT a duplicate. ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
 Your code MUST end with: return { passed: boolean, errors: string[], details: string }
 - passed: true if ALL checks succeeded
@@ -106,6 +132,9 @@ Your code MUST end with: return { passed: boolean, errors: string[], details: st
 PATTERN — follow this exact structure using callExt:
 \`\`\`
 const errors = [];
+
+// ── CLEANUP: Reset state from previous test runs ──
+await writeExtMemory('${registeredAs}', 'list.key', []);
 
 // Test 1: call extension action via callExt (same as cortex)
 const r1 = await callExt('${registeredAs}', 'actionName', { key: 'value' });
@@ -135,6 +164,10 @@ For EXTENSION tests:
 ║  readExtMemory('ext-name', 'memory.key')                               ║
 ║    → Returns value from ext:{name} namespace, or null                  ║
 ║    → Use to verify side effects (e.g., watchlist was updated)          ║
+║                                                                        ║
+║  writeExtMemory('ext-name', 'memory.key', value)                       ║
+║    → Writes value to ext:{name} namespace (for cleanup/setup ONLY)     ║
+║    → Use at START of test to reset stale state from previous runs      ║
 ║                                                                        ║
 ║  DO NOT use testFetch for extension actions.                           ║
 ║  DO NOT create getMemory/setMemory/deleteMemory helpers.              ║
@@ -167,8 +200,20 @@ For TRANSLATION tests:
       .filter(ts => bpComp && ts.component === bpComp.id)
       .flatMap(ts => ts.scenarios || []);
 
+    // Extract memory keys the extension writes to (for cleanup instructions)
+    const memoryProduces = (bpComp?.produces || [])
+      .filter(p => p.startsWith('memory:'))
+      .map(p => p.replace('memory:', ''));
+
     if (componentType === 'extension' && scenarios.length > 0) {
-      testSection += `\n## Test Scenarios (from blueprint)
+      const cleanupSection = memoryProduces.length > 0
+        ? `\n## Memory Keys to Reset at Start (from blueprint produces)
+Reset these keys BEFORE the first test scenario using writeExtMemory:
+${memoryProduces.map(k => `  await writeExtMemory('${registeredAs}', '${k.replace(/\.\*$/, '')}', ${k.includes('.*') ? 'null  // wildcard — reset known instances' : '[]'});`).join('\n')}
+Note: For wildcard keys (*.pattern), reset specific instances you will create during the test.\n`
+        : '';
+      testSection += `${cleanupSection}
+## Test Scenarios (from blueprint)
 
 ALL extension calls are POST to /v1/ext/${registeredAs}/{actionId}
 Response envelope: { ok: true, data: { ...action return value... } }
@@ -274,7 +319,11 @@ ${INIT_CONTRACT}
 ## Complete server-side example
 
 const errors = [];
-// ALL extension calls use POST. Response: { ok: true, data: { ...action return... } }
+
+// ── CLEANUP: Reset state from previous runs ──
+// Reset ALL memory keys the extension writes to (from blueprint produces)
+await writeExtMemory('my-service', 'items.list', []);
+await writeExtMemory('my-service', 'stats.counter', 0);
 
 // [MEMORY] init — MUST succeed
 const r0 = await callExt('my-service', 'init', {});

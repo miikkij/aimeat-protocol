@@ -10,6 +10,7 @@
  *   v1.0.0 — 2026-03-21 — Initial implementation
  *   v2.0.0 — 2026-03-21 — Remove all deterministic test logic. Tests are AI-generated
  *     via prompt-driven workflow. This file is infrastructure only.
+ *   v2.1.0 — 2026-03-24 — Add writeExtMemory helper for test state cleanup
  */
 
 import { tmpdir } from 'node:os';
@@ -151,14 +152,23 @@ export async function executeHttpTest(
       return null;
     };
 
+    // Write extension memory directly — for test state setup/cleanup
+    const writeExtMemory = async (extName: string, key: string, value: unknown) => {
+      await testFetch(`/v1/memory/ext:${extName}/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify({ value }),
+      });
+    };
+
     type TestFetchFn = (url: string, opts?: RequestInit) => Promise<{ status: number; ok: boolean; body: unknown }>;
     type CallExtFn = (extName: string, actionId: string, body?: Record<string, unknown>) => Promise<unknown>;
     type ReadExtMemoryFn = (extName: string, key: string) => Promise<unknown>;
-    // Execute the AI-generated test code — provides testFetch + callExt + readExtMemory
-    const testFn = new Function('testFetch', 'baseUrl', 'callExt', 'readExtMemory', `return (async () => { ${testCode} })()`) as
-      (testFetch: TestFetchFn, baseUrl: string, callExt: CallExtFn, readExtMemory: ReadExtMemoryFn) => Promise<{ passed: boolean; errors: string[]; details?: string }>;
+    type WriteExtMemoryFn = (extName: string, key: string, value: unknown) => Promise<void>;
+    // Execute the AI-generated test code — provides testFetch + callExt + readExtMemory + writeExtMemory
+    const testFn = new Function('testFetch', 'baseUrl', 'callExt', 'readExtMemory', 'writeExtMemory', `return (async () => { ${testCode} })()`) as
+      (testFetch: TestFetchFn, baseUrl: string, callExt: CallExtFn, readExtMemory: ReadExtMemoryFn, writeExtMemory: WriteExtMemoryFn) => Promise<{ passed: boolean; errors: string[]; details?: string }>;
 
-    const result = await testFn(testFetch, baseUrl, callExt, readExtMemory);
+    const result = await testFn(testFetch, baseUrl, callExt, readExtMemory, writeExtMemory);
     return {
       passed: result?.passed ?? false,
       errors: result?.errors ?? ['Test returned no result'],
