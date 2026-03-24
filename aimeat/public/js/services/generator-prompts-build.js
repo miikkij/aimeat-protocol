@@ -722,6 +722,40 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     }
   }
 
+  // Cortex: if blueprint produces api:t, cortex MUST include translation helper methods
+  if (type === 'cortex' && blueprint?.components) {
+    const componentId = blueprint.components.find(c => c.label === label)?.id;
+    const comp = componentId && blueprint.components.find(c => c.id === componentId);
+    if (comp?.produces && comp.produces.some(p => p === 'api:t')) {
+      context += `\n## REQUIRED: Translation Helper Methods
+
+Your cortex MUST include these translation methods (blueprint produces "api:t"):
+
+\`\`\`javascript
+// Translation helper — MUST be included
+async function getTranslations(locale) {
+  const strings = await readExtMemory(EXT.name, 'i18n.' + (locale || 'fi'));
+  return strings || {};
+}
+
+function t(key, translations) {
+  if (!translations) return key;
+  const parts = key.split('.');
+  let val = translations;
+  for (const p of parts) {
+    val = val?.[p];
+    if (val === undefined) return key;
+  }
+  return val;
+}
+\`\`\`
+
+Export both as public methods: getTranslations(locale) and t(key, translations).
+The app calls getTranslations() during startup and t() for every UI string.
+If these are missing, the app WILL crash with "getTranslations is not a function".\n`;
+    }
+  }
+
   // Thread interview data source details to extension prompts
   if (type === 'extension' && interviewSpec?.dataSources) {
     context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';

@@ -183,8 +183,14 @@ export async function executePlaywrightTest(
   componentId: string,
   targetUrl: string,
 ): Promise<{ passed: boolean; errors: string[]; screenshots: string[] }> {
-  const pw = await loadPlaywright();
-  const browser = await pw.chromium.launch({ headless: true });
+  let pw;
+  let browser;
+  try {
+    pw = await loadPlaywright();
+    browser = await pw.chromium.launch({ headless: true });
+  } catch (err) {
+    return { passed: false, errors: [`Playwright not available: ${(err as Error).message?.split('\n')[0]}`], screenshots: [] };
+  }
   const errors: string[] = [];
   const screenshots: string[] = [];
 
