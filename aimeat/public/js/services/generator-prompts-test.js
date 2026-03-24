@@ -316,6 +316,11 @@ ${INIT_CONTRACT}
 - For apps: verify the use cases from the interview actually work in the UI
 - DO NOT write placeholder tests — every assertion must verify real behavior
 
+## JavaScript Pitfalls — AVOID THESE BUGS
+- **NEVER compare arrays/objects with === or !==** — \`value !== []\` is ALWAYS true (reference comparison). Use: \`Array.isArray(value) && value.length === 0\` to check for empty array, or \`value === null\` to check for null.
+- **NEVER use \`== null\`** — use strict \`=== null\` or \`=== undefined\`.
+- **Check array emptiness** with \`.length === 0\`, not comparison to \`[]\`.
+
 ## Complete server-side example
 
 const errors = [];

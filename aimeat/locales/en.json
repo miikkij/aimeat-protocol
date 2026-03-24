@@ -1239,6 +1239,7 @@
       "test_code_placeholder": "Paste AI-generated test code here...",
       "test_run": "Run Test",
       "test_result_title": "Result",
+      "test_trace_title": "Diagnostics trace",
       "test_no_testable": "No registered testable components (extension/cortex/app)",
       "openrouter": {
         "title": "OpenRouter Settings",

@@ -10,6 +10,7 @@
  *   import { buildBlueprintPrompt, buildInterviewPrompt, buildComponentPrompt } from '/js/services/generator-prompts-build.js';
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
+ *   v1.1.0 — 2026-03-24 — Add API URL usage rules + notes to extension data source details
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
@@ -761,7 +762,11 @@ If these are missing, the app WILL crash with "getTranslations is not a function
     context += '\n## Data Source Details (from interview — use these to write correct parsers)\n';
     for (const ds of interviewSpec.dataSources) {
       context += `- **${ds.name}** (${ds.type}): ${ds.url || 'user-input'}\n`;
+      if (ds.url) {
+        context += `  ⚠️ Use this EXACT URL as the base. Do NOT guess or modify the URL structure — read the notes below for how to construct requests.\n`;
+      }
       if (ds.encoding) context += `  Encoding: ${ds.encoding}\n`;
+      if (ds.notes) context += `  Notes: ${ds.notes}\n`;
       if (ds.responseEnvelope) {
         context += `  Response envelope (top-level JSON structure): \`${typeof ds.responseEnvelope === 'string' ? ds.responseEnvelope : JSON.stringify(ds.responseEnvelope)}\`\n`;
         context += `  ⚠️ Use the EXACT field names from this envelope to access the results array. Do NOT guess field names like "results" or "data" — use what the API actually returns.\n`;

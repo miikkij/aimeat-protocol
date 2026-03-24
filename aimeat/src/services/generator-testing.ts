@@ -33,6 +33,13 @@ export interface ComponentTestPlan {
   level: number;
 }
 
+export interface TraceEntry {
+  fn: string;
+  args: string;
+  result: string;
+  status: number;
+}
+
 export interface TestResult {
   componentId: string;
   type: string;
@@ -42,6 +49,7 @@ export interface TestResult {
   errors: string[];
   screenshots: string[];
   fixRound: number;
+  trace?: TraceEntry[];
 }
 
 export interface TestReport {
@@ -115,7 +123,14 @@ export async function executeHttpTest(
   testCode: string,
   baseUrl: string,
   token: string,
-): Promise<{ passed: boolean; errors: string[]; details?: string }> {
+): Promise<{ passed: boolean; errors: string[]; details?: string; trace?: TraceEntry[] }> {
+  // Diagnostic trace — records every helper call with input/output
+  const trace: TraceEntry[] = [];
+  const trunc = (v: unknown, max = 500): string => {
+    const s = typeof v === 'string' ? v : JSON.stringify(v);
+    return s && s.length > max ? s.slice(0, max) + '…' : (s ?? 'null');
+  };
+
   try {
     // Build a sandboxed function that the AI test code can use
     const testFetch = async (url: string, opts?: RequestInit) => {
@@ -141,23 +156,28 @@ export async function executeHttpTest(
       });
       // Return the action's actual data (unwrap AIMEAT envelope)
       const b = resp.body as Record<string, unknown> | null;
-      return (b as any)?.data ?? null;
+      const result = (b as any)?.data ?? null;
+      trace.push({ fn: 'callExt', args: `${extName}/${actionId}(${trunc(body, 200)})`, result: trunc(result), status: resp.status });
+      return result;
     };
 
     const readExtMemory = async (extName: string, key: string) => {
       const resp = await testFetch(`/v1/memory/ext:${extName}/${key}`, { method: 'GET' });
       const b = resp.body as Record<string, unknown> | null;
-      if (resp.ok && (b as any)?.data?.value !== undefined) return (b as any).data.value;
-      if (resp.ok && (b as any)?.data !== undefined) return (b as any).data;
-      return null;
+      let result: unknown = null;
+      if (resp.ok && (b as any)?.data?.value !== undefined) result = (b as any).data.value;
+      else if (resp.ok && (b as any)?.data !== undefined) result = (b as any).data;
+      trace.push({ fn: 'readExtMemory', args: `${extName}/${key}`, result: trunc(result), status: resp.status });
+      return result;
     };
 
     // Write extension memory directly — for test state setup/cleanup
     const writeExtMemory = async (extName: string, key: string, value: unknown) => {
-      await testFetch(`/v1/memory/ext:${extName}/${key}`, {
+      const resp = await testFetch(`/v1/memory/ext:${extName}/${key}`, {
         method: 'PUT',
         body: JSON.stringify({ value }),
       });
+      trace.push({ fn: 'writeExtMemory', args: `${extName}/${key}`, result: trunc(value, 100), status: resp.status });
     };
 
     type TestFetchFn = (url: string, opts?: RequestInit) => Promise<{ status: number; ok: boolean; body: unknown }>;
@@ -173,9 +193,10 @@ export async function executeHttpTest(
       passed: result?.passed ?? false,
       errors: result?.errors ?? ['Test returned no result'],
       details: result?.details,
+      trace,
     };
   } catch (err) {
-    return { passed: false, errors: [`Test execution error: ${(err as Error).message}`] };
+    return { passed: false, errors: [`Test execution error: ${(err as Error).message}`], trace };
   }
 }
 

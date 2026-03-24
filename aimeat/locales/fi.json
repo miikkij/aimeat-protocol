@@ -1239,6 +1239,7 @@
       "test_code_placeholder": "Liitä tekoälyn generoima testikoodi tähän...",
       "test_run": "Aja testi",
       "test_result_title": "Tulos",
+      "test_trace_title": "Diagnostiikka-trace",
       "test_no_testable": "Ei rekisteröityjä testattavia komponentteja (extension/cortex/app)",
       "openrouter": {
         "title": "OpenRouter-asetukset",

@@ -16,6 +16,7 @@
  *   import { runWithAi, stripCodeblock, cancelAiRequest } from './generator-detail.js';
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from generator-tab.js (was inline in v6.1.0)
+ *   v1.1.0 — 2026-03-24 — Fix useEffect deps (testCode/testResult sync), add trace display
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -141,7 +142,7 @@ export function ComponentDetail({ component, project, components, projectId, int
         history: [...(component.history || []), { action: 'prompt_generated', at: new Date().toISOString(), by: 'system' }],
       }).then(() => onUpdate());
     }
-  }, [component.id, component.result, component.status]);
+  }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
   const completedComponents = components.filter(c => c.status === 'done' && c.registeredAs);
   const prompt = component.prompt || buildComponentPrompt(
@@ -585,6 +586,14 @@ export function ComponentDetail({ component, project, components, projectId, int
                 <ul class="pf-gen-test-errors">
                   ${testResult.errors.map(e => html`<li>${e}</li>`)}
                 </ul>
+              `}
+              ${testResult.trace && testResult.trace.length > 0 && html`
+                <details class="pf-gen-test-trace">
+                  <summary>${t('profile.generator.test_trace_title') || 'Trace'} (${testResult.trace.length})</summary>
+                  <pre class="pf-gen-trace-pre">${testResult.trace.map(t =>
+                    `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}`
+                  ).join('\n\n')}</pre>
+                </details>
               `}
               ${testResult.screenshots && testResult.screenshots.length > 0 && html`
                 <div class="pf-gen-test-screenshots">
