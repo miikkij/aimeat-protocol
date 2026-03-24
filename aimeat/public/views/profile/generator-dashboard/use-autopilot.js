@@ -85,9 +85,6 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           project.description, project.blueprint, completedComponents,
           interviewSpec,
         );
-        // Debug: write prompt
-        writeDebugArtifact(projectId, cid, 'prompt', prompt);
-
         // Run AI
         let content;
         try {
@@ -97,11 +94,10 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           break;
         }
         if (autopilotState.cancelledRef.current) break;
-        // Debug: write raw AI response BEFORE any processing
+        // Debug: write full AI exchange — sent prompt, raw response, processed result
+        writeDebugArtifact(projectId, cid, 'prompt', prompt);
         writeDebugArtifact(projectId, cid, 'ai-raw-response', content);
-        // Strip codeblock wrappers for extensions (AI models often wrap in ```)
         if (comp.type === 'extension') content = stripCodeblock(content);
-        // Debug: write generated code (after stripping)
         writeDebugArtifact(projectId, cid, 'generated', content);
 
         // Save result
@@ -122,12 +118,15 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
             );
             const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
+            writeDebugArtifact(projectId, cid, 'fix-prompt-' + attempt, fixPrompt);
             try {
               content = await runWithAi(projectId, fixPrompt);
             } catch (e) {
               showToast?.(`${comp.label}: ${e.message}`, true);
               break;
             }
+            writeDebugArtifact(projectId, cid, 'fix-raw-response-' + attempt, content);
+            if (comp.type === 'extension') content = stripCodeblock(content);
             vr = validateComponent(comp.type, content, project.blueprint);
           }
         }
@@ -286,10 +285,11 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                     ...(vr.errors || []),
                     ...testResult.errors.map(e => `TEST FAILURE: ${e}`),
                   ], comp.type, testContext);
+                  writeDebugArtifact(projectId, cid, 'test-fix-prompt-' + (fix + 1), fixPrompt);
 
                   try {
                     content = await runWithAi(projectId, fixPrompt);
-                    writeDebugArtifact(projectId, cid, 'fix-raw-response-' + (fix + 1), content);
+                    writeDebugArtifact(projectId, cid, 'test-fix-raw-response-' + (fix + 1), content);
                   } catch (e) {
                     showToast?.(`${comp.label}: ${e.message}`, true);
                     await writeProjectLog(projectId, 'test_fix_ai_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
@@ -350,8 +350,9 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   await writeProjectLog(projectId, 'test_fix_regenerating_test', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
                   try {
                     const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec);
+                    writeDebugArtifact(projectId, cid, 'test-fix-test-prompt-' + (fix + 1), newTestPrompt);
                     let newTestCode = await runWithAi(projectId, newTestPrompt);
-                    writeDebugArtifact(projectId, cid, 'test-raw-response-fix-' + (fix + 1), newTestCode);
+                    writeDebugArtifact(projectId, cid, 'test-fix-test-raw-response-' + (fix + 1), newTestCode);
                     newTestCode = stripCodeblock(newTestCode);
                     aiTestCode = newTestCode;
                   } catch (e) {
