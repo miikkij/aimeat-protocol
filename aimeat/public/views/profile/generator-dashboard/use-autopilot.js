@@ -97,9 +97,11 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           break;
         }
         if (autopilotState.cancelledRef.current) break;
+        // Debug: write raw AI response BEFORE any processing
+        writeDebugArtifact(projectId, cid, 'ai-raw-response', content);
         // Strip codeblock wrappers for extensions (AI models often wrap in ```)
         if (comp.type === 'extension') content = stripCodeblock(content);
-        // Debug: write generated code
+        // Debug: write generated code (after stripping)
         writeDebugArtifact(projectId, cid, 'generated', content);
 
         // Save result
@@ -222,6 +224,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
               writeDebugArtifact(projectId, cid, 'test-prompt', testPromptText);
               aiTestCode = await runWithAi(projectId, testPromptText);
+              writeDebugArtifact(projectId, cid, 'test-raw-response', aiTestCode);
               aiTestCode = stripCodeblock(aiTestCode);
               writeDebugArtifact(projectId, cid, 'test-code', aiTestCode);
               updated = { ...updated, testPrompt: testPromptText, testCode: aiTestCode, testEnvironment,
@@ -286,6 +289,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
 
                   try {
                     content = await runWithAi(projectId, fixPrompt);
+                    writeDebugArtifact(projectId, cid, 'fix-raw-response-' + (fix + 1), content);
                   } catch (e) {
                     showToast?.(`${comp.label}: ${e.message}`, true);
                     await writeProjectLog(projectId, 'test_fix_ai_failed', { meta: { component: comp.label, round: fix + 1, error: e.message, by: 'autopilot' } });
@@ -347,6 +351,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   try {
                     const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec);
                     let newTestCode = await runWithAi(projectId, newTestPrompt);
+                    writeDebugArtifact(projectId, cid, 'test-raw-response-fix-' + (fix + 1), newTestCode);
                     newTestCode = stripCodeblock(newTestCode);
                     aiTestCode = newTestCode;
                   } catch (e) {

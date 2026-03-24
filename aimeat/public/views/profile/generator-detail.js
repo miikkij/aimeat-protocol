@@ -40,8 +40,8 @@ let _activeAiController = null;
 export function stripCodeblock(text) {
   if (!text) return text;
   const trimmed = text.trim();
-  // Match ```<optional lang>\n...\n``` or ```<optional lang>\n...```
-  const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```\s*$/);
+  // Match ```<optional lang>\n...\n``` — tolerate trailing junk after closing ```
+  const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```/);
   return match ? match[1].trim() : trimmed;
 }
 
