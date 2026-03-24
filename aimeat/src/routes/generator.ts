@@ -126,6 +126,44 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     }
   );
 
+  // ── Debug file viewer API (MUST be before :projectId routes) ─────────
+
+  router.get('/v1/generator/debug/projects',
+    requireAuth(), requireRole('owner'),
+    async (_req, res) => {
+      const { listDebugProjects } = await import('../services/generator-debug.js');
+      res.json(success(config.nodeId, { projects: await listDebugProjects() }));
+    }
+  );
+
+  router.get('/v1/generator/debug/:projectId/files',
+    requireAuth(), requireRole('owner'),
+    async (req, res) => {
+      const { listDebugFiles } = await import('../services/generator-debug.js');
+      res.json(success(config.nodeId, { projectId: req.params['projectId'] as string, files: await listDebugFiles(req.params['projectId'] as string) }));
+    }
+  );
+
+  router.get('/v1/generator/debug/:projectId/file',
+    requireAuth(), requireRole('owner'),
+    async (req, res) => {
+      const { readDebugFile } = await import('../services/generator-debug.js');
+      const filePath = (req.query['path'] as string) || '';
+      if (!filePath) { res.status(400).json(error(config.nodeId, 'INVALID_QUERY', 'path query parameter is required')); return; }
+      const content = await readDebugFile(req.params['projectId'] as string, filePath);
+      if (content === null) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found')); return; }
+      res.json(success(config.nodeId, { projectId: req.params['projectId'] as string, path: filePath, content }));
+    }
+  );
+
+  router.delete('/v1/generator/debug/:projectId',
+    requireAuth(), requireRole('owner'),
+    async (req, res) => {
+      const { deleteDebugProject } = await import('../services/generator-debug.js');
+      res.json(success(config.nodeId, { deleted: await deleteDebugProject(req.params['projectId'] as string), projectId: req.params['projectId'] as string }));
+    }
+  );
+
   // GET /v1/generator/:projectId — get full project state
   router.get('/v1/generator/:projectId',
     requireAuth(),
@@ -919,64 +957,6 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const prompt = buildBlueprintPrompt(project.description || '', interviewSpec);
 
       res.json(success(config.nodeId, { prompt }));
-    }
-  );
-
-  // ── Debug file viewer API ────────────────────────────────────────────
-
-  // GET /v1/generator/debug/projects — list all projects with debug data
-  router.get('/v1/generator/debug/projects',
-    requireAuth(),
-    requireRole('owner'),
-    async (_req, res) => {
-      const { listDebugProjects } = await import('../services/generator-debug.js');
-      const projects = await listDebugProjects();
-      res.json(success(config.nodeId, { projects }));
-    }
-  );
-
-  // GET /v1/generator/debug/:projectId/files — list files for a project
-  router.get('/v1/generator/debug/:projectId/files',
-    requireAuth(),
-    requireRole('owner'),
-    async (req, res) => {
-      const { listDebugFiles } = await import('../services/generator-debug.js');
-      const projectId = req.params['projectId'] as string;
-      const files = await listDebugFiles(projectId);
-      res.json(success(config.nodeId, { projectId, files }));
-    }
-  );
-
-  // GET /v1/generator/debug/:projectId/file — read a specific file (path in query param)
-  router.get('/v1/generator/debug/:projectId/file',
-    requireAuth(),
-    requireRole('owner'),
-    async (req, res) => {
-      const { readDebugFile } = await import('../services/generator-debug.js');
-      const projectId = req.params['projectId'] as string;
-      const filePath = (req.query['path'] as string) || '';
-      if (!filePath) {
-        res.status(400).json(error(config.nodeId, 'INVALID_QUERY', 'path query parameter is required'));
-        return;
-      }
-      const content = await readDebugFile(projectId, filePath);
-      if (content === null) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
-        return;
-      }
-      res.json(success(config.nodeId, { projectId, path: filePath, content }));
-    }
-  );
-
-  // DELETE /v1/generator/debug/:projectId — delete debug data for a project
-  router.delete('/v1/generator/debug/:projectId',
-    requireAuth(),
-    requireRole('owner'),
-    async (req, res) => {
-      const { deleteDebugProject } = await import('../services/generator-debug.js');
-      const projectId = req.params['projectId'] as string;
-      const deleted = await deleteDebugProject(projectId);
-      res.json(success(config.nodeId, { deleted, projectId }));
     }
   );
 

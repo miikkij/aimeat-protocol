@@ -175,7 +175,12 @@ export function DebugPanel({ projectId }) {
         ${selectedFile ? html`
           <div class="pf-gen-debug-content-header">
             <span class="pf-gen-debug-path">${selectedFile}</span>
-            <button class="btn-ghost btn-sm" onClick=${() => fileContent && navigator.clipboard.writeText(fileContent)}>Copy</button>
+            <button class="btn-outline btn-sm pf-gen-debug-copy-file" onClick=${() => {
+              if (fileContent) {
+                navigator.clipboard.writeText(fileContent);
+                // TODO: visual feedback
+              }
+            }}>Copy File</button>
           </div>
           ${loadingFile
             ? html`<p>${t('profile.loading')}</p>`

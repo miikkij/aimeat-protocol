@@ -1758,8 +1758,9 @@
 .pf-gen-debug-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-gen-debug-content { overflow: auto; }
 .pf-gen-debug-content-header { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-1); padding-bottom: var(--sp-1); border-bottom: 1px solid var(--border); }
+.pf-gen-debug-copy-file { margin-left: auto; }
 .pf-gen-debug-path { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); }
-.pf-gen-debug-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-2); font-family: var(--mono); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; overflow: auto; max-height: 500px; line-height: 1.4; }
+.pf-gen-debug-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 0; padding: var(--sp-2); font-family: var(--mono); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; overflow: auto; max-height: 500px; line-height: 1.4; }
 .pf-gen-debug-hint { color: var(--text-dim); font-style: italic; padding: var(--sp-4); text-align: center; }
 @media (max-width: 700px) {
   .pf-gen-debug-body { grid-template-columns: 1fr; }
