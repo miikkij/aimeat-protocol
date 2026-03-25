@@ -551,9 +551,9 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
   // GET /v1/generator/:projectId/screenshots/:filename — serve test screenshot PNGs
   // NOTE: registered before /:projectId/components/:componentId to avoid 'screenshots' matching as componentId
+  // Screenshots are project-scoped and non-sensitive — serve without auth
+  // so <img src="..."> tags work without JS-based auth header injection
   router.get('/v1/generator/:projectId/screenshots/:filename',
-    requireAuth(),
-    requireRole('owner'),
     async (req, res) => {
       const projectId = req.params['projectId'] as string;
       const filename = req.params['filename'] as string;

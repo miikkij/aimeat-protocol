@@ -234,6 +234,8 @@ export async function executePlaywrightTest(
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
 
     // Inject auth session so cortex/app can make authenticated API calls
+    // Cortex callExt() expects session.fetch() to return the AIMEAT envelope: {ok, data, ...}
+    // NOT a raw Response — so we parse and return the JSON object directly
     if (authToken) {
       const authSetup = `
         window.AIMEAT = window.AIMEAT || {};
@@ -252,8 +254,9 @@ export async function executePlaywrightTest(
         };
         window.AIMEAT.data = {
           getPublic: async function(ns, key) {
+            var jwt = ${JSON.stringify(authToken)};
             var url = '/v1/memory/' + encodeURIComponent(ns) + '/' + encodeURIComponent(key);
-            var resp = await fetch(url);
+            var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + jwt } });
             if (!resp.ok) return null;
             var json = await resp.json();
             return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
@@ -261,6 +264,17 @@ export async function executePlaywrightTest(
           get: async function(key) {
             var jwt = ${JSON.stringify(authToken)};
             var resp = await fetch('/v1/memory/' + encodeURIComponent(key), { headers: { 'Authorization': 'Bearer ' + jwt } });
+            if (!resp.ok) return null;
+            var json = await resp.json();
+            return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
+          },
+          put: async function(key, value) {
+            var jwt = ${JSON.stringify(authToken)};
+            var resp = await fetch('/v1/memory/' + encodeURIComponent(key), {
+              method: 'PUT',
+              headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ value: value })
+            });
             if (!resp.ok) return null;
             var json = await resp.json();
             return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
@@ -284,18 +298,33 @@ export async function executePlaywrightTest(
 
     // Execute AI-generated test code in the page context
     // The test code sets window.__testResults = { passed, errors, details }
+    // Test code is typically an async IIFE — we add a sentinel so we can poll for completion
     const wrappedCode = `
-      window.__testResults = { passed: false, errors: ['Test did not complete'] };
-      try {
-        ${testCode}
-      } catch (e) {
-        window.__testResults = { passed: false, errors: ['Test threw: ' + e.message] };
-      }
+      window.__testResults = null;
+      window.__testRunning = true;
+      (async function() {
+        try {
+          ${testCode}
+        } catch (e) {
+          if (!window.__testResults) {
+            window.__testResults = { passed: false, errors: ['Test threw: ' + e.message] };
+          }
+        } finally {
+          window.__testRunning = false;
+          if (!window.__testResults) {
+            window.__testResults = { passed: false, errors: ['Test did not complete'] };
+          }
+        }
+      })();
     `;
     await page.evaluate(wrappedCode);
 
-    // Wait for async operations
-    await page.waitForTimeout(3000);
+    // Wait for test to finish (poll __testRunning, max 60s for external API calls)
+    try {
+      await page.waitForFunction('window.__testRunning === false', { timeout: 60000 });
+    } catch {
+      // Timeout — test took too long
+    }
 
     // Take post-test screenshot
     const finalScreenshot = `${componentId}-02-tested.png`;

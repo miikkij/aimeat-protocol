@@ -256,6 +256,8 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               };
               await saveComponent(projectId, updated);
               await writeProjectLog(projectId, 'test_code_generated', { meta: { component: comp.label, environment: testEnvironment, codeLength: aiTestCode.length, by: 'autopilot' } });
+              // Refresh UI so test code textarea shows the generated code before test runs
+              await core.loadData();
             } catch (e) {
               await writeProjectLog(projectId, 'test_code_generation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
               showToast?.(`${comp.label}: Test generation failed: ${e.message}`, true);
@@ -276,6 +278,8 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   history: [...(updated.history || []), { action: 'test_' + testResult.status, at: new Date().toISOString(), by: 'autopilot', errors: testResult.errors }],
                 };
                 await saveComponent(projectId, updated);
+                // Refresh UI so test result displays immediately
+                await core.loadData();
               }
 
               if (testResult) {
