@@ -40,9 +40,24 @@ let _activeAiController = null;
 export function stripCodeblock(text) {
   if (!text) return text;
   const trimmed = text.trim();
-  // Match ```<optional lang>\n...\n``` — tolerate trailing junk after closing ```
-  const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```/);
-  return match ? match[1].trim() : trimmed;
+  // Count how many ``` fences exist
+  const fenceCount = (trimmed.match(/^```/gm) || []).length;
+  if (fenceCount === 2) {
+    // Single code block wrapper: ```lang\n...\n``` — strip the outer fences
+    const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```\s*$/);
+    if (match) return match[1].trim();
+  }
+  if (fenceCount > 2) {
+    // Multiple code blocks inside (e.g., cortex: ```yaml + ```javascript)
+    // Check if the ENTIRE response is wrapped in an OUTER fence (AI sometimes does this)
+    // Pattern: ```\n```yaml\n...\n```\n```javascript\n...\n```\n```
+    const outerMatch = trimmed.match(/^```\s*\n([\s\S]*)\n```\s*$/);
+    if (outerMatch) return outerMatch[1].trim();
+    // Otherwise: multiple blocks ARE the content — don't strip anything
+    return trimmed;
+  }
+  // No fences or unparseable — return as-is
+  return trimmed;
 }
 
 export async function runWithAi(projectId, prompt, systemPrompt = null) {
