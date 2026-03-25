@@ -570,11 +570,15 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 
   // GET /v1/generator/test-page/:projectId/:componentId — browser test runner page
   // Serves a self-contained HTML page that loads cortex/app library, auth, and test code.
-  // Playwright just navigates here and reads window.__testResults — no eval injection needed.
+  // Playwright just navigates here and reads window.__testResults.
+  // CSP is removed for this route — AI-generated test code may use eval/new Function and
+  // this is an internal test page behind auth, not a public-facing page.
   router.get('/v1/generator/test-page/:projectId/:componentId',
     requireAuth(),
     requireRole('owner'),
     async (req, res) => {
+      // Remove CSP for test pages — AI-generated code may need eval()
+      res.removeHeader('Content-Security-Policy');
       const projectId = req.params['projectId'] as string;
       const componentId = req.params['componentId'] as string;
       const token = (req.headers.authorization ?? '').replace('Bearer ', '');
