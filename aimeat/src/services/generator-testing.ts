@@ -227,7 +227,9 @@ export async function executePlaywrightTest(
   const screenshots: string[] = [];
 
   try {
-    const page = await browser.newPage();
+    // bypassCSP: true — AI-generated test code may use eval/new Function
+    const context = await browser.newContext({ bypassCSP: true });
+    const page = await context.newPage();
     const dir = await ensureScreenshotDir(projectId);
 
     const consoleErrors: string[] = [];
