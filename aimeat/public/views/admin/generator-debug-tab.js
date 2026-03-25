@@ -84,12 +84,33 @@ export default function GeneratorDebugTab() {
         };
         return order(a).localeCompare(order(b));
       });
-      const parts = [`=== GENERATOR DEBUG DUMP — ${projId} ===`, `Date: ${new Date().toISOString()}`, `Files: ${allFiles.length}`, ''];
+      // First pass: load all files and count lines
+      const loaded = [];
       for (const f of sorted) {
         try {
           const r = await apiGet(`/v1/generator/debug/${projId}/file?path=${encodeURIComponent(f)}`);
-          parts.push('='.repeat(60), `FILE: ${f}`, '='.repeat(60), r?.data?.content || '(empty)', '');
-        } catch { parts.push(`--- ${f}: (failed to load) ---`); }
+          loaded.push({ path: f, content: r?.data?.content || '(empty)' });
+        } catch { loaded.push({ path: f, content: '(failed to load)' }); }
+      }
+
+      // Build Table of Contents with line numbers
+      const toc = ['TABLE OF CONTENTS', '-'.repeat(40)];
+      let lineNum = 1;
+      // Header takes 4 lines + blank + TOC itself — calculate after TOC is built
+      const tocHeaderLines = 4; // header lines before TOC
+      // Pre-calculate TOC size: header(1) + separator(1) + entries + blank(1) + separator(1)
+      const tocSize = tocHeaderLines + 2 + loaded.length + 2;
+      lineNum = tocSize + 1;
+      for (const { path, content } of loaded) {
+        const contentLines = content.split('\n').length;
+        toc.push(`  ${path}  (lines ${lineNum}–${lineNum + contentLines + 2})`);
+        lineNum += contentLines + 4; // separator(1) + FILE header(1) + separator(1) + content + blank(1)
+      }
+      toc.push('');
+
+      const parts = [`=== GENERATOR DEBUG DUMP — ${projId} ===`, `Date: ${new Date().toISOString()}`, `Files: ${loaded.length}`, '', ...toc];
+      for (const { path, content } of loaded) {
+        parts.push('='.repeat(60), `FILE: ${path}`, '='.repeat(60), content, '');
       }
       await navigator.clipboard.writeText(parts.join('\n'));
       setCopying('done');

@@ -32,7 +32,7 @@ import { apiPost } from '/js/api.js';
 import {
   loadAllComponents, saveComponent, registerComponent, writeProjectLog,
 } from '/js/services/generator.js';
-import { buildComponentPrompt, buildFixPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
+import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
 import { runTests, runComponentTest } from '/js/services/generator-testing.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
@@ -198,7 +198,14 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
         core.project?.description, core.project?.blueprint, completedComps,
         core.interviewSpec,
       );
-      const fixP = buildFixPrompt(originalPrompt, comp.result || '', failedTestComp.errors || [], comp.type, testContext);
+      // Step 1: Reflection — diagnose the failure before writing code
+      let reflectionDiagnosis = '';
+      try {
+        const reflectionPrompt = buildReflectionPrompt(comp.result || '', failedTestComp.errors || [], testContext);
+        reflectionDiagnosis = await runWithAi(projectId, reflectionPrompt);
+      } catch { /* reflection is optional enhancement */ }
+
+      const fixP = buildFixPrompt(originalPrompt, comp.result || '', failedTestComp.errors || [], comp.type, testContext, null, reflectionDiagnosis);
 
       let content = await runWithAi(projectId, fixP);
       if (comp.type === 'extension') content = stripCodeblock(content);

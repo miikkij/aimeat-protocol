@@ -18,4 +18,4 @@
 export { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES } from './generator-prompts-base.js';
 export { buildBlueprintPrompt, buildInterviewPrompt, buildComponentPrompt } from './generator-prompts-build.js';
 export { buildTestPrompt } from './generator-prompts-test.js';
-export { buildBlueprintFixPrompt, buildFixPrompt, buildImpactPrompt, buildEditPrompt } from './generator-prompts-fix.js';
+export { buildBlueprintFixPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildImpactPrompt, buildEditPrompt } from './generator-prompts-fix.js';

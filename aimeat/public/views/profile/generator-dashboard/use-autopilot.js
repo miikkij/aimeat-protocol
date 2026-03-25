@@ -32,7 +32,7 @@ import { apiPost, apiDelete } from '/js/api.js';
 import {
   loadAllComponents, saveComponent, registerComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
-import { buildComponentPrompt, buildFixPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
+import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
 import { runComponentTest } from '/js/services/generator-testing.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
@@ -290,9 +290,10 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                 await writeProjectLog(projectId, 'component_test_failed', { meta: { component: comp.label, errors: testResult.errors, by: 'autopilot' } });
                 showToast?.(`${comp.label}: ${t('profile.generator.test_failed')}`, true);
 
-                // Per-component fix loop (max 3 rounds)
+                // Per-component fix loop with reflection + history + fresh generation
                 const MAX_FIX = 3;
                 let fixed = false;
+                const previousAttempts = [];
                 for (let fix = 0; fix < MAX_FIX && !fixed && !autopilotState.cancelledRef.current; fix++) {
                   autopilotState.setStep(
                     comp.label + ' — ' + t('profile.generator.openrouter.retrying').replace('{current}', fix + 1).replace('{max}', MAX_FIX)
@@ -301,7 +302,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   updated = { ...updated, history: [...(updated.history || []), { action: 'test_fix_round', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, maxRounds: MAX_FIX }] };
                   await saveComponent(projectId, updated);
 
-                  // Build fix prompt WITH testContext — read testReport via ref for freshness
+                  // Build testContext with trace data
                   const currentReport = testExec.testReportRef.current;
                   const testContext = {
                     errors: testResult.errors,
@@ -311,11 +312,38 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                       .map(c => ({ componentId: c.componentId, status: c.status })),
                     blueprintComponent: project.blueprint?.components?.find(c => c.label === comp.label) || null,
                   };
-                  const fixPrompt = buildFixPrompt(prompt, content, [
+
+                  const allErrors = [
                     ...(vr.errors || []),
                     ...testResult.errors.map(e => `TEST FAILURE: ${e}`),
-                  ], comp.type, testContext);
-                  writeDebugArtifact(projectId, cid, 'test-fix-prompt-' + (fix + 1), fixPrompt);
+                  ];
+
+                  // Step 1: Reflection — diagnose the failure before writing code
+                  let reflectionDiagnosis = '';
+                  try {
+                    const reflectionPrompt = buildReflectionPrompt(content, allErrors, testContext);
+                    writeDebugArtifact(projectId, cid, 'test-fix-reflection-' + (fix + 1), reflectionPrompt);
+                    reflectionDiagnosis = await runWithAi(projectId, reflectionPrompt);
+                    writeDebugArtifact(projectId, cid, 'test-fix-diagnosis-' + (fix + 1), reflectionDiagnosis);
+                  } catch (e) {
+                    await writeProjectLog(projectId, 'test_fix_reflection_failed', { meta: { component: comp.label, round: fix + 1, error: e.message } });
+                  }
+
+                  // Step 2: Detect oscillation — same errors as previous round?
+                  const lastAttempt = previousAttempts[previousAttempts.length - 1];
+                  const sameErrors = lastAttempt && JSON.stringify(lastAttempt.errors.sort()) === JSON.stringify(allErrors.sort());
+
+                  let fixPrompt;
+                  if (fix === MAX_FIX - 1 || sameErrors) {
+                    // Final round or oscillation detected: fresh generation with pitfalls
+                    fixPrompt = buildFreshGenerationPrompt(prompt, previousAttempts, testContext);
+                    writeDebugArtifact(projectId, cid, 'test-fix-prompt-' + (fix + 1) + '-FRESH', fixPrompt);
+                    await writeProjectLog(projectId, 'test_fix_fresh_generation', { meta: { component: comp.label, round: fix + 1, reason: sameErrors ? 'oscillation_detected' : 'final_round' } });
+                  } else {
+                    // Normal fix with reflection + history
+                    fixPrompt = buildFixPrompt(prompt, content, allErrors, comp.type, testContext, previousAttempts, reflectionDiagnosis);
+                    writeDebugArtifact(projectId, cid, 'test-fix-prompt-' + (fix + 1), fixPrompt);
+                  }
 
                   try {
                     content = await runWithAi(projectId, fixPrompt);
@@ -412,6 +440,14 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                     showToast?.(`${comp.label}: ${t('profile.generator.test_passed')}`);
                   } else {
                     testResult.errors = reTestResult?.errors || testResult.errors;
+                    // Record this attempt for next round's context
+                    previousAttempts.push({
+                      round: fix + 1,
+                      diagnosis: reflectionDiagnosis || null,
+                      errors: reTestResult?.errors || testResult.errors,
+                    });
+                    // Update trace for next round
+                    if (reTestResult?.trace) testContext.trace = reTestResult.trace;
                     updated = { ...updated, testResult: reTestResult || testResult, testCode: aiTestCode,
                       history: [...(updated.history || []), { action: 'test_fix_still_failing', at: new Date().toISOString(), by: 'autopilot', round: fix + 1, errors: reTestResult?.errors }],
                     };

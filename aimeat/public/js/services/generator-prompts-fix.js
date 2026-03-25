@@ -32,7 +32,32 @@ Common mistakes to avoid:
 ${buildBlueprintPrompt(description, interviewSpec)}`;
 }
 
-export function buildFixPrompt(originalPrompt, failedResult, errors, componentType, testContext) {
+/**
+ * Build a reflection prompt — asks AI to diagnose the failure WITHOUT writing code.
+ * The diagnosis is then fed into the actual fix prompt for better results.
+ */
+export function buildReflectionPrompt(failedResult, errors, testContext) {
+  let prompt = `You are debugging a failed component. Your job is to DIAGNOSE the problem — do NOT write code.
+
+## Failed Code
+${failedResult}
+
+## Errors
+${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
+${testContext ? buildTestContextSection(testContext) : ''}
+
+## Your Task
+
+Analyze the errors and the ACTUAL API RESPONSES above. In 2-5 sentences, explain:
+1. What is the ROOT CAUSE of each error?
+2. What specific data shapes or field names does the code assume vs what the API actually returns?
+3. What specific lines or patterns in the code need to change?
+
+Be precise — reference exact field names from the API responses. Do NOT write code.`;
+  return prompt;
+}
+
+export function buildFixPrompt(originalPrompt, failedResult, errors, componentType, testContext, previousAttempts, reflectionDiagnosis) {
   // Type-specific constraints using shared platform rules
   let typeConstraint = '';
   if (componentType === 'extension') {
@@ -52,6 +77,24 @@ APP CONSTRAINTS (browser HTML):
 - Handle empty state gracefully (no data on first run)\n`;
   }
 
+  // Build previous attempts section
+  let attemptsSection = '';
+  if (previousAttempts && previousAttempts.length > 0) {
+    attemptsSection = '\n\n## PREVIOUS FIX ATTEMPTS (DO NOT repeat these approaches)\n\n';
+    for (const attempt of previousAttempts) {
+      attemptsSection += `### Round ${attempt.round}\n`;
+      if (attempt.diagnosis) attemptsSection += `Diagnosis: ${attempt.diagnosis}\n`;
+      attemptsSection += `Errors after this round: ${attempt.errors.join('; ')}\n\n`;
+    }
+    attemptsSection += `You are now on round ${previousAttempts.length + 1}. You MUST try a FUNDAMENTALLY different approach than the previous rounds.\n`;
+  }
+
+  // Build reflection diagnosis section
+  let reflectionSection = '';
+  if (reflectionDiagnosis) {
+    reflectionSection = `\n\n## ROOT CAUSE ANALYSIS (from diagnostic step)\n\n${reflectionDiagnosis}\n\nApply this analysis precisely when fixing the code.\n`;
+  }
+
   return `${INSTRUCTION_DISCLAIMER}The following result had validation errors. Fix ONLY the errors listed below.
 
 ${HTML_ENTITY_RULES}
@@ -64,8 +107,46 @@ ${failedResult}
 
 ERRORS:
 ${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}
-${testContext ? buildTestContextSection(testContext) : ''}
+${testContext ? buildTestContextSection(testContext) : ''}${attemptsSection}${reflectionSection}
 Return the corrected result in the same format as the original.`;
+}
+
+/**
+ * Build a fresh-generation prompt for the final fix round.
+ * Instead of showing broken code (which anchors the AI), regenerate from scratch
+ * with explicit warnings about known pitfalls from all previous rounds.
+ */
+export function buildFreshGenerationPrompt(originalPrompt, previousAttempts, testContext) {
+  let pitfalls = '';
+  if (previousAttempts && previousAttempts.length > 0) {
+    pitfalls = '\n\n## KNOWN PITFALLS (from previous failed attempts — AVOID ALL of these)\n\n';
+    const seen = new Set();
+    for (const attempt of previousAttempts) {
+      if (attempt.diagnosis && !seen.has(attempt.diagnosis)) {
+        pitfalls += `- ${attempt.diagnosis}\n`;
+        seen.add(attempt.diagnosis);
+      }
+      for (const err of attempt.errors) {
+        if (!seen.has(err)) {
+          pitfalls += `- Error to avoid: ${err}\n`;
+          seen.add(err);
+        }
+      }
+    }
+  }
+
+  let traceSection = '';
+  if (testContext?.trace && testContext.trace.length > 0) {
+    traceSection = '\n\n## ACTUAL API RESPONSES (use these exact data shapes)\n\n';
+    for (const t of testContext.trace) {
+      traceSection += `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}\n\n`;
+    }
+  }
+
+  return `${originalPrompt}
+${pitfalls}${traceSection}
+IMPORTANT: This is a fresh generation. Do NOT reference any previous code.
+Study the ACTUAL API RESPONSES above carefully and match those exact data shapes.`;
 }
 
 /** Build a test failure context section for fix prompts */
