@@ -1314,6 +1314,21 @@ NEVER assume data exists — the user may open the app before any extension has 
  * Summarize extension code into a compact API reference (actions, memory keys, data shapes).
  * Avoids injecting thousands of lines of full extension code into prompts.
  */
+/**
+ * Extract only code blocks (```yaml ... ``` and ```javascript ... ```) from AI response.
+ * Strips explanatory text that AI adds during fix rounds.
+ */
+export function extractCodeBlocks(text) {
+  if (!text) return '';
+  const blocks = [];
+  const re = /```(\w*)\n([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    blocks.push('```' + m[1] + '\n' + m[2] + '```');
+  }
+  return blocks.length > 0 ? blocks.join('\n\n') : text;
+}
+
 export function summarizeExtensionApi(result) {
   if (!result) return '  (no code available)\n';
   const lines = typeof result === 'string' ? result.split('\n') : [];

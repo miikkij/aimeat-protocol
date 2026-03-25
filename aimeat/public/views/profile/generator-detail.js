@@ -332,6 +332,7 @@ export function ComponentDetail({ component, project, components, projectId, int
       }
       onUpdate();
     } catch (e) {
+      console.error('[generator] AI run failed:', e);
       showToast?.(e.message, true);
     }
     setAiRunning(false);

@@ -182,8 +182,11 @@ export default function GeneratorDebugTab() {
             </div>
             <div class="pf-gen-debug-content">
               ${selectedFile ? html`
-                <div class="pf-gen-debug-content-header">
-                  <span class="pf-gen-debug-path">${selectedFile}</span>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid var(--border)">
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:0.85rem">${selectedFile}</span>
+                  <button class="btn-outline btn-sm" style="flex-shrink:0" onClick=${() => {
+                    navigator.clipboard.writeText(fileContent).catch(() => {});
+                  }}>Copy File</button>
                 </div>
                 ${loadingFile
                   ? html`<p>${t('profile.loading')}</p>`
