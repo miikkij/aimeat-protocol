@@ -1177,15 +1177,32 @@ Second block — JavaScript library:
 
   function nodeUrl() { return window.location.origin; }
 
+  // ── Memory helpers — use AIMEAT.data library (always available in browser) ──
+  // The AIMEAT.data library handles auth, endpoints, and response parsing automatically.
+  // Do NOT use raw fetch() or session.fetch() for memory operations.
+
+  /** Read from extension namespace (public, no auth needed) */
   async function readExtMemory(extName, key) {
-    if (AIMEAT.data && AIMEAT.data.getPublic) {
-      return AIMEAT.data.getPublic('ext:' + extName, key);
-    }
-    const url = nodeUrl() + '/v1/memory/' + encodeURIComponent('ext:' + extName) + '/' + encodeURIComponent(key);
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    const json = await resp.json();
-    return json.ok ? json.data.value : null;
+    try { return await AIMEAT.data.getPublic('ext:' + extName, key); }
+    catch (e) { return null; }
+  }
+
+  /** Read from current user's own namespace */
+  async function readOwnerMemory(key) {
+    try { return await AIMEAT.data.get(key); }
+    catch (e) { return null; }
+  }
+
+  /** Write to current user's own namespace */
+  async function writeOwnerMemory(key, value) {
+    try { await AIMEAT.data.set(key, value); return true; }
+    catch (e) { return false; }
+  }
+
+  /** Delete from current user's own namespace */
+  async function deleteOwnerMemory(key) {
+    try { await AIMEAT.data.delete(key); return true; }
+    catch (e) { return false; }
   }
 
   // ╔══════════════════════════════════════════════════════════════════════════╗
