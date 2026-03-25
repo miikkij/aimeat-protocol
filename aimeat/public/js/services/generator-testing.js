@@ -45,3 +45,16 @@ export async function runTests(projectId, level = 'comprehensive') {
 export function screenshotUrl(projectId, filename) {
   return `/v1/generator/${projectId}/screenshots/${filename}`;
 }
+
+/**
+ * Probe an extension by calling each action with test parameters.
+ * Captures real JSON responses so they can be injected into subsequent prompts.
+ *
+ * @param {string} projectId - The project
+ * @param {string} extensionName - The registered extension name (e.g., 'my-extension')
+ * @param {Array<{action: string, input: object}>} scenarios - Actions to call with test inputs
+ * @returns {Promise<Array<{action: string, input: object, status: number, response: any}>>}
+ */
+export async function probeExtension(projectId, extensionName, scenarios) {
+  return apiPost(`/v1/generator/${projectId}/probe-extension`, { extensionName, scenarios });
+}

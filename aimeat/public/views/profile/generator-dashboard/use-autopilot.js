@@ -34,7 +34,7 @@ import {
 } from '/js/services/generator.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
-import { runComponentTest } from '/js/services/generator-testing.js';
+import { runComponentTest, probeExtension } from '/js/services/generator-testing.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
 
 /**
@@ -230,6 +230,44 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           }
         }
 
+        // Probe extension after activation — capture real API responses for downstream prompts
+        if (comp.type === 'extension' && updated.registeredAs && !autopilotState.cancelledRef.current) {
+          try {
+            // Build probe scenarios from blueprint testScenarios or from extension action list
+            const bpComp = project.blueprint?.components?.find(c => c.label === comp.label);
+            const bpScenarios = (project.blueprint?.testScenarios || [])
+              .filter(ts => ts.component === bpComp?.id)
+              .flatMap(ts => ts.scenarios || []);
+
+            let probeScenarios;
+            if (bpScenarios.length > 0) {
+              probeScenarios = bpScenarios.map(s => ({ action: s.action, input: s.input || {} }));
+            } else {
+              // Fallback: extract action names from generated YAML and call each with empty input
+              const actionMatches = [...(content.matchAll(/- id:\s*"?([^\s"]+)/g) || [])];
+              probeScenarios = actionMatches.map(m => ({ action: m[1], input: {} }));
+            }
+
+            if (probeScenarios.length > 0) {
+              autopilotState.setStep(comp.label + ' — probing extension...');
+              await writeProjectLog(projectId, 'extension_probe_start', { meta: { component: comp.label, extensionName: updated.registeredAs, scenarios: probeScenarios.length, by: 'autopilot' } });
+
+              const probeResp = await probeExtension(projectId, updated.registeredAs, probeScenarios);
+              const probeResults = probeResp?.data?.results || [];
+
+              // Save probe results to component data — downstream prompts will inject these
+              updated = { ...updated, probeResults,
+                history: [...(updated.history || []), { action: 'extension_probed', at: new Date().toISOString(), by: 'autopilot', probed: probeResults.length }],
+              };
+              await saveComponent(projectId, updated);
+              writeDebugArtifact(projectId, comp.id || bpComp?.id || 'ext', 'probe-results', JSON.stringify(probeResults, null, 2));
+              await writeProjectLog(projectId, 'extension_probe_complete', { meta: { component: comp.label, results: probeResults.length, by: 'autopilot' } });
+            }
+          } catch (e) {
+            await writeProjectLog(projectId, 'extension_probe_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+          }
+        }
+
         // Per-component test immediately after registration
         // Read testScope via ref for stale-closure safety
         if (!autopilotState.cancelledRef.current && testExec.testScopeRef.current !== 'none') {
@@ -240,10 +278,17 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
             const testEnvironment = (comp.type === 'cortex' || comp.type === 'app') ? 'browser' : 'server';
             let aiTestCode;
             let testPromptText;
+            // Gather probe results: own probeResults for extensions, or extension's probeResults for cortex/app
+            let testProbeResults = updated.probeResults || null;
+            if (!testProbeResults && (comp.type === 'cortex' || comp.type === 'app')) {
+              const allComps = await loadAllComponents(projectId);
+              const extComp = allComps.find(c => c.type === 'extension' && c.probeResults);
+              testProbeResults = extComp?.probeResults || null;
+            }
             try {
               testPromptText = buildTestPrompt(
                 comp.type, content, comp.label, updated.registeredAs,
-                project.blueprint, interviewSpec
+                project.blueprint, interviewSpec, testProbeResults
               );
               await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
               writeDebugArtifact(projectId, cid, 'test-prompt', testPromptText);
@@ -411,7 +456,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   // Regenerate test code for the fixed component
                   await writeProjectLog(projectId, 'test_fix_regenerating_test', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
                   try {
-                    const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec);
+                    const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec, testProbeResults);
                     writeDebugArtifact(projectId, cid, 'test-fix-test-prompt-' + (fix + 1), newTestPrompt);
                     let newTestCode = await runWithAi(projectId, newTestPrompt);
                     writeDebugArtifact(projectId, cid, 'test-fix-test-raw-response-' + (fix + 1), newTestCode);

@@ -639,27 +639,20 @@ If a cortex library has a getI18n(locale) method, use that instead (recommended)
 
 \\\`\\\`\\\`javascript
 // Helper for extension calls (copy this EXACTLY):
-// method MUST match the extension action's declared HTTP method (GET or POST)
-async function extCall(extName, actionId, body = {}, method = 'POST') {
+// ALL extension actions are POST — the backend only has router.post() routes
+async function extCall(extName, actionId, body = {}) {
   const session = AIMEAT.auth.getSession();
   if (!session) throw new Error('Not logged in');
-  const basePath = '/v1/ext/' + extName + '/' + actionId;
-  const opts = { method };
-  if (method === 'POST' || method === 'PUT') {
-    opts.body = JSON.stringify(body || {});
-  }
-  const url = method === 'GET' && body && Object.keys(body).length > 0
-    ? basePath + '?' + new URLSearchParams(body).toString()
-    : basePath;
-  const resp = await session.fetch(url, opts);
+  const url = '/v1/ext/' + extName + '/' + actionId;
+  const resp = await session.fetch(url, { method: 'POST', body: JSON.stringify(body) });
   // resp is ALREADY parsed JSON — never call resp.json()
   if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
   return resp.data;  // unwrapped payload
 }
 
-// Usage — check the extension manifest for each action's method:
-const result = await extCall('my-extension', 'my-action', { query: 'test' }, 'POST');
-const data = await extCall('my-extension', 'get-data', {}, 'GET');
+// Usage:
+const result = await extCall('my-extension', 'searchItems', { query: 'test' });
+const company = await extCall('my-extension', 'getCompany', { businessId: '1234567-8' });
 \\\`\\\`\\\``}
 
 ## CDN Libraries & Design Resources
@@ -1189,20 +1182,20 @@ Second block — JavaScript library:
   // ║  CRITICAL: session.fetch() returns ALREADY-PARSED JSON (not Response). ║
   // ║  Do NOT call resp.json() — it will crash. Use resp.data directly.      ║
   // ╚══════════════════════════════════════════════════════════════════════════╝
-  // method MUST match extension action's declared method (GET or POST)
-  async function callExt(extName, actionId, body, method = 'POST') {
-    const session = AIMEAT.auth && AIMEAT.auth.getSession();
-    if (!session) return null;
-    const opts = { method };
-    if (method === 'POST' || method === 'PUT') {
-      opts.body = JSON.stringify(body || {});
+  // ALL extension actions are POST — the backend only has router.post() routes
+  async function callExt(extName, actionId, body) {
+    try {
+      if (!AIMEAT.auth || !AIMEAT.auth.getSession) return null;
+      const session = AIMEAT.auth.getSession();
+      if (!session) return null;
+      const url = '/v1/ext/' + extName + '/' + actionId;
+      const opts = { method: 'POST', body: JSON.stringify(body || {}) };
+      const resp = await session.fetch(url, opts);
+      if (!resp || !resp.ok) return null;
+      return resp.data;
+    } catch (e) {
+      return null;
     }
-    const url = method === 'GET' && body && Object.keys(body).length > 0
-      ? '/v1/ext/' + extName + '/' + actionId + '?' + new URLSearchParams(body).toString()
-      : '/v1/ext/' + extName + '/' + actionId;
-    const resp = await session.fetch(url, opts);
-    if (!resp || !resp.ok) return null;
-    return resp.data;  // ALREADY parsed — never call resp.json()
   }
 
   // ── Public API ──
@@ -1480,22 +1473,46 @@ to ALL users, not just the installing owner.
  * Used by: extension template, test prompt, fix prompt
  */
 export const SANDBOX_CONSTRAINTS = `
-## V8 Sandbox Constraints
-
-Extension code runs in an ISOLATED V8 sandbox. NOT available:
-- No require(), no import (except export default for action entry point)
-- No Node.js APIs (fs, path, crypto, Buffer, process, etc.)
-- No fetch() global — use ctx.fetch() instead
-- No setTimeout, setInterval, setImmediate
-- No console.log — use ctx.log.info/warn/error()
-- No DOM APIs (document, window, etc.)
+## V8 Sandbox Environment
 
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  The ctx object has ONLY these properties:                              ║
+║  This is a BARE V8 JavaScript engine — NOT Node.js, NOT a browser.     ║
+║  Only ECMAScript built-in objects and the ctx API exist.                ║
+║  The ONLY way to interact with the outside world is through ctx.       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+### What IS available (ECMAScript built-ins):
+JSON, Math, Date, RegExp, Promise, async/await, String, Array, Object,
+Map, Set, WeakMap, WeakSet, Symbol, Proxy, Reflect,
+encodeURIComponent, decodeURIComponent, parseInt, parseFloat, isNaN, isFinite
+
+### What is NOT available:
+
+**Node.js APIs** — no require, no import, no Buffer, no process, no fs, no path, no crypto
+**Web APIs** — no URLSearchParams, no URL, no TextEncoder, no TextDecoder,
+  no Headers, no Request, no Response, no FormData, no Blob, no File,
+  no AbortController, no atob, no btoa, no structuredClone, no crypto (Web Crypto),
+  no queueMicrotask, no performance
+**Browser APIs** — no document, no window, no fetch (use ctx.fetch), no navigator
+**Timers** — no setTimeout, no setInterval, no setImmediate
+**Console** — no console.log (use ctx.log.info/warn/error)
+**Modules** — no require(), no import (except export default for action entry point)
+
+### URL construction (URLSearchParams is NOT available):
+\`\`\`
+WRONG:  const params = new URLSearchParams(); params.set('name', query);
+WRONG:  const url = new URL(baseUrl); url.searchParams.set('name', query);
+RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query);
+RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query) + '&businessId=' + encodeURIComponent(id);
+\`\`\`
+
+### The ctx API — ONLY these properties exist:
+
+╔══════════════════════════════════════════════════════════════════════════╗
 ║  ctx.memory (get/set/search/delete/getPublic)                          ║
 ║  ctx.fetch(url, opts) → { ok, status, text, headers }                  ║
-║  ctx.wallet (consume/deposit/balance)                                   ║
-║  ctx.consent (check/request)                                            ║
+║  ctx.wallet (consume/getBalance)                                        ║
+║  ctx.consent (check/require)                                            ║
 ║  ctx.trust (getScore)                                                   ║
 ║  ctx.caller (gaii/owner/roles)                                          ║
 ║  ctx.config (extension config object)                                   ║

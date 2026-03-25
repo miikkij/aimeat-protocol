@@ -13,7 +13,7 @@
  *   v1.1.0 — 2026-03-24 — Add API URL usage rules + notes to extension data source details
  */
 
-import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
+import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
 
 export function buildBlueprintPrompt(description, interviewSpec = null, availableCortexLibs = null) {
   const specContext = interviewSpec ? `
@@ -624,6 +624,17 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
       // template only for the specific components that template needs.
       if (c.result && c.type === 'extension') {
         context += `  API summary:\n${summarizeExtensionApi(c.result)}\n`;
+        // Inject probe results — real API responses captured from live execution
+        if (c.probeResults && Array.isArray(c.probeResults) && c.probeResults.length > 0 && (type === 'cortex' || type === 'app' || type === 'extension')) {
+          context += `\n  ## ACTUAL API RESPONSES (captured from live execution of ${c.registeredAs})\n`;
+          context += `  Study these carefully — your code MUST handle these exact data shapes.\n\n`;
+          for (const probe of c.probeResults) {
+            if (probe.status === 200 && probe.response) {
+              context += `  POST /v1/ext/${c.registeredAs}/${probe.action} ${JSON.stringify(probe.input)}\n`;
+              context += `  → ${JSON.stringify(probe.response)}\n\n`;
+            }
+          }
+        }
       } else if (c.result && c.type === 'cortex') {
         context += `  API summary:\n${summarizeCortexApi(c.result)}\n`;
       }
@@ -721,6 +732,11 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
         context += '\n';
       }
     }
+  }
+
+  // Cortex: inject EXTENSION_CONSUMPTION_RULES so cortex knows ALL actions are POST
+  if (type === 'cortex') {
+    context += '\n' + EXTENSION_CONSUMPTION_RULES + '\n';
   }
 
   // Cortex: if blueprint produces api:t, cortex MUST include translation helper methods

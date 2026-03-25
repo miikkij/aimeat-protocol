@@ -519,6 +519,63 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     }
   );
 
+  // POST /v1/generator/:projectId/probe-extension — call extension actions with test params, capture real responses
+  // Used by autopilot to get actual API response shapes for injection into cortex/app prompts.
+  router.post('/v1/generator/:projectId/probe-extension',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const { extensionName, scenarios } = req.body as {
+        extensionName?: string;
+        scenarios?: Array<{ action: string; input: Record<string, unknown> }>;
+      };
+
+      if (!extensionName || !scenarios || !Array.isArray(scenarios)) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'extensionName and scenarios[] required.'));
+      }
+
+      // Verify project ownership
+      const projectRecord = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRecord) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found.'));
+      }
+
+      const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+      const baseUrl = `http://localhost:${config.port}`;
+      const results: Array<{ action: string; input: Record<string, unknown>; status: number; response: unknown }> = [];
+
+      for (const scenario of scenarios) {
+        try {
+          const resp = await fetch(`${baseUrl}/v1/ext/${encodeURIComponent(extensionName)}/${encodeURIComponent(scenario.action)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(scenario.input || {}),
+          });
+          const body = await resp.json() as Record<string, unknown>;
+          results.push({
+            action: scenario.action,
+            input: scenario.input || {},
+            status: resp.status,
+            response: (body as { data?: unknown }).data ?? body,
+          });
+        } catch (e) {
+          results.push({
+            action: scenario.action,
+            input: scenario.input || {},
+            status: 500,
+            response: { error: (e as Error).message },
+          });
+        }
+      }
+
+      logger.info('[generator] Extension probe complete', { extensionName, probed: results.length, projectId });
+
+      res.json(success(config.nodeId, { extensionName, results }));
+    },
+  );
+
   // POST /v1/generator/:projectId/test — legacy bulk test endpoint
   // Tests are now per-component via AI-generated code. This endpoint returns a stub.
   router.post('/v1/generator/:projectId/test',
@@ -613,56 +670,42 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 <pre id="log"></pre>
 <div id="result"></div>
 
+<script nonce="${nonce}" src="/v1/libs/aimeat-auth.js"></script>
 <script nonce="${nonce}">
-// Auth setup — cortex callExt() needs AIMEAT.auth.getSession()
-window.AIMEAT = window.AIMEAT || {};
-window.AIMEAT.auth = {
-  getSession: function() {
-    var jwt = ${JSON.stringify(token)};
-    return {
-      jwt: jwt,
-      fetch: async function(url, opts) {
-        var fullUrl = url.startsWith('http') ? url : url;
-        var hdrs = Object.assign({}, (opts && opts.headers) || {}, {
-          'Authorization': 'Bearer ' + jwt,
-          'Content-Type': 'application/json'
-        });
-        var resp = await fetch(fullUrl, Object.assign({}, opts, { headers: hdrs }));
-        return resp.json();
-      }
-    };
-  }
-};
-window.AIMEAT.data = {
-  getPublic: async function(ns, key) {
-    var jwt = ${JSON.stringify(token)};
-    var resp = await fetch('/v1/memory/' + encodeURIComponent(ns) + '/' + encodeURIComponent(key),
-      { headers: { 'Authorization': 'Bearer ' + jwt } });
-    if (!resp.ok) return null;
-    var json = await resp.json();
-    return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
-  },
-  get: async function(key) {
-    var jwt = ${JSON.stringify(token)};
-    var resp = await fetch('/v1/memory/' + encodeURIComponent(key),
-      { headers: { 'Authorization': 'Bearer ' + jwt } });
-    if (!resp.ok) return null;
-    var json = await resp.json();
-    return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
-  },
-  put: async function(key, value) {
-    var jwt = ${JSON.stringify(token)};
-    var resp = await fetch('/v1/memory/' + encodeURIComponent(key), {
-      method: 'PUT',
-      headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: value })
-    });
-    if (!resp.ok) return null;
-    var json = await resp.json();
-    return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
-  }
-};
+// Inject test session into the real auth library
+// Uses the same session.fetch() pattern as the real createSession() in aimeat-auth.js:
+//   const resp = await fetch(url, { ...opts, headers }); return resp.json();
+(function() {
+  var jwt = ${JSON.stringify(token)};
+  var parseJwt = function(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); } catch(e) { return null; } };
+  var payload = parseJwt(jwt);
+  var session = {
+    jwt: jwt,
+    owner: payload && payload.owner || null,
+    gaii: payload && payload.sub || null,
+    ghii: (payload && payload.owner || '') + '@' + (payload && payload.node || ''),
+    publicKey: null,
+    nodeUrl: window.location.origin,
+    roles: payload && payload.roles || [],
+    get valid() { return true; },
+    async fetch(path, opts) {
+      if (!opts) opts = {};
+      var url = window.location.origin + path;
+      var headers = Object.assign({}, opts.headers || {}, {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + jwt
+      });
+      var resp = await fetch(url, Object.assign({}, opts, { headers: headers }));
+      return resp.json();
+    },
+    async refresh() { return this; }
+  };
+  // Override getSession synchronously — before aimeat-data.js loads
+  var origGetSession = AIMEAT.auth.getSession.bind(AIMEAT.auth);
+  AIMEAT.auth.getSession = function() { return session || origGetSession(); };
+})();
 </script>
+<script nonce="${nonce}" src="/v1/libs/aimeat-data.js"></script>
 
 ${scripts.join('\n')}
 

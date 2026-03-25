@@ -14,7 +14,7 @@
 
 import { INSTRUCTION_DISCLAIMER, SANDBOX_CONSTRAINTS, EXTENSION_CONSUMPTION_RULES } from './generator-prompts-base.js';
 
-export function buildTestPrompt(componentType, componentCode, componentLabel, registeredAs, blueprint, interviewSpec) {
+export function buildTestPrompt(componentType, componentCode, componentLabel, registeredAs, blueprint, interviewSpec, probeResults) {
 
   /* ── Blueprint-derived metadata ─────────────────────────── */
 
@@ -99,6 +99,28 @@ Test EVERY scenario above.\n`;
 
 ${scenarios.map((s, i) => `${i + 1}. ${s.action}: ${s.expect}`).join('\n')}
 \n`;
+    }
+  }
+
+  /* ── Golden samples from probe — real API responses as test reference ── */
+
+  let goldenSection = '';
+  if (probeResults && Array.isArray(probeResults) && probeResults.length > 0) {
+    const successful = probeResults.filter(p => p.status === 200 && p.response);
+    if (successful.length > 0) {
+      goldenSection = `\n## GOLDEN SAMPLES — Real API responses (use these as test reference)
+
+These are ACTUAL responses captured from the live extension. Your test assertions
+MUST match these data shapes. Do NOT invent field names — use exactly what you see here.
+
+${successful.map(p => `### ${p.action}(${JSON.stringify(p.input)})
+\`\`\`json
+${JSON.stringify(p.response, null, 2)}
+\`\`\`
+`).join('\n')}
+When writing assertions, reference the EXACT field names from the golden samples above.
+For example, if the response has \`businessId: { value: "123" }\`, assert \`result.businessId.value\`, NOT \`result.businessId === "123"\`.
+`;
     }
   }
 
@@ -294,7 +316,7 @@ For TRANSLATION tests:
 - Type: ${componentType}
 - Label: ${componentLabel}
 - Registered as: ${registeredAs || 'unknown'}
-${testSection}
+${goldenSection}${testSection}
 ## Component Code
 \`\`\`
 ${componentCode}

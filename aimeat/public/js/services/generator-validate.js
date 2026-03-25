@@ -173,6 +173,25 @@ export function validateAntiPatterns(type, code) {
     if (/\b(setTimeout|setInterval|setImmediate)\s*\(/m.test(code)) {
       errors.push('CRASH: setTimeout/setInterval/setImmediate are not available in the V8 sandbox.');
     }
+    // Web APIs — not available in bare V8 isolate (not Node.js, not browser)
+    if (/\bnew\s+URLSearchParams\b/m.test(code)) {
+      errors.push('CRASH: URLSearchParams is not available in the V8 sandbox. Use string concatenation with encodeURIComponent() instead.');
+    }
+    if (/\bnew\s+URL\s*\(/m.test(code)) {
+      errors.push('CRASH: URL constructor is not available in the V8 sandbox. Use string concatenation instead.');
+    }
+    if (/\bnew\s+(TextEncoder|TextDecoder)\s*\(/m.test(code)) {
+      errors.push('CRASH: TextEncoder/TextDecoder are not available in the V8 sandbox.');
+    }
+    if (/\bnew\s+(Headers|Request|Response|FormData|Blob|AbortController)\s*\(/m.test(code)) {
+      errors.push('CRASH: Web API constructors (Headers, Request, Response, FormData, Blob, AbortController) are not available in the V8 sandbox.');
+    }
+    if (/\b(atob|btoa)\s*\(/m.test(code)) {
+      errors.push('CRASH: atob/btoa are not available in the V8 sandbox.');
+    }
+    if (/\bstructuredClone\s*\(/m.test(code)) {
+      errors.push('CRASH: structuredClone is not available in the V8 sandbox. Use JSON.parse(JSON.stringify(obj)) instead.');
+    }
   }
 
   // === HTML entity corruption (any type) ===
