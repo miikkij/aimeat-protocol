@@ -369,20 +369,14 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
           let targetUrl: string;
           if (compType === 'app') {
             targetUrl = `${baseUrl}/apps/${registeredAs}`;
-          } else if (compType === 'cortex') {
-            // Cortex test uses a blank page — the cortex library is injected via preScripts
-            targetUrl = `${baseUrl}/v1/portal`;
           } else {
-            targetUrl = baseUrl;
+            // Cortex and other browser tests use the self-contained test page
+            // It includes auth, library scripts, and test code — Playwright just navigates and reads results
+            targetUrl = `${baseUrl}/v1/generator/test-page/${projectId}/${componentId}`;
           }
 
           await ensureScreenshotDir(projectId);
-          // For cortex tests: inject the cortex library script before running test code
-          const preScripts: string[] = [];
-          if (compType === 'cortex' && registeredAs) {
-            preScripts.push(`/v1/cortex/${registeredAs}/libs/${registeredAs}.js`);
-          }
-          const pwResult = await executePlaywrightTest(testCode as string, projectId, componentId, targetUrl, preScripts, token);
+          const pwResult = await executePlaywrightTest(testCode as string, projectId, componentId, targetUrl, [], token);
           result = { componentId, type: compType, status: pwResult.passed ? 'passed' : 'failed', scenarios: 1, passed: pwResult.passed ? 1 : 0, errors: pwResult.errors, screenshots: pwResult.screenshots, fixRound: 0 };
         }
       } else {
@@ -571,6 +565,126 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       } catch {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Screenshot not found'));
       }
+    }
+  );
+
+  // GET /v1/generator/test-page/:projectId/:componentId — browser test runner page
+  // Serves a self-contained HTML page that loads cortex/app library, auth, and test code.
+  // Playwright just navigates here and reads window.__testResults — no eval injection needed.
+  router.get('/v1/generator/test-page/:projectId/:componentId',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+      const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+
+      const compRec = await storage.getMemory(ownerGhii(req), `generator.${projectId}.component.${componentId}`);
+      const compVal = (compRec?.value as Record<string, unknown>) ?? {};
+      const compType = (compVal.type as string) || 'unknown';
+      const registeredAs = compVal.registeredAs as string || componentId;
+      const testCode = (compVal.testCode as string) || '';
+
+      if (!testCode) {
+        res.status(400).send('No test code for this component');
+        return;
+      }
+
+      // Build cortex/app script tags
+      const scripts: string[] = [];
+      if (compType === 'cortex' && registeredAs) {
+        scripts.push(`<script src="/v1/cortex/${registeredAs}/libs/${registeredAs}.js"></script>`);
+      }
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Test: ${registeredAs}</title></head>
+<body>
+<h1>Testing: ${registeredAs} (${compType})</h1>
+<pre id="log"></pre>
+<div id="result"></div>
+
+<script>
+// Auth setup — cortex callExt() needs AIMEAT.auth.getSession()
+window.AIMEAT = window.AIMEAT || {};
+window.AIMEAT.auth = {
+  getSession: function() {
+    var jwt = ${JSON.stringify(token)};
+    return {
+      jwt: jwt,
+      fetch: async function(url, opts) {
+        var fullUrl = url.startsWith('http') ? url : url;
+        var hdrs = Object.assign({}, (opts && opts.headers) || {}, {
+          'Authorization': 'Bearer ' + jwt,
+          'Content-Type': 'application/json'
+        });
+        var resp = await fetch(fullUrl, Object.assign({}, opts, { headers: hdrs }));
+        return resp.json();
+      }
+    };
+  }
+};
+window.AIMEAT.data = {
+  getPublic: async function(ns, key) {
+    var jwt = ${JSON.stringify(token)};
+    var resp = await fetch('/v1/memory/' + encodeURIComponent(ns) + '/' + encodeURIComponent(key),
+      { headers: { 'Authorization': 'Bearer ' + jwt } });
+    if (!resp.ok) return null;
+    var json = await resp.json();
+    return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
+  },
+  get: async function(key) {
+    var jwt = ${JSON.stringify(token)};
+    var resp = await fetch('/v1/memory/' + encodeURIComponent(key),
+      { headers: { 'Authorization': 'Bearer ' + jwt } });
+    if (!resp.ok) return null;
+    var json = await resp.json();
+    return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
+  },
+  put: async function(key, value) {
+    var jwt = ${JSON.stringify(token)};
+    var resp = await fetch('/v1/memory/' + encodeURIComponent(key), {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: value })
+    });
+    if (!resp.ok) return null;
+    var json = await resp.json();
+    return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
+  }
+};
+</script>
+
+${scripts.join('\n')}
+
+<script>
+// Test runner
+window.__testResults = null;
+window.__testRunning = true;
+(async function() {
+  try {
+    ${testCode}
+  } catch (e) {
+    if (!window.__testResults) {
+      window.__testResults = { passed: false, errors: ['Test threw: ' + e.message] };
+    }
+  } finally {
+    window.__testRunning = false;
+    if (!window.__testResults) {
+      window.__testResults = { passed: false, errors: ['Test did not complete'] };
+    }
+    // Show results in DOM
+    var el = document.getElementById('result');
+    if (el && window.__testResults) {
+      el.textContent = JSON.stringify(window.__testResults, null, 2);
+      el.style.color = window.__testResults.passed ? 'green' : 'red';
+    }
+  }
+})();
+</script>
+</body></html>`;
+
+      res.set('Content-Type', 'text/html');
+      res.send(html);
     }
   );
 

@@ -198,13 +198,22 @@ export async function executeHttpTest(
  * For apps: navigates to URL, interacts with page, takes screenshots.
  * For cortex: loads cortex lib, calls methods, verifies results.
  */
+/**
+ * Execute a browser test by navigating to a test page URL.
+ * For cortex/app tests, the server provides a self-contained test page at
+ * GET /v1/generator/test-page/:projectId/:componentId that includes auth,
+ * library scripts, and test code — Playwright just navigates and reads results.
+ *
+ * For app tests, navigates to the app URL and injects test code via addScriptTag.
+ */
 export async function executePlaywrightTest(
-  testCode: string,
+  _testCode: string,
   projectId: string,
   componentId: string,
   targetUrl: string,
-  preScripts: string[] = [],
+  _preScripts: string[] = [],
   authToken?: string,
+  _serverPort?: number,
 ): Promise<{ passed: boolean; errors: string[]; screenshots: string[] }> {
   let pw;
   let browser;
@@ -230,96 +239,20 @@ export async function executePlaywrightTest(
       }
     });
 
-    // Navigate to target
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
-
-    // Inject auth session so cortex/app can make authenticated API calls
-    // Cortex callExt() expects session.fetch() to return the AIMEAT envelope: {ok, data, ...}
-    // NOT a raw Response — so we parse and return the JSON object directly
+    // Set auth header for all requests so the test page can be loaded
     if (authToken) {
-      const authSetup = `
-        window.AIMEAT = window.AIMEAT || {};
-        window.AIMEAT.auth = {
-          getSession: function() {
-            var jwt = ${JSON.stringify(authToken)};
-            return {
-              jwt: jwt,
-              fetch: async function(url, opts) {
-                var hdrs = Object.assign({}, (opts && opts.headers) || {}, { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' });
-                var resp = await fetch(url, Object.assign({}, opts, { headers: hdrs }));
-                return resp.json();
-              }
-            };
-          }
-        };
-        window.AIMEAT.data = {
-          getPublic: async function(ns, key) {
-            var jwt = ${JSON.stringify(authToken)};
-            var url = '/v1/memory/' + encodeURIComponent(ns) + '/' + encodeURIComponent(key);
-            var resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + jwt } });
-            if (!resp.ok) return null;
-            var json = await resp.json();
-            return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
-          },
-          get: async function(key) {
-            var jwt = ${JSON.stringify(authToken)};
-            var resp = await fetch('/v1/memory/' + encodeURIComponent(key), { headers: { 'Authorization': 'Bearer ' + jwt } });
-            if (!resp.ok) return null;
-            var json = await resp.json();
-            return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
-          },
-          put: async function(key, value) {
-            var jwt = ${JSON.stringify(authToken)};
-            var resp = await fetch('/v1/memory/' + encodeURIComponent(key), {
-              method: 'PUT',
-              headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ value: value })
-            });
-            if (!resp.ok) return null;
-            var json = await resp.json();
-            return (json && json.data && json.data.value !== undefined) ? json.data.value : (json && json.data) || null;
-          }
-        };
-      `;
-      await page.evaluate(authSetup);
+      await page.setExtraHTTPHeaders({ 'Authorization': `Bearer ${authToken}` });
     }
 
-    // Inject pre-scripts (e.g., cortex library) before test code runs
-    const origin = new URL(targetUrl).origin;
-    for (const src of preScripts) {
-      await page.addScriptTag({ url: `${origin}${src}` });
-      await page.waitForTimeout(500);
-    }
+    // Navigate to the target URL (test page for cortex, app URL for apps)
+    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
 
     // Take initial screenshot
     const initScreenshot = `${componentId}-01-load.png`;
     await page.screenshot({ path: join(dir, initScreenshot), fullPage: true });
     screenshots.push(initScreenshot);
 
-    // Execute AI-generated test code in the page context
-    // The test code sets window.__testResults = { passed, errors, details }
-    // Test code is typically an async IIFE — we add a sentinel so we can poll for completion
-    const wrappedCode = `
-      window.__testResults = null;
-      window.__testRunning = true;
-      (async function() {
-        try {
-          ${testCode}
-        } catch (e) {
-          if (!window.__testResults) {
-            window.__testResults = { passed: false, errors: ['Test threw: ' + e.message] };
-          }
-        } finally {
-          window.__testRunning = false;
-          if (!window.__testResults) {
-            window.__testResults = { passed: false, errors: ['Test did not complete'] };
-          }
-        }
-      })();
-    `;
-    await page.evaluate(wrappedCode);
-
-    // Wait for test to finish (poll __testRunning, max 60s for external API calls)
+    // Wait for test to finish — the test page sets window.__testRunning = false when done
     try {
       await page.waitForFunction('window.__testRunning === false', { timeout: 60000 });
     } catch {
@@ -331,7 +264,7 @@ export async function executePlaywrightTest(
     await page.screenshot({ path: join(dir, finalScreenshot), fullPage: true });
     screenshots.push(finalScreenshot);
 
-    // Collect results
+    // Collect results from window.__testResults
     const results = await page.evaluate('window.__testResults') as { passed?: boolean; errors?: string[]; details?: string } | null;
 
     if (consoleErrors.length > 0) {
