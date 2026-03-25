@@ -590,10 +590,11 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
-      // Build cortex/app script tags
+      // Build cortex/app script tags — nonce required for CSP
+      const nonce = res.locals.cspNonce as string;
       const scripts: string[] = [];
       if (compType === 'cortex' && registeredAs) {
-        scripts.push(`<script src="/v1/cortex/${registeredAs}/libs/${registeredAs}.js"></script>`);
+        scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${registeredAs}/libs/${registeredAs}.js"></script>`);
       }
 
       const html = `<!DOCTYPE html>
@@ -603,7 +604,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 <pre id="log"></pre>
 <div id="result"></div>
 
-<script>
+<script nonce="${nonce}">
 // Auth setup — cortex callExt() needs AIMEAT.auth.getSession()
 window.AIMEAT = window.AIMEAT || {};
 window.AIMEAT.auth = {
@@ -656,7 +657,7 @@ window.AIMEAT.data = {
 
 ${scripts.join('\n')}
 
-<script>
+<script nonce="${nonce}">
 // Test runner
 window.__testResults = null;
 window.__testRunning = true;
