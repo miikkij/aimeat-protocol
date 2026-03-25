@@ -113,14 +113,103 @@ CRITICAL SANDBOX RULES — violating ANY will crash the test:
 - Set results on: window.__testResults = { passed: boolean, errors: string[], details: string }
 
 For CORTEX tests:
-- The cortex library is loaded at: /v1/cortex/{name}/libs/{name}.js
+- The cortex library is already loaded on the test page
 - Access it via: window.AIMEAT.{camelCaseName}
-- Test init() AND every public method
+- Authentication IS available — session.fetch() works
+
+## QUALITY REQUIREMENTS (MANDATORY)
+
+Every test MUST follow this pattern for EVERY API call:
+
+1. **Call** — invoke the method with real, meaningful parameters
+2. **Log** — log the FULL response: \`log('method returned: ' + JSON.stringify(result))\`
+3. **Assert not null** — \`if (result === null) fail('method: got null')\`
+4. **Assert shape** — check specific field names and types from the cortex code
+5. **Assert values** — for external APIs, verify arrays have length > 0, objects have expected fields
+6. **Verify side effects** — after writes, READ BACK and check the data is there
+
+NEVER do this:
+\`\`\`
+if (result === null) log('returned null (expected without auth)');  // WRONG — auth IS available
+\`\`\`
+
+ALWAYS do this:
+\`\`\`
+if (result === null) fail('method: returned null — should return data');
+if (!result.items) fail('method: missing items field');
+if (!Array.isArray(result.items)) fail('method: items should be array');
+log('method returned: ' + JSON.stringify(result));
+\`\`\`
+
+## CORTEX TEST EXAMPLE (follow this pattern exactly)
+
+\`\`\`javascript
+const lib = window.AIMEAT.myDomainLib;
+if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
+
+// 1. INIT — verify readiness
+const initResult = await lib.init();
+log('init returned: ' + JSON.stringify(initResult));
+if (!initResult) fail('init: returned null');
+else if (typeof initResult.ready !== 'boolean') fail('init: missing ready field');
+else pass('init: ready=' + initResult.ready);
+
+// 2. SEARCH — verify real API data comes back
+const searchResult = await lib.search('test query');
+log('search returned: ' + JSON.stringify(searchResult));
+if (!searchResult) fail('search: returned null');
+else if (!Array.isArray(searchResult.items)) fail('search: items should be array');
+else if (searchResult.items.length === 0) fail('search: got empty results for known query');
+else pass('search: got ' + searchResult.items.length + ' results');
+
+// 3. WRITE — add item, then READ BACK to verify
+const addResult = await lib.addItem('test-id', 'Test Name');
+log('addItem returned: ' + JSON.stringify(addResult));
+if (!addResult) fail('addItem: returned null');
+else if (!addResult.success) fail('addItem: success not true');
+
+// 3b. READ BACK — verify the item was actually saved
+const listAfterAdd = await lib.getItems();
+log('getItems after add: ' + JSON.stringify(listAfterAdd));
+if (!listAfterAdd || !listAfterAdd.items) fail('getItems: returned null after add');
+else {
+  const found = listAfterAdd.items.find(i => i.id === 'test-id');
+  if (!found) fail('addItem: item not found in list after add');
+  else pass('addItem: item persisted and readable');
+}
+
+// 4. DELETE — remove item, then READ BACK to verify
+const removeResult = await lib.removeItem('test-id');
+log('removeItem returned: ' + JSON.stringify(removeResult));
+if (!removeResult) fail('removeItem: returned null');
+
+// 4b. READ BACK — verify removal
+const listAfterRemove = await lib.getItems();
+log('getItems after remove: ' + JSON.stringify(listAfterRemove));
+if (listAfterRemove && listAfterRemove.items) {
+  const stillThere = listAfterRemove.items.find(i => i.id === 'test-id');
+  if (stillThere) fail('removeItem: item still in list after remove');
+  else pass('removeItem: item removed successfully');
+}
+
+// 5. ERROR HANDLING — test with invalid input
+const badResult = await lib.getItem(null);
+log('getItem(null) returned: ' + JSON.stringify(badResult));
+// Should return null or error, not crash
+pass('getItem(null): handled gracefully');
+
+window.__testResults = results;
+\`\`\`
+
+Apply this EXACT pattern to the component under test. Use the actual method names and field names from the component code.
 ${cortexMethods}
 For APP tests:
-- The app is already loaded in the page
+- The app is already loaded on the test page
+- Authentication IS available
 - Wait for data to render: await new Promise(r => setTimeout(r, 3000));
 - Check DOM elements, click buttons, verify results
+- Verify actual content renders (not translation keys like "search.title")
+- Verify API calls return real data visible in the UI
 ${appApis}`;
 
   const serverEnvDoc = `## Test Environment: Server-side sandbox (new Function)
