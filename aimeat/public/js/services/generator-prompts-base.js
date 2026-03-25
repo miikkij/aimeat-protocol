@@ -1244,8 +1244,9 @@ Example: YAML name \`my-domain-lib\` → LIB_NAME = \`myDomainLib\` → \`AIMEAT
 
 - The library MUST be a single IIFE that registers on \`window.AIMEAT\`
 - Use \`AIMEAT.register(name, exports)\` if available, always set \`AIMEAT[name] = exports\`
-- Use \`AIMEAT.data.getPublic()\` when aimeat-data.js is loaded, fallback to raw fetch
-- Use \`AIMEAT.auth.getSession()\` for authenticated extension calls
+- Use \`AIMEAT.data.getPublic()\` for public memory reads (extension namespace data)
+- Use \`AIMEAT.auth.getSession().fetch()\` for ALL authenticated calls — NEVER use raw fetch() for API calls
+- The fallback path (when AIMEAT.data is not loaded) MUST also use session.fetch(), not raw fetch()
 - Extension names in \`EXT\` object MUST exactly match the registered extension \`metadata.name\`
 - \`init()\` MUST follow the init() contract below — no custom behavior
 - All public methods must be async (return Promises)

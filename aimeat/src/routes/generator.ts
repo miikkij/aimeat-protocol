@@ -365,15 +365,9 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         if (!await isPlaywrightAvailable()) {
           result = { componentId, type: compType, status: 'skipped', scenarios: 0, passed: 0, errors: ['Playwright not available'], screenshots: [], fixRound: 0 };
         } else {
-          // Determine target URL
-          let targetUrl: string;
-          if (compType === 'app') {
-            targetUrl = `${baseUrl}/apps/${registeredAs}`;
-          } else {
-            // Cortex and other browser tests use the self-contained test page
-            // It includes auth, library scripts, and test code — Playwright just navigates and reads results
-            targetUrl = `${baseUrl}/v1/generator/test-page/${projectId}/${componentId}`;
-          }
+          // All browser tests use the self-contained test page
+          // It includes auth, library scripts, and test code — Playwright just navigates and reads results
+          const targetUrl = `${baseUrl}/v1/generator/test-page/${projectId}/${componentId}`;
 
           await ensureScreenshotDir(projectId);
           const pwResult = await executePlaywrightTest(testCode as string, projectId, componentId, targetUrl, [], token);
@@ -599,6 +593,17 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const scripts: string[] = [];
       if (compType === 'cortex' && registeredAs) {
         scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${registeredAs}/libs/${registeredAs}.js"></script>`);
+      }
+      // App tests need the same cortex libraries the app uses
+      // Load all cortex libs that belong to this project
+      if (compType === 'app') {
+        const allComps = await storage.listMemory(ownerGhii(req), { prefix: `generator.${projectId}.component.`, visibility: 'owner' });
+        for (const rec of allComps) {
+          const val = rec.value as Record<string, unknown>;
+          if (val.type === 'cortex' && val.registeredAs) {
+            scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${val.registeredAs}/libs/${val.registeredAs}.js"></script>`);
+          }
+        }
       }
 
       const html = `<!DOCTYPE html>
