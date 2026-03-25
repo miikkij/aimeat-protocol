@@ -253,8 +253,10 @@ export async function executePlaywrightTest(
     screenshots.push(initScreenshot);
 
     // Wait for test to finish — the test page sets window.__testRunning = false when done
+    // Use function form (not string) to avoid CSP unsafe-eval blocks
     try {
-      await page.waitForFunction('window.__testRunning === false', { timeout: 60000 });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await page.waitForFunction(() => (globalThis as any).__testRunning === false, { timeout: 60000 });
     } catch {
       // Timeout — test took too long
     }
@@ -264,8 +266,9 @@ export async function executePlaywrightTest(
     await page.screenshot({ path: join(dir, finalScreenshot), fullPage: true });
     screenshots.push(finalScreenshot);
 
-    // Collect results from window.__testResults
-    const results = await page.evaluate('window.__testResults') as { passed?: boolean; errors?: string[]; details?: string } | null;
+    // Collect results — use function form to avoid CSP unsafe-eval
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results = await page.evaluate(() => (globalThis as any).__testResults) as { passed?: boolean; errors?: string[]; details?: string } | null;
 
     if (consoleErrors.length > 0) {
       errors.push(`Console errors: ${consoleErrors.slice(0, 5).join('; ')}`);
