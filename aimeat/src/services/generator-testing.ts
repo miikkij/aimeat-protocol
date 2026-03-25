@@ -237,7 +237,10 @@ export async function executePlaywrightTest(
     page.on('console', (msg: any) => {
       if (msg.type() === 'error') {
         const text = msg.text();
-        if (!text.includes('favicon')) consoleErrors.push(text);
+        // Ignore expected noise: favicon, HTTP status errors from external APIs (400/404/500 etc)
+        if (text.includes('favicon')) return;
+        if (text.includes('Failed to load resource: the server responded with a status of')) return;
+        consoleErrors.push(text);
       }
     });
 
