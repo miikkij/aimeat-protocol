@@ -161,7 +161,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
           break;
         }
         if (autopilotState.cancelledRef.current) break;
-        if (comp.type === 'extension') content = stripCodeblock(content);
+        content = stripCodeblock(content);
 
         let vr = validateComponent(comp.type, content, core.project?.blueprint);
 
@@ -174,7 +174,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
             );
             const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
             try { content = await runWithAi(projectId, fp); } catch (e) { break; }
-            if (comp.type === 'extension') content = stripCodeblock(content);
+            content = stripCodeblock(content);
             vr = validateComponent(comp.type, content, core.project?.blueprint);
           }
         }
@@ -243,7 +243,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
         upstream || null,
       );
       let content = await runWithAi(projectId, prompt);
-      if (comp.type === 'extension') content = stripCodeblock(content);
+      content = stripCodeblock(content);
       let vr = validateComponent(comp.type, content, core.project?.blueprint);
 
       if (!vr.valid && orSettings?.autoRetry) {
@@ -251,7 +251,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
           const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
           try { content = await runWithAi(projectId, fp); } catch { break; }
-          if (comp.type === 'extension') content = stripCodeblock(content);
+          content = stripCodeblock(content);
           vr = validateComponent(comp.type, content, core.project?.blueprint);
         }
       }

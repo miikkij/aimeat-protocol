@@ -97,7 +97,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         // Debug: write full AI exchange — sent prompt, raw response, processed result
         writeDebugArtifact(projectId, cid, 'prompt', prompt);
         writeDebugArtifact(projectId, cid, 'ai-raw-response', content);
-        if (comp.type === 'extension') content = stripCodeblock(content);
+        content = stripCodeblock(content);
         writeDebugArtifact(projectId, cid, 'generated', content);
 
         // Save result
@@ -126,7 +126,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               break;
             }
             writeDebugArtifact(projectId, cid, 'fix-raw-response-' + attempt, content);
-            if (comp.type === 'extension') content = stripCodeblock(content);
+            content = stripCodeblock(content);
             vr = validateComponent(comp.type, content, project.blueprint);
           }
         }

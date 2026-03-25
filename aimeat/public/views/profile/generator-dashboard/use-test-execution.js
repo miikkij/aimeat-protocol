@@ -208,7 +208,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
       const fixP = buildFixPrompt(originalPrompt, comp.result || '', failedTestComp.errors || [], comp.type, testContext, null, reflectionDiagnosis);
 
       let content = await runWithAi(projectId, fixP);
-      if (comp.type === 'extension') content = stripCodeblock(content);
+      content = stripCodeblock(content);
 
       let vr = validateComponent(comp.type, content, core.project?.blueprint);
 
@@ -218,7 +218,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
           showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
           const retryP = buildFixPrompt(originalPrompt, content, vr.errors, comp.type);
           content = await runWithAi(projectId, retryP);
-          if (comp.type === 'extension') content = stripCodeblock(content);
+          content = stripCodeblock(content);
           vr = validateComponent(comp.type, content, core.project?.blueprint);
         }
       }

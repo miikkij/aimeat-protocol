@@ -302,7 +302,7 @@ export function ComponentDetail({ component, project, components, projectId, int
       );
       let content = await runWithAi(projectId, fresh);
       // Strip codeblock wrappers for extensions (AI models often wrap in ```)
-      if (component.type === 'extension') content = stripCodeblock(content);
+      content = stripCodeblock(content);
       setResult(content);
 
       // Validate
