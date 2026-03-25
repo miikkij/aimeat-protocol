@@ -527,10 +527,19 @@ Do NOT call any method not in this list. Do NOT rename these methods.
 This project has Cortex libraries that wrap all extension APIs into clean domain methods.
 Load them via <script> tags and use their API.
 
-${cortexLibs.map(lib => `### ${lib.label}
+${(() => {
+        // Collect probe results from extension components — real API response data
+        const extProbeResults = (completedComponents || [])
+          .filter(c => c.type === 'extension' && c.probeResults && c.probeResults.length > 0)
+          .flatMap(c => c.probeResults.filter(p => p.status === 200 && p.response));
+        return cortexLibs.map(lib => {
+          const apiSummary = lib.result ? summarizeCortexApiForApp(lib.result, extProbeResults) : '  (no API info available)';
+          return `### ${lib.label}
 Load: \\\`<script src="/v1/cortex/${lib.name}/libs/${lib.name}.js"></script>\\\`
-${lib.result ? `Full cortex code (use EXACTLY these method names and return shapes):\n${lib.result}` : ''}
-`).join('\n')}
+${apiSummary}
+`;
+        }).join('\n');
+      })()}
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  Read the cortex code above CAREFULLY.                                 ║
@@ -654,8 +663,8 @@ async function extCall(extName, actionId, body = {}) {
 }
 
 // Usage:
-const result = await extCall('my-extension', 'searchItems', { query: 'test' });
-const company = await extCall('my-extension', 'getCompany', { businessId: '1234567-8' });
+const results = await extCall('my-extension', 'search', { query: 'test' });
+const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
 \\\`\\\`\\\``}
 
 ## CDN Libraries & Design Resources
@@ -1247,6 +1256,31 @@ Example: YAML name \`my-domain-lib\` → LIB_NAME = \`myDomainLib\` → \`AIMEAT
 - Handle errors gracefully — return null or empty arrays, don't throw for missing data
 - Include the prompt component with documented API surface for downstream AI consumers
 
+### MANDATORY: JSDoc for every public method
+
+Every exported method MUST have a JSDoc comment with:
+- \`@param\` for each parameter with its type and description
+- \`@returns\` with the EXACT return shape — never use \`{Object}\`, always describe the fields
+
+WRONG:
+\\\`\\\`\\\`javascript
+/** @returns {Object|null} Item data */
+async function getItem(id) { ... }
+\\\`\\\`\\\`
+
+RIGHT:
+\\\`\\\`\\\`javascript
+/**
+ * @param {string} id - Unique identifier
+ * @returns {{ id: string, name: string, status: string, metadata: { createdAt: string, updatedAt: string } } | null}
+ */
+async function getItem(id) { ... }
+\\\`\\\`\\\`
+
+Use the ACTUAL API RESPONSES section (from probe data) to determine the exact return shapes.
+Every field you see in the probe response MUST appear in the @returns type definition.
+If probe data shows a nested object like \`field: { value: "abc", date: "2024-01-01" }\`, your @returns MUST reflect that: \`field: { value: string, date: string }\`.
+
 ## init() Contract (MUST follow exactly)
 
 ╔══════════════════════════════════════════════════════════════════════════╗
@@ -1425,6 +1459,104 @@ export function summarizeCortexApi(result) {
   return summary.join('\n') + '\n';
 }
 
+/**
+ * Summarize cortex API for the app prompt — shows ONLY public methods and return shapes.
+ * Never shows internal functions (callExt, readExtMemory, etc.) to prevent apps from
+ * bypassing the cortex and calling extensions directly.
+ */
+/**
+ * Generate a JSDoc-style API reference from cortex source code for the app prompt.
+ * Shows ONLY public methods with parameters and return types.
+ * Never exposes internal functions (callExt, readExtMemory, etc.).
+ */
+export function summarizeCortexApiForApp(result, probeResults) {
+  if (!result) return '  (no API info available)';
+
+  // Extract LIB_NAME
+  const libMatch = result.match(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
+  const libName = libMatch ? libMatch[1] : 'unknownLib';
+
+  // Extract exported method names from the exports object
+  const exportsMatch = result.match(/(?:const|var)\s+exports\s*=\s*\{([\s\S]*?)\}/);
+  const exportedNames = new Set();
+  if (exportsMatch) {
+    for (const m of exportsMatch[1].split(',')) {
+      const name = m.trim().split(':')[0].trim();
+      if (name && !name.startsWith('//')) exportedNames.add(name);
+    }
+  }
+
+  // Extract function signatures + JSDoc comments for exported methods only
+  const jsdocEntries = [];
+  // Match JSDoc + function pairs: /** ... */ followed by async function name(...)
+  const funcRegex = /(\/\*\*[\s\S]*?\*\/)\s*(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g;
+  let match;
+  while ((match = funcRegex.exec(result)) !== null) {
+    const [, docComment, funcName, params] = match;
+    if (!exportedNames.has(funcName)) continue; // skip internal functions
+    jsdocEntries.push({ name: funcName, params, doc: docComment });
+  }
+
+  // Also catch functions without JSDoc (fallback)
+  const bareFuncRegex = /(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)\s*\{/g;
+  while ((match = bareFuncRegex.exec(result)) !== null) {
+    const [, funcName, params] = match;
+    if (!exportedNames.has(funcName)) continue;
+    if (jsdocEntries.some(e => e.name === funcName)) continue; // already captured
+    jsdocEntries.push({ name: funcName, params, doc: null });
+  }
+
+  // Build JSDoc-style output
+  const lines = [];
+  lines.push(`/**`);
+  lines.push(` * Cortex library: AIMEAT.${libName}`);
+  lines.push(` * Load: <script src="/v1/cortex/.../${libName.replace(/([A-Z])/g, '-$1').toLowerCase()}.js"></script>`);
+  lines.push(` *`);
+  lines.push(` * Call these methods from your app. They handle all backend communication internally.`);
+  lines.push(` * Do NOT call callExt(), readExtMemory(), writeOwnerMemory() or /v1/ext/ directly.`);
+  lines.push(` */`);
+  lines.push('');
+
+  for (const entry of jsdocEntries) {
+    if (entry.doc) {
+      // Include the original JSDoc comment
+      lines.push(entry.doc.trim());
+    }
+    lines.push(`async AIMEAT.${libName}.${entry.name}(${entry.params})`);
+    // Attach real response example from probe if available
+    if (probeResults && probeResults.length > 0) {
+      const probe = probeResults.find(p => p.action === entry.name);
+      if (probe && probe.response) {
+        lines.push(`// Example response (captured from live API):`);
+        lines.push(`// ${JSON.stringify(probe.response).substring(0, 500)}`);
+      }
+    }
+    lines.push('');
+  }
+
+  // If no JSDoc entries found, fall back to api_surface from YAML
+  if (jsdocEntries.length === 0) {
+    const apiSurfaceMatch = result.match(/api_surface:\s*\|\n([\s\S]*?)(?=\n\s{4}\w|\n\s{2}-|\n[^\s])/);
+    if (apiSurfaceMatch) {
+      lines.push('Public API:');
+      for (const sl of apiSurfaceMatch[1].split('\n').map(l => l.trim()).filter(Boolean)) {
+        lines.push('  ' + sl);
+      }
+    } else {
+      // Last resort: just list method names
+      for (const name of exportedNames) {
+        lines.push(`async AIMEAT.${libName}.${name}()`);
+      }
+    }
+  }
+
+  lines.push('');
+  lines.push('// These are the ONLY methods available. The cortex handles all extension');
+  lines.push('// communication internally. NEVER call callExt(), readExtMemory(), or /v1/ext/ directly.');
+
+  return lines.join('\n');
+}
+
 /* ── Shared Platform Rules ─────────────────────────────────────────────── */
 // These constants are shared across multiple prompts (extension, cortex, test, fix, edit)
 // to ensure consistent platform knowledge. When a rule changes, it propagates everywhere.
@@ -1504,7 +1636,7 @@ encodeURIComponent, decodeURIComponent, parseInt, parseFloat, isNaN, isFinite
 WRONG:  const params = new URLSearchParams(); params.set('name', query);
 WRONG:  const url = new URL(baseUrl); url.searchParams.set('name', query);
 RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query);
-RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query) + '&businessId=' + encodeURIComponent(id);
+RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query) + '&id=' + encodeURIComponent(id);
 \`\`\`
 
 ### The ctx API — ONLY these properties exist:

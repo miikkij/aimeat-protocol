@@ -278,8 +278,8 @@ IMPORTANT — classify each scenario's "type":
 
 Examples:
   { "action": "init", "input": {}, "expect": "Initializes data structures", "type": "memory" }
-  { "action": "searchCompanies", "input": { "query": "Nokia" }, "expect": "Returns matching companies from PRH API", "type": "external-api" }
-  { "action": "removeFromWatchlist", "input": { "businessId": "123" }, "expect": "Removes entry from memory", "type": "memory" }
+  { "action": "search", "input": { "query": "test" }, "expect": "Returns matching items from external API", "type": "external-api" }
+  { "action": "removeItem", "input": { "id": "abc-123" }, "expect": "Removes entry from memory", "type": "memory" }
 
 Be concrete: use real-world example values (e.g., symbol "AAPL" for stock data, city "Helsinki" for weather).
 Test the happy path — the test system handles error paths.

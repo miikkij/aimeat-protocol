@@ -119,7 +119,7 @@ ${JSON.stringify(p.response, null, 2)}
 \`\`\`
 `).join('\n')}
 When writing assertions, reference the EXACT field names from the golden samples above.
-For example, if the response has \`businessId: { value: "123" }\`, assert \`result.businessId.value\`, NOT \`result.businessId === "123"\`.
+For example, if the response has \`item: { id: "abc", name: "Test" }\`, assert \`result.item.id\`, NOT \`result.item === "abc"\`.
 `;
     }
   }
