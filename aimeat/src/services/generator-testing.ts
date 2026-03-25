@@ -126,9 +126,9 @@ export async function executeHttpTest(
 ): Promise<{ passed: boolean; errors: string[]; details?: string; trace?: TraceEntry[] }> {
   // Diagnostic trace — records every helper call with input/output
   const trace: TraceEntry[] = [];
-  const trunc = (v: unknown, max = 500): string => {
+  const trunc = (v: unknown): string => {
     const s = typeof v === 'string' ? v : JSON.stringify(v);
-    return s && s.length > max ? s.slice(0, max) + '…' : (s ?? 'null');
+    return s ?? 'null';
   };
 
   try {
@@ -157,7 +157,7 @@ export async function executeHttpTest(
       // Return the action's actual data (unwrap AIMEAT envelope)
       const b = resp.body as Record<string, unknown> | null;
       const result = (b as any)?.data ?? null;
-      trace.push({ fn: 'callExt', args: `${extName}/${actionId}(${trunc(body, 200)})`, result: trunc(result), status: resp.status });
+      trace.push({ fn: 'callExt', args: `${extName}/${actionId}(${trunc(body)})`, result: trunc(result), status: resp.status });
       return result;
     };
 
@@ -276,7 +276,7 @@ export async function executePlaywrightTest(
     const results = await page.evaluate(() => (globalThis as any).__testResults) as { passed?: boolean; errors?: string[]; details?: string } | null;
 
     if (consoleErrors.length > 0) {
-      errors.push(`Console errors: ${consoleErrors.slice(0, 5).join('; ')}`);
+      errors.push(`Console errors: ${consoleErrors.join('; ')}`);
     }
 
     if (results) {

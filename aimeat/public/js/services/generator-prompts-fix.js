@@ -72,6 +72,17 @@ Return the corrected result in the same format as the original.`;
 function buildTestContextSection(testContext) {
   let section = '\n\n## Test Failure Context\n';
   section += 'Test errors:\n' + testContext.errors.join('\n') + '\n';
+
+  // Include FULL diagnostic trace so the AI can see actual API responses
+  if (testContext.trace && testContext.trace.length > 0) {
+    section += '\n## ACTUAL API RESPONSES (diagnostic trace)\n';
+    section += 'These are the real responses from every API call during the test.\n';
+    section += 'Study these carefully to understand the actual data shapes before fixing.\n\n';
+    for (const t of testContext.trace) {
+      section += `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}\n\n`;
+    }
+  }
+
   if (testContext.dependencyResults) {
     section += '\nDependency test results (these passed):\n';
     for (const dep of testContext.dependencyResults) {

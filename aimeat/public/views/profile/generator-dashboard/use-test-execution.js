@@ -180,6 +180,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
     const blueprintComp = core.project?.blueprint?.components?.find(c => c.id === componentId);
     const testContext = {
       errors: failedTestComp.errors || [],
+      trace: failedTestComp.trace || [],
       dependencyResults: (testReport?.components || [])
         .filter(c => c.componentId !== componentId && c.status === 'passed')
         .map(c => ({ componentId: c.componentId, status: c.status })),

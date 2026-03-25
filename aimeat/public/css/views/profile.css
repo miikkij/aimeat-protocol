@@ -1731,8 +1731,8 @@
 .pf-gen-test-trace summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); }
 .pf-gen-trace-pre {
   margin-top: 0.25rem; padding: 0.5rem; font-size: 0.75rem; line-height: 1.4;
-  background: var(--bg-dim, #1a1a2e); color: var(--text); border-radius: 6px;
-  overflow-x: auto; max-height: 400px; white-space: pre-wrap; word-break: break-word;
+  background: var(--surface, #f8fafc); color: var(--text, #1e293b); border: 1px solid var(--border, #e2e8f0); border-radius: 6px;
+  overflow-x: auto; white-space: pre-wrap; word-break: break-word;
 }
 
 /* ─── Responsive: tablet ─── */

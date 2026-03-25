@@ -305,6 +305,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   const currentReport = testExec.testReportRef.current;
                   const testContext = {
                     errors: testResult.errors,
+                    trace: testResult.trace || [],
                     dependencyResults: (currentReport?.components || [])
                       .filter(c => c.componentId !== comp.id && c.status === 'passed')
                       .map(c => ({ componentId: c.componentId, status: c.status })),
