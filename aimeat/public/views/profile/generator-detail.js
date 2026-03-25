@@ -25,7 +25,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
 import {
-  saveComponent, registerComponent, reregisterComponent, writeProjectLog,
+  saveComponent, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
 import { buildComponentPrompt, buildFixPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
@@ -315,8 +315,9 @@ export function ComponentDetail({ component, project, components, projectId, int
         project.description, project.blueprint, completedComps,
         interviewSpec,
       );
+      writeDebugArtifact(projectId, component.id, 'prompt', fresh);
       let content = await runWithAi(projectId, fresh);
-      // Strip codeblock wrappers for extensions (AI models often wrap in ```)
+      writeDebugArtifact(projectId, component.id, 'ai-raw-response', content);
       content = stripCodeblock(content);
       setResult(content);
 

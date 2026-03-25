@@ -543,6 +543,9 @@ IMPORTANT:
 - Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`my-domain-lib\\\` → \\\`AIMEAT.myDomainLib.init()\\\`)
 - Use the cortex methods for ALL data access — never call extensions or memory directly
 - The cortex handles authentication, error handling, and data transformation
+- NEVER call cortex internal functions like callExt(), readExtMemory(), writeOwnerMemory() — these are PRIVATE
+- NEVER build retry loops — if an API call returns null or fails, show an error message to the user. Do NOT call the same function again automatically.
+- If cortex doesn't have a method you need (e.g., checkWatchlist), show a message that the feature requires the cortex to be updated — do NOT bypass cortex and call extensions directly
 
 ### UI CORTEX RULES (if aimeat-ui-* libraries are loaded):
 - NEVER use native alert(), confirm(), or prompt() — use AIMEAT.ui.dialogs.Confirm(), AIMEAT.ui.dialogs.toast(), AIMEAT.ui.dialogs.Modal() instead
@@ -1067,33 +1070,31 @@ const userSettings = await readOwnerMemory('settings.config');
 const settings = { ...defaults, ...(userSettings || {}) };
 \\\`\\\`\\\`
 
-## Extension Action Calls (authenticated)
+## Extension Action Calls (authenticated — internal helper, NOT exported)
 
-Use callExt() for TWO purposes:
-1. **On-demand user actions** (search, refresh, manual trigger)
-2. **Writing shared data** — extension actions run server-side and CAN write to ext: namespace
+callExt() is an INTERNAL helper inside the cortex IIFE. It is NOT part of the public API.
+Apps MUST NOT call callExt() directly — use the cortex's exported methods instead.
 
 \\\`\\\`\\\`javascript
-// method MUST match the extension action's declared method (GET or POST)
-async function callExt(extName, actionId, body, method = 'POST') {
-  const session = AIMEAT.auth && AIMEAT.auth.getSession();
-  if (!session) throw new Error('Not logged in');
-  const opts = { method };
-  if (method === 'POST' || method === 'PUT') {
-    opts.body = JSON.stringify(body || {});
+// ALL extension actions are POST — the backend only has router.post() routes
+async function callExt(extName, actionId, body) {
+  try {
+    if (!AIMEAT.auth || !AIMEAT.auth.getSession) return null;
+    var session = AIMEAT.auth.getSession();
+    if (!session) return null;
+    var url = '/v1/ext/' + extName + '/' + actionId;
+    var opts = { method: 'POST', body: JSON.stringify(body || {}) };
+    var resp = await session.fetch(url, opts);
+    if (!resp || !resp.ok) return null;
+    return resp.data;
+  } catch (e) {
+    return null;
   }
-  const url = method === 'GET' && body && Object.keys(body).length > 0
-    ? '/v1/ext/' + extName + '/' + actionId + '?' + new URLSearchParams(body).toString()
-    : '/v1/ext/' + extName + '/' + actionId;
-  const resp = await session.fetch(url, opts);
-  if (!resp.ok) throw new Error((resp.error && resp.error.message) || 'Extension call failed');
-  return resp.data;
 }
 \\\`\\\`\\\`
 
-CRITICAL: Check the extension manifest above — each action declares its HTTP method.
-Use \`callExt(EXT.name, 'actionId', {input}, 'GET')\` for GET actions and
-\`callExt(EXT.name, 'actionId', {input})\` for POST actions. Using the WRONG method will fail.
+IMPORTANT: callExt is a PRIVATE helper inside the IIFE. Do NOT export it.
+Apps use the cortex's public methods (init, searchCompanies, etc.), never callExt directly.
 
 ### Where to store different types of data
 
