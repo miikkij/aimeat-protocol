@@ -34,12 +34,12 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
   ctx.memory.getPublic(namespace, key) → value or null (read data from a DIFFERENT namespace)
     Use this to read: (a) another extension's public data, (b) the OWNER's shared data (memory components, translations, settings).
     Example — read another extension's data: await ctx.memory.getPublic('ext:other-ext', 'some.key')
-    Example — read owner's shared data: await ctx.memory.getPublic(ctx.caller.owner, 'lookup.data')
+    Example — read owner's shared data: await ctx.memory.getPublic(ctx.caller.gaii, 'lookup.data')
     ╔═══════════════════════════════════════════════════════════════════════════════╗
     ║  IMPORTANT: ctx.memory.get() ONLY reads from the extension's OWN namespace. ║
     ║  Data stored by memory components (seed data, settings, translations) lives  ║
-    ║  in the OWNER's namespace — use ctx.memory.getPublic(ctx.caller.owner, key)  ║
-    ║  to access it. ctx.caller.owner is automatically set to the installing user. ║
+    ║  in the OWNER's namespace — use ctx.memory.getPublic(ctx.caller.gaii, key)  ║
+    ║  to access it. ctx.caller.gaii is the caller's GHII identity (e.g. "testuser@node-id"). ║
     ╚═══════════════════════════════════════════════════════════════════════════════╝
   ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
     Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
@@ -335,9 +335,9 @@ export default async function(ctx, input) {
 
   // ── Reading OWNER'S SHARED DATA (memory components, settings, translations) ──
   // Data stored by memory-1, memory-2 etc. lives in the OWNER's namespace, NOT the extension's.
-  // Use getPublic(ctx.caller.owner, key) to read it:
-  const lookup = await ctx.memory.getPublic(ctx.caller.owner, "lookup.data") || [];
-  const settings = await ctx.memory.getPublic(ctx.caller.owner, "settings.config") || {};
+  // Use getPublic(ctx.caller.gaii, key) to read it:
+  const lookup = await ctx.memory.getPublic(ctx.caller.gaii, "lookup.data") || [];
+  const settings = await ctx.memory.getPublic(ctx.caller.gaii, "settings.config") || {};
 
   // ── Writing to EXTENSION'S OWN MEMORY ──
   await ctx.memory.set("results.today", { items: data.results, fetchedAt: new Date().toISOString() });
@@ -444,8 +444,8 @@ for (const key of SHARED_KEYS) {
     // Try service-prefixed key first, then plain key
     const extName = ctx.config?.name || '';
     const prefixed = extName ? extName + '.' + key : key;
-    const ownerData = await ctx.memory.getPublic(ctx.caller.owner, prefixed)
-                   || await ctx.memory.getPublic(ctx.caller.owner, key);
+    const ownerData = await ctx.memory.getPublic(ctx.caller.gaii, prefixed)
+                   || await ctx.memory.getPublic(ctx.caller.gaii, key);
     if (ownerData) {
       await ctx.memory.set(key, ownerData);
       ctx.log.info('Copied shared data to extension namespace', { key });
@@ -472,9 +472,9 @@ everyone via \`getPublic('ext:{name}', key)\`.
 - Always check for undefined/null before using memory values — on first run, NOTHING exists yet
 - Always convert dates to ISO 8601 before storing in memory
 - ╔═ OWNER DATA: seed data (memory components), settings, and translations are in the OWNER's namespace ═╗
-  Use \`ctx.memory.getPublic(ctx.caller.owner, key)\` to read them — NOT \`ctx.memory.get(key)\`.
+  Use \`ctx.memory.getPublic(ctx.caller.gaii, key)\` to read them — NOT \`ctx.memory.get(key)\`.
   \`ctx.memory.get()\` only reads from the extension's own \`ext:{name}\` namespace.
-  Common pattern: \`const data = await ctx.memory.getPublic(ctx.caller.owner, "lookup.data") || [];\`
+  Common pattern: \`const data = await ctx.memory.getPublic(ctx.caller.gaii, "lookup.data") || [];\`
 ${HTML_ENTITY_RULES}`,
 
   app: (label, context, completedComponents) => {
@@ -1633,7 +1633,7 @@ AIMEAT has TWO types of memory namespaces — understanding this is CRITICAL:
    - Memory components (seed data, lookup tables) store here
    - Translation components store here (i18n.fi, i18n.en)
    - Settings components store here (settings.config)
-   - Accessible via: ctx.memory.getPublic(ctx.caller.owner, key) [from extension]
+   - Accessible via: ctx.memory.getPublic(ctx.caller.gaii, key) [from extension]
    - Accessible via: /v1/memory/{key} [from HTTP with owner's JWT]
 
 2. **Extension namespace** (\`ext:{name}\`) — where extension runtime data lives
@@ -1645,7 +1645,7 @@ AIMEAT has TWO types of memory namespaces — understanding this is CRITICAL:
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  Extension ctx.memory.get(key) ONLY reads from ext:{name} namespace.  ║
 ║  Seed data (memory components), settings, translations live in the     ║
-║  OWNER's namespace — use ctx.memory.getPublic(ctx.caller.owner, key). ║
+║  OWNER's namespace — use ctx.memory.getPublic(ctx.caller.gaii, key). ║
 ║                                                                        ║
 ║  From OUTSIDE (cortex, app, tests):                                    ║
 ║  - Read extension data: getPublic('ext:{name}', key) or readExtMemory ║
