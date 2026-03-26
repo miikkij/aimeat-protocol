@@ -103,14 +103,30 @@ All of these are available to both cortex libraries and apps. A cortex can use A
 
 ### Phase 4: CAPABILITY
 
-#### 4a. Extension
+#### 4a. Extension Test (generated FIRST, before extension code — test-first pattern)
+**Requires from blueprint:** `actions` section with input/output $ref, `structures`
+**Requires from interview:** `dataSources[].sampleEntry` (expected data shapes), test company/entity
+**Produces:** Test code that defines what the extension must do — acts as a specification
+**Why first:** The test is generated from the contract (blueprint), not from the implementation. This breaks the tautology — the test defines success before any code exists. The test also serves as source material for the extension generation prompt.
+
+#### 4b. Extension
 **Requires from blueprint:** `actions` section (ext:* entries with input/output $ref), `structures`, `memoryKeys` it produces, `schedules`
 **Requires from interview:** `dataSources[]` (URLs, response envelopes, sample entries)
 **Requires from MSM:** API contract (if paired)
 **Requires from previous:** Registered CSM name, registered memory key names
+**Requires from test:** The pre-generated test code (extension must pass this)
 **Produces:** Registered and activated extension with all actions working
-**Success:** Validation passes → contract verification passes (all blueprint action IDs exist in manifest) → registered → activated → @activate init runs → **mandatory probe all actions** → golden samples captured
-**Tests:** Server-side tests generated from blueprint `actions` definitions + golden samples. Tests verify action return shapes match structures.
+**Success flow:**
+1. Validation passes (syntax/structure)
+2. Contract verification passes (all blueprint action IDs exist in manifest)
+3. **Explain step:** AI explains what the extension does, what it exports, what shapes it returns — compared against blueprint before proceeding
+4. Registered
+5. **Smoke test:** Can it activate without crashing? (5-second check)
+6. Activated → @activate init runs
+7. **Mandatory probe all actions** → golden samples captured
+8. **Probe reconciliation:** Compare golden samples against interview `sampleEntry` — if shapes differ (API changed, stale sample), warn user and update structures
+9. Run pre-generated test against the live extension
+**Tests:** Server-side tests generated BEFORE the extension code, from blueprint `actions` definitions + structures. Zero implementation code in test prompt.
 
 ### Phase 5: CORTEX (layered — must be in order)
 
@@ -119,8 +135,14 @@ All of these are available to both cortex libraries and apps. A cortex can use A
 **Requires from extension:** `registeredAs` name, probe golden samples (actual return data)
 **Requires from node:** Available AIMEAT platform libraries (data, storage, social, wallet)
 **Produces:** Registered cortex library exporting data access methods
-**Success:** Validation passes → contract verification (all declared methods exist in exports) → registered → **mandatory probe** (load in browser, call each method, capture actual returns)
-**Tests:** Browser tests verifying each method returns data matching structures. Integration test: data cortex calls extension action → response shape matches.
+**Success flow:**
+1. Validation passes
+2. Contract verification (all declared methods exist in exports)
+3. **Explain step:** AI explains what methods it exports and what they return — compared against blueprint
+4. Registered
+5. **Smoke test:** Can it load in a browser script tag without JS errors?
+6. **Mandatory probe** (load in browser, call each method, capture actual returns)
+**Tests:** Browser tests from blueprint actions. Zero implementation code in test prompt. Integration test: data cortex calls extension action → response shape matches structure.
 
 #### 5b. Feature Cortex (one per use case group)
 **Requires from interview:** The specific `useCases[]` entry + matching `views[]` entry (type, interactions, description)
@@ -129,15 +151,27 @@ All of these are available to both cortex libraries and apps. A cortex can use A
 **Requires from translations:** Registered translation keys relevant to this feature
 **Requires from node:** Platform UI cortex library APIs with working code examples
 **Produces:** Registered cortex library exporting `render(container)` function
-**Success:** Validation passes → contract verification → registered → **mandatory probe** (load in browser, call render(container), verify DOM elements created)
-**Tests:** Browser tests verifying render() creates expected DOM, data displays correctly, interactions work.
+**Success flow:**
+1. Validation passes
+2. Contract verification (render function exists, declared methods exist)
+3. **Explain step**
+4. Registered
+5. **Smoke test:** Can it load without JS errors?
+6. **Mandatory probe** (load in browser, call render(container), verify DOM elements created)
+**Tests:** Browser tests from use case description. Zero implementation code in test prompt.
 
 #### 5c. App-Domain Cortex
 **Requires from feature cortex:** All registered feature cortex probe results (method names, render functions)
 **Requires from blueprint:** App component's `consumes[]`
 **Requires from node:** AIMEAT.auth pattern, other installed cortex libraries
 **Produces:** Registered cortex library composing all features + auth + i18n
-**Success:** Validation passes → contract verification → registered → **mandatory probe** (verify init works, all feature renders accessible, translations load)
+**Success flow:**
+1. Validation passes
+2. Contract verification
+3. **Explain step**
+4. Registered
+5. **Smoke test**
+6. **Mandatory probe** (verify init works, all feature renders accessible, translations load)
 **Tests:** Browser tests verifying composition: auth initializes, translations load, each feature render() is callable.
 
 ### Phase 6: APP
@@ -147,7 +181,11 @@ All of these are available to both cortex libraries and apps. A cortex can use A
 **Requires from app-domain cortex:** Probe results (actual API surface)
 **Requires from translations:** App-level keys only (tab names, page titles)
 **Produces:** Registered HTML app
-**Success:** Validation passes → registered → **browser test** (navigate all views, complete all use cases, verify translations, verify responsive, verify no JS errors)
+**Success flow:**
+1. Validation passes
+2. Registered
+3. **Smoke test:** Does it load without JS errors?
+4. **Browser test** (navigate all views, complete all use cases, verify translations, verify responsive, verify no JS errors)
 **Tests:** Browser user journey test covering every use case from the interview.
 
 ---
@@ -580,6 +618,17 @@ What the user does from clicking "+ New Project" to having a working, tested app
 8. Back in the generator, paste it into the **"Step 2: Paste the JSON Specification"** textarea
 9. Click **"Import Specification"**
 
+### 9.2b Spec Quality Gate (automated, no AI needed)
+
+After importing the specification, the generator automatically checks:
+- Does every data source have a verified URL?
+- Does every data source have a `sampleEntry` with actual data?
+- Are there at least 2 use cases defined?
+- Do views reference data entities that exist in the data model?
+- Is a locale set?
+
+If any check fails, the generator shows what's missing and asks the user to fix the interview spec before proceeding to blueprint.
+
 ### 9.3 Blueprint
 
 1. The generator shows the **blueprint prompt** and a **"Copy Prompt"** button
@@ -679,16 +728,28 @@ Prioritized list of changes needed to make the generator work. Only items we can
   Files: `generator-prompts-build.js`, `generator-validate.js`
 
 - [ ] **10.3 Platform UI component working examples**
-  Read the source code of each aimeat-ui-* cortex library. Extract one complete working example per component (container creation, parameter shape, rendering, cleanup). Add these examples to the feature cortex prompt and app prompt.
-  Files: `generator-prompts-base.js` (cortex template, app template)
+  Read the source code of each aimeat-ui-* cortex library. Extract one complete working example per component (container creation, parameter shape, rendering, cleanup). Add these examples to the feature cortex prompt.
+  Files: new `prompts-cortex-feature.js` or `generator-prompts-base.js`
 
 - [ ] **10.4 Component prompts: inject $ref structures**
   Each component prompt should receive the relevant structures from the blueprint, not just raw JSON Schema. Extension prompt gets structures it produces. Cortex prompt gets structures it consumes and returns. App prompt gets structures it renders.
   Files: `generator-prompts-build.js`
 
+- [ ] **10.5 Structured context bundles between steps** *(moved from P3)*
+  After each successful registration + probe, create a structured summary:
+  ```
+  { name, type, registeredAs, exports: [...], probeResults: [...], memoryKeysWritten: [...] }
+  ```
+  Store in component state. Feed this bundle (not raw source code) into downstream prompts. This is the Lovable "context bundle" pattern — without it, downstream prompts reconstruct context from raw source code, which is the #1 cause of the planner-coder gap.
+  Files: `generator-prompts-build.js`, `generator-detail.js`
+
+- [ ] **10.6 Mandatory reflection before fix attempts** *(moved from P3)*
+  When a component fails validation or testing, always run `buildReflectionPrompt()` first to get an explanation of what went wrong. Feed the reflection into the fix prompt. Research (LeDex) showed explain-then-fix improves repair quality by 15%+.
+  Files: `generator-detail.js`
+
 ### Priority 2 — Prevents most integration failures
 
-- [ ] **10.5 Contract verification after generation (Verify phase)**
+- [ ] **10.7 Contract verification after generation (Verify phase)**
   After validation but before registration: machine-compare the generated output against the blueprint contract.
   - Extension: parse YAML manifest, confirm all declared action IDs exist in JS files
   - Cortex: parse JS exports object, confirm all methods from blueprint `produces` exist
@@ -696,7 +757,7 @@ Prioritized list of changes needed to make the generator work. Only items we can
   Add as a step in the validator or as a new post-validation check.
   Files: `generator-validate.js`
 
-- [ ] **10.6 Mandatory probes at every layer**
+- [ ] **10.8 Mandatory probes at every layer**
   After registration of extension AND each cortex: execute the component and capture real outputs.
   - Extension: probe each action with test inputs, capture golden samples (already exists, make mandatory)
   - Data cortex: load in browser test page, call each exported method, capture return values
@@ -704,39 +765,46 @@ Prioritized list of changes needed to make the generator work. Only items we can
   Package probe results as structured context bundle for the next component's prompt.
   Files: `generator-detail.js`, `generator-testing.js`, `generator-prompts-build.js`
 
-- [ ] **10.7 Smoke test before full testing**
-  After registration, before running the full test suite: can the component load without errors? Does it export what the blueprint says? Quick check that catches 80% of failures in seconds.
+- [ ] **10.9 Smoke test before full testing**
+  After registration, before probe: can the component load without errors? Does it export what the blueprint says? 5-second check that catches 80% of failures.
   Files: `generator-testing.js` or new `generator-smoke.js`
 
-- [ ] **10.8 Tests from blueprint contract, not from implementation**
-  Update `buildTestPrompt()` to generate tests from: blueprint data model (structures + actions) + interview use cases + probe golden samples. Remove or reduce the injection of the component's own source code into the test prompt. The test designer should verify the contract, not transcribe the implementation.
+- [ ] **10.10 Tests from blueprint contract, not from implementation (zero implementation code)**
+  Update `buildTestPrompt()` to generate tests from: blueprint structures + actions + interview use cases + probe golden samples. **Hard rule: zero implementation code in test prompts.** The test designer sees only the contract and the golden samples. This breaks the tautology.
   Files: `generator-prompts-test.js`
+
+- [ ] **10.11 Test-first for extensions**
+  Generate extension test from blueprint BEFORE generating extension code. The test defines what the extension must do — it acts as a specification. The extension prompt then includes the pre-written test as a requirement the extension must pass. Research (TGen): +8-12% improvement.
+  Files: `generator-prompts-test.js`, `generator-prompts-build.js`, `generator-detail.js`
+
+- [ ] **10.12 Spec quality gate**
+  After interview import, before blueprint: automated checks (no AI needed). Does every data source have a verified URL? A sampleEntry? Are there use cases? Do views reference existing entities? Reject specs that don't meet minimum quality.
+  Files: `generator-detail.js` or `generator-validate.js`
+
+- [ ] **10.13 Probe reconciliation (live data vs sampleEntry)**
+  After extension probe: compare golden sample data shapes against interview `sampleEntry`. If they differ (API changed, stale sample, rate limited), warn the user and offer to update structures. Prevents silent contract violations from flowing downstream.
+  Files: `generator-detail.js`, `generator-testing.js`
+
+- [ ] **10.14 Explain step after generation**
+  After generation, before validation: ask the AI to explain what the component does, what it exports, what shapes it returns. Compare explanation against blueprint contract. If they diverge, regenerate before even trying to validate. Catches semantic drift early. Different from reflection (which is after failure).
+  Files: `generator-detail.js`, new prompt builder function
 
 ### Priority 3 — Improves quality
 
-- [ ] **10.9 Mandatory reflection before fix attempts**
-  When a component fails validation or testing, always run `buildReflectionPrompt()` first to get an explanation of what went wrong. Feed the reflection into the fix prompt. Currently exists but is optional/underused.
-  Files: `generator-detail.js`
-
-- [ ] **10.10 Structured context bundles between steps**
-  After each successful registration + probe, create a structured summary:
-  ```
-  { name, type, registeredAs, exports: [...], probeResults: [...], memoryKeysWritten: [...] }
-  ```
-  Store in component state. Feed this bundle (not raw source code) into downstream prompts. More reliable than parsing exports from source.
-  Files: `generator-prompts-build.js`, `generator-detail.js`
-
-- [ ] **10.11 Prompt modularization**
-  Split `generator-prompts-base.js` into per-component-type files: `prompts-extension.js`, `prompts-cortex.js`, `prompts-app.js`, `prompts-translation.js`, etc. The current file is too large to maintain.
+- [ ] **10.15 Prompt modularization**
+  Split `generator-prompts-base.js` into per-component-type files: `prompts-extension.js`, `prompts-cortex-data.js`, `prompts-cortex-feature.js`, `prompts-cortex-app.js`, `prompts-app.js`, `prompts-translation.js`, etc. The current file is too large to maintain.
   Files: `generator-prompts-base.js` → multiple smaller files
 
-- [ ] **10.12 Integration tests between layers**
+- [ ] **10.16 Integration tests between layers**
   Add a new test type that tests component boundaries:
   - Data cortex calls extension action → verify response matches structure
   - Feature cortex calls data cortex method → verify data shape
   - App-domain cortex composes feature cortex → verify API surface
   Generate from blueprint's produces/consumes graph.
   Files: `generator-prompts-test.js`, `generator-testing.js`
+
+- [ ] **10.17 Prompt size budgets**
+  Set explicit token targets per prompt type: Interview ~2K, Blueprint ~4K, CSM/MSM/Memory ~2K, Translation ~3K, Extension ~8K, Data cortex ~6K, Feature cortex ~10K, App-domain cortex ~6K, App ~8K. When context exceeds budget, cut reference material first, keep goal and structures.
 
 ---
 
