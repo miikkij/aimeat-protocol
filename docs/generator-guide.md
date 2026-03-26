@@ -263,69 +263,92 @@ After all components are registered, the app is tested in a browser:
 
 ---
 
-## 6. What Each Prompt Needs
+## 6. What Each Prompt Needs (and Where It Comes From)
 
 ### CSM Prompt
-- Project description
-- Data model fields (raw source data only)
-- Locale
+| Need | Source |
+|------|--------|
+| Project description | Interview spec → `description` |
+| Data model fields (raw source data only) | Blueprint → `dataModel` (entries with `source: "external"` or `source: "static"`) |
+| Locale | Interview spec → `locale` |
 
 ### MSM Prompt
-- External service name, URL, auth type
-- Endpoints with methods
-- Response formats
+| Need | Source |
+|------|--------|
+| External service name, URL | Interview spec → `dataSources[]` (verified URLs) |
+| Auth type and credentials | Interview spec → `externalServices[]` |
+| Endpoints with methods | Interview spec → `dataSources[].sampleEntry`, `responseEnvelope` |
+| Response formats | Interview spec → `dataSources[].format`, `encoding` |
 
 ### Memory Prompt
-- Data model keys this component produces
-- Default values
-- Locale
+| Need | Source |
+|------|--------|
+| Data model keys this component produces | Blueprint → `dataModel` (entries where `producedBy` matches this component) |
+| Default values | Interview spec → `userSettings[]` with defaults |
+| Locale | Interview spec → `locale` |
 
 ### Translation Prompt
-- All use cases (to know what text is needed)
-- All views (tab names, headers, buttons)
-- Data model field names
-- Common UI patterns
-- Locale
-- (EN must match FI keys exactly)
+| Need | Source |
+|------|--------|
+| All use cases | Interview spec → `useCases[]` |
+| All views (tab names, headers, buttons) | Interview spec → `views[]` |
+| Data model field names | Blueprint → `dataModel` property names |
+| Common UI patterns | Built-in template (loading, error, empty states, buttons) |
+| Locale | Interview spec → `locale` / component label indicates which locale |
+| EN must match FI keys exactly | FI translation component result (when generating EN) |
 
 ### Extension Prompt
-- Data source URLs, response envelopes, sample entries
-- Data model keys to write and their shapes
-- Schedules
-- Config keys
-- V8 sandbox rules and ctx API
-- Action IDs from blueprint
+| Need | Source |
+|------|--------|
+| Data source URLs, response envelopes, sample entries | Interview spec → `dataSources[]` |
+| Data model keys to write and their shapes | Blueprint → `dataModel` (entries where `producedBy` matches this component) |
+| Schedules | Blueprint → component's `schedules[]` |
+| Config keys | Blueprint → `settings.user[]` and `settings.service[]` |
+| V8 sandbox rules and ctx API | Built-in template (static reference material) |
+| Action IDs | Blueprint → component's `produces[]` and test scenarios |
+| MSM contract (if paired) | Registered MSM component result (API endpoints, auth) |
+| Already completed components | Previous components' `registeredAs` names |
 
 ### Data Cortex Prompt
-- Extension name (registeredAs)
-- Extension actions and their inputs/outputs
-- Extension memory keys and data shapes
-- AIMEAT platform libraries available (data, storage, social, etc.)
-- Which data methods to export
+| Need | Source |
+|------|--------|
+| Extension name (registeredAs) | Extension component's registration result |
+| Extension actions and inputs/outputs | Extension component result (parsed from YAML manifest) |
+| Extension memory keys and data shapes | Blueprint → `dataModel` + extension probe results (golden samples) |
+| AIMEAT platform libraries available | Node → `GET /v1/libs/` (always available) |
+| Which data methods to export | Blueprint → cortex component's `produces[]` |
 
 ### Feature Cortex Prompt (per use case)
-- Use case description (what the user wants to do)
-- Data cortex API (methods available for data access)
-- Platform UI cortex libraries available and their APIs
-- AIMEAT platform libraries available
-- Other installed cortex libraries
-- Translation keys relevant to this feature
-- What to render and how (from interview views)
+| Need | Source |
+|------|--------|
+| Use case description | Interview spec → `useCases[]` (the specific use case this feature implements) |
+| Data cortex API | Data cortex component result (parsed exports) |
+| Platform UI cortex libraries and their APIs | Node → `GET /v1/cortex?status=active` + blueprint `uses` field |
+| AIMEAT platform libraries available | Node → `GET /v1/libs/` |
+| Other installed cortex libraries | Node → `GET /v1/cortex?status=active` |
+| Translation keys relevant to this feature | Registered translation component results (extracted keys) |
+| What to render and how | Interview spec → `views[]` (the view matching this use case) |
 
 ### App-Domain Cortex Prompt
-- All feature cortex components and their APIs
-- Auth initialization pattern
-- Translation loading pattern
-- Settings management
-- What to compose into the final API
+| Need | Source |
+|------|--------|
+| All feature cortex components and their APIs | Previously registered feature cortex component results (parsed exports) |
+| Auth initialization pattern | Built-in template (AIMEAT.auth standard pattern) |
+| Translation loading pattern | Built-in template (readExtMemory for i18n) |
+| Settings management | Blueprint → `settings` + data cortex methods |
+| What to compose into the final API | Blueprint → app component's `consumes[]` |
 
 ### App Prompt
-- Use cases (what the user wants to do — drives navigation and views)
-- App-domain cortex API (method names and return shapes)
-- Platform UI cortex libraries (for layout, if cortex doesn't handle all rendering)
-- Style preferences (mood, layout, responsive requirements)
-- Mobile + desktop requirements
-- Test data (known company for verification)
+| Need | Source |
+|------|--------|
+| Use cases | Interview spec → `useCases[]` |
+| Views with layout and interactions | Interview spec → `views[]` |
+| Style preferences | Interview spec → `style` (mood, layout, typography) |
+| App-domain cortex API | App-domain cortex component result (parsed exports with @returns shapes) |
+| Platform UI cortex libraries | Node → active cortex list + blueprint `uses` |
+| Translation keys (app-level only) | Registered translation component results |
+| Mobile + desktop requirements | Interview spec → `style.displayContext` |
+| Test data | Interview spec → `dataSources[].sampleEntry` (known test entity) |
 
 ---
 
