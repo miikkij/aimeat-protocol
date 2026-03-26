@@ -280,6 +280,9 @@ export interface AimeatConfig {
   // Service Generator
   generatorEnabled: boolean;
 
+  // Foundry (prompt-driven service builder)
+  foundryEnabled: boolean;
+
   // Cortex Extensions (Manifest-based)
   cortexEnabled: boolean;
   cortexMaxInstalled: number;
@@ -577,6 +580,11 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Service Generator
     generatorEnabled: process.env.AIMEAT_GENERATOR_ENABLED !== 'false',
+
+    // Foundry (prompt-driven service builder)
+    foundryEnabled: process.env.AIMEAT_FOUNDRY_ENABLED
+      ? process.env.AIMEAT_FOUNDRY_ENABLED !== 'false'
+      : (process.env.AIMEAT_GENERATOR_ENABLED !== 'false'),
 
     // Cortex Extensions (Manifest-based)
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',
