@@ -647,6 +647,135 @@ Prioritized list of changes needed to make the generator work. Only items we can
 
 ---
 
+## 10b. Prompt Change List — Current → New (per component type)
+
+Specific changes to each prompt compared to what exists today.
+
+### Blueprint Prompt (`buildBlueprintPrompt` in `generator-prompts-build.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Data model format | Flat `dataModel` with memory keys only | Three-part: `structures` (reusable types), `memoryKeys` ($ref to structures), `actions` (input/output with $ref) |
+| Cortex components | Single `cortex-1` component | Three types: `cortex-data`, `cortex-feature-*`, `cortex-app` with sub-ordering |
+| Action return shapes | Only `produces: ["api:methodName"]` — name only | `actions` section with input/output shapes referencing structures |
+| Structure source | JSON Schema from field descriptions | Built from interview `sampleEntry` — real API response shapes |
+| Available platform libs | Cortex libs listed with exports | Add core platform libs (aimeat-data, aimeat-storage, etc.) to available capabilities |
+
+### CSM Prompt (`COMPONENT_TEMPLATES.csm` in `generator-prompts-base.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Data model | Raw JSON Schema from blueprint | Structures from blueprint `structures` section (only raw source data fields) |
+| No other changes | — | CSM prompt is simple and works well |
+
+### MSM Prompt (`COMPONENT_TEMPLATES.msm` in `generator-prompts-base.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Data source info | From interview `dataSources[]` | Same, plus link to extension that will consume this MSM |
+| No major changes | — | MSM prompt is straightforward |
+
+### Memory Prompt (`COMPONENT_TEMPLATES.memory` in `generator-prompts-base.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Data model | Raw JSON Schema | Structures from blueprint via $ref |
+| No major changes | — | Memory prompt works well |
+
+### Translation Prompt (`COMPONENT_TEMPLATES.translation` in `generator-prompts-base.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Use cases | Not included | ADD: interview `useCases[]` — so AI knows what UI text is needed |
+| Views | Not included | ADD: interview `views[]` — tab names, section headers, buttons |
+| EN key matching | Instruction only ("must match FI") | ADD: when generating EN, include actual FI key list from registered FI component |
+| No other changes | — | — |
+
+### Extension Prompt (`COMPONENT_TEMPLATES.extension` in `generator-prompts-base.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Data model | Raw JSON Schema from blueprint | Structures via $ref — extension sees the exact types it must produce |
+| Action definitions | Action IDs from blueprint produces | Action definitions from blueprint `actions` section with input/output $ref shapes |
+| MSM reference | Not linked | ADD: if paired with MSM, include the registered MSM's API contract |
+| ctx.caller | Fixed: uses `ctx.caller.gaii` | Same (already fixed this session) |
+| Return values | Not specified — AI decides | ENFORCE: action return shapes from blueprint `actions` section |
+
+### Data Cortex Prompt (NEW — does not exist yet)
+
+| Item | Source |
+|------|--------|
+| Extension name | Extension component `registeredAs` |
+| Extension actions with input/output | Blueprint `actions` section (ext:* entries with $ref) |
+| Extension probe golden samples | Mandatory probe results after extension registration |
+| AIMEAT platform libraries | Node `GET /v1/libs/` |
+| Structures it returns | Blueprint `structures` relevant to this cortex |
+| Methods to export | Blueprint cortex-data component `produces` |
+| Template | New template — pure data access, no UI, wraps extension + AIMEAT.data |
+
+### Feature Cortex Prompt (NEW — does not exist yet)
+
+| Item | Source |
+|------|--------|
+| Use case | Interview `useCases[]` — the specific one this feature implements |
+| View description | Interview `views[]` — matching view with type, interactions |
+| Data cortex API | Data cortex probe results — actual method names and return shapes |
+| Structures | Blueprint `structures` relevant to this feature |
+| Platform UI cortex libraries | Blueprint `uses` field + working code examples |
+| AIMEAT platform libraries | Node `GET /v1/libs/` |
+| Translation keys | Registered translation component — keys relevant to this feature |
+| Template | New template — data+UI module, exports render(container), like aimeat-charts |
+
+### App-Domain Cortex Prompt (NEW — does not exist yet)
+
+| Item | Source |
+|------|--------|
+| Feature cortex components | All registered feature cortex probe results — names, methods, render() functions |
+| Auth pattern | Built-in template (AIMEAT.auth) |
+| Translation loading | Built-in template |
+| Settings | Data cortex methods for settings |
+| Template | New template — composition layer, combines features + auth + i18n |
+
+### App Prompt (`COMPONENT_TEMPLATES.app` in `generator-prompts-base.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Use cases | Added this session but was missing | KEEP: interview `useCases[]` |
+| Views | Added this session but was missing | KEEP: interview `views[]` with interactions |
+| Style | Not injected | ADD: interview `style` (mood, layout, typography) |
+| Cortex API | Parsed from cortex source code | CHANGE: from app-domain cortex probe results (actual exports) |
+| Translation keys | Extracted from translation components | REDUCE: only app-level keys (navigation, page titles). Feature cortex handles its own translations |
+| Platform UI libraries | Full API signatures injected | REDUCE: app delegates UI component usage to feature cortex. App only needs layout (responsive, mobile/desktop) |
+| Nested object handling | displayValue() pattern added | REMOVE: app receives pre-processed data from cortex, not raw API objects |
+| Prompt size | ~30K chars | TARGET: ~8-10K chars — use cases + views + cortex API + style + responsive rules |
+
+### Test Prompts (`buildTestPrompt` in `generator-prompts-test.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Input | Component source code + blueprint + probe results | CHANGE: blueprint structures + actions + golden samples. Remove component source code from test context |
+| Extension test | Tests action return shapes | SAME but assertions come from blueprint `actions` output $ref, not from reading the code |
+| Cortex test | Tests method existence and return values | ADD: data cortex integration test (does it call extension correctly?) |
+| Feature cortex test | Not tested | ADD: render(container) produces expected DOM, uses correct translation keys |
+| App test | Browser user journey | SAME but driven by interview use cases list |
+
+### Fix Prompt (`buildFixPrompt` in `generator-prompts-fix.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Contract mismatches | Not included | ADD: when contract verification fails, include specific mismatches (expected vs actual) |
+| Structure $ref | Not included | ADD: show the expected structure definition alongside the error |
+| No other major changes | — | Fix prompt logic is solid |
+
+### Reflection Prompt (`buildReflectionPrompt` in `generator-prompts-fix.js`)
+
+| Change | Current | New |
+|--------|---------|-----|
+| Usage | Optional, only after test failure | CHANGE: mandatory before any fix attempt |
+| No other changes | — | Reflection prompt is well-designed |
+
+---
+
 ## 11. Failure Handling — What Happens When Things Go Wrong
 
 The happy path is: generate → validate → register → probe → test → next. But every step can fail. Here's what to do at each failure point.
